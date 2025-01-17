@@ -78,24 +78,24 @@ func TestTransactionSizing(t *testing.T) {
 	}
 
 	// ccipSend test messages + instruction ---------------------------------
-	sendNoTokens := ccip_router.Solana2AnyMessage{
+	sendNoTokens := ccip_router.SVM2AnyMessage{
 		Receiver:     make([]byte, 20), // EVM address
 		Data:         []byte{},
-		TokenAmounts: []ccip_router.SolanaTokenAmount{}, // no tokens
-		FeeToken:     [32]byte{},                        // solana fee token
-		ExtraArgs:    ccip_router.ExtraArgsInput{},      // default options
+		TokenAmounts: []ccip_router.SVMTokenAmount{}, // no tokens
+		FeeToken:     [32]byte{},                     // solana fee token
+		ExtraArgs:    ccip_router.ExtraArgsInput{},   // default options
 	}
-	sendSingleMinimalToken := ccip_router.Solana2AnyMessage{
+	sendSingleMinimalToken := ccip_router.SVM2AnyMessage{
 		Receiver: make([]byte, 20),
 		Data:     []byte{},
-		TokenAmounts: []ccip_router.SolanaTokenAmount{ccip_router.SolanaTokenAmount{
+		TokenAmounts: []ccip_router.SVMTokenAmount{ccip_router.SVMTokenAmount{
 			Token:  [32]byte{},
 			Amount: 0,
 		}}, // one token
 		FeeToken:  [32]byte{},
 		ExtraArgs: ccip_router.ExtraArgsInput{}, // default options
 	}
-	ixCcipSend := func(msg ccip_router.Solana2AnyMessage, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
+	ixCcipSend := func(msg ccip_router.SVM2AnyMessage, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewCcipSendInstruction(
 			1,
 			msg,
@@ -108,6 +108,7 @@ func TestTransactionSizing(t *testing.T) {
 			routerTable["billingTokenProgram"],
 			routerTable["billingTokenMint"],
 			routerTable["billingTokenConfig"],
+			mustRandomPubkey(), // link billing config
 			mustRandomPubkey(), // user billing token ATA
 			routerTable["routerBillingTokenATA"],
 			routerTable["routerBillingSigner"],
@@ -169,7 +170,7 @@ func TestTransactionSizing(t *testing.T) {
 	// ccip execute test messages + instruction -----------------------
 	executeEmpty := ccip_router.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
-		Message: ccip_router.Any2SolanaRampMessage{
+		Message: ccip_router.Any2SVMRampMessage{
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 0,
@@ -180,8 +181,8 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:       make([]byte, 20), // EVM sender
 			Data:         []byte{},
 			Receiver:     [32]byte{},
-			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{},
-			ExtraArgs: ccip_router.SolanaExtraArgs{
+			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{},
+			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
 				Accounts:         []solana.PublicKey{},
@@ -193,7 +194,7 @@ func TestTransactionSizing(t *testing.T) {
 	}
 	executeSingleToken := ccip_router.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
-		Message: ccip_router.Any2SolanaRampMessage{
+		Message: ccip_router.Any2SVMRampMessage{
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 0,
@@ -204,14 +205,14 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:   make([]byte, 20), // EVM sender
 			Data:     []byte{},
 			Receiver: [32]byte{},
-			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{{
+			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{{
 				SourcePoolAddress: make([]byte, 20), // EVM origin token pool
 				DestTokenAddress:  [32]byte{},
 				DestGasAmount:     0,
 				ExtraData:         []byte{},
 				Amount:            [32]uint8{},
 			}},
-			ExtraArgs: ccip_router.SolanaExtraArgs{
+			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
 				Accounts:         []solana.PublicKey{},

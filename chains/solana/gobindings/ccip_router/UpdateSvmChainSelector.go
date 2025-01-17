@@ -10,15 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Updates the Solana chain selector in the router configuration.
+// Updates the SVM chain selector in the router configuration.
 //
 // This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
 //
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for updating the configuration.
-// * `new_chain_selector` - The new chain selector for Solana.
-type UpdateSolanaChainSelector struct {
+// * `new_chain_selector` - The new chain selector for SVM.
+type UpdateSvmChainSelector struct {
 	NewChainSelector *uint64
 
 	// [0] = [WRITE] config
@@ -29,71 +29,71 @@ type UpdateSolanaChainSelector struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewUpdateSolanaChainSelectorInstructionBuilder creates a new `UpdateSolanaChainSelector` instruction builder.
-func NewUpdateSolanaChainSelectorInstructionBuilder() *UpdateSolanaChainSelector {
-	nd := &UpdateSolanaChainSelector{
+// NewUpdateSvmChainSelectorInstructionBuilder creates a new `UpdateSvmChainSelector` instruction builder.
+func NewUpdateSvmChainSelectorInstructionBuilder() *UpdateSvmChainSelector {
+	nd := &UpdateSvmChainSelector{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
 
 // SetNewChainSelector sets the "newChainSelector" parameter.
-func (inst *UpdateSolanaChainSelector) SetNewChainSelector(newChainSelector uint64) *UpdateSolanaChainSelector {
+func (inst *UpdateSvmChainSelector) SetNewChainSelector(newChainSelector uint64) *UpdateSvmChainSelector {
 	inst.NewChainSelector = &newChainSelector
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *UpdateSolanaChainSelector) SetConfigAccount(config ag_solanago.PublicKey) *UpdateSolanaChainSelector {
+func (inst *UpdateSvmChainSelector) SetConfigAccount(config ag_solanago.PublicKey) *UpdateSvmChainSelector {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *UpdateSolanaChainSelector) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateSvmChainSelector) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *UpdateSolanaChainSelector) SetAuthorityAccount(authority ag_solanago.PublicKey) *UpdateSolanaChainSelector {
+func (inst *UpdateSvmChainSelector) SetAuthorityAccount(authority ag_solanago.PublicKey) *UpdateSvmChainSelector {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *UpdateSolanaChainSelector) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateSvmChainSelector) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *UpdateSolanaChainSelector) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateSolanaChainSelector {
+func (inst *UpdateSvmChainSelector) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateSvmChainSelector {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *UpdateSolanaChainSelector) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *UpdateSvmChainSelector) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-func (inst UpdateSolanaChainSelector) Build() *Instruction {
+func (inst UpdateSvmChainSelector) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_UpdateSolanaChainSelector,
+		TypeID: Instruction_UpdateSvmChainSelector,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst UpdateSolanaChainSelector) ValidateAndBuild() (*Instruction, error) {
+func (inst UpdateSvmChainSelector) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *UpdateSolanaChainSelector) Validate() error {
+func (inst *UpdateSvmChainSelector) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.NewChainSelector == nil {
@@ -116,11 +116,11 @@ func (inst *UpdateSolanaChainSelector) Validate() error {
 	return nil
 }
 
-func (inst *UpdateSolanaChainSelector) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *UpdateSvmChainSelector) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("UpdateSolanaChainSelector")).
+			programBranch.Child(ag_format.Instruction("UpdateSvmChainSelector")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -139,7 +139,7 @@ func (inst *UpdateSolanaChainSelector) EncodeToTree(parent ag_treeout.Branches) 
 		})
 }
 
-func (obj UpdateSolanaChainSelector) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj UpdateSvmChainSelector) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `NewChainSelector` param:
 	err = encoder.Encode(obj.NewChainSelector)
 	if err != nil {
@@ -147,7 +147,7 @@ func (obj UpdateSolanaChainSelector) MarshalWithEncoder(encoder *ag_binary.Encod
 	}
 	return nil
 }
-func (obj *UpdateSolanaChainSelector) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *UpdateSvmChainSelector) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `NewChainSelector`:
 	err = decoder.Decode(&obj.NewChainSelector)
 	if err != nil {
@@ -156,15 +156,15 @@ func (obj *UpdateSolanaChainSelector) UnmarshalWithDecoder(decoder *ag_binary.De
 	return nil
 }
 
-// NewUpdateSolanaChainSelectorInstruction declares a new UpdateSolanaChainSelector instruction with the provided parameters and accounts.
-func NewUpdateSolanaChainSelectorInstruction(
+// NewUpdateSvmChainSelectorInstruction declares a new UpdateSvmChainSelector instruction with the provided parameters and accounts.
+func NewUpdateSvmChainSelectorInstruction(
 	// Parameters:
 	newChainSelector uint64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *UpdateSolanaChainSelector {
-	return NewUpdateSolanaChainSelectorInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *UpdateSvmChainSelector {
+	return NewUpdateSvmChainSelectorInstructionBuilder().
 		SetNewChainSelector(newChainSelector).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
