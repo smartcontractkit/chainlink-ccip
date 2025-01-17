@@ -1295,7 +1295,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 				"resp", resp)
 			if err != nil {
 				if errors.Is(err, contractreader.ErrNoBindings) {
-					// ErrNoBindings is an allowable error.
+					// ErrNoBindings is an allowable error during initialization
 					lggr.Infow(
 						"unable to lookup source fee quoters (onRamp dynamic config), "+
 							"this is expected during initialization", "err", err)
@@ -1360,7 +1360,7 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 			)
 			if err != nil {
 				if errors.Is(err, contractreader.ErrNoBindings) {
-					// ErrNoBindings is an allowable error.
+					// ErrNoBindings is an allowable error during initialization
 					r.lggr.Infow("unable to lookup source routers (onRamp dest chain config), "+
 						"this is expected during initialization", "chain", chainSel, "err", err)
 				} else {
