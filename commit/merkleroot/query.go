@@ -8,9 +8,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
+	lggr := logutil.WithContextValues(ctx, p.lggr)
+
 	if !p.offchainCfg.RMNEnabled {
 		return Query{}, nil
 	}
@@ -24,7 +27,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, fmt.Errorf("RMN report config is empty")
 	}
 
-	if err := p.prepareRMNController(ctx, prevOutcome); err != nil {
+	if err := p.prepareRMNController(ctx, lggr, prevOutcome); err != nil {
 		return Query{}, fmt.Errorf("initialize RMN controller: %w", err)
 	}
 

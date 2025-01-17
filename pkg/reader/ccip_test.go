@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -60,7 +62,12 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	) {
 		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
 		v := returnVal.(*sourceChainConfig)
-		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
+
+		fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
+			"0x%d000000000000000000000000000000000000000", sourceChain),
+		)
+		require.NoError(t, err)
+		v.OnRamp = cciptypes.UnknownAddress(fromString)
 		v.IsEnabled = true
 	}).Return(nil)
 
@@ -73,6 +80,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
 		}, nil, chainC, offrampAddress,
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
@@ -87,8 +95,8 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	cfgs, err := ccipReader.getOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})
 	assert.NoError(t, err)
 	assert.Len(t, cfgs, 2)
-	assert.Equal(t, []byte("onramp-1"), cfgs[chainA].OnRamp)
-	assert.Equal(t, []byte("onramp-2"), cfgs[chainB].OnRamp)
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", cfgs[chainA].OnRamp.String())
+	assert.Equal(t, "0x2000000000000000000000000000000000000000", cfgs[chainB].OnRamp.String())
 }
 
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
@@ -510,22 +518,42 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedContractAddresses, contractAddresses)
-	require.Equal(t, 3, hook.Len())
+	require.Equal(t, 7, hook.Len())
 
 	assert.Contains(
 		t,
-		"appending RMN remote contract address",
 		hook.All()[0].Message,
+		"appending router contract address",
 	)
 	assert.Contains(
 		t,
-		"unable to lookup source fee quoters, this is expected during initialization",
 		hook.All()[1].Message,
+		"appending RMN remote contract address",
 	)
 	assert.Contains(
 		t,
-		"unable to lookup source routers, this is expected during initialization",
 		hook.All()[2].Message,
+		"appending fee quoter contract address",
+	)
+	assert.Contains(
+		t,
+		hook.All()[3].Message,
+		"unable to lookup source fee quoters (onRamp dynamic config), this is expected during initialization",
+	)
+	assert.Contains(
+		t,
+		hook.All()[4].Message,
+		"unable to lookup source fee quoters (onRamp dynamic config), this is expected during initialization",
+	)
+	assert.Contains(
+		t,
+		"unable to lookup source routers (onRamp dest chain config), this is expected during initialization",
+		hook.All()[5].Message,
+	)
+	assert.Contains(
+		t,
+		"unable to lookup source routers (onRamp dest chain config), this is expected during initialization",
+		hook.All()[6].Message,
 	)
 }
 
@@ -773,6 +801,7 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
 		}, nil, chainC, offrampAddress,
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -820,6 +849,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
 		}, nil, chainC, offrampAddress,
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -852,6 +882,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	ctx := context.Background()
@@ -880,6 +911,7 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	ctx := context.Background()
@@ -929,6 +961,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 		nil,
 		chainC,
 		string(offrampAddress),
+		ccipocr3.NewMockExtraDataCodec(t),
 	}
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(

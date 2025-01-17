@@ -15,7 +15,7 @@ var (
 	// Note: This is an arbitrary value used only for localnet testing
 	// Value (0x4808e31713a26612) derived from keccak256("solana:localnet")
 	//
-	// Note: CCIP chain-selector uses genesis hash of each Solana network
+	// Note: CCIP chain-selector uses genesis hash of each SVM network
 	// (mainnet-beta, devnet, testnet) to determine their chain IDs.
 	// See: chain-selector specification
 	TestChainID             uint64 = 5190648258797659666
@@ -24,7 +24,7 @@ var (
 	}
 
 	// [0,0,0,...'t','e','s','t','-','m','c','m',]
-	TestMsigNamePaddedBuffer = [32]byte{
+	TestMsigID = [32]byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x74, 0x65, 0x73, 0x74, 0x2d, 0x6d, 0x63, 0x6d,
 	}
 	MaxNumSigners               = 180

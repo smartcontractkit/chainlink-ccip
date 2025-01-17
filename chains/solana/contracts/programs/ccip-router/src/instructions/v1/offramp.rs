@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
 use super::merkle::{calculate_merkle_root, MerkleError};
-use super::messages::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
+use super::messages::pools::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
 use super::ocr3base::{ocr3_transmit, ReportContext};
 use super::ocr3impl::{Ocr3ReportForCommit, Ocr3ReportForExecutionReportSingleChain};
 use super::pools::{
@@ -10,12 +10,15 @@ use super::pools::{
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::config::is_on_ramp_configured;
+use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
+use crate::v1::messages::ramps::is_writable;
 use crate::{
-    Any2SolanaMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
-    CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
+    Any2SVMMessage, Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput,
+    CommitReport, CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
     ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
-    MessageExecutionState, OcrPluginType, RampMessageHeader, SkippedAlreadyExecutedMessage,
-    SolanaAccountMeta, SolanaTokenAmount, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
+    MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
+    SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
     UsdPerTokenUpdated, UsdPerUnitGasUpdated, CCIP_RECEIVE_DISCRIMINATOR, DEST_CHAIN_STATE_SEED,
     EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
 };
@@ -28,8 +31,23 @@ pub fn commit<'info>(
 ) -> Result<()> {
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
 
-    // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
+    // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
+
+    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
+    let source_chain_state = &mut ctx.accounts.source_chain_state;
+
+    require!(
+        source_chain_state.config.is_enabled,
+        CcipRouterError::UnsupportedSourceChainSelector
+    );
+    require!(
+        is_on_ramp_configured(
+            &source_chain_state.config,
+            &report.merkle_root.on_ramp_address
+        ),
+        CcipRouterError::InvalidInputs
+    );
 
     // Check if the report contains price updates
     let empty_token_price_updates = report.price_updates.token_price_updates.is_empty();
@@ -110,14 +128,6 @@ pub fn commit<'info>(
         }
     }
 
-    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-    let source_chain_state = &mut ctx.accounts.source_chain_state;
-
-    require!(
-        source_chain_state.config.is_enabled,
-        CcipRouterError::UnsupportedSourceChainSelector
-    );
-
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
     // - Timestamp of the Commit Report
@@ -187,6 +197,7 @@ pub fn execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: ExecutionReportSingleChain,
     report_context_byte_words: [[u8; 32]; 3],
+    token_indexes: &[u8],
 ) -> Result<()> {
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
     // limit borrowing of ctx
@@ -203,12 +214,13 @@ pub fn execute<'info>(
         )?;
     }
 
-    internal_execute(ctx, execution_report)
+    internal_execute(ctx, execution_report, token_indexes)
 }
 
 pub fn manually_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: ExecutionReportSingleChain,
+    token_indexes: &[u8],
 ) -> Result<()> {
     // limit borrowing of ctx
     {
@@ -223,7 +235,7 @@ pub fn manually_execute<'info>(
             CcipRouterError::ManualExecutionNotAllowed
         );
     }
-    internal_execute(ctx, execution_report)
+    internal_execute(ctx, execution_report, token_indexes)
 }
 
 /////////////
@@ -332,16 +344,23 @@ fn update_chain_state_gas_price(
 fn internal_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: ExecutionReportSingleChain,
+    token_indexes: &[u8],
 ) -> Result<()> {
     // TODO: Limit send size data to 256
 
-    // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
+    // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
-    let solana_chain_selector = config.solana_chain_selector;
+    let svm_chain_selector = config.svm_chain_selector;
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain_state = &ctx.accounts.source_chain_state;
-    let on_ramp_address = &source_chain_state.config.on_ramp;
+    require!(
+        is_on_ramp_configured(
+            &source_chain_state.config,
+            &execution_report.message.on_ramp_address
+        ),
+        CcipRouterError::InvalidInputs
+    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
@@ -357,10 +376,10 @@ fn internal_execute<'info>(
         source_chain_state,
         commit_report,
         &message_header,
-        solana_chain_selector,
+        svm_chain_selector,
     )?;
 
-    let original_state = commit_report.get_state(message_header.sequence_number);
+    let original_state = execution_state::get(commit_report, message_header.sequence_number);
 
     if original_state == MessageExecutionState::Success {
         emit!(SkippedAlreadyExecutedMessage {
@@ -370,27 +389,23 @@ fn internal_execute<'info>(
         return Ok(());
     }
 
-    let hashed_leaf = verify_merkle_root(&execution_report, on_ramp_address)?;
+    let hashed_leaf = verify_merkle_root(&execution_report)?;
 
     // send tokens any -> SOL
     require!(
-        execution_report.token_indexes.len() == execution_report.message.token_amounts.len()
-            && execution_report.token_indexes.len() == execution_report.offchain_token_data.len(),
+        token_indexes.len() == execution_report.message.token_amounts.len()
+            && token_indexes.len() == execution_report.offchain_token_data.len(),
         CcipRouterError::InvalidInputs,
     );
     let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
-    let mut token_amounts =
-        vec![SolanaTokenAmount::default(); execution_report.token_indexes.len()];
+    let mut token_amounts = vec![SVMTokenAmount::default(); token_indexes.len()];
 
     // handle tokens
     // note: indexes are used instead of counts in case more accounts need to be passed in remaining_accounts before token accounts
     // token_indexes = [2, 4] where remaining_accounts is [custom_account, custom_account, token1_account1, token1_account2, token2_account1, token2_account2] for example
     for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
-        let (start, end) = calculate_token_pool_account_indices(
-            i,
-            &execution_report.token_indexes,
-            ctx.remaining_accounts.len(),
-        )?;
+        let (start, end) =
+            calculate_token_pool_account_indices(i, token_indexes, ctx.remaining_accounts.len())?;
         let acc_list = &ctx.remaining_accounts[start..end];
         let accs = validate_and_parse_token_accounts(
             execution_report.message.receiver,
@@ -437,7 +452,7 @@ fn internal_execute<'info>(
             CcipRouterError::OfframpInvalidDataLength
         );
 
-        token_amounts[i] = SolanaTokenAmount {
+        token_amounts[i] = SVMTokenAmount {
             token: accs.mint.key(),
             amount: ReleaseOrMintOutV1::try_from_slice(&return_data)?.destination_amount,
         };
@@ -449,7 +464,7 @@ fn internal_execute<'info>(
         );
     }
 
-    let message = Any2SolanaMessage {
+    let message = Any2SVMMessage {
         message_id: execution_report.message.header.message_id,
         source_chain_selector: execution_report.source_chain_selector,
         sender: execution_report.message.sender,
@@ -460,14 +475,12 @@ fn internal_execute<'info>(
     // handle CPI call if there are extra accounts
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens, but the first token has a non-zero index (indicating extra accounts before token accounts)
-    if should_execute_messaging(
-        &execution_report.token_indexes,
-        ctx.remaining_accounts.is_empty(),
-    ) {
+    if should_execute_messaging(token_indexes, ctx.remaining_accounts.is_empty()) {
         let (msg_program, msg_accounts) = parse_messaging_accounts(
-            &execution_report.token_indexes,
+            token_indexes,
             execution_report.message.receiver,
-            execution_report.message.extra_args.accounts,
+            &execution_report.message.extra_args.accounts,
+            &execution_report.message.extra_args.is_writable_bitmap,
             ctx.remaining_accounts,
         )?;
 
@@ -508,13 +521,17 @@ fn internal_execute<'info>(
     }
 
     let new_state = MessageExecutionState::Success;
-    commit_report.set_state(message_header.sequence_number, new_state.to_owned());
+    execution_state::set(
+        commit_report,
+        message_header.sequence_number,
+        new_state.to_owned(),
+    );
 
     emit!(ExecutionStateChanged {
         source_chain_selector: message_header.source_chain_selector,
         sequence_number: message_header.sequence_number,
         message_id: message_header.message_id, // Unique identifier for the message, generated with the source chain's encoding scheme
-        message_hash: hashed_leaf,             // Hash of the message using Solana encoding
+        message_hash: hashed_leaf,             // Hash of the message using SVM encoding
         state: new_state,
     });
 
@@ -540,7 +557,8 @@ fn should_execute_messaging(token_indexes: &[u8], remaining_accounts_empty: bool
 fn parse_messaging_accounts<'info>(
     token_indexes: &[u8],
     receiver: Pubkey,
-    source_accounts: Vec<SolanaAccountMeta>,
+    source_accounts: &[Pubkey],
+    source_bitmap: &u64,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
     let end_ind = if token_indexes.is_empty() {
@@ -556,7 +574,7 @@ fn parse_messaging_accounts<'info>(
     let source_msg_accounts = &source_accounts[1..source_accounts.len()];
 
     require!(
-        source_program.pubkey == msg_program.key(),
+        *source_program == msg_program.key(),
         CcipRouterError::InvalidInputs,
     );
 
@@ -581,13 +599,11 @@ fn parse_messaging_accounts<'info>(
             CcipRouterError::InvalidInputs
         );
         for (i, acc) in source_msg_accounts.iter().enumerate() {
-            let current_acc = &msg_accounts[i + 1];
+            let current_acc = &msg_accounts[i + 1]; // TODO: remove offset by 1 to skip receiver after receiver refactor
+            require!(*acc == current_acc.key(), CcipRouterError::InvalidInputs);
             require!(
-                acc.pubkey == current_acc.key(),
-                CcipRouterError::InvalidInputs
-            );
-            require!(
-                acc.is_writable == current_acc.is_writable,
+                // TODO: remove offset by 1 to skip program after receiver refactor
+                is_writable(source_bitmap, (i + 1) as u8) == current_acc.is_writable,
                 CcipRouterError::InvalidInputs
             );
         }
@@ -597,7 +613,7 @@ fn parse_messaging_accounts<'info>(
 }
 
 /// Build the instruction data (discriminator + any other data)
-fn build_receiver_discriminator_and_data(ramp_message: Any2SolanaMessage) -> Result<Vec<u8>> {
+fn build_receiver_discriminator_and_data(ramp_message: Any2SVMMessage) -> Result<Vec<u8>> {
     let m: std::result::Result<Vec<u8>, std::io::Error> = ramp_message.try_to_vec();
     require!(m.is_ok(), CcipRouterError::InvalidMessage);
     let message = m.unwrap();
@@ -609,11 +625,8 @@ fn build_receiver_discriminator_and_data(ramp_message: Any2SolanaMessage) -> Res
     Ok(data)
 }
 
-pub fn verify_merkle_root(
-    execution_report: &ExecutionReportSingleChain,
-    on_ramp_address: &[u8],
-) -> Result<[u8; 32]> {
-    let hashed_leaf = execution_report.message.hash(on_ramp_address);
+pub fn verify_merkle_root(execution_report: &ExecutionReportSingleChain) -> Result<[u8; 32]> {
+    let hashed_leaf = hash(&execution_report.message);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
         calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
     require!(
@@ -629,7 +642,7 @@ pub fn validate_execution_report<'info>(
     source_chain_state: &Account<'info, SourceChain>,
     commit_report: &Account<'info, CommitReport>,
     message_header: &RampMessageHeader,
-    solana_chain_selector: u64,
+    svm_chain_selector: u64,
 ) -> Result<()> {
     require!(
         execution_report.message.header.nonce == 0,
@@ -652,7 +665,7 @@ pub fn validate_execution_report<'info>(
         CcipRouterError::UnsupportedSourceChainSelector
     );
     require!(
-        message_header.dest_chain_selector == solana_chain_selector,
+        message_header.dest_chain_selector == svm_chain_selector,
         CcipRouterError::UnsupportedDestinationChainSelector
     );
     require!(
@@ -661,4 +674,221 @@ pub fn validate_execution_report<'info>(
     );
 
     Ok(())
+}
+
+fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
+    use anchor_lang::solana_program::hash;
+
+    // Calculate vectors size to ensure that the hash is unique
+    let sender_size = [msg.sender.len() as u8];
+    let on_ramp_address_size = [msg.on_ramp_address.len() as u8];
+    let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
+
+    // RampMessageHeader struct
+    let header_source_chain_selector = msg.header.source_chain_selector.to_be_bytes();
+    let header_dest_chain_selector = msg.header.dest_chain_selector.to_be_bytes();
+    let header_sequence_number = msg.header.sequence_number.to_be_bytes();
+    let header_nonce = msg.header.nonce.to_be_bytes();
+
+    // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
+    // As similar as https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L111
+    let result = hash::hashv(&[
+        LEAF_DOMAIN_SEPARATOR.as_slice(),
+        // metadata hash
+        "Any2SVMMessageHashV1".as_bytes(),
+        &header_source_chain_selector,
+        &header_dest_chain_selector,
+        &on_ramp_address_size,
+        &msg.on_ramp_address,
+        // message header
+        &msg.header.message_id,
+        &msg.receiver.to_bytes(),
+        &header_sequence_number,
+        msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialized
+        &header_nonce,
+        // message
+        &sender_size,
+        &msg.sender,
+        &data_size.to_be_bytes(),
+        &msg.data,
+        // token transfers
+        msg.token_amounts.try_to_vec().unwrap().as_ref(), // borsh serialized
+    ]);
+
+    result.to_bytes()
+}
+
+mod execution_state {
+    use crate::{CommitReport, MessageExecutionState};
+
+    pub fn set(
+        report: &mut CommitReport,
+        sequence_number: u64,
+        execution_state: MessageExecutionState,
+    ) {
+        let packed = &mut report.execution_states;
+        let dif = sequence_number.checked_sub(report.min_msg_nr);
+        assert!(dif.is_some(), "Sequence number out of bounds");
+        let i = dif.unwrap();
+        assert!(i < 64, "Sequence number out of bounds");
+
+        // Clear the 2 bits at position 'i'
+        *packed &= !(0b11 << (i * 2));
+        // Set the new value in the cleared bits
+        *packed |= (execution_state as u128) << (i * 2);
+    }
+
+    pub fn get(report: &CommitReport, sequence_number: u64) -> MessageExecutionState {
+        let packed = report.execution_states;
+        let dif = sequence_number.checked_sub(report.min_msg_nr);
+        assert!(dif.is_some(), "Sequence number out of bounds");
+        let i = dif.unwrap();
+        assert!(i < 64, "Sequence number out of bounds");
+
+        let mask = 0b11 << (i * 2);
+        let state = (packed & mask) >> (i * 2);
+        MessageExecutionState::try_from(state).unwrap()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_set_state() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 0,
+                merkle_root: [0; 32],
+                timestamp: 0,
+                min_msg_nr: 0,
+                max_msg_nr: 64,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 0, MessageExecutionState::Success);
+            assert_eq!(get(&commit_report, 0), MessageExecutionState::Success);
+
+            set(&mut commit_report, 1, MessageExecutionState::Failure);
+            assert_eq!(get(&commit_report, 1), MessageExecutionState::Failure);
+
+            set(&mut commit_report, 2, MessageExecutionState::Untouched);
+            assert_eq!(get(&commit_report, 2), MessageExecutionState::Untouched);
+
+            set(&mut commit_report, 3, MessageExecutionState::InProgress);
+            assert_eq!(get(&commit_report, 3), MessageExecutionState::InProgress);
+        }
+
+        #[test]
+        #[should_panic(expected = "Sequence number out of bounds")]
+        fn test_set_state_out_of_bounds() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 65, MessageExecutionState::Success);
+        }
+
+        #[test]
+        fn test_get_state() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 1501, MessageExecutionState::Success);
+            set(&mut commit_report, 1505, MessageExecutionState::Failure);
+            set(&mut commit_report, 1520, MessageExecutionState::Untouched);
+            set(&mut commit_report, 1523, MessageExecutionState::InProgress);
+
+            assert_eq!(get(&commit_report, 1501), MessageExecutionState::Success);
+            assert_eq!(get(&commit_report, 1505), MessageExecutionState::Failure);
+            assert_eq!(get(&commit_report, 1520), MessageExecutionState::Untouched);
+            assert_eq!(get(&commit_report, 1523), MessageExecutionState::InProgress);
+        }
+
+        #[test]
+        #[should_panic(expected = "Sequence number out of bounds")]
+        fn test_get_state_out_of_bounds() {
+            let commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            get(&commit_report, 65);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Any2SVMRampMessage, Any2SVMTokenTransfer, SVMExtraArgs};
+
+    /// Builds a message and hash it, it's compared with a known hash
+    #[test]
+    fn test_hash() {
+        let on_ramp_address = &[1, 2, 3].to_vec();
+
+        let message = Any2SVMRampMessage {
+            sender: [
+                1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ]
+            .to_vec(),
+            receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
+            data: vec![4, 5, 6],
+            header: RampMessageHeader {
+                message_id: [
+                    8, 5, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ],
+                source_chain_selector: 67,
+                dest_chain_selector: 78,
+                sequence_number: 89,
+                nonce: 90,
+            },
+            token_amounts: [Any2SVMTokenTransfer {
+                source_pool_address: vec![0, 1, 2, 3],
+                dest_token_address: Pubkey::try_from(
+                    "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
+                )
+                .unwrap(),
+                dest_gas_amount: 100,
+                extra_data: vec![4, 5, 6],
+                amount: [1; 32],
+            }]
+            .to_vec(),
+            extra_args: SVMExtraArgs {
+                compute_units: 1000,
+                is_writable_bitmap: 1,
+                accounts: vec![
+                    Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
+                ],
+            },
+            on_ramp_address: on_ramp_address.clone(),
+        };
+        let hash_result = hash(&message);
+
+        assert_eq!(
+            "60f412fe7c28ae6981b694f92677276f767a98e0314b9a31a3c38366223e7e52",
+            hex::encode(hash_result)
+        );
+    }
 }

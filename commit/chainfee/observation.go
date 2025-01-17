@@ -7,10 +7,16 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/exp/maps"
+
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -26,6 +32,8 @@ func (p *processor) Observation(
 	_ Outcome,
 	_ Query,
 ) (Observation, error) {
+	lggr := logutil.WithContextValues(ctx, p.lggr)
+
 	supportedChains, err := p.chainSupport.SupportedChains(p.oracleID)
 	if err != nil {
 		return Observation{}, err
@@ -33,7 +41,7 @@ func (p *processor) Observation(
 
 	supportedChains.Remove(p.destChain)
 	if supportedChains.Cardinality() == 0 {
-		p.lggr.Info("no supported chains other than dest chain to observe")
+		lggr.Info("no supported chains other than dest chain to observe")
 		return Observation{}, nil
 	}
 
@@ -73,10 +81,10 @@ func (p *processor) Observation(
 		return Observation{}, fmt.Errorf("unexpected error: %w", err)
 	}
 
-	fChain := p.observeFChain()
+	fChain := p.observeFChain(lggr)
 	now := time.Now().UTC()
 
-	p.lggr.Infow("observed fee components",
+	lggr.Infow("observed fee components",
 		"supportedChains", supportedChainsSlice,
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
@@ -85,10 +93,18 @@ func (p *processor) Observation(
 		"timestampNow", now,
 	)
 
+	uniqueChains := mapset.NewSet[cciptypes.ChainSelector](maps.Keys(feeComponents)...)
+	uniqueChains = uniqueChains.Intersect(mapset.NewSet(maps.Keys(nativeTokenPrices)...))
+
+	if len(uniqueChains.ToSlice()) == 0 {
+		lggr.Info("observations don't have any unique chains")
+		return Observation{}, nil
+	}
+
 	obs := Observation{
 		FChain:            fChain,
-		FeeComponents:     feeComponents,
-		NativeTokenPrices: nativeTokenPrices,
+		FeeComponents:     filterMapByUniqueChains(feeComponents, uniqueChains),
+		NativeTokenPrices: filterMapByUniqueChains(nativeTokenPrices, uniqueChains),
 		ChainFeeUpdates:   chainFeeUpdates,
 		TimestampNow:      now,
 	}
@@ -97,10 +113,24 @@ func (p *processor) Observation(
 	return obs, nil
 }
 
-func (p *processor) observeFChain() map[cciptypes.ChainSelector]int {
+// filterMapBySet filters a map based on the keys present in the set.
+func filterMapByUniqueChains[T comparable](
+	m map[cciptypes.ChainSelector]T,
+	s mapset.Set[cciptypes.ChainSelector],
+) map[cciptypes.ChainSelector]T {
+	filtered := make(map[cciptypes.ChainSelector]T)
+	for k, v := range m {
+		if s.Contains(k) {
+			filtered[k] = v
+		}
+	}
+	return filtered
+}
+
+func (p *processor) observeFChain(lggr logger.Logger) map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
-		p.lggr.Errorw("call to GetFChain failed", "err", err)
+		lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain

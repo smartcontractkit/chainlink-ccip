@@ -86,7 +86,7 @@ func NewPlugin(
 	}
 
 	chainSupport := plugincommon.NewChainSupport(
-		logutil.WithContext(lggr, "ChainSupport"),
+		logutil.WithComponent(lggr, "ChainSupport"),
 		homeChain,
 		oracleIDToP2pID,
 		reportingCfg.OracleID,
@@ -94,7 +94,7 @@ func NewPlugin(
 	)
 
 	rmnController := rmn.NewController(
-		logutil.WithContext(lggr, "RMNController"),
+		logutil.WithComponent(lggr, "RMNController"),
 		rmnCrypto,
 		offchainCfg.SignObservationPrefix,
 		rmnPeerClient,
@@ -106,7 +106,7 @@ func NewPlugin(
 	merkleRootProcessor := merkleroot.NewProcessor(
 		reportingCfg.OracleID,
 		oracleIDToP2pID,
-		logutil.WithContext(lggr, "MerkleRoot"),
+		logutil.WithComponent(lggr, "MerkleRoot"),
 		offchainCfg,
 		destChain,
 		homeChain,
@@ -122,7 +122,7 @@ func NewPlugin(
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		reportingCfg.OracleID,
-		logutil.WithContext(lggr, "TokenPrice"),
+		logutil.WithComponent(lggr, "TokenPrice"),
 		offchainCfg,
 		destChain,
 		chainSupport,
@@ -133,7 +133,7 @@ func NewPlugin(
 	)
 
 	discoveryProcessor := discovery.NewContractDiscoveryProcessor(
-		logutil.WithContext(lggr, "Discovery"),
+		logutil.WithComponent(lggr, "Discovery"),
 		&ccipReader,
 		homeChain,
 		destChain,
@@ -142,7 +142,7 @@ func NewPlugin(
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(
-		logutil.WithContext(lggr, "ChainFee"),
+		logutil.WithComponent(lggr, "ChainFee"),
 		reportingCfg.OracleID,
 		destChain,
 		homeChain,
@@ -157,7 +157,7 @@ func NewPlugin(
 		donID:               donID,
 		oracleID:            reportingCfg.OracleID,
 		oracleIDToP2PID:     oracleIDToP2pID,
-		lggr:                logutil.WithContext(lggr, "Plugin"),
+		lggr:                logutil.WithComponent(lggr, "Plugin"),
 		offchainCfg:         offchainCfg,
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
@@ -216,13 +216,17 @@ func (p *Plugin) ObservationQuorum(
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
+	// Ensure that sequence number is in the context for consumption by all
+	// downstream processors and the ccip reader.
+	ctx, lggr := logutil.WithOCRSeqNr(ctx, p.lggr, outCtx.SeqNr)
+
 	var discoveryObs dt.Observation
 	var err error
 
 	if p.discoveryProcessor != nil {
 		discoveryObs, err = p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
 		if err != nil {
-			p.lggr.Errorw("failed to discover contracts", "err", err)
+			lggr.Errorw("failed to discover contracts", "err", err)
 		}
 	}
 
@@ -234,8 +238,8 @@ func (p *Plugin) Observation(
 			return nil, fmt.Errorf("encode discovery observation: %w, observation: %+v", err, obs)
 		}
 
-		p.lggr.Infow("contracts not initialized, only making discovery observations", "discoveryObs", discoveryObs)
-		p.lggr.Debugw("commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+		lggr.Infow("contracts not initialized, only making discovery observations", "discoveryObs", discoveryObs)
+		lggr.Infow("commit plugin making observation", "encodedObservation", encoded, "observation", obs)
 
 		return encoded, nil
 	}
@@ -252,45 +256,97 @@ func (p *Plugin) Observation(
 
 	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery)
 	if err != nil {
-		p.lggr.Errorw("get merkle root processor observation",
-			"err", err, "prevOutcome", prevOutcome.MerkleRootOutcome, "decodedQ", decodedQ.MerkleRootQuery)
+		lggr.Errorw("get merkle root processor observation",
+			"err", err,
+			"prevMerkleRootOutcome", prevOutcome.MerkleRootOutcome,
+			"decodedQ", decodedQ.MerkleRootQuery,
+		)
 	}
 
-	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
-	if err != nil {
-		p.lggr.Errorw("get token price processor observation", "err", err,
-			"prevOutcome", prevOutcome.TokenPriceOutcome, "decodedQ", decodedQ.TokenPriceQuery)
-	}
-
-	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
-	if err != nil {
-		p.lggr.Errorw("get gas prices processor observation",
-			"err", err, "prevOutcome", prevOutcome.ChainFeeOutcome, "decodedQ", decodedQ.ChainFeeQuery)
-	}
+	tokenPriceObs, chainFeeObs := p.getPriceRelatedObservations(ctx, lggr, prevOutcome, decodedQ)
 
 	obs := committypes.Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
 		DiscoveryObs:  discoveryObs,
 		ChainFeeObs:   chainFeeObs,
-		FChain:        p.ObserveFChain(),
+		FChain:        p.ObserveFChain(lggr),
 	}
 
 	p.metricsReporter.TrackObservation(obs)
 
 	encoded, err := obs.Encode()
 	if err != nil {
-		return nil, fmt.Errorf("encode observation: %w, observation: %+v", err, obs)
+		return nil, fmt.Errorf("encode observation: %w, observation: %+v, seq nr: %d", err, obs, outCtx.SeqNr)
 	}
 
-	p.lggr.Debugw("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+	lggr.Infow("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
 	return encoded, nil
 }
 
-func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
+func (p *Plugin) getPriceRelatedObservations(
+	ctx context.Context,
+	lggr logger.Logger,
+	prevOutcome committypes.Outcome,
+	decodedQ committypes.Query,
+) (tokenprice.Observation, chainfee.Observation) {
+	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
+
+	// If we are waiting for price updates to make it onchain, but we have no more checks remaining, stop waiting.
+	if waitingForPriceUpdatesToMakeItOnchain && prevOutcome.MainOutcome.RemainingPriceChecks == 0 {
+		lggr.Warnw(
+			"no more price checks remaining, prices of previous outcome did not make it through",
+			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+		)
+		waitingForPriceUpdatesToMakeItOnchain = false
+	}
+
+	// If we still wait for price updates to make it onchain, check if the latest price report made it through.
+	if waitingForPriceUpdatesToMakeItOnchain {
+		latestPriceOcrSeqNum, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+		if err != nil {
+			lggr.Errorw("get latest price sequence number", "err", err)
+			return tokenprice.Observation{}, chainfee.Observation{}
+		}
+
+		if cciptypes.SeqNum(latestPriceOcrSeqNum) >= prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber {
+			lggr.Infow("previous price report made it through", "ocrSeqNum", latestPriceOcrSeqNum)
+			waitingForPriceUpdatesToMakeItOnchain = false
+		}
+	}
+
+	// If we are still waiting for price updates to make it onchain, don't make any price observations.
+	if waitingForPriceUpdatesToMakeItOnchain {
+		lggr.Infow("waiting for price updates to make it onchain, no prices observed in this round",
+			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+			"remainingPriceChecks", prevOutcome.MainOutcome.RemainingPriceChecks,
+		)
+		return tokenprice.Observation{}, chainfee.Observation{}
+	}
+
+	var tokenPriceObs tokenprice.Observation
+	var chainFeeObs chainfee.Observation
+	var err error
+
+	tokenPriceObs, err = p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
+	if err != nil {
+		lggr.Errorw("get token price processor observation", "err", err,
+			"prevTokenPriceOutcome", prevOutcome.TokenPriceOutcome)
+	}
+
+	chainFeeObs, err = p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
+	if err != nil {
+		lggr.Errorw("get gas prices processor observation",
+			"err", err, "prevChainFeeOutcome", prevOutcome.ChainFeeOutcome)
+	}
+
+	return tokenPriceObs, chainFeeObs
+}
+
+func (p *Plugin) ObserveFChain(lggr logger.Logger) map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
-		p.lggr.Errorw("call to GetFChain failed", "err", err)
+		lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
@@ -299,7 +355,8 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 func (p *Plugin) Outcome(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
-	p.lggr.Debugw("performing outcome", "outctx", outCtx, "query", q, "attributedObservations", aos)
+	ctx, lggr := logutil.WithOCRSeqNr(ctx, p.lggr, outCtx.SeqNr)
+	lggr.Debugw("commit plugin performing outcome", "attributedObservations", aos)
 
 	prevOutcome, err := committypes.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
@@ -319,11 +376,11 @@ func (p *Plugin) Outcome(
 	for _, ao := range aos {
 		obs, err := committypes.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
-			p.lggr.Warnw("failed to decode observation, observation skipped", "err", err)
+			lggr.Warnw("failed to decode observation, observation skipped", "err", err)
 			continue
 		}
 
-		p.lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
+		lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
 
 		merkleRootObservations = append(merkleRootObservations, attributedMerkleRootObservation{
 			OracleID: ao.Observer, Observation: obs.MerkleRootObs})
@@ -339,13 +396,13 @@ func (p *Plugin) Outcome(
 	}
 
 	if p.discoveryProcessor != nil {
-		p.lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryObservations)
+		lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryObservations)
 
 		// The outcome phase of the discovery processor is binding contracts to the chain reader. This is the reason
 		// we ignore the outcome of the discovery processor.
 		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
-			return nil, fmt.Errorf("discovery processor outcome: %w", err)
+			return nil, fmt.Errorf("discovery processor outcome: %w, seqNr: %d", err, outCtx.SeqNr)
 		}
 		p.contractsInitialized.Store(true)
 	}
@@ -357,7 +414,7 @@ func (p *Plugin) Outcome(
 		merkleRootObservations,
 	)
 	if err != nil {
-		p.lggr.Errorw(" get merkle roots outcome", "err", err)
+		lggr.Errorw("failed to get merkle roots outcome", "err", err)
 	}
 
 	tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
@@ -367,7 +424,7 @@ func (p *Plugin) Outcome(
 		tokenPricesObservations,
 	)
 	if err != nil {
-		p.lggr.Warnw("failed to get token prices outcome", "err", err)
+		lggr.Warnw("failed to get token prices outcome", "err", err)
 	}
 
 	chainFeeOutcome, err := p.chainFeeProcessor.Outcome(
@@ -377,19 +434,58 @@ func (p *Plugin) Outcome(
 		chainFeeObservations,
 	)
 	if err != nil {
-		p.lggr.Warnw("failed to get gas prices outcome", "err", err)
+		lggr.Warnw("failed to get gas prices outcome", "err", err)
 	}
 
 	out := committypes.Outcome{
 		MerkleRootOutcome: merkleRootOutcome,
 		TokenPriceOutcome: tokenPriceOutcome,
 		ChainFeeOutcome:   chainFeeOutcome,
+		MainOutcome:       p.getMainOutcome(outCtx, prevOutcome, tokenPriceOutcome, chainFeeOutcome),
 	}
 	p.metricsReporter.TrackOutcome(out)
+
+	lggr.Infow("Commit plugin finished outcome", "outcome", out)
+
 	return out.Encode()
 }
 
+func (p *Plugin) getMainOutcome(
+	outCtx ocr3types.OutcomeContext,
+	prevOutcome committypes.Outcome,
+	tokenPriceOutcome tokenprice.Outcome,
+	chainFeeOutcome chainfee.Outcome,
+) committypes.MainOutcome {
+	pricesObservedInThisRound := len(tokenPriceOutcome.TokenPrices) > 0 || len(chainFeeOutcome.GasPrices) > 0
+	if pricesObservedInThisRound {
+		return committypes.MainOutcome{
+			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(outCtx.SeqNr),
+			RemainingPriceChecks:           p.offchainCfg.InflightPriceCheckRetries,
+		}
+	}
+
+	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
+	if waitingForPriceUpdatesToMakeItOnchain {
+		remainingPriceChecks := prevOutcome.MainOutcome.RemainingPriceChecks - 1
+		if remainingPriceChecks < 0 {
+			remainingPriceChecks = 0
+		}
+
+		return committypes.MainOutcome{
+			InflightPriceOcrSequenceNumber: prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+			RemainingPriceChecks:           remainingPriceChecks,
+		}
+	}
+
+	return committypes.MainOutcome{
+		InflightPriceOcrSequenceNumber: 0,
+		RemainingPriceChecks:           0,
+	}
+}
+
 func (p *Plugin) Close() error {
+	p.lggr.Infow("closing commit plugin")
+
 	return services.CloseAll(
 		p.merkleRootProcessor,
 		p.tokenPriceProcessor,

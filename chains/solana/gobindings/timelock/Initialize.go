@@ -12,7 +12,8 @@ import (
 
 // Initialize is the `initialize` instruction.
 type Initialize struct {
-	MinDelay *uint64
+	TimelockId *[32]uint8
+	MinDelay   *uint64
 
 	// [0] = [WRITE] config
 	//
@@ -42,6 +43,12 @@ func NewInitializeInstructionBuilder() *Initialize {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *Initialize) SetTimelockId(timelockId [32]uint8) *Initialize {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetMinDelay sets the "minDelay" parameter.
@@ -180,6 +187,9 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 func (inst *Initialize) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.MinDelay == nil {
 			return errors.New("MinDelay parameter is not set")
 		}
@@ -230,8 +240,9 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MinDelay", *inst.MinDelay))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("  MinDelay", *inst.MinDelay))
 					})
 
 					// Accounts of the instruction:
@@ -252,6 +263,11 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `MinDelay` param:
 	err = encoder.Encode(obj.MinDelay)
 	if err != nil {
@@ -260,6 +276,11 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `MinDelay`:
 	err = decoder.Decode(&obj.MinDelay)
 	if err != nil {
@@ -271,6 +292,7 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	minDelay uint64,
 	// Accounts:
 	config ag_solanago.PublicKey,
@@ -284,6 +306,7 @@ func NewInitializeInstruction(
 	cancellerRoleAccessController ag_solanago.PublicKey,
 	bypasserRoleAccessController ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetMinDelay(minDelay).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).

@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/grpc"
-
 	sel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -57,7 +55,7 @@ const (
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 1_167_765
+	maxOutcomeLength = 1_167_836
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
@@ -67,37 +65,13 @@ const (
 	maxReportCount = 1
 )
 
-// PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
-// and a validation service.
-type PluginFactoryConstructor struct{}
-
-func NewPluginFactoryConstructor() *PluginFactoryConstructor {
-	return &PluginFactoryConstructor{}
-}
-func (p PluginFactoryConstructor) NewReportingPluginFactory(
-	ctx context.Context,
-	config core.ReportingPluginServiceConfig,
-	grpcProvider grpc.ClientConnInterface,
-	pipelineRunner core.PipelineRunnerService,
-	telemetry core.TelemetryService,
-	errorLog core.ErrorLog,
-	capRegistry core.CapabilitiesRegistry,
-	keyValueStore core.KeyValueStore,
-	relayerSet core.RelayerSet,
-) (core.OCR3ReportingPluginFactory, error) {
-	return nil, errors.New("this functionality should not be used")
-}
-
-func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (core.ValidationService, error) {
-	return nil, errors.New("this functionality should not be used")
-}
-
 type PluginFactory struct {
 	baseLggr          logger.Logger
 	donID             plugintypes.DonID
 	ocrConfig         reader.OCR3ConfigWithMeta
 	commitCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
+	extraDataCodec    cciptypes.ExtraDataCodec
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -114,6 +88,7 @@ func NewPluginFactory(
 	ocrConfig reader.OCR3ConfigWithMeta,
 	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
+	extraDataCodec cciptypes.ExtraDataCodec,
 	homeChainReader reader.HomeChain,
 	homeChainSelector cciptypes.ChainSelector,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
@@ -127,6 +102,7 @@ func NewPluginFactory(
 		ocrConfig:         ocrConfig,
 		commitCodec:       commitCodec,
 		msgHasher:         msgHasher,
+		extraDataCodec:    extraDataCodec,
 		homeChainReader:   homeChainReader,
 		homeChainSelector: homeChainSelector,
 		contractReaders:   contractReaders,
@@ -189,7 +165,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		rmnHomeReader = readerpkg.NewRMNHomePoller(
 			rmnCr,
 			rmnHomeBoundContract,
-			logutil.WithContext(lggr, "RMNHomePoller"),
+			logutil.WithComponent(lggr, "RMNHomePoller"),
 			5*time.Second,
 		)
 
@@ -204,11 +180,12 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	ccipReader := readerpkg.NewCCIPChainReader(
 		ctx,
-		logutil.WithContext(lggr, "CCIPReader"),
+		logutil.WithComponent(lggr, "CCIPReader"),
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
+		p.extraDataCodec,
 	)
 
 	// The node supports the chain that the token prices are on.
@@ -228,7 +205,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
-		logutil.WithContext(lggr, "PriceReader"),
+		logutil.WithComponent(lggr, "PriceReader"),
 		readers,
 		offchainConfig.TokenInfo,
 		ccipReader,
@@ -301,5 +278,4 @@ func (p PluginFactory) HealthReport() map[string]error {
 }
 
 // Interface compatibility checks.
-var _ core.OCR3ReportingPluginClient = &PluginFactoryConstructor{}
 var _ core.OCR3ReportingPluginFactory = &PluginFactory{}

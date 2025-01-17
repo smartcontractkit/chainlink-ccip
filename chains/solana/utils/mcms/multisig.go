@@ -105,11 +105,9 @@ func (sa *SignatureAnalyzer) PrintGroupStructure() {
 
 		parentID := sa.groupParents[groupID]
 		parentStr := "root"
-		groupIDUint8, err := SafeToUint8(groupID)
-		if err != nil {
-			panic(err)
-		}
-		if parentID != groupIDUint8 {
+
+		//nolint:gosec
+		if parentID != uint8(groupID) {
 			parentStr = fmt.Sprintf("%d", parentID)
 		}
 		fmt.Printf("Parent group: %s\n", parentStr)

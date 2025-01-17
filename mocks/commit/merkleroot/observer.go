@@ -27,17 +27,17 @@ func (_m *MockObserver) EXPECT() *MockObserver_Expecter {
 	return &MockObserver_Expecter{mock: &_m.Mock}
 }
 
-// ObserveFChain provides a mock function with given fields:
-func (_m *MockObserver) ObserveFChain() map[ccipocr3.ChainSelector]int {
-	ret := _m.Called()
+// ObserveFChain provides a mock function with given fields: ctx
+func (_m *MockObserver) ObserveFChain(ctx context.Context) map[ccipocr3.ChainSelector]int {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ObserveFChain")
 	}
 
 	var r0 map[ccipocr3.ChainSelector]int
-	if rf, ok := ret.Get(0).(func() map[ccipocr3.ChainSelector]int); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) map[ccipocr3.ChainSelector]int); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]int)
@@ -53,13 +53,14 @@ type MockObserver_ObserveFChain_Call struct {
 }
 
 // ObserveFChain is a helper method to define mock.On call
-func (_e *MockObserver_Expecter) ObserveFChain() *MockObserver_ObserveFChain_Call {
-	return &MockObserver_ObserveFChain_Call{Call: _e.mock.On("ObserveFChain")}
+//   - ctx context.Context
+func (_e *MockObserver_Expecter) ObserveFChain(ctx interface{}) *MockObserver_ObserveFChain_Call {
+	return &MockObserver_ObserveFChain_Call{Call: _e.mock.On("ObserveFChain", ctx)}
 }
 
-func (_c *MockObserver_ObserveFChain_Call) Run(run func()) *MockObserver_ObserveFChain_Call {
+func (_c *MockObserver_ObserveFChain_Call) Run(run func(ctx context.Context)) *MockObserver_ObserveFChain_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -69,7 +70,7 @@ func (_c *MockObserver_ObserveFChain_Call) Return(_a0 map[ccipocr3.ChainSelector
 	return _c
 }
 
-func (_c *MockObserver_ObserveFChain_Call) RunAndReturn(run func() map[ccipocr3.ChainSelector]int) *MockObserver_ObserveFChain_Call {
+func (_c *MockObserver_ObserveFChain_Call) RunAndReturn(run func(context.Context) map[ccipocr3.ChainSelector]int) *MockObserver_ObserveFChain_Call {
 	_c.Call.Return(run)
 	return _c
 }

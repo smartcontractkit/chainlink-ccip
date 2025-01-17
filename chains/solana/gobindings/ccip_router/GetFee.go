@@ -34,7 +34,7 @@ import (
 // The fee amount in u64.
 type GetFee struct {
 	DestChainSelector *uint64
-	Message           *Solana2AnyMessage
+	Message           *SVM2AnyMessage
 
 	// [0] = [] destChainState
 	//
@@ -57,7 +57,7 @@ func (inst *GetFee) SetDestChainSelector(destChainSelector uint64) *GetFee {
 }
 
 // SetMessage sets the "message" parameter.
-func (inst *GetFee) SetMessage(message Solana2AnyMessage) *GetFee {
+func (inst *GetFee) SetMessage(message SVM2AnyMessage) *GetFee {
 	inst.Message = &message
 	return inst
 }
@@ -178,7 +178,7 @@ func (obj *GetFee) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 func NewGetFeeInstruction(
 	// Parameters:
 	destChainSelector uint64,
-	message Solana2AnyMessage,
+	message SVM2AnyMessage,
 	// Accounts:
 	destChainState ag_solanago.PublicKey,
 	billingTokenConfig ag_solanago.PublicKey) *GetFee {

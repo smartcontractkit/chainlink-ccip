@@ -17,8 +17,8 @@ import "bytes"
 // RMNSignatures, if RMN is configured for some lanes involved in the commitment.
 // A report with RMN signatures but without merkle roots is invalid.
 type CommitPluginReport struct {
-	MerkleRoots  []MerkleRootChain `json:"merkleRoots"`
 	PriceUpdates PriceUpdates      `json:"priceUpdates"`
+	MerkleRoots  []MerkleRootChain `json:"merkleRoots"`
 
 	// RMNSignatures are the ECDSA signatures from the RMN signing nodes on the RMNReport structure.
 	// For more details see the contract here: https://github.com/smartcontractkit/chainlink/blob/7ba0f37134a618375542079ff1805fe2224d7916/contracts/src/v0.8/ccip/interfaces/IRMNV2.sol#L8-L12

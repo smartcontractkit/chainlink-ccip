@@ -228,18 +228,18 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
-				prepareCcipReaderMock(params.ctx, n.ccipReader, false, tc.enableDiscovery, true)
+				prepareCcipReaderMock(n.ccipReader, false, tc.enableDiscovery, true)
 
 				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
 					require.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))
-					n.ccipReader.EXPECT().NextSeqNum(params.ctx, tc.offRampNextSeqNumDefaultOverrideKeys).Unset()
+					n.ccipReader.EXPECT().NextSeqNum(mock.Anything, tc.offRampNextSeqNumDefaultOverrideKeys).Unset()
 					n.ccipReader.EXPECT().
-						NextSeqNum(params.ctx, tc.offRampNextSeqNumDefaultOverrideKeys).
+						NextSeqNum(mock.Anything, tc.offRampNextSeqNumDefaultOverrideKeys).
 						Return(tc.offRampNextSeqNumDefaultOverrideValues, nil).
 						Maybe()
 				}
 
-				preparePriceReaderMock(params.ctx, n.priceReader)
+				preparePriceReaderMock(n.priceReader)
 			}
 
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
@@ -290,14 +290,14 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
+					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
 					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
 						arbAddr: arbPrice,
 						ethAddr: ethPrice,
 					}, nil).Maybe()
 
 				m.EXPECT().
-					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
+					GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
 					).
@@ -308,6 +308,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: orderedTokenPrices,
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
@@ -327,12 +328,25 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			},
 		},
 		{
+			name: "prices already inflight, no prices to report",
+			prevOutcome: committypes.Outcome{
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+			},
+			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {},
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				TokenPriceOutcome: tokenprice.Outcome{},
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+			},
+			expTransmittedReports: []ccipocr3.CommitPluginReport{},
+		},
+		{
 			name:        "fresh tokens don't need new updates",
 			prevOutcome: committypes.Outcome{},
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
+					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
 					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
 						arbAddr: arbPrice,
 						ethAddr: ethPrice,
@@ -341,7 +355,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 				// Arb is fresh, will not be updated
 				m.EXPECT().
-					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
+					GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{
 							arbAddr: {Value: ccipocr3.NewBigInt(arbPrice), Timestamp: time.Now()},
@@ -361,14 +375,14 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
+					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
 					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
 						arbAddr: arbPrice,
 						ethAddr: ethPrice,
 					}, nil).Maybe()
 
 				m.EXPECT().
-					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
+					GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{
 							// Arb is fresh, will not be updated
@@ -390,6 +404,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 						tokenPriceMap[ethAddr],
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
@@ -418,7 +433,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					reportCodec = n.reportCodec
 				}
 
-				prepareCcipReaderMock(params.ctx, n.ccipReader, true, false, true)
+				prepareCcipReaderMock(n.ccipReader, true, false, true)
 				tc.mockPriceReader(n.priceReader)
 			}
 
@@ -484,11 +499,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							sourceChain1: newFeeComponents,
@@ -496,7 +512,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						})
 
 				m.EXPECT().
-					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						sourceChain1: newNativePrice,
 						sourceChain2: newNativePrice,
@@ -509,22 +525,38 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							sourceChain1: newFeeComponents,
 						})
 
 				m.EXPECT().
-					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						sourceChain1: newNativePrice,
 						sourceChain2: newNativePrice,
 					})
+			},
+		},
+		{
+			name: "fee components should not be updated when there's a subset of chains but we wait for prices",
+			prevOutcome: committypes.Outcome{
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+			},
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+			},
+			expTransmittedReportLen: 0,
+			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
+				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Unset()
+				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Return(0, nil).Maybe()
 			},
 		},
 		{
@@ -536,18 +568,19 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							sourceChain1: newFeeComponents,
 						})
 
 				m.EXPECT().
-					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						sourceChain1: newNativePrice,
 					})
@@ -569,18 +602,19 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							sourceChain1: newFeeComponents2,
 						})
 
 				m.EXPECT().
-					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						sourceChain1: newNativePrice2,
 					})
@@ -602,27 +636,28 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(mock.Anything, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							sourceChain1: newFeeComponents2,
 						})
 				m.EXPECT().
-					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						sourceChain1: newNativePrice2,
 					})
 
-				m.EXPECT().GetChainFeePriceUpdate(params.ctx, mock.Anything).Unset()
+				m.EXPECT().GetChainFeePriceUpdate(mock.Anything, mock.Anything).Unset()
 				elapsed, err := time.ParseDuration("3h")
 				require.NoError(t, err)
 				t := time.Now().UTC().Add(-elapsed)
 				m.EXPECT().
-					GetChainFeePriceUpdate(params.ctx, mock.Anything).
+					GetChainFeePriceUpdate(mock.Anything, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
 						sourceChain1: {
 							Timestamp: t,
@@ -640,9 +675,9 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				n := setupNode(paramsCp)
 				nodes[i] = n.node
 
-				prepareCcipReaderMock(params.ctx, n.ccipReader, true, false, false)
+				prepareCcipReaderMock(n.ccipReader, true, false, false)
 
-				preparePriceReaderMock(params.ctx, n.priceReader)
+				preparePriceReaderMock(n.priceReader)
 
 				tc.mockCCIPReader(n.ccipReader)
 			}
@@ -672,25 +707,24 @@ func normalizeOutcome(o committypes.Outcome) committypes.Outcome {
 }
 
 func prepareCcipReaderMock(
-	ctx context.Context,
 	ccipReader *readerpkg_mock.MockCCIPReader,
 	mockEmptySeqNrs bool,
 	enableDiscovery bool,
-	mockChainFee bool) {
-
+	mockChainFee bool,
+) {
 	if mockChainFee {
 		ccipReader.EXPECT().
-			GetChainsFeeComponents(ctx, mock.Anything).
+			GetChainsFeeComponents(mock.Anything, mock.Anything).
 			Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).Maybe()
 		ccipReader.EXPECT().
-			GetWrappedNativeTokenPriceUSD(ctx, mock.Anything).
+			GetWrappedNativeTokenPriceUSD(mock.Anything, mock.Anything).
 			Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
 	}
 	ccipReader.EXPECT().
-		GetLatestPriceSeqNr(ctx).
+		GetLatestPriceSeqNr(mock.Anything).
 		Return(0, nil).Maybe()
 	ccipReader.EXPECT().
-		GetChainFeePriceUpdate(ctx, mock.Anything).
+		GetChainFeePriceUpdate(mock.Anything, mock.Anything).
 		Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
@@ -699,8 +733,9 @@ func prepareCcipReaderMock(
 		Return(&reader2.CurseInfo{}, nil).Maybe()
 
 	if mockEmptySeqNrs {
-		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Unset()
-		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Return(map[ccipocr3.ChainSelector]ccipocr3.SeqNum{}, nil).
+		ccipReader.EXPECT().NextSeqNum(mock.Anything, mock.Anything).Unset()
+		ccipReader.EXPECT().NextSeqNum(mock.Anything, mock.Anything).
+			Return(map[ccipocr3.ChainSelector]ccipocr3.SeqNum{}, nil).
 			Maybe()
 	}
 
@@ -710,16 +745,16 @@ func prepareCcipReaderMock(
 	}
 }
 
-func preparePriceReaderMock(ctx context.Context, priceReader *readerpkg_mock.MockPriceReader) {
+func preparePriceReaderMock(priceReader *readerpkg_mock.MockPriceReader) {
 	priceReader.EXPECT().
-		GetFeeQuoterTokenUpdates(ctx, mock.Anything, mock.Anything).
+		GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
 		Return(
 			map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
 		).
 		Maybe()
 
 	priceReader.EXPECT().
-		GetFeedPricesUSD(ctx, mock.Anything).
+		GetFeedPricesUSD(mock.Anything, mock.Anything).
 		Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{}, nil).Maybe()
 }
 
@@ -815,7 +850,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 			})
 		}
 
-		ccipReader.EXPECT().MsgsBetweenSeqNums(params.ctx, sourceChain,
+		ccipReader.EXPECT().MsgsBetweenSeqNums(mock.Anything, sourceChain,
 			ccipocr3.NewSeqNumRange(offRampNextSeqNum, offRampNextSeqNum)).
 			Return(newMsgs, nil).Maybe()
 
@@ -829,21 +864,21 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		seqNumsOfChainsWithNewMsgs[chainSel] = params.offRampNextSeqNum[chainSel]
 	}
 	if len(chainsWithNewMsgs) > 0 {
-		ccipReader.EXPECT().NextSeqNum(params.ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
+		ccipReader.EXPECT().NextSeqNum(mock.Anything, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
 	}
-	ccipReader.EXPECT().NextSeqNum(params.ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
+	ccipReader.EXPECT().NextSeqNum(mock.Anything, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
 
 	for _, ch := range sourceChains {
 		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
-			params.ctx, ch, destChain).Return(params.offRampNextSeqNum[ch]+1, nil).Maybe()
+			mock.Anything, ch, destChain).Return(params.offRampNextSeqNum[ch]+1, nil).Maybe()
 	}
 
 	ccipReader.EXPECT().
-		GetRMNRemoteConfig(params.ctx, mock.Anything).
+		GetRMNRemoteConfig(mock.Anything, mock.Anything).
 		Return(params.rmnReportCfg, nil).Maybe()
 
 	ccipReader.EXPECT().
-		GetOffRampConfigDigest(params.ctx, consts.PluginTypeCommit).
+		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
 	p := NewPlugin(
@@ -922,7 +957,8 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},
-		PriceFeedChainSelector: sourceChain1,
+		PriceFeedChainSelector:    sourceChain1,
+		InflightPriceCheckRetries: 10,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

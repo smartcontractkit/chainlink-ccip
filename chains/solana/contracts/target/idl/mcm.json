@@ -3,14 +3,14 @@
   "name": "mcm",
   "docs": [
     "This is mcm program supporting multiple instances of multisig configuration",
-    "A single deployed program manages multiple multisig states(configurations) identified by multisig_name"
+    "A single deployed program manages multiple multisig states(configurations) identified by multisig_id"
   ],
   "instructions": [
     {
       "name": "initialize",
       "docs": [
-        "initialize a new multisig configuration, store the chain_id and multisig_name",
-        "multisig_name is a unique identifier for the multisig configuration(32 bytes, left-padded)"
+        "initialize a new multisig configuration, store the chain_id and multisig_id",
+        "multisig_id is a unique identifier for the multisig configuration(32 bytes, left-padded)"
       ],
       "accounts": [
         {
@@ -55,7 +55,7 @@
           "type": "u64"
         },
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -81,7 +81,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -111,7 +111,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -157,7 +157,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -234,7 +234,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -310,7 +310,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -369,7 +369,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -404,7 +404,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -446,7 +446,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -477,7 +477,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -508,7 +508,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -551,7 +551,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -598,7 +598,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -637,7 +637,7 @@
       ],
       "args": [
         {
-          "name": "multisigName",
+          "name": "multisigId",
           "type": {
             "array": [
               "u8",
@@ -699,7 +699,7 @@
             "type": "u64"
           },
           {
-            "name": "multisigName",
+            "name": "multisigId",
             "type": {
               "array": [
                 "u8",

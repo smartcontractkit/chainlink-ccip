@@ -12,7 +12,8 @@ import (
 
 // Cancel is the `cancel` instruction.
 type Cancel struct {
-	Id *[32]uint8
+	TimelockId *[32]uint8
+	Id         *[32]uint8
 
 	// [0] = [WRITE] operation
 	//
@@ -30,6 +31,12 @@ func NewCancelInstructionBuilder() *Cancel {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *Cancel) SetTimelockId(timelockId [32]uint8) *Cancel {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetId sets the "id" parameter.
@@ -102,6 +109,9 @@ func (inst Cancel) ValidateAndBuild() (*Instruction, error) {
 func (inst *Cancel) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
@@ -134,8 +144,9 @@ func (inst *Cancel) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Id", *inst.Id))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
 					})
 
 					// Accounts of the instruction:
@@ -150,6 +161,11 @@ func (inst *Cancel) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Cancel) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Id` param:
 	err = encoder.Encode(obj.Id)
 	if err != nil {
@@ -158,6 +174,11 @@ func (obj Cancel) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 func (obj *Cancel) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Id`:
 	err = decoder.Decode(&obj.Id)
 	if err != nil {
@@ -169,6 +190,7 @@ func (obj *Cancel) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 // NewCancelInstruction declares a new Cancel instruction with the provided parameters and accounts.
 func NewCancelInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
@@ -176,6 +198,7 @@ func NewCancelInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *Cancel {
 	return NewCancelInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).

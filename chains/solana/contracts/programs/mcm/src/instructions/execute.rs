@@ -12,7 +12,7 @@ use crate::state::root::*;
 
 pub fn execute<'info>(
     ctx: Context<'_, '_, '_, 'info, Execute<'info>>,
-    multisig_name: [u8; MULTISIG_NAME_PADDED],
+    multisig_id: [u8; MULTISIG_ID_PADDED],
     chain_id: u64,
     nonce: u64,
     data: Vec<u8>,
@@ -34,7 +34,7 @@ pub fn execute<'info>(
     require!(chain_id == multisig_config.chain_id, McmError::WrongChainId);
 
     // use unix_timestamp from Clock which provides seconds precision.
-    // while Solana's PoH provides cryptographic proofs of time passage,
+    // while SVM's PoH provides cryptographic proofs of time passage,
     // clock drift can still occur if slot times exceed the ideal 400ms
     // (e.g., network had 30min drift in June 2022 when slots took 730ms)
     // ref: https://docs.solana.com/architecture/synchronization
@@ -84,7 +84,7 @@ pub fn execute<'info>(
 
     let seeds = &[
         SIGNER_SEED,
-        multisig_name.as_ref(),
+        multisig_id.as_ref(),
         &[ctx.bumps.multisig_signer],
     ];
     let signer = &[&seeds[..]];
@@ -103,15 +103,15 @@ pub fn execute<'info>(
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED])]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED])]
 pub struct Execute<'info> {
-    #[account(mut, seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
+    #[account(mut, seeds = [CONFIG_SEED, multisig_id.as_ref()], bump)]
     pub multisig_config: Account<'info, MultisigConfig>,
 
-    #[account(seeds = [ROOT_METADATA_SEED, multisig_name.as_ref()], bump)]
+    #[account(seeds = [ROOT_METADATA_SEED, multisig_id.as_ref()], bump)]
     pub root_metadata: Account<'info, RootMetadata>,
 
-    #[account(mut, seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_name.as_ref()], bump)]
+    #[account(mut, seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_id.as_ref()], bump)]
     pub expiring_root_and_op_count: Account<'info, ExpiringRootAndOpCount>,
 
     /// CHECK: This is just used to invoke it through the CPI, it's value is not accessed directly
@@ -119,7 +119,7 @@ pub struct Execute<'info> {
 
     /// CHECK: program signer PDA that can hold balance
     #[account(
-        seeds = [SIGNER_SEED, multisig_name.as_ref()],
+        seeds = [SIGNER_SEED, multisig_id.as_ref()],
         bump
     )]
     pub multisig_signer: UncheckedAccount<'info>,

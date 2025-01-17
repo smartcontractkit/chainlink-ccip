@@ -37,11 +37,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-const (
-	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
-	transmissionDelayMultiplier = 3 * time.Second
-)
-
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
 	donID        plugintypes.DonID
@@ -99,10 +94,10 @@ func NewPlugin(
 		homeChain:             homeChain,
 		tokenDataObserver:     tokenDataObserver,
 		estimateProvider:      estimateProvider,
-		lggr:                  logutil.WithContext(lggr, "Plugin"),
+		lggr:                  logutil.WithComponent(lggr, "Plugin"),
 		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
-			logutil.WithContext(lggr, "Discovery"),
+			logutil.WithComponent(lggr, "Discovery"),
 			&ccipReader,
 			homeChain,
 			destChain,
@@ -110,7 +105,7 @@ func NewPlugin(
 			oracleIDToP2pID,
 		),
 		chainSupport: plugincommon.NewChainSupport(
-			logutil.WithContext(lggr, "ChainSupport"),
+			logutil.WithComponent(lggr, "ChainSupport"),
 			homeChain,
 			oracleIDToP2pID,
 			reportingCfg.OracleID,
@@ -251,7 +246,9 @@ func selectReport(
 		// The builder may attach metadata to the commit report.
 		commitReports[i], err = builder.Add(ctx, commitReport)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to add report to builder: %w", err)
+			pendingReports++
+			lggr.Errorw("unable to add report to builder", "err", err)
+			continue
 		}
 
 		selectedReports = append(selectedReports, commitReports[i])
@@ -314,7 +311,7 @@ func (p *Plugin) Reports(
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
 		p.chainSupport,
 		maps.Keys(p.oracleIDToP2pID),
-		transmissionDelayMultiplier,
+		p.offchainCfg.TransmissionDelayMultiplier,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get transmission schedule: %w", err)

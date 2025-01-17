@@ -12,7 +12,7 @@ type Config struct {
 	Version                         uint8
 	DefaultAllowOutOfOrderExecution uint8
 	Padding0                        [6]uint8
-	SolanaChainSelector             uint64
+	SvmChainSelector                uint64
 	DefaultGasLimit                 ag_binary.Uint128
 	Padding1                        [8]uint8
 	Owner                           ag_solanago.PublicKey
@@ -20,6 +20,8 @@ type Config struct {
 	EnableManualExecutionAfter      int64
 	Padding2                        [8]uint8
 	Ocr3                            [2]Ocr3Config
+	MaxFeeJuelsPerMsg               ag_binary.Uint128
+	LinkTokenMint                   ag_solanago.PublicKey
 	FeeAggregator                   ag_solanago.PublicKey
 }
 
@@ -46,8 +48,8 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `SolanaChainSelector` param:
-	err = encoder.Encode(obj.SolanaChainSelector)
+	// Serialize `SvmChainSelector` param:
+	err = encoder.Encode(obj.SvmChainSelector)
 	if err != nil {
 		return err
 	}
@@ -83,6 +85,16 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Ocr3` param:
 	err = encoder.Encode(obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxFeeJuelsPerMsg` param:
+	err = encoder.Encode(obj.MaxFeeJuelsPerMsg)
+	if err != nil {
+		return err
+	}
+	// Serialize `LinkTokenMint` param:
+	err = encoder.Encode(obj.LinkTokenMint)
 	if err != nil {
 		return err
 	}
@@ -123,8 +135,8 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `SolanaChainSelector`:
-	err = decoder.Decode(&obj.SolanaChainSelector)
+	// Deserialize `SvmChainSelector`:
+	err = decoder.Decode(&obj.SvmChainSelector)
 	if err != nil {
 		return err
 	}
@@ -160,6 +172,16 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Ocr3`:
 	err = decoder.Decode(&obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxFeeJuelsPerMsg`:
+	err = decoder.Decode(&obj.MaxFeeJuelsPerMsg)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LinkTokenMint`:
+	err = decoder.Decode(&obj.LinkTokenMint)
 	if err != nil {
 		return err
 	}
@@ -687,6 +709,7 @@ type TokenAdminRegistry struct {
 	Administrator        ag_solanago.PublicKey
 	PendingAdministrator ag_solanago.PublicKey
 	LookupTable          ag_solanago.PublicKey
+	WritableIndexes      [2]ag_binary.Uint128
 }
 
 var TokenAdminRegistryDiscriminator = [8]byte{70, 92, 207, 200, 76, 17, 57, 114}
@@ -714,6 +737,11 @@ func (obj TokenAdminRegistry) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `LookupTable` param:
 	err = encoder.Encode(obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	// Serialize `WritableIndexes` param:
+	err = encoder.Encode(obj.WritableIndexes)
 	if err != nil {
 		return err
 	}
@@ -751,6 +779,11 @@ func (obj *TokenAdminRegistry) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `LookupTable`:
 	err = decoder.Decode(&obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	// Deserialize `WritableIndexes`:
+	err = decoder.Decode(&obj.WritableIndexes)
 	if err != nil {
 		return err
 	}

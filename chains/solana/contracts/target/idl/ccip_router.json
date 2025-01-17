@@ -31,7 +31,7 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
-        "* `solana_chain_selector` - The chain selector for Solana.",
+        "* `svm_chain_selector` - The chain selector for SVM.",
         "* `default_gas_limit` - The default gas limit for other destination chains.",
         "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
         "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
@@ -80,7 +80,7 @@
       ],
       "args": [
         {
-          "name": "solanaChainSelector",
+          "name": "svmChainSelector",
           "type": "u64"
         },
         {
@@ -98,6 +98,14 @@
         {
           "name": "feeAggregator",
           "type": "publicKey"
+        },
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey"
+        },
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128"
         }
       ]
     },
@@ -414,16 +422,16 @@
       ]
     },
     {
-      "name": "updateSolanaChainSelector",
+      "name": "updateSvmChainSelector",
       "docs": [
-        "Updates the Solana chain selector in the router configuration.",
+        "Updates the SVM chain selector in the router configuration.",
         "",
         "This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.",
         "",
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `new_chain_selector` - The new chain selector for Solana."
+        "* `new_chain_selector` - The new chain selector for SVM."
       ],
       "accounts": [
         {
@@ -526,7 +534,7 @@
       "docs": [
         "Updates the minimum amount of time required between a message being committed and when it can be manually executed.",
         "",
-        "This is part of the OffRamp Configuration for Solana.",
+        "This is part of the OffRamp Configuration for SVM.",
         "The Admin is the only one able to update this config.",
         "",
         "# Arguments",
@@ -648,12 +656,18 @@
         "",
         "* `ctx` - The context containing the accounts required for setting the pool.",
         "* `mint` - The public key of the token mint.",
-        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool."
+        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.",
+        "* `is_writable` - index of account in lookup table that is writable"
       ],
       "accounts": [
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolLookuptable",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -668,8 +682,8 @@
           "type": "publicKey"
         },
         {
-          "name": "poolLookupTable",
-          "type": "publicKey"
+          "name": "writableIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1058,7 +1072,7 @@
         {
           "name": "message",
           "type": {
-            "defined": "Solana2AnyMessage"
+            "defined": "SVM2AnyMessage"
           }
         }
       ],
@@ -1184,6 +1198,11 @@
           "isSigner": false
         },
         {
+          "name": "linkTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "feeTokenUserAssociatedAccount",
           "isMut": false,
           "isSigner": false,
@@ -1216,8 +1235,12 @@
         {
           "name": "message",
           "type": {
-            "defined": "Solana2AnyMessage"
+            "defined": "SVM2AnyMessage"
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1229,7 +1252,7 @@
         "",
         "The method name needs to be commit with Anchor encoding.",
         "",
-        "This function is called by the OffChain when committing one Report to the Solana Router.",
+        "This function is called by the OffChain when committing one Report to the SVM Router.",
         "In this Flow only one report is sent, the Commit Report. This is different as EVM does,",
         "this is because here all the chain state is stored in one account per Merkle Tree Root.",
         "So, to avoid having to send a dynamic size array of accounts, in this message only one Commit Report Account is sent.",
@@ -1322,7 +1345,7 @@
         "",
         "The method name needs to be execute with Anchor encoding.",
         "",
-        "This function is called by the OffChain when executing one Report to the Solana Router.",
+        "This function is called by the OffChain when executing one Report to the SVM Router.",
         "In this Flow only one message is sent, the Execution Report. This is different as EVM does,",
         "this is because there is no try/catch mechanism to allow batch execution.",
         "This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.",
@@ -1402,6 +1425,10 @@
               3
             ]
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1467,6 +1494,10 @@
           "type": {
             "defined": "ExecutionReportSingleChain"
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     }
@@ -1495,7 +1526,7 @@
             }
           },
           {
-            "name": "solanaChainSelector",
+            "name": "svmChainSelector",
             "type": "u64"
           },
           {
@@ -1542,6 +1573,14 @@
                 2
               ]
             }
+          },
+          {
+            "name": "maxFeeJuelsPerMsg",
+            "type": "u128"
+          },
+          {
+            "name": "linkTokenMint",
+            "type": "publicKey"
           },
           {
             "name": "feeAggregator",
@@ -1746,6 +1785,15 @@
           {
             "name": "lookupTable",
             "type": "publicKey"
+          },
+          {
+            "name": "writableIndexes",
+            "type": {
+              "array": [
+                "u128",
+                2
+              ]
+            }
           }
         ]
       }
@@ -2049,7 +2097,7 @@
           {
             "name": "message",
             "type": {
-              "defined": "Any2SolanaRampMessage"
+              "defined": "Any2SVMRampMessage"
             }
           },
           {
@@ -2077,32 +2125,12 @@
                 ]
               }
             }
-          },
-          {
-            "name": "tokenIndexes",
-            "type": "bytes"
           }
         ]
       }
     },
     {
-      "name": "SolanaAccountMeta",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "pubkey",
-            "type": "publicKey"
-          },
-          {
-            "name": "isWritable",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SolanaExtraArgs",
+      "name": "SVMExtraArgs",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2111,11 +2139,13 @@
             "type": "u32"
           },
           {
+            "name": "isWritableBitmap",
+            "type": "u64"
+          },
+          {
             "name": "accounts",
             "type": {
-              "vec": {
-                "defined": "SolanaAccountMeta"
-              }
+              "vec": "publicKey"
             }
           }
         ]
@@ -2138,7 +2168,7 @@
       }
     },
     {
-      "name": "Any2SolanaRampMessage",
+      "name": "Any2SVMRampMessage",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2164,21 +2194,25 @@
             "name": "tokenAmounts",
             "type": {
               "vec": {
-                "defined": "Any2SolanaTokenTransfer"
+                "defined": "Any2SVMTokenTransfer"
               }
             }
           },
           {
             "name": "extraArgs",
             "type": {
-              "defined": "SolanaExtraArgs"
+              "defined": "SVMExtraArgs"
             }
+          },
+          {
+            "name": "onRampAddress",
+            "type": "bytes"
           }
         ]
       }
     },
     {
-      "name": "Solana2AnyRampMessage",
+      "name": "SVM2AnyRampMessage",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2211,10 +2245,14 @@
             "type": "publicKey"
           },
           {
+            "name": "feeTokenAmount",
+            "type": "u64"
+          },
+          {
             "name": "tokenAmounts",
             "type": {
               "vec": {
-                "defined": "Solana2AnyTokenTransfer"
+                "defined": "SVM2AnyTokenTransfer"
               }
             }
           }
@@ -2222,7 +2260,7 @@
       }
     },
     {
-      "name": "Solana2AnyTokenTransfer",
+      "name": "SVM2AnyTokenTransfer",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2255,7 +2293,7 @@
       }
     },
     {
-      "name": "Any2SolanaTokenTransfer",
+      "name": "Any2SVMTokenTransfer",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2288,7 +2326,7 @@
       }
     },
     {
-      "name": "Solana2AnyMessage",
+      "name": "SVM2AnyMessage",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2304,7 +2342,7 @@
             "name": "tokenAmounts",
             "type": {
               "vec": {
-                "defined": "SolanaTokenAmount"
+                "defined": "SVMTokenAmount"
               }
             }
           },
@@ -2317,16 +2355,12 @@
             "type": {
               "defined": "ExtraArgsInput"
             }
-          },
-          {
-            "name": "tokenIndexes",
-            "type": "bytes"
           }
         ]
       }
     },
     {
-      "name": "SolanaTokenAmount",
+      "name": "SVMTokenAmount",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2362,7 +2396,7 @@
       }
     },
     {
-      "name": "Any2SolanaMessage",
+      "name": "Any2SVMMessage",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2391,7 +2425,7 @@
             "name": "tokenAmounts",
             "type": {
               "vec": {
-                "defined": "SolanaTokenAmount"
+                "defined": "SVMTokenAmount"
               }
             }
           }
@@ -2484,7 +2518,17 @@
           },
           {
             "name": "onRamp",
-            "type": "bytes"
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    64
+                  ]
+                },
+                2
+              ]
+            }
           }
         ]
       }
@@ -2809,6 +2853,9 @@
             "name": "InvalidInputsLookupTableAccounts"
           },
           {
+            "name": "InvalidInputsLookupTableAccountWritable"
+          },
+          {
             "name": "InvalidInputsTokenAmount"
           },
           {
@@ -2864,6 +2911,12 @@
           },
           {
             "name": "InvalidInputsMissingTokenConfig"
+          },
+          {
+            "name": "MessageFeeTooHigh"
+          },
+          {
+            "name": "SourceTokenDataTooLarge"
           }
         ]
       }
@@ -2886,7 +2939,7 @@
         {
           "name": "message",
           "type": {
-            "defined": "Solana2AnyRampMessage"
+            "defined": "SVM2AnyRampMessage"
           },
           "index": false
         }

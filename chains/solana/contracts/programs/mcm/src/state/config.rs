@@ -26,7 +26,7 @@ pub struct McmSigner {
 #[account]
 pub struct MultisigConfig {
     pub chain_id: u64,
-    pub multisig_name: [u8; MULTISIG_NAME_PADDED],
+    pub multisig_id: [u8; MULTISIG_ID_PADDED],
 
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
@@ -45,13 +45,13 @@ impl MultisigConfig {
         NUM_GROUPS + // group_parents [u8; NUM_GROUPS]
         32 + // owner (Pubkey)
         32 + // proposed_owner (Pubkey)
-        4 + // string prefix for multisig_name
-        MULTISIG_NAME_PADDED + // fixed max multisig_name length from initialization
+        4 + // string prefix for multisig_id
+        MULTISIG_ID_PADDED + // fixed max multisig_id length from initialization
         4; // empty vec prefix for signers
 
     // for realloc - only need to account for signers
     pub fn space_with_signers(num_signers: usize) -> usize {
-        Self::INIT_SPACE +      // Base space including fixed multisig_name
+        Self::INIT_SPACE +      // Base space including fixed multisig_id
         num_signers * McmSigner::INIT_SPACE // Just add signers space
     }
 }

@@ -12,9 +12,9 @@ import (
 
 // FinalizeSignatures is the `finalizeSignatures` instruction.
 type FinalizeSignatures struct {
-	MultisigName *[32]uint8
-	Root         *[32]uint8
-	ValidUntil   *uint32
+	MultisigId *[32]uint8
+	Root       *[32]uint8
+	ValidUntil *uint32
 
 	// [0] = [WRITE] signatures
 	//
@@ -30,9 +30,9 @@ func NewFinalizeSignaturesInstructionBuilder() *FinalizeSignatures {
 	return nd
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *FinalizeSignatures) SetMultisigName(multisigName [32]uint8) *FinalizeSignatures {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *FinalizeSignatures) SetMultisigId(multisigId [32]uint8) *FinalizeSignatures {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -90,8 +90,8 @@ func (inst FinalizeSignatures) ValidateAndBuild() (*Instruction, error) {
 func (inst *FinalizeSignatures) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 		if inst.Root == nil {
 			return errors.New("Root parameter is not set")
@@ -123,9 +123,9 @@ func (inst *FinalizeSignatures) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MultisigName", *inst.MultisigName))
-						paramsBranch.Child(ag_format.Param("        Root", *inst.Root))
-						paramsBranch.Child(ag_format.Param("  ValidUntil", *inst.ValidUntil))
+						paramsBranch.Child(ag_format.Param("MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param("      Root", *inst.Root))
+						paramsBranch.Child(ag_format.Param("ValidUntil", *inst.ValidUntil))
 					})
 
 					// Accounts of the instruction:
@@ -138,8 +138,8 @@ func (inst *FinalizeSignatures) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj FinalizeSignatures) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -156,8 +156,8 @@ func (obj FinalizeSignatures) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	return nil
 }
 func (obj *FinalizeSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -177,14 +177,14 @@ func (obj *FinalizeSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 // NewFinalizeSignaturesInstruction declares a new FinalizeSignatures instruction with the provided parameters and accounts.
 func NewFinalizeSignaturesInstruction(
 	// Parameters:
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	root [32]uint8,
 	validUntil uint32,
 	// Accounts:
 	signatures ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *FinalizeSignatures {
 	return NewFinalizeSignaturesInstructionBuilder().
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetRoot(root).
 		SetValidUntil(validUntil).
 		SetSignaturesAccount(signatures).

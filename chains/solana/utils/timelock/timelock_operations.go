@@ -2,13 +2,14 @@ package timelock
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 )
 
 // represents a single instruction with its required accounts
@@ -19,6 +20,7 @@ type Instruction struct {
 
 // represents a batch of instructions that having atomicy to be scheduled and executed via timelock
 type Operation struct {
+	TimelockID   [32]byte      // timelock instance identifier
 	Predecessor  [32]byte      // hashed id of the previous operation
 	Salt         [32]byte      // random salt for the operation
 	Delay        uint64        // delay in seconds
@@ -47,11 +49,8 @@ func (op *Operation) AddInstruction(ix solana.Instruction, additionalPrograms []
 }
 
 func (op *Operation) IxsCountU32() uint32 {
-	ixsCount, err := mcms.SafeToUint32(len(op.instructions))
-	if err != nil {
-		panic(err)
-	}
-	return ixsCount
+	//nolint:gosec
+	return uint32(len(op.instructions))
 }
 
 // convert operation to timelock instruction data slice
@@ -94,12 +93,16 @@ func (op *Operation) RemainingAccounts() []*solana.AccountMeta {
 
 // hash the operation and return operation id
 func (op *Operation) OperationID() [32]byte {
-	return hashOperation(op.ToInstructionData(), op.Predecessor, op.Salt)
+	id, err := hashOperation(op.ToInstructionData(), op.Predecessor, op.Salt)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 func (op *Operation) OperationPDA() solana.PublicKey {
 	id := op.OperationID()
-	return config.TimelockOperationPDA(id)
+	return GetOperationPDA(op.TimelockID, id)
 }
 
 // type conversion from solana instruction to timelock instruction data
@@ -125,11 +128,22 @@ func convertToInstructionData(ix solana.Instruction) (timelock.InstructionData, 
 	}, nil
 }
 
-func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte, salt [32]byte) [32]byte {
+func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte, salt [32]byte) ([32]byte, error) {
 	var encodedData bytes.Buffer
+	// length prefix for instructions
+	//nolint:gosec
+	if err := binary.Write(&encodedData, binary.LittleEndian, uint32(len(instructions))); err != nil {
+		return [32]byte{}, fmt.Errorf("encoding instructions length: %w", err)
+	}
 
 	for _, ix := range instructions {
 		encodedData.Write(ix.ProgramId[:])
+
+		// length prefix for accounts array
+		//nolint:gosec
+		if err := binary.Write(&encodedData, binary.LittleEndian, uint32(len(ix.Accounts))); err != nil {
+			return [32]byte{}, fmt.Errorf("encoding accounts length: %w", err)
+		}
 
 		for _, acc := range ix.Accounts {
 			encodedData.Write(acc.Pubkey[:])
@@ -144,16 +158,21 @@ func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte
 				encodedData.WriteByte(0)
 			}
 		}
+
+		// length prefix for instruction data
+		//nolint:gosec
+		if err := binary.Write(&encodedData, binary.LittleEndian, uint32(len(ix.Data))); err != nil {
+			return [32]byte{}, fmt.Errorf("encoding data length: %w", err)
+		}
 		encodedData.Write(ix.Data)
 	}
 
 	encodedData.Write(predecessor[:])
 	encodedData.Write(salt[:])
 
-	result := mcms.Keccak256(encodedData.Bytes())
+	result := eth.Keccak256(encodedData.Bytes())
 
 	var hash [32]byte
 	copy(hash[:], result)
-
-	return hash
+	return hash, nil
 }

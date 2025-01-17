@@ -137,19 +137,21 @@ func (c *compositeTokenDataObserver) Observe(
 	msgObservations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
 	tokenDataObservations := c.initTokenDataObservations(msgObservations)
-
+	merged := tokenDataObservations
 	for _, ob := range c.observers {
 		tokenData, err := ob.Observe(ctx, msgObservations)
 		if err != nil {
 			c.lggr.Error("Error while observing token data", "error", err)
 			continue
 		}
-		tokenDataObservations, err = merge(tokenDataObservations, tokenData)
+		merged, err = merge(tokenDataObservations, tokenData)
 		if err != nil {
-			return nil, err
+			c.lggr.Error("Error while merging token data",
+				"error", err)
+			merged = tokenDataObservations
 		}
 	}
-	return tokenDataObservations, nil
+	return merged, nil
 }
 
 func (c *compositeTokenDataObserver) IsTokenSupported(
@@ -203,6 +205,8 @@ func (c *compositeTokenDataObserver) initTokenDataObservations(
 	return tokenObservation
 }
 
+// merge merges token data from two observations, it's used to combine token data from multiple observers.
+// In case of token data mismatch, it returns an error and the base observation.
 func merge(
 	base exectypes.TokenDataObservations,
 	from exectypes.TokenDataObservations,
