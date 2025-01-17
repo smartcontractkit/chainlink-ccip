@@ -2,10 +2,8 @@ package parse
 
 import "testing"
 
+//nolint:lll // long test data
 func Test_sanitizeString(t *testing.T) {
-	type args struct {
-		s string
-	}
 	tests := []struct {
 		name  string
 		lines []string

@@ -12,10 +12,11 @@ import (
 )
 
 func mustParseTime(str string) time.Time {
-	t, _ := time.Parse(time.RFC3339, "2024-12-09T20:59:53.531Z")
+	t, _ := time.Parse(time.RFC3339, str)
 	return t
 }
 
+//nolint:lll // long test data
 func TestParse(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -44,8 +45,8 @@ func TestParse(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := parse.Filter(tc.line)
 			require.NoError(t, err)
 			require.NotNil(t, result)
