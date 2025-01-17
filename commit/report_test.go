@@ -247,7 +247,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 			report := ccipocr3.CommitPluginReport{
 				MerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
 			}
-			stale := p.isStaleReport(tc.reportSeqNum, tc.onChainSeqNum, report)
+			stale := p.isStaleReport(p.lggr, tc.reportSeqNum, tc.onChainSeqNum, report)
 			require.Equal(t, tc.shouldBeStale, stale)
 		})
 	}

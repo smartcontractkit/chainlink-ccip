@@ -148,8 +148,9 @@ pub fn ocr3_transmit<R: Ocr3Report>(
         instruction_sysvar,
     )?;
 
-    require!(
-        tx.data.len() as u128 == expected_data_len,
+    require_eq!(
+        tx.data.len() as u128,
+        expected_data_len,
         Ocr3Error::WrongMessageLength
     );
 

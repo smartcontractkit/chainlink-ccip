@@ -8,7 +8,7 @@ use crate::program::CcipRouter;
 use crate::state::{CommitReport, Config, ExternalExecutionConfig, Nonce};
 use crate::{
     BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
-    ExecutionReportSingleChain, GlobalState, Solana2AnyMessage, SourceChain,
+    ExecutionReportSingleChain, GlobalState, SVM2AnyMessage, SourceChain,
 };
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -96,7 +96,7 @@ impl MerkleRoot {
 }
 
 #[derive(Accounts)]
-#[instruction(destination_chain_selector: u64, message: Solana2AnyMessage)]
+#[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct GetFee<'info> {
     #[account(
         seeds = [DEST_CHAIN_STATE_SEED, destination_chain_selector.to_le_bytes().as_ref()],
@@ -476,7 +476,7 @@ pub struct RemoveBillingTokenConfig<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(destination_chain_selector: u64, message: Solana2AnyMessage)]
+#[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct CcipSend<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -518,12 +518,18 @@ pub struct CcipSend<'info> {
     pub fee_token_mint: InterfaceAccount<'info, Mint>, // pass pre-2022 wSOL if using native SOL
 
     #[account(
-        // `message.fee_token` would ideally be named `message.fee_mint` in Solana,
+        // `message.fee_token` would ideally be named `message.fee_mint` in SVM,
         // but using the `token` nomenclature is more compatible with EVM
         seeds = [FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()], // the arg would ideally be named mint, but message.fee_token was set for EVM consistency
         bump,
     )]
     pub fee_token_config: Account<'info, BillingTokenConfigWrapper>, // pass pre-2022 wSOL config if using native SOL
+
+    #[account(
+        seeds = [FEE_BILLING_TOKEN_CONFIG, config.load()?.link_token_mint.key().as_ref()],
+        bump,
+    )]
+    pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
 
     /// CHECK this is the associated token account for the user paying the fee.
     /// If paying with native SOL, this must be the zero address.

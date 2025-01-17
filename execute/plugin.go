@@ -94,10 +94,10 @@ func NewPlugin(
 		homeChain:             homeChain,
 		tokenDataObserver:     tokenDataObserver,
 		estimateProvider:      estimateProvider,
-		lggr:                  logutil.WithContext(lggr, "Plugin"),
+		lggr:                  logutil.WithComponent(lggr, "Plugin"),
 		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
-			logutil.WithContext(lggr, "Discovery"),
+			logutil.WithComponent(lggr, "Discovery"),
 			&ccipReader,
 			homeChain,
 			destChain,
@@ -105,7 +105,7 @@ func NewPlugin(
 			oracleIDToP2pID,
 		),
 		chainSupport: plugincommon.NewChainSupport(
-			logutil.WithContext(lggr, "ChainSupport"),
+			logutil.WithComponent(lggr, "ChainSupport"),
 			homeChain,
 			oracleIDToP2pID,
 			reportingCfg.OracleID,
