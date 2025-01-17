@@ -144,7 +144,7 @@ pub mod token_pool {
         ctx: Context<'_, '_, '_, 'info, TokenOfframp<'info>>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
-        let parsed_amount = to_solana_token_amount(
+        let parsed_amount = to_svm_token_amount(
             release_or_mint.amount,
             ctx.accounts.chain_config.remote.decimals,
             ctx.accounts.config.decimals,
@@ -519,7 +519,7 @@ pub struct RemoteConfig {
     pub decimals: u8, // needed to track decimals from remote to convert properly
 }
 
-pub fn to_solana_token_amount(
+pub fn to_svm_token_amount(
     incoming_amount_bytes: [u8; 32], // LE encoded u256
     incoming_decimal: u8,
     local_decimal: u8,
@@ -560,7 +560,7 @@ mod tests {
     fn test_larger_incoming_decimal() {
         let mut u256_bytes = [0u8; 32];
         U256::from(BASE_VALUE * BASE_VALUE).to_little_endian(&mut u256_bytes);
-        let local_val = to_solana_token_amount(u256_bytes, 18, 9).unwrap();
+        let local_val = to_svm_token_amount(u256_bytes, 18, 9).unwrap();
         assert!(local_val == BASE_VALUE);
     }
 
@@ -568,7 +568,7 @@ mod tests {
     fn test_smaller_incoming_decimal() {
         let mut u256_bytes = [0u8; 32];
         U256::from(BASE_VALUE).to_little_endian(&mut u256_bytes);
-        let local_val = to_solana_token_amount(u256_bytes, 9, 18).unwrap();
+        let local_val = to_svm_token_amount(u256_bytes, 9, 18).unwrap();
         assert!(local_val == BASE_VALUE * BASE_VALUE);
     }
 
@@ -576,7 +576,7 @@ mod tests {
     fn test_equal_incoming_decimal() {
         let mut u256_bytes = [0u8; 32];
         U256::from(BASE_VALUE).to_little_endian(&mut u256_bytes);
-        let local_val = to_solana_token_amount(u256_bytes, 9, 9).unwrap();
+        let local_val = to_svm_token_amount(u256_bytes, 9, 9).unwrap();
         assert!(local_val == BASE_VALUE);
     }
 
@@ -584,7 +584,7 @@ mod tests {
     fn test_u256_overflow() {
         let mut u256_bytes = [0u8; 32];
         U256::from(BASE_VALUE * BASE_VALUE).to_little_endian(&mut u256_bytes);
-        let res = to_solana_token_amount(u256_bytes, 0, 18);
+        let res = to_svm_token_amount(u256_bytes, 0, 18);
         assert!(res.is_err());
     }
 
@@ -592,7 +592,7 @@ mod tests {
     fn test_u256_divide_to_zero() {
         let mut u256_bytes = [0u8; 32];
         U256::from(BASE_VALUE).to_little_endian(&mut u256_bytes);
-        let local_val = to_solana_token_amount(u256_bytes, 18, 0).unwrap();
+        let local_val = to_svm_token_amount(u256_bytes, 18, 0).unwrap();
         assert!(local_val == 0);
     }
 
@@ -603,7 +603,7 @@ mod tests {
             .checked_add(U256::from(1))
             .unwrap()
             .to_little_endian(&mut u256_bytes);
-        let res = to_solana_token_amount(u256_bytes, 0, 0);
+        let res = to_svm_token_amount(u256_bytes, 0, 0);
         assert!(res.is_err());
     }
 }

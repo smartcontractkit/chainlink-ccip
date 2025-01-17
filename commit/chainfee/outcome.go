@@ -7,28 +7,33 @@ import (
 	"sort"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func (p *processor) Outcome(
-	_ context.Context,
+	ctx context.Context,
 	_ Outcome,
 	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
-	consensusObs, err := p.getConsensusObservation(aos)
+	lggr := logutil.WithContextValues(ctx, p.lggr)
+
+	consensusObs, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
 		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
 	}
+
 	// No need to update yet
 	if len(consensusObs.FeeComponents) == 0 {
-		p.lggr.Debug("no consensus on fee components, nothing to update",
+		lggr.Warn("no consensus on fee components, nothing to update",
 			"consensusObs", consensusObs)
 		return Outcome{}, nil
 	}
@@ -50,12 +55,12 @@ func (p *processor) Outcome(
 		// 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 		usdPerFeeToken, ok := consensusObs.NativeTokenPrices[chain]
 		if !ok {
-			p.lggr.Warnw("missing native token price for chain, chain fee will not be updated",
+			lggr.Warnw("missing native token price for chain, chain fee will not be updated",
 				"chain", chain,
 			)
 			continue
 		}
-		p.lggr.Debugw("USD per fee token", "chain", chain, "usdPerFeeToken", usdPerFeeToken)
+		lggr.Debugw("USD per fee token", "chain", chain, "usdPerFeeToken", usdPerFeeToken)
 
 		// Example with Wei as the lowest denominator and Eth as the Fee token
 		// usdPerEthToken = Xe18USD18
@@ -71,6 +76,7 @@ func (p *processor) Outcome(
 	}
 
 	gasPrices := p.getGasPricesToUpdate(
+		lggr,
 		chainFeeUSDPrices,
 		consensusObs.ChainFeeUpdates,
 		consensusObs.TimestampNow,
@@ -81,21 +87,21 @@ func (p *processor) Outcome(
 		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
 	})
 
-	p.lggr.Infow("Gas Prices Outcome", "gasPrices", gasPrices)
+	lggr.Infow("Gas Prices Outcome", "gasPrices", gasPrices)
 	out := Outcome{GasPrices: gasPrices}
 	p.metricsReporter.TrackChainFeeOutcome(out)
 	return out, nil
 }
 
 func (p *processor) getConsensusObservation(
-	aos []plugincommon.AttributedObservation[Observation],
+	lggr logger.Logger, aos []plugincommon.AttributedObservation[Observation],
 ) (Observation, error) {
 	aggObs := aggregateObservations(aos)
 
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
-	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)
+	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
 
 	fDestChain, exists := fChains[p.destChain]
 	if !exists {
@@ -111,7 +117,7 @@ func (p *processor) getConsensusObservation(
 	timestamp := consensus.Median(aggObs.Timestamps, consensus.TimestampComparator)
 
 	chainFeeUpdatesConsensus := consensus.GetConsensusMapAggregator(
-		p.lggr,
+		lggr,
 		"ChainFeeUpdates",
 		aggObs.ChainFeeUpdates,
 		consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fDestChain)),
@@ -121,7 +127,7 @@ func (p *processor) getConsensusObservation(
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 
 	feeComponents := consensus.GetConsensusMapAggregator(
-		p.lggr,
+		lggr,
 		"FeeComponents",
 		aggObs.FeeComponents,
 		twoFChainPlus1,
@@ -141,7 +147,7 @@ func (p *processor) getConsensusObservation(
 	)
 
 	nativeTokenPrices := consensus.GetConsensusMapAggregator(
-		p.lggr,
+		lggr,
 		"NativeTokenPrices",
 		aggObs.NativeTokenPrices,
 		twoFChainPlus1,
@@ -206,6 +212,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 // 1. If time passed since the last update is greater than the stale threshold.
 // 2. If deviation between the fee quoter and latest observed chain fee exceeds the chain's configured threshold.
 func (p *processor) getGasPricesToUpdate(
+	lggr logger.Logger,
 	currentChainUSDFees map[cciptypes.ChainSelector]ComponentsUSDPrices,
 	latestUpdates map[cciptypes.ChainSelector]Update,
 	obsTimestamp time.Time,
@@ -239,7 +246,7 @@ func (p *processor) getGasPricesToUpdate(
 		}
 		ci, ok := feeInfo[chain]
 		if !ok {
-			p.lggr.Warnf("could not find fee info for chain %d", chain)
+			lggr.Warnf("could not find fee info for chain %d", chain)
 			continue
 		}
 

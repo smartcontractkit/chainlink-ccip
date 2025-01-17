@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
@@ -52,7 +53,9 @@ func (p *Processor) Observation(
 	prevOutcome Outcome,
 	q Query,
 ) (Observation, error) {
-	if err := p.prepareRMNController(ctx, prevOutcome); err != nil {
+	lggr := logutil.WithContextValues(ctx, p.lggr)
+
+	if err := p.prepareRMNController(ctx, lggr, prevOutcome); err != nil {
 		return Observation{}, fmt.Errorf("initialize RMN controller: %w", err)
 	}
 
@@ -65,7 +68,7 @@ func (p *Processor) Observation(
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
-	p.lggr.Infow("sending merkle root processor observation",
+	lggr.Infow("sending merkle root processor observation",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	p.metricsReporter.TrackMerkleObservation(observation, nextState.String())
 	return observation, nil
@@ -75,23 +78,23 @@ func (p *Processor) Observation(
 // 1. RMN is enabled.
 // 2. RMN controller is not already initialized with the same cfg digest.
 // 3. RMN remote config is available from previous outcome.
-func (p *Processor) prepareRMNController(ctx context.Context, prevOutcome Outcome) error {
+func (p *Processor) prepareRMNController(ctx context.Context, lggr logger.Logger, prevOutcome Outcome) error {
 	if !p.offchainCfg.RMNEnabled {
 		return nil
 	}
 
 	if prevOutcome.RMNRemoteCfg.IsEmpty() {
-		p.lggr.Debug("RMN remote config is empty, skipping RMN controller initialization in this round")
+		lggr.Debug("RMN remote config is empty, skipping RMN controller initialization in this round")
 		return nil
 	}
 
 	if prevOutcome.RMNRemoteCfg.ConfigDigest == p.rmnControllerCfgDigest {
-		p.lggr.Debugw("RMN controller already initialized with the same config digest",
+		lggr.Debugw("RMN controller already initialized with the same config digest",
 			"configDigest", p.rmnControllerCfgDigest)
 		return nil
 	}
 
-	p.lggr.Infow("Initializing RMN controller", "rmnRemoteCfg", prevOutcome.RMNRemoteCfg)
+	lggr.Infow("Initializing RMN controller", "rmnRemoteCfg", prevOutcome.RMNRemoteCfg)
 
 	rmnNodesInfo, err := p.rmnHomeReader.GetRMNNodesInfo(prevOutcome.RMNRemoteCfg.ConfigDigest)
 	if err != nil {
@@ -100,7 +103,7 @@ func (p *Processor) prepareRMNController(ctx context.Context, prevOutcome Outcom
 
 	oraclePeerIDs := make([]ragep2ptypes.PeerID, 0, len(p.oracleIDToP2pID))
 	for _, p2pID := range p.oracleIDToP2pID {
-		p.lggr.Infow("Adding oracle node to peerIDs", "p2pID", p2pID.String())
+		lggr.Infow("Adding oracle node to peerIDs", "p2pID", p2pID.String())
 		oraclePeerIDs = append(oraclePeerIDs, p2pID)
 	}
 
@@ -253,7 +256,7 @@ func (p *Processor) getObservation(
 			OnRampMaxSeqNums:   onRampLatestSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
 			RMNRemoteConfig:    rmnRemoteCfg,
-			FChain:             p.observer.ObserveFChain(),
+			FChain:             p.observer.ObserveFChain(ctx),
 		}, nextState, nil
 	case buildingReport:
 		if q.RetryRMNSignatures {
@@ -263,12 +266,12 @@ func (p *Processor) getObservation(
 		}
 		return Observation{
 			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			FChain:      p.observer.ObserveFChain(),
+			FChain:      p.observer.ObserveFChain(ctx),
 		}, nextState, nil
 	case waitingForReportTransmission:
 		return Observation{
 			OffRampNextSeqNums: p.observer.ObserveOffRampNextSeqNums(ctx),
-			FChain:             p.observer.ObserveFChain(),
+			FChain:             p.observer.ObserveFChain(ctx),
 		}, nextState, nil
 	default:
 		return Observation{},
@@ -301,7 +304,7 @@ type Observer interface {
 	// ObserveFChain observes the FChain for each supported chain. Check implementation specific details to learn
 	// if external calls are made, if values are cached, etc...
 	// NOTE: You can assume that every oracle can call this method, since data are fetched from home chain.
-	ObserveFChain() map[cciptypes.ChainSelector]int
+	ObserveFChain(ctx context.Context) map[cciptypes.ChainSelector]int
 }
 
 type observerImpl struct {
@@ -335,26 +338,28 @@ func newObserverImpl(
 // If the destination chain is cursed it returns nil.
 // If some source chain is cursed, it is not included in the results.
 func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
+	lggr := logutil.WithContextValues(ctx, o.lggr)
+
 	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
 	if err != nil {
-		o.lggr.Warnw("call to SupportsDestChain failed", "err", err)
+		lggr.Warnw("call to SupportsDestChain failed", "err", err)
 		return nil
 	}
 
 	if !supportsDestChain {
-		o.lggr.Debugw("cannot observe off ramp seq nums since destination chain is not supported")
+		lggr.Debugw("cannot observe off ramp seq nums since destination chain is not supported")
 		return nil
 	}
 
 	allSourceChains, err := o.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
-		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
 		return nil
 	}
 
 	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, o.chainSupport.DestChain(), allSourceChains)
 	if err != nil {
-		o.lggr.Errorw("nothing to observe: rmn read error",
+		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
 			"curseInfo", curseInfo,
 			"sourceChains", allSourceChains,
@@ -362,13 +367,13 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
-		o.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", curseInfo)
+		lggr.Warnw("nothing to observe: rmn curse", "curseInfo", curseInfo)
 		return nil
 	}
 
 	sourceChains := curseInfo.NonCursedSourceChains(allSourceChains)
 	if len(sourceChains) == 0 {
-		o.lggr.Warnw(
+		lggr.Warnw(
 			"nothing to observe from the offRamp, no active source chains exist",
 			"curseInfo", curseInfo)
 		return nil
@@ -376,7 +381,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 
 	offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, sourceChains)
 	if err != nil {
-		o.lggr.Warnw("call to NextSeqNum failed", "err", err)
+		lggr.Warnw("call to NextSeqNum failed", "err", err)
 		return nil
 	}
 
@@ -392,16 +397,17 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 // ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
 func (o observerImpl) ObserveLatestOnRampSeqNums(
 	ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain {
+	lggr := logutil.WithContextValues(ctx, o.lggr)
 
 	allSourceChains, err := o.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
-		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
 		return nil
 	}
 
 	supportedChains, err := o.chainSupport.SupportedChains(o.oracleID)
 	if err != nil {
-		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
 		return nil
 	}
 
@@ -416,12 +422,12 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 		eg.Go(func() error {
 			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain, destChain)
 			if err != nil {
-				o.lggr.Errorf("failed to get expected next seq num for source chain %d: %s", sourceChain, err)
+				lggr.Errorf("failed to get expected next seq num for source chain %d: %s", sourceChain, err)
 				return nil
 			}
 
 			if nextOnRampSeqNum == 0 {
-				o.lggr.Errorf("unexpected next seq num for source chain %d, it is 0", sourceChain)
+				lggr.Errorf("unexpected next seq num for source chain %d, it is 0", sourceChain)
 				return nil
 			}
 
@@ -437,7 +443,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 	}
 
 	if err := eg.Wait(); err != nil {
-		o.lggr.Warnw("call to GetExpectedNextSequenceNumber failed", "err", err)
+		lggr.Warnw("call to GetExpectedNextSequenceNumber failed", "err", err)
 		return nil
 	}
 
@@ -452,10 +458,11 @@ func (o observerImpl) ObserveMerkleRoots(
 	ctx context.Context,
 	ranges []plugintypes.ChainRange,
 ) []cciptypes.MerkleRootChain {
+	lggr := logutil.WithContextValues(ctx, o.lggr)
 
 	supportedChains, err := o.chainSupport.SupportedChains(o.oracleID)
 	if err != nil {
-		o.lggr.Warnw("call to supportedChains failed", "err", err)
+		lggr.Warnw("call to supportedChains failed", "err", err)
 		return nil
 	}
 
@@ -469,12 +476,12 @@ func (o observerImpl) ObserveMerkleRoots(
 				defer wg.Done()
 				msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
 				if err != nil {
-					o.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+					lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
 					return
 				}
 
 				if uint64(len(msgs)) != uint64(chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1) {
-					o.lggr.Warnw("call to MsgsBetweenSeqNums returned unexpected number of messages chain skipped",
+					lggr.Warnw("call to MsgsBetweenSeqNums returned unexpected number of messages, chain skipped",
 						"chain", chainRange.ChainSel,
 						"range", chainRange.SeqNumRange,
 						"expected", chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1,
@@ -489,7 +496,7 @@ func (o observerImpl) ObserveMerkleRoots(
 				for seqNum := chainRange.SeqNumRange.Start(); seqNum <= chainRange.SeqNumRange.End(); seqNum++ {
 					msgSeqNum := msgs[msgIdx].Header.SequenceNumber
 					if msgSeqNum != seqNum {
-						o.lggr.Warnw("message sequence number does not match seqNum range chain skipped",
+						lggr.Warnw("message sequence number does not match seqNum range, chain skipped",
 							"chain", chainRange.ChainSel,
 							"seqNum", seqNum,
 							"msgSeqNum", msgSeqNum,
@@ -500,15 +507,15 @@ func (o observerImpl) ObserveMerkleRoots(
 					msgIdx++
 				}
 
-				root, err := o.computeMerkleRoot(ctx, msgs)
+				root, err := o.computeMerkleRoot(ctx, lggr, msgs)
 				if err != nil {
-					o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
+					lggr.Warnw("call to computeMerkleRoot failed", "err", err)
 					return
 				}
 
 				onRampAddress, err := o.ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainRange.ChainSel)
 				if err != nil {
-					o.lggr.Warnw(
+					lggr.Warnw(
 						fmt.Sprintf("getting onramp contract address failed for selector %d", chainRange.ChainSel),
 						"err", err,
 						"chainSelector", chainRange.ChainSel,
@@ -536,7 +543,11 @@ func (o observerImpl) ObserveMerkleRoots(
 
 // computeMerkleRoot computes the merkle root of a list of messages.
 // Messages should be sorted by sequence number and not have any gaps.
-func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
+func (o observerImpl) computeMerkleRoot(
+	ctx context.Context,
+	lggr logger.Logger,
+	msgs []cciptypes.Message,
+) (cciptypes.Bytes32, error) {
 	hashes := make([][32]byte, len(msgs))
 	hashesStr := make([]string, len(hashes)) // also keep hashes as strings for logging purposes
 
@@ -554,7 +565,7 @@ func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 
 			msgHash, err := o.msgHasher.Hash(ctx, msg)
 			if err != nil {
-				o.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+				lggr.Warnw("failed to hash message", "msg", msg, "err", err)
 				return fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
 			}
 
@@ -575,7 +586,7 @@ func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 	}
 
 	root := tree.Root()
-	o.lggr.Infow("Computed merkle root", "hashes", hashesStr, "root", cciptypes.Bytes32(root).String())
+	lggr.Infow("Computed merkle root", "hashes", hashesStr, "root", cciptypes.Bytes32(root).String())
 	return root, nil
 }
 
@@ -584,6 +595,8 @@ func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 func (o observerImpl) ObserveRMNRemoteCfg(
 	ctx context.Context,
 	dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig {
+	lggr := logutil.WithContextValues(ctx, o.lggr)
+
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx, dstChain)
 	if err != nil {
 		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
@@ -591,7 +604,7 @@ func (o observerImpl) ObserveRMNRemoteCfg(
 			return rmntypes.RemoteConfig{}
 		}
 		// legitimate error
-		o.lggr.Errorw("call to GetRMNRemoteConfig failed", "err", err)
+		lggr.Errorw("call to GetRMNRemoteConfig failed", "err", err)
 		return rmntypes.RemoteConfig{}
 	}
 	return rmnRemoteCfg
@@ -599,11 +612,13 @@ func (o observerImpl) ObserveRMNRemoteCfg(
 
 // ObserveFChain observes the FChain for each supported chain.
 // NOTE: It does not make any external calls, values are cached.
-func (o observerImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
+func (o observerImpl) ObserveFChain(ctx context.Context) map[cciptypes.ChainSelector]int {
+	lggr := logutil.WithContextValues(ctx, o.lggr)
+
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
 		// TODO: metrics
-		o.lggr.Errorw("call to GetFChain failed", "err", err)
+		lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain

@@ -7,7 +7,7 @@ pub struct Config {
     pub version: u8,
     pub default_allow_out_of_order_execution: u8, // bytemuck::Pod compliant required for zero_copy
     _padding0: [u8; 6],
-    pub solana_chain_selector: u64,
+    pub svm_chain_selector: u64,
     pub default_gas_limit: u128,
     _padding1: [u8; 8],
 
@@ -21,6 +21,8 @@ pub struct Config {
     // TODO: token pool global config
 
     // TODO: billing global configs'
+    pub max_fee_juels_per_msg: u128,
+    pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
 
@@ -66,8 +68,10 @@ pub struct GlobalState {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct SourceChainConfig {
     pub is_enabled: bool, // Flag whether the source chain is enabled or not
-    #[max_len(64)]
-    pub on_ramp: Vec<u8>, // OnRamp address on the source chain
+    // OnRamp addresses supported from the source chain, each of them has a 64 byte address. So this can hold 2 addresses.
+    // If only one address is configured, then the space for the second address must be zeroed.
+    // Each address must be right padded with zeros if it is less than 64 bytes.
+    pub on_ramp: [[u8; 64]; 2],
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
@@ -78,7 +82,7 @@ pub struct SourceChainState {
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct SourceChain {
-    // Config for Any2Solana
+    // Config for Any2SVM
     pub version: u8,
     pub chain_selector: u64,       // Chain selector used for the seed
     pub state: SourceChainState,   // values that are updated automatically
@@ -118,7 +122,7 @@ pub struct DestChainConfig {
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct DestChain {
-    // Config for Solana2Any
+    // Config for SVM2Any
     pub version: u8,
     pub chain_selector: u64,     // Chain selector used for the seed
     pub state: DestChainState,   // values that are updated automatically
@@ -200,14 +204,14 @@ pub struct BillingTokenConfigWrapper {
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
-    pub timestamp: i64, // maintaining the type that Solana returns for the time (solana_program::clock::UnixTimestamp = i64)
+    pub timestamp: i64, // maintaining the type that SVM returns for the time (solana_program::clock::UnixTimestamp = i64)
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
 // used in the commit report execution_states field
 pub enum MessageExecutionState {
     Untouched = 0,
-    InProgress = 1, // Not used in Solana, but used in EVM
+    InProgress = 1, // Not used in SVM, but used in EVM
     Success = 2,
     Failure = 3,
 }
@@ -228,6 +232,7 @@ impl TryFrom<u128> for MessageExecutionState {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use std::convert::TryFrom;
 
