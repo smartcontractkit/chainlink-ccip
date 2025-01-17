@@ -495,7 +495,8 @@ func (r *ccipChainReader) Nonces(
 
 			val, ok := returnVal.(*uint64)
 			if !ok || val == nil {
-				return nil, fmt.Errorf("invalid nonce value returned for address %s", address)
+				r.lggr.Errorw("invalid nonce value returned", "address", address)
+				continue
 			}
 
 			res[address] = *val
@@ -1244,16 +1245,16 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 	srcChains []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]getOnRampDynamicConfigResponse {
 	result := make(map[cciptypes.ChainSelector]getOnRampDynamicConfigResponse)
-	if err := validateExtendedReaderExistence(r.contractReaders, srcChains...); err != nil {
-		r.lggr.Errorw("validate extended reader existence", "err", err)
-		return result
-	}
 
 	mu := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
 	for _, chainSel := range srcChains {
 		// no onramp for the destination chain
 		if chainSel == r.destChain {
+			continue
+		}
+		if r.contractReaders[chainSel] == nil {
+			r.lggr.Errorw("contract reader not found", "chain", chainSel)
 			continue
 		}
 
@@ -1308,16 +1309,16 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 	srcChains []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]onRampDestChainConfig {
 	result := make(map[cciptypes.ChainSelector]onRampDestChainConfig)
-	if err := validateExtendedReaderExistence(r.contractReaders, srcChains...); err != nil {
-		r.lggr.Errorw("validate extended reader existence", "err", err)
-		return result
-	}
 
 	mu := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
 	for _, chainSel := range srcChains {
 		// no onramp for the destination chain
 		if chainSel == r.destChain {
+			continue
+		}
+		if r.contractReaders[chainSel] == nil {
+			r.lggr.Errorw("contract reader not found", "chain", chainSel)
 			continue
 		}
 
