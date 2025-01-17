@@ -233,7 +233,6 @@ func selectReport(
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	var selectedReports []exectypes.CommitData
 	pendingReports := 0
 	for i, commitReport := range commitReports {
 		// handle incomplete observations.
@@ -251,8 +250,6 @@ func selectReport(
 			continue
 		}
 
-		selectedReports = append(selectedReports, commitReports[i])
-
 		// If the report has not been fully executed, keep it for the next round.
 		// Detect a report was not fully executed
 		if len(commitReports[i].Messages) > len(commitReports[i].ExecutedMessages) {
@@ -260,7 +257,7 @@ func selectReport(
 		}
 	}
 
-	execReports, err := builder.Build()
+	execReports, selectedReports, err := builder.Build()
 
 	lggr.Infow(
 		"reports have been selected",
