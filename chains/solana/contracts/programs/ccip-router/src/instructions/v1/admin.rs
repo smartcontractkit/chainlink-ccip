@@ -46,6 +46,7 @@ pub fn update_fee_aggregator(
 ) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
     config.fee_aggregator = fee_aggregator;
+    // todo: emit ConfigSet event
     Ok(())
 }
 
