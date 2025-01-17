@@ -665,16 +665,10 @@ type Any2SVMRampMessage struct {
 	Header        RampMessageHeader
 	Sender        []byte
 	Data          []byte
-<<<<<<< HEAD
 	LogicReceiver ag_solanago.PublicKey
 	TokenReceiver ag_solanago.PublicKey
-	TokenAmounts  []Any2SolanaTokenTransfer
-	ExtraArgs     SolanaExtraArgs
-=======
-	Receiver      ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
 	ExtraArgs     SVMExtraArgs
->>>>>>> main
 	OnRampAddress []byte
 }
 

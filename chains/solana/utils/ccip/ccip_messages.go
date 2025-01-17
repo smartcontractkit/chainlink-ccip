@@ -99,7 +99,7 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 		},
 		Sender:        []byte{1, 2, 3},
 		Data:          []byte{4, 5, 6},
-		LogicReceiver: config.ReceiverExternalExecutionConfigPDA,
+		LogicReceiver: config.CcipLogicReceiver,
 		ExtraArgs: ccip_router.SVMExtraArgs{
 			ComputeUnits:     1000,
 			IsWritableBitmap: 3, // [true, true, false]

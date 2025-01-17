@@ -24,18 +24,11 @@ func TestMessageHashing(t *testing.T) {
 
 	t.Run("AnyToSVM", func(t *testing.T) {
 		t.Parallel()
-<<<<<<< HEAD
-		h, err := HashEvmToSolanaMessage(ccip_router.Any2SolanaRampMessage{
+		h, err := HashAnyToSVMMessage(ccip_router.Any2SVMRampMessage{
 			Sender:        sender,
 			TokenReceiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			LogicReceiver: solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
 			Data:          []byte{4, 5, 6},
-=======
-		h, err := HashAnyToSVMMessage(ccip_router.Any2SVMRampMessage{
-			Sender:   sender,
-			Receiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
-			Data:     []byte{4, 5, 6},
->>>>>>> main
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{8, 5, 3},
 				SourceChainSelector: 67,

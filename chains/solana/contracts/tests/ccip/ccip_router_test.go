@@ -3452,7 +3452,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				for i, testcase := range priceUpdatesCases {
 					t.Run(testcase.Name, func(t *testing.T) {
-						_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SolanaChainSelector, []byte{1, 2, 3, uint8(i)})
+						_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, uint8(i)})
 						rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 						require.NoError(t, err)
 
@@ -3556,7 +3556,7 @@ func TestCCIPRouter(t *testing.T) {
 					sourceChainSelector := uint64(34)
 					sourceChainStatePDA, err := ccip.GetSourceChainStatePDA(sourceChainSelector)
 					require.NoError(t, err)
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, sourceChainSelector, config.SolanaChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, sourceChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(sourceChainSelector, root)
 					require.NoError(t, err)
 
@@ -3593,7 +3593,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an invalid interval it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SolanaChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3630,7 +3630,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an interval size bigger than supported it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SolanaChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3704,7 +3704,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with a repeated merkle root, it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SolanaChainSelector, []byte{1, 2, 3, 1}) // repeated root
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, 1}) // repeated root
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3742,7 +3742,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an invalid min interval, it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SolanaChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3840,7 +3840,7 @@ func TestCCIPRouter(t *testing.T) {
 						// TODO right now I'm allowing sending too many remaining_accounts, but if we want to be restrictive with that we can add a test here
 					}
 
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SolanaChainSelector, []byte{1, 2, 3})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3907,7 +3907,7 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("When committing a report with the exact next interval, it succeeds", func(t *testing.T) {
-				_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SolanaChainSelector, []byte{4, 5, 6})
+				_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 				require.NoError(t, err)
 
