@@ -46,11 +46,17 @@ func Test_sanitizeString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var got []string
 			for i, line := range tt.lines {
-				got = append(got, sanitizeString(line))
+				got = append(got, sanitizeString(line, LogTypeCI))
 				if got[i] != tt.want[i] {
 					t.Errorf("sanitizeString() = %v, want %v", got, tt.want)
 				}
 			}
 		})
 	}
+}
+
+func TestSanitize(t *testing.T) {
+	line := `logger.go:146: 2025-01-17T13:59:55.521+0200	INFO	CCIPCommitPlugin.evm.1337.3379446385462418246.0x075f98f19ef9873523cde0267ab8b0253904363e	commit/plugin.go:482	closing commit plugin	{"version": "unset@unset", "plugin": "Commit", "oracleID": 1, "donID": 2, "configDigest": "000a7d1df8632e2b3479350dcca1ee46eeec889dc37eb2ab094e63a1820ba291", "component": "Plugin"}`
+	sanitized := sanitizeString(line, LogTypeMixed)
+	t.Log("sanitized line:", sanitized)
 }

@@ -46,11 +46,43 @@ func TestParse(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := parse.Filter(tc.line)
+			result, err := parse.Filter(tc.line, parse.LogTypeJSON)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			require.Equal(t, tc.expected, *result)
 		})
 	}
 	fmt.Println(tests)
+}
+
+func Test_ParseLine_Mixed(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		expected map[string]any
+	}{
+		{
+			name: "mixed log",
+			line: `logger.go:146: 2025-01-17T13:59:55.521+0200	INFO	CCIPCommitPlugin.evm.1337.3379446385462418246.0x075f98f19ef9873523cde0267ab8b0253904363e	commit/plugin.go:482	closing commit plugin	{"version": "unset@unset", "plugin": "Commit", "oracleID": 1, "donID": 2, "configDigest": "000a7d1df8632e2b3479350dcca1ee46eeec889dc37eb2ab094e63a1820ba291", "component": "Plugin"}`,
+			expected: map[string]any{
+				"caller":     "commit/plugin.go:482",
+				"component":  "Plugin",
+				"level":      "INFO",
+				"logger":     "CCIPCommitPlugin.evm.1337.3379446385462418246.0x075f98f19ef9873523cde0267ab8b0253904363e",
+				"message":    "closing commit plugin",
+				"timestamp":  "2025-01-17T13:59:55.521+0200",
+				"jsonFields": `{"version": "unset@unset", "plugin": "Commit", "oracleID": 1, "donID": 2, "configDigest": "000a7d1df8632e2b3479350dcca1ee46eeec889dc37eb2ab094e63a1820ba291", "component": "Plugin"}`,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := parse.ParseLine(tc.line, parse.LogTypeMixed)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Equal(t, tc.expected, result)
+		})
+	}
 }

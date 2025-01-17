@@ -15,7 +15,8 @@ import (
 )
 
 type arguments struct {
-	files []string
+	files   []string
+	logType string
 }
 
 // renderData
@@ -66,6 +67,8 @@ func run(args arguments) error {
 		io.Filenames = args.files
 	}
 
+	fmt.Println("processing files", io.Filenames)
+
 	inputStream, err := stream.InitializeInputStream(io)
 	if err != nil {
 		return fmt.Errorf("failed to initialize input stream: %w", err)
@@ -74,10 +77,10 @@ func run(args arguments) error {
 	scanner := bufio.NewScanner(inputStream)
 	for scanner.Scan() {
 		line := scanner.Text()
-		data, err := parse.Filter(line)
+		data, err := parse.Filter(line, args.logType)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to get data: %s\n", err)
-			continue
+			return err
 		}
 		if data == nil {
 			// no data to display.
@@ -100,6 +103,18 @@ func makeCommand() *cli.Command {
 				Name:        "filename",
 				Usage:       "Provide one or more files to read. If not provided, reads from stdin.",
 				Destination: &args.files,
+			},
+			&cli.StringFlag{
+				Name:        "logType",
+				Usage:       "Specify the type of log to parse, valid options: json, mixed, ci",
+				Destination: &args.logType,
+				Required:    true,
+				Validator: func(s string) error {
+					if s != parse.LogTypeJSON && s != parse.LogTypeMixed {
+						return fmt.Errorf("invalid log type: %s, expected either %s or %s", s, parse.LogTypeJSON, parse.LogTypeMixed)
+					}
+					return nil
+				},
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {

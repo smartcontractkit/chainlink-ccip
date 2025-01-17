@@ -12,6 +12,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241212163958-6a43e61b9d49
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
+	github.com/urfave/cli/v3 v3.0.0-beta1
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.27.0
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
@@ -54,7 +55,6 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/urfave/cli/v3 v3.0.0-beta1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.opentelemetry.io/otel v1.30.0 // indirect
 	go.opentelemetry.io/otel/metric v1.30.0 // indirect
