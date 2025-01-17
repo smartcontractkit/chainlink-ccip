@@ -133,6 +133,9 @@ const (
 	MissingNonce                  messageStatus = "missing_nonce"
 	InvalidNonce                  messageStatus = "invalid_nonce"
 	TooCostly                     messageStatus = "tooCostly"
+	TXMCheckError                 messageStatus = "txm_check_error"
+	TXMFatalStatus                messageStatus = "txm_fatal_status"
+	SkippedInflight               messageStatus = "skipped_inflight"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
 		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
@@ -147,7 +150,13 @@ const (
 )
 
 // Check for the messages.
-type Check func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error)
+type Check func(
+	ctx context.Context,
+	lggr logger.Logger,
+	msg ccipocr3.Message,
+	idx int,
+	report exectypes.CommitData,
+) (messageStatus, error)
 
 /*
 // Template
@@ -164,7 +173,13 @@ func Template() Check {
 // CheckIfPseudoDeleted checks if the message has been removed, typically done to reduce observation size.
 // This check should happen early because other checks are likely to fail if the message has been deleted.
 func CheckIfPseudoDeleted() Check {
-	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+	return func(
+		_ context.Context,
+		lggr logger.Logger,
+		msg ccipocr3.Message,
+		idx int,
+		report exectypes.CommitData,
+	) (messageStatus, error) {
 		if msg.IsEmpty() {
 			lggr.Errorw("message pseudo deleted", "index", idx)
 			return PseudoDeleted, nil
@@ -175,7 +190,13 @@ func CheckIfPseudoDeleted() Check {
 
 // CheckAlreadyExecuted checks the report executed list to see if the message has been executed.
 func CheckAlreadyExecuted() Check {
-	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+	return func(
+		_ context.Context,
+		lggr logger.Logger,
+		msg ccipocr3.Message,
+		idx int,
+		report exectypes.CommitData,
+	) (messageStatus, error) {
 		if slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber) {
 			lggr.Infow(
 				"message already executed",
@@ -192,7 +213,13 @@ func CheckAlreadyExecuted() Check {
 
 // CheckTokenData rejects messages which are missing their token data (attestations, i.e. CCTP).
 func CheckTokenData() Check {
-	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+	return func(
+		_ context.Context,
+		lggr logger.Logger,
+		msg ccipocr3.Message,
+		idx int,
+		report exectypes.CommitData,
+	) (messageStatus, error) {
 		if idx >= len(report.MessageTokenData) {
 			lggr.Errorw("token data index out of range", "index", idx, "messageTokensData", len(report.MessageTokenData))
 			return Error, fmt.Errorf("token data index out of range")
@@ -223,7 +250,13 @@ func CheckTokenData() Check {
 
 // CheckTooCostly compares the costly list for a given message.
 func CheckTooCostly() Check {
-	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+	return func(
+		_ context.Context,
+		lggr logger.Logger,
+		msg ccipocr3.Message,
+		idx int,
+		report exectypes.CommitData,
+	) (messageStatus, error) {
 		// 4. Check if the message is too costly to execute.
 		if slices.Contains(report.CostlyMessages, msg.Header.MessageID) {
 			lggr.Infow(
@@ -248,7 +281,13 @@ func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64) Chec
 	// temporary map to store state between nonce checks for this round.
 	expectedNonce := make(map[ccipocr3.ChainSelector]map[string]uint64)
 
-	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+	return func(
+		_ context.Context,
+		lggr logger.Logger,
+		msg ccipocr3.Message,
+		idx int,
+		report exectypes.CommitData,
+	) (messageStatus, error) {
 		// Setting the Nonce to zero (or omitting it) indicates that the message
 		// can be executed out of order. We allow this in the plugin by skipping
 		// the nonce check.
@@ -320,7 +359,7 @@ func (b *execReportBuilder) checkMessages(ctx context.Context, report exectypes.
 
 // checkMessage for execution readiness.
 func (b *execReportBuilder) checkMessage(
-	_ context.Context, idx int, execReport exectypes.CommitData,
+	ctx context.Context, idx int, execReport exectypes.CommitData,
 ) (exectypes.CommitData, messageStatus, error) {
 	result := execReport
 
@@ -333,7 +372,7 @@ func (b *execReportBuilder) checkMessage(
 	msg := execReport.Messages[idx]
 
 	for _, check := range b.checks {
-		status, err := check(b.lggr, msg, idx, execReport)
+		status, err := check(ctx, b.lggr, msg, idx, execReport)
 		if err != nil {
 			return execReport, Error, err
 		}
