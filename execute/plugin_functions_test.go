@@ -2,11 +2,9 @@ package execute
 
 import (
 	"fmt"
-	"testing"
-	"time"
-
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
+	"testing"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -1233,80 +1231,6 @@ func Test_mergeCostlyMessages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := mergeCostlyMessages(tt.aos, tt.fChainDest)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func Test_getMessageTimestampMap(t *testing.T) {
-	tests := []struct {
-		name              string
-		commitReportCache map[cciptypes.ChainSelector][]exectypes.CommitData
-		obs               exectypes.MessageObservations
-		want              map[cciptypes.Bytes32]time.Time
-		wantErr           assert.ErrorAssertionFunc
-	}{
-		{
-			name:              "empty",
-			commitReportCache: map[cciptypes.ChainSelector][]exectypes.CommitData{},
-			obs:               exectypes.MessageObservations{},
-			want:              map[cciptypes.Bytes32]time.Time{},
-			wantErr:           assert.NoError,
-		},
-		{
-			name:              "missing commit data for a chain",
-			commitReportCache: map[cciptypes.ChainSelector][]exectypes.CommitData{},
-			obs: exectypes.MessageObservations{
-				1: {
-					1: {
-						Header: cciptypes.RampMessageHeader{
-							MessageID: cciptypes.Bytes32{0x01},
-						},
-					},
-				},
-			},
-			want:    map[cciptypes.Bytes32]time.Time{},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "happy path",
-			commitReportCache: map[cciptypes.ChainSelector][]exectypes.CommitData{
-				1: {
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
-						Timestamp:           time.Unix(1, 0),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(15, 25),
-						Timestamp:           time.Unix(2, 0),
-					},
-				},
-			},
-			obs: exectypes.MessageObservations{
-				1: {
-					1: {
-						Header: cciptypes.RampMessageHeader{
-							MessageID: cciptypes.Bytes32{0x01},
-						},
-					},
-					16: {
-						Header: cciptypes.RampMessageHeader{
-							MessageID: cciptypes.Bytes32{0x04},
-						},
-					},
-				},
-			},
-			want: map[cciptypes.Bytes32]time.Time{
-				{0x01}: time.Unix(1, 0),
-				{0x04}: time.Unix(2, 0),
-			},
-			wantErr: assert.NoError,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := getMessageTimestampMap(tt.commitReportCache, tt.obs)
 			assert.Equal(t, tt.want, got)
 		})
 	}

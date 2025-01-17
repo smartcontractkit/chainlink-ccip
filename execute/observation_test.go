@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -177,6 +178,82 @@ func Test_getMessagesObservation(t *testing.T) {
 				observation.Hashes = nil
 				assert.Equal(t, tt.expectedObs, observation)
 			}
+		})
+	}
+}
+
+func Test_readAllMessages(t *testing.T) {
+	ctx := context.Background()
+
+	// Create mock objects
+	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
+	lggr := mocks.NullLogger
+	timestamp := time.Now()
+
+	tests := []struct {
+		name               string
+		commitData         []exectypes.CommitData
+		expectedMsgs       exectypes.MessageObservations
+		expectedReports    exectypes.CommitObservations
+		expectedTimestamps map[cciptypes.Bytes32]time.Time
+		expectedError      bool
+	}{
+		{
+			name:               "no commit data",
+			commitData:         []exectypes.CommitData{},
+			expectedMsgs:       exectypes.MessageObservations{},
+			expectedReports:    exectypes.CommitObservations{},
+			expectedTimestamps: map[cciptypes.Bytes32]time.Time{},
+			expectedError:      false,
+		},
+		{
+			name: "valid commit data",
+			commitData: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
+					Timestamp:           timestamp,
+				},
+			},
+			expectedMsgs: exectypes.MessageObservations{
+				1: {
+					1: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 1, MessageID: cciptypes.Bytes32{0x01}}},
+					2: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2, MessageID: cciptypes.Bytes32{0x02}}},
+					3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3, MessageID: cciptypes.Bytes32{0x03}}},
+				},
+			},
+			expectedReports: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
+						Timestamp:           timestamp,
+					},
+				},
+			},
+			expectedTimestamps: map[cciptypes.Bytes32]time.Time{
+				cciptypes.Bytes32{0x01}: timestamp,
+				cciptypes.Bytes32{0x02}: timestamp,
+				cciptypes.Bytes32{0x03}: timestamp,
+			},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up mock expectations
+			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
+				cciptypes.NewSeqNumRange(1, 3)).Return([]cciptypes.Message{
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 1, MessageID: cciptypes.Bytes32{0x01}}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2, MessageID: cciptypes.Bytes32{0x02}}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3, MessageID: cciptypes.Bytes32{0x03}}},
+			}, nil).Maybe()
+
+			msgs, reports, timestamps := readAllMessages(ctx, lggr, ccipReader, tt.commitData)
+			assert.Equal(t, tt.expectedMsgs, msgs)
+			assert.Equal(t, tt.expectedReports, reports)
+			assert.Equal(t, tt.expectedTimestamps, timestamps)
 		})
 	}
 }

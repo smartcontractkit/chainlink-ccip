@@ -3,10 +3,8 @@ package execute
 import (
 	"errors"
 	"fmt"
-	"sort"
-	"time"
-
 	mapset "github.com/deckarep/golang-set/v2"
+	"sort"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -590,30 +588,4 @@ func getConsensusObservation(
 	)
 
 	return observation, nil
-}
-
-// getMessageTimestampMap returns a map of message IDs to their timestamps.
-// cciptypes.Message does not contain a timestamp, so we need to derive the timestamp from the commit data.
-func getMessageTimestampMap(
-	commitReportCache map[cciptypes.ChainSelector][]exectypes.CommitData,
-	messages exectypes.MessageObservations,
-) map[cciptypes.Bytes32]time.Time {
-	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
-
-	for chainSel, SeqNumToMsg := range messages {
-		commitData, ok := commitReportCache[chainSel]
-		if !ok {
-			continue
-		}
-
-		for seqNum, msg := range SeqNumToMsg {
-			for _, commit := range commitData {
-				if commit.SequenceNumberRange.Contains(seqNum) {
-					messageTimestamps[msg.Header.MessageID] = commit.Timestamp
-				}
-			}
-		}
-	}
-
-	return messageTimestamps
 }
