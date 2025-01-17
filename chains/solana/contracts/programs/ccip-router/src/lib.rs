@@ -88,6 +88,15 @@ pub mod ccip_router {
 
         ctx.accounts.state.latest_price_sequence_number = 0;
 
+        emit!(ConfigSet {
+            chain_selector: config.svm_chain_selector,
+            fee_aggregator: config.fee_aggregator,
+            enable_manual_execution_after: config.enable_manual_execution_after,
+            default_gas_limit: config.default_gas_limit,
+            link_token_mint: config.link_token_mint,
+            max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+        });
+
         Ok(())
     }
 
