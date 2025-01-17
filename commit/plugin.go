@@ -466,9 +466,14 @@ func (p *Plugin) getMainOutcome(
 
 	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
 	if waitingForPriceUpdatesToMakeItOnchain {
+		remainingPriceChecks := prevOutcome.MainOutcome.RemainingPriceChecks - 1
+		if remainingPriceChecks < 0 {
+			remainingPriceChecks = 0
+		}
+
 		return committypes.MainOutcome{
 			InflightPriceOcrSequenceNumber: prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
-			RemainingPriceChecks:           prevOutcome.MainOutcome.RemainingPriceChecks - 1,
+			RemainingPriceChecks:           remainingPriceChecks,
 		}
 	}
 

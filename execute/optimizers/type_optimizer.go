@@ -1,8 +1,9 @@
 package optimizers
 
 import (
-	"fmt"
 	"sort"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
@@ -15,6 +16,7 @@ import (
 type ObservationOptimizer struct {
 	maxEncodedSize    int
 	emptyEncodedSizes EmptyEncodeSizes
+	lggr              logger.Logger
 }
 
 func NewObservationOptimizer(maxEncodedSize int) ObservationOptimizer {
@@ -53,6 +55,8 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 // Keep repeating this process until the encoded observation fits within the op.maxEncodedSize
 // Important Note: We can't delete messages completely from single reports as we need them to create merkle proofs.
 //
+// Errors are returned if the observation cannot be encoded.
+//
 //nolint:gocyclo
 func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observation) (exectypes.Observation, error) {
 	obs := observation
@@ -84,7 +88,8 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 			// Remove messages one by one starting from the last message of the last commit report.
 			for seqNum <= lastCommit.SequenceNumberRange.End() {
 				if _, ok := obs.Messages[chain][seqNum]; !ok {
-					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
+					op.lggr.Errorw("missing message", "seqNum", seqNum, "chain", chain)
+					continue
 				}
 				obs.Messages[chain][seqNum] = cciptypes.Message{}
 				obs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
