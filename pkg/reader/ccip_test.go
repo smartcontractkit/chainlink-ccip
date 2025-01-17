@@ -518,7 +518,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedContractAddresses, contractAddresses)
-	require.Equal(t, 5, hook.Len())
+	require.Equal(t, 7, hook.Len())
 
 	assert.Contains(
 		t,
@@ -538,12 +538,22 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	assert.Contains(
 		t,
 		hook.All()[3].Message,
-		"unable to lookup source fee quoters, this is expected during initialization",
+		"unable to lookup source fee quoters (onRamp dynamic config), this is expected during initialization",
 	)
 	assert.Contains(
 		t,
 		hook.All()[4].Message,
-		"unable to lookup source routers, this is expected during initialization",
+		"unable to lookup source fee quoters (onRamp dynamic config), this is expected during initialization",
+	)
+	assert.Contains(
+		t,
+		"unable to lookup source routers (onRamp dest chain config), this is expected during initialization",
+		hook.All()[5].Message,
+	)
+	assert.Contains(
+		t,
+		"unable to lookup source routers (onRamp dest chain config), this is expected during initialization",
+		hook.All()[6].Message,
 	)
 }
 

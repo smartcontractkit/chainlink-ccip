@@ -2,10 +2,7 @@ package execute
 
 import (
 	"context"
-	"errors"
 	"fmt"
-
-	"google.golang.org/grpc"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
@@ -63,31 +60,6 @@ const (
 	// per-source-chain reports. These are not limited by this value.
 	maxReportCount = 1
 )
-
-// PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
-// and a validation service.
-type PluginFactoryConstructor struct{}
-
-func NewPluginFactoryConstructor() *PluginFactoryConstructor {
-	return &PluginFactoryConstructor{}
-}
-func (p PluginFactoryConstructor) NewReportingPluginFactory(
-	ctx context.Context,
-	config core.ReportingPluginServiceConfig,
-	grpcProvider grpc.ClientConnInterface,
-	pipelineRunner core.PipelineRunnerService,
-	telemetry core.TelemetryService,
-	errorLog core.ErrorLog,
-	capRegistry core.CapabilitiesRegistry,
-	keyValueStore core.KeyValueStore,
-	relayerSet core.RelayerSet,
-) (core.OCR3ReportingPluginFactory, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (core.ValidationService, error) {
-	panic("implement me")
-}
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
@@ -248,5 +220,4 @@ func (p PluginFactory) HealthReport() map[string]error {
 }
 
 // Interface compatibility checks.
-var _ core.OCR3ReportingPluginClient = &PluginFactoryConstructor{}
 var _ core.OCR3ReportingPluginFactory = &PluginFactory{}
