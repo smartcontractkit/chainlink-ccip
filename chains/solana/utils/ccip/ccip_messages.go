@@ -67,14 +67,14 @@ func NextCommitReportContext() [3][32]byte {
 	return CreateReportContext(reportSequence)
 }
 
-func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client) (ccip_router.Any2SolanaRampMessage, [32]byte, error) {
+func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client) (ccip_router.Any2SVMRampMessage, [32]byte, error) {
 	nextSeq, err := NextSequenceNumber(ctx, solanaGoClient, config.EvmSourceChainStatePDA)
 	if err != nil {
-		return ccip_router.Any2SolanaRampMessage{}, [32]byte{}, err
+		return ccip_router.Any2SVMRampMessage{}, [32]byte{}, err
 	}
 	msg := CreateDefaultMessageWith(config.EvmChainSelector, nextSeq)
 
-	hash, err := HashEvmToSolanaMessage(msg, config.OnRampAddress)
+	hash, err := HashAnyToSVMMessage(msg, config.OnRampAddress)
 	return msg, [32]byte(hash), err
 }
 
@@ -84,23 +84,23 @@ func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceC
 	return chainStateAccount.State.MinSeqNr, err
 }
 
-func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64) ccip_router.Any2SolanaRampMessage {
+func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64) ccip_router.Any2SVMRampMessage {
 	sourceHash, _ := hex.DecodeString("4571dc5d4711693551f54a96307bf71121e2a1abd21d8ae04b8e05f447821064")
 	var messageID [32]byte
 	copy(messageID[:], sourceHash)
 
-	message := ccip_router.Any2SolanaRampMessage{
+	message := ccip_router.Any2SVMRampMessage{
 		Header: ccip_router.RampMessageHeader{
 			MessageId:           messageID,
 			SourceChainSelector: sourceChainSelector,
-			DestChainSelector:   config.SolanaChainSelector,
+			DestChainSelector:   config.SVMChainSelector,
 			SequenceNumber:      sequenceNumber,
 			Nonce:               0,
 		},
 		Sender:   []byte{1, 2, 3},
 		Data:     []byte{4, 5, 6},
 		Receiver: config.ReceiverExternalExecutionConfigPDA,
-		ExtraArgs: ccip_router.SolanaExtraArgs{
+		ExtraArgs: ccip_router.SVMExtraArgs{
 			ComputeUnits:     1000,
 			IsWritableBitmap: 2, // bitmap[1] == 1
 			Accounts: []solana.PublicKey{
@@ -112,22 +112,22 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 	return message
 }
 
-func MakeEvmToSolanaMessage(ccipReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SolanaRampMessage, [32]byte, error) {
-	msg := CreateDefaultMessageWith(evmChainSelector, 1)
+func MakeAnyToSVMMessage(ccipReceiver solana.PublicKey, chainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SVMRampMessage, [32]byte, error) {
+	msg := CreateDefaultMessageWith(chainSelector, 1)
 	msg.Header.DestChainSelector = solanaChainSelector
 	msg.Receiver = ccipReceiver
 	msg.Data = data
 
-	hash, err := HashEvmToSolanaMessage(msg, config.OnRampAddress)
+	hash, err := HashAnyToSVMMessage(msg, config.OnRampAddress)
 	msg.Header.MessageId = [32]byte(hash)
 	return msg, msg.Header.MessageId, err
 }
 
-func HashEvmToSolanaMessage(msg ccip_router.Any2SolanaRampMessage, onRampAddress []byte) ([]byte, error) {
+func HashAnyToSVMMessage(msg ccip_router.Any2SVMRampMessage, onRampAddress []byte) ([]byte, error) {
 	hash := sha256.New()
 
 	hash.Write(leafDomainSeparator[:])
-	hash.Write([]byte("Any2SolanaMessageHashV1"))
+	hash.Write([]byte("Any2SVMMessageHashV1"))
 
 	if err := binary.Write(hash, binary.BigEndian, msg.Header.SourceChainSelector); err != nil {
 		return nil, err
@@ -215,11 +215,11 @@ func MerkleFrom(data [][]byte) []byte {
 	return hash
 }
 
-func HashSolanaToAnyMessage(msg ccip_router.Solana2AnyRampMessage) ([]byte, error) {
+func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
 	hash := sha256.New()
 
 	hash.Write(leafDomainSeparator[:])
-	hash.Write([]byte("Solana2AnyMessageHashV1"))
+	hash.Write([]byte("SVM2AnyMessageHashV1"))
 
 	if err := binary.Write(hash, binary.BigEndian, msg.Header.SourceChainSelector); err != nil {
 		return nil, err

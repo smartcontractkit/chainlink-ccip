@@ -34,7 +34,7 @@ pub fn execute<'info>(
     require!(chain_id == multisig_config.chain_id, McmError::WrongChainId);
 
     // use unix_timestamp from Clock which provides seconds precision.
-    // while Solana's PoH provides cryptographic proofs of time passage,
+    // while SVM's PoH provides cryptographic proofs of time passage,
     // clock drift can still occur if slot times exceed the ideal 400ms
     // (e.g., network had 30min drift in June 2022 when slots took 730ms)
     // ref: https://docs.solana.com/architecture/synchronization

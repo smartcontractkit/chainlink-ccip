@@ -27,20 +27,20 @@ impl RampMessageHeader {
 /// Report that is submitted by the execution DON at the execution phase. (including chain selector data)
 pub struct ExecutionReportSingleChain {
     pub source_chain_selector: u64,
-    pub message: Any2SolanaRampMessage,
+    pub message: Any2SVMRampMessage,
     pub offchain_token_data: Vec<Vec<u8>>, // https://github.com/smartcontractkit/chainlink/blob/885baff9479e935e0fc34d9f52214a32c158eac5/contracts/src/v0.8/ccip/libraries/Internal.sol#L72
     pub root: [u8; 32],
     pub proofs: Vec<[u8; 32]>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct SolanaExtraArgs {
+pub struct SVMExtraArgs {
     pub compute_units: u32,
     pub is_writable_bitmap: u64,
     pub accounts: Vec<Pubkey>,
 }
 
-impl SolanaExtraArgs {
+impl SVMExtraArgs {
     pub fn len(&self) -> usize {
         4 // compute units
         + 8 // isWritable bitmap
@@ -55,7 +55,7 @@ pub struct AnyExtraArgs {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaRampMessage {
+pub struct Any2SVMRampMessage {
     pub header: RampMessageHeader,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
@@ -63,12 +63,12 @@ pub struct Any2SolanaRampMessage {
     // token transfers: recipient of token transfers (associated token addresses are validated against this address)
     // arbitrary messaging: expected account in the declared arbitrary messaging accounts (2nd in the list of the accounts)
     pub receiver: Pubkey,
-    pub token_amounts: Vec<Any2SolanaTokenTransfer>,
-    pub extra_args: SolanaExtraArgs,
+    pub token_amounts: Vec<Any2SVMTokenTransfer>,
+    pub extra_args: SVMExtraArgs,
     pub on_ramp_address: Vec<u8>,
 }
 
-impl Any2SolanaRampMessage {
+impl Any2SVMRampMessage {
     pub fn len(&self) -> usize {
         let token_len = self.token_amounts.iter().fold(0, |acc, e| acc + e.len());
 
@@ -84,9 +84,9 @@ impl Any2SolanaRampMessage {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic message emitted from the OnRamp
-// Note: hash(Any2SolanaRampMessage) != hash(Solana2AnyRampMessage) due to encoding & parameter differences
-// messageId = hash(Solana2AnyRampMessage) using the source EVM chain's encoding format
-pub struct Solana2AnyRampMessage {
+// Note: hash(Any2SVMRampMessage) != hash(SVM2AnyRampMessage) due to encoding & parameter differences
+// messageId = hash(SVM2AnyRampMessage) using the source EVM chain's encoding format
+pub struct SVM2AnyRampMessage {
     pub header: RampMessageHeader, // Message header
     pub sender: Pubkey,            // sender address on the source chain
     pub data: Vec<u8>,             // arbitrary data payload supplied by the message sender
@@ -94,11 +94,11 @@ pub struct Solana2AnyRampMessage {
     pub extra_args: AnyExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
     pub fee_token: Pubkey,
     pub fee_token_amount: u64,
-    pub token_amounts: Vec<Solana2AnyTokenTransfer>,
+    pub token_amounts: Vec<SVM2AnyTokenTransfer>,
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct Solana2AnyTokenTransfer {
+pub struct SVM2AnyTokenTransfer {
     // The source pool address. This value is trusted as it was obtained through the onRamp. It can be relied
     // upon by the destination pool to validate the source pool.
     pub source_pool_address: Pubkey,
@@ -116,7 +116,7 @@ pub struct Solana2AnyTokenTransfer {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaTokenTransfer {
+pub struct Any2SVMTokenTransfer {
     // The source pool address encoded to bytes. This value is trusted as it is obtained through the onRamp. It can be
     // relied upon by the destination pool to validate the source pool.
     pub source_pool_address: Vec<u8>,
@@ -129,7 +129,7 @@ pub struct Any2SolanaTokenTransfer {
     pub amount: [u8; 32], // LE encoded u256, any cross-chain token amounts are u256
 }
 
-impl Any2SolanaTokenTransfer {
+impl Any2SVMTokenTransfer {
     pub fn len(&self) -> usize {
         4 + self.source_pool_address.len() // source_pool
         + 32 // token_address
@@ -140,16 +140,16 @@ impl Any2SolanaTokenTransfer {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Solana2AnyMessage {
+pub struct SVM2AnyMessage {
     pub receiver: Vec<u8>,
     pub data: Vec<u8>,
-    pub token_amounts: Vec<SolanaTokenAmount>,
+    pub token_amounts: Vec<SVMTokenAmount>,
     pub fee_token: Pubkey, // pass zero address if native SOL
     pub extra_args: ExtraArgsInput,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default, Debug, PartialEq, Eq)]
-pub struct SolanaTokenAmount {
+pub struct SVMTokenAmount {
     pub token: Pubkey,
     pub amount: u64, // u64 - amount local to solana
 }
@@ -161,10 +161,10 @@ pub struct ExtraArgsInput {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaMessage {
+pub struct Any2SVMMessage {
     pub message_id: [u8; 32],
     pub source_chain_selector: u64,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
-    pub token_amounts: Vec<SolanaTokenAmount>,
+    pub token_amounts: Vec<SVMTokenAmount>,
 }

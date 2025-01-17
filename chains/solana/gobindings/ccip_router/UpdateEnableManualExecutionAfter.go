@@ -12,7 +12,7 @@ import (
 
 // Updates the minimum amount of time required between a message being committed and when it can be manually executed.
 //
-// This is part of the OffRamp Configuration for Solana.
+// This is part of the OffRamp Configuration for SVM.
 // The Admin is the only one able to update this config.
 //
 // # Arguments

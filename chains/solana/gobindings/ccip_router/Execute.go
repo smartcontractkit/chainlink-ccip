@@ -15,7 +15,7 @@ import (
 //
 // The method name needs to be execute with Anchor encoding.
 //
-// This function is called by the OffChain when executing one Report to the Solana Router.
+// This function is called by the OffChain when executing one Report to the SVM Router.
 // In this Flow only one message is sent, the Execution Report. This is different as EVM does,
 // this is because there is no try/catch mechanism to allow batch execution.
 // This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.
