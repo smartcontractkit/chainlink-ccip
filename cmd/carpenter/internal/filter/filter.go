@@ -13,7 +13,7 @@ func init() {
 
 var _ parse.DataFilter = CommitFilter
 
-func CommitFilter(data parse.Data, object map[string]interface{}) *parse.Data {
+func CommitFilter(data parse.Data) *parse.Data {
 	var result *parse.Data
 	if data.Plugin == "Commit" {
 		//if data.PluginProcessor == "MerkleRoot" {
@@ -25,7 +25,7 @@ func CommitFilter(data parse.Data, object map[string]interface{}) *parse.Data {
 		return nil
 	}
 
-	time, err := getTimestamp("ts", object)
+	time, err := getTimestamp("ts", data.RawLoggerFields)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to parse timestamp: %s", err)
 	} else {

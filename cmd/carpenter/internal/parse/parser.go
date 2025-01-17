@@ -53,7 +53,7 @@ Ideal log format
 */
 
 // DataFilter is used by Filter to identify lines that should be displayed.
-type DataFilter func(data Data, object map[string]interface{}) *Data
+type DataFilter func(data Data) *Data
 
 type filter struct {
 	name string
@@ -122,6 +122,8 @@ func ParseLine(line, logType string) (*Data, error) {
 		if data.IsEmpty() {
 			return nil, nil
 		}
+
+		data.RawLoggerFields = obj
 
 		return &data, nil
 	} else if logType == LogTypeMixed {
@@ -203,14 +205,14 @@ func Filter(line, logType string) (*Data, error) {
 		return nil, fmt.Errorf("ParseLine: %w", err)
 	}
 
-	// for _, f := range filters {
-	// 	data := f.df(data, data)
-	// 	if data != nil {
-	// 		data.FilterName = f.name
-	// 		return data, nil
-	// 	}
-	// 	// TODO: multiple matches?
-	// }
+	for _, f := range filters {
+		data := f.df(*data)
+		if data != nil {
+			data.FilterName = f.name
+			return data, nil
+		}
+		// TODO: multiple matches?
+	}
 	return data, nil
 }
 
