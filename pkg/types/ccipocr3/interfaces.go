@@ -21,7 +21,8 @@ type MessageHasher interface {
 }
 
 type ExtraDataCodec interface {
-	DecodeExtraData(ExtraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
+	DecodeExtraArgs(extraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
+	DecodeDestExecData(destExecData Bytes, sourceChainSelector ChainSelector) (Bytes, error)
 }
 
 // RMNCrypto provides a chain-agnostic interface for verifying RMN signatures.
