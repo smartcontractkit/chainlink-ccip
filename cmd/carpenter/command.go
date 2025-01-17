@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -41,22 +42,64 @@ func renderData(data *parse.Data) {
 
 	var timeStyle = lipgloss.NewStyle().Width(10).Height(1).MaxHeight(1).
 		Align(lipgloss.Center)
-	var uidStyle = lipgloss.NewStyle().Width(15).Height(1).MaxHeight(1).
+	var uidStyle = lipgloss.NewStyle().Width(20).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1).Bold(true)
-	var messageStyle = lipgloss.NewStyle().Width(50).Height(1).MaxHeight(1).
+	var levelStyle = lipgloss.NewStyle().Width(4).Height(1).MaxHeight(1).
+		Align(lipgloss.Left).PaddingLeft(1).Italic(true)
+	var messageStyle = lipgloss.NewStyle().Width(75).Height(1).MaxHeight(1).
+		Align(lipgloss.Left).PaddingLeft(1)
+	var fieldsStyle = lipgloss.NewStyle().Width(100).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1)
 
-	uid := fmt.Sprintf("%s.%s.%s",
+	uid := fmt.Sprintf("%s.%s.%s.%s",
 		withColor(data.OracleID, data.OracleID),
 		withColor(data.DONID, data.DONID),
 		withColor(data.SequenceNumber, data.SequenceNumber),
+		withColor(data.Component, 0),
 	)
 
-	fmt.Printf("%s|%s|%s\n",
+	fmt.Printf("%s|%s|%s|%s|%s\n",
 		timeStyle.Render(data.Timestamp.Format(time.TimeOnly)),
 		uidStyle.Render(uid),
+		levelStyle.Render(truncateLevel(data.Level)),
 		messageStyle.Render(data.Message),
+		fieldsStyle.Render(getRelevantFieldsForMessage(data)),
 	)
+}
+
+func truncateLevel(level string) string {
+	switch lv := strings.ToLower(level); lv {
+	case "info":
+		return "ifo"
+	case "debug":
+		return "dbg"
+	case "warn":
+		return "wrn"
+	case "error":
+		return "err"
+	case "critical":
+		return "crt"
+	default:
+		return "unk"
+	}
+}
+
+func getRelevantFieldsForMessage(data *parse.Data) string {
+	if strings.HasPrefix(data.Message, "call to MsgsBetweenSeqNums returned unexpected") {
+		return fmt.Sprintf("expected=%v actual=%v chain=%v", data.RawLoggerFields["expected"], data.RawLoggerFields["actual"], data.RawLoggerFields["chain"])
+	}
+	if strings.HasPrefix(data.Message, "queried messages between sequence numbers") {
+		return fmt.Sprintf("numMsgs=%v sourceChain=%v seqNumRange=%v",
+			data.RawLoggerFields["numMsgs"], data.RawLoggerFields["sourceChainSelector"], data.RawLoggerFields["seqNumRange"])
+	}
+	if strings.HasPrefix(data.Message, "decoded messages between sequence numbers") {
+		return fmt.Sprintf("sourceChain=%v seqNumRange=%v",
+			data.RawLoggerFields["sourceChainSelector"], data.RawLoggerFields["seqNumRange"])
+	}
+	if strings.ToLower(data.Level) == "error" {
+		return fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
+	}
+	return "{}"
 }
 
 func run(args arguments) error {

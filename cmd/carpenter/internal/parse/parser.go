@@ -119,7 +119,7 @@ func ParseLine(line, logType string) (*Data, error) {
 		}
 
 		// This isn't ours.
-		if (data == Data{}) {
+		if data.IsEmpty() {
 			return nil, nil
 		}
 
@@ -176,6 +176,15 @@ func ParseLine(line, logType string) (*Data, error) {
 			return nil, fmt.Errorf("could not parse json fields: %w, fields: %s", err, obj["jsonFields"])
 		}
 
+		// parse the json fields into a map[string]any so that we can have the raw
+		// fields in the data struct.
+		var rawFields = make(map[string]any)
+		if err := json.Unmarshal([]byte(obj["jsonFields"]), &rawFields); err != nil {
+			return nil, fmt.Errorf("could not parse json fields: %w, fields: %s", err, obj["jsonFields"])
+		}
+
+		data.RawLoggerFields = rawFields
+
 		return &data, nil
 	} else if logType == LogTypeCI {
 		return nil, fmt.Errorf("CI log parsing not yet implemented")
@@ -227,7 +236,13 @@ type Data struct {
 	Version        string    `json:"version"`
 	ConfigDigest   string    `json:"configDigest"`
 
+	RawLoggerFields map[string]any `json:"-"`
+
 	// Additional detail space, can be unique to each filter.
 	// i.e. an error message, observer details, number of messages, etc
 	Details string
+}
+
+func (d Data) IsEmpty() bool {
+	return false // TODO: implement
 }
