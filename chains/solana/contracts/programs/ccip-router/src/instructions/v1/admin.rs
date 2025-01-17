@@ -156,13 +156,13 @@ pub fn update_dest_chain_config(
     Ok(())
 }
 
-pub fn update_solana_chain_selector(
+pub fn update_svm_chain_selector(
     ctx: Context<UpdateConfigCCIPRouter>,
     new_chain_selector: u64,
 ) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
 
-    config.solana_chain_selector = new_chain_selector;
+    config.svm_chain_selector = new_chain_selector;
 
     Ok(())
 }

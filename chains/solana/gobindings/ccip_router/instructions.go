@@ -43,7 +43,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for initialization.
-	// * `solana_chain_selector` - The chain selector for Solana.
+	// * `svm_chain_selector` - The chain selector for SVM.
 	// * `default_gas_limit` - The default gas limit for other destination chains.
 	// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
 	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
@@ -134,15 +134,15 @@ var (
 	// * `dest_chain_config` - The new configuration for the destination chain.
 	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
 
-	// Updates the Solana chain selector in the router configuration.
+	// Updates the SVM chain selector in the router configuration.
 	//
 	// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
 	//
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `new_chain_selector` - The new chain selector for Solana.
-	Instruction_UpdateSolanaChainSelector = ag_binary.TypeID([8]byte{128, 198, 143, 222, 43, 55, 119, 106})
+	// * `new_chain_selector` - The new chain selector for SVM.
+	Instruction_UpdateSvmChainSelector = ag_binary.TypeID([8]byte{164, 212, 71, 101, 166, 113, 26, 93})
 
 	// Updates the default gas limit in the router configuration.
 	//
@@ -166,7 +166,7 @@ var (
 
 	// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
 	//
-	// This is part of the OffRamp Configuration for Solana.
+	// This is part of the OffRamp Configuration for SVM.
 	// The Admin is the only one able to update this config.
 	//
 	// # Arguments
@@ -331,7 +331,7 @@ var (
 	//
 	// The method name needs to be commit with Anchor encoding.
 	//
-	// This function is called by the OffChain when committing one Report to the Solana Router.
+	// This function is called by the OffChain when committing one Report to the SVM Router.
 	// In this Flow only one report is sent, the Commit Report. This is different as EVM does,
 	// this is because here all the chain state is stored in one account per Merkle Tree Root.
 	// So, to avoid having to send a dynamic size array of accounts, in this message only one Commit Report Account is sent.
@@ -356,7 +356,7 @@ var (
 	//
 	// The method name needs to be execute with Anchor encoding.
 	//
-	// This function is called by the OffChain when executing one Report to the Solana Router.
+	// This function is called by the OffChain when executing one Report to the SVM Router.
 	// In this Flow only one message is sent, the Execution Report. This is different as EVM does,
 	// this is because there is no try/catch mechanism to allow batch execution.
 	// This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.
@@ -409,8 +409,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateSourceChainConfig"
 	case Instruction_UpdateDestChainConfig:
 		return "UpdateDestChainConfig"
-	case Instruction_UpdateSolanaChainSelector:
-		return "UpdateSolanaChainSelector"
+	case Instruction_UpdateSvmChainSelector:
+		return "UpdateSvmChainSelector"
 	case Instruction_UpdateDefaultGasLimit:
 		return "UpdateDefaultGasLimit"
 	case Instruction_UpdateDefaultAllowOutOfOrderExecution:
@@ -497,7 +497,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"update_dest_chain_config", (*UpdateDestChainConfig)(nil),
 		},
 		{
-			"update_solana_chain_selector", (*UpdateSolanaChainSelector)(nil),
+			"update_svm_chain_selector", (*UpdateSvmChainSelector)(nil),
 		},
 		{
 			"update_default_gas_limit", (*UpdateDefaultGasLimit)(nil),

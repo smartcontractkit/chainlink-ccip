@@ -17,16 +17,18 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for initialization.
-// * `solana_chain_selector` - The chain selector for Solana.
+// * `svm_chain_selector` - The chain selector for SVM.
 // * `default_gas_limit` - The default gas limit for other destination chains.
 // * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
 // * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
 type Initialize struct {
-	SolanaChainSelector             *uint64
+	SvmChainSelector                *uint64
 	DefaultGasLimit                 *ag_binary.Uint128
 	DefaultAllowOutOfOrderExecution *bool
 	EnableExecutionAfter            *int64
 	FeeAggregator                   *ag_solanago.PublicKey
+	LinkTokenMint                   *ag_solanago.PublicKey
+	MaxFeeJuelsPerMsg               *ag_binary.Uint128
 
 	// [0] = [WRITE] config
 	//
@@ -54,9 +56,9 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetSolanaChainSelector sets the "solanaChainSelector" parameter.
-func (inst *Initialize) SetSolanaChainSelector(solanaChainSelector uint64) *Initialize {
-	inst.SolanaChainSelector = &solanaChainSelector
+// SetSvmChainSelector sets the "svmChainSelector" parameter.
+func (inst *Initialize) SetSvmChainSelector(svmChainSelector uint64) *Initialize {
+	inst.SvmChainSelector = &svmChainSelector
 	return inst
 }
 
@@ -81,6 +83,18 @@ func (inst *Initialize) SetEnableExecutionAfter(enableExecutionAfter int64) *Ini
 // SetFeeAggregator sets the "feeAggregator" parameter.
 func (inst *Initialize) SetFeeAggregator(feeAggregator ag_solanago.PublicKey) *Initialize {
 	inst.FeeAggregator = &feeAggregator
+	return inst
+}
+
+// SetLinkTokenMint sets the "linkTokenMint" parameter.
+func (inst *Initialize) SetLinkTokenMint(linkTokenMint ag_solanago.PublicKey) *Initialize {
+	inst.LinkTokenMint = &linkTokenMint
+	return inst
+}
+
+// SetMaxFeeJuelsPerMsg sets the "maxFeeJuelsPerMsg" parameter.
+func (inst *Initialize) SetMaxFeeJuelsPerMsg(maxFeeJuelsPerMsg ag_binary.Uint128) *Initialize {
+	inst.MaxFeeJuelsPerMsg = &maxFeeJuelsPerMsg
 	return inst
 }
 
@@ -192,8 +206,8 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 func (inst *Initialize) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.SolanaChainSelector == nil {
-			return errors.New("SolanaChainSelector parameter is not set")
+		if inst.SvmChainSelector == nil {
+			return errors.New("SvmChainSelector parameter is not set")
 		}
 		if inst.DefaultGasLimit == nil {
 			return errors.New("DefaultGasLimit parameter is not set")
@@ -206,6 +220,12 @@ func (inst *Initialize) Validate() error {
 		}
 		if inst.FeeAggregator == nil {
 			return errors.New("FeeAggregator parameter is not set")
+		}
+		if inst.LinkTokenMint == nil {
+			return errors.New("LinkTokenMint parameter is not set")
+		}
+		if inst.MaxFeeJuelsPerMsg == nil {
+			return errors.New("MaxFeeJuelsPerMsg parameter is not set")
 		}
 	}
 
@@ -248,12 +268,14 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("            SolanaChainSelector", *inst.SolanaChainSelector))
+					instructionBranch.Child("Params[len=7]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("               SvmChainSelector", *inst.SvmChainSelector))
 						paramsBranch.Child(ag_format.Param("                DefaultGasLimit", *inst.DefaultGasLimit))
 						paramsBranch.Child(ag_format.Param("DefaultAllowOutOfOrderExecution", *inst.DefaultAllowOutOfOrderExecution))
 						paramsBranch.Child(ag_format.Param("           EnableExecutionAfter", *inst.EnableExecutionAfter))
 						paramsBranch.Child(ag_format.Param("                  FeeAggregator", *inst.FeeAggregator))
+						paramsBranch.Child(ag_format.Param("                  LinkTokenMint", *inst.LinkTokenMint))
+						paramsBranch.Child(ag_format.Param("              MaxFeeJuelsPerMsg", *inst.MaxFeeJuelsPerMsg))
 					})
 
 					// Accounts of the instruction:
@@ -272,8 +294,8 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `SolanaChainSelector` param:
-	err = encoder.Encode(obj.SolanaChainSelector)
+	// Serialize `SvmChainSelector` param:
+	err = encoder.Encode(obj.SvmChainSelector)
 	if err != nil {
 		return err
 	}
@@ -297,11 +319,21 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Serialize `LinkTokenMint` param:
+	err = encoder.Encode(obj.LinkTokenMint)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxFeeJuelsPerMsg` param:
+	err = encoder.Encode(obj.MaxFeeJuelsPerMsg)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `SolanaChainSelector`:
-	err = decoder.Decode(&obj.SolanaChainSelector)
+	// Deserialize `SvmChainSelector`:
+	err = decoder.Decode(&obj.SvmChainSelector)
 	if err != nil {
 		return err
 	}
@@ -325,17 +357,29 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
+	// Deserialize `LinkTokenMint`:
+	err = decoder.Decode(&obj.LinkTokenMint)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxFeeJuelsPerMsg`:
+	err = decoder.Decode(&obj.MaxFeeJuelsPerMsg)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	solanaChainSelector uint64,
+	svmChainSelector uint64,
 	defaultGasLimit ag_binary.Uint128,
 	defaultAllowOutOfOrderExecution bool,
 	enableExecutionAfter int64,
 	feeAggregator ag_solanago.PublicKey,
+	linkTokenMint ag_solanago.PublicKey,
+	maxFeeJuelsPerMsg ag_binary.Uint128,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	state ag_solanago.PublicKey,
@@ -346,11 +390,13 @@ func NewInitializeInstruction(
 	externalExecutionConfig ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetSolanaChainSelector(solanaChainSelector).
+		SetSvmChainSelector(svmChainSelector).
 		SetDefaultGasLimit(defaultGasLimit).
 		SetDefaultAllowOutOfOrderExecution(defaultAllowOutOfOrderExecution).
 		SetEnableExecutionAfter(enableExecutionAfter).
 		SetFeeAggregator(feeAggregator).
+		SetLinkTokenMint(linkTokenMint).
+		SetMaxFeeJuelsPerMsg(maxFeeJuelsPerMsg).
 		SetConfigAccount(config).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority).

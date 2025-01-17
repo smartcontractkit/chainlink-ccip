@@ -9,6 +9,7 @@ pub mod token_admin_registry;
 /////////////////////
 // Private modules //
 /////////////////////
+mod config;
 mod fee_quoter;
 mod merkle;
 mod messages;
