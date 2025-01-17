@@ -10,7 +10,7 @@ declare_id!("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8");
 pub mod ccip_invalid_receiver {
     use super::*;
 
-    pub fn ccip_receive(ctx: Context<Initialize>, _message: Any2SolanaMessage) -> Result<()> {
+    pub fn ccip_receive(ctx: Context<Initialize>, _message: Any2SVMMessage) -> Result<()> {
         msg!("Not reachable due to uninitialized accounts");
 
         let counter = &mut ctx.accounts.counter;
@@ -47,16 +47,16 @@ pub struct Counter {
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaMessage {
+pub struct Any2SVMMessage {
     pub message_id: [u8; 32],
     pub source_chain_selector: u64,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
-    pub token_amounts: Vec<SolanaTokenAmount>,
+    pub token_amounts: Vec<SVMTokenAmount>,
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct SolanaTokenAmount {
+pub struct SVMTokenAmount {
     pub token: Pubkey,
     pub amount: u64, // TODO: EVM uses u256
 }

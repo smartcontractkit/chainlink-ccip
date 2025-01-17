@@ -25,7 +25,7 @@
         {
           "name": "message",
           "type": {
-            "defined": "Any2SolanaMessage"
+            "defined": "Any2SVMMessage"
           }
         }
       ]
@@ -47,7 +47,7 @@
   ],
   "types": [
     {
-      "name": "Any2SolanaMessage",
+      "name": "Any2SVMMessage",
       "type": {
         "kind": "struct",
         "fields": [
@@ -76,7 +76,7 @@
             "name": "tokenAmounts",
             "type": {
               "vec": {
-                "defined": "SolanaTokenAmount"
+                "defined": "SVMTokenAmount"
               }
             }
           }
@@ -84,7 +84,7 @@
       }
     },
     {
-      "name": "SolanaTokenAmount",
+      "name": "SVMTokenAmount",
       "type": {
         "kind": "struct",
         "fields": [
