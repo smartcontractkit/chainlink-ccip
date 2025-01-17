@@ -16,8 +16,9 @@ import (
 )
 
 type arguments struct {
-	files   []string
-	logType string
+	files          []string
+	logType        string
+	disableFilters bool
 }
 
 // renderData
@@ -46,7 +47,7 @@ func renderData(data *parse.Data) {
 		Align(lipgloss.Left).PaddingLeft(1).Bold(true)
 	var levelStyle = lipgloss.NewStyle().Width(4).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1).Italic(true)
-	var messageStyle = lipgloss.NewStyle().Width(75).Height(1).MaxHeight(1).
+	var messageStyle = lipgloss.NewStyle().Width(60).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1)
 	var fieldsStyle = lipgloss.NewStyle().Width(100).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1)
@@ -85,21 +86,35 @@ func truncateLevel(level string) string {
 }
 
 func getRelevantFieldsForMessage(data *parse.Data) string {
+	var fields string
+
+	if strings.ToLower(data.Level) == "error" {
+		fields = fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
+	}
+
 	if strings.HasPrefix(data.Message, "call to MsgsBetweenSeqNums returned unexpected") {
-		return fmt.Sprintf("expected=%v actual=%v chain=%v", data.RawLoggerFields["expected"], data.RawLoggerFields["actual"], data.RawLoggerFields["chain"])
+		return fmt.Sprintf(
+			"%s expected=%v actual=%v chain=%v",
+			fields,
+			data.RawLoggerFields["expected"],
+			data.RawLoggerFields["actual"],
+			data.RawLoggerFields["chain"],
+		)
 	}
 	if strings.HasPrefix(data.Message, "queried messages between sequence numbers") {
-		return fmt.Sprintf("numMsgs=%v sourceChain=%v seqNumRange=%v",
-			data.RawLoggerFields["numMsgs"], data.RawLoggerFields["sourceChainSelector"], data.RawLoggerFields["seqNumRange"])
+		return fmt.Sprintf("%s numMsgs=%v sourceChain=%v seqNumRange=%v",
+			fields,
+			data.RawLoggerFields["numMsgs"],
+			data.RawLoggerFields["sourceChainSelector"],
+			data.RawLoggerFields["seqNumRange"],
+		)
 	}
 	if strings.HasPrefix(data.Message, "decoded messages between sequence numbers") {
-		return fmt.Sprintf("sourceChain=%v seqNumRange=%v",
-			data.RawLoggerFields["sourceChainSelector"], data.RawLoggerFields["seqNumRange"])
+		return fmt.Sprintf("%s sourceChain=%v seqNumRange=%v",
+			fields, data.RawLoggerFields["sourceChainSelector"], data.RawLoggerFields["seqNumRange"])
 	}
-	if strings.ToLower(data.Level) == "error" {
-		return fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
-	}
-	return "{}"
+
+	return ""
 }
 
 func run(args arguments) error {
@@ -120,7 +135,7 @@ func run(args arguments) error {
 	scanner := bufio.NewScanner(inputStream)
 	for scanner.Scan() {
 		line := scanner.Text()
-		data, err := parse.Filter(line, args.logType)
+		data, err := parse.Filter(line, args.logType, args.disableFilters)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to get data: %s\n", err)
 			return err
@@ -158,6 +173,12 @@ func makeCommand() *cli.Command {
 					}
 					return nil
 				},
+			},
+			&cli.BoolFlag{
+				Name:        "disableFilters",
+				Usage:       "Set to disable filter application on the logs. Defaults to false.",
+				Destination: &args.disableFilters,
+				Required:    false,
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {

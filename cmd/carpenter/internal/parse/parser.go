@@ -194,7 +194,7 @@ func ParseLine(line, logType string) (*Data, error) {
 	}
 }
 
-func Filter(line, logType string) (*Data, error) {
+func Filter(line, logType string, disableFilters bool) (*Data, error) {
 	line = sanitizeString(line, logType)
 	if len(line) == 0 {
 		return nil, nil
@@ -205,14 +205,17 @@ func Filter(line, logType string) (*Data, error) {
 		return nil, fmt.Errorf("ParseLine: %w", err)
 	}
 
-	for _, f := range filters {
-		data := f.df(*data)
-		if data != nil {
-			data.FilterName = f.name
-			return data, nil
+	if !disableFilters {
+		for _, f := range filters {
+			data := f.df(*data)
+			if data != nil {
+				data.FilterName = f.name
+				return data, nil
+			}
+			// TODO: multiple matches?
 		}
-		// TODO: multiple matches?
 	}
+
 	return data, nil
 }
 
