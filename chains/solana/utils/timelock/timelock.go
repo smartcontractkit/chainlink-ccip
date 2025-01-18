@@ -111,7 +111,7 @@ func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccoun
 }
 
 // instructions builder for preloading instructions to timelock operation
-func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey) ([]solana.Instruction, error) {
+func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey, proposerAccessController solana.PublicKey) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 	initOpIx, ioErr := timelock.NewInitializeOperationInstruction(
 		timelockID,
@@ -121,6 +121,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		op.IxsCountU32(),
 		op.OperationPDA(),
 		GetConfigPDA(timelockID),
+		proposerAccessController,
 		authority,
 		solana.SystemProgramID,
 	).ValidateAndBuild()
@@ -136,6 +137,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 			[]timelock.InstructionData{instruction}, // this should be a slice of instruction within 1232 bytes
 			op.OperationPDA(),
 			GetConfigPDA(timelockID),
+			proposerAccessController,
 			authority,
 			solana.SystemProgramID, // for reallocation
 		).ValidateAndBuild()
@@ -150,6 +152,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		op.OperationID(),
 		op.OperationPDA(),
 		GetConfigPDA(timelockID),
+		proposerAccessController,
 		authority,
 	).ValidateAndBuild()
 	if foErr != nil {
