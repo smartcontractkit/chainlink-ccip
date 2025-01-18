@@ -171,6 +171,9 @@ pub struct InitializeOperation<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
+    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    pub role_access_controller: AccountLoader<'info, AccessController>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
 
@@ -203,13 +206,10 @@ pub struct AppendInstructions<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    #[account(
-        mut,
-        constraint = (
-            operation.authority == authority.key() ||
-            config.owner == authority.key()
-        ) @ AuthError::Unauthorized
-    )]
+    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    pub role_access_controller: AccountLoader<'info, AccessController>,
+
+    #[account(mut)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
@@ -232,13 +232,10 @@ pub struct FinalizeOperation<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    #[account(
-        mut,
-        constraint = (
-            operation.authority == authority.key() ||
-            config.owner == authority.key()
-        ) @ AuthError::Unauthorized
-    )]
+    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    pub role_access_controller: AccountLoader<'info, AccessController>,
+
+    #[account(mut)]
     pub authority: Signer<'info>,
 }
 
@@ -257,12 +254,9 @@ pub struct ClearOperation<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    #[account(
-        mut,
-        constraint = (
-            operation.authority == authority.key() ||
-            config.owner == authority.key()
-        ) @ AuthError::Unauthorized
-    )]
+    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    pub role_access_controller: AccountLoader<'info, AccessController>,
+
+    #[account(mut)]
     pub authority: Signer<'info>,
 }

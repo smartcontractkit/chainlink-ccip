@@ -177,6 +177,11 @@
           "isSigner": false
         },
         {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -244,6 +249,11 @@
           "isSigner": false
         },
         {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -297,6 +307,11 @@
           "isSigner": false
         },
         {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -333,6 +348,11 @@
         },
         {
           "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
           "isMut": false,
           "isSigner": false
         },

@@ -53,6 +53,7 @@ pub mod timelock {
         schedule::schedule_batch(ctx, timelock_id, id, delay)
     }
 
+    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
     pub fn initialize_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, InitializeOperation<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -64,6 +65,7 @@ pub mod timelock {
         schedule::initialize_operation(ctx, timelock_id, id, predecessor, salt, instruction_count)
     }
 
+    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
     pub fn append_instructions<'info>(
         ctx: Context<'_, '_, '_, 'info, AppendInstructions<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -73,6 +75,7 @@ pub mod timelock {
         schedule::append_instructions(ctx, timelock_id, id, instructions_batch)
     }
 
+    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
     pub fn clear_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, ClearOperation<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -81,6 +84,7 @@ pub mod timelock {
         schedule::clear_operation(ctx, timelock_id, id)
     }
 
+    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
     pub fn finalize_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, FinalizeOperation<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],

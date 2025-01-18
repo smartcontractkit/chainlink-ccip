@@ -22,16 +22,18 @@ type InitializeOperation struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [WRITE, SIGNER] authority
+	// [2] = [] roleAccessController
 	//
-	// [3] = [] systemProgram
+	// [3] = [WRITE, SIGNER] authority
+	//
+	// [4] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeOperationInstructionBuilder creates a new `InitializeOperation` instruction builder.
 func NewInitializeOperationInstructionBuilder() *InitializeOperation {
 	nd := &InitializeOperation{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -88,26 +90,37 @@ func (inst *InitializeOperation) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
+// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+func (inst *InitializeOperation) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *InitializeOperation {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
+	return inst
+}
+
+// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+func (inst *InitializeOperation) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *InitializeOperation) SetAuthorityAccount(authority ag_solanago.PublicKey) *InitializeOperation {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *InitializeOperation) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *InitializeOperation) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeOperation {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *InitializeOperation) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst InitializeOperation) Build() *Instruction {
@@ -156,9 +169,12 @@ func (inst *InitializeOperation) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.RoleAccessController is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.Authority is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -183,11 +199,12 @@ func (inst *InitializeOperation) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("       systemProgram", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -261,6 +278,7 @@ func NewInitializeOperationInstruction(
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
+	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *InitializeOperation {
 	return NewInitializeOperationInstructionBuilder().
@@ -271,6 +289,7 @@ func NewInitializeOperationInstruction(
 		SetInstructionCount(instructionCount).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).
+		SetRoleAccessControllerAccount(roleAccessController).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)
 }
