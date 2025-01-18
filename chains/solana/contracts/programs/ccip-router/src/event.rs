@@ -108,6 +108,18 @@ pub struct PremiumMultiplierWeiPerEthUpdated {
 }
 
 #[event]
+pub struct ConfigSet {
+    pub chain_selector: u64,
+
+    pub fee_aggregator: Pubkey,
+    pub enable_manual_execution_after: i64,
+    pub default_gas_limit: u128,
+    pub max_fee_juels_per_msg: u128,
+    pub link_token_mint: Pubkey,
+    pub default_allow_out_of_order_execution: bool,
+}
+
+#[event]
 pub struct SourceChainConfigUpdated {
     pub source_chain_selector: u64,
     pub source_chain_config: SourceChainConfig,

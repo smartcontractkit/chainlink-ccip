@@ -3,13 +3,14 @@ use anchor_spl::token_interface;
 
 use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
-    DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
-    FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved, Ocr3ConfigInfo, OcrPluginType,
-    OwnershipTransferRequested, OwnershipTransferred, RemoveBillingTokenConfig, SetOcrConfig,
-    SetTokenBillingConfig, SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated,
-    SourceChainState, TimestampedPackedU224, TokenBilling, TransferOwnership,
-    UpdateBillingTokenConfig, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
-    UpdateSourceChainSelectorConfig, WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
+    ConfigSet, DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState,
+    FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved, Ocr3ConfigInfo,
+    OcrPluginType, OwnershipTransferRequested, OwnershipTransferred, RemoveBillingTokenConfig,
+    SetOcrConfig, SetTokenBillingConfig, SourceChainAdded, SourceChainConfig,
+    SourceChainConfigUpdated, SourceChainState, TimestampedPackedU224, TokenBilling,
+    TransferOwnership, UpdateBillingTokenConfig, UpdateConfigCCIPRouter,
+    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
+    FEE_BILLING_SIGNER_SEEDS,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -46,6 +47,16 @@ pub fn update_fee_aggregator(
 ) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
     config.fee_aggregator = fee_aggregator;
+
+    emit!(ConfigSet {
+        chain_selector: config.svm_chain_selector,
+        fee_aggregator: config.fee_aggregator,
+        link_token_mint: config.link_token_mint,
+        enable_manual_execution_after: config.enable_manual_execution_after,
+        default_gas_limit: config.default_gas_limit,
+        max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+    });
+
     Ok(())
 }
 
@@ -97,6 +108,7 @@ pub fn disable_source_chain_selector(
 
     chain_state.config.is_enabled = false;
 
+    // todo: more specific event type, maybe SourceChainDisabled?
     emit!(SourceChainConfigUpdated {
         source_chain_selector,
         source_chain_config: chain_state.config.clone(),
@@ -113,6 +125,7 @@ pub fn disable_dest_chain_selector(
 
     chain_state.config.is_enabled = false;
 
+    // todo: more specific event type, maybe DestChainDisabled?
     emit!(DestChainConfigUpdated {
         dest_chain_selector,
         dest_chain_config: chain_state.config.clone(),
@@ -161,6 +174,16 @@ pub fn update_svm_chain_selector(
 
     config.svm_chain_selector = new_chain_selector;
 
+    emit!(ConfigSet {
+        chain_selector: config.svm_chain_selector,
+        fee_aggregator: config.fee_aggregator,
+        link_token_mint: config.link_token_mint,
+        enable_manual_execution_after: config.enable_manual_execution_after,
+        default_gas_limit: config.default_gas_limit,
+        max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+        default_allow_out_of_order_execution: config.default_allow_out_of_order_execution != 0,
+    });
+
     Ok(())
 }
 
@@ -171,6 +194,16 @@ pub fn update_default_gas_limit(
     let mut config = ctx.accounts.config.load_mut()?;
 
     config.default_gas_limit = new_gas_limit;
+
+    emit!(ConfigSet {
+        chain_selector: config.svm_chain_selector,
+        fee_aggregator: config.fee_aggregator,
+        link_token_mint: config.link_token_mint,
+        enable_manual_execution_after: config.enable_manual_execution_after,
+        default_gas_limit: config.default_gas_limit,
+        max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+        default_allow_out_of_order_execution: config.default_allow_out_of_order_execution != 0,
+    });
 
     Ok(())
 }
@@ -187,6 +220,16 @@ pub fn update_default_allow_out_of_order_execution(
     }
     config.default_allow_out_of_order_execution = v;
 
+    emit!(ConfigSet {
+        chain_selector: config.svm_chain_selector,
+        fee_aggregator: config.fee_aggregator,
+        link_token_mint: config.link_token_mint,
+        enable_manual_execution_after: config.enable_manual_execution_after,
+        default_gas_limit: config.default_gas_limit,
+        max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+        default_allow_out_of_order_execution: config.default_allow_out_of_order_execution != 0,
+    });
+
     Ok(())
 }
 
@@ -197,6 +240,16 @@ pub fn update_enable_manual_execution_after(
     let mut config = ctx.accounts.config.load_mut()?;
 
     config.enable_manual_execution_after = new_enable_manual_execution_after;
+
+    emit!(ConfigSet {
+        chain_selector: config.svm_chain_selector,
+        fee_aggregator: config.fee_aggregator,
+        link_token_mint: config.link_token_mint,
+        enable_manual_execution_after: config.enable_manual_execution_after,
+        default_gas_limit: config.default_gas_limit,
+        max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+        default_allow_out_of_order_execution: config.default_allow_out_of_order_execution != 0,
+    });
 
     Ok(())
 }
@@ -211,6 +264,8 @@ pub fn set_token_billing(
     ctx.accounts.per_chain_per_token_config.billing = cfg;
     ctx.accounts.per_chain_per_token_config.chain_selector = chain_selector;
     ctx.accounts.per_chain_per_token_config.mint = mint;
+
+    // todo: biiling config updated event?
     Ok(())
 }
 
