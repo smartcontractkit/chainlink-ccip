@@ -20,9 +20,9 @@ use super::price_math::{Exponential, Usd18Decimals};
 /// When abi encoded, excluding array contents,
 /// Any2EVMMessage takes up a fixed number of 13 slots, 32 bytes each.
 /// We assume sender always takes 1 slot.
-/// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 18.
+/// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 15.
 /// The fixed bytes does not cover struct data (this is represented by ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
-pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 18);
+pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 
 /// Each token transfer adds 1 RampTokenAmount
 /// RampTokenAmount has 5 fields, 2 of which are bytes type, 1 Address, 1 uint256 and 1 uint32.
