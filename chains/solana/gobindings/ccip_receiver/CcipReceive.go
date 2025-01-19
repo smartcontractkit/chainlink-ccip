@@ -17,7 +17,7 @@ import (
 // But none of them could be an init, realloc or close.
 // In this case, it increments the counter value by 1 and logs the parsed message.
 type CcipReceive struct {
-	Message *Any2SolanaMessage
+	Message *Any2SVMMessage
 
 	// [0] = [SIGNER] authority
 	//
@@ -38,7 +38,7 @@ func NewCcipReceiveInstructionBuilder() *CcipReceive {
 }
 
 // SetMessage sets the "message" parameter.
-func (inst *CcipReceive) SetMessage(message Any2SolanaMessage) *CcipReceive {
+func (inst *CcipReceive) SetMessage(message Any2SVMMessage) *CcipReceive {
 	inst.Message = &message
 	return inst
 }
@@ -174,7 +174,7 @@ func (obj *CcipReceive) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 // NewCcipReceiveInstruction declares a new CcipReceive instruction with the provided parameters and accounts.
 func NewCcipReceiveInstruction(
 	// Parameters:
-	message Any2SolanaMessage,
+	message Any2SVMMessage,
 	// Accounts:
 	authority ag_solanago.PublicKey,
 	externalExecutionConfig ag_solanago.PublicKey,

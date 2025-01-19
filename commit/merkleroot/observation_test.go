@@ -76,12 +76,12 @@ func TestObservation(t *testing.T) {
 			},
 			query: Query{},
 			setupMocks: func() {
-				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything).Return(
+				mockObserver.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}}).Once()
-				mockObserver.On("ObserveLatestOnRampSeqNums", mock.Anything, destChain).Return(
+				mockObserver.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything, destChain).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}})
-				mockObserver.On("ObserveRMNRemoteCfg", mock.Anything, destChain).Return(rmntypes.RemoteConfig{})
-				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
+				mockObserver.EXPECT().ObserveRMNRemoteCfg(mock.Anything, destChain).Return(rmntypes.RemoteConfig{})
+				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
 			expectedObs: Observation{
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}},
@@ -103,14 +103,14 @@ func TestObservation(t *testing.T) {
 				RMNSignatures: &rmn.ReportSignatures{},
 			},
 			setupMocks: func() {
-				mockObserver.On("ObserveMerkleRoots", mock.Anything, mock.Anything).Return([]cciptypes.MerkleRootChain{
+				mockObserver.EXPECT().ObserveMerkleRoots(mock.Anything, mock.Anything).Return([]cciptypes.MerkleRootChain{
 					{
 						ChainSel:     1,
 						SeqNumsRange: [2]cciptypes.SeqNum{5, 10},
 						MerkleRoot:   [32]byte{1},
 					}})
-				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
-				mockCCIPReader.On("GetContractAddress", mock.Anything, mock.Anything).Return(offchainAddress, nil)
+				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
+				mockCCIPReader.EXPECT().GetContractAddress(mock.Anything, mock.Anything).Return(offchainAddress, nil)
 			},
 			expectedObs: Observation{
 				MerkleRoots: []cciptypes.MerkleRootChain{
@@ -130,9 +130,9 @@ func TestObservation(t *testing.T) {
 			},
 			query: Query{},
 			setupMocks: func() {
-				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything).Return(
+				mockObserver.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 20}}).Once()
-				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
+				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
 			expectedObs: Observation{
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 20}},
@@ -737,7 +737,7 @@ func Test_computeMerkleRoot(t *testing.T) {
 				msgs = append(msgs, cciptypes.Message{Header: h})
 			}
 
-			rootBytes, err := p.computeMerkleRoot(context.Background(), msgs)
+			rootBytes, err := p.computeMerkleRoot(context.Background(), p.lggr, msgs)
 
 			if tc.expErr {
 				assert.Error(t, err)
@@ -758,16 +758,16 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 		offchainCfg: pluginconfig.CommitOffchainConfig{RMNEnabled: false},
 	}
 
-	err := p.prepareRMNController(ctx, Outcome{})
+	err := p.prepareRMNController(ctx, p.lggr, Outcome{})
 	assert.NoError(t, err, "rmn is not enabled")
 
 	p.offchainCfg.RMNEnabled = true
 	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
-	err = p.prepareRMNController(ctx, Outcome{})
+	err = p.prepareRMNController(ctx, p.lggr, Outcome{})
 	assert.NoError(t, err, "rmn enabled but controller already initialized")
 
 	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
-	err = p.prepareRMNController(ctx, Outcome{})
+	err = p.prepareRMNController(ctx, p.lggr, Outcome{})
 	assert.NoError(t, err, "previous outcome does not contain remote config digest")
 
 	rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
@@ -791,7 +791,7 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 		rmnNodes,
 	).Return(nil)
 
-	err = p.prepareRMNController(ctx, Outcome{RMNRemoteCfg: cfg})
+	err = p.prepareRMNController(ctx, p.lggr, Outcome{RMNRemoteCfg: cfg})
 	assert.NoError(t, err, "rmn controller initialized")
 	assert.Equal(t, cfg.ConfigDigest, p.rmnControllerCfgDigest)
 }

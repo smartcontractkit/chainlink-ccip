@@ -1,8 +1,9 @@
+use anchor_lang::prelude::*;
 use std::ops::{Add, AddAssign, Mul};
 
 use ethnum::U256;
 
-use crate::{SolanaTokenAmount, TimestampedPackedU224};
+use crate::{BillingTokenConfig, CcipRouterError, SVMTokenAmount, TimestampedPackedU224};
 
 pub trait Exponential {
     fn e(self, exponent: u8) -> U256;
@@ -18,6 +19,21 @@ impl<T: Into<u32>> Exponential for T {
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Usd18Decimals(pub U256);
 
+pub fn get_validated_token_price(token_config: &BillingTokenConfig) -> Result<Usd18Decimals> {
+    let timestamp = token_config.usd_per_token.timestamp;
+    let price: Usd18Decimals = (&token_config.usd_per_token).into();
+
+    // NOTE: There's no validation done with respect to token price staleness since data feeds are not
+    // supported in solana. Only the existence of `any` timestamp is checked, to ensure the price
+    // was set at least once.
+    require!(
+        price.0 != 0 && timestamp != 0,
+        CcipRouterError::InvalidTokenPrice
+    );
+
+    Ok(price)
+}
+
 impl Usd18Decimals {
     pub const ZERO: Self = Self(U256::ZERO);
 
@@ -25,7 +41,7 @@ impl Usd18Decimals {
         Self(U256::new(cents.into()) * 1u32.e(16))
     }
 
-    pub fn from_token_amount(sta: &SolanaTokenAmount, price: &Usd18Decimals) -> Self {
+    pub fn from_token_amount(sta: &SVMTokenAmount, price: &Usd18Decimals) -> Self {
         Usd18Decimals(U256::new(sta.amount.into()) * price.0 / 1u32.e(18))
     }
 }
@@ -44,11 +60,11 @@ impl AddAssign for Usd18Decimals {
     }
 }
 
-impl Mul<U256> for Usd18Decimals {
+impl<T: Into<U256>> Mul<T> for Usd18Decimals {
     type Output = Self;
 
-    fn mul(mut self, rhs: U256) -> Self::Output {
-        self.0 *= rhs;
+    fn mul(mut self, rhs: T) -> Self::Output {
+        self.0 *= rhs.into();
         self
     }
 }
