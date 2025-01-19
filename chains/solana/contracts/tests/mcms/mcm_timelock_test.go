@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
@@ -524,6 +525,8 @@ func TestMcmWithTimelock(t *testing.T) {
 						Delay:       uint64(1),
 					}
 
+					mcmOpNodes := []mcms.McmOpNode{}
+
 					for i := 0; i < numMintIxs; i++ {
 						// timelock signer can mint token (transferred authority)
 						ix, mIxErr := tokens.MintTo(1*solana.LAMPORTS_PER_SOL, v.tokenProgram, mint, rAta, timelockutil.GetSignerPDA(config.TestTimelockID))
@@ -533,10 +536,12 @@ func TestMcmWithTimelock(t *testing.T) {
 						opToSchedule.AddInstruction(ix, []solana.PublicKey{v.tokenProgram})
 					}
 
-					ixs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, opToSchedule, admin.PublicKey(), msigs[timelock.Proposer_Role].AccessController.PublicKey())
+					ixs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, opToSchedule, proposerMsig.SignerPDA, msigs[timelock.Proposer_Role].AccessController.PublicKey())
 					require.NoError(t, ierr)
-					for _, ix := range ixs {
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					for i, ix := range ixs {
+						opNode, oerr := mcms.IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, ix, uint64(currentOpCount+i))
+						require.NoError(t, oerr)
+						mcmOpNodes = append(mcmOpNodes, opNode)
 					}
 
 					// Schedule the operation
@@ -551,9 +556,11 @@ func TestMcmWithTimelock(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, scErr)
 
-					node, cErr := mcms.IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleIx, uint64(currentOpCount)) // operation nonce
+					node, cErr := mcms.IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleIx, uint64(currentOpCount+len(mcmOpNodes))) // operation nonce
 					require.NoError(t, cErr)
-					mcmOpNodes := []mcms.McmOpNode{node} // only one mcm op node
+
+					mcmOpNodes = append(mcmOpNodes, node)
+
 					validUntil := uint32(0xffffffff)
 
 					rootValidationData, rErr := mcms.CreateMcmRootData(mcms.McmRootInput{
@@ -649,6 +656,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					})
 
 					t.Run("mcm:execute -> timelock::schedule_batch", func(t *testing.T) {
+						// this includes timelock::initialize, append, finalize operation, and timelock::schedule_batch ixs
 						t.Run("check if timelock config is correct", func(t *testing.T) {
 							info, infoErr := solanaGoClient.GetAccountInfoWithOpts(ctx, timelockutil.GetConfigPDA(config.TestTimelockID), &rpc.GetAccountInfoOpts{
 								Commitment: config.DefaultCommitment,
@@ -685,51 +693,53 @@ func TestMcmWithTimelock(t *testing.T) {
 							require.NotNil(t, tx.Meta)
 							require.Nil(t, tx.Meta.Err, fmt.Sprintf("tx failed with: %+v", tx.Meta))
 
-							parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
-								[]common.EventMapping{
-									common.EventMappingFor[mcms.OpExecuted]("OpExecuted"),
-									common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
-								},
-							)
+							if bytes.Equal(op.Data[:8], timelock.Instruction_ScheduleBatch[:]) {
+								parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+									[]common.EventMapping{
+										common.EventMappingFor[mcms.OpExecuted]("OpExecuted"),
+										common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
+									},
+								)
 
-							// check opExecuted event
-							event := parsedLogs[0].EventData[0].Data.(*mcms.OpExecuted)
-							require.Equal(t, op.Nonce, event.Nonce)
-							require.Equal(t, op.To, event.To)
-							require.Equal(t, op.Data, common.NormalizeData(event.Data))
+								// check opExecuted event
+								event := parsedLogs[0].EventData[0].Data.(*mcms.OpExecuted)
+								require.Equal(t, op.Nonce, event.Nonce)
+								require.Equal(t, op.To, event.To)
+								require.Equal(t, op.Data, common.NormalizeData(event.Data))
 
-							// check inner CallScheduled events
-							opIxData := opToSchedule.ToInstructionData()
-							require.Equal(t, len(opIxData), len(parsedLogs[0].InnerCalls[0].EventData), "Number of actual CallScheduled events does not match expected for operation")
+								// check inner CallScheduled events
+								opIxData := opToSchedule.ToInstructionData()
+								require.Equal(t, len(opIxData), len(parsedLogs[0].InnerCalls[0].EventData), "Number of actual CallScheduled events does not match expected for operation")
 
-							for j, ix := range opIxData {
-								timelockEvent := parsedLogs[0].InnerCalls[0].EventData[j].Data.(*timelockutil.CallScheduled)
-								require.Equal(t, opToSchedule.OperationID(), timelockEvent.ID, "ID does not match")
-								require.Equal(t, uint64(j), timelockEvent.Index, "Index does not match")
-								require.Equal(t, ix.ProgramId, timelockEvent.Target, "Target does not match")
-								require.Equal(t, opToSchedule.Predecessor, timelockEvent.Predecessor, "Predecessor does not match")
-								require.Equal(t, opToSchedule.Salt, timelockEvent.Salt, "Salt does not match")
-								require.Equal(t, opToSchedule.Delay, timelockEvent.Delay, "Delay does not match")
-								require.Equal(t, ix.Data, common.NormalizeData(timelockEvent.Data), "Data does not match")
+								for j, ix := range opIxData {
+									timelockEvent := parsedLogs[0].InnerCalls[0].EventData[j].Data.(*timelockutil.CallScheduled)
+									require.Equal(t, opToSchedule.OperationID(), timelockEvent.ID, "ID does not match")
+									require.Equal(t, uint64(j), timelockEvent.Index, "Index does not match")
+									require.Equal(t, ix.ProgramId, timelockEvent.Target, "Target does not match")
+									require.Equal(t, opToSchedule.Predecessor, timelockEvent.Predecessor, "Predecessor does not match")
+									require.Equal(t, opToSchedule.Salt, timelockEvent.Salt, "Salt does not match")
+									require.Equal(t, opToSchedule.Delay, timelockEvent.Delay, "Delay does not match")
+									require.Equal(t, ix.Data, common.NormalizeData(timelockEvent.Data), "Data does not match")
+								}
+
+								var opAccount timelock.Operation
+								err = common.GetAccountDataBorshInto(ctx, solanaGoClient, opToSchedule.OperationPDA(), config.DefaultCommitment, &opAccount)
+								if err != nil {
+									require.NoError(t, err, "failed to get account info")
+								}
+
+								require.Equal(t,
+									tx.BlockTime.Time().Add(time.Duration(opToSchedule.Delay)*time.Second).Unix(),
+									int64(opAccount.Timestamp),
+									"Scheduled Times don't match",
+								)
+
+								require.Equal(t,
+									opToSchedule.OperationID(),
+									opAccount.Id,
+									"Ids don't match",
+								)
 							}
-
-							var opAccount timelock.Operation
-							err = common.GetAccountDataBorshInto(ctx, solanaGoClient, opToSchedule.OperationPDA(), config.DefaultCommitment, &opAccount)
-							if err != nil {
-								require.NoError(t, err, "failed to get account info")
-							}
-
-							require.Equal(t,
-								tx.BlockTime.Time().Add(time.Duration(opToSchedule.Delay)*time.Second).Unix(),
-								int64(opAccount.Timestamp),
-								"Scheduled Times don't match",
-							)
-
-							require.Equal(t,
-								opToSchedule.OperationID(),
-								opAccount.Id,
-								"Ids don't match",
-							)
 						}
 					})
 
@@ -930,7 +940,6 @@ func TestMcmWithTimelock(t *testing.T) {
 
 		for i, op := range timelockOps {
 			t.Run(fmt.Sprintf("prepare mcm op node %d with timelock::schedule_batch ix", i), func(t *testing.T) {
-
 				// base nonce for this operation group
 				baseNonce := nextNonce + uint64(i)
 
@@ -963,8 +972,6 @@ func TestMcmWithTimelock(t *testing.T) {
 				nextNonce += uint64(len(preloadIxs))
 			})
 		}
-
-		t.Logf("%+v", opNodes)
 
 		//////////////////////////////////
 		// mcm - Prepare root & root metadata //
@@ -1069,10 +1076,9 @@ func TestMcmWithTimelock(t *testing.T) {
 		})
 
 		t.Run("mcm::execute to preload operation and schedule timelock operations", func(t *testing.T) {
-			t.Logf("Executing all operations %v", len(opNodes))
 			// this includes timelock::initialize, append, finalize operation, and timelock::schedule_batch ixs
-			for _, op := range opNodes {
-				t.Logf("Executing operation %v", op.Nonce)
+			foundCallScheduledIdx := 0
+			for i, op := range opNodes {
 				proofs, proofsErr := op.Proofs()
 				require.NoError(t, proofsErr)
 
@@ -1097,36 +1103,39 @@ func TestMcmWithTimelock(t *testing.T) {
 
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
 
-				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
-					[]common.EventMapping{
-						common.EventMappingFor[mcms.OpExecuted]("OpExecuted"),
-						// common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
-					},
-				)
+				if bytes.Equal(op.Data[:8], timelock.Instruction_ScheduleBatch[:]) {
+					parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+						[]common.EventMapping{
+							common.EventMappingFor[mcms.OpExecuted]("OpExecuted"),
+							common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
+						},
+					)
 
-				// check opExecuted event
-				event := parsedLogs[0].EventData[0].Data.(*mcms.OpExecuted)
-				require.Equal(t, op.Nonce, event.Nonce)
-				require.Equal(t, op.To, event.To)
-				require.Equal(t, op.Data, common.NormalizeData(event.Data))
+					// check opExecuted event
+					event := parsedLogs[0].EventData[0].Data.(*mcms.OpExecuted)
+					require.Equal(t, op.Nonce, event.Nonce)
+					require.Equal(t, op.To, event.To)
+					require.Equal(t, op.Data, common.NormalizeData(event.Data))
 
-				// todo: now pre-loading ixs are also being executed with mcm::execute, assert correctly
-				// check inner CallScheduled events
-				// currentOp := timelockOps[i] // match the Operation with the current opNode
-				// opIxData := currentOp.ToInstructionData()
+					// check inner CallScheduled events
+					currentOp := timelockOps[foundCallScheduledIdx] // match the Operation with the current opNode
 
-				// require.Equal(t, len(opIxData), len(parsedLogs[0].InnerCalls[0].EventData), "Number of actual CallScheduled events does not match expected for operation %d", i)
+					opIxData := currentOp.ToInstructionData()
 
-				// for j, ix := range opIxData {
-				// 	timelockEvent := parsedLogs[0].InnerCalls[0].EventData[j].Data.(*timelockutil.CallScheduled)
-				// 	require.Equal(t, currentOp.OperationID(), timelockEvent.ID, "ID does not match")
-				// 	require.Equal(t, uint64(j), timelockEvent.Index, "Index does not match")
-				// 	require.Equal(t, ix.ProgramId, timelockEvent.Target, "Target does not match")
-				// 	require.Equal(t, currentOp.Predecessor, timelockEvent.Predecessor, "Predecessor does not match")
-				// 	require.Equal(t, currentOp.Salt, timelockEvent.Salt, "Salt does not match")
-				// 	require.Equal(t, currentOp.Delay, timelockEvent.Delay, "Delay does not match")
-				// 	require.Equal(t, ix.Data, common.NormalizeData(timelockEvent.Data), "Data does not match")
-				// }
+					require.Equal(t, len(opIxData), len(parsedLogs[0].InnerCalls[0].EventData), "Number of actual CallScheduled events does not match expected for operation %d", i)
+
+					for j, ix := range opIxData {
+						timelockEvent := parsedLogs[0].InnerCalls[0].EventData[j].Data.(*timelockutil.CallScheduled)
+						require.Equal(t, currentOp.OperationID(), timelockEvent.ID, "ID does not match")
+						require.Equal(t, uint64(j), timelockEvent.Index, "Index does not match")
+						require.Equal(t, ix.ProgramId, timelockEvent.Target, "Target does not match")
+						require.Equal(t, currentOp.Predecessor, timelockEvent.Predecessor, "Predecessor does not match")
+						require.Equal(t, currentOp.Salt, timelockEvent.Salt, "Salt does not match")
+						require.Equal(t, currentOp.Delay, timelockEvent.Delay, "Delay does not match")
+						require.Equal(t, ix.Data, common.NormalizeData(timelockEvent.Data), "Data does not match")
+					}
+					foundCallScheduledIdx++
+				}
 			}
 		})
 
