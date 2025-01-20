@@ -27,6 +27,7 @@ const (
 	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
 	defaultInflightPriceCheckRetries          = 5
+	defaultRelativeBoostPerWaitHour           = 0.2 // 20 percent
 )
 
 type FeeInfo struct {
