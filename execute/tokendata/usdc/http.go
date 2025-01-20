@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -150,9 +151,11 @@ func (r httpResponse) attestationToBytes() (cciptypes.Bytes, error) {
 }
 
 func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cciptypes.Bytes, HTTPStatus, error) {
+	lggr := logutil.WithContextValues(ctx, h.lggr)
+
 	// Terminate immediately when rate limited
 	if coolDown, duration := h.inCoolDownPeriod(); coolDown {
-		h.lggr.Errorw(
+		lggr.Errorw(
 			"Rate limited by the Attestation API, dropping all requests",
 			"coolDownDuration", duration,
 		)
@@ -163,7 +166,7 @@ func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cc
 		// Wait blocks until it the attestation API can be called or the
 		// context is Done.
 		if waitErr := h.rate.Wait(ctx); waitErr != nil {
-			h.lggr.Warnw("Self rate-limited, sending too many requests to the Attestation API")
+			lggr.Warnw("Self rate-limited, sending too many requests to the Attestation API")
 			return nil, http.StatusTooManyRequests, ErrRateLimit
 		}
 	}
@@ -176,8 +179,8 @@ func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cc
 	requestURL := *h.apiURL
 	requestURL.Path = path.Join(requestURL.Path, apiVersion, attestationPath, messageHash.String())
 
-	response, httpStatus, err := h.callAPI(timeoutCtx, requestURL)
-	h.lggr.Debugw(
+	response, httpStatus, err := h.callAPI(timeoutCtx, lggr, requestURL)
+	lggr.Debugw(
 		"Response from attestation API",
 		"messageHash", messageHash,
 		"status", httpStatus,
@@ -186,7 +189,7 @@ func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cc
 	return response, httpStatus, err
 }
 
-func (h *httpClient) callAPI(ctx context.Context, url url.URL) (cciptypes.Bytes, HTTPStatus, error) {
+func (h *httpClient) callAPI(ctx context.Context, lggr logger.Logger, url url.URL) (cciptypes.Bytes, HTTPStatus, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
@@ -210,7 +213,7 @@ func (h *httpClient) callAPI(ctx context.Context, url url.URL) (cciptypes.Bytes,
 	}
 	// Explicitly signal if the API is being rate limited
 	if res.StatusCode == http.StatusTooManyRequests {
-		h.setCoolDownPeriod(res.Header)
+		h.setCoolDownPeriod(lggr, res.Header)
 		return nil, status, ErrRateLimit
 	}
 	if res.StatusCode == http.StatusNotFound {
@@ -241,7 +244,7 @@ func (h *httpClient) parsePayload(res *http.Response) (cciptypes.Bytes, error) {
 	return response.attestationToBytes()
 }
 
-func (h *httpClient) setCoolDownPeriod(headers http.Header) {
+func (h *httpClient) setCoolDownPeriod(lggr logger.Logger, headers http.Header) {
 	coolDownDuration := defaultCoolDownDuration
 	if retryAfterHeader, exists := headers["Retry-After"]; exists && len(retryAfterHeader) > 0 {
 		retryAfterSec, errParseInt := strconv.ParseInt(retryAfterHeader[0], 10, 64)
@@ -257,7 +260,7 @@ func (h *httpClient) setCoolDownPeriod(headers http.Header) {
 
 	coolDownDuration = min(coolDownDuration, maxCoolDownDuration)
 	//Logging on the error level, because we should always self-rate limit before hitting the API rate limit
-	h.lggr.Errorw(
+	lggr.Errorw(
 		"Rate limited by the Attestation API, setting cool down",
 		"coolDownDuration", coolDownDuration,
 	)
