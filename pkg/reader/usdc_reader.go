@@ -159,7 +159,7 @@ func (u usdcMessageReader) MessagesByTokenID(
 	for _, id := range eventIDsByMsgTokenID {
 		eventIDs = append(eventIDs, id)
 	}
-	
+
 	keyFilter, err := query.Where(
 		consts.EventNameCCTPMessageSent,
 		query.Comparator(
