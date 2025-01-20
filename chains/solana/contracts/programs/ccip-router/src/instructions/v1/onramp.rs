@@ -49,7 +49,6 @@ pub fn get_fee<'info>(
         .collect::<Result<Vec<_>>>()?;
 
     Ok(fee_for_msg(
-        dest_chain_selector,
         message,
         &ctx.accounts.dest_chain_state,
         &ctx.accounts.billing_token_config.config,
@@ -109,7 +108,6 @@ pub fn ccip_send<'info>(
         .collect::<Result<Vec<_>>>()?;
 
     let fee = fee_for_msg(
-        dest_chain_selector,
         &message,
         dest_chain,
         &ctx.accounts.fee_token_config.config,

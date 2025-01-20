@@ -15,13 +15,14 @@ use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 use super::price_math::get_validated_token_price;
 use super::price_math::{Exponential, Usd18Decimals};
 
-/// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
+/// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, sender and tokenAmounts).
 /// Each variable array takes 1 more slot to store its length.
 /// When abi encoded, excluding array contents,
 /// Any2EVMMessage takes up a fixed number of 13 slots, 32 bytes each.
-/// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 14.
+/// We assume sender always takes 1 slot.
+/// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 15.
 /// The fixed bytes does not cover struct data (this is represented by ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
-pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 14);
+pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 
 /// Each token transfer adds 1 RampTokenAmount
 /// RampTokenAmount has 5 fields, 2 of which are bytes type, 1 Address, 1 uint256 and 1 uint32.
@@ -32,7 +33,6 @@ pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 14);
 pub const ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
 
 pub fn fee_for_msg(
-    _dest_chain_selector: u64,
     message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     fee_token_config: &BillingTokenConfig,
@@ -77,7 +77,8 @@ pub fn fee_for_msg(
     let execution_gas = gas_limit
         + U256::new(dest_chain.config.dest_gas_overhead as u128)
         + U256::new(message.data.len() as u128)
-            * U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
+            * (U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
+                + network_fee.transfer_bytes_overhead)
         + network_fee.transfer_gas;
 
     let execution_cost = execution_gas_price
@@ -171,7 +172,7 @@ fn network_fee(
             token_network_fees(&token_configs[i], token_amount, config_for_dest_chain)?
         } else {
             // If the token has no specific overrides configured, we use the global defaults.
-            global_network_fees(dest_chain)
+            default_token_network_fees(dest_chain)
         };
 
         fee += token_network_fee;
@@ -213,7 +214,7 @@ fn token_network_fees(
     })
 }
 
-fn global_network_fees(dest_chain: &DestChain) -> NetworkFee {
+fn default_token_network_fees(dest_chain: &DestChain) -> NetworkFee {
     let (premium, global_gas, global_overhead) = (
         Usd18Decimals::from_usd_cents(dest_chain.config.default_token_fee_usdcents.into()),
         U256::new(dest_chain.config.default_token_dest_gas_overhead.into()),
@@ -249,10 +250,10 @@ pub(super) struct UnpackedDoubleU224 {
 impl From<&TimestampedPackedU224> for UnpackedDoubleU224 {
     fn from(packed: &TimestampedPackedU224) -> Self {
         let mut u128_buffer = [0u8; 16];
-        u128_buffer[2..16].clone_from_slice(&packed.value[14..]);
-        let high = u128::from_be_bytes(u128_buffer);
-        u128_buffer[2..16].clone_from_slice(&packed.value[..14]);
+        u128_buffer[2..16].clone_from_slice(&packed.value[14..]); // @TODO: byte alignment good?
         let low = u128::from_be_bytes(u128_buffer);
+        u128_buffer[2..16].clone_from_slice(&packed.value[..14]);
+        let high = u128::from_be_bytes(u128_buffer);
         Self { high, low }
     }
 }
@@ -389,7 +390,6 @@ pub mod tests {
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &sample_dest_chain(),
                 &sample_billing_config(),
@@ -411,7 +411,6 @@ pub mod tests {
         chain.config.network_fee_usdcents *= 12;
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &chain,
                 &sample_billing_config(),
@@ -437,7 +436,6 @@ pub mod tests {
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &sample_dest_chain(),
                 &sample_billing_config(),
@@ -473,7 +471,6 @@ pub mod tests {
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -508,7 +505,6 @@ pub mod tests {
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -546,7 +542,6 @@ pub mod tests {
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -565,7 +560,6 @@ pub mod tests {
 
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -601,7 +595,6 @@ pub mod tests {
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -620,7 +613,6 @@ pub mod tests {
 
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -657,7 +649,6 @@ pub mod tests {
         chain.config.max_number_of_tokens_per_msg = 5;
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -699,7 +690,6 @@ pub mod tests {
         billing_config.usd_per_token.timestamp = 0;
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &sample_dest_chain(),
                 &billing_config,
@@ -717,7 +707,6 @@ pub mod tests {
         billing_config.usd_per_token.value = [0u8; 28];
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &sample_dest_chain(),
                 &billing_config,
@@ -739,7 +728,6 @@ pub mod tests {
             -2 * chain.config.gas_price_staleness_threshold as i64;
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &chain,
                 &sample_billing_config(),
@@ -763,5 +751,24 @@ pub mod tests {
         let roundtrip: PackedPrice = (&ts_packed).into();
 
         assert_eq!(price, roundtrip);
+    }
+
+    #[test]
+    fn test_packed_price_from_bytes() {
+        // 2gwei DA encoded in higher order 112 bits, 1gwei Exec gas price encoded in lower order 112 bits
+        let bytes = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1b, 0xc1, 0x6d, 0x67, 0x4e, 0xc8, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0xe0, 0xb6, 0xb3, 0xa7, 0x64, 0x00, 0x00,
+        ];
+
+        let ts_packed = TimestampedPackedU224 {
+            value: bytes,
+            timestamp: 0,
+        };
+
+        let price: PackedPrice = (&ts_packed).into();
+
+        assert_eq!(price.execution_gas_price, Usd18Decimals(1u32.e(18)));
+        assert_eq!(price.data_availability_gas_price, Usd18Decimals(2u32.e(18)));
     }
 }
