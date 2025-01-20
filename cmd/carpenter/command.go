@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -15,7 +16,9 @@ import (
 )
 
 type arguments struct {
-	files []string
+	files          []string
+	logType        string
+	disableFilters bool
 }
 
 // renderData
@@ -40,22 +43,98 @@ func renderData(data *parse.Data) {
 
 	var timeStyle = lipgloss.NewStyle().Width(10).Height(1).MaxHeight(1).
 		Align(lipgloss.Center)
-	var uidStyle = lipgloss.NewStyle().Width(15).Height(1).MaxHeight(1).
+	var uidStyle = lipgloss.NewStyle().Width(25).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1).Bold(true)
-	var messageStyle = lipgloss.NewStyle().Width(50).Height(1).MaxHeight(1).
+	var levelStyle = lipgloss.NewStyle().Width(4).Height(1).MaxHeight(1).
+		Align(lipgloss.Left).PaddingLeft(1).Italic(true)
+	var messageStyle = lipgloss.NewStyle().Width(60).Height(1).MaxHeight(1).
+		Align(lipgloss.Left).PaddingLeft(1)
+	var fieldsStyle = lipgloss.NewStyle().Width(100).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1)
 
-	uid := fmt.Sprintf("%s.%s.%s",
+	uid := fmt.Sprintf("%s.%s.%s.%s.%s",
 		withColor(data.OracleID, data.OracleID),
 		withColor(data.DONID, data.DONID),
 		withColor(data.SequenceNumber, data.SequenceNumber),
+		withColor(data.Component, 0),
+		withColor(data.OCRPhase, ocrPhaseToColor(data.OCRPhase)),
 	)
 
-	fmt.Printf("%s|%s|%s\n",
+	fmt.Printf("%s|%s|%s|%s|%s\n",
 		timeStyle.Render(data.Timestamp.Format(time.TimeOnly)),
 		uidStyle.Render(uid),
+		levelStyle.Render(truncateLevel(data.Level)),
 		messageStyle.Render(data.Message),
+		fieldsStyle.Render(getRelevantFieldsForMessage(data)),
 	)
+}
+
+func ocrPhaseToColor(phase string) int {
+	switch phase {
+	case "qry":
+		return 1
+	case "obs":
+		return 2
+	case "otcm":
+		return 3
+	case "rprt":
+		return 4
+	case "sacc":
+		return 5
+	case "strn":
+		return 6
+	default:
+		return 0
+	}
+}
+
+func truncateLevel(level string) string {
+	switch lv := strings.ToLower(level); lv {
+	case "info":
+		return "ifo"
+	case "debug":
+		return "dbg"
+	case "warn":
+		return "wrn"
+	case "error":
+		return "err"
+	case "critical":
+		return "crt"
+	default:
+		return "unk"
+	}
+}
+
+func getRelevantFieldsForMessage(data *parse.Data) string {
+	var fields string
+
+	if strings.ToLower(data.Level) == "error" {
+		fields = fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
+	}
+
+	if strings.HasPrefix(data.Message, "call to MsgsBetweenSeqNums returned unexpected") {
+		return fmt.Sprintf(
+			"%s expected=%v actual=%v chain=%v",
+			fields,
+			data.RawLoggerFields["expected"],
+			data.RawLoggerFields["actual"],
+			data.RawLoggerFields["chain"],
+		)
+	}
+	if strings.HasPrefix(data.Message, "queried messages between sequence numbers") {
+		return fmt.Sprintf("%s numMsgs=%v sourceChain=%v seqNumRange=%v",
+			fields,
+			data.RawLoggerFields["numMsgs"],
+			data.RawLoggerFields["sourceChainSelector"],
+			data.RawLoggerFields["seqNumRange"],
+		)
+	}
+	if strings.HasPrefix(data.Message, "decoded messages between sequence numbers") {
+		return fmt.Sprintf("%s sourceChain=%v seqNumRange=%v",
+			fields, data.RawLoggerFields["sourceChainSelector"], data.RawLoggerFields["seqNumRange"])
+	}
+
+	return ""
 }
 
 func run(args arguments) error {
@@ -66,6 +145,8 @@ func run(args arguments) error {
 		io.Filenames = args.files
 	}
 
+	fmt.Println("processing files", io.Filenames)
+
 	inputStream, err := stream.InitializeInputStream(io)
 	if err != nil {
 		return fmt.Errorf("failed to initialize input stream: %w", err)
@@ -74,10 +155,10 @@ func run(args arguments) error {
 	scanner := bufio.NewScanner(inputStream)
 	for scanner.Scan() {
 		line := scanner.Text()
-		data, err := parse.Filter(line)
+		data, err := parse.Filter(line, args.logType, args.disableFilters)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to get data: %s\n", err)
-			continue
+			return err
 		}
 		if data == nil {
 			// no data to display.
@@ -100,6 +181,24 @@ func makeCommand() *cli.Command {
 				Name:        "filename",
 				Usage:       "Provide one or more files to read. If not provided, reads from stdin.",
 				Destination: &args.files,
+			},
+			&cli.StringFlag{
+				Name:        "logType",
+				Usage:       "Specify the type of log to parse, valid options: json, mixed, ci",
+				Destination: &args.logType,
+				Required:    true,
+				Validator: func(s string) error {
+					if s != parse.LogTypeJSON && s != parse.LogTypeMixed {
+						return fmt.Errorf("invalid log type: %s, expected either %s or %s", s, parse.LogTypeJSON, parse.LogTypeMixed)
+					}
+					return nil
+				},
+			},
+			&cli.BoolFlag{
+				Name:        "disableFilters",
+				Usage:       "Set to disable filter application on the logs. Defaults to false.",
+				Destination: &args.disableFilters,
+				Required:    false,
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
