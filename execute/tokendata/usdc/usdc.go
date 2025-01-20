@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -57,11 +58,13 @@ func (u *TokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
+	lggr := logutil.WithContextValues(ctx, u.lggr)
+
 	// 1. Pick only messages that contain USDC tokens
-	usdcMessages := u.pickOnlyUSDCMessages(messages)
+	usdcMessages := u.pickOnlyUSDCMessages(lggr, messages)
 
 	// 2. Fetch USDC messages by token id based on the `MessageSent (bytes message)` event
-	usdcMessagesByTokenID, err := u.fetchUSDCEventMessages(ctx, usdcMessages)
+	usdcMessagesByTokenID, err := u.fetchUSDCEventMessages(ctx, lggr, usdcMessages)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +76,7 @@ func (u *TokenDataObserver) Observe(
 	}
 
 	// 4. Add attestations to the token observations
-	return u.extractTokenData(ctx, messages, attestations)
+	return u.extractTokenData(ctx, lggr, messages, attestations)
 }
 
 func (u *TokenDataObserver) IsTokenSupported(
@@ -89,6 +92,7 @@ func (u *TokenDataObserver) Close() error {
 }
 
 func (u *TokenDataObserver) pickOnlyUSDCMessages(
+	lggr logger.Logger,
 	messageObservations exectypes.MessageObservations,
 ) map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.RampTokenAmount {
 	usdcMessages := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.RampTokenAmount)
@@ -102,7 +106,7 @@ func (u *TokenDataObserver) pickOnlyUSDCMessages(
 					usdcMessages[chainSelector][reader.NewMessageTokenID(seqNum, i)] = tokenAmount
 				}
 
-				u.lggr.Debugw(
+				lggr.Debugw(
 					"Scanning message's tokens for USDC data",
 					"isUSDC", ok,
 					"seqNum", seqNum,
@@ -118,6 +122,7 @@ func (u *TokenDataObserver) pickOnlyUSDCMessages(
 
 func (u *TokenDataObserver) fetchUSDCEventMessages(
 	ctx context.Context,
+	lggr logger.Logger,
 	usdcMessages map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.RampTokenAmount,
 ) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes, error) {
 	output := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes)
@@ -130,7 +135,7 @@ func (u *TokenDataObserver) fetchUSDCEventMessages(
 		// TODO Sequential reading USDC messages from the source chain
 		msgByTokenID, err := u.usdcMessageReader.MessagesByTokenID(ctx, chainSelector, u.destChainSelector, messages)
 		if err != nil {
-			u.lggr.Errorw(
+			lggr.Errorw(
 				"Failed fetching USDC events from the source chain",
 				"sourceChainSelector", chainSelector,
 				"destChainSelector", u.destChainSelector,
@@ -157,6 +162,7 @@ func (u *TokenDataObserver) fetchAttestations(
 
 func (u *TokenDataObserver) extractTokenData(
 	ctx context.Context,
+	lggr logger.Logger,
 	messages exectypes.MessageObservations,
 	attestations map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus,
 ) (exectypes.TokenDataObservations, error) {
@@ -169,7 +175,7 @@ func (u *TokenDataObserver) extractTokenData(
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i, tokenAmount := range message.TokenAmounts {
 				if !u.IsTokenSupported(chainSelector, tokenAmount) {
-					u.lggr.Debugw(
+					lggr.Debugw(
 						"Ignoring unsupported token",
 						"seqNum", seqNum,
 						"sourceChainSelector", chainSelector,

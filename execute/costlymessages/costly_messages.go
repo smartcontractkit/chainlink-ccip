@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -92,8 +93,10 @@ func (o *observer) Observe(
 	messages []cciptypes.Message,
 	messageTimestamps map[cciptypes.Bytes32]time.Time,
 ) ([]cciptypes.Bytes32, error) {
+	lggr := logutil.WithContextValues(ctx, o.lggr)
+
 	if !o.enabled {
-		o.lggr.Infof("Observer is disabled")
+		lggr.Infof("Observer is disabled")
 		return nil, nil
 	}
 
@@ -128,7 +131,7 @@ func (o *observer) Observe(
 			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
 		}
 		if fee.Cmp(execCost) < 0 {
-			o.lggr.Warnw("Message is too costly to execute", "messageID",
+			lggr.Warnw("Message is too costly to execute", "messageID",
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
 		}
@@ -318,6 +321,8 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 	messages []cciptypes.Message,
 	messageTimeStamps map[cciptypes.Bytes32]time.Time,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
+	lggr := logutil.WithContextValues(ctx, c.lggr)
+
 	linkPriceUSD, err := c.ccipReader.LinkPriceUSD(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get LINK price in USD: %w", err)
@@ -330,7 +335,7 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 		if !ok {
 			// If a timestamp is missing we can't do fee boosting, but we still record the fee. In the worst case, the
 			// message will not be executed (as it will be considered too costly).
-			c.lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
+			lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
 		} else {
 			// TODO: What's the blockchain timestamp? Should we use now().UTC instead?
 			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
@@ -371,6 +376,8 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	ctx context.Context,
 	messages []cciptypes.Message,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
+	lggr := logutil.WithContextValues(ctx, c.lggr)
+
 	if len(messages) == 0 {
 		return nil, fmt.Errorf("no messages provided")
 	}
@@ -387,7 +394,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 		return nil, fmt.Errorf("missing data availability fee")
 	}
 
-	executionFee, daFee, err := c.getFeesUSD18(ctx, feeComponents, messages[0].Header.DestChainSelector)
+	executionFee, daFee, err := c.getFeesUSD18(ctx, lggr, feeComponents, messages[0].Header.DestChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert fee components to USD18: %w", err)
 	}
@@ -409,6 +416,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 
 func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	ctx context.Context,
+	lggr logger.Logger,
 	feeComponents types.ChainFeeComponents,
 	destChainSelector cciptypes.ChainSelector,
 ) (plugintypes.USD18, plugintypes.USD18, error) {
@@ -426,7 +434,8 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	executionFee := mathslib.CalculateUsdPerUnitGas(feeComponents.ExecutionFee, nativeTokenPrice.Int)
 	dataAvailabilityFee := mathslib.CalculateUsdPerUnitGas(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int)
 
-	c.lggr.Debugw("Fee calculation", "nativeTokenPrice", nativeTokenPrice,
+	lggr.Debugw("Fee calculation",
+		"nativeTokenPrice", nativeTokenPrice,
 		"feeComponents.ExecutionFee", feeComponents.ExecutionFee,
 		"feeComponents.DataAvailabilityFee", feeComponents.DataAvailabilityFee,
 		"executionFee", executionFee,

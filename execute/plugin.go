@@ -94,7 +94,7 @@ func NewPlugin(
 		homeChain:             homeChain,
 		tokenDataObserver:     tokenDataObserver,
 		estimateProvider:      estimateProvider,
-		lggr:                  logutil.WithComponent(lggr, "Plugin"),
+		lggr:                  logutil.WithComponent(lggr, "ExecutePlugin"),
 		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
 			logutil.WithComponent(lggr, "Discovery"),
@@ -287,8 +287,10 @@ func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcome ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseReports)
+
 	if outcome == nil {
-		p.lggr.Warn("no outcome, skipping report generation")
+		lggr.Warn("no outcome, skipping report generation")
 		return nil, nil
 	}
 
@@ -316,7 +318,7 @@ func (p *Plugin) Reports(
 	if err != nil {
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
 	}
-	p.lggr.Debugw("transmission schedule override",
+	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2pID)
 
 	r := []ocr3types.ReportPlus[[]byte]{
@@ -338,11 +340,9 @@ func (p *Plugin) Reports(
 // If you're added more checks make sure to follow this pattern.
 func (p *Plugin) validateReport(
 	ctx context.Context,
-	seqNr uint64,
+	lggr logger.Logger,
 	r ocr3types.ReportWithInfo[[]byte],
 ) (valid bool, decodedReport cciptypes.ExecutePluginReport, err error) {
-	lggr := logger.With(p.lggr, "seqNr", seqNr)
-
 	// Just a safety check, should never happen.
 	if r.Report == nil {
 		lggr.Warn("skipping nil report")
@@ -389,13 +389,15 @@ func (p *Plugin) validateReport(
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
+
+	valid, decodedReport, err := p.validateReport(ctx, lggr, r)
 	if err != nil {
 		return false, fmt.Errorf("validate exec report: %w", err)
 	}
 
 	if !valid {
-		p.lggr.Infow("report is not accepted", "seqNr", seqNr)
+		lggr.Infow("report is not accepted", "seqNr", seqNr)
 		return false, nil
 	}
 
@@ -405,9 +407,9 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		func(r cciptypes.ExecutePluginReportSingleChain) cciptypes.ChainSelector {
 			return r.SourceChainSelector
 		})
-	isCursed, err := plugincommon.IsReportCursed(ctx, p.lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
+	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
 	if err != nil {
-		p.lggr.Errorw(
+		lggr.Errorw(
 			"report not accepted due to curse checking error",
 			"err", err,
 		)
@@ -418,7 +420,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	p.lggr.Infow("ShouldAcceptAttestedReport returns true, report accepted",
+	lggr.Infow("ShouldAcceptAttestedReport returns true, report accepted",
 		"seqNr", seqNr,
 		"reports", decodedReport.ChainReports,
 	)
@@ -428,18 +430,19 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
+
+	valid, decodedReport, err := p.validateReport(ctx, lggr, r)
 	if err != nil {
 		return valid, fmt.Errorf("validate exec report: %w", err)
 	}
 
 	if !valid {
-		p.lggr.Infow("report not accepted for transmit", "seqNr", seqNr)
+		lggr.Infow("report not accepted for transmit")
 		return false, nil
 	}
 
-	p.lggr.Infow("ShouldTransmitAttestedReport returns true, report accepted",
-		"seqNr", seqNr,
+	lggr.Infow("ShouldTransmitAttestedReport returns true, report accepted",
 		"reports", decodedReport.ChainReports,
 	)
 	return true, nil

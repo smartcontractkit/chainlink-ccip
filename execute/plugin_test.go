@@ -285,7 +285,9 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 }
 
 func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
-	p := &Plugin{}
+	p := &Plugin{
+		lggr: logger.Test(t),
+	}
 	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{
 		PreviousOutcome: []byte("not a valid observation"),
 	}, nil)
@@ -448,7 +450,9 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 
 func TestPlugin_Reports_UnableToParse(t *testing.T) {
 	ctx := tests.Context(t)
-	p := &Plugin{}
+	p := &Plugin{
+		lggr: logger.Test(t),
+	}
 	_, err := p.Reports(ctx, 0, ocr3types.Outcome("not a valid observation"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to decode outcome")
@@ -459,7 +463,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
-	p := &Plugin{reportCodec: codec}
+	p := &Plugin{reportCodec: codec, lggr: logger.Test(t)}
 	report, err := exectypes.NewOutcome(exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}).Encode()
 	require.NoError(t, err)
 

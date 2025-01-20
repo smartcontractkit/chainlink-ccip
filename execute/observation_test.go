@@ -170,7 +170,7 @@ func Test_getMessagesObservation(t *testing.T) {
 			}, nil).Maybe()
 
 			observation := exectypes.Observation{}
-			observation, err := plugin.getMessagesObservation(ctx, tt.previousOutcome, observation)
+			observation, err := plugin.getMessagesObservation(ctx, plugin.lggr, tt.previousOutcome, observation)
 			if tt.expectedError {
 				require.Error(t, err)
 			} else {
