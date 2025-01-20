@@ -5,7 +5,7 @@ use access_controller::AccessController;
 use crate::constants::{
     ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED, TIMELOCK_OPERATION_SEED,
 };
-use crate::error::{AuthError, TimelockError};
+use crate::error::TimelockError;
 use crate::event::*;
 use crate::state::{Config, InstructionData, Operation};
 
