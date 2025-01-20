@@ -4,6 +4,8 @@ import (
 	"context"
 )
 
+// TODO: Consolidate CommitPluginCodec, ExecutePluginCodec, MessageHasher, ExtraDataCodec into a single Codec interface.
+
 type CommitPluginCodec interface {
 	Encode(context.Context, CommitPluginReport) ([]byte, error)
 	Decode(context.Context, []byte) (CommitPluginReport, error)
@@ -16,6 +18,10 @@ type ExecutePluginCodec interface {
 
 type MessageHasher interface {
 	Hash(context.Context, Message) (Bytes32, error)
+}
+
+type ExtraDataCodec interface {
+	DecodeExtraData(ExtraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
 }
 
 // RMNCrypto provides a chain-agnostic interface for verifying RMN signatures.

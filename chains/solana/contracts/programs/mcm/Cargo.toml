@@ -1,7 +1,7 @@
 [package]
 name = "mcm"
 version = "0.1.0-dev"
-description = "Solana implementation of ManyChainMultiSig"
+description = "SVM implementation of ManyChainMultiSig"
 edition = "2021"
 
 [lib]

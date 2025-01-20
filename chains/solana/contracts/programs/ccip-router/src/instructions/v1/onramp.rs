@@ -7,20 +7,22 @@ use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
-    validate_and_parse_token_accounts, TokenAccounts,
+    validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
 
 use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
+use crate::v1::price_math::get_validated_token_price;
 use crate::{
-    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, ExtraArgsInput, GetFee,
-    Nonce, RampMessageHeader, Solana2AnyMessage, Solana2AnyRampMessage, Solana2AnyTokenTransfer,
-    SolanaTokenAmount, EXTERNAL_TOKEN_POOL_SEED,
+    AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
+    DestChainConfig, ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader,
+    SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
+    EXTERNAL_TOKEN_POOL_SEED,
 };
 
 pub fn get_fee<'info>(
     ctx: Context<'_, '_, 'info, 'info, GetFee>,
     dest_chain_selector: u64,
-    message: Solana2AnyMessage,
+    message: SVM2AnyMessage,
 ) -> Result<u64> {
     let remaining_accounts = &ctx.remaining_accounts;
     let message = &message;
@@ -36,14 +38,12 @@ pub fn get_fee<'info>(
     let token_billing_config_accounts = token_billing_config_accounts
         .iter()
         .zip(message.token_amounts.iter())
-        .map(|(a, SolanaTokenAmount { token, .. })| {
-            validated_try_to::billing_token_config(a, *token)
-        })
+        .map(|(a, SVMTokenAmount { token, .. })| validated_try_to::billing_token_config(a, *token))
         .collect::<Result<Vec<_>>>()?;
     let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
         .iter()
         .zip(message.token_amounts.iter())
-        .map(|(a, SolanaTokenAmount { token, .. })| {
+        .map(|(a, SVMTokenAmount { token, .. })| {
             validated_try_to::per_chain_per_token_config(a, *token, dest_chain_selector)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -62,10 +62,10 @@ pub fn get_fee<'info>(
 pub fn ccip_send<'info>(
     ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
     dest_chain_selector: u64,
-    message: Solana2AnyMessage,
+    message: SVM2AnyMessage,
     token_indexes: Vec<u8>,
 ) -> Result<()> {
-    // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
+    // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
 
     let dest_chain = &mut ctx.accounts.dest_chain_state;
@@ -117,6 +117,18 @@ pub fn ccip_send<'info>(
         &per_chain_per_token_config_accounts,
     )?;
 
+    let link_fee = convert(
+        &fee,
+        &ctx.accounts.fee_token_config.config,
+        &ctx.accounts.link_token_config.config,
+    )?;
+
+    require_gte!(
+        config.max_fee_juels_per_msg,
+        link_fee.amount as u128,
+        CcipRouterError::MessageFeeTooHigh,
+    );
+
     let is_paying_with_native_sol = message.fee_token == Pubkey::default();
     if is_paying_with_native_sol {
         wrap_native_sol(
@@ -155,7 +167,7 @@ pub fn ccip_send<'info>(
 
     let sender = ctx.accounts.authority.key.to_owned();
     let receiver = message.receiver.clone();
-    let source_chain_selector = config.solana_chain_selector;
+    let source_chain_selector = config.svm_chain_selector;
     let extra_args = extra_args_or_default(config, message.extra_args);
 
     let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
@@ -167,7 +179,7 @@ pub fn ccip_send<'info>(
         CcipRouterError::InvalidInputs,
     );
 
-    let mut new_message: Solana2AnyRampMessage = Solana2AnyRampMessage {
+    let mut new_message: SVM2AnyRampMessage = SVM2AnyRampMessage {
         sender,
         receiver,
         data: message.data,
@@ -181,7 +193,7 @@ pub fn ccip_send<'info>(
         extra_args,
         fee_token: message.fee_token,
         fee_token_amount: fee.amount,
-        token_amounts: vec![Solana2AnyTokenTransfer::default(); token_count],
+        token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count],
     };
 
     let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
@@ -232,17 +244,14 @@ pub fn ccip_send<'info>(
                 seeds,
             )?;
 
-            let data = LockOrBurnOutV1::try_from_slice(&return_data)?;
-            new_message.token_amounts[i] = Solana2AnyTokenTransfer {
-                source_pool_address: current_token_accounts.pool_config.key(),
-                dest_token_address: data.dest_token_address,
-                extra_data: data.dest_pool_data,
-                amount: u64_to_le_u256(token_amount.amount), // pool on receiver chain handles decimals
-                dest_exec_data: vec![0; 0],                  // TODO: Implement this
-                                                             // Destination chain specific execution data encoded in bytes
-                                                             // for an EVM destination, it consists of the amount of gas available for the releaseOrMint
-                                                             // and transfer calls made by the offRamp
-            };
+            let lock_or_burn_out_data = LockOrBurnOutV1::try_from_slice(&return_data)?;
+            new_message.token_amounts[i] = token_transfer(
+                lock_or_burn_out_data,
+                current_token_accounts.pool_config.key(),
+                token_amount,
+                &dest_chain.config,
+                &per_chain_per_token_config_accounts[i],
+            )?;
         }
     }
 
@@ -256,6 +265,44 @@ pub fn ccip_send<'info>(
     });
 
     Ok(())
+}
+
+fn token_transfer(
+    lock_or_burn_out_data: LockOrBurnOutV1,
+    source_pool_address: Pubkey,
+    token_amount: &SVMTokenAmount,
+    dest_chain_config: &DestChainConfig,
+    token_config: &PerChainPerTokenConfig,
+) -> Result<SVM2AnyTokenTransfer> {
+    let dest_gas_amount = if token_config.billing.is_enabled {
+        token_config.billing.dest_gas_overhead
+    } else {
+        dest_chain_config.default_token_dest_gas_overhead
+    };
+
+    let extra_data = lock_or_burn_out_data.dest_pool_data;
+    let extra_data_length = extra_data.len() as u32;
+
+    require!(
+        extra_data_length <= CCIP_LOCK_OR_BURN_V1_RET_BYTES
+            || extra_data_length <= token_config.billing.dest_bytes_overhead,
+        CcipRouterError::SourceTokenDataTooLarge
+    );
+
+    // TODO: Revisit when/if non-EVM destinations from SVM become supported.
+    // for an EVM destination, exec data it consists of the amount of gas available for the releaseOrMint
+    // and transfer calls made by the offRamp
+    let dest_exec_data = ethnum::U256::new(dest_gas_amount.into())
+        .to_be_bytes()
+        .to_vec();
+
+    Ok(SVM2AnyTokenTransfer {
+        source_pool_address,
+        dest_token_address: lock_or_burn_out_data.dest_token_address,
+        extra_data,
+        amount: u64_to_le_u256(token_amount.amount), // pool on receiver chain handles decimals
+        dest_exec_data,
+    })
 }
 
 /////////////
@@ -297,7 +344,7 @@ fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraAr
     Ok(final_nonce)
 }
 
-fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
+fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
     use anchor_lang::solana_program::hash;
 
     // Push Data Size to ensure that the hash is unique
@@ -314,7 +361,7 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
     let result = hash::hashv(&[
         LEAF_DOMAIN_SEPARATOR.as_slice(),
         // metadata
-        "Solana2AnyMessageHashV1".as_bytes(),
+        "SVM2AnyMessageHashV1".as_bytes(),
         &header_source_chain_selector,
         &header_dest_chain_selector,
         &crate::ID.to_bytes(), // onramp: ccip_router program
@@ -336,6 +383,24 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
     ]);
 
     result.to_bytes()
+}
+
+// Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
+pub fn convert(
+    source_token_amount: &SVMTokenAmount,
+    source_config: &BillingTokenConfig,
+    target_config: &BillingTokenConfig,
+) -> Result<SVMTokenAmount> {
+    assert!(source_config.mint == source_token_amount.token);
+    let source_price = get_validated_token_price(source_config)?;
+    let target_price = get_validated_token_price(target_config)?;
+
+    Ok(SVMTokenAmount {
+        token: target_config.mint,
+        amount: ((source_price * source_token_amount.amount).0 / target_price.0)
+            .try_into()
+            .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+    })
 }
 
 /// Methods in this module are used to deserialize AccountInfo into the state structs
@@ -395,12 +460,16 @@ mod validated_try_to {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{
+        fee_quoter::tests::sample_additional_token, messages::ramps::tests::sample_dest_chain,
+    };
+
     use super::*;
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
-        let message = Solana2AnyRampMessage {
+        let message = SVM2AnyRampMessage {
             header: RampMessageHeader {
                 message_id: [0; 32],
                 source_chain_selector: 10,
@@ -421,7 +490,7 @@ mod tests {
             },
             fee_token: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
             fee_token_amount: 50,
-            token_amounts: [Solana2AnyTokenTransfer {
+            token_amounts: [SVM2AnyTokenTransfer {
                 source_pool_address: Pubkey::try_from(
                     "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
                 )
@@ -437,8 +506,103 @@ mod tests {
         let hash_result = hash(&message);
 
         assert_eq!(
-            "557e0080a3616647be8f376859d4c991778a21859e266ab3c92edfa04655f5dc",
+            "df0890c0fb144ce4dee6556f2cd41382676f75e7292b61eca658b1d122a36f58",
             hex::encode(hash_result)
+        );
+    }
+
+    #[test]
+    fn token_transfer_with_no_pool_data() {
+        let source_pool_address = Pubkey::new_unique();
+        let lock_or_burn_out_data = LockOrBurnOutV1 {
+            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+            dest_pool_data: vec![],
+        };
+
+        let dest_chain = sample_dest_chain();
+        let (token_billing_config, mut per_chain_per_token_config) = sample_additional_token();
+        let token_amount = &SVMTokenAmount {
+            token: token_billing_config.mint,
+            amount: 100,
+        };
+
+        let transfer = token_transfer(
+            lock_or_burn_out_data.clone(),
+            source_pool_address,
+            token_amount,
+            &dest_chain.config,
+            &per_chain_per_token_config,
+        )
+        .unwrap();
+
+        let expected_exec_data =
+            ethnum::U256::new(per_chain_per_token_config.billing.dest_gas_overhead.into())
+                .to_be_bytes();
+
+        assert!(transfer.extra_data.is_empty());
+        assert_eq!(transfer.dest_exec_data, expected_exec_data);
+
+        // If we now disable billing overrides, the gas overhead will change
+        per_chain_per_token_config.billing.is_enabled = false;
+        let expected_exec_data =
+            ethnum::U256::new(dest_chain.config.default_token_dest_gas_overhead.into())
+                .to_be_bytes();
+
+        let transfer = token_transfer(
+            lock_or_burn_out_data,
+            source_pool_address,
+            token_amount,
+            &dest_chain.config,
+            &per_chain_per_token_config,
+        )
+        .unwrap();
+        assert!(transfer.extra_data.is_empty());
+        assert_eq!(transfer.dest_exec_data, expected_exec_data);
+    }
+
+    #[test]
+    fn token_transfer_validates_data_length() {
+        let dest_chain = sample_dest_chain();
+        let (token_billing_config, per_chain_per_token_config) = sample_additional_token();
+        let token_amount = &SVMTokenAmount {
+            token: token_billing_config.mint,
+            amount: 100,
+        };
+
+        let reasonable_size = CCIP_LOCK_OR_BURN_V1_RET_BYTES as usize;
+        let source_pool_address = Pubkey::new_unique();
+        let lock_or_burn_out_data = LockOrBurnOutV1 {
+            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+            dest_pool_data: vec![b'A'; reasonable_size],
+        };
+
+        token_transfer(
+            lock_or_burn_out_data,
+            source_pool_address,
+            token_amount,
+            &dest_chain.config,
+            &per_chain_per_token_config,
+        )
+        .unwrap();
+
+        let unreasonable_size = (CCIP_LOCK_OR_BURN_V1_RET_BYTES
+            .max(per_chain_per_token_config.billing.dest_gas_overhead)
+            + 1) as usize;
+        let lock_or_burn_out_data = LockOrBurnOutV1 {
+            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+            dest_pool_data: vec![b'A'; unreasonable_size],
+        };
+
+        assert_eq!(
+            token_transfer(
+                lock_or_burn_out_data,
+                source_pool_address,
+                token_amount,
+                &dest_chain.config,
+                &per_chain_per_token_config,
+            )
+            .unwrap_err(),
+            CcipRouterError::SourceTokenDataTooLarge.into()
         );
     }
 }

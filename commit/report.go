@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -41,13 +42,15 @@ func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseReports)
+
 	outcome, err := committypes.DecodeOutcome(outcomeBytes)
 	if err != nil {
-		p.lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
+		lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
-	p.lggr.Infow("generating report",
+	lggr.Infow("generating report",
 		"roots", outcome.MerkleRootOutcome.RootsToReport,
 		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
 		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
@@ -79,7 +82,7 @@ func (p *Plugin) Reports(
 	}
 
 	if rep.IsEmpty() {
-		p.lggr.Infow("empty report", "report", rep)
+		lggr.Infow("empty report", "report", rep)
 		return []ocr3types.ReportPlus[[]byte]{}, nil
 	}
 
@@ -101,8 +104,10 @@ func (p *Plugin) Reports(
 	if err != nil {
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
 	}
-	p.lggr.Debugw("transmission schedule override",
+	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2PID)
+
+	lggr.Infow("commit plugin generated reports", "report", rep, "reportInfo", repInfo)
 
 	return []ocr3types.ReportPlus[[]byte]{
 		{
@@ -123,17 +128,16 @@ func (p *Plugin) Reports(
 //nolint:gocyclo
 func (p *Plugin) validateReport(
 	ctx context.Context,
+	lggr logger.Logger,
 	seqNr uint64,
 	r ocr3types.ReportWithInfo[[]byte],
 ) (bool, cciptypes.CommitPluginReport, error) {
-	lggr := logger.With(p.lggr, "seqNr", seqNr)
-
 	if r.Report == nil {
 		lggr.Warn("nil report")
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
-	decodedReport, err := p.decodeReport(ctx, r.Report)
+	decodedReport, err := p.decodeReport(ctx, lggr, r.Report)
 	if err != nil {
 		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report: %w, report: %x", err, r.Report)
 	}
@@ -180,12 +184,12 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
-	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	latestPriceSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
 	if err != nil {
 		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("get latest price seq nr: %w", err)
 	}
 
-	if p.isStaleReport(seqNr, latestSeqNr, decodedReport) {
+	if p.isStaleReport(lggr, seqNr, latestPriceSeqNr, decodedReport) {
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
@@ -202,24 +206,25 @@ func (p *Plugin) validateReport(
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
+
+	valid, decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if err != nil {
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 
 	if !valid {
-		p.lggr.Infow("report is not accepted", "seqNr", seqNr)
+		lggr.Infow("report is not accepted")
 		return false, nil
 	}
 
 	// TODO: consider doing this in validateReport,
 	// will end up doing it in both ShouldAccept and ShouldTransmit.
-	if isCursed, err := p.checkReportCursed(ctx, decodedReport); err != nil || isCursed {
+	if isCursed, err := p.checkReportCursed(ctx, lggr, decodedReport); err != nil || isCursed {
 		return false, err
 	}
 
-	p.lggr.Infow("ShouldAcceptedAttestedReport passed checks",
-		"seqNr", seqNr,
+	lggr.Infow("ShouldAcceptedAttestedReport passed checks",
 		"timestamp", time.Now().UTC(),
 		"rootsLen", len(decodedReport.MerkleRoots),
 		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
@@ -228,33 +233,49 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	return true, nil
 }
 
-func (p *Plugin) decodeReport(ctx context.Context, report []byte) (cciptypes.CommitPluginReport, error) {
+func (p *Plugin) decodeReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	report []byte,
+) (cciptypes.CommitPluginReport, error) {
 	decodedReport, err := p.reportCodec.Decode(ctx, report)
 	if err != nil {
-		return cciptypes.CommitPluginReport{}, fmt.Errorf("decode commit plugin report: %w", err)
+		return cciptypes.CommitPluginReport{},
+			fmt.Errorf("decode commit plugin report: %w", err)
 	}
 	if decodedReport.IsEmpty() {
-		p.lggr.Infow("empty report")
+		lggr.Infow("empty report")
 	}
 	return decodedReport, nil
 }
 
-func (p *Plugin) isStaleReport(seqNr, latestSeqNr uint64, decodedReport cciptypes.CommitPluginReport) bool {
-	if seqNr <= latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
-		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestSeqNr)
+func (p *Plugin) isStaleReport(
+	lggr logger.Logger,
+	seqNr,
+	latestPriceSeqNr uint64,
+	decodedReport cciptypes.CommitPluginReport,
+) bool {
+	if seqNr <= latestPriceSeqNr && len(decodedReport.MerkleRoots) == 0 {
+		lggr.Infow(
+			"skipping stale report due to stale price seq nr and no merkle roots",
+			"latestPriceSeqNr", latestPriceSeqNr)
 		return true
 	}
 	return false
 }
 
-func (p *Plugin) checkReportCursed(ctx context.Context, decodedReport cciptypes.CommitPluginReport) (bool, error) {
+func (p *Plugin) checkReportCursed(
+	ctx context.Context,
+	lggr logger.Logger,
+	decodedReport cciptypes.CommitPluginReport,
+) (bool, error) {
 	sourceChains := slicelib.Map(decodedReport.MerkleRoots,
 		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector {
 			return r.ChainSel
 		})
-	isCursed, err := plugincommon.IsReportCursed(ctx, p.lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
+	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
 	if err != nil {
-		p.lggr.Errorw("report not accepted due to curse checking error", "err", err)
+		lggr.Errorw("report not accepted due to curse checking error", "err", err)
 		return false, err
 	}
 	return isCursed, nil
@@ -263,17 +284,19 @@ func (p *Plugin) checkReportCursed(ctx context.Context, decodedReport cciptypes.
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
+
+	valid, decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if err != nil {
 		return false, fmt.Errorf("validating report: %w", err)
 	}
 
 	if !valid {
-		p.lggr.Infow("report not valid, not transmitting", "seqNr", seqNr)
+		lggr.Infow("report not valid, not transmitting")
 		return false, nil
 	}
 
-	p.lggr.Infow("ShouldTransmitAcceptedReport passed checks",
+	lggr.Infow("ShouldTransmitAcceptedReport passed checks",
 		"seqNr", seqNr,
 		"timestamp", time.Now().UTC(),
 		"rootsLen", len(decodedReport.MerkleRoots),

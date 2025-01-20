@@ -491,4 +491,15 @@ func calculateMessageMaxDAGas(
 	return dataGas
 }
 
+type NoopObserver struct{}
+
+func (n *NoopObserver) Observe(
+	_ context.Context,
+	_ []cciptypes.Message,
+	_ map[cciptypes.Bytes32]time.Time,
+) ([]cciptypes.Bytes32, error) {
+	costlyMessages := make([]cciptypes.Bytes32, 0)
+	return costlyMessages, nil
+}
+
 var _ MessageExecCostUSD18Calculator = &CCIPMessageExecCostUSD18Calculator{}

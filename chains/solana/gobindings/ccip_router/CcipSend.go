@@ -26,7 +26,7 @@ import (
 // * `message` - The message to be sent. The size limit of data is 256 bytes.
 type CcipSend struct {
 	DestChainSelector *uint64
-	Message           *Solana2AnyMessage
+	Message           *SVM2AnyMessage
 	TokenIndexes      *[]byte
 
 	// [0] = [] config
@@ -45,22 +45,24 @@ type CcipSend struct {
 	//
 	// [7] = [] feeTokenConfig
 	//
-	// [8] = [] feeTokenUserAssociatedAccount
+	// [8] = [] linkTokenConfig
+	//
+	// [9] = [] feeTokenUserAssociatedAccount
 	// ··········· CHECK this is the associated token account for the user paying the fee.
 	// ··········· If paying with native SOL, this must be the zero address.
 	//
-	// [9] = [WRITE] feeTokenReceiver
+	// [10] = [WRITE] feeTokenReceiver
 	//
-	// [10] = [] feeBillingSigner
+	// [11] = [] feeBillingSigner
 	//
-	// [11] = [WRITE] tokenPoolsSigner
+	// [12] = [WRITE] tokenPoolsSigner
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCcipSendInstructionBuilder creates a new `CcipSend` instruction builder.
 func NewCcipSendInstructionBuilder() *CcipSend {
 	nd := &CcipSend{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 12),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 13),
 	}
 	return nd
 }
@@ -72,7 +74,7 @@ func (inst *CcipSend) SetDestChainSelector(destChainSelector uint64) *CcipSend {
 }
 
 // SetMessage sets the "message" parameter.
-func (inst *CcipSend) SetMessage(message Solana2AnyMessage) *CcipSend {
+func (inst *CcipSend) SetMessage(message SVM2AnyMessage) *CcipSend {
 	inst.Message = &message
 	return inst
 }
@@ -171,11 +173,22 @@ func (inst *CcipSend) GetFeeTokenConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[7]
 }
 
+// SetLinkTokenConfigAccount sets the "linkTokenConfig" account.
+func (inst *CcipSend) SetLinkTokenConfigAccount(linkTokenConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(linkTokenConfig)
+	return inst
+}
+
+// GetLinkTokenConfigAccount gets the "linkTokenConfig" account.
+func (inst *CcipSend) GetLinkTokenConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[8]
+}
+
 // SetFeeTokenUserAssociatedAccountAccount sets the "feeTokenUserAssociatedAccount" account.
 // CHECK this is the associated token account for the user paying the fee.
 // If paying with native SOL, this must be the zero address.
 func (inst *CcipSend) SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssociatedAccount ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(feeTokenUserAssociatedAccount)
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(feeTokenUserAssociatedAccount)
 	return inst
 }
 
@@ -183,40 +196,40 @@ func (inst *CcipSend) SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssoci
 // CHECK this is the associated token account for the user paying the fee.
 // If paying with native SOL, this must be the zero address.
 func (inst *CcipSend) GetFeeTokenUserAssociatedAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice[9]
 }
 
 // SetFeeTokenReceiverAccount sets the "feeTokenReceiver" account.
 func (inst *CcipSend) SetFeeTokenReceiverAccount(feeTokenReceiver ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(feeTokenReceiver).WRITE()
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(feeTokenReceiver).WRITE()
 	return inst
 }
 
 // GetFeeTokenReceiverAccount gets the "feeTokenReceiver" account.
 func (inst *CcipSend) GetFeeTokenReceiverAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice[10]
 }
 
 // SetFeeBillingSignerAccount sets the "feeBillingSigner" account.
 func (inst *CcipSend) SetFeeBillingSignerAccount(feeBillingSigner ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(feeBillingSigner)
+	inst.AccountMetaSlice[11] = ag_solanago.Meta(feeBillingSigner)
 	return inst
 }
 
 // GetFeeBillingSignerAccount gets the "feeBillingSigner" account.
 func (inst *CcipSend) GetFeeBillingSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
+	return inst.AccountMetaSlice[11]
 }
 
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 func (inst *CcipSend) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
+	inst.AccountMetaSlice[12] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 func (inst *CcipSend) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
+	return inst.AccountMetaSlice[12]
 }
 
 func (inst CcipSend) Build() *Instruction {
@@ -277,15 +290,18 @@ func (inst *CcipSend) Validate() error {
 			return errors.New("accounts.FeeTokenConfig is not set")
 		}
 		if inst.AccountMetaSlice[8] == nil {
-			return errors.New("accounts.FeeTokenUserAssociatedAccount is not set")
+			return errors.New("accounts.LinkTokenConfig is not set")
 		}
 		if inst.AccountMetaSlice[9] == nil {
-			return errors.New("accounts.FeeTokenReceiver is not set")
+			return errors.New("accounts.FeeTokenUserAssociatedAccount is not set")
 		}
 		if inst.AccountMetaSlice[10] == nil {
-			return errors.New("accounts.FeeBillingSigner is not set")
+			return errors.New("accounts.FeeTokenReceiver is not set")
 		}
 		if inst.AccountMetaSlice[11] == nil {
+			return errors.New("accounts.FeeBillingSigner is not set")
+		}
+		if inst.AccountMetaSlice[12] == nil {
 			return errors.New("accounts.TokenPoolsSigner is not set")
 		}
 	}
@@ -308,7 +324,7 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=12]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=13]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("        destChainState", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("                 nonce", inst.AccountMetaSlice[2]))
@@ -317,10 +333,11 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("       feeTokenProgram", inst.AccountMetaSlice[5]))
 						accountsBranch.Child(ag_format.Meta("          feeTokenMint", inst.AccountMetaSlice[6]))
 						accountsBranch.Child(ag_format.Meta("        feeTokenConfig", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("feeTokenUserAssociated", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("      feeTokenReceiver", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("      feeBillingSigner", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("      tokenPoolsSigner", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("       linkTokenConfig", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("feeTokenUserAssociated", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("      feeTokenReceiver", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("      feeBillingSigner", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("      tokenPoolsSigner", inst.AccountMetaSlice[12]))
 					})
 				})
 		})
@@ -367,7 +384,7 @@ func (obj *CcipSend) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error
 func NewCcipSendInstruction(
 	// Parameters:
 	destChainSelector uint64,
-	message Solana2AnyMessage,
+	message SVM2AnyMessage,
 	tokenIndexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
@@ -378,6 +395,7 @@ func NewCcipSendInstruction(
 	feeTokenProgram ag_solanago.PublicKey,
 	feeTokenMint ag_solanago.PublicKey,
 	feeTokenConfig ag_solanago.PublicKey,
+	linkTokenConfig ag_solanago.PublicKey,
 	feeTokenUserAssociatedAccount ag_solanago.PublicKey,
 	feeTokenReceiver ag_solanago.PublicKey,
 	feeBillingSigner ag_solanago.PublicKey,
@@ -394,6 +412,7 @@ func NewCcipSendInstruction(
 		SetFeeTokenProgramAccount(feeTokenProgram).
 		SetFeeTokenMintAccount(feeTokenMint).
 		SetFeeTokenConfigAccount(feeTokenConfig).
+		SetLinkTokenConfigAccount(linkTokenConfig).
 		SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssociatedAccount).
 		SetFeeTokenReceiverAccount(feeTokenReceiver).
 		SetFeeBillingSignerAccount(feeBillingSigner).

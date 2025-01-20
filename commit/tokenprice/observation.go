@@ -7,7 +7,10 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -16,16 +19,17 @@ func (p *processor) Observation(
 	prevOutcome Outcome,
 	query Query,
 ) (Observation, error) {
+	lggr := logutil.WithContextValues(ctx, p.lggr)
 
-	fChain := p.ObserveFChain()
+	fChain := p.ObserveFChain(lggr)
 	if len(fChain) == 0 {
 		return Observation{}, nil
 	}
 
-	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
-	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
+	feedTokenPrices := p.ObserveFeedTokenPrices(ctx, lggr)
+	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx, lggr)
 	now := time.Now().UTC()
-	p.lggr.Infow(
+	lggr.Infow(
 		"observed token prices",
 		"feed prices", feedTokenPrices,
 		"fee quoter updates", feeQuoterUpdates,
@@ -42,29 +46,29 @@ func (p *processor) Observation(
 	return obs, nil
 }
 
-func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {
+func (p *processor) ObserveFChain(lggr logger.Logger) map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
-		p.lggr.Errorw("call to GetFChain failed", "err", err)
+		lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
 }
 
-func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
+func (p *processor) ObserveFeedTokenPrices(ctx context.Context, lggr logger.Logger) []cciptypes.TokenPrice {
 	if p.tokenPriceReader == nil {
-		p.lggr.Debugw("no token price reader available")
+		lggr.Debugw("no token price reader available")
 		return []cciptypes.TokenPrice{}
 	}
 
 	supportedChains, err := p.chainSupport.SupportedChains(p.oracleID)
 	if err != nil {
-		p.lggr.Warnw("call to SupportedChains failed", "err", err)
+		lggr.Warnw("call to SupportedChains failed", "err", err)
 		return []cciptypes.TokenPrice{}
 	}
 
 	if !supportedChains.Contains(p.offChainCfg.PriceFeedChainSelector) {
-		p.lggr.Debugf("oracle does not support feed chain %d", p.offChainCfg.PriceFeedChainSelector)
+		lggr.Debugf("oracle does not support feed chain %d", p.offChainCfg.PriceFeedChainSelector)
 		return []cciptypes.TokenPrice{}
 
 	}
@@ -72,10 +76,10 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	tokensToQuery := maps.Keys(p.offChainCfg.TokenInfo)
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
-	p.lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
+	lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
 	tokenPrices, err := p.tokenPriceReader.GetFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
-		p.lggr.Errorw("call to GetFeedPricesUSD failed",
+		lggr.Errorw("call to GetFeedPricesUSD failed",
 			"err", err)
 		return []cciptypes.TokenPrice{}
 	}
@@ -91,29 +95,31 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 }
 
 func (p *processor) ObserveFeeQuoterTokenUpdates(
-	ctx context.Context) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
+	ctx context.Context,
+	lggr logger.Logger,
+) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
 	if p.tokenPriceReader == nil {
-		p.lggr.Debugw("no token price reader available")
+		lggr.Debugw("no token price reader available")
 		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
 	}
 
 	supportsDestChain, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
-		p.lggr.Warnw("call to SupportsDestChain failed", "err", err)
+		lggr.Warnw("call to SupportsDestChain failed", "err", err)
 		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
 	}
 	if !supportsDestChain {
-		p.lggr.Debugw("oracle does not support fee quoter observation")
+		lggr.Debugw("oracle does not support fee quoter observation")
 		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
 	}
 
 	tokensToQuery := maps.Keys(p.offChainCfg.TokenInfo)
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
-	p.lggr.Infow("observing fee quoter token updates")
+	lggr.Infow("observing fee quoter token updates")
 	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery, p.destChain)
 	if err != nil {
-		p.lggr.Errorw("call to GetFeeQuoterTokenUpdates failed", "err", err)
+		lggr.Errorw("call to GetFeeQuoterTokenUpdates failed", "err", err)
 		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
 	}
 
