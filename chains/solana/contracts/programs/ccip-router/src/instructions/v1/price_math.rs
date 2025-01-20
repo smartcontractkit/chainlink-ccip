@@ -17,9 +17,11 @@ impl<T: Into<u32>> Exponential for T {
 
 // USD with 18 decimals (i.e. $8 -> 8e18)
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Usd18Decimals(pub U256);
+pub(super) struct Usd18Decimals(pub U256);
 
-pub fn get_validated_token_price(token_config: &BillingTokenConfig) -> Result<Usd18Decimals> {
+pub(super) fn get_validated_token_price(
+    token_config: &BillingTokenConfig,
+) -> Result<Usd18Decimals> {
     let timestamp = token_config.usd_per_token.timestamp;
     let price: Usd18Decimals = (&token_config.usd_per_token).into();
 
