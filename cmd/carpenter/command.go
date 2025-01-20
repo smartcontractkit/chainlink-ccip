@@ -43,7 +43,7 @@ func renderData(data *parse.Data) {
 
 	var timeStyle = lipgloss.NewStyle().Width(10).Height(1).MaxHeight(1).
 		Align(lipgloss.Center)
-	var uidStyle = lipgloss.NewStyle().Width(20).Height(1).MaxHeight(1).
+	var uidStyle = lipgloss.NewStyle().Width(25).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1).Bold(true)
 	var levelStyle = lipgloss.NewStyle().Width(4).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1).Italic(true)
@@ -52,11 +52,12 @@ func renderData(data *parse.Data) {
 	var fieldsStyle = lipgloss.NewStyle().Width(100).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1)
 
-	uid := fmt.Sprintf("%s.%s.%s.%s",
+	uid := fmt.Sprintf("%s.%s.%s.%s.%s",
 		withColor(data.OracleID, data.OracleID),
 		withColor(data.DONID, data.DONID),
 		withColor(data.SequenceNumber, data.SequenceNumber),
 		withColor(data.Component, 0),
+		withColor(data.OCRPhase, ocrPhaseToColor(data.OCRPhase)),
 	)
 
 	fmt.Printf("%s|%s|%s|%s|%s\n",
@@ -66,6 +67,25 @@ func renderData(data *parse.Data) {
 		messageStyle.Render(data.Message),
 		fieldsStyle.Render(getRelevantFieldsForMessage(data)),
 	)
+}
+
+func ocrPhaseToColor(phase string) int {
+	switch phase {
+	case "qry":
+		return 1
+	case "obs":
+		return 2
+	case "otcm":
+		return 3
+	case "rprt":
+		return 4
+	case "sacc":
+		return 5
+	case "strn":
+		return 6
+	default:
+		return 0
+	}
 }
 
 func truncateLevel(level string) string {

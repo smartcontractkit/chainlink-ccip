@@ -232,6 +232,7 @@ type Data struct {
 	Level          string    `json:"level"`
 	Caller         string    `json:"caller"`
 	SequenceNumber int       `json:"ocrSeqNr"`
+	OCRPhase       string    `json:"ocrPhase"`
 	Plugin         string    `json:"plugin"`
 	Component      string    `json:"component"`
 	OracleID       int       `json:"oracleID"`
