@@ -6,9 +6,9 @@ use crate::ocr3base::{ConfigSet, Ocr3Error, Transmitted};
 use ccip_state::{Ocr3Config, Ocr3ConfigInfo};
 
 #[constant]
-pub const MAX_ORACLES: usize = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx
-pub const MAX_SIGNERS: usize = MAX_ORACLES;
-pub const MAX_TRANSMITTERS: usize = MAX_ORACLES;
+pub const MAX_ORACLES: u32 = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx
+pub const MAX_SIGNERS: usize = MAX_ORACLES as usize;
+pub const MAX_TRANSMITTERS: usize = MAX_ORACLES as usize;
 
 pub const SIGNATURE_LENGTH: usize = SECP256K1_SIGNATURE_LENGTH + 1; // signature + recovery ID
 
@@ -16,7 +16,8 @@ pub const TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT_NO_SIGNATURES: u128 = 8 // 
     + 3 * 32; // report context
 pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 = 4; // u32 length of signatures vec (borsh serialization)
 
-#[zero_copy]
+#[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
 pub(super) struct ReportContext {
     // byte_words consists of:

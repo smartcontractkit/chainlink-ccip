@@ -4,7 +4,7 @@ declare_id!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"); // TODO
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
 pub struct Config {
     pub version: u8,
     pub default_allow_out_of_order_execution: u8, // bytemuck::Pod compliant required for zero_copy
@@ -28,7 +28,8 @@ pub struct Config {
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
 
-#[zero_copy]
+#[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
 pub struct Ocr3ConfigInfo {
     pub config_digest: [u8; 32], // 32-byte hash of configuration
@@ -41,7 +42,8 @@ pub struct Ocr3ConfigInfo {
 // signers: pubkey is 20-byte address, secp256k1 curve ECDSA
 // transmitters: 32-byte pubkey, ed25519
 
-#[zero_copy]
+#[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
 pub struct Ocr3Config {
     pub plugin_type: u8, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
