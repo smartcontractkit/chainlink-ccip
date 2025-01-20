@@ -88,7 +88,7 @@ func TestTransactionSizing(t *testing.T) {
 	sendSingleMinimalToken := ccip_router.SVM2AnyMessage{
 		Receiver: make([]byte, 20),
 		Data:     []byte{},
-		TokenAmounts: []ccip_router.SVMTokenAmount{ccip_router.SVMTokenAmount{
+		TokenAmounts: []ccip_router.SVMTokenAmount{{
 			Token:  [32]byte{},
 			Amount: 0,
 		}}, // one token
@@ -210,7 +210,7 @@ func TestTransactionSizing(t *testing.T) {
 				DestTokenAddress:  [32]byte{},
 				DestGasAmount:     0,
 				ExtraData:         []byte{},
-				Amount:            [32]uint8{},
+				Amount:            ccip_router.CrossChainAmount{LeBytes: [32]uint8{}},
 			}},
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,

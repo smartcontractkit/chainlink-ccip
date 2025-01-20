@@ -121,75 +121,75 @@ mod tests {
         let cases = vec![
             // No address configured
             ConfigTestCase {
-                config_on_ramps: empty_config.clone(),
+                config_on_ramps: empty_config,
                 given_on_ramp: vec![],
                 expected: false,
             },
             ConfigTestCase {
-                config_on_ramps: empty_config.clone(),
+                config_on_ramps: empty_config,
                 given_on_ramp: vec![1; 64],
                 expected: false,
             },
             ConfigTestCase {
-                config_on_ramps: empty_config.clone(),
+                config_on_ramps: empty_config,
                 given_on_ramp: vec![4; 64],
                 expected: false,
             },
             // One address configured
             ConfigTestCase {
-                config_on_ramps: one_address_config.clone(),
+                config_on_ramps: one_address_config,
                 given_on_ramp: vec![],
                 expected: false,
             },
             ConfigTestCase {
-                config_on_ramps: one_address_config.clone(),
+                config_on_ramps: one_address_config,
                 given_on_ramp: vec![1; 64],
                 expected: true,
             },
             ConfigTestCase {
-                config_on_ramps: one_address_config.clone(),
+                config_on_ramps: one_address_config,
                 given_on_ramp: vec![4; 64],
                 expected: false,
             },
             // Two addresses configured
             ConfigTestCase {
-                config_on_ramps: two_addresses_config.clone(),
+                config_on_ramps: two_addresses_config,
                 given_on_ramp: vec![],
                 expected: false,
             },
             ConfigTestCase {
-                config_on_ramps: two_addresses_config.clone(),
+                config_on_ramps: two_addresses_config,
                 given_on_ramp: vec![2; 64],
                 expected: true,
             },
             ConfigTestCase {
-                config_on_ramps: two_addresses_config.clone(),
+                config_on_ramps: two_addresses_config,
                 given_on_ramp: vec![3; 64],
                 expected: true,
             },
             ConfigTestCase {
-                config_on_ramps: two_addresses_config.clone(),
+                config_on_ramps: two_addresses_config,
                 given_on_ramp: [vec![2; 32], vec![3; 32]].concat(),
                 expected: false,
             },
             // Two addresses configured with smaller addresses
             ConfigTestCase {
-                config_on_ramps: two_smaller_addresses_config.clone(),
+                config_on_ramps: two_smaller_addresses_config,
                 given_on_ramp: vec![],
                 expected: false,
             },
             ConfigTestCase {
-                config_on_ramps: two_smaller_addresses_config.clone(),
+                config_on_ramps: two_smaller_addresses_config,
                 given_on_ramp: vec![0; 32],
                 expected: false,
             },
             ConfigTestCase {
-                config_on_ramps: two_smaller_addresses_config.clone(),
+                config_on_ramps: two_smaller_addresses_config,
                 given_on_ramp: vec![4; 32],
                 expected: true,
             },
             ConfigTestCase {
-                config_on_ramps: two_smaller_addresses_config.clone(),
+                config_on_ramps: two_smaller_addresses_config,
                 given_on_ramp: vec![5; 32],
                 expected: true,
             },
