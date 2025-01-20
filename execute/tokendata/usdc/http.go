@@ -189,7 +189,11 @@ func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cc
 	return response, httpStatus, err
 }
 
-func (h *httpClient) callAPI(ctx context.Context, lggr logger.Logger, url url.URL) (cciptypes.Bytes, HTTPStatus, error) {
+func (h *httpClient) callAPI(
+	ctx context.Context,
+	lggr logger.Logger,
+	url url.URL,
+) (cciptypes.Bytes, HTTPStatus, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
