@@ -218,7 +218,7 @@ func (p *Plugin) Observation(
 ) (types.Observation, error) {
 	// Ensure that sequence number is in the context for consumption by all
 	// downstream processors and the ccip reader.
-	ctx, lggr := logutil.WithOCRSeqNr(ctx, p.lggr, outCtx.SeqNr)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseObservation)
 
 	var discoveryObs dt.Observation
 	var err error
@@ -355,7 +355,7 @@ func (p *Plugin) ObserveFChain(lggr logger.Logger) map[cciptypes.ChainSelector]i
 func (p *Plugin) Outcome(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
-	ctx, lggr := logutil.WithOCRSeqNr(ctx, p.lggr, outCtx.SeqNr)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseOutcome)
 	lggr.Debugw("commit plugin performing outcome", "attributedObservations", aos)
 
 	prevOutcome, err := committypes.DecodeOutcome(outCtx.PreviousOutcome)
