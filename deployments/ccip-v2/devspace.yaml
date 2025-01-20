@@ -31,7 +31,7 @@ vars:
     default: ccip
   DON_VERSION:
     source: env
-    default: ccip-v1.6-latest
+    default: ccip-dev
   CCIP_TOOLING_VERSION:
     source: env
     default: v2
@@ -157,6 +157,7 @@ profiles:
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
+              - version-from-env
               - network-geth-chain-1337
               - network-geth-chain-2337
               - network-additional-geth-chains
