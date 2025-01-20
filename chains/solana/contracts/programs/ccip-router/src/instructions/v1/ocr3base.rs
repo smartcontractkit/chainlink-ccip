@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar;
 use anchor_lang::solana_program::{keccak, secp256k1_recover::*};
 
-use crate::{Ocr3Config, Ocr3ConfigInfo};
+use crate::ocr3base::{ConfigSet, Ocr3Error, Transmitted};
+use crate::state::{Ocr3Config, Ocr3ConfigInfo};
 
 #[constant]
 pub const MAX_ORACLES: usize = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx
@@ -17,7 +18,7 @@ pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 
 
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
-pub struct ReportContext {
+pub(super) struct ReportContext {
     // byte_words consists of:
     // [0]: ConfigDigest
     // [1]: 24 byte padding, 8 byte sequence number
@@ -113,12 +114,12 @@ fn clear_transmitters(ocr3_config: &mut Ocr3Config) {
     ocr3_config.transmitters = [[0; 32]; MAX_TRANSMITTERS]
 }
 
-pub trait Ocr3Report {
+pub(super) trait Ocr3Report {
     fn hash(&self, ctx: &ReportContext) -> [u8; 32];
     fn len(&self) -> usize;
 }
 
-pub fn ocr3_transmit<R: Ocr3Report>(
+pub(super) fn ocr3_transmit<R: Ocr3Report>(
     ocr3_config: &Ocr3Config,
     instruction_sysvar: &AccountInfo<'_>,
     transmitter: Pubkey,
@@ -230,54 +231,4 @@ fn assign_oracles<const A: usize>(oracles: &mut [[u8; A]], location: &mut [[u8; 
         location[i] = *o;
     }
     Ok(())
-}
-
-#[error_code]
-pub enum Ocr3Error {
-    #[msg("Invalid config: F must be positive")]
-    InvalidConfigFMustBePositive,
-    #[msg("Invalid config: Too many transmitters")]
-    InvalidConfigTooManyTransmitters,
-    #[msg("Invalid config: Too many signers")]
-    InvalidConfigTooManySigners,
-    #[msg("Invalid config: F is too high")]
-    InvalidConfigFIsTooHigh,
-    #[msg("Invalid config: Repeated oracle address")]
-    InvalidConfigRepeatedOracle,
-    #[msg("Wrong message length")]
-    WrongMessageLength,
-    #[msg("Config digest mismatch")]
-    ConfigDigestMismatch,
-    #[msg("Wrong number signatures")]
-    WrongNumberOfSignatures,
-    #[msg("Unauthorized transmitter")]
-    UnauthorizedTransmitter,
-    #[msg("Unauthorized signer")]
-    UnauthorizedSigner,
-    #[msg("Non unique signatures")]
-    NonUniqueSignatures,
-    #[msg("Oracle cannot be zero address")]
-    OracleCannotBeZeroAddress,
-    #[msg("Static config cannot be changed")]
-    StaticConfigCannotBeChanged,
-    #[msg("Incorrect plugin type")]
-    InvalidPluginType,
-    #[msg("Invalid signature")]
-    InvalidSignature,
-}
-
-#[event]
-pub struct ConfigSet {
-    pub ocr_plugin_type: u8,
-    pub config_digest: [u8; 32],
-    pub signers: Vec<[u8; 20]>,
-    pub transmitters: Vec<Pubkey>,
-    pub f: u8,
-}
-
-#[event]
-pub struct Transmitted {
-    pub ocr_plugin_type: u8,
-    pub config_digest: [u8; 32],
-    pub sequence_number: u64,
 }

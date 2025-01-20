@@ -80,14 +80,17 @@ func TestLogCopy(t *testing.T) {
 func Test_GetSeqNr(t *testing.T) {
 	ctx := context.TODO()
 	seqNr := rand.Uint64()
+	phase := PhaseObservation
 
 	// Add sequence number to context
-	ctxWithSeqNr := ctxWithOCRSeqNr(ctx, seqNr)
+	ctxWithSeqNr := ctxWithOCRVals(ctx, seqNr, phase)
 
 	// Retrieve sequence number from context
 	retrievedSeqNr := GetSeqNr(ctxWithSeqNr)
-
 	require.Equal(t, seqNr, retrievedSeqNr, "The sequence number should match the one set in the context")
+
+	retreivedPhase := ctxWithSeqNr.Value(ocrPhaseKey).(string)
+	require.Equal(t, phase, retreivedPhase, "The phase should match the one set in the context")
 
 	// Retrieve sequence number from context without sequence number
 	retrievedSeqNr = GetSeqNr(ctx)
@@ -97,9 +100,10 @@ func Test_GetSeqNr(t *testing.T) {
 func Test_WithContextValues(t *testing.T) {
 	ctx := context.TODO()
 	seqNr := rand.Uint64()
+	phase := PhaseObservation
 
 	// Add sequence number to context
-	ctxWithSeqNr := ctxWithOCRSeqNr(ctx, seqNr)
+	ctxWithSeqNr := ctxWithOCRVals(ctx, seqNr, phase)
 
 	lggr, observed := logger.TestObserved(t, zapcore.InfoLevel)
 	lggr = WithContextValues(ctxWithSeqNr, lggr)
@@ -119,10 +123,11 @@ func Test_WithContextValues(t *testing.T) {
 func Test_WithOCRSeqNr(t *testing.T) {
 	ctx := context.TODO()
 	seqNr := rand.Uint64()
+	phase := PhaseObservation
 
 	lggr, observed := logger.TestObserved(t, zapcore.InfoLevel)
 
-	newCtx, newLggr := WithOCRSeqNr(ctx, lggr, seqNr)
+	newCtx, newLggr := WithOCRInfo(ctx, lggr, seqNr, phase)
 
 	// Check if the context has the correct sequence number
 	retrievedSeqNr := GetSeqNr(newCtx)
@@ -138,4 +143,13 @@ func Test_WithOCRSeqNr(t *testing.T) {
 		},
 	)
 	require.Len(t, seqNrLogs.All(), 1)
+
+	phaseLogs := observed.FilterField(
+		zapcore.Field{
+			Key:    ocrPhaseLoggerKey,
+			Type:   zapcore.StringType,
+			String: phase,
+		},
+	)
+	require.Len(t, phaseLogs.All(), 1)
 }
