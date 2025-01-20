@@ -68,6 +68,7 @@ type PluginFactory struct {
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
 	msgHasher        cciptypes.MessageHasher
+	extraDataCodec   cciptypes.ExtraDataCodec
 	homeChainReader  reader.HomeChain
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
@@ -81,6 +82,7 @@ func NewPluginFactory(
 	ocrConfig reader.OCR3ConfigWithMeta,
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
+	extraDataCodec cciptypes.ExtraDataCodec,
 	homeChainReader reader.HomeChain,
 	tokenDataEncoder cciptypes.TokenDataEncoder,
 	estimateProvider cciptypes.EstimateProvider,
@@ -93,6 +95,7 @@ func NewPluginFactory(
 		ocrConfig:        ocrConfig,
 		execCodec:        execCodec,
 		msgHasher:        msgHasher,
+		extraDataCodec:   extraDataCodec,
 		homeChainReader:  homeChainReader,
 		estimateProvider: estimateProvider,
 		contractReaders:  contractReaders,
@@ -111,7 +114,7 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
 	}
 
-	if err = offchainConfig.Validate(); err != nil {
+	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
 	}
 
@@ -140,6 +143,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
+		p.extraDataCodec,
 	)
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(

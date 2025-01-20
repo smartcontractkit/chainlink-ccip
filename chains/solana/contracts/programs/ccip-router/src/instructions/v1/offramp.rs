@@ -1,8 +1,10 @@
 use anchor_lang::prelude::*;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
-use super::merkle::{calculate_merkle_root, MerkleError};
+use super::config::is_on_ramp_configured;
+use super::merkle::{calculate_merkle_root, MerkleError, LEAF_DOMAIN_SEPARATOR};
 use super::messages::pools::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
+use super::messages::ramps::{is_writable, Any2SVMMessage};
 use super::ocr3base::{ocr3_transmit, ReportContext};
 use super::ocr3impl::{Ocr3ReportForCommit, Ocr3ReportForExecutionReportSingleChain};
 use super::pools::{
@@ -10,16 +12,13 @@ use super::pools::{
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
-use crate::v1::config::is_on_ramp_configured;
-use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
-use crate::v1::messages::ramps::is_writable;
 use crate::{
-    Any2SVMMessage, Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput,
-    CommitReport, CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
+    Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
+    CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
     ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
     MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
     SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
-    UsdPerTokenUpdated, UsdPerUnitGasUpdated, CCIP_RECEIVE_DISCRIMINATOR, DEST_CHAIN_STATE_SEED,
+    UsdPerTokenUpdated, UsdPerUnitGasUpdated, DEST_CHAIN_STATE_SEED,
     EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
 };
 
@@ -506,7 +505,7 @@ fn internal_execute<'info>(
             })
             .collect();
 
-        let data = build_receiver_discriminator_and_data(message)?;
+        let data = message.build_receiver_discriminator_and_data()?;
 
         let instruction = Instruction {
             program_id: msg_program.key(), // The receiver Program Id that will handle the ccip_receive message
@@ -600,19 +599,6 @@ fn parse_messaging_accounts<'info>(
     }
 
     Ok((msg_program, msg_accounts))
-}
-
-/// Build the instruction data (discriminator + any other data)
-fn build_receiver_discriminator_and_data(ramp_message: Any2SVMMessage) -> Result<Vec<u8>> {
-    let m: std::result::Result<Vec<u8>, std::io::Error> = ramp_message.try_to_vec();
-    require!(m.is_ok(), CcipRouterError::InvalidMessage);
-    let message = m.unwrap();
-
-    let mut data = Vec::with_capacity(8);
-    data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
-    data.extend_from_slice(&message);
-
-    Ok(data)
 }
 
 pub fn verify_merkle_root(execution_report: &ExecutionReportSingleChain) -> Result<[u8; 32]> {

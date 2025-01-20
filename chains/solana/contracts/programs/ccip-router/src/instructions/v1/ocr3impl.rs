@@ -4,7 +4,7 @@ use crate::{CommitInput, ExecutionReportSingleChain};
 
 use super::ocr3base::{Ocr3Report, ReportContext};
 
-pub struct Ocr3ReportForCommit<'a>(pub &'a CommitInput);
+pub(super) struct Ocr3ReportForCommit<'a>(pub &'a CommitInput);
 
 impl Ocr3Report for Ocr3ReportForCommit<'_> {
     fn hash(&self, ctx: &ReportContext) -> [u8; 32] {
@@ -23,7 +23,7 @@ impl Ocr3Report for Ocr3ReportForCommit<'_> {
     }
 }
 
-pub struct Ocr3ReportForExecutionReportSingleChain<'a>(pub &'a ExecutionReportSingleChain);
+pub(super) struct Ocr3ReportForExecutionReportSingleChain<'a>(pub &'a ExecutionReportSingleChain);
 
 impl Ocr3Report for Ocr3ReportForExecutionReportSingleChain<'_> {
     fn hash(&self, _: &ReportContext) -> [u8; 32] {
