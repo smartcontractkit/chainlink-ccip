@@ -58,7 +58,7 @@ pub(super) struct TokenAccounts<'a> {
 }
 
 pub(super) fn validate_and_parse_token_accounts<'info>(
-    user: Pubkey,
+    token_receiver: Pubkey,
     chain_selector: u64,
     router: Pubkey,
     accounts: &'info [AccountInfo<'info>],
@@ -122,7 +122,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         require!(
             user_token_account.key()
                 == get_associated_token_address_with_program_id(
-                    &user,
+                    &token_receiver,
                     &mint.key(),
                     &token_program.key()
                 )
