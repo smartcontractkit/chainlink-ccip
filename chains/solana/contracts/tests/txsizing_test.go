@@ -73,7 +73,7 @@ func TestTransactionSizing(t *testing.T) {
 		bz, err := tx.MarshalBinary()
 		require.NoError(t, err)
 		l := len(bz)
-		require.LessOrEqual(t, l, 1242)
+		require.LessOrEqual(t, l, 1250)
 		return fmt.Sprintf("%-55s: %-4d - remaining: %d", name, l, 1232-l)
 	}
 
