@@ -663,7 +663,7 @@ pub fn validate_execution_report<'info>(
 }
 
 fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
-    use anchor_lang::solana_program::hash;
+    use anchor_lang::solana_program::keccak;
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = [msg.sender.len() as u8];
@@ -676,9 +676,8 @@ fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
-    // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
     // As similar as https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L111
-    let result = hash::hashv(&[
+    let result = keccak::hashv(&[
         LEAF_DOMAIN_SEPARATOR.as_slice(),
         // metadata hash
         "Any2SVMMessageHashV1".as_bytes(),
@@ -873,7 +872,7 @@ mod tests {
         let hash_result = hash(&message);
 
         assert_eq!(
-            "60f412fe7c28ae6981b694f92677276f767a98e0314b9a31a3c38366223e7e52",
+            "cabe4b03c22b7e6c684748f4c7abe710f82180fede7ad6e48fd3640fb74f8cfd",
             hex::encode(hash_result)
         );
     }
