@@ -143,7 +143,7 @@ func (u usdcMessageReader) MessagesByTokenID(
 	}
 
 	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
-	eventIDs, err := u.recreateMessageTransmitterEvents(dest, tokens)
+	eventIDsByMsgTokenID, err := u.recreateMessageTransmitterEvents(dest, tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -155,22 +155,19 @@ func (u usdcMessageReader) MessagesByTokenID(
 		return nil, fmt.Errorf("no contract bound for chain %d", source)
 	}
 
-	eventFilter := make([]query.Expression, 0, len(eventIDs))
-	for _, id := range eventIDs {
-		eventFilter = append(
-			eventFilter,
-			query.Comparator(
-				consts.CCTPMessageSentValue,
-				primitives.ValueComparator{
-					Value:    id,
-					Operator: primitives.Eq,
-				}),
-		)
+	eventIDs := make([]eventID, len(eventIDsByMsgTokenID))
+	for _, id := range eventIDsByMsgTokenID {
+		eventIDs = append(eventIDs, id)
 	}
-
+	
 	keyFilter, err := query.Where(
 		consts.EventNameCCTPMessageSent,
-		query.Or(eventFilter...),
+		query.Comparator(
+			consts.CCTPMessageSentValue,
+			primitives.ValueComparator{
+				Value:    primitives.Any(eventIDs),
+				Operator: primitives.Eq,
+			}),
 		query.Confidence(primitives.Finalized),
 	)
 	if err != nil {
@@ -182,7 +179,7 @@ func (u usdcMessageReader) MessagesByTokenID(
 		cr,
 		keyFilter,
 		query.NewLimitAndSort(
-			query.Limit{Count: uint64(len(eventIDs))},
+			query.Limit{Count: uint64(len(eventIDsByMsgTokenID))},
 			query.NewSortBySequence(query.Asc),
 		),
 		&MessageSentEvent{},
@@ -206,7 +203,7 @@ func (u usdcMessageReader) MessagesByTokenID(
 
 	// 3. Remapping database events to the proper MessageTokenID
 	out := make(map[MessageTokenID]cciptypes.Bytes)
-	for tokenID, messageID := range eventIDs {
+	for tokenID, messageID := range eventIDsByMsgTokenID {
 		message, ok1 := messageSentEvents[messageID]
 		if !ok1 {
 			// Token not available in the source chain, it should never happen at this stage
