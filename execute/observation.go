@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -176,7 +177,7 @@ func readAllMessages(
 	lggr logger.Logger,
 	ccipReader reader.CCIPReader,
 	commitData []exectypes.CommitData,
-) (exectypes.MessageObservations, exectypes.CommitObservations, map[cciptypes.Bytes32]time.Time) {
+) (exectypes.MessageObservations, exectypes.CommitObservations, map[cciptypes.Bytes32]time.Time, error) {
 	messageObs := make(exectypes.MessageObservations)
 	availableReports := make(exectypes.CommitObservations)
 	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
@@ -188,31 +189,42 @@ func readAllMessages(
 			continue
 		}
 
+		ranges, err := computeRanges(reports)
+		if err != nil {
+			return exectypes.MessageObservations{}, exectypes.CommitObservations{}, nil, err
+		}
+
 		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 		// Read messages for each range.
-		for _, report := range reports {
-			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
-			if err != nil || len(msgs) != report.SequenceNumberRange.Length() {
+		for _, reportsAndRange := range ranges {
+			seqNumRange := reportsAndRange.SeqNumRange
+			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, seqNumRange)
+			if err != nil || len(msgs) != seqNumRange.Length() {
+				roots := slicelib.Map(reportsAndRange.reports, func(report exectypes.CommitData) string {
+					return report.MerkleRoot.String()
+				})
 				lggr.Errorw("unable to read all messages for report",
 					"srcChain", srcChain,
-					"seqRange", report.SequenceNumberRange,
-					"merkleRoot", report.MerkleRoot,
+					"seqRange", seqNumRange,
+					"merkleRoot", roots,
 					"err", err,
 				)
 				continue
 			}
-			for _, msg := range msgs {
-				messageObs[srcChain][msg.Header.SequenceNumber] = msg
-				messageTimestamps[msg.Header.MessageID] = report.Timestamp
+			for _, report := range reportsAndRange.reports {
+				for _, msg := range msgs {
+					messageObs[srcChain][msg.Header.SequenceNumber] = msg
+					messageTimestamps[msg.Header.MessageID] = report.Timestamp
+				}
+				availableReports[srcChain] = append(availableReports[srcChain], report)
 			}
-			availableReports[srcChain] = append(availableReports[srcChain], report)
 		}
 		// Remove empty chains.
 		if len(messageObs[srcChain]) == 0 {
 			delete(messageObs, srcChain)
 		}
 	}
-	return messageObs, availableReports, messageTimestamps
+	return messageObs, availableReports, messageTimestamps, nil
 }
 
 func (p *Plugin) getMessagesObservation(
@@ -230,12 +242,15 @@ func (p *Plugin) getMessagesObservation(
 		return observation, nil
 	}
 
-	messageObs, commitReportCache, messageTimestamps := readAllMessages(
+	messageObs, commitReportCache, messageTimestamps, err := readAllMessages(
 		ctx,
 		p.lggr,
 		p.ccipReader,
 		previousOutcome.CommitReports,
 	)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to read all messages: %w", err)
+	}
 
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
