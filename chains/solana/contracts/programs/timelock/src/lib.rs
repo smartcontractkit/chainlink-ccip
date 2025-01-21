@@ -34,7 +34,7 @@ pub mod timelock {
         initialize::initialize(ctx, timelock_id, min_delay)
     }
 
-    #[access_control(only_admin!(ctx))]
+    #[access_control(require_only_admin!(ctx))]
     pub fn batch_add_access<'info>(
         ctx: Context<'_, '_, '_, 'info, BatchAddAccess<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -43,7 +43,7 @@ pub mod timelock {
         initialize::batch_add_access(ctx, timelock_id, role)
     }
 
-    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
+    #[access_control(require_role_or_admin!(ctx, Role::Proposer))]
     pub fn schedule_batch<'info>(
         ctx: Context<'_, '_, '_, 'info, ScheduleBatch<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -53,7 +53,7 @@ pub mod timelock {
         schedule::schedule_batch(ctx, timelock_id, id, delay)
     }
 
-    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
+    #[access_control(require_role_or_admin!(ctx, Role::Proposer, Role::Bypasser))]
     pub fn initialize_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, InitializeOperation<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -65,7 +65,7 @@ pub mod timelock {
         schedule::initialize_operation(ctx, timelock_id, id, predecessor, salt, instruction_count)
     }
 
-    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
+    #[access_control(require_role_or_admin!(ctx, Role::Proposer, Role::Bypasser))]
     pub fn append_instructions<'info>(
         ctx: Context<'_, '_, '_, 'info, AppendInstructions<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -75,7 +75,7 @@ pub mod timelock {
         schedule::append_instructions(ctx, timelock_id, id, instructions_batch)
     }
 
-    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
+    #[access_control(require_role_or_admin!(ctx, Role::Proposer, Role::Bypasser))]
     pub fn clear_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, ClearOperation<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -84,7 +84,7 @@ pub mod timelock {
         schedule::clear_operation(ctx, timelock_id, id)
     }
 
-    #[access_control(only_role_or_admin_role!(ctx, Role::Proposer))]
+    #[access_control(require_role_or_admin!(ctx, Role::Proposer, Role::Bypasser))]
     pub fn finalize_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, FinalizeOperation<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -93,7 +93,7 @@ pub mod timelock {
         schedule::finalize_operation(ctx, timelock_id, id)
     }
 
-    #[access_control(only_role_or_admin_role!(ctx, Role::Canceller))]
+    #[access_control(require_role_or_admin!(ctx, Role::Canceller))]
     pub fn cancel<'info>(
         ctx: Context<'_, '_, '_, 'info, Cancel<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -102,7 +102,7 @@ pub mod timelock {
         cancel::cancel(ctx, timelock_id, id)
     }
 
-    #[access_control(only_role_or_admin_role!(ctx, Role::Executor))]
+    #[access_control(require_role_or_admin!(ctx, Role::Executor))]
     pub fn execute_batch<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteBatch<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -111,7 +111,7 @@ pub mod timelock {
         execute::execute_batch(ctx, timelock_id, id)
     }
 
-    #[access_control(only_role_or_admin_role!(ctx, Role::Bypasser))]
+    #[access_control(require_role_or_admin!(ctx, Role::Bypasser))]
     pub fn bypasser_execute_batch<'info>(
         ctx: Context<'_, '_, '_, 'info, BypasserExecuteBatch<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -120,7 +120,7 @@ pub mod timelock {
         execute::bypasser_execute_batch(ctx, timelock_id, id)
     }
 
-    #[access_control(only_admin!(ctx))]
+    #[access_control(require_only_admin!(ctx))]
     pub fn update_delay(
         ctx: Context<UpdateDelay>,
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -136,7 +136,7 @@ pub mod timelock {
         Ok(())
     }
 
-    #[access_control(only_admin!(ctx))]
+    #[access_control(require_only_admin!(ctx))]
     pub fn block_function_selector(
         ctx: Context<BlockFunctionSelector>,
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -148,7 +148,7 @@ pub mod timelock {
         Ok(())
     }
 
-    #[access_control(only_admin!(ctx))]
+    #[access_control(require_only_admin!(ctx))]
     pub fn unblock_function_selector(
         ctx: Context<UnblockFunctionSelector>,
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -160,7 +160,7 @@ pub mod timelock {
         Ok(())
     }
 
-    #[access_control(only_admin!(ctx))]
+    #[access_control(require_only_admin!(ctx))]
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
