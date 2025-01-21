@@ -42,7 +42,7 @@ func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-	ctx, lggr := logutil.WithOCRSeqNr(ctx, p.lggr, seqNr)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseReports)
 
 	outcome, err := committypes.DecodeOutcome(outcomeBytes)
 	if err != nil {
@@ -206,7 +206,7 @@ func (p *Plugin) validateReport(
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	ctx, lggr := logutil.WithOCRSeqNr(ctx, p.lggr, seqNr)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
 	valid, decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if err != nil {
@@ -284,7 +284,7 @@ func (p *Plugin) checkReportCursed(
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	ctx, lggr := logutil.WithOCRSeqNr(ctx, p.lggr, seqNr)
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
 
 	valid, decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if err != nil {

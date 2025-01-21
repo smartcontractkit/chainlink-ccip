@@ -581,3 +581,41 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePositive(t *testing.T) {
+	tests := []struct {
+		name    string
+		fee     *big.Int
+		wantErr bool
+	}{
+		{
+			name:    "nil fee",
+			fee:     nil,
+			wantErr: true,
+		},
+		{
+			name:    "negative fee",
+			fee:     big.NewInt(-1),
+			wantErr: true,
+		},
+		{
+			name:    "zero fee",
+			fee:     big.NewInt(0),
+			wantErr: true,
+		},
+		{
+			name:    "positive fee",
+			fee:     big.NewInt(1),
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePositive(tt.fee)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validatePositive() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

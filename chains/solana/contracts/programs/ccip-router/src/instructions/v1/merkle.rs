@@ -1,4 +1,4 @@
-use anchor_lang::solana_program::hash;
+use anchor_lang::solana_program::keccak;
 
 pub const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
 const MAX_NUM_HASHES: usize = 128; // TODO: Change this to 256 when supporting commit reports with 256 messages
@@ -10,9 +10,9 @@ pub enum MerkleError {
 
 fn hash_pair(hash1: &[u8; 32], hash2: &[u8; 32]) -> [u8; 32] {
     if hash1 < hash2 {
-        hash::hashv(&[hash1, hash2]).to_bytes()
+        keccak::hashv(&[hash1, hash2]).to_bytes()
     } else {
-        hash::hashv(&[hash2, hash1]).to_bytes()
+        keccak::hashv(&[hash2, hash1]).to_bytes()
     }
 }
 
@@ -58,7 +58,7 @@ mod tests {
                     .unwrap(),
             ];
         let expected_root: [u8; 32] =
-            hex::decode("d23481665c993b84af89b0fec64bc789ba1d39b97e2e947f550e69a0eef3cf5c")
+            hex::decode("94b949ca8fd6307aa72481fe44eca36c63686f8e85acac99e4f0cd2b36a99d33")
                 .unwrap()
                 .to_owned()
                 .try_into()
@@ -66,7 +66,7 @@ mod tests {
 
         let result = calculate_merkle_root(hashed_leaf, proofs);
         assert!(result.is_ok());
-        assert_eq!(expected_root, result.unwrap());
+        assert_eq!(hex::encode(expected_root), hex::encode(result.unwrap()));
     }
 
     #[test]
@@ -88,7 +88,7 @@ mod tests {
 
         let result = calculate_merkle_root(hashed_leaf, proofs);
         assert!(result.is_ok());
-        assert_eq!(expected_root, result.unwrap());
+        assert_eq!(hex::encode(expected_root), hex::encode(result.unwrap()));
     }
 
     #[test]
@@ -126,7 +126,7 @@ mod tests {
         ];
 
         let expected_root: [u8; 32] =
-            hex::decode("00e9612b8588dc36a210ac439ba6569ca5263a98b3f9c2da5b342dc7925d3393")
+            hex::decode("577252413aa3c3c02bca5a8e30ad69fdf1b138d4ccc3d834d3c6934775ceaf87")
                 .unwrap()
                 .to_owned()
                 .try_into()
@@ -134,6 +134,6 @@ mod tests {
 
         let result = calculate_merkle_root(a, proofs);
         assert!(result.is_ok());
-        assert_eq!(expected_root, result.unwrap());
+        assert_eq!(hex::encode(expected_root), hex::encode(result.unwrap()));
     }
 }

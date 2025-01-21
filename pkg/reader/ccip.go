@@ -42,6 +42,7 @@ type ccipChainReader struct {
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
+	extraDataCodec  cciptypes.ExtraDataCodec
 }
 
 func newCCIPChainReaderInternal(
@@ -51,6 +52,7 @@ func newCCIPChainReaderInternal(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
+	extraDataCodec cciptypes.ExtraDataCodec,
 ) *ccipChainReader {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
@@ -63,6 +65,7 @@ func newCCIPChainReaderInternal(
 		contractWriters: contractWriters,
 		destChain:       destChain,
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
+		extraDataCodec:  extraDataCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -364,6 +367,10 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
+		msg.Message.ExtraArgsDecoded, err = r.extraDataCodec.DecodeExtraData(msg.Message.ExtraArgs, sourceChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode ExtraArgs: %w", err)
+		}
 		msg.Message.Header.OnRamp = onRampAddress
 		msgs = append(msgs, msg.Message)
 	}

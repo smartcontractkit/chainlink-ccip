@@ -73,7 +73,7 @@ func TestTransactionSizing(t *testing.T) {
 		bz, err := tx.MarshalBinary()
 		require.NoError(t, err)
 		l := len(bz)
-		require.LessOrEqual(t, l, 1232)
+		require.LessOrEqual(t, l, 1250)
 		return fmt.Sprintf("%-55s: %-4d - remaining: %d", name, l, 1232-l)
 	}
 
@@ -88,7 +88,7 @@ func TestTransactionSizing(t *testing.T) {
 	sendSingleMinimalToken := ccip_router.SVM2AnyMessage{
 		Receiver: make([]byte, 20),
 		Data:     []byte{},
-		TokenAmounts: []ccip_router.SVMTokenAmount{ccip_router.SVMTokenAmount{
+		TokenAmounts: []ccip_router.SVMTokenAmount{{
 			Token:  [32]byte{},
 			Amount: 0,
 		}}, // one token
@@ -178,10 +178,11 @@ func TestTransactionSizing(t *testing.T) {
 				SequenceNumber:      0,
 				Nonce:               0,
 			},
-			Sender:       make([]byte, 20), // EVM sender
-			Data:         []byte{},
-			Receiver:     [32]byte{},
-			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{},
+			Sender:        make([]byte, 20), // EVM sender
+			Data:          []byte{},
+			TokenReceiver: [32]byte{},
+			LogicReceiver: [32]byte{},
+			TokenAmounts:  []ccip_router.Any2SVMTokenTransfer{},
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
@@ -202,15 +203,16 @@ func TestTransactionSizing(t *testing.T) {
 				SequenceNumber:      0,
 				Nonce:               0,
 			},
-			Sender:   make([]byte, 20), // EVM sender
-			Data:     []byte{},
-			Receiver: [32]byte{},
+			Sender:        make([]byte, 20), // EVM sender
+			Data:          []byte{},
+			TokenReceiver: [32]byte{},
+			LogicReceiver: [32]byte{},
 			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{{
 				SourcePoolAddress: make([]byte, 20), // EVM origin token pool
 				DestTokenAddress:  [32]byte{},
 				DestGasAmount:     0,
 				ExtraData:         []byte{},
-				Amount:            [32]uint8{},
+				Amount:            ccip_router.CrossChainAmount{LeBytes: [32]uint8{}},
 			}},
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,

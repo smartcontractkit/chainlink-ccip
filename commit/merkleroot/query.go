@@ -44,7 +44,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
 		onRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
-			p.lggr.Warnf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
+			lggr.Warnf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
 			continue
 		}
 
@@ -68,7 +68,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	sigs, err := p.rmnController.ComputeReportSignatures(ctxQuery, dstChainInfo, reqUpdates, prevOutcome.RMNRemoteCfg)
 	if err != nil {
 		if errors.Is(err, rmn.ErrTimeout) {
-			p.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
+			lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
 				len(reqUpdates), dstChainInfo)
 			return Query{RetryRMNSignatures: true}, nil
 		}

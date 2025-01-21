@@ -3,6 +3,7 @@ package pluginconfig
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -60,6 +61,9 @@ func (e *ExecuteOffchainConfig) applyDefaults() {
 	if e.TransmissionDelayMultiplier == 0 {
 		e.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
 	}
+	if e.RelativeBoostPerWaitHour == 0 {
+		e.RelativeBoostPerWaitHour = defaultRelativeBoostPerWaitHour
+	}
 }
 
 func (e *ExecuteOffchainConfig) Validate() error {
@@ -86,6 +90,9 @@ func (e *ExecuteOffchainConfig) Validate() error {
 		return errors.New("MessageVisibilityInterval not set")
 	}
 
+	if e.RelativeBoostPerWaitHour > 1 || e.RelativeBoostPerWaitHour < 0 {
+		return fmt.Errorf("RelativeBoostPerWaitHour must be <= 1 and >= 0, got: %f", e.RelativeBoostPerWaitHour)
+	}
 	set := make(map[string]struct{})
 	for _, ob := range e.TokenDataObservers {
 		if err := ob.Validate(); err != nil {

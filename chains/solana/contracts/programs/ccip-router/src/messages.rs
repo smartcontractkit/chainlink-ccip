@@ -1,3 +1,5 @@
+use std::convert::Into;
+
 use anchor_lang::prelude::*;
 
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
@@ -59,10 +61,13 @@ pub struct Any2SVMRampMessage {
     pub header: RampMessageHeader,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
-    // receiver is used as the target for the two main functionalities
-    // token transfers: recipient of token transfers (associated token addresses are validated against this address)
-    // arbitrary messaging: expected account in the declared arbitrary messaging accounts (2nd in the list of the accounts)
-    pub receiver: Pubkey,
+    // In EVM receiver means the address that all the listed tokens will transfer to and the address of the message execution.
+    // In Solana the receiver is split into two:
+    // Logic Receiver is the Program ID of the user's program that will execute the message
+    pub logic_receiver: Pubkey,
+    // Token Receiver is the address which the ATA will be calculated from.
+    // If token receiver and message execution, then the token receiver must be a PDA from the logic receiver
+    pub token_receiver: Pubkey,
     pub token_amounts: Vec<Any2SVMTokenTransfer>,
     pub extra_args: SVMExtraArgs,
     pub on_ramp_address: Vec<u8>,
@@ -75,7 +80,8 @@ impl Any2SVMRampMessage {
         self.header.len() // header
         + 4 + self.sender.len() // sender
         + 4 + self.data.len() // data
-        + 32 // receiver
+        + 32 // logic receiver
+        + 32 // token receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
         + 4 + self.on_ramp_address.len() // on_ramp_address
@@ -93,8 +99,9 @@ pub struct SVM2AnyRampMessage {
     pub receiver: Vec<u8>,         // receiver address on the destination chain
     pub extra_args: AnyExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
     pub fee_token: Pubkey,
-    pub fee_token_amount: u64,
     pub token_amounts: Vec<SVM2AnyTokenTransfer>,
+    pub fee_token_amount: CrossChainAmount,
+    pub fee_value_juels: CrossChainAmount,
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
@@ -109,7 +116,7 @@ pub struct SVM2AnyTokenTransfer {
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
     pub extra_data: Vec<u8>,
-    pub amount: [u8; 32], // LE encoded u256 -  cross-chain token amount is always u256
+    pub amount: CrossChainAmount, // LE encoded u256 -  cross-chain token amount is always u256
     // Destination chain data used to execute the token transfer on the destination chain. For an EVM destination, it
     // consists of the amount of gas available for the releaseOrMint and transfer calls made by the offRamp.
     pub dest_exec_data: Vec<u8>,
@@ -126,7 +133,7 @@ pub struct Any2SVMTokenTransfer {
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
     pub extra_data: Vec<u8>,
-    pub amount: [u8; 32], // LE encoded u256, any cross-chain token amounts are u256
+    pub amount: CrossChainAmount,
 }
 
 impl Any2SVMTokenTransfer {
@@ -160,11 +167,25 @@ pub struct ExtraArgsInput {
     pub allow_out_of_order_execution: Option<bool>,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SVMMessage {
-    pub message_id: [u8; 32],
-    pub source_chain_selector: u64,
-    pub sender: Vec<u8>,
-    pub data: Vec<u8>,
-    pub token_amounts: Vec<SVMTokenAmount>,
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
+pub struct CrossChainAmount {
+    le_bytes: [u8; 32],
+}
+
+impl CrossChainAmount {
+    pub const ZERO: Self = Self {
+        le_bytes: [0u8; 32],
+    };
+
+    pub fn to_bytes(self) -> [u8; 32] {
+        self.le_bytes
+    }
+}
+
+impl<T: Into<ethnum::U256>> From<T> for CrossChainAmount {
+    fn from(value: T) -> Self {
+        Self {
+            le_bytes: value.into().to_le_bytes(),
+        }
+    }
 }
