@@ -1677,6 +1677,8 @@ const (
 	InvalidInputsMissingTokenConfig_CcipRouterError
 	MessageFeeTooHigh_CcipRouterError
 	SourceTokenDataTooLarge_CcipRouterError
+	MessageGasLimitTooHigh_CcipRouterError
+	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1759,6 +1761,10 @@ func (value CcipRouterError) String() string {
 		return "MessageFeeTooHigh"
 	case SourceTokenDataTooLarge_CcipRouterError:
 		return "SourceTokenDataTooLarge"
+	case MessageGasLimitTooHigh_CcipRouterError:
+		return "MessageGasLimitTooHigh"
+	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError:
+		return "ExtraArgOutOfOrderExecutionMustBeTrue"
 	default:
 		return ""
 	}
