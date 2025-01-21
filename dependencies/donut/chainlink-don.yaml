@@ -61,6 +61,11 @@ vars:
 
 pipelines:
   deploy:
+    flags:
+      # Determine if it should deply infra-only without onchain deployment
+      - name: infraOnly
+        type: bool
+        default: false
     run: |-
       if [[ "$PROVIDER" == "kind" ]]; then
        ensure_pull_secrets --all
@@ -69,19 +74,25 @@ pipelines:
       create_deployments --all
 
       if [[ "$CCIP_TOOLING_VERSION" == "v2" ]]; then
+        echo "Deploying dependencies for CCIP v2 Tooling"
+
         run_dependency_pipelines job-distributor
 
-        # deploy-home-chain-contracts pipeline write 2 files to temp dir
-        #   - ccip-v2-scripts-node-overrides.toml
-        #   - ccip-v2-scripts-address-book.json
-        run_dependency_pipelines ccip-v2-scripts-deploy-home-chain
+        if [ $(get_flag "infraOnly") == "false" ]; then
+          # deploy-home-chain-contracts pipeline write 2 files to temp dir
+          #   - ccip-v2-scripts-node-overrides.toml
+          #   - ccip-v2-scripts-address-book.json
+          run_dependency_pipelines ccip-v2-scripts-deploy-home-chain
 
-        NODE_TOML_OVERRIDES=$(cat ${TMP_DIR}/ccip-v2-scripts-node-overrides.toml) \
-          gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${TMP_DIR}/ccip-v2-node-overrides.yaml
-        create_deployments chainlink-don --from-file="${TMP_DIR}/ccip-v2-node-overrides.yaml"
+          NODE_TOML_OVERRIDES=$(cat ${TMP_DIR}/ccip-v2-scripts-node-overrides.toml) \
+            gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${TMP_DIR}/ccip-v2-node-overrides.yaml
+          create_deployments chainlink-don --from-file="${TMP_DIR}/ccip-v2-node-overrides.yaml"
 
-        # deploy on chain contracts (tokens, lanes, token pools, price registry, router)
-        run_dependency_pipelines ccip-v2-scripts-deploy-ccip
+          # deploy on chain contracts (tokens, lanes, token pools, price registry, router)
+          run_dependency_pipelines ccip-v2-scripts-deploy-ccip
+        else
+          echo "infraOnly=true, skipping on chain deployments and node orchestration"
+        fi
       fi
 deployments:
   chainlink-don:

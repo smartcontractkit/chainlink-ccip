@@ -39,6 +39,17 @@ deployments:
           enabled: false
         metrics:
           enabled: false
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/instance: "postgres"
+    events: ["after:deploy:postgres"]
+
 profiles:
   - name: aws
     activation:

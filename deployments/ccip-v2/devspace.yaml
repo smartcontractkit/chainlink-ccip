@@ -53,7 +53,7 @@ imports:
   - path: ${IMPORTS_DIR}/lib-kind
 
 pipelines:
-  ccip-v2:
+  maybe-kind:
     run: |-
       if [ "$PROVIDER" == "kind" ]; then
         run_dependency_pipelines kind-core
@@ -61,12 +61,25 @@ pipelines:
           run_dependency_pipelines kind-monitoring
         fi
       fi
+  ccip-v2:
+    run: |-
+      run_pipelines maybe-kind
 
       run_dependency_pipelines geth
       run_pipelines ingress-check
 
       # Deploy CCIP enabled fully configured DON
       run_dependency_pipelines ccip-don
+      run_pipelines ingress-check
+  ccip-v2-infra-only:
+    run: |-
+      run_pipelines maybe-kind
+
+      run_dependency_pipelines geth
+      run_pipelines ingress-check
+
+      # Deploy CCIP enabled fully configured DON
+      run_dependency_pipelines ccip-don --set-flag infraOnly="true"
       run_pipelines ingress-check
   geth:
     run: |-
@@ -89,7 +102,6 @@ pipelines:
   job-distributor:
     run: |-
       run_dependency_pipelines job-distributor
-
 profiles:
   - name: kind
     activation:
@@ -188,7 +200,11 @@ commands:
     command: devspace run-pipeline ccip-v2 -p load-tests
     description: Run the ccip v2 pipeline.
     appendArgs: true
-  deploy-geth:
+  ccip-v2-infra:
+    command: devspace run-pipeline ccip-v2-infra-only -p default
+    description: Run the ccip v2 pipeline without onchain deployment, just infra.
+    appendArgs: true
+  geth:
     command: devspace run-pipeline geth -p ccip-v2
     description: Run the ccip v2 pipeline.
     appendArgs: true
@@ -196,7 +212,7 @@ commands:
     command: devspace run-pipeline debug-gap -p debug-gap
     description: Run the ccip v2 pipeline.
     appendArgs: true
-  deploy-job-distributor:
+  job-distributor:
     command: devspace run-pipeline job-distributor -p job-distributor
     description: Run the job-distributor pipeline.
     appendArgs: true
@@ -204,7 +220,7 @@ commands:
     command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-home-chain
     description: Deploy CCIP Contracts and Add lanes.
     appendArgs: true
-  deploy-ccip:
+  deploy-ccip-contracts:
     command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-deploy-ccip
     description: Deploy CCIP Contracts and Add lanes.
     appendArgs: true
