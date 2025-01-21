@@ -77,13 +77,17 @@ func (p *Plugin) Observation(
 	case exectypes.GetMessages:
 		// Phase 2: Gather messages from the source chains and build the execution report.
 		observation, err = p.getMessagesObservation(ctx, lggr, previousOutcome, observation)
-		lggr.Errorw("failed to getMessagesObservation", "err", err)
-		return nil, nil
+		if err != nil {
+			lggr.Errorw("failed to getMessagesObservation", "err", err)
+			return nil, nil
+		}
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
 		observation, err = p.getFilterObservation(ctx, lggr, previousOutcome, observation)
-		lggr.Errorw("failed to getFilterObservation", "err", err)
-		return nil, nil
+		if err != nil {
+			lggr.Errorw("failed to getFilterObservation", "err", err)
+			return nil, nil
+		}
 	default:
 		return nil, fmt.Errorf("get observation: unknown state")
 	}
