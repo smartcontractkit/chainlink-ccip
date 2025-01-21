@@ -162,8 +162,6 @@ func run(args arguments) error {
 		io.Filenames = args.files
 	}
 
-	fmt.Println("processing files", io.Filenames)
-
 	inputStream, err := stream.InitializeInputStream(io)
 	if err != nil {
 		return fmt.Errorf("failed to initialize input stream: %w", err)
