@@ -15,14 +15,14 @@ use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 use super::price_math::get_validated_token_price;
 use super::price_math::{Exponential, Usd18Decimals};
 
-/// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, sender and tokenAmounts).
+/// SVM2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, sender and tokenAmounts).
 /// Each variable array takes 1 more slot to store its length.
 /// When abi encoded, excluding array contents,
-/// Any2EVMMessage takes up a fixed number of 13 slots, 32 bytes each.
+/// SVM2AnyMessage takes up a fixed number of 13 slots, 32 bytes each.
 /// We assume sender always takes 1 slot.
 /// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 15.
-/// The fixed bytes does not cover struct data (this is represented by ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
-pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
+/// The fixed bytes does not cover struct data (this is represented by SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
+pub const SVM_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 
 /// Each token transfer adds 1 RampTokenAmount
 /// RampTokenAmount has 5 fields, 2 of which are bytes type, 1 Address, 1 uint256 and 1 uint32.
@@ -30,7 +30,7 @@ pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 /// address
 /// uint256 amount takes 1 slot.
 /// uint32 destGasAmount takes 1 slot.
-pub const ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
+pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
 
 pub fn fee_for_msg(
     message: &SVM2AnyMessage,
@@ -76,9 +76,8 @@ pub fn fee_for_msg(
 
     let execution_gas = gas_limit
         + U256::new(dest_chain.config.dest_gas_overhead as u128)
-        + U256::new(message.data.len() as u128)
-            * (U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
-                + network_fee.transfer_bytes_overhead)
+        + (U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead)
+            * U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
         + network_fee.transfer_gas;
 
     let execution_cost = execution_gas_price
@@ -114,10 +113,10 @@ fn data_availability_cost(
 ) -> Usd18Decimals {
     // Sums up byte lengths of fixed message fields and dynamic message fields.
     // Fixed message fields do account for the offset and length slot of the dynamic fields.
-    let data_availability_length_bytes = ANY_2_EVM_MESSAGE_FIXED_BYTES
+    let data_availability_length_bytes = SVM_2_EVM_MESSAGE_FIXED_BYTES
         + U256::new(message.data.len() as u128)
         + (U256::new(message.token_amounts.len() as u128)
-            * ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
+            * SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
         + token_transfer_bytes_overhead;
 
     // dest_data_availability_overhead_gas is a separate config value for flexibility to be updated
@@ -250,7 +249,7 @@ pub struct UnpackedDoubleU224 {
 impl From<&TimestampedPackedU224> for UnpackedDoubleU224 {
     fn from(packed: &TimestampedPackedU224) -> Self {
         let mut u128_buffer = [0u8; 16];
-        u128_buffer[2..16].clone_from_slice(&packed.value[14..]); // @TODO: byte alignment good?
+        u128_buffer[2..16].clone_from_slice(&packed.value[14..]);
         let low = u128::from_be_bytes(u128_buffer);
         u128_buffer[2..16].clone_from_slice(&packed.value[..14]);
         let high = u128::from_be_bytes(u128_buffer);
