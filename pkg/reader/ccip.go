@@ -373,12 +373,12 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		}
 		msg.Message.Header.OnRamp = onRampAddress
 
-		for i, token := range msg.Message.TokenAmounts {
-			token.DestExecData, err = r.extraDataCodec.DecodeTokenAmountDestExecData(token.DestExecData, sourceChainSelector)
+		for i, tokenAmount := range msg.Message.TokenAmounts {
+			tokenAmount.DestExecData, err = r.extraDataCodec.DecodeTokenAmountDestExecData(tokenAmount.DestExecData, sourceChainSelector)
 			if err != nil {
-				return nil, fmt.Errorf("failed to decode DestExecData: %w", err)
+				return nil, fmt.Errorf("failed to decode token amount destExecData (%v): %w", tokenAmount.DestExecData, err)
 			}
-			msg.Message.TokenAmounts[i] = token
+			msg.Message.TokenAmounts[i] = tokenAmount
 		}
 		msgs = append(msgs, msg.Message)
 	}
