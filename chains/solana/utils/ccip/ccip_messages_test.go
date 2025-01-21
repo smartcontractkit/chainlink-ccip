@@ -56,7 +56,7 @@ func TestMessageHashing(t *testing.T) {
 		}, config.OnRampAddress)
 
 		require.NoError(t, err)
-		require.Equal(t, "266b8d99e64a52fdd325f67674f56d0005dbee5e9999ff22017d5b117fbedfa3", hex.EncodeToString(h))
+		require.Equal(t, "4db316059ebdabdb76b8b090d4df866c00de34c4f1ab959fc3ad142c8bde3bfa", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {
@@ -91,6 +91,6 @@ func TestMessageHashing(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "877ba2a7329fe40e5f73b697eff78577988a72216e6c96b57335c97f92e14268", hex.EncodeToString(h))
+		require.Equal(t, "009bc51872fe41ea096bd881bf52e3daf07c80e112ffeeba6aa503d8281b6bfd", hex.EncodeToString(h))
 	})
 }
