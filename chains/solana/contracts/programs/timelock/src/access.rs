@@ -26,61 +26,53 @@ use crate::state::{Config, Role};
 /// ```
 #[macro_export]
 macro_rules! require_role_or_admin {
-    ($ctx:expr, $($role:expr),+) => {
-        {
-            let mut result = Err(anchor_lang::error::Error::from(AuthError::Unauthorized));
-            $(
-                if only_role_or_admin(
-                    &$ctx.accounts.config,
-                    &$ctx.accounts.role_access_controller,
-                    &$ctx.accounts.authority,
-                    $role
-                ).is_ok() {
-                    result = Ok(());
-                }
-            )*
-            result
-        }
-    };
+    ($ctx:expr, $($role:expr),+) => {{
+        only_role_or_admin(
+            &$ctx.accounts.config,
+            &$ctx.accounts.role_access_controller,
+            &$ctx.accounts.authority,
+            &[$($role),+]
+        )
+    }};
 }
 
-/// Helper function to verify if an authority has admin rights or a specific role.
-/// Returns Ok(()) if the authority is either the admin or has the specified role.
+/// Helper function to verify if an authority has admin rights or any of the specified roles.
+/// Returns Ok(()) if the authority is either the admin or has at least one of the roles.
 ///
 /// # Arguments
 /// * `config` - Account containing program configuration including owner
 /// * `role_controller` - Account managing role-based access control
 /// * `authority` - The signer attempting to execute the instruction
-/// * `role` - The role being checked for authorization
+/// * `roles` - Array of roles being checked for authorization
 ///
 /// # Returns
-/// * `Result<()>` - Ok if authorized, Err with AuthError::Unauthorized otherwise
+/// * `Result<()>` - Ok if authorized
+/// * `Err(TimelockError::InvalidAccessController)` - If provided controller isn't configured for any roles
+/// * `Err(AuthError::Unauthorized)` - If authority lacks admin rights and required roles
+
 pub fn only_role_or_admin(
     config: &Account<Config>,
     role_controller: &AccountLoader<AccessController>,
     authority: &Signer,
-    role: Role,
+    roles: &[Role],
 ) -> Result<()> {
-    // Check if the authority is the admin (owner) first
-    // This provides a bypass for the owner regardless of role assignments
     if authority.key() == config.owner {
         return Ok(());
     }
 
-    // Verify that we're using the correct access controller for this role
-    // This prevents using a different access controller than what's registered
-    require_keys_eq!(
-        config.get_role_controller(&role),
-        role_controller.key(),
+    require!(
+        roles
+            .iter()
+            .any(|role| config.get_role_controller(role) == role_controller.key()),
         TimelockError::InvalidAccessController
     );
 
-    // Finally, check if the authority has been granted the required role
-    require!(
-        access_controller::has_access(role_controller, &authority.key())?,
-        AuthError::Unauthorized
-    );
+    let has_valid_role = roles.iter().any(|role| {
+        config.get_role_controller(role) == role_controller.key()
+            && access_controller::has_access(role_controller, &authority.key()).unwrap_or(false)
+    });
 
+    require!(has_valid_role, AuthError::Unauthorized);
     Ok(())
 }
 

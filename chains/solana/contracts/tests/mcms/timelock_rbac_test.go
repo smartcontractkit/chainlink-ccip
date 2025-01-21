@@ -284,9 +284,9 @@ func TestTimelockRBAC(t *testing.T) {
 			ac := roleMap[timelock.Proposer_Role].AccessController
 
 			// preload the operation with proposer for access testing on schedule_batch
-			ixs, prierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp, proposer.PublicKey(), ac.PublicKey())
+			prixs, prierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp, proposer.PublicKey(), ac.PublicKey())
 			require.NoError(t, prierr)
-			for _, ix := range ixs {
+			for _, ix := range prixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 			}
 
