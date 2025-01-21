@@ -112,6 +112,23 @@ func getRelevantFieldsForMessage(data *parse.Data) string {
 		fields = fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
 	}
 
+	if strings.HasPrefix(data.Message, "failed to get token prices outcome") {
+		return fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
+	}
+
+	if strings.HasPrefix(data.Message, "Get consensus observation failed, empty outcome") {
+		return fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
+	}
+
+	if strings.HasPrefix(data.Message, "Sending Outcome") {
+		return fmt.Sprintf("nextState=%v outcome=%v",
+			data.RawLoggerFields["nextState"], data.RawLoggerFields["outcome"])
+	}
+
+	if strings.HasPrefix(data.Message, "sending merkle root processor observation") {
+		return fmt.Sprintf("observation=%v", data.RawLoggerFields["observation"])
+	}
+
 	if strings.HasPrefix(data.Message, "call to MsgsBetweenSeqNums returned unexpected") {
 		return fmt.Sprintf(
 			"%s expected=%v actual=%v chain=%v",
