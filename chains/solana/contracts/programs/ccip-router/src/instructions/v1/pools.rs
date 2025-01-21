@@ -314,13 +314,6 @@ pub fn get_balance<'a>(token_account: &'a AccountInfo<'a>) -> Result<u64> {
     Ok(acc.amount)
 }
 
-// pack u64 into LE u256 for cross-chain amount
-pub fn u64_to_le_u256(v: u64) -> [u8; 32] {
-    let mut out: [u8; 32] = [0; 32];
-    out[..8].copy_from_slice(v.to_le_bytes().as_slice());
-    out
-}
-
 pub mod token_admin_registry_writable {
     use crate::TokenAdminRegistry;
 

@@ -2119,15 +2119,23 @@
             "type": "publicKey"
           },
           {
-            "name": "feeTokenAmount",
-            "type": "u64"
-          },
-          {
             "name": "tokenAmounts",
             "type": {
               "vec": {
                 "defined": "SVM2AnyTokenTransfer"
               }
+            }
+          },
+          {
+            "name": "feeTokenAmount",
+            "type": {
+              "defined": "CrossChainAmount"
+            }
+          },
+          {
+            "name": "feeValueJuels",
+            "type": {
+              "defined": "CrossChainAmount"
             }
           }
         ]
@@ -2153,10 +2161,7 @@
           {
             "name": "amount",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "defined": "CrossChainAmount"
             }
           },
           {
@@ -2190,10 +2195,7 @@
           {
             "name": "amount",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "defined": "CrossChainAmount"
             }
           }
         ]
@@ -2264,6 +2266,23 @@
             "name": "allowOutOfOrderExecution",
             "type": {
               "option": "bool"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossChainAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "leBytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
             }
           }
         ]

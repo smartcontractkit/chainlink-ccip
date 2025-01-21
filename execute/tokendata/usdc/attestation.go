@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -90,13 +91,14 @@ func (s *sequentialAttestationClient) Attestations(
 	ctx context.Context,
 	messagesByChain map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
 ) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
+	lggr := logutil.WithContextValues(ctx, s.lggr)
 	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus)
 
 	for chainSelector, messagesByTokenID := range messagesByChain {
 		outcome[chainSelector] = make(map[reader.MessageTokenID]AttestationStatus)
 
 		for tokenID, message := range messagesByTokenID {
-			s.lggr.Debugw(
+			lggr.Debugw(
 				"Fetching attestation from the API",
 				"chainSelector", chainSelector,
 				"message", message,

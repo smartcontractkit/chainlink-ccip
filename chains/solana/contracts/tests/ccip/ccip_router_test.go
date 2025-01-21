@@ -899,10 +899,15 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Any nonzero timestamp is valid (for now)
 			validTimestamp := int64(100)
-			value := [28]uint8{}
+			bigValue := [28]uint8{}
 			bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
 			require.True(t, ok)
-			bigNum.FillBytes(value[:])
+			bigNum.FillBytes(bigValue[:])
+
+			smallValue := [28]uint8{}
+			smallNum, ok := new(big.Int).SetString("1981668000000000000", 10)
+			require.True(t, ok)
+			smallNum.FillBytes(smallValue[:])
 
 			testTokens := []TestToken{
 				{
@@ -911,7 +916,7 @@ func TestCCIPRouter(t *testing.T) {
 						Enabled: true,
 						Mint:    solana.SolMint,
 						UsdPerToken: ccip_router.TimestampedPackedU224{
-							Value:     value,
+							Value:     smallValue,
 							Timestamp: validTimestamp,
 						},
 						PremiumMultiplierWeiPerEth: 9000000,
@@ -922,7 +927,7 @@ func TestCCIPRouter(t *testing.T) {
 						Enabled: true,
 						Mint:    token2022.mint,
 						UsdPerToken: ccip_router.TimestampedPackedU224{
-							Value:     value,
+							Value:     bigValue,
 							Timestamp: validTimestamp,
 						},
 						PremiumMultiplierWeiPerEth: 11000000,
@@ -2688,10 +2693,16 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
 			require.Equal(t, 1, len(ccipMessageSentEvent.Message.TokenAmounts))
 			ta := ccipMessageSentEvent.Message.TokenAmounts[0]
+
+			require.Equal(t, wsol.mint, ccipMessageSentEvent.Message.FeeToken)
+			require.Equal(t, tokens.ToLittleEndianU256(36333028), ccipMessageSentEvent.Message.FeeTokenAmount.LeBytes)
+			// The difference is the ratio between the fee token value (wsol) and link token value (signified by token2022 in these tests).
+			// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels
+			require.Equal(t, tokens.ToLittleEndianU256(3633302), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
 			require.Equal(t, token0.PoolConfig, ta.SourcePoolAddress)
 			require.Equal(t, []byte{1, 2, 3}, ta.DestTokenAddress)
 			require.Equal(t, 0, len(ta.ExtraData))
-			require.Equal(t, tokens.ToLittleEndianU256(1), ta.Amount)
+			require.Equal(t, tokens.ToLittleEndianU256(1), ta.Amount.LeBytes)
 			require.Equal(t, 32, len(ta.DestExecData))
 			expectedDestExecData := make([]byte, 32)
 			// Token0 billing had DestGasOverhead set to 100 during setup
@@ -4934,7 +4945,7 @@ func TestCCIPRouter(t *testing.T) {
 				message.TokenAmounts = []ccip_router.Any2SVMTokenTransfer{{
 					SourcePoolAddress: []byte{1, 2, 3},
 					DestTokenAddress:  token0.Mint.PublicKey(),
-					Amount:            tokens.ToLittleEndianU256(1),
+					Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 				}}
 				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
@@ -5403,7 +5414,7 @@ func TestCCIPRouter(t *testing.T) {
 				message.TokenAmounts = []ccip_router.Any2SVMTokenTransfer{{
 					SourcePoolAddress: []byte{1, 2, 3},
 					DestTokenAddress:  token0.Mint.PublicKey(),
-					Amount:            tokens.ToLittleEndianU256(1),
+					Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 				}}
 				message.TokenReceiver = receiver.PublicKey()
 				message.LogicReceiver = solana.PublicKey{} // no logic receiver

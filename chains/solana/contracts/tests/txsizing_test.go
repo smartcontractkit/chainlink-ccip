@@ -212,7 +212,7 @@ func TestTransactionSizing(t *testing.T) {
 				DestTokenAddress:  [32]byte{},
 				DestGasAmount:     0,
 				ExtraData:         []byte{},
-				Amount:            [32]uint8{},
+				Amount:            ccip_router.CrossChainAmount{LeBytes: [32]uint8{}},
 			}},
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,
