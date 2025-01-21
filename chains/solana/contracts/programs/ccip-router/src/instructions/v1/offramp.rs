@@ -9,7 +9,7 @@ use super::ocr3base::{ocr3_transmit, ReportContext};
 use super::ocr3impl::{Ocr3ReportForCommit, Ocr3ReportForExecutionReportSingleChain};
 use super::pools::{
     calculate_token_pool_account_indices, get_balance, interact_with_pool,
-    validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
+    validate_and_parse_token_accounts, TokenAccounts, CCIP_POOL_V1_RET_BYTES,
 };
 
 use crate::{
@@ -403,14 +403,13 @@ fn internal_execute<'info>(
     // note: indexes are used instead of counts in case more accounts need to be passed in remaining_accounts before token accounts
     // token_indexes = [2, 4] where remaining_accounts is [custom_account, custom_account, token1_account1, token1_account2, token2_account1, token2_account2] for example
     for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
-        let (start, end) =
-            calculate_token_pool_account_indices(i, token_indexes, ctx.remaining_accounts.len())?;
-        let acc_list = &ctx.remaining_accounts[start..end];
-        let accs = validate_and_parse_token_accounts(
+        let accs = get_token_accounts_for(
+            ctx.program_id.key(),
+            ctx.remaining_accounts,
             execution_report.message.token_receiver,
             execution_report.message.header.source_chain_selector,
-            ctx.program_id.key(),
-            acc_list,
+            token_indexes,
+            i,
         )?;
         let router_token_pool_signer = &ctx.accounts.token_pools_signer;
 
@@ -538,6 +537,26 @@ fn internal_execute<'info>(
     });
 
     Ok(())
+}
+
+fn get_token_accounts_for<'a>(
+    router: Pubkey,
+    accounts: &'a [AccountInfo<'a>],
+    token_receiver: Pubkey,
+    chain_selector: u64,
+    token_indexes: &[u8],
+    i: usize,
+) -> Result<TokenAccounts<'a>> {
+    let (start, end) = calculate_token_pool_account_indices(i, token_indexes, accounts.len())?;
+
+    let accs = validate_and_parse_token_accounts(
+        token_receiver,
+        chain_selector,
+        router,
+        &accounts[start..end],
+    )?;
+
+    Ok(accs)
 }
 
 // should_execute_messaging checks if:
