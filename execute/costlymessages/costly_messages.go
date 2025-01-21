@@ -117,9 +117,15 @@ func (o *observer) Observe(
 		if !ok {
 			return nil, fmt.Errorf("missing fee for message %s", msg.Header.MessageID)
 		}
+		if err := validatePositive(fee); err != nil {
+			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
+		}
 		execCost, ok := execCosts[msg.Header.MessageID]
 		if !ok {
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
+		}
+		if err := validatePositive(execCost); err != nil {
+			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
 		}
 		if fee.Cmp(execCost) < 0 {
 			o.lggr.Warnw("Message is too costly to execute", "messageID",
@@ -129,6 +135,16 @@ func (o *observer) Observe(
 	}
 
 	return costlyMessages, nil
+}
+
+func validatePositive(fee *big.Int) error {
+	if fee == nil {
+		return fmt.Errorf("fee is nil")
+	}
+	if fee.Cmp(big.NewInt(0)) <= 0 {
+		return fmt.Errorf("fee is non positive %d", fee)
+	}
+	return nil
 }
 
 var _ Observer = &observer{}
@@ -143,27 +159,29 @@ type MessageFeeE18USDCalculator interface {
 	) (map[cciptypes.Bytes32]plugintypes.USD18, error)
 }
 
-// ZeroMessageFeeUSD18Calculator returns a fee of 0 for all messages.
-type ZeroMessageFeeUSD18Calculator struct{}
+// ConstMessageFeeUSD18Calculator returns a fee of 0 for all messages.
+type ConstMessageFeeUSD18Calculator struct {
+	fee *big.Int
+}
 
-func NewZeroMessageFeeUSD18Calculator() *ZeroMessageFeeUSD18Calculator {
-	return &ZeroMessageFeeUSD18Calculator{}
+func NewConstMessageFeeUSD18Calculator(fee *big.Int) *ConstMessageFeeUSD18Calculator {
+	return &ConstMessageFeeUSD18Calculator{fee: fee}
 }
 
 // MessageFeeUSD18 returns a fee of 0 for all messages.
-func (n *ZeroMessageFeeUSD18Calculator) MessageFeeUSD18(
+func (n *ConstMessageFeeUSD18Calculator) MessageFeeUSD18(
 	_ context.Context,
 	messages []cciptypes.Message,
 	_ map[cciptypes.Bytes32]time.Time,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
 	messageFees := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
-		messageFees[msg.Header.MessageID] = plugintypes.NewUSD18(0)
+		messageFees[msg.Header.MessageID] = n.fee
 	}
 	return messageFees, nil
 }
 
-var _ MessageFeeE18USDCalculator = &ZeroMessageFeeUSD18Calculator{}
+var _ MessageFeeE18USDCalculator = &ConstMessageFeeUSD18Calculator{}
 
 // MessageExecCostUSD18Calculator Calculates the execution cost of a set of messages in USD18s.
 type MessageExecCostUSD18Calculator interface {
@@ -171,26 +189,30 @@ type MessageExecCostUSD18Calculator interface {
 	MessageExecCostUSD18(context.Context, []cciptypes.Message) (map[cciptypes.Bytes32]plugintypes.USD18, error)
 }
 
-// ZeroMessageExecCostUSD18Calculator returns a cost of 0 for all messages.
-type ZeroMessageExecCostUSD18Calculator struct{}
+// ConstMessageExecCostUSD18Calculator returns a cost of 0 for all messages.
+type ConstMessageExecCostUSD18Calculator struct {
+	cost *big.Int
+}
 
-func NewZeroMessageExecCostUSD18Calculator() *ZeroMessageExecCostUSD18Calculator {
-	return &ZeroMessageExecCostUSD18Calculator{}
+func NewConstMessageExecCostUSD18Calculator(cost *big.Int) *ConstMessageExecCostUSD18Calculator {
+	return &ConstMessageExecCostUSD18Calculator{
+		cost: cost,
+	}
 }
 
 // MessageExecCostUSD18 returns a cost of 0 for all messages.
-func (n *ZeroMessageExecCostUSD18Calculator) MessageExecCostUSD18(
+func (n *ConstMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	_ context.Context,
 	messages []cciptypes.Message,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
 	messageExecCosts := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
-		messageExecCosts[msg.Header.MessageID] = plugintypes.NewUSD18(0)
+		messageExecCosts[msg.Header.MessageID] = n.cost
 	}
 	return messageExecCosts, nil
 }
 
-var _ MessageExecCostUSD18Calculator = &ZeroMessageExecCostUSD18Calculator{}
+var _ MessageExecCostUSD18Calculator = &ConstMessageExecCostUSD18Calculator{}
 
 // StaticMessageFeeUSD18Calculator returns a static fee for all messages.
 type StaticMessageFeeUSD18Calculator struct {
@@ -303,16 +325,14 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 
 	messageFees := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
-		feeUSD18 := new(big.Int).Div(
-			new(big.Int).Mul(linkPriceUSD.Int, msg.FeeValueJuels.Int),
-			new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
-		)
+		feeUSD18 := mathslib.CalculateUsdPerUnitGas(msg.FeeValueJuels.Int, linkPriceUSD.Int)
 		timestamp, ok := messageTimeStamps[msg.Header.MessageID]
 		if !ok {
 			// If a timestamp is missing we can't do fee boosting, but we still record the fee. In the worst case, the
 			// message will not be executed (as it will be considered too costly).
 			c.lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
 		} else {
+			// TODO: What's the blockchain timestamp? Should we use now().UTC instead?
 			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
