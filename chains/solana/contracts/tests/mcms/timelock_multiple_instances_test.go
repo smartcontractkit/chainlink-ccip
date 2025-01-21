@@ -235,16 +235,38 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					timelockInstances[1].ID,
 					op,
 					proposer.PublicKey(),
+					timelockInstances[1].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(),
 				)
 				require.NoError(t, prierr)
 
-				for _, ix := range preloadIxs {
+				// unauthorized on initialize operation
+				testutils.SendAndFailWith(
+					ctx,
+					t,
+					solanaGoClient,
+					[]solana.Instruction{preloadIxs[0]},
+					proposer,
+					config.DefaultCommitment,
+					[]string{"Error Code: " + timelockutil.UnauthorizedError.String()},
+				)
+
+				// preload operation with correct access for test
+				proposer2 := timelockInstances[1].RoleMap[timelock.Proposer_Role].RandomPick()
+				preloadIxs2, prierr2 := timelockutil.GetPreloadOperationIxs(
+					timelockInstances[1].ID,
+					op,
+					proposer2.PublicKey(),
+					timelockInstances[1].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(),
+				)
+				require.NoError(t, prierr2)
+
+				for _, ix := range preloadIxs2 {
 					testutils.SendAndConfirm(
 						ctx,
 						t,
 						solanaGoClient,
 						[]solana.Instruction{ix},
-						proposer,
+						proposer2,
 						config.DefaultCommitment,
 					)
 				}
@@ -379,6 +401,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					timelockInstances[0].ID,
 					op,
 					proposer1.PublicKey(),
+					timelockInstances[0].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(),
 				)
 				require.NoError(t, prierr)
 				for _, ix := range preloadIxs {
@@ -452,6 +475,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					timelockInstances[0].ID,
 					op,
 					proposer1.PublicKey(),
+					timelockInstances[0].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(),
 				)
 				require.NoError(t, prierr)
 				for _, ix := range preloadIxs {
@@ -511,12 +535,15 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					Salt:        salt,
 					Delay:       1,
 				}
-				preloadIxs, priErr := timelockutil.GetPreloadOperationIxs(target.ID, op, sourceProposer.PublicKey())
+
+				// preload operation with correct access for test
+				targetProposer := target.RoleMap[timelock.Proposer_Role].RandomPick()
+				targetProposerAC := target.RoleMap[timelock.Proposer_Role].AccessController.PublicKey()
+				preloadIxs, priErr := timelockutil.GetPreloadOperationIxs(target.ID, op, targetProposer.PublicKey(), targetProposerAC)
 				require.NoError(t, priErr)
 
-				// try sending from sourceProposer
 				for _, ix := range preloadIxs {
-					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, sourceProposer, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, targetProposer, config.DefaultCommitment)
 				}
 
 				// attempt to schedule with the WRONG AC
@@ -693,6 +720,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 				op.OperationID(),
 				op.OperationPDA(),
 				timelockInstances[1].ConfigPDA, // Wrong config
+				timelockInstances[0].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(),
 				timelockInstances[1].Admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
@@ -729,7 +757,7 @@ func createAndScheduleOperation(
 		Delay:       delay,
 	}
 
-	preloadIxs, err := timelockutil.GetPreloadOperationIxs(inst.ID, op, proposer.PublicKey())
+	preloadIxs, err := timelockutil.GetPreloadOperationIxs(inst.ID, op, proposer.PublicKey(), inst.RoleMap[timelock.Proposer_Role].AccessController.PublicKey())
 	require.NoError(t, err)
 	for _, ix := range preloadIxs {
 		testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{ix}, proposer, config.DefaultCommitment)

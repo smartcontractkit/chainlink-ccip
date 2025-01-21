@@ -245,7 +245,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			operationPDA := op.OperationPDA()
 			signer := roleMap[timelock.Proposer_Role].RandomPick()
 
-			ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, signer.PublicKey())
+			ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, signer.PublicKey(), roleMap[timelock.Proposer_Role].AccessController.PublicKey())
 			require.NoError(t, err)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)

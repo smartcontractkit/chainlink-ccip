@@ -19,14 +19,16 @@ type FinalizeOperation struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [WRITE, SIGNER] authority
+	// [2] = [] roleAccessController
+	//
+	// [3] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewFinalizeOperationInstructionBuilder creates a new `FinalizeOperation` instruction builder.
 func NewFinalizeOperationInstructionBuilder() *FinalizeOperation {
 	nd := &FinalizeOperation{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -65,15 +67,26 @@ func (inst *FinalizeOperation) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
+// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+func (inst *FinalizeOperation) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *FinalizeOperation {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
+	return inst
+}
+
+// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+func (inst *FinalizeOperation) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *FinalizeOperation) SetAuthorityAccount(authority ag_solanago.PublicKey) *FinalizeOperation {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *FinalizeOperation) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst FinalizeOperation) Build() *Instruction {
@@ -113,6 +126,9 @@ func (inst *FinalizeOperation) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.RoleAccessController is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -134,10 +150,11 @@ func (inst *FinalizeOperation) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -178,11 +195,13 @@ func NewFinalizeOperationInstruction(
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
+	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *FinalizeOperation {
 	return NewFinalizeOperationInstructionBuilder().
 		SetTimelockId(timelockId).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).
+		SetRoleAccessControllerAccount(roleAccessController).
 		SetAuthorityAccount(authority)
 }

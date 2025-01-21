@@ -279,13 +279,15 @@ func TestTimelockRBAC(t *testing.T) {
 		nonExecutableOp.AddInstruction(ix, []solana.PublicKey{})
 
 		t.Run("rbac: when try to schedule from non proposer role, it fails", func(t *testing.T) {
+			proposer := roleMap[timelock.Proposer_Role].RandomPick()
 			nonProposer := roleMap[timelock.Executor_Role].RandomPick()
 			ac := roleMap[timelock.Proposer_Role].AccessController
 
-			ixs, prierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp, nonProposer.PublicKey())
+			// preload the operation with proposer for access testing on schedule_batch
+			ixs, prierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp, proposer.PublicKey(), ac.PublicKey())
 			require.NoError(t, prierr)
 			for _, ix := range ixs {
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 			}
 
 			ix, scerr := timelock.NewScheduleBatchInstruction(
@@ -354,7 +356,7 @@ func TestTimelockRBAC(t *testing.T) {
 			ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockID)).Build()
 			nonExecutableOp2.AddInstruction(ix, []solana.PublicKey{})
 
-			ixs, prerr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp2, proposer.PublicKey())
+			ixs, prerr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp2, proposer.PublicKey(), ac.PublicKey())
 			require.NoError(t, prerr)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)

@@ -38,8 +38,9 @@ pub fn execute_batch<'info>(
             ctx.program_id,
         );
 
-        require!(
-            ctx.accounts.predecessor_operation.key() == expected_address,
+        require_keys_eq!(
+            ctx.accounts.predecessor_operation.key(),
+            expected_address,
             TimelockError::InvalidInput
         );
 
@@ -49,8 +50,9 @@ pub fn execute_batch<'info>(
 
         require!(predecessor_acc.is_done(), TimelockError::MissingDependency);
     } else {
-        require!(
-            ctx.accounts.predecessor_operation.key() == Pubkey::zeroed(),
+        require_keys_eq!(
+            ctx.accounts.predecessor_operation.key(),
+            Pubkey::zeroed(),
             TimelockError::InvalidInput
         );
     }
