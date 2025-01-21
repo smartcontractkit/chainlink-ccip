@@ -157,7 +157,7 @@ func NewPlugin(
 		donID:               donID,
 		oracleID:            reportingCfg.OracleID,
 		oracleIDToP2PID:     oracleIDToP2pID,
-		lggr:                logutil.WithComponent(lggr, "Plugin"),
+		lggr:                logutil.WithComponent(lggr, "CommitPlugin"),
 		offchainCfg:         offchainCfg,
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
