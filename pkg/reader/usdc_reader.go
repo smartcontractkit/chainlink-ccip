@@ -155,20 +155,24 @@ func (u usdcMessageReader) MessagesByTokenID(
 		return nil, fmt.Errorf("no contract bound for chain %d", source)
 	}
 
-	eventIDs := make([]eventID, 0, len(eventIDsByMsgTokenID))
-	for _, id := range eventIDsByMsgTokenID {
-		eventIDs = append(eventIDs, id)
-	}
+	expressions := []query.Expression{query.Confidence(primitives.Finalized)}
+	if len(eventIDsByMsgTokenID) > 0 {
+		eventIDs := make([]eventID, 0, len(eventIDsByMsgTokenID))
+		for _, id := range eventIDsByMsgTokenID {
+			eventIDs = append(eventIDs, id)
+		}
 
-	keyFilter, err := query.Where(
-		consts.EventNameCCTPMessageSent,
-		query.Comparator(
+		expressions = append(expressions, query.Comparator(
 			consts.CCTPMessageSentValue,
 			primitives.ValueComparator{
 				Value:    primitives.Any(eventIDs),
 				Operator: primitives.Eq,
-			}),
-		query.Confidence(primitives.Finalized),
+			}))
+	}
+
+	keyFilter, err := query.Where(
+		consts.EventNameCCTPMessageSent,
+		expressions...,
 	)
 	if err != nil {
 		return nil, err
