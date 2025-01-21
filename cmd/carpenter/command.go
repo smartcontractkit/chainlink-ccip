@@ -188,8 +188,13 @@ func makeCommand() *cli.Command {
 				Destination: &args.logType,
 				Required:    true,
 				Validator: func(s string) error {
-					if s != parse.LogTypeJSON && s != parse.LogTypeMixed {
-						return fmt.Errorf("invalid log type: %s, expected either %s or %s", s, parse.LogTypeJSON, parse.LogTypeMixed)
+					if !parse.IsValidLogType(s) {
+						return fmt.Errorf("invalid log type: %s, expected either %s or %s or %s",
+							s,
+							parse.LogTypeJSON,
+							parse.LogTypeMixed,
+							parse.LogTypeMixedGoTestJSON,
+						)
 					}
 					return nil
 				},
