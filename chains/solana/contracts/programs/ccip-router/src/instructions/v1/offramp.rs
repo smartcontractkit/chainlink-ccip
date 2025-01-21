@@ -814,6 +814,8 @@ mod execution_state {
 
 #[cfg(test)]
 mod tests {
+    use ethnum::U256;
+
     use super::*;
     use crate::{Any2SVMRampMessage, Any2SVMTokenTransfer, SVMExtraArgs};
 
@@ -851,7 +853,7 @@ mod tests {
                 .unwrap(),
                 dest_gas_amount: 100,
                 extra_data: vec![4, 5, 6],
-                amount: [1; 32],
+                amount: U256::from_le_bytes([1; 32]).into(),
             }]
             .to_vec(),
             extra_args: SVMExtraArgs {

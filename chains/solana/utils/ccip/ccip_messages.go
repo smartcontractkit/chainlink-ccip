@@ -251,6 +251,9 @@ func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
 	if err := binary.Write(hash, binary.BigEndian, msg.FeeTokenAmount); err != nil {
 		return nil, err
 	}
+	if err := binary.Write(hash, binary.BigEndian, msg.FeeValueJuels); err != nil {
+		return nil, err
+	}
 	if _, err := hash.Write([]byte{uint8(len(msg.Receiver))}); err != nil { //nolint:gosec
 		return nil, err
 	}

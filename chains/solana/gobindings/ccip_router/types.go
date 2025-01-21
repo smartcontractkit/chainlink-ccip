@@ -520,8 +520,9 @@ type SVM2AnyRampMessage struct {
 	Receiver       []byte
 	ExtraArgs      AnyExtraArgs
 	FeeToken       ag_solanago.PublicKey
-	FeeTokenAmount uint64
 	TokenAmounts   []SVM2AnyTokenTransfer
+	FeeTokenAmount CrossChainAmount
+	FeeValueJuels  CrossChainAmount
 }
 
 func (obj SVM2AnyRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -555,13 +556,18 @@ func (obj SVM2AnyRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	if err != nil {
 		return err
 	}
+	// Serialize `TokenAmounts` param:
+	err = encoder.Encode(obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
 	// Serialize `FeeTokenAmount` param:
 	err = encoder.Encode(obj.FeeTokenAmount)
 	if err != nil {
 		return err
 	}
-	// Serialize `TokenAmounts` param:
-	err = encoder.Encode(obj.TokenAmounts)
+	// Serialize `FeeValueJuels` param:
+	err = encoder.Encode(obj.FeeValueJuels)
 	if err != nil {
 		return err
 	}
@@ -599,13 +605,18 @@ func (obj *SVM2AnyRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	if err != nil {
 		return err
 	}
+	// Deserialize `TokenAmounts`:
+	err = decoder.Decode(&obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
 	// Deserialize `FeeTokenAmount`:
 	err = decoder.Decode(&obj.FeeTokenAmount)
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenAmounts`:
-	err = decoder.Decode(&obj.TokenAmounts)
+	// Deserialize `FeeValueJuels`:
+	err = decoder.Decode(&obj.FeeValueJuels)
 	if err != nil {
 		return err
 	}
@@ -616,7 +627,7 @@ type SVM2AnyTokenTransfer struct {
 	SourcePoolAddress ag_solanago.PublicKey
 	DestTokenAddress  []byte
 	ExtraData         []byte
-	Amount            [32]uint8
+	Amount            CrossChainAmount
 	DestExecData      []byte
 }
 
@@ -683,7 +694,7 @@ type Any2SVMTokenTransfer struct {
 	DestTokenAddress  ag_solanago.PublicKey
 	DestGasAmount     uint32
 	ExtraData         []byte
-	Amount            [32]uint8
+	Amount            CrossChainAmount
 }
 
 func (obj Any2SVMTokenTransfer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -914,6 +925,28 @@ func (obj *ExtraArgsInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+type CrossChainAmount struct {
+	LeBytes [32]uint8
+}
+
+func (obj CrossChainAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `LeBytes` param:
+	err = encoder.Encode(obj.LeBytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `LeBytes`:
+	err = decoder.Decode(&obj.LeBytes)
+	if err != nil {
+		return err
 	}
 	return nil
 }

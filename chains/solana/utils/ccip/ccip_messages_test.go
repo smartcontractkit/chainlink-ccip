@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
 func TestMessageHashing(t *testing.T) {
@@ -49,7 +50,7 @@ func TestMessageHashing(t *testing.T) {
 					DestTokenAddress:  solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
 					DestGasAmount:     100,
 					ExtraData:         []byte{4, 5, 6},
-					Amount:            tokenAmount,
+					Amount:            ccip_router.CrossChainAmount{LeBytes: tokenAmount},
 				},
 			},
 		}, config.OnRampAddress)
@@ -77,18 +78,19 @@ func TestMessageHashing(t *testing.T) {
 				AllowOutOfOrderExecution: true,
 			},
 			FeeToken:       solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
-			FeeTokenAmount: 50,
+			FeeTokenAmount: ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(50)},
+			FeeValueJuels:  ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(500)},
 			TokenAmounts: []ccip_router.SVM2AnyTokenTransfer{
 				{
 					SourcePoolAddress: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
 					DestTokenAddress:  []byte{0, 1, 2, 3},
 					ExtraData:         []byte{4, 5, 6},
-					Amount:            tokenAmount,
+					Amount:            ccip_router.CrossChainAmount{LeBytes: tokenAmount},
 					DestExecData:      []byte{4, 5, 6},
 				},
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "df0890c0fb144ce4dee6556f2cd41382676f75e7292b61eca658b1d122a36f58", hex.EncodeToString(h))
+		require.Equal(t, "877ba2a7329fe40e5f73b697eff78577988a72216e6c96b57335c97f92e14268", hex.EncodeToString(h))
 	})
 }
