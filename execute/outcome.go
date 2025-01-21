@@ -177,6 +177,10 @@ func (p *Plugin) getFilterOutcome(
 ) (exectypes.Outcome, error) {
 	commitReports := previousOutcome.CommitReports
 
+	// TODO: This can't actually go here. We need to observe the Txm statuses...
+	statusCache := NewMessageStatusCache(p.ccipReader.)
+	txmStatusChecker := NewTXMCheck(p.statuses, p.offchainCfg.MaxTxAttempts)
+
 	builder := report.NewBuilder(
 		p.lggr,
 		p.msgHasher,
