@@ -155,7 +155,7 @@ func (u usdcMessageReader) MessagesByTokenID(
 		return nil, fmt.Errorf("no contract bound for chain %d", source)
 	}
 
-	eventIDs := make([]eventID, len(eventIDsByMsgTokenID))
+	eventIDs := make([]eventID, 0, len(eventIDsByMsgTokenID))
 	for _, id := range eventIDsByMsgTokenID {
 		eventIDs = append(eventIDs, id)
 	}
