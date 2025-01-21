@@ -479,7 +479,7 @@ pub mod tests {
             .unwrap(),
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 52885511932309044,
+                amount: 52911699750913573,
             }
         );
     }
@@ -514,7 +514,7 @@ pub mod tests {
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the min_fee
-                amount: 398110981980079407
+                amount: 398634738352169990
             }
         );
     }
@@ -550,7 +550,7 @@ pub mod tests {
             .unwrap(),
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 36130696584140229
+                amount: 36654452956230811
             }
         );
 
@@ -569,7 +569,7 @@ pub mod tests {
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Slight increase in price
-                amount: 37480696584140229
+                amount: 38004452956230811
             }
         );
     }
@@ -603,7 +603,7 @@ pub mod tests {
             .unwrap(),
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 35234859440885153
+                amount: 35758615812975735
             }
         );
 
@@ -621,7 +621,7 @@ pub mod tests {
             .unwrap(),
             SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 35234859440885153
+                amount: 35758615812975735
             }
         );
     }
@@ -658,7 +658,7 @@ pub mod tests {
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens
-                amount: 153233232867589323
+                amount: 155328258355951652
             }
         );
     }
