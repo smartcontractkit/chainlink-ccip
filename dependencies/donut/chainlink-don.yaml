@@ -20,6 +20,9 @@ vars:
   LOCAL_VALUES_DIR:
     source: env
     default: ./values
+  LOCAL_SCRIPTS_DIR:
+    source: env
+    default: ./scripts
   # Infrastructure Provider, either kind or aws
   PROVIDER:
     source: env
@@ -190,6 +193,12 @@ profiles:
         ADDITIONAL_CHAINS_COUNT=${ADDITIONAL_CHAINS_COUNT} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/network.geth-n-chains.yaml
+      )
+  - name: network-generated
+    merge: |-
+      $(
+        SCRIPT_DIR=./scripts/ccip_load_tests_config \
+        go run ./scripts/ccip_load_tests_config/main.go
       )
   # versions
   - name: version-latest

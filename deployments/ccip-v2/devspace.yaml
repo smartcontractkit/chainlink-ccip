@@ -140,7 +140,7 @@ profiles:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-  - name: ccip-v2
+  - name: default
     patches:
       - op: add
         path: dependencies
@@ -161,9 +161,31 @@ profiles:
               - network-geth-chain-1337
               - network-geth-chain-2337
               - network-additional-geth-chains
+  - name: load-tests
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          geth:
+            path: ${DEPENDENCIES_DIR}/geth
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip-v2-load-tests
+          ccip-don:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - version-from-env
+              - network-generated
 commands:
   ccip-v2:
-    command: devspace run-pipeline ccip-v2 -p ccip-v2
+    command: devspace run-pipeline ccip-v2 -p default
+    description: Run the ccip v2 pipeline.
+    appendArgs: true
+  ccip-v2-load-tests:
+    command: devspace run-pipeline ccip-v2 -p load-tests
     description: Run the ccip v2 pipeline.
     appendArgs: true
   deploy-geth:

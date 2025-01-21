@@ -64,7 +64,6 @@ deployments:
         chains:
           - networkId: 1337
           - networkId: 2337
-        blocktime: 1
 
         # These ingresses create Route 53 Records.
         ingress:
@@ -174,6 +173,14 @@ profiles:
         ADDITIONAL_CHAINS_COUNT=${ADDITIONAL_CHAINS_COUNT} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/additional-chains.yaml
+      )
+  - name: ccip-v2-load-tests
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        ADDITIONAL_CHAINS_COUNT=2 \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-load-tests.yaml
       )
   - name: aws
     activation:

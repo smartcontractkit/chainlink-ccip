@@ -1,0 +1,20 @@
+deployments:
+    chainlink-don:
+      helm:
+        values:
+          common:
+            chainlink:
+              v2Config:
+                {{- range .Chains  }}
+                01-network-geth-chain-{{ .NetworkId }}.toml: |
+                  [[EVM]]
+                  ChainID = "{{ .NetworkId }}"
+                  MinContractPayment = '0'
+                  AutoCreateKey = true
+                  FinalityDepth = {{ .FinalityDepth }}
+
+                  [[EVM.Nodes]]
+                  Name = 'node-{{ .NetworkId }}'
+                  HTTPURL = "http://geth-{{ .NetworkId }}:8544"
+                  WSURL = "ws://geth-{{ .NetworkId }}:8546"
+                {{- end }}
