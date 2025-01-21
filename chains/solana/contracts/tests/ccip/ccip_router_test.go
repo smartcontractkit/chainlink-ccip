@@ -33,7 +33,7 @@ func TestCCIPRouter(t *testing.T) {
 	t.Parallel()
 
 	ccip_router.SetProgramID(config.CcipRouterProgram)
-	ccip_receiver.SetProgramID(config.CcipReceiverProgram)
+	ccip_receiver.SetProgramID(config.CcipLogicReceiver)
 	token_pool.SetProgramID(config.CcipTokenPoolProgram)
 
 	ctx := tests.Context(t)
@@ -899,10 +899,15 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Any nonzero timestamp is valid (for now)
 			validTimestamp := int64(100)
-			value := [28]uint8{}
+			bigValue := [28]uint8{}
 			bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
 			require.True(t, ok)
-			bigNum.FillBytes(value[:])
+			bigNum.FillBytes(bigValue[:])
+
+			smallValue := [28]uint8{}
+			smallNum, ok := new(big.Int).SetString("1981668000000000000", 10)
+			require.True(t, ok)
+			smallNum.FillBytes(smallValue[:])
 
 			testTokens := []TestToken{
 				{
@@ -911,7 +916,7 @@ func TestCCIPRouter(t *testing.T) {
 						Enabled: true,
 						Mint:    solana.SolMint,
 						UsdPerToken: ccip_router.TimestampedPackedU224{
-							Value:     value,
+							Value:     smallValue,
 							Timestamp: validTimestamp,
 						},
 						PremiumMultiplierWeiPerEth: 9000000,
@@ -922,7 +927,7 @@ func TestCCIPRouter(t *testing.T) {
 						Enabled: true,
 						Mint:    token2022.mint,
 						UsdPerToken: ccip_router.TimestampedPackedU224{
-							Value:     value,
+							Value:     bigValue,
 							Timestamp: validTimestamp,
 						},
 						PremiumMultiplierWeiPerEth: 11000000,
@@ -2688,10 +2693,16 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &ccipMessageSentEvent, config.PrintEvents))
 			require.Equal(t, 1, len(ccipMessageSentEvent.Message.TokenAmounts))
 			ta := ccipMessageSentEvent.Message.TokenAmounts[0]
+
+			require.Equal(t, wsol.mint, ccipMessageSentEvent.Message.FeeToken)
+			require.Equal(t, tokens.ToLittleEndianU256(36333028), ccipMessageSentEvent.Message.FeeTokenAmount.LeBytes)
+			// The difference is the ratio between the fee token value (wsol) and link token value (signified by token2022 in these tests).
+			// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels
+			require.Equal(t, tokens.ToLittleEndianU256(3633302), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
 			require.Equal(t, token0.PoolConfig, ta.SourcePoolAddress)
 			require.Equal(t, []byte{1, 2, 3}, ta.DestTokenAddress)
 			require.Equal(t, 0, len(ta.ExtraData))
-			require.Equal(t, tokens.ToLittleEndianU256(1), ta.Amount)
+			require.Equal(t, tokens.ToLittleEndianU256(1), ta.Amount.LeBytes)
 			require.Equal(t, 32, len(ta.DestExecData))
 			expectedDestExecData := make([]byte, 32)
 			// Token0 billing had DestGasOverhead set to 100 during setup
@@ -3452,7 +3463,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				for i, testcase := range priceUpdatesCases {
 					t.Run(testcase.Name, func(t *testing.T) {
-						_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, uint8(i)})
+						_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, uint8(i)})
 						rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 						require.NoError(t, err)
 
@@ -3556,7 +3567,7 @@ func TestCCIPRouter(t *testing.T) {
 					sourceChainSelector := uint64(34)
 					sourceChainStatePDA, err := ccip.GetSourceChainStatePDA(sourceChainSelector)
 					require.NoError(t, err)
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, sourceChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, sourceChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(sourceChainSelector, root)
 					require.NoError(t, err)
 
@@ -3593,7 +3604,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an invalid interval it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3630,7 +3641,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an interval size bigger than supported it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3704,7 +3715,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with a repeated merkle root, it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, 1}) // repeated root
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, 1}) // repeated root
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3742,7 +3753,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an invalid min interval, it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3840,7 +3851,7 @@ func TestCCIPRouter(t *testing.T) {
 						// TODO right now I'm allowing sending too many remaining_accounts, but if we want to be restrictive with that we can add a test here
 					}
 
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3907,7 +3918,7 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("When committing a report with the exact next interval, it succeeds", func(t *testing.T) {
-				_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+				_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 				require.NoError(t, err)
 
@@ -4286,7 +4297,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4374,7 +4385,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4464,7 +4475,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4536,7 +4547,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4575,7 +4586,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4620,7 +4631,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4699,7 +4710,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4732,7 +4743,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4768,11 +4779,12 @@ func TestCCIPRouter(t *testing.T) {
 				stubAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, config.CcipInvalidReceiverProgram)
 
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-				message.Receiver = stubAccountPDA
+				message.TokenReceiver = stubAccountPDA
+				message.LogicReceiver = config.CcipInvalidReceiverProgram
 				sequenceNumber := message.Header.SequenceNumber
 				message.ExtraArgs.IsWritableBitmap = 0
 				message.ExtraArgs.Accounts = []solana.PublicKey{
-					config.CcipInvalidReceiverProgram,
+					stubAccountPDA,
 					solana.SystemProgramID,
 				}
 
@@ -4832,7 +4844,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipInvalidReceiverProgram, false, false),
-					solana.NewAccountMeta(stubAccountPDA, true, false),
+					solana.NewAccountMeta(stubAccountPDA, false, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
@@ -4908,7 +4920,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -4929,10 +4941,11 @@ func TestCCIPRouter(t *testing.T) {
 
 				sourceChainSelector := config.EvmChainSelector
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
 				message.TokenAmounts = []ccip_router.Any2SVMTokenTransfer{{
 					SourcePoolAddress: []byte{1, 2, 3},
 					DestTokenAddress:  token0.Mint.PublicKey(),
-					Amount:            tokens.ToLittleEndianU256(1),
+					Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 				}}
 				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
@@ -4992,7 +5005,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -5049,7 +5062,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -5205,7 +5218,7 @@ func TestCCIPRouter(t *testing.T) {
 						)
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
-							solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -5256,7 +5269,7 @@ func TestCCIPRouter(t *testing.T) {
 						)
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
-							solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -5298,10 +5311,10 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 
 				// To make the message go through the validations we need to specify all additional accounts used when executing the CPI
-				message.ExtraArgs.IsWritableBitmap = 2 + 32 + 64 + 128
+				message.ExtraArgs.IsWritableBitmap = ccip.GenerateBitMapForIndexes([]int{0, 1, 5, 6, 7})
 				message.ExtraArgs.Accounts = []solana.PublicKey{
-					config.CcipReceiverProgram,
-					config.ReceiverTargetAccountPDA, // writable (index = 1)
+					config.ReceiverExternalExecutionConfigPDA, // writable (index = 0)
+					config.ReceiverTargetAccountPDA,           // writable (index = 1)
 					solana.SystemProgramID,
 					config.CcipRouterProgram,
 					config.RouterConfigPDA,
@@ -5366,7 +5379,7 @@ func TestCCIPRouter(t *testing.T) {
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
-					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 					// accounts for base CPI call
 					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
@@ -5401,9 +5414,10 @@ func TestCCIPRouter(t *testing.T) {
 				message.TokenAmounts = []ccip_router.Any2SVMTokenTransfer{{
 					SourcePoolAddress: []byte{1, 2, 3},
 					DestTokenAddress:  token0.Mint.PublicKey(),
-					Amount:            tokens.ToLittleEndianU256(1),
+					Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 				}}
-				message.Receiver = receiver.PublicKey()
+				message.TokenReceiver = receiver.PublicKey()
+				message.LogicReceiver = solana.PublicKey{} // no logic receiver
 				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 

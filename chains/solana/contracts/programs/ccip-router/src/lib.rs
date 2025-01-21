@@ -13,6 +13,8 @@ use crate::state::*;
 mod event;
 use crate::event::*;
 
+mod ocr3base;
+
 mod messages;
 use crate::messages::*;
 

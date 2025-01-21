@@ -227,7 +227,7 @@ fn default_token_network_fees(dest_chain: &DestChain) -> NetworkFee {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackedPrice {
+pub(super) struct PackedPrice {
     // L1 gas price (encoded in the lower 112 bits)
     pub execution_gas_price: Usd18Decimals,
     // L2 gas price (encoded in the higher 112 bits)
@@ -241,7 +241,7 @@ impl From<&TimestampedPackedU224> for PackedPrice {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnpackedDoubleU224 {
+pub(super) struct UnpackedDoubleU224 {
     pub high: u128,
     pub low: u128,
 }

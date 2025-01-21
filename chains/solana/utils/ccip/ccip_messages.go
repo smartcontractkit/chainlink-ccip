@@ -3,13 +3,13 @@ package ccip
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -19,7 +19,7 @@ import (
 var leafDomainSeparator = [32]byte{}
 
 func HashCommitReport(ctx [3][32]byte, report ccip_router.CommitInput) ([]byte, error) {
-	hash := sha256.New()
+	hash := sha3.NewLegacyKeccak256()
 	encodedReport, err := bin.MarshalBorsh(report)
 	if err != nil {
 		return nil, err
@@ -97,14 +97,16 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 			SequenceNumber:      sequenceNumber,
 			Nonce:               0,
 		},
-		Sender:   []byte{1, 2, 3},
-		Data:     []byte{4, 5, 6},
-		Receiver: config.ReceiverExternalExecutionConfigPDA,
+		Sender:        []byte{1, 2, 3},
+		Data:          []byte{4, 5, 6},
+		LogicReceiver: config.CcipLogicReceiver,
 		ExtraArgs: ccip_router.SVMExtraArgs{
 			ComputeUnits:     1000,
-			IsWritableBitmap: 2, // bitmap[1] == 1
+			IsWritableBitmap: GenerateBitMapForIndexes([]int{0, 1}),
 			Accounts: []solana.PublicKey{
-				config.CcipReceiverProgram, config.ReceiverTargetAccountPDA, solana.SystemProgramID,
+				config.ReceiverExternalExecutionConfigPDA, // writable (index 0)
+				config.ReceiverTargetAccountPDA,           // writable (index 1)
+				solana.SystemProgramID,
 			},
 		},
 		OnRampAddress: config.OnRampAddress,
@@ -112,10 +114,11 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 	return message
 }
 
-func MakeAnyToSVMMessage(ccipReceiver solana.PublicKey, chainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SVMRampMessage, [32]byte, error) {
+func MakeAnyToSVMMessage(tokenReceiver solana.PublicKey, logicReceiver solana.PublicKey, chainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SVMRampMessage, [32]byte, error) {
 	msg := CreateDefaultMessageWith(chainSelector, 1)
 	msg.Header.DestChainSelector = solanaChainSelector
-	msg.Receiver = ccipReceiver
+	msg.TokenReceiver = tokenReceiver
+	msg.LogicReceiver = logicReceiver
 	msg.Data = data
 
 	hash, err := HashAnyToSVMMessage(msg, config.OnRampAddress)
@@ -124,7 +127,7 @@ func MakeAnyToSVMMessage(ccipReceiver solana.PublicKey, chainSelector uint64, so
 }
 
 func HashAnyToSVMMessage(msg ccip_router.Any2SVMRampMessage, onRampAddress []byte) ([]byte, error) {
-	hash := sha256.New()
+	hash := sha3.NewLegacyKeccak256()
 
 	hash.Write(leafDomainSeparator[:])
 	hash.Write([]byte("Any2SVMMessageHashV1"))
@@ -145,7 +148,10 @@ func HashAnyToSVMMessage(msg ccip_router.Any2SVMRampMessage, onRampAddress []byt
 	if _, err := hash.Write(msg.Header.MessageId[:]); err != nil {
 		return nil, err
 	}
-	if _, err := hash.Write(msg.Receiver[:]); err != nil {
+	if _, err := hash.Write(msg.TokenReceiver[:]); err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(msg.LogicReceiver[:]); err != nil {
 		return nil, err
 	}
 	if err := binary.Write(hash, binary.BigEndian, msg.Header.SequenceNumber); err != nil {
@@ -189,7 +195,7 @@ func HashAnyToSVMMessage(msg ccip_router.Any2SVMRampMessage, onRampAddress []byt
 
 // hashPair hashes two byte slices and returns the result as a byte slice.
 func hashPair(a, b []byte) []byte {
-	h := sha256.New()
+	h := sha3.NewLegacyKeccak256()
 	if bytes.Compare(a, b) < 0 {
 		h.Write(a)
 		h.Write(b)
@@ -216,7 +222,7 @@ func MerkleFrom(data [][]byte) []byte {
 }
 
 func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
-	hash := sha256.New()
+	hash := sha3.NewLegacyKeccak256()
 
 	hash.Write(leafDomainSeparator[:])
 	hash.Write([]byte("SVM2AnyMessageHashV1"))
@@ -243,6 +249,9 @@ func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
 		return nil, err
 	}
 	if err := binary.Write(hash, binary.BigEndian, msg.FeeTokenAmount); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(hash, binary.BigEndian, msg.FeeValueJuels); err != nil {
 		return nil, err
 	}
 	if _, err := hash.Write([]byte{uint8(len(msg.Receiver))}); err != nil { //nolint:gosec
@@ -274,4 +283,16 @@ func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
 	}
 
 	return hash.Sum(nil), nil
+}
+
+// GenerateBitMapForIndexes generates a bitmap for the given indexes.
+
+func GenerateBitMapForIndexes(indexes []int) uint64 {
+	var bitmap uint64
+
+	for _, index := range indexes {
+		bitmap |= 1 << index
+	}
+
+	return bitmap
 }

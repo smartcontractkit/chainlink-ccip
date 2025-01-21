@@ -1920,136 +1920,6 @@
       }
     },
     {
-      "name": "LockOrBurnInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "receiver",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "originalSender",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReleaseOrMintInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalSender",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "receiver",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          },
-          {
-            "name": "sourcePoolAddress",
-            "docs": [
-              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
-              "expected pool address for the given remoteChainSelector."
-            ],
-            "type": "bytes"
-          },
-          {
-            "name": "sourcePoolData",
-            "type": "bytes"
-          },
-          {
-            "name": "offchainTokenData",
-            "docs": [
-              "@dev WARNING: offchainTokenData is untrusted data."
-            ],
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "LockOrBurnOutV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destTokenAddress",
-            "type": "bytes"
-          },
-          {
-            "name": "destPoolData",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReleaseOrMintOutV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destinationAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReportContext",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "byteWords",
-            "type": {
-              "array": [
-                {
-                  "array": [
-                    "u8",
-                    32
-                  ]
-                },
-                3
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "RampMessageHeader",
       "type": {
         "kind": "struct",
@@ -2187,7 +2057,11 @@
             "type": "bytes"
           },
           {
-            "name": "receiver",
+            "name": "logicReceiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenReceiver",
             "type": "publicKey"
           },
           {
@@ -2245,15 +2119,23 @@
             "type": "publicKey"
           },
           {
-            "name": "feeTokenAmount",
-            "type": "u64"
-          },
-          {
             "name": "tokenAmounts",
             "type": {
               "vec": {
                 "defined": "SVM2AnyTokenTransfer"
               }
+            }
+          },
+          {
+            "name": "feeTokenAmount",
+            "type": {
+              "defined": "CrossChainAmount"
+            }
+          },
+          {
+            "name": "feeValueJuels",
+            "type": {
+              "defined": "CrossChainAmount"
             }
           }
         ]
@@ -2279,10 +2161,7 @@
           {
             "name": "amount",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "defined": "CrossChainAmount"
             }
           },
           {
@@ -2316,10 +2195,7 @@
           {
             "name": "amount",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "defined": "CrossChainAmount"
             }
           }
         ]
@@ -2396,37 +2272,17 @@
       }
     },
     {
-      "name": "Any2SVMMessage",
+      "name": "CrossChainAmount",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "messageId",
+            "name": "leBytes",
             "type": {
               "array": [
                 "u8",
                 32
               ]
-            }
-          },
-          {
-            "name": "sourceChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "sender",
-            "type": "bytes"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "name": "tokenAmounts",
-            "type": {
-              "vec": {
-                "defined": "SVMTokenAmount"
-              }
             }
           }
         ]
