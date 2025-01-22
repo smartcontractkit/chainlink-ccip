@@ -208,12 +208,7 @@ func readAllMessages(
 				continue
 			}
 
-			if len(msgs) != report.SequenceNumberRange.Length() {
-				lggr.Errorw("unable to read all messages for report", "len(msgs)", len(msgs))
-				continue
-			}
-
-			if !allSeqNrsObserved(msgs, report.SequenceNumberRange) {
+			if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
 				lggr.Errorw("missing messages in range",
 					"srcChain", srcChain, "seqRange", report.SequenceNumberRange)
 				continue
@@ -231,21 +226,6 @@ func readAllMessages(
 		}
 	}
 	return messageObs, availableReports, messageTimestamps
-}
-
-// allSeqNrsObserved returns true if there is a gap messages sequence numbers.
-func allSeqNrsObserved(msgs []cciptypes.Message, numberRange cciptypes.SeqNumRange) bool {
-	msgMap := make(map[cciptypes.SeqNum]struct{})
-	for _, msg := range msgs {
-		msgMap[msg.Header.SequenceNumber] = struct{}{}
-	}
-	// Check for missing sequence numbers in observed messages.
-	for i := numberRange.Start(); i <= numberRange.End(); i++ {
-		if _, ok := msgMap[i]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 func (p *Plugin) getMessagesObservation(

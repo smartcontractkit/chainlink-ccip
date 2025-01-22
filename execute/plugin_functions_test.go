@@ -1258,3 +1258,51 @@ func Test_mergeCostlyMessages(t *testing.T) {
 		})
 	}
 }
+
+func Test_allSeqNrsObserved(t *testing.T) {
+	tests := []struct {
+		name        string
+		msgs        []cciptypes.Message
+		numberRange cciptypes.SeqNumRange
+		want        bool
+	}{
+		{
+			name:        "all sequence numbers observed",
+			msgs:        EmptyMessagesForRange(1, 3),
+			numberRange: cciptypes.NewSeqNumRange(1, 3),
+			want:        true,
+		},
+		{
+			name:        "missing sequence number",
+			msgs:        []cciptypes.Message{EmptyMessagesForRange(1, 1)[0], EmptyMessagesForRange(3, 3)[0]},
+			numberRange: cciptypes.NewSeqNumRange(1, 3),
+			want:        false,
+		},
+		{
+			name:        "extra sequence number",
+			msgs:        EmptyMessagesForRange(1, 4),
+			numberRange: cciptypes.NewSeqNumRange(1, 3),
+			want:        false,
+		},
+		{
+			name:        "empty messages",
+			msgs:        []cciptypes.Message{},
+			numberRange: cciptypes.NewSeqNumRange(1, 3),
+			want:        false,
+		},
+		{
+			name:        "empty range",
+			msgs:        EmptyMessagesForRange(1, 4),
+			numberRange: cciptypes.NewSeqNumRange(0, 0),
+			want:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := msgsConformToSeqRange(tt.msgs, tt.numberRange); got != tt.want {
+				t.Errorf("msgsConformToSeqRange() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
