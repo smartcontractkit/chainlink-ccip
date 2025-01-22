@@ -2647,17 +2647,6 @@
       }
     },
     {
-      "name": "MerkleError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "InvalidProof"
-          }
-        ]
-      }
-    },
-    {
       "name": "MessageExecutionState",
       "type": {
         "kind": "enum",
