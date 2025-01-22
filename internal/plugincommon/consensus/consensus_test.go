@@ -267,3 +267,80 @@ func TestMakeMultiThreshold_GenericKey(t *testing.T) {
 	_, ok = threshold.Get(4)
 	assert.False(t, ok)
 }
+
+func Test_GetConsensusMapAggregator(t *testing.T) {
+	lggr := logger.Test(t)
+	//f := 3
+
+	testCases := []struct {
+		name           string
+		inputMap       map[int][]int
+		thresholdMap   map[int]int
+		expectedOutput map[int]int
+	}{
+		{
+			name: "threshold met",
+			inputMap: map[int][]int{
+				1: {5, 5, 5, 5, 5},
+				2: {5, 5, 5, 3, 5},
+				3: {5, 5, 5},
+			},
+			thresholdMap: map[int]int{
+				1: 3,
+				2: 3,
+				3: 3,
+			},
+			expectedOutput: map[int]int{
+				1: 5,
+				2: 5,
+				3: 5,
+			},
+		},
+		{
+			name: "threshold not met",
+			inputMap: map[int][]int{
+				1: {5, 5},
+				2: {5, 5, 5, 3, 5},
+				3: {5, 5},
+			},
+			thresholdMap: map[int]int{
+				1: 3,
+				2: 3,
+				3: 3,
+			},
+			expectedOutput: map[int]int{
+				2: 5,
+			},
+		},
+		{
+			name: "key not in threshold map",
+			inputMap: map[int][]int{
+				1: {5, 5, 5, 5, 5},
+				2: {5, 5, 5, 3, 5},
+				3: {5, 5, 5},
+			},
+			thresholdMap: map[int]int{
+				1: 3,
+				2: 3,
+			},
+			expectedOutput: map[int]int{
+				1: 5,
+				2: 5,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			threshold := MakeMultiThreshold(tc.thresholdMap, func(i int) Threshold {
+				return Threshold(tc.thresholdMap[i])
+			})
+			result := GetConsensusMapAggregator(lggr, "test", tc.inputMap, threshold, func(vals []int) int {
+				return Median(vals, func(a, b int) bool {
+					return a < b
+				})
+			})
+			assert.Equal(t, tc.expectedOutput, result)
+		})
+	}
+}
