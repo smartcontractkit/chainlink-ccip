@@ -143,7 +143,7 @@ pub struct ScheduleBatch<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]
@@ -172,7 +172,7 @@ pub struct InitializeOperation<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]
@@ -207,7 +207,7 @@ pub struct AppendInstructions<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]
@@ -233,7 +233,7 @@ pub struct FinalizeOperation<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]
@@ -255,7 +255,7 @@ pub struct ClearOperation<'info> {
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    // NOTE: access controller check and access happens in only_role_or_admin_role macro
+    // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]

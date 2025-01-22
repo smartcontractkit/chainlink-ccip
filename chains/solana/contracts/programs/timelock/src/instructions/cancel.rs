@@ -35,7 +35,7 @@ pub struct Cancel<'info> {
     #[account( seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    // NOTE: access controller check happens in only_role_or_admin_role macro
+    // NOTE: access controller check happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]

@@ -168,7 +168,7 @@ pub struct ExecuteBatch<'info> {
     )]
     pub timelock_signer: UncheckedAccount<'info>,
 
-    // NOTE: access controller check happens in only_role_or_admin_role macro
+    // NOTE: access controller check happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]
@@ -183,7 +183,7 @@ pub struct BypasserExecuteBatch<'info> {
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
-        close = authority,
+        close = authority, // close the operation after execution
     )]
     pub operation: Account<'info, Operation>,
 
@@ -197,7 +197,7 @@ pub struct BypasserExecuteBatch<'info> {
     )]
     pub timelock_signer: UncheckedAccount<'info>,
 
-    // NOTE: access controller check happens in only_role_or_admin_role macro
+    // NOTE: access controller check happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]
