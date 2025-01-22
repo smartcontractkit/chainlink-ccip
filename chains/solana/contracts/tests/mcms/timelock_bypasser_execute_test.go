@@ -295,11 +295,8 @@ func TestTimelockBypasserExecute(t *testing.T) {
 					require.Equal(t, ixx.Data, common.NormalizeData(event.Data))
 				}
 
-				var opAccount timelock.Operation
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
-				if err != nil {
-					require.NoError(t, err, "failed to get account info")
-				}
+				// check if operation pda is closed
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, operationPDA, config.DefaultCommitment)
 
 				recipientWsolBalance, err := solanaGoClient.GetTokenAccountBalance(
 					ctx,
