@@ -13,7 +13,7 @@
       in {
         devShells = {
           default = import ./shell.nix { inherit pkgs; keystone = false; };
-          keystone = import ./shell.nix { inherit pkgs; keystone = true; };
+          keystone = import ./shell.nix { inherit pkgs; keystone = false; };
         };
         formatter = pkgs.nixpkgs-fmt;
       });

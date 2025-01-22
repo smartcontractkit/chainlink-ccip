@@ -23,6 +23,7 @@ const (
 	lokiEndpointKey             = "loki-endpoint"
 	testDelayKey                = "test-delay"
 	chainlinkCodeDirKey         = "chainlink-code-dir"
+	capabilitiesCodeDirKey      = "capabilities-code-dir"
 	goreleaserKeyKey            = "goreleaser-key"
 	chainlinkHelmRegistryURIKey = "chainlink-helm-registry-uri"
 )
@@ -35,6 +36,24 @@ var keystoneCmd = &cobra.Command{
 		if viper.GetString(goreleaserKeyKey) == "" {
 			return fmt.Errorf("goreleaser key is required")
 		}
+		cap_repo := os.Getenv("CAPABILITIES_REPO")
+		if cap_repo == "" {
+			return fmt.Errorf("CAPABILITIES_REPO is required. Check .env or export it: '%v'", os.Environ())
+		}
+
+		// ensure that the capabilities repo exists
+		if _, err := os.Stat(cap_repo); os.IsNotExist(err) {
+			return fmt.Errorf("CAPABILITIES_REPO '%s' does not exist", cap_repo)
+		} else {
+			// resolve the capabilities repo path
+			cap_repo, err = filepath.Abs(cap_repo)
+			if err != nil {
+				return fmt.Errorf("failed to resolve capabilities repo path: %s", err)
+			}
+			// set the capabilities repo path
+			logger.Info("Setting CAPABILITIES_REPO to", slog.String("cap_repo", cap_repo))
+			os.Setenv("CAPABILITIES_REPO", cap_repo)
+		}
 
 		return nil
 	},
@@ -46,8 +65,6 @@ var startCmd = &cobra.Command{
 	Short: "Start keystone and run a smoke test",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		// The user's mental model is that they will be executing this command from the root of the crib repository
-		clCodeDir := filepath.Join("../..", viper.GetString(chainlinkCodeDirKey))
 		config := utils.StartCmdConfig{
 			SkipSetup:                viper.GetBool(skipSetupKey),
 			Clean:                    viper.GetBool(cleanKey),
@@ -55,7 +72,7 @@ var startCmd = &cobra.Command{
 			RetryDelay:               viper.GetDuration(retryDelayKey),
 			LokiEndpoint:             viper.GetString(lokiEndpointKey),
 			TestDelay:                viper.GetDuration(testDelayKey),
-			ChainlinkCodeDir:         clCodeDir,
+			ChainlinkCodeDir:         viper.GetString(chainlinkCodeDirKey),
 			GoreleaserKey:            viper.GetString(goreleaserKeyKey),
 			ChainlinkHelmRegistryURI: viper.GetString(chainlinkHelmRegistryURIKey),
 		}
@@ -123,7 +140,8 @@ func init() {
 	flags.StringP(lokiEndpointKey, "l", "https://loki.localhost", "Loki endpoint URL")
 	flags.DurationP(testDelayKey, "t", 2*time.Minute, "Delay before testing")
 	flags.BoolP(printConfigKey, "p", false, "Print the configuration and exit")
-	flags.StringP(chainlinkCodeDirKey, "C", "..", "Directory that contains the /chainlink repository")
+	flags.StringP(chainlinkCodeDirKey, "C", "../../..", "Directory that contains the /chainlink repository. The Default assumes you are using a go workspace with chainlink and crib as peer repositories and 'crib/deployments/chainlink' as the working directory")
+
 	flags.StringP(goreleaserKeyKey, "g", "", "Goreleaser key")
 	flags.StringP(chainlinkHelmRegistryURIKey, "H", "", "The URI of the Helm registry for infra-charts, if left empty, charts will be pulled from git")
 	_ = viper.BindPFlags(keystoneCmd.Flags())

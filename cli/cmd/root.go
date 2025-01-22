@@ -31,6 +31,8 @@ all the required Chainlink dependencies.`,
 		initLogger()
 		// keystone is its own command and doesn't require a product directory
 		if cmd.Name() == "keystone" || cmd.Parent().Name() == "keystone" || cmd.Name() == "git-charts" {
+			logger.Info("initializing config for keystone")
+			initConfig(false)
 			return
 		}
 		isChildOfDevspaceCmd := false

@@ -5,7 +5,7 @@ let
 
   mkShell' = mkShell.override {
     # The current nix default SDK for macOS fails to compile Go projects, so we use a newer one for now.
-    stdenv = if stdenv.isDarwin then overrideSDK stdenv "11.0" else stdenv;
+    # stdenv = if stdenv.isDarwin then overrideSDK stdenv "11.0" else stdenv;
   };
 
   # Custom derivation to include only logcli from loki using runCommand
@@ -85,7 +85,10 @@ mkShell' {
 
       # Sourcing the .env file as the last step
       if [ -f ".env" ]; then
-        export $(grep -v '^#' .env | xargs)
+        #export $(grep -v '^#' .env | xargs)
+        set -a
+        source .env
+        set +a
       fi
     ''}
 
