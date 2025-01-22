@@ -431,6 +431,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			reportsInitialRequestTimerDuration:      time.Minute,
 			ed25519Verifier:                         signatureVerifierAlwaysTrue{},
 			rmnCrypto:                               signatureVerifierAlwaysTrue{},
+			metricsReporter:                         NoopMetrics{},
 		}
 
 		updateRequests := []*rmnpb.FixedDestLaneUpdateRequest{

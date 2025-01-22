@@ -117,6 +117,8 @@ type controller struct {
 	// reportsInitialRequestTimerDuration is the duration of the initial report signature request timer.
 	// After this timer expires we send additional report signature requests to the rest of the RMN nodes.
 	reportsInitialRequestTimerDuration time.Duration
+
+	metricsReporter MetricsReporter
 }
 
 // NewController creates a new RMN Controller instance.
@@ -128,6 +130,7 @@ func NewController(
 	rmnHomeReader readerpkg.RMNHome,
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
+	metricsReporter MetricsReporter,
 ) Controller {
 
 	lggr.Infow("creating new RMN controller",
@@ -143,6 +146,7 @@ func NewController(
 		ed25519Verifier:                         NewED25519Verifier(),
 		observationsInitialRequestTimerDuration: observationsInitialRequestTimerDuration,
 		reportsInitialRequestTimerDuration:      reportsInitialRequestTimerDuration,
+		metricsReporter:                         metricsReporter,
 	}
 }
 
@@ -344,13 +348,14 @@ func (c *controller) getRmnSignedObservations(
 
 // sendObservationRequests sends observation requests to the RMN nodes.
 // If a specific request fails, it is logged and not included in the returned requestIDs mapping.
+// Returns a set of inflight requests (a mapping from request ID to InFlightRequest)
 func (c *controller) sendObservationRequests(
 	lggr logger.Logger,
 	destChain *rmnpb.LaneDest,
 	requestsPerNode map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
-) (requestIDs mapset.Set[uint64]) {
-	requestIDs = mapset.NewSet[uint64]()
+) (inFlightRequests map[uint64]InFlightRmnRequest) {
+	inFlightRequests = make(map[uint64]InFlightRmnRequest)
 
 	for nodeID, requests := range requestsPerNode {
 		sort.Slice(requests, func(i, j int) bool {
@@ -390,14 +395,15 @@ func (c *controller) sendObservationRequests(
 		lggr := logger.With(lggr, "node", nodeID, "requestID", req.RequestId)
 		lggr.Infow("sending observation request", "laneUpdateRequests", requests)
 		if err := c.marshalAndSend(req, rmnNode); err != nil {
+			c.metricsReporter.TrackRmnRequest(RmnMethodObservation, 0, uint64(nodeID), "failed_to_send_request")
 			lggr.Errorw("failed to send observation request", "err", err)
 			continue
 		}
 
-		requestIDs.Add(req.RequestId)
+		inFlightRequests[req.RequestId] = NewInFlightRmnRequest(uint64(nodeID))
 	}
 
-	return requestIDs
+	return inFlightRequests
 }
 
 // listenForRmnObservationResponses listens for the RMN observation responses.
@@ -409,14 +415,15 @@ func (c *controller) listenForRmnObservationResponses(
 	ctx context.Context,
 	lggr logger.Logger,
 	destChain *rmnpb.LaneDest,
-	requestIDs mapset.Set[uint64],
+	inFlightRequests map[uint64]InFlightRmnRequest, // map from requestIDs to request info
 	lursPerChain map[uint64]updateRequestWithMeta,
 	requestedNodes map[uint64]mapset.Set[rmntypes.NodeID],
 	configDigest cciptypes.Bytes32,
 	homeFMap map[cciptypes.ChainSelector]int,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) ([]rmnSignedObservationWithMeta, error) {
-	lggr.Infow("listening for RMN observation responses", "requestIDs", requestIDs.String())
+	lggr.Infow("listening for RMN observation responses", "requestIDs",
+		mapset.NewSetFromMapKeys(inFlightRequests).String())
 
 	finishedRequestIDs := mapset.NewSet[uint64]()
 	rmnObservationResponses := make([]rmnSignedObservationWithMeta, 0)
@@ -428,7 +435,7 @@ func (c *controller) listenForRmnObservationResponses(
 	for {
 		select {
 		case resp := <-c.peerClient.Recv():
-			parsedResp, err := c.parseResponse(&resp, requestIDs, finishedRequestIDs)
+			parsedResp, latency, err := c.parseResponse(&resp, inFlightRequests, finishedRequestIDs)
 			if err != nil {
 				lggr.Debugw("skipping an unexpected RMN response", "err", err)
 				continue
@@ -443,10 +450,13 @@ func (c *controller) listenForRmnObservationResponses(
 				destChain,
 				configDigest,
 			)
+
 			if err != nil {
+				c.metricsReporter.TrackRmnRequest(RmnMethodObservation, latency, uint64(resp.RMNNodeID), "invalid_response")
 				lggr.Warnw("skipping an invalid RMN observation response", "err", err)
 				initialObservationRequestTimer.Reset(0) // immediately schedule the additional requests
 			} else {
+				c.metricsReporter.TrackRmnRequest(RmnMethodObservation, latency, uint64(resp.RMNNodeID), "")
 				rmnObservationResponses = append(rmnObservationResponses, rmnSignedObservationWithMeta{
 					SignedObservation: parsedResp.GetSignedObservation(),
 					RMNNodeID:         resp.RMNNodeID,
@@ -464,8 +474,8 @@ func (c *controller) listenForRmnObservationResponses(
 			}
 
 			// We got all the responses we were waiting for, but they are not sufficient for all chains.
-			if timerExpired && finishedRequestIDs.Equal(requestIDs) {
-				lggr.Warn("observation requests were finished, but results are not sufficient")
+			if timerExpired && finishedRequestIDs.Equal(mapset.NewSetFromMapKeys(inFlightRequests)) {
+				lggr.Warnw("observation requests were finished, but results are not sufficient")
 				return rmnObservationResponses, ErrInsufficientObservationResponses
 			}
 		case <-initialObservationRequestTimer.C:
@@ -485,9 +495,16 @@ func (c *controller) listenForRmnObservationResponses(
 					requestsPerNode[nodeID] = append(requestsPerNode[nodeID], updateReq.Data)
 				}
 			}
-			newRequestIDs := c.sendObservationRequests(lggr, destChain, requestsPerNode, rmnNodeInfo)
-			requestIDs = requestIDs.Union(newRequestIDs)
+			newInFlightRequests := c.sendObservationRequests(lggr, destChain, requestsPerNode, rmnNodeInfo)
+			maps.Copy(inFlightRequests, newInFlightRequests)
 		case <-ctx.Done():
+			// Report metrics for requests we never received responses for
+			for requestID, requestInfo := range inFlightRequests {
+				if !finishedRequestIDs.Contains(requestID) {
+					c.metricsReporter.TrackRmnRequest(RmnMethodObservation, requestInfo.Latency(),
+						requestInfo.nodeID, "timeout")
+				}
+			}
 			return nil, ErrTimeout
 		}
 	}
@@ -696,7 +713,7 @@ func (c *controller) getRmnReportSignatures(
 	}
 	remoteF := int(rmnRemoteCfg.FSign)
 	signers := rmnRemoteCfg.Signers
-	requestIDs, signersRequested, err := c.sendReportSignatureRequest(
+	inFlightRequests, signersRequested, err := c.sendReportSignatureRequest(
 		lggr,
 		reportSigReq,
 		signers,
@@ -709,7 +726,7 @@ func (c *controller) getRmnReportSignatures(
 	ecdsaSignatures, err := c.listenForRmnReportSignatures(
 		ctx,
 		lggr,
-		requestIDs,
+		inFlightRequests,
 		rmnReport,
 		reportSigReq,
 		signersRequested,
@@ -812,13 +829,13 @@ func (c *controller) sendReportSignatureRequest(
 	remoteF int,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) (
-	requestIDs mapset.Set[uint64], signersRequested mapset.Set[rmntypes.NodeID], err error) {
-	requestIDs = mapset.NewSet[uint64]()
+	inFlightRequests map[uint64]InFlightRmnRequest, signersRequested mapset.Set[rmntypes.NodeID], err error) {
+	inFlightRequests = make(map[uint64]InFlightRmnRequest)
 	signersRequested = mapset.NewSet[rmntypes.NodeID]()
 
 	// Send the report signature request to at least #remoteF+1
 	for _, node := range randomShuffle(remoteSigners) {
-		if consensus.GteFPlusOne(remoteF, requestIDs.Cardinality()) {
+		if consensus.GteFPlusOne(remoteF, len(inFlightRequests)) {
 			break
 		}
 
@@ -840,17 +857,18 @@ func (c *controller) sendReportSignatureRequest(
 		err := c.marshalAndSend(req, rmnNode)
 		if err != nil {
 			lggr.Warnw("failed to send report signature request", "node", node.NodeIndex, "err", err)
+			c.metricsReporter.TrackRmnRequest(RmnMethodReportSignature, 0, node.NodeIndex, "failed_to_send_request")
 			continue
 		}
 
-		requestIDs.Add(req.RequestId)
+		inFlightRequests[req.RequestId] = NewInFlightRmnRequest(node.NodeIndex)
 		signersRequested.Add(rmntypes.NodeID(node.NodeIndex))
 	}
 
-	if consensus.LtFPlusOne(remoteF, requestIDs.Cardinality()) {
-		return requestIDs, signersRequested, fmt.Errorf("not able to send to enough report signers")
+	if consensus.LtFPlusOne(remoteF, len(inFlightRequests)) {
+		return inFlightRequests, signersRequested, fmt.Errorf("not able to send to enough report signers")
 	}
-	return requestIDs, signersRequested, nil
+	return inFlightRequests, signersRequested, nil
 }
 
 // reportSigWithSignerAddress is a helper struct to store the report signature and
@@ -864,7 +882,7 @@ type reportSigWithSignerAddress struct {
 func (c *controller) listenForRmnReportSignatures(
 	ctx context.Context,
 	lggr logger.Logger,
-	requestIDs mapset.Set[uint64],
+	inFlightRequests map[uint64]InFlightRmnRequest,
 	rmnReport cciptypes.RMNReport,
 	reportSigReq *rmnpb.ReportSignatureRequest,
 	signersRequested mapset.Set[rmntypes.NodeID],
@@ -877,13 +895,15 @@ func (c *controller) listenForRmnReportSignatures(
 
 	reportSigs := make([]reportSigWithSignerAddress, 0)
 	finishedRequests := mapset.NewSet[uint64]()
-	requestIDs = requestIDs.Clone()
+	inFlightRequests = maps.Clone(inFlightRequests)
+	requestIDs := mapset.NewSetFromMapKeys(inFlightRequests)
 	lggr.Infof("waiting for report signatures, requestIDs: %s", requestIDs.String())
 
 	for {
 		select {
 		case resp := <-c.peerClient.Recv():
-			responseTyp, err := c.parseResponse(&resp, requestIDs, finishedRequests)
+			requestIDs = mapset.NewSetFromMapKeys(inFlightRequests)
+			responseTyp, latency, err := c.parseResponse(&resp, inFlightRequests, finishedRequests)
 			if err != nil {
 				lggr.Infow("failed to parse RMN signature response", "err", err)
 				continue
@@ -891,10 +911,13 @@ func (c *controller) listenForRmnReportSignatures(
 			finishedRequests.Add(responseTyp.RequestId)
 
 			reportSig, err := c.validateReportSigResponse(ctx, responseTyp, resp.RMNNodeID, signers, rmnReport)
+
 			if err != nil {
+				c.metricsReporter.TrackRmnRequest(RmnMethodReportSignature, latency, uint64(resp.RMNNodeID), "invalid_response")
 				lggr.Warnw("skipping an invalid RMN report signature response", "err", err)
 				tReportsInitialRequest.Reset(0) // schedule additional requests if any
 			} else {
+				c.metricsReporter.TrackRmnRequest(RmnMethodReportSignature, latency, uint64(resp.RMNNodeID), "")
 				lggr.Infow("received valid report signature", "node", resp.RMNNodeID, "requestID", responseTyp.RequestId)
 				reportSigs = append(reportSigs, *reportSig)
 			}
@@ -939,10 +962,17 @@ func (c *controller) listenForRmnReportSignatures(
 					lggr.Errorw("failed to send report signature request", "node", nodeIndex, "err", err)
 					continue
 				}
-				requestIDs.Add(req.RequestId)
+				inFlightRequests[req.RequestId] = NewInFlightRmnRequest(nodeIndex)
 				signersRequested.Add(rmntypes.NodeID(nodeIndex))
 			}
 		case <-ctx.Done():
+			// Report metrics for requests we never received responses for
+			for requestID, requestInfo := range inFlightRequests {
+				if !finishedRequests.Contains(requestID) {
+					c.metricsReporter.TrackRmnRequest(RmnMethodReportSignature, requestInfo.Latency(),
+						requestInfo.nodeID, "timeout")
+				}
+			}
 			return nil, ErrTimeout
 		}
 	}
@@ -1057,26 +1087,35 @@ func (c *controller) marshalAndSend(req *rmnpb.Request, rmnNode rmntypes.HomeNod
 	return nil
 }
 
-// parseResponse parses the response from the RMN and returns the response.
+// parseResponse parses the response from the RMN and returns the response and the response latency
 // Validates that the response is expected and not a duplicate.
 func (c *controller) parseResponse(
-	resp *PeerResponse, requestIDs, gotResponses mapset.Set[uint64]) (*rmnpb.Response, error) {
+	resp *PeerResponse, inFlightRequests map[uint64]InFlightRmnRequest, gotResponses mapset.Set[uint64],
+) (*rmnpb.Response, float64, error) {
 	responseTyp := &rmnpb.Response{}
 	err := proto.Unmarshal(resp.Body, responseTyp)
 	if err != nil {
-		return nil, fmt.Errorf("proto unmarshal: %w", err)
+		return nil, 0, fmt.Errorf("proto unmarshal: %w", err)
 	}
 
-	if !requestIDs.Contains(responseTyp.RequestId) {
-		return nil, fmt.Errorf(
-			"got an RMN response that we are not waiting for: %d (%s)", responseTyp.RequestId, requestIDs.String())
+	requestInfo, exists := inFlightRequests[responseTyp.RequestId]
+	if !exists {
+		requestIDs := mapset.NewSetFromMapKeys(inFlightRequests).String()
+		return nil, 0, fmt.Errorf(
+			"got an RMN response that we are not waiting for: %d (%s)", responseTyp.RequestId, requestIDs)
+	}
+
+	if requestInfo.nodeID != uint64(resp.RMNNodeID) {
+		return nil, 0, fmt.Errorf(
+			"got an RMN response from node %d, but the request was made to node %d, requestID: %d",
+			resp.RMNNodeID, requestInfo.nodeID, responseTyp.RequestId)
 	}
 
 	if gotResponses.Contains(responseTyp.RequestId) {
-		return nil, fmt.Errorf("got a duplicate RMN response: %d", responseTyp.RequestId)
+		return nil, 0, fmt.Errorf("got a duplicate RMN response: %d", responseTyp.RequestId)
 	}
 
-	return responseTyp, nil
+	return responseTyp, requestInfo.Latency(), nil
 }
 
 func randomShuffle[T any](s []T) []T {
@@ -1101,4 +1140,24 @@ func newRequestID(lggr logger.Logger) uint64 {
 	}
 	randomUint64 := binary.LittleEndian.Uint64(b)
 	return randomUint64
+}
+
+// InFlightRmnRequest tracks an in-flight RMN request, used for metrics
+// RMN requests are sent async, so in order to compute request latencies we need to store a mapping from request ID to
+// InFlightRmnRequest, and then reference when we get a response (or if we don't receive a response, we are able to
+// mark the InFlightRmnRequests that have timed out, and mark the offending node IDs).
+type InFlightRmnRequest struct {
+	sent   time.Time // The time the request was sent
+	nodeID uint64    // The node that the request was sent to
+}
+
+func NewInFlightRmnRequest(nodeID uint64) InFlightRmnRequest {
+	return InFlightRmnRequest{
+		sent:   time.Now(),
+		nodeID: nodeID,
+	}
+}
+
+func (i *InFlightRmnRequest) Latency() float64 {
+	return float64(time.Since(i.sent).Milliseconds())
 }
