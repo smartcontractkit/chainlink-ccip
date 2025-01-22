@@ -198,7 +198,8 @@ func readAllMessages(
 		// Read messages for each range.
 		for _, report := range reports {
 			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
-			if err != nil || len(msgs) != report.SequenceNumberRange.Length() || gapInSequenceNumbers(msgs, report.SequenceNumberRange) {
+			if err != nil || len(msgs) != report.SequenceNumberRange.Length() ||
+				gapInSequenceNumbers(msgs, report.SequenceNumberRange) {
 				lggr.Errorw("unable to read all messages for report",
 					"srcChain", srcChain,
 					"seqRange", report.SequenceNumberRange,

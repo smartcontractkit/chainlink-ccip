@@ -123,7 +123,8 @@ func validateObservedSequenceNumbers(
 
 			for _, msg := range data.Messages {
 				if !data.SequenceNumberRange.Contains(msg.Header.SequenceNumber) {
-					return fmt.Errorf("message %d not in observed range %v for chain %d", msg.Header.SequenceNumber, data.SequenceNumberRange, data.SourceChain)
+					return fmt.Errorf("message %d not in observed range %v for chain %d",
+						msg.Header.SequenceNumber, data.SequenceNumberRange, data.SourceChain)
 				}
 			}
 		}
