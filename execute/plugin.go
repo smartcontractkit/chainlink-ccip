@@ -241,6 +241,11 @@ func (p *Plugin) ValidateObservation(
 		if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
 			return fmt.Errorf("validate token data observations: %w", err)
 		}
+
+		err = validateCostlyMessagesObservations(decodedObservation.Messages, decodedObservation.CostlyMessages)
+		if err != nil {
+			return fmt.Errorf("validate costly messages: %w", err)
+		}
 	}
 
 	return nil

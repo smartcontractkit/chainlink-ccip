@@ -43,8 +43,6 @@ func validateMsgsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedMsgs exectypes.MessageObservations,
 ) error {
-	// TODO: validate that CommitReports and Nonces are only observed if the destChain is supported.
-
 	for chainSel, msgs := range observedMsgs {
 		if len(msgs) == 0 {
 			continue
@@ -69,6 +67,14 @@ func validateTokenDataObservations(
 	}
 
 	for chain, msgs := range observedMsgs {
+		chainTd, ok := tokenData[chain]
+		if !ok {
+			return fmt.Errorf("token data not found for chain %d", chain)
+		}
+		if len(msgs) != len(chainTd) {
+			return fmt.Errorf("unexpected number of token data observations for chain %d: expected %d, got %d",
+				chain, len(msgs), len(chainTd))
+		}
 		for seq, msg := range msgs {
 			if _, ok := tokenData[chain][seq]; !ok {
 				return fmt.Errorf("token data not found for message %s", msg)
@@ -76,6 +82,23 @@ func validateTokenDataObservations(
 		}
 	}
 
+	return nil
+}
+
+func validateCostlyMessagesObservations(
+	observedMsgs exectypes.MessageObservations,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+	msgs := observedMsgs.Flatten()
+	msgsIDMap := make(map[cciptypes.Bytes32]struct{})
+	for _, msg := range msgs {
+		msgsIDMap[msg.Header.MessageID] = struct{}{}
+	}
+	for _, id := range costlyMessages {
+		if _, ok := msgsIDMap[id]; !ok {
+			return fmt.Errorf("costly message %s not found in observed messages", id)
+		}
+	}
 	return nil
 }
 
@@ -90,6 +113,12 @@ func validateHashesExist(
 	}
 
 	for chain, msgs := range observedMsgs {
+		_, ok := hashes[chain]
+		if !ok {
+			return fmt.Errorf("hash not found for chain %d", chain)
+		}
+
+		// hashes lengths can be larger than the observed messages in case of observation truncation.
 		for seq, msg := range msgs {
 			if _, ok := hashes[chain][seq]; !ok {
 				return fmt.Errorf("hash not found for message %s", msg)
@@ -111,18 +140,15 @@ func validateMessagesConformToCommitReports(
 			if !ok {
 				return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
 			}
-			msgs := make([]cciptypes.Message, 0, len(msgsMap))
-			for _, msg := range msgsMap {
-				msgs = append(msgs, msg)
+
+			for seqNum := data.SequenceNumberRange.Start(); seqNum <= data.SequenceNumberRange.End(); seqNum++ {
+				_, ok = msgsMap[seqNum]
+				if !ok {
+					return fmt.Errorf("no message observed for sequence number %d, "+
+						"while report's range sholud include it", seqNum)
+				}
+				msgsCount++
 			}
-			if !msgsConformToSeqRange(msgs, data.SequenceNumberRange) {
-				return fmt.Errorf("messages don't conform to sequence numbers observed for chain %d, "+
-					"sequence numbers: %v",
-					data.SourceChain,
-					data.SequenceNumberRange,
-				)
-			}
-			msgsCount += len(msgs)
 		}
 	}
 	allMsgs := observedMsgs.Flatten()

@@ -248,9 +248,10 @@ func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 	}
 	encodedPrevOutcome, err := prevOutcome.Encode()
 	require.NoError(t, err)
-	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{PreviousOutcome: encodedPrevOutcome}, types.Query{}, types.AttributedObservation{
-		Observation: encoded,
-	})
+	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{PreviousOutcome: encodedPrevOutcome}, types.Query{},
+		types.AttributedObservation{
+			Observation: encoded,
+		})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "validate observer reading eligibility: observer not allowed to read from chain 0")
 }
@@ -289,7 +290,9 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 		Observation: encoded,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validate commit reports reading eligibility: observer not allowed to read from chain 1")
+	assert.Contains(t,
+		err.Error(),
+		"validate commit reports reading eligibility: observer not allowed to read from chain 1")
 }
 
 func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {

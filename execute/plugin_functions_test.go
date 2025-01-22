@@ -199,19 +199,19 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 				1: {
 					{
 						MerkleRoot:          cciptypes.Bytes32{1},
-						SequenceNumberRange: cciptypes.SeqNumRange{1, 4},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2},
 						SourceChain:         1,
 					},
 				},
 			},
 			observedMsgs: exectypes.MessageObservations{
-				1: EmptyMessagesMapForRange(1, 3),
+				1: EmptyMessagesMapForRanges([]cciptypes.SeqNumRange{{1, 2}, {5, 10}}),
 			},
 			expErr: true,
 		},
 		{
-			name: "ValidData with messages",
+			name: "valid multiple commit reports for multiple chains",
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
 				1: {
 					{
@@ -232,6 +232,59 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 				1: EmptyMessagesMapForRange(1, 3),
 				2: EmptyMessagesMapForRange(11, 15),
 			},
+		},
+		{
+			name: "valid multiple commit reports for same chain",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 3},
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+					},
+					{
+						MerkleRoot:          cciptypes.Bytes32{2},
+						SequenceNumberRange: cciptypes.SeqNumRange{4, 6},
+					},
+					{
+						MerkleRoot:          cciptypes.Bytes32{3},
+						SequenceNumberRange: cciptypes.SeqNumRange{8, 10},
+					},
+				},
+			},
+			observedMsgs: exectypes.MessageObservations{
+				1: EmptyMessagesMapForRanges([]cciptypes.SeqNumRange{{1, 3}, {4, 6}, {8, 10}}),
+			},
+		},
+		{
+			name: "Extra Sequence Numbers",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 3},
+					},
+				},
+			},
+			observedMsgs: exectypes.MessageObservations{
+				1: EmptyMessagesMapForRange(1, 4),
+			},
+			expErr: true,
+		},
+		{
+			name: "Missing Sequence Numbers",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 3},
+					},
+				},
+			},
+			observedMsgs: exectypes.MessageObservations{
+				1: EmptyMessagesMapForRange(1, 2),
+			},
+			expErr: true,
 		},
 	}
 
@@ -1352,6 +1405,118 @@ func Test_allSeqNrsObserved(t *testing.T) {
 			if got := msgsConformToSeqRange(tt.msgs, tt.numberRange); got != tt.want {
 				t.Errorf("msgsConformToSeqRange() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func Test_validateCostlyMessagesObservations(t *testing.T) {
+	tests := []struct {
+		name           string
+		observedMsgs   exectypes.MessageObservations
+		costlyMessages []cciptypes.Bytes32
+		expErr         bool
+	}{
+		{
+			name: "ValidCostlyMessages",
+			observedMsgs: exectypes.MessageObservations{
+				1: {
+					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
+					2: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x02}}},
+				},
+			},
+			costlyMessages: []cciptypes.Bytes32{{0x01}, {0x02}},
+			expErr:         false,
+		},
+		{
+			name: "CostlyMessageNotFound",
+			observedMsgs: exectypes.MessageObservations{
+				1: {
+					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
+				},
+			},
+			costlyMessages: []cciptypes.Bytes32{{0x02}},
+			expErr:         true,
+		},
+		{
+			name: "EmptyCostlyMessages",
+			observedMsgs: exectypes.MessageObservations{
+				1: {
+					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
+				},
+			},
+			costlyMessages: []cciptypes.Bytes32{},
+			expErr:         false,
+		},
+		{
+			name:           "EmptyObservedMessages",
+			observedMsgs:   exectypes.MessageObservations{},
+			costlyMessages: []cciptypes.Bytes32{{0x01}},
+			expErr:         true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateCostlyMessagesObservations(tc.observedMsgs, tc.costlyMessages)
+			if tc.expErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test_validateCommitReportsReadingEligibility(t *testing.T) {
+	tests := []struct {
+		name            string
+		supportedChains mapset.Set[cciptypes.ChainSelector]
+		observedData    exectypes.CommitObservations
+		expErr          string
+	}{
+		{
+			name:            "ValidCommitReports",
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+			observedData: exectypes.CommitObservations{
+				1: {
+					{SourceChain: 1},
+				},
+				2: {
+					{SourceChain: 2},
+				},
+			},
+		},
+		{
+			name:            "UnsupportedChain",
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1)),
+			observedData: exectypes.CommitObservations{
+				2: {
+					{SourceChain: 2},
+				},
+			},
+			expErr: "observer not allowed to read from chain 2",
+		},
+		{
+			name:            "MismatchedSourceChain",
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1)),
+			observedData: exectypes.CommitObservations{
+				1: {
+					{SourceChain: 2},
+				},
+			},
+			expErr: "observer not allowed to read from chain 2",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateCommitReportsReadingEligibility(tc.supportedChains, tc.observedData)
+			if len(tc.expErr) != 0 {
+				assert.Error(t, err)
+				assert.ErrorContains(t, err, tc.expErr)
+				return
+			}
+			assert.NoError(t, err)
 		})
 	}
 }
