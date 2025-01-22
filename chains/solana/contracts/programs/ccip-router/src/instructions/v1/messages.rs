@@ -277,6 +277,56 @@ pub mod ramps {
             );
         }
 
+        #[test]
+        fn message_exceeds_gas_limit_fails_to_validate() {
+            let mut message = sample_message();
+            message.extra_args.gas_limit = Some(1_000_000_000);
+            assert_eq!(
+                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
+                    .unwrap_err(),
+                CcipRouterError::MessageGasLimitTooHigh.into()
+            );
+        }
+
+        #[test]
+        fn validate_out_of_order_execution() {
+            let mut dest_chain_enforce = sample_dest_chain();
+            dest_chain_enforce.config.enforce_out_of_order = true;
+            let mut dest_chain_not_enforce = sample_dest_chain();
+            dest_chain_not_enforce.config.enforce_out_of_order = false;
+
+            let mut message_ooo = sample_message();
+            message_ooo.extra_args.allow_out_of_order_execution = Some(true);
+            let mut message_not_ooo = sample_message();
+            message_not_ooo.extra_args.allow_out_of_order_execution = Some(false);
+
+            // allowed cases
+            validate_svm2any(&message_ooo, &dest_chain_enforce, &sample_billing_config()).unwrap();
+            validate_svm2any(
+                &message_ooo,
+                &dest_chain_not_enforce,
+                &sample_billing_config(),
+            )
+            .unwrap();
+            validate_svm2any(
+                &message_not_ooo,
+                &dest_chain_not_enforce,
+                &sample_billing_config(),
+            )
+            .unwrap();
+
+            // not allowed cases
+            assert_eq!(
+                validate_svm2any(
+                    &message_not_ooo,
+                    &dest_chain_enforce,
+                    &sample_billing_config()
+                )
+                .unwrap_err(),
+                CcipRouterError::ExtraArgOutOfOrderExecutionMustBeTrue.into()
+            );
+        }
+
         pub fn sample_message() -> SVM2AnyMessage {
             let mut receiver = vec![0u8; 32];
 
