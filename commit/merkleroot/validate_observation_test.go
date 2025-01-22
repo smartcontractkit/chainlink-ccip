@@ -127,14 +127,14 @@ func Test_validateObservedOnRampMaxSeqNums(t *testing.T) {
 			expErr:                  false,
 		},
 		{
-			name: "Invalid if SeqNum is 0",
+			name: "Valid if SeqNum is 0",
 			onRampMaxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 0},
 				{ChainSel: 2, SeqNum: 20},
 			},
 			observer:                10,
 			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
-			expErr:                  true,
+			expErr:                  false,
 		},
 		{
 			name: "Invalid if chain is 0",

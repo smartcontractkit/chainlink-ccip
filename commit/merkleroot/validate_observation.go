@@ -123,10 +123,6 @@ func validateObservedOnRampMaxSeqNums(
 			return fmt.Errorf("duplicate onRampMaxSeqNum for chain %d", seqNumChain.ChainSel)
 		}
 
-		if seqNumChain.SeqNum == 0 {
-			return fmt.Errorf("onRampMaxSeqNum for chain %d is 0", seqNumChain.ChainSel)
-		}
-
 		if seqNumChain.ChainSel == 0 {
 			return fmt.Errorf("onRampMaxSeqNum for chain %d has chain selector 0", seqNumChain.ChainSel)
 		}
