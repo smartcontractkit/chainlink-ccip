@@ -24,6 +24,8 @@ pub struct Config {
     pub max_fee_juels_per_msg: u128,
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
+
+    pub main_version: [u8; 8], // e.g. string "1.0.0" in bytes, left-padded with zeroes
 }
 
 #[zero_copy]

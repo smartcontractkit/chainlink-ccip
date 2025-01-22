@@ -105,7 +105,11 @@ pub mod ccip_router {
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        v1::admin::transfer_ownership(ctx, proposed_owner)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::transfer_ownership(ctx, proposed_owner),
+            BusinessLogic::V1_0_1 => v2::admin::transfer_ownership(ctx, proposed_owner),
+        }
     }
 
     /// Accepts the ownership of the router by the proposed owner.
@@ -117,7 +121,11 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for accepting ownership.
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        v1::admin::accept_ownership(ctx)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::accept_ownership(ctx),
+            BusinessLogic::V1_0_1 => v2::admin::accept_ownership(ctx),
+        }
     }
 
     /// Updates the fee aggregator in the router configuration.
@@ -131,7 +139,11 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         fee_aggregator: Pubkey,
     ) -> Result<()> {
-        v1::admin::update_fee_aggregator(ctx, fee_aggregator)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::update_fee_aggregator(ctx, fee_aggregator),
+            BusinessLogic::V1_0_1 => v2::admin::update_fee_aggregator(ctx, fee_aggregator),
+        }
     }
 
     /// Adds a new chain selector to the router.
@@ -152,12 +164,21 @@ pub mod ccip_router {
         source_chain_config: SourceChainConfig,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::add_chain_selector(
-            ctx,
-            new_chain_selector,
-            source_chain_config,
-            dest_chain_config,
-        )
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::add_chain_selector(
+                ctx,
+                new_chain_selector,
+                source_chain_config,
+                dest_chain_config,
+            ),
+            BusinessLogic::V1_0_1 => v2::admin::add_chain_selector(
+                ctx,
+                new_chain_selector,
+                source_chain_config,
+                dest_chain_config,
+            ),
+        }
     }
 
     /// Disables the source chain selector.
@@ -172,7 +193,15 @@ pub mod ccip_router {
         ctx: Context<UpdateSourceChainSelectorConfig>,
         source_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::admin::disable_source_chain_selector(ctx, source_chain_selector)
+            }
+        }
     }
 
     /// Disables the destination chain selector.
@@ -187,7 +216,15 @@ pub mod ccip_router {
         ctx: Context<UpdateDestChainSelectorConfig>,
         dest_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::disable_dest_chain_selector(ctx, dest_chain_selector)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::admin::disable_dest_chain_selector(ctx, dest_chain_selector)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::admin::disable_dest_chain_selector(ctx, dest_chain_selector)
+            }
+        }
     }
 
     /// Updates the configuration of the source chain selector.
@@ -204,7 +241,19 @@ pub mod ccip_router {
         source_chain_selector: u64,
         source_chain_config: SourceChainConfig,
     ) -> Result<()> {
-        v1::admin::update_source_chain_config(ctx, source_chain_selector, source_chain_config)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::update_source_chain_config(
+                ctx,
+                source_chain_selector,
+                source_chain_config,
+            ),
+            BusinessLogic::V1_0_1 => v2::admin::update_source_chain_config(
+                ctx,
+                source_chain_selector,
+                source_chain_config,
+            ),
+        }
     }
 
     /// Updates the configuration of the destination chain selector.
@@ -221,7 +270,15 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
+            }
+        }
     }
 
     /// Updates the SVM chain selector in the router configuration.
@@ -236,7 +293,11 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::update_svm_chain_selector(ctx, new_chain_selector),
+            BusinessLogic::V1_0_1 => v2::admin::update_svm_chain_selector(ctx, new_chain_selector),
+        }
     }
 
     /// Updates the default gas limit in the router configuration.
@@ -252,7 +313,11 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_gas_limit: u128,
     ) -> Result<()> {
-        v1::admin::update_default_gas_limit(ctx, new_gas_limit)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::update_default_gas_limit(ctx, new_gas_limit),
+            BusinessLogic::V1_0_1 => v2::admin::update_default_gas_limit(ctx, new_gas_limit),
+        }
     }
 
     /// Updates the default setting for allowing out-of-order execution for other destination chains.
@@ -266,10 +331,17 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_allow_out_of_order_execution: bool,
     ) -> Result<()> {
-        v1::admin::update_default_allow_out_of_order_execution(
-            ctx,
-            new_allow_out_of_order_execution,
-        )
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::update_default_allow_out_of_order_execution(
+                ctx,
+                new_allow_out_of_order_execution,
+            ),
+            BusinessLogic::V1_0_1 => v2::admin::update_default_allow_out_of_order_execution(
+                ctx,
+                new_allow_out_of_order_execution,
+            ),
+        }
     }
 
     /// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
@@ -285,7 +357,17 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_enable_manual_execution_after: i64,
     ) -> Result<()> {
-        v1::admin::update_enable_manual_execution_after(ctx, new_enable_manual_execution_after)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::update_enable_manual_execution_after(
+                ctx,
+                new_enable_manual_execution_after,
+            ),
+            BusinessLogic::V1_0_1 => v2::admin::update_enable_manual_execution_after(
+                ctx,
+                new_enable_manual_execution_after,
+            ),
+        }
     }
 
     /// Registers the Token Admin Registry via the CCIP Admin
@@ -300,11 +382,23 @@ pub mod ccip_router {
         mint: Pubkey, // should we validate that this is a real token program?
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::register_token_admin_registry_via_get_ccip_admin(
-            ctx,
-            mint,
-            token_admin_registry_admin,
-        )
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::token_admin_registry::register_token_admin_registry_via_get_ccip_admin(
+                    ctx,
+                    mint,
+                    token_admin_registry_admin,
+                )
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::token_admin_registry::register_token_admin_registry_via_get_ccip_admin(
+                    ctx,
+                    mint,
+                    token_admin_registry_admin,
+                )
+            }
+        }
     }
 
     /// Registers the Token Admin Registry via the token owner.
@@ -317,7 +411,15 @@ pub mod ccip_router {
     pub fn register_token_admin_registry_via_owner(
         ctx: Context<RegisterTokenAdminRegistryViaOwner>,
     ) -> Result<()> {
-        v1::token_admin_registry::register_token_admin_registry_via_owner(ctx)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::token_admin_registry::register_token_admin_registry_via_owner(ctx)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::token_admin_registry::register_token_admin_registry_via_owner(ctx)
+            }
+        }
     }
 
     /// Sets the pool lookup table for a given token mint.
@@ -335,7 +437,15 @@ pub mod ccip_router {
         mint: Pubkey,
         writable_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::token_admin_registry::set_pool(ctx, mint, writable_indexes)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::token_admin_registry::set_pool(ctx, mint, writable_indexes)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::token_admin_registry::set_pool(ctx, mint, writable_indexes)
+            }
+        }
     }
 
     /// Transfers the admin role of the token admin registry to a new admin.
@@ -352,7 +462,19 @@ pub mod ccip_router {
         mint: Pubkey,
         new_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::token_admin_registry::transfer_admin_role_token_admin_registry(
+                    ctx, mint, new_admin,
+                )
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::token_admin_registry::transfer_admin_role_token_admin_registry(
+                    ctx, mint, new_admin,
+                )
+            }
+        }
     }
 
     /// Accepts the admin role of the token admin registry.
@@ -367,7 +489,15 @@ pub mod ccip_router {
         ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
         mint: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
+            }
+        }
     }
 
     /// Sets the token billing configuration.
@@ -386,7 +516,11 @@ pub mod ccip_router {
         mint: Pubkey,
         cfg: TokenBilling,
     ) -> Result<()> {
-        v1::admin::set_token_billing(ctx, chain_selector, mint, cfg)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::set_token_billing(ctx, chain_selector, mint, cfg),
+            BusinessLogic::V1_0_1 => v2::admin::set_token_billing(ctx, chain_selector, mint, cfg),
+        }
     }
 
     /// Sets the OCR configuration.
@@ -406,7 +540,15 @@ pub mod ccip_router {
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
-        v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
+            }
+        }
     }
 
     /// Adds a billing token configuration.
@@ -418,9 +560,13 @@ pub mod ccip_router {
     /// * `config` - The billing token configuration to be added.
     pub fn add_billing_token_config(
         ctx: Context<AddBillingTokenConfig>,
-        config: BillingTokenConfig,
+        billing_config: BillingTokenConfig,
     ) -> Result<()> {
-        v1::admin::add_billing_token_config(ctx, config)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::add_billing_token_config(ctx, billing_config),
+            BusinessLogic::V1_0_1 => v2::admin::add_billing_token_config(ctx, billing_config),
+        }
     }
 
     /// Updates the billing token configuration.
@@ -432,9 +578,13 @@ pub mod ccip_router {
     /// * `config` - The new billing token configuration.
     pub fn update_billing_token_config(
         ctx: Context<UpdateBillingTokenConfig>,
-        config: BillingTokenConfig,
+        billing_config: BillingTokenConfig,
     ) -> Result<()> {
-        v1::admin::update_billing_token_config(ctx, config)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::update_billing_token_config(ctx, billing_config),
+            BusinessLogic::V1_0_1 => v2::admin::update_billing_token_config(ctx, billing_config),
+        }
     }
 
     /// Removes the billing token configuration.
@@ -444,7 +594,11 @@ pub mod ccip_router {
     ///
     /// * `ctx` - The context containing the accounts required for removing the billing token configuration.
     pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
-        v1::admin::remove_billing_token_config(ctx)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::admin::remove_billing_token_config(ctx),
+            BusinessLogic::V1_0_1 => v2::admin::remove_billing_token_config(ctx),
+        }
     }
 
     /// Calculates the fee for sending a message to the destination chain.
@@ -474,7 +628,11 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<u64> {
-        v1::onramp::get_fee(ctx, dest_chain_selector, message)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::onramp::get_fee(ctx, dest_chain_selector, message),
+            BusinessLogic::V1_0_1 => v2::onramp::get_fee(ctx, dest_chain_selector, message),
+        }
     }
 
     /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
@@ -490,7 +648,15 @@ pub mod ccip_router {
         transfer_all: bool,
         desired_amount: u64, // if transfer_all is false, this value must be 0
     ) -> Result<()> {
-        v1::admin::withdraw_billed_funds(ctx, transfer_all, desired_amount)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::admin::withdraw_billed_funds(ctx, transfer_all, desired_amount)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::admin::withdraw_billed_funds(ctx, transfer_all, desired_amount)
+            }
+        }
     }
 
     /// ON RAMP FLOW
@@ -513,7 +679,15 @@ pub mod ccip_router {
         message: SVM2AnyMessage,
         token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
+            }
+        }
     }
 
     /// OFF RAMP FLOW
@@ -545,7 +719,15 @@ pub mod ccip_router {
         report: CommitInput,
         signatures: Vec<[u8; 65]>,
     ) -> Result<()> {
-        v1::offramp::commit(ctx, report_context_byte_words, report, signatures)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::offramp::commit(ctx, report_context_byte_words, report, signatures)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::offramp::commit(ctx, report_context_byte_words, report, signatures)
+            }
+        }
     }
 
     /// OFF RAMP FLOW
@@ -576,12 +758,21 @@ pub mod ccip_router {
         report_context_byte_words: [[u8; 32]; 3],
         token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::execute(
-            ctx,
-            execution_report,
-            report_context_byte_words,
-            &token_indexes,
-        )
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => v1::offramp::execute(
+                ctx,
+                execution_report,
+                report_context_byte_words,
+                &token_indexes,
+            ),
+            BusinessLogic::V1_0_1 => v2::offramp::execute(
+                ctx,
+                execution_report,
+                report_context_byte_words,
+                &token_indexes,
+            ),
+        }
     }
 
     /// Manually executes a report to the router.
@@ -599,8 +790,30 @@ pub mod ccip_router {
         execution_report: ExecutionReportSingleChain,
         token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::manually_execute(ctx, execution_report, &token_indexes)
+        let config = ctx.accounts.config.load()?;
+        match route_to(config)? {
+            BusinessLogic::V1_0_0 => {
+                v1::offramp::manually_execute(ctx, execution_report, &token_indexes)
+            }
+            BusinessLogic::V1_0_1 => {
+                v2::offramp::manually_execute(ctx, execution_report, &token_indexes)
+            }
+        }
     }
+}
+
+fn route_to(config: std::cell::Ref<Config>) -> Result<BusinessLogic> {
+    let semver = std::str::from_utf8(&config.main_version).unwrap();
+    match semver {
+        "1.0.0" => Ok(BusinessLogic::V1_0_0),
+        "1.0.1" => Ok(BusinessLogic::V1_0_1),
+        _ => err!(CcipRouterError::InvalidInputs),
+    }
+}
+
+enum BusinessLogic {
+    V1_0_0,
+    V1_0_1,
 }
 
 #[error_code]
