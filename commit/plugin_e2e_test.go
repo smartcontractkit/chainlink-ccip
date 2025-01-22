@@ -119,7 +119,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			RootsToReport: []ccipocr3.MerkleRootChain{
 				{
 					ChainSel:      sourceChain1,
-					OnRampAddress: ccipocr3.UnknownAddress{},
+					OnRampAddress: ccipocr3.UnknownAddress{1},
 					SeqNumsRange:  ccipocr3.SeqNumRange{0xa, 0xa},
 					MerkleRoot:    merkleRoot1,
 				},
@@ -168,7 +168,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 						{
 							ChainSel:      sourceChain1,
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(0xa, 0xa),
-							OnRampAddress: ccipocr3.UnknownAddress{},
+							OnRampAddress: ccipocr3.UnknownAddress{1},
 							MerkleRoot:    merkleRoot1,
 						},
 					},
@@ -728,7 +728,7 @@ func prepareCcipReaderMock(
 		Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
-		Return(ccipocr3.Bytes{}, nil).Maybe()
+		Return(ccipocr3.Bytes{1}, nil).Maybe()
 	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
 		Return(&reader2.CurseInfo{}, nil).Maybe()
 
@@ -846,6 +846,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 				Header: ccipocr3.RampMessageHeader{
 					MessageID:      messageID,
 					SequenceNumber: offRampNextSeqNum + ccipocr3.SeqNum(i),
+					OnRamp:         ccipocr3.UnknownAddress{1},
 				},
 			})
 		}
