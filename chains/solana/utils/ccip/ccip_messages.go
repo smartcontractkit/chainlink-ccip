@@ -3,13 +3,13 @@ package ccip
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -19,7 +19,7 @@ import (
 var leafDomainSeparator = [32]byte{}
 
 func HashCommitReport(ctx [3][32]byte, report ccip_router.CommitInput) ([]byte, error) {
-	hash := sha256.New()
+	hash := sha3.NewLegacyKeccak256()
 	encodedReport, err := bin.MarshalBorsh(report)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func MakeAnyToSVMMessage(tokenReceiver solana.PublicKey, logicReceiver solana.Pu
 }
 
 func HashAnyToSVMMessage(msg ccip_router.Any2SVMRampMessage, onRampAddress []byte) ([]byte, error) {
-	hash := sha256.New()
+	hash := sha3.NewLegacyKeccak256()
 
 	hash.Write(leafDomainSeparator[:])
 	hash.Write([]byte("Any2SVMMessageHashV1"))
@@ -195,7 +195,7 @@ func HashAnyToSVMMessage(msg ccip_router.Any2SVMRampMessage, onRampAddress []byt
 
 // hashPair hashes two byte slices and returns the result as a byte slice.
 func hashPair(a, b []byte) []byte {
-	h := sha256.New()
+	h := sha3.NewLegacyKeccak256()
 	if bytes.Compare(a, b) < 0 {
 		h.Write(a)
 		h.Write(b)
@@ -222,7 +222,7 @@ func MerkleFrom(data [][]byte) []byte {
 }
 
 func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
-	hash := sha256.New()
+	hash := sha3.NewLegacyKeccak256()
 
 	hash.Write(leafDomainSeparator[:])
 	hash.Write([]byte("SVM2AnyMessageHashV1"))
