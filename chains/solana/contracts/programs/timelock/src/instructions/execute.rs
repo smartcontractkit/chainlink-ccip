@@ -19,7 +19,7 @@ use crate::state::{Config, InstructionData, Operation};
 pub fn execute_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, ExecuteBatch<'info>>,
     timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; 32],
+    _id: [u8; HASH_BYTES],
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
 
@@ -93,7 +93,7 @@ pub fn execute_batch<'info>(
 pub fn bypasser_execute_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, BypasserExecuteBatch<'info>>,
     timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; 32],
+    _id: [u8; HASH_BYTES],
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
 
@@ -176,13 +176,14 @@ pub struct ExecuteBatch<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; 32], id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct BypasserExecuteBatch<'info> {
     #[account(
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
+        close = authority,
     )]
     pub operation: Account<'info, Operation>,
 

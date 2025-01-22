@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::keccak::HASH_BYTES;
 
 use access_controller::AccessController;
 
@@ -11,7 +12,7 @@ use crate::state::{Config, Operation};
 pub fn cancel<'info>(
     _ctx: Context<'_, '_, '_, 'info, Cancel<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    id: [u8; 32],
+    id: [u8; HASH_BYTES],
 ) -> Result<()> {
     emit!(Cancelled { id });
     // NOTE: PDA is closed - is handled by anchor on exit due to the `close` attribute
@@ -19,7 +20,7 @@ pub fn cancel<'info>(
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct Cancel<'info> {
     #[account(
         mut,

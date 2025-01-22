@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::keccak::HASH_BYTES;
 
 use access_controller::AccessController;
 
@@ -14,7 +15,7 @@ use crate::state::{Config, InstructionData, Operation};
 pub fn schedule_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, ScheduleBatch<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; 32],
+    _id: [u8; HASH_BYTES],
     delay: u64,
 ) -> Result<()> {
     // delay should greater than min_delay
@@ -70,8 +71,8 @@ pub fn schedule_batch<'info>(
 pub fn initialize_operation<'info>(
     ctx: Context<'_, '_, '_, 'info, InitializeOperation<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    id: [u8; 32],
-    predecessor: [u8; 32],
+    id: [u8; HASH_BYTES],
+    predecessor: [u8; HASH_BYTES],
     salt: [u8; 32],
     instruction_count: u32,
 ) -> Result<()> {
@@ -95,7 +96,7 @@ pub fn initialize_operation<'info>(
 pub fn append_instructions<'info>(
     ctx: Context<'_, '_, '_, 'info, AppendInstructions<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; 32],
+    _id: [u8; HASH_BYTES],
     instructions_batch: Vec<InstructionData>,
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
@@ -109,7 +110,7 @@ pub fn append_instructions<'info>(
 pub fn finalize_operation<'info>(
     ctx: Context<'_, '_, '_, 'info, FinalizeOperation<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; 32],
+    _id: [u8; HASH_BYTES],
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
     op.is_finalized = true;
@@ -120,7 +121,7 @@ pub fn finalize_operation<'info>(
 pub fn clear_operation(
     _ctx: Context<ClearOperation>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; 32],
+    _id: [u8; HASH_BYTES],
 ) -> Result<()> {
     // NOTE: ctx.accounts.operation is closed to be able to re-initialized,
     // also allow finalized operation to be cleared
@@ -128,7 +129,7 @@ pub fn clear_operation(
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct ScheduleBatch<'info> {
     #[account(
         mut,
@@ -152,9 +153,9 @@ pub struct ScheduleBatch<'info> {
 #[derive(Accounts)]
 #[instruction(
     timelock_id: [u8; TIMELOCK_ID_PADDED],
-    id: [u8; 32],
-    predecessor: [u8; 32],
-    salt: [u8; 32],
+    id: [u8; HASH_BYTES],
+    predecessor: [u8; HASH_BYTES],
+    salt: [u8; HASH_BYTES],
     instruction_count: u32,
 )]
 pub struct InitializeOperation<'info> {
@@ -181,7 +182,7 @@ pub struct InitializeOperation<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32], instructions_batch: Vec<InstructionData>)]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES], instructions_batch: Vec<InstructionData>)]
 pub struct AppendInstructions<'info> {
     #[account(
         mut,
@@ -216,7 +217,7 @@ pub struct AppendInstructions<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct FinalizeOperation<'info> {
     #[account(
         mut,
@@ -240,7 +241,7 @@ pub struct FinalizeOperation<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct ClearOperation<'info> {
     #[account(
         mut,
