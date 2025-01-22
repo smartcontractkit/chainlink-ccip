@@ -6,7 +6,7 @@ use anchor_spl::token_interface;
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
-    calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
+    calculate_token_pool_account_indices, interact_with_pool, transfer_token,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
 
@@ -49,7 +49,6 @@ pub fn get_fee<'info>(
         .collect::<Result<Vec<_>>>()?;
 
     Ok(fee_for_msg(
-        dest_chain_selector,
         message,
         &ctx.accounts.dest_chain_state,
         &ctx.accounts.billing_token_config.config,
@@ -109,7 +108,6 @@ pub fn ccip_send<'info>(
         .collect::<Result<Vec<_>>>()?;
 
     let fee = fee_for_msg(
-        dest_chain_selector,
         &message,
         dest_chain,
         &ctx.accounts.fee_token_config.config,
@@ -192,7 +190,8 @@ pub fn ccip_send<'info>(
         },
         extra_args,
         fee_token: message.fee_token,
-        fee_token_amount: fee.amount,
+        fee_token_amount: fee.amount.into(),
+        fee_value_juels: link_fee.amount.into(),
         token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count],
     };
 
@@ -300,7 +299,7 @@ fn token_transfer(
         source_pool_address,
         dest_token_address: lock_or_burn_out_data.dest_token_address,
         extra_data,
-        amount: u64_to_le_u256(token_amount.amount), // pool on receiver chain handles decimals
+        amount: token_amount.amount.into(), // pool on receiver chain handles decimals
         dest_exec_data,
     })
 }
@@ -345,7 +344,7 @@ fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraAr
 }
 
 fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
-    use anchor_lang::solana_program::hash;
+    use anchor_lang::solana_program::keccak;
 
     // Push Data Size to ensure that the hash is unique
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
@@ -356,9 +355,8 @@ fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
-    // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
     // similar to: https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L134
-    let result = hash::hashv(&[
+    let result = keccak::hashv(&[
         LEAF_DOMAIN_SEPARATOR.as_slice(),
         // metadata
         "SVM2AnyMessageHashV1".as_bytes(),
@@ -370,7 +368,11 @@ fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
         &header_sequence_number,
         &header_nonce,
         &msg.fee_token.to_bytes(),
-        &msg.fee_token_amount.to_be_bytes(),
+        // The cross-chain amounts are encoded in little endian, but
+        // this is irrelevant to the hashing function as long as both
+        // sides agree.
+        &msg.fee_token_amount.to_bytes(),
+        &msg.fee_value_juels.to_bytes(),
         // messaging
         &[msg.receiver.len() as u8],
         &msg.receiver,
@@ -460,6 +462,8 @@ mod validated_try_to {
 
 #[cfg(test)]
 mod tests {
+    use ethnum::U256;
+
     use super::super::{
         fee_quoter::tests::sample_additional_token, messages::ramps::tests::sample_dest_chain,
     };
@@ -489,7 +493,7 @@ mod tests {
                 allow_out_of_order_execution: true,
             },
             fee_token: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
-            fee_token_amount: 50,
+            fee_token_amount: 50u32.into(),
             token_amounts: [SVM2AnyTokenTransfer {
                 source_pool_address: Pubkey::try_from(
                     "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
@@ -497,16 +501,17 @@ mod tests {
                 .unwrap(),
                 dest_token_address: vec![0, 1, 2, 3],
                 extra_data: vec![4, 5, 6],
-                amount: [1; 32],
+                amount: U256::from_le_bytes([1; 32]).into(),
                 dest_exec_data: vec![4, 5, 6],
             }]
             .to_vec(),
+            fee_value_juels: 500u32.into(),
         };
 
         let hash_result = hash(&message);
 
         assert_eq!(
-            "df0890c0fb144ce4dee6556f2cd41382676f75e7292b61eca658b1d122a36f58",
+            "009bc51872fe41ea096bd881bf52e3daf07c80e112ffeeba6aa503d8281b6bfd",
             hex::encode(hash_result)
         );
     }

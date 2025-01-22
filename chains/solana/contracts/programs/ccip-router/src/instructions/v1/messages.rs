@@ -1,5 +1,8 @@
 pub mod pools {
-    use crate::{TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR, TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR};
+    use crate::{
+        CrossChainAmount, TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR,
+        TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR,
+    };
 
     use super::super::pools::ToTxData;
     use anchor_lang::prelude::*;
@@ -27,8 +30,8 @@ pub mod pools {
         pub original_sender: Vec<u8>, //          The original sender of the tx on the source chain
         pub remote_chain_selector: u64, // ─╮ The chain ID of the source chain
         pub receiver: Pubkey, // ───────────╯ The Token Associated Account that will receive the tokens on the destination chain.
-        pub amount: [u8; 32], // LE u256 amount - The amount of tokens to release or mint, denominated in the source token's decimals, pool expected to handle conversation to solana token specifics
-        pub local_token: Pubkey, //            The address of the Token Mint Account on SVM
+        pub amount: CrossChainAmount, // LE u256 amount - The amount of tokens to release or mint, denominated in the source token's decimals, pool expected to handle conversation to solana token specifics
+        pub local_token: Pubkey,      //            The address of the Token Mint Account on SVM
         /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
         /// expected pool address for the given remoteChainSelector.
         pub source_pool_address: Vec<u8>, //       The address bytes of the source pool
@@ -172,8 +175,8 @@ pub mod ramps {
         impl UnpackedDoubleU224 {
             pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
                 let mut value = [0u8; 28];
-                value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
-                value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                value[14..].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                value[..14].clone_from_slice(&self.high.to_be_bytes()[2..16]);
                 TimestampedPackedU224 { value, timestamp }
             }
         }

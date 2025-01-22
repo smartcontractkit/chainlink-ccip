@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -17,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -27,7 +30,11 @@ import (
 func (p *Plugin) Outcome(
 	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
-	p.lggr.Debugw("Execute plugin performing outcome",
+	// Ensure that sequence number is in the context for consumption by all
+	// downstream processors and the ccip reader.
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outctx.SeqNr, logutil.PhaseOutcome)
+
+	lggr.Debugw("Execute plugin performing outcome",
 		"outctx", outctx,
 		"query", query,
 		"attributedObservations", aos)
@@ -68,7 +75,7 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("destination chain %d is not in FChain", p.destChain)
 	}
 
-	observation, err := getConsensusObservation(p.lggr, decodedAos, p.destChain, p.reportingCfg.F, fChain)
+	observation, err := getConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
@@ -79,15 +86,15 @@ func (p *Plugin) Outcome(
 	case exectypes.GetCommitReports:
 		outcome = p.getCommitReportsOutcome(observation)
 	case exectypes.GetMessages:
-		outcome = p.getMessagesOutcome(observation)
+		outcome = p.getMessagesOutcome(lggr, observation)
 	case exectypes.Filter:
-		outcome, err = p.getFilterOutcome(ctx, observation, previousOutcome)
+		outcome, err = p.getFilterOutcome(ctx, lggr, observation, previousOutcome)
 	default:
 		panic("unknown state")
 	}
 
 	if err != nil {
-		p.lggr.Warnw(
+		lggr.Warnw(
 			fmt.Sprintf("[oracle %d] exec outcome error", p.reportingCfg.OracleID),
 			"err", err)
 		return nil, fmt.Errorf("unable to get outcome: %w", err)
@@ -96,7 +103,7 @@ func (p *Plugin) Outcome(
 	// This may happen if there is nothing to observe, or during startup when the contracts have
 	// been discovered. In the latter case, getCommitReportsOutcome will return an empty outcome.
 	if outcome.IsEmpty() {
-		p.lggr.Warnw(
+		lggr.Warnw(
 			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
 			"execPluginState", state)
 		if p.contractsInitialized {
@@ -106,7 +113,7 @@ func (p *Plugin) Outcome(
 	}
 
 	p.observer.TrackOutcome(outcome, state)
-	p.lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
+	lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
 
 	return outcome.Encode()
 }
@@ -127,6 +134,7 @@ func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exec
 }
 
 func (p *Plugin) getMessagesOutcome(
+	lggr logger.Logger,
 	observation exectypes.Observation,
 ) exectypes.Outcome {
 	commitReports := make([]exectypes.CommitData, 0)
@@ -137,11 +145,11 @@ func (p *Plugin) getMessagesOutcome(
 
 	// First ensure that all observed messages has hashes and token data.
 	if err := validateHashesExist(observation.Messages, observation.Hashes); err != nil {
-		p.lggr.Errorw("validate hashes exist: %w", err)
+		lggr.Errorw("validate hashes exist: %w", err)
 		return exectypes.Outcome{}
 	}
 	if err := validateTokenDataObservations(observation.Messages, observation.TokenData); err != nil {
-		p.lggr.Errorw("validate token data observations: %w", err)
+		lggr.Errorw("validate token data observations: %w", err)
 		return exectypes.Outcome{}
 	}
 
@@ -178,13 +186,14 @@ func (p *Plugin) getMessagesOutcome(
 
 func (p *Plugin) getFilterOutcome(
 	ctx context.Context,
+	lggr logger.Logger,
 	observation exectypes.Observation,
 	previousOutcome exectypes.Outcome,
 ) (exectypes.Outcome, error) {
 	commitReports := previousOutcome.CommitReports
 
 	builder := report.NewBuilder(
-		p.lggr,
+		lggr,
 		p.msgHasher,
 		p.reportCodec,
 		p.estimateProvider,
@@ -192,11 +201,13 @@ func (p *Plugin) getFilterOutcome(
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces)),
+		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
+		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),
 	)
 
-	outcomeReports, selectedReports, err := selectReport(
+	outcomeReports, selectedCommitReports, err := selectReport(
 		ctx,
-		p.lggr,
+		lggr,
 		commitReports,
 		builder)
 	if err != nil {
@@ -209,5 +220,5 @@ func (p *Plugin) getFilterOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.Filter, selectedReports, execReport), nil
+	return exectypes.NewOutcome(exectypes.Filter, selectedCommitReports, execReport), nil
 }

@@ -58,7 +58,7 @@ pub(super) struct TokenAccounts<'a> {
 }
 
 pub(super) fn validate_and_parse_token_accounts<'info>(
-    user: Pubkey,
+    token_receiver: Pubkey,
     chain_selector: u64,
     router: Pubkey,
     accounts: &'info [AccountInfo<'info>],
@@ -122,7 +122,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         require!(
             user_token_account.key()
                 == get_associated_token_address_with_program_id(
-                    &user,
+                    &token_receiver,
                     &mint.key(),
                     &token_program.key()
                 )
@@ -312,13 +312,6 @@ pub fn get_balance<'a>(token_account: &'a AccountInfo<'a>) -> Result<u64> {
     let mut acc: InterfaceAccount<TokenAccount> = InterfaceAccount::try_from(token_account)?;
     acc.reload()?; // reload state to ensure latest balance
     Ok(acc.amount)
-}
-
-// pack u64 into LE u256 for cross-chain amount
-pub fn u64_to_le_u256(v: u64) -> [u8; 32] {
-    let mut out: [u8; 32] = [0; 32];
-    out[..8].copy_from_slice(v.to_le_bytes().as_slice());
-    out
 }
 
 pub mod token_admin_registry_writable {

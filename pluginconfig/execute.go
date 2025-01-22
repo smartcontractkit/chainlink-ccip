@@ -3,6 +3,7 @@ package pluginconfig
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -33,13 +34,22 @@ type ExecuteOffchainConfig struct {
 	MessageVisibilityInterval commonconfig.Duration `json:"messageVisibilityInterval"`
 
 	// BatchingStrategyID is the strategy to use for batching messages.
+	// Deprecated: this is replaced by MaxReportMessages and MaxSingleChainReports.
 	BatchingStrategyID uint32 `json:"batchingStrategyID"`
 
 	// TokenDataObservers registers different strategies for processing token data.
 	TokenDataObservers []TokenDataObserverConfig `json:"tokenDataObservers"`
 
-	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
+	// TransmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
+
+	// MaxReportMessages is the maximum number of messages that can be included in a report.
+	// When set to 0, this setting is ignored.
+	MaxReportMessages uint64 `json:"maxReportMessages"`
+
+	// MaxSingleChainReports is the maximum number of single chain reports that can be included in a report.
+	// When set to 0, this setting is ignored.
+	MaxSingleChainReports uint64 `json:"maxSingleChainReports"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
@@ -81,7 +91,7 @@ func (e *ExecuteOffchainConfig) Validate() error {
 	}
 
 	if e.RelativeBoostPerWaitHour > 1 || e.RelativeBoostPerWaitHour < 0 {
-		return errors.New("RelativeBoostPerWaitHour must be <= 1 and >= 0")
+		return fmt.Errorf("RelativeBoostPerWaitHour must be <= 1 and >= 0, got: %f", e.RelativeBoostPerWaitHour)
 	}
 	set := make(map[string]struct{})
 	for _, ob := range e.TokenDataObservers {
