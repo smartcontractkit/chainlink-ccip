@@ -348,10 +348,10 @@ func selectReport(
 }
 
 func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
-	var ri cciptypes.ExecuteReportInfo
+	merkleRoots := []cciptypes.MerkleRootChain{}
 
 	for _, commitReport := range report.CommitReports {
-		ri = append(ri, cciptypes.MerkleRootChain{
+		merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 			ChainSel:      commitReport.SourceChain,
 			OnRampAddress: commitReport.OnRampAddress,
 			SeqNumsRange:  commitReport.SequenceNumberRange,
@@ -359,7 +359,10 @@ func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
 		})
 	}
 
-	return ri
+	return cciptypes.ExecuteReportInfo{
+		AbstractReports: report.Report.ChainReports,
+		MerkleRoots:     merkleRoots,
+	}
 }
 
 func (p *Plugin) Reports(
