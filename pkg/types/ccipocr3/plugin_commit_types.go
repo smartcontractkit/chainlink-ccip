@@ -1,6 +1,9 @@
 package ccipocr3
 
-import "bytes"
+import (
+	"bytes"
+	"fmt"
+)
 
 // CommitPluginReport contains the necessary information to commit CCIP
 // messages from potentially many source chains, to a single destination chain.
@@ -42,6 +45,12 @@ type MerkleRootChain struct {
 	OnRampAddress UnknownAddress `json:"onRampAddress"`
 	SeqNumsRange  SeqNumRange    `json:"seqNumsRange"`
 	MerkleRoot    Bytes32        `json:"merkleRoot"`
+}
+
+// String returns a string representation of the MerkleRootChain
+func (m MerkleRootChain) String() string {
+	return fmt.Sprintf("MerkleRoot(chain:%d, seqNumsRange:%s, merkleRoot:%s, onRamp:%s)",
+		m.ChainSel, m.SeqNumsRange, m.MerkleRoot, m.OnRampAddress)
 }
 
 func (m MerkleRootChain) Equals(other MerkleRootChain) bool {

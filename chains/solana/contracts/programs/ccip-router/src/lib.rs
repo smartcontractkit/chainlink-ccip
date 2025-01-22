@@ -683,4 +683,8 @@ pub enum CcipRouterError {
     MessageFeeTooHigh,
     #[msg("Source token data is too large")]
     SourceTokenDataTooLarge,
+    #[msg("Message gas limit too high")]
+    MessageGasLimitTooHigh,
+    #[msg("Extra arg out of order execution must be true")]
+    ExtraArgOutOfOrderExecutionMustBeTrue,
 }

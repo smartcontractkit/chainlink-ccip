@@ -2057,7 +2057,11 @@
             "type": "bytes"
           },
           {
-            "name": "receiver",
+            "name": "logicReceiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenReceiver",
             "type": "publicKey"
           },
           {
@@ -2769,6 +2773,12 @@
           },
           {
             "name": "SourceTokenDataTooLarge"
+          },
+          {
+            "name": "MessageGasLimitTooHigh"
+          },
+          {
+            "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
           }
         ]
       }

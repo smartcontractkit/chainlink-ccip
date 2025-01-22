@@ -89,15 +89,17 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 				1: {
 					{
 						MerkleRoot:          cciptypes.Bytes32{1},
-						SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 3},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+						Messages:            EmptyMessagesForRange(1, 3),
 					},
 				},
 				2: {
 					{
 						MerkleRoot:          cciptypes.Bytes32{2},
-						SequenceNumberRange: cciptypes.SeqNumRange{11, 20},
+						SequenceNumberRange: cciptypes.SeqNumRange{11, 15},
 						ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
+						Messages:            EmptyMessagesForRange(11, 15),
 					},
 				},
 			},
@@ -110,11 +112,13 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+						Messages:            EmptyMessagesForRange(1, 10),
 					},
 					{
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{11, 20},
 						ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
+						Messages:            EmptyMessagesForRange(11, 20),
 					},
 				},
 			},
@@ -128,11 +132,13 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+						Messages:            EmptyMessagesForRange(1, 10),
 					},
 					{
 						MerkleRoot:          cciptypes.Bytes32{2},
 						SequenceNumberRange: cciptypes.SeqNumRange{5, 15},
 						ExecutedMessages:    []cciptypes.SeqNum{6, 7, 8},
+						Messages:            EmptyMessagesForRange(5, 15),
 					},
 				},
 			},
@@ -146,6 +152,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 11},
+						Messages:            EmptyMessagesForRange(1, 10),
 					},
 				},
 			},
@@ -160,6 +167,21 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name:         "EmptyObservedData",
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{},
+		},
+		{
+			name: "Gap in Sequence Numbers",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 4},
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2},
+						// Missing message 4
+						Messages: EmptyMessagesForRange(1, 3),
+					},
+				},
+			},
+			expErr: true,
 		},
 	}
 
@@ -1233,6 +1255,54 @@ func Test_mergeCostlyMessages(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := mergeCostlyMessages(tt.aos, tt.fChainDest)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_allSeqNrsObserved(t *testing.T) {
+	tests := []struct {
+		name        string
+		msgs        []cciptypes.Message
+		numberRange cciptypes.SeqNumRange
+		want        bool
+	}{
+		{
+			name:        "all sequence numbers observed",
+			msgs:        EmptyMessagesForRange(1, 3),
+			numberRange: cciptypes.NewSeqNumRange(1, 3),
+			want:        true,
+		},
+		{
+			name:        "missing sequence number",
+			msgs:        []cciptypes.Message{EmptyMessagesForRange(1, 1)[0], EmptyMessagesForRange(3, 3)[0]},
+			numberRange: cciptypes.NewSeqNumRange(1, 3),
+			want:        false,
+		},
+		{
+			name:        "extra sequence number",
+			msgs:        EmptyMessagesForRange(1, 4),
+			numberRange: cciptypes.NewSeqNumRange(1, 3),
+			want:        false,
+		},
+		{
+			name:        "empty messages",
+			msgs:        []cciptypes.Message{},
+			numberRange: cciptypes.NewSeqNumRange(1, 3),
+			want:        false,
+		},
+		{
+			name:        "empty range",
+			msgs:        EmptyMessagesForRange(1, 4),
+			numberRange: cciptypes.NewSeqNumRange(0, 0),
+			want:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := msgsConformToSeqRange(tt.msgs, tt.numberRange); got != tt.want {
+				t.Errorf("msgsConformToSeqRange() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
