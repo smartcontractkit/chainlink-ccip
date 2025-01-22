@@ -418,7 +418,8 @@ type Any2SVMRampMessage struct {
 	Header        RampMessageHeader
 	Sender        []byte
 	Data          []byte
-	Receiver      ag_solanago.PublicKey
+	LogicReceiver ag_solanago.PublicKey
+	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
 	ExtraArgs     SVMExtraArgs
 	OnRampAddress []byte
@@ -440,8 +441,13 @@ func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	if err != nil {
 		return err
 	}
-	// Serialize `Receiver` param:
-	err = encoder.Encode(obj.Receiver)
+	// Serialize `LogicReceiver` param:
+	err = encoder.Encode(obj.LogicReceiver)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenReceiver` param:
+	err = encoder.Encode(obj.TokenReceiver)
 	if err != nil {
 		return err
 	}
@@ -479,8 +485,13 @@ func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Receiver`:
-	err = decoder.Decode(&obj.Receiver)
+	// Deserialize `LogicReceiver`:
+	err = decoder.Decode(&obj.LogicReceiver)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
 	if err != nil {
 		return err
 	}
