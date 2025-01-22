@@ -14,18 +14,17 @@ import (
 
 func DeployCCIPAndAddLanes(logger *zap.SugaredLogger, env config.DevspaceEnv, outputDir string) {
 	ctx := context.Background()
-	maybeGHAJWTToken := ""
 	var err error
 
 	if env.CIEnv {
-		maybeGHAJWTToken, err = gap.FetchJWTTokenForGAP(ctx)
+		_, err = gap.FetchJWTTokenForGAP(ctx)
 		if err != nil {
 			logger.Fatal("failed to fetch GA JWT", "error", err)
 			os.Exit(1)
 		}
 	}
 
-	envConfig, err := config.GetEnvConfig(env, maybeGHAJWTToken)
+	envConfig, err := config.GetEnvConfig(env)
 	if err != nil {
 		logger.Fatal("unable to deploy ccip and add lanes", "err", err)
 		os.Exit(1)

@@ -37,7 +37,7 @@ func testData() TestData {
 func TestGetEnvConfig(t *testing.T) {
 	t.Parallel()
 	env := testData().DevspaceEnv
-	config, err := GetEnvConfig(env, "")
+	config, err := GetEnvConfig(env)
 	require.NoError(t, err)
 	assert.NotNil(t, config)
 	assert.NotEmpty(t, config.Chains)
@@ -55,7 +55,7 @@ func TestGetEnvConfig_AdditionalChains(t *testing.T) {
 		AdditionalChainsCount: 2,
 	}
 
-	config, err := GetEnvConfig(env, "")
+	config, err := GetEnvConfig(env)
 	require.NoError(t, err)
 	assert.NotNil(t, config)
 	assert.Len(t, config.Chains, 4)

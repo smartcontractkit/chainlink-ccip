@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-func GetEnvConfig(env DevspaceEnv, ghaJWTTokenForGAP string) (*devenv.EnvironmentConfig, error) {
+func GetEnvConfig(env DevspaceEnv) (*devenv.EnvironmentConfig, error) {
 	chainConfigurers := getChainConfigurers(env)
 
 	chainConfigs := make([]devenv.ChainConfig, 0)
@@ -41,7 +41,6 @@ func GetEnvConfig(env DevspaceEnv, ghaJWTTokenForGAP string) (*devenv.Environmen
 			MinVersion: tls.VersionTLS12,
 		}),
 		NodeInfo: nodeInfos,
-		GAP:      ghaJWTTokenForGAP,
 	}
 
 	return &devenv.EnvironmentConfig{

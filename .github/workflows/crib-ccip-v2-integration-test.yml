@@ -7,6 +7,8 @@ on:
       - "dependencies/donut/**"
       - "dependencies/job-distributor/**"
       - "dependencies/geth/**"
+      - "dependencies/ccip-v2-scripts/**"
+      - "dependencies/postgres/**"
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
       # Exclude .gitignore

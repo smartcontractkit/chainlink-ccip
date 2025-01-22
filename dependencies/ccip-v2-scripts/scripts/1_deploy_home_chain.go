@@ -59,7 +59,7 @@ func (h HomeChainDeployer) Deploy() {
 
 	h.logger.Infow("debug token", "token", maybeGHAJWTToken)
 
-	envConfig, err := config.GetEnvConfig(h.env, maybeGHAJWTToken)
+	envConfig, err := config.GetEnvConfig(h.env)
 	if err != nil {
 		h.logger.Fatal(err)
 		os.Exit(1)
