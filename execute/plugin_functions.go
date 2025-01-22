@@ -121,21 +121,27 @@ func validateObservedSequenceNumbers(
 
 var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
 
+type reportAndRange struct {
+	cciptypes.SeqNumRange
+	reports []exectypes.CommitData
+}
+
 // computeRanges takes a slice of reports and computes the smallest number of contiguous ranges
 // that cover all the sequence numbers in the reports.
 // Note: reports need all messages to create a proof even if some are already executed.
-func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, error) {
-	var ranges []cciptypes.SeqNumRange
+func computeRanges(reports []exectypes.CommitData) ([]reportAndRange, error) {
+	var ranges []reportAndRange
 
 	if len(reports) == 0 {
 		return nil, nil
 	}
 
-	var seqRange cciptypes.SeqNumRange
+	var seqRange reportAndRange
 	for i, report := range reports {
 		if i == 0 {
 			// initialize
-			seqRange = cciptypes.NewSeqNumRange(report.SequenceNumberRange.Start(), report.SequenceNumberRange.End())
+			seqRange.SeqNumRange = cciptypes.NewSeqNumRange(report.SequenceNumberRange.Start(), report.SequenceNumberRange.End())
+			seqRange.reports = []exectypes.CommitData{report}
 		} else if seqRange.End()+1 == report.SequenceNumberRange.Start() {
 			// extend the contiguous range
 			seqRange.SetEnd(report.SequenceNumberRange.End())
@@ -145,7 +151,9 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 			ranges = append(ranges, seqRange)
 
 			// Reset the range.
-			seqRange = cciptypes.NewSeqNumRange(report.SequenceNumberRange.Start(), report.SequenceNumberRange.End())
+			seqRange = reportAndRange{}
+			seqRange.SeqNumRange = cciptypes.NewSeqNumRange(report.SequenceNumberRange.Start(), report.SequenceNumberRange.End())
+			seqRange.reports = []exectypes.CommitData{report}
 		}
 	}
 	// add final range
