@@ -198,7 +198,7 @@ func readAllMessages(
 		// Read messages for each range.
 		for _, report := range reports {
 			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
-			if err != nil || len(msgs) != report.SequenceNumberRange.Length() {
+			if err != nil || len(msgs) != report.SequenceNumberRange.Length() || gapInSequenceNumbers(msgs, report.SequenceNumberRange) {
 				lggr.Errorw("unable to read all messages for report",
 					"srcChain", srcChain,
 					"seqRange", report.SequenceNumberRange,
@@ -219,6 +219,22 @@ func readAllMessages(
 		}
 	}
 	return messageObs, availableReports, messageTimestamps
+}
+
+// gapInSequenceNumbers returns true if there is a gap messages sequence numbers.
+func gapInSequenceNumbers(msgs []cciptypes.Message, numberRange cciptypes.SeqNumRange) bool {
+	// Add msgs to a map to check for duplicates.
+	msgMap := make(map[cciptypes.SeqNum]struct{})
+	for _, msg := range msgs {
+		msgMap[msg.Header.SequenceNumber] = struct{}{}
+	}
+	// Check for gaps in sequence numbers.
+	for i := numberRange.Start(); i <= numberRange.End(); i++ {
+		if _, ok := msgMap[i]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Plugin) getMessagesObservation(

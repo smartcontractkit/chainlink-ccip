@@ -113,6 +113,19 @@ func validateObservedSequenceNumbers(
 					return fmt.Errorf("executed message %d not in observed range %v", seqNum, data.SequenceNumberRange)
 				}
 			}
+
+			// No gap in messages sequence numbers observed
+			// When there are no messages observed then it's okay to proceed as GetCommitReports state don't
+			// observe messages but only the merkle roots and sequence number ranges.
+			if len(data.Messages) != 0 && data.SequenceNumberRange.Length() != len(data.Messages) {
+				return fmt.Errorf("sequence number range %v has gaps", data.SequenceNumberRange)
+			}
+
+			for _, msg := range data.Messages {
+				if !data.SequenceNumberRange.Contains(msg.Header.SequenceNumber) {
+					return fmt.Errorf("message %d not in observed range %v for chain %d", msg.Header.SequenceNumber, data.SequenceNumberRange, data.SourceChain)
+				}
+			}
 		}
 	}
 

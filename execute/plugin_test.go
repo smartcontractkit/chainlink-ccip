@@ -268,8 +268,8 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	root := cciptypes.Bytes32{}
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
-			{MerkleRoot: root},
-			{MerkleRoot: root},
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2), Messages: EmptyMessagesForRange(1, 2)},
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 5), Messages: EmptyMessagesForRange(1, 5)},
 		},
 	}
 	observation := exectypes.NewObservation(
