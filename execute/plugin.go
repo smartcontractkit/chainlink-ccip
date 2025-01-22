@@ -219,7 +219,7 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
-	err = validateObservedSequenceNumbers(decodedObservation.CommitReports, decodedObservation.Messages)
+	err = validateObservedSequenceNumbers(decodedObservation.CommitReports)
 	if err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
@@ -230,6 +230,10 @@ func (p *Plugin) ValidateObservation(
 			return fmt.Errorf("validate observer reading eligibility: %w", err)
 		}
 
+		err = validateMessagesConformToCommitReports(decodedObservation.CommitReports, decodedObservation.Messages)
+		if err != nil {
+			return fmt.Errorf("validate messages conform to commit reports: %w", err)
+		}
 		if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
 			return fmt.Errorf("validate hashes exist: %w", err)
 		}

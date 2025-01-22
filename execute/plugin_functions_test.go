@@ -81,7 +81,6 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
 		name         string
 		observedData map[cciptypes.ChainSelector][]exectypes.CommitData
-		observedMsgs exectypes.MessageObservations
 		expErr       bool
 	}{
 		{
@@ -162,6 +161,37 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 			name:         "EmptyObservedData",
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{},
 		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateObservedSequenceNumbers(tc.observedData)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func Test_validateMessagesConformToCommitReports(t *testing.T) {
+	testCases := []struct {
+		name         string
+		observedData map[cciptypes.ChainSelector][]exectypes.CommitData
+		observedMsgs exectypes.MessageObservations
+		expErr       bool
+	}{
+		{
+			name: "NoCommitData",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {},
+			},
+		},
+		{
+			name:         "EmptyObservedData",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{},
+		},
 		// Tests with messages
 		{
 			name: "Gap in Sequence Numbers",
@@ -207,7 +237,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedSequenceNumbers(tc.observedData, tc.observedMsgs)
+			err := validateMessagesConformToCommitReports(tc.observedData, tc.observedMsgs)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -216,7 +246,6 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		})
 	}
 }
-
 func Test_computeRanges(t *testing.T) {
 	type args struct {
 		reports []exectypes.CommitData

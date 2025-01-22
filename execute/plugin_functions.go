@@ -100,11 +100,45 @@ func validateHashesExist(
 	return nil
 }
 
+func validateMessagesConformToCommitReports(
+	observedData exectypes.CommitObservations,
+	observedMsgs exectypes.MessageObservations,
+) error {
+	msgsCount := 0
+	for chain, report := range observedData {
+		for _, data := range report {
+			msgsMap, ok := observedMsgs[chain]
+			if !ok {
+				return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
+			}
+			msgs := make([]cciptypes.Message, 0, len(msgsMap))
+			for _, msg := range msgsMap {
+				msgs = append(msgs, msg)
+			}
+			if !msgsConformToSeqRange(msgs, data.SequenceNumberRange) {
+				return fmt.Errorf("messages don't conform to sequence numbers observed for chain %d, "+
+					"sequence numbers: %v",
+					data.SourceChain,
+					data.SequenceNumberRange,
+				)
+			}
+			msgsCount += len(msgs)
+		}
+	}
+	allMsgs := observedMsgs.Flatten()
+	// need to make sure that only messages that are in the commit reports are observed
+	if msgsCount != len(allMsgs) {
+		return fmt.Errorf("messages observed %d do not match the messages in the commit reports %d",
+			len(allMsgs), msgsCount)
+	}
+
+	return nil
+}
+
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain
 // and that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(
 	observedData map[cciptypes.ChainSelector][]exectypes.CommitData,
-	observedMsgs exectypes.MessageObservations,
 ) error {
 	for _, commitData := range observedData {
 		// observed commitData must not contain duplicates
@@ -131,25 +165,6 @@ func validateObservedSequenceNumbers(
 				if !data.SequenceNumberRange.Contains(seqNum) {
 					return fmt.Errorf("executed message %d not in observed range %v", seqNum, data.SequenceNumberRange)
 				}
-			}
-
-			// When there are no messages observed then it's okay to proceed as GetCommitReports state don't
-			// observe messages but only the merkle roots and sequence number ranges.
-			_, ok := observedMsgs[data.SourceChain]
-			if !ok || len(observedMsgs[data.SourceChain]) == 0 {
-				continue
-			}
-
-			msgs := make([]cciptypes.Message, 0, len(observedMsgs[data.SourceChain]))
-			for _, msg := range observedMsgs[data.SourceChain] {
-				msgs = append(msgs, msg)
-			}
-			if !msgsConformToSeqRange(msgs, data.SequenceNumberRange) {
-				return fmt.Errorf("messages don't conform to sequence numbers observed for chain %d, "+
-					"sequence numbers: %v",
-					data.SourceChain,
-					data.SequenceNumberRange,
-				)
 			}
 		}
 	}
