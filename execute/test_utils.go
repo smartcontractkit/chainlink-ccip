@@ -543,3 +543,16 @@ func EmptyMessagesForRange(start, end uint64) []cciptypes.Message {
 	}
 	return messages
 }
+
+func EmptyMessagesMapForRange(start, end uint64) map[cciptypes.SeqNum]cciptypes.Message {
+	messages := make(map[cciptypes.SeqNum]cciptypes.Message)
+	for i := start; i <= end; i++ {
+		messages[cciptypes.SeqNum(i)] = cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:      cciptypes.Bytes32{byte(i)},
+				SequenceNumber: cciptypes.SeqNum(i),
+			},
+		}
+	}
+	return messages
+}

@@ -81,6 +81,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
 		name         string
 		observedData map[cciptypes.ChainSelector][]exectypes.CommitData
+		observedMsgs exectypes.MessageObservations
 		expErr       bool
 	}{
 		{
@@ -91,7 +92,6 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{1, 3},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
-						Messages:            EmptyMessagesForRange(1, 3),
 					},
 				},
 				2: {
@@ -99,7 +99,6 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{2},
 						SequenceNumberRange: cciptypes.SeqNumRange{11, 15},
 						ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
-						Messages:            EmptyMessagesForRange(11, 15),
 					},
 				},
 			},
@@ -112,13 +111,11 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
-						Messages:            EmptyMessagesForRange(1, 10),
 					},
 					{
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{11, 20},
 						ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
-						Messages:            EmptyMessagesForRange(11, 20),
 					},
 				},
 			},
@@ -132,13 +129,11 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
-						Messages:            EmptyMessagesForRange(1, 10),
 					},
 					{
 						MerkleRoot:          cciptypes.Bytes32{2},
 						SequenceNumberRange: cciptypes.SeqNumRange{5, 15},
 						ExecutedMessages:    []cciptypes.SeqNum{6, 7, 8},
-						Messages:            EmptyMessagesForRange(5, 15),
 					},
 				},
 			},
@@ -152,7 +147,6 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 11},
-						Messages:            EmptyMessagesForRange(1, 10),
 					},
 				},
 			},
@@ -168,6 +162,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 			name:         "EmptyObservedData",
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{},
 		},
+		// Tests with messages
 		{
 			name: "Gap in Sequence Numbers",
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
@@ -176,18 +171,43 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 						MerkleRoot:          cciptypes.Bytes32{1},
 						SequenceNumberRange: cciptypes.SeqNumRange{1, 4},
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2},
-						// Missing message 4
-						Messages: EmptyMessagesForRange(1, 3),
+						SourceChain:         1,
 					},
 				},
 			},
+			observedMsgs: exectypes.MessageObservations{
+				1: EmptyMessagesMapForRange(1, 3),
+			},
 			expErr: true,
+		},
+		{
+			name: "ValidData with messages",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 3},
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+					},
+				},
+				2: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{2},
+						SequenceNumberRange: cciptypes.SeqNumRange{11, 15},
+						ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
+					},
+				},
+			},
+			observedMsgs: exectypes.MessageObservations{
+				1: EmptyMessagesMapForRange(1, 3),
+				2: EmptyMessagesMapForRange(11, 15),
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedSequenceNumbers(tc.observedData)
+			err := validateObservedSequenceNumbers(tc.observedData, tc.observedMsgs)
 			if tc.expErr {
 				assert.Error(t, err)
 				return

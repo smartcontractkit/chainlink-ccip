@@ -86,6 +86,7 @@ func validateHashesExist(
 // and that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(
 	observedData map[cciptypes.ChainSelector][]exectypes.CommitData,
+	observedMsgs exectypes.MessageObservations,
 ) error {
 	for _, commitData := range observedData {
 		// observed commitData must not contain duplicates
@@ -114,12 +115,18 @@ func validateObservedSequenceNumbers(
 				}
 			}
 
-			// no need to check for missing sequence numbers in the observed messages
-			if len(data.Messages) == 0 {
+			// When there are no messages observed then it's okay to proceed as GetCommitReports state don't
+			// observe messages but only the merkle roots and sequence number ranges.
+			_, ok := observedMsgs[data.SourceChain]
+			if !ok || len(observedMsgs[data.SourceChain]) == 0 {
 				continue
 			}
 
-			if !msgsConformToSeqRange(data.Messages, data.SequenceNumberRange) {
+			msgs := make([]cciptypes.Message, 0, len(observedMsgs[data.SourceChain]))
+			for _, msg := range observedMsgs[data.SourceChain] {
+				msgs = append(msgs, msg)
+			}
+			if !msgsConformToSeqRange(msgs, data.SequenceNumberRange) {
 				return fmt.Errorf("messages don't conform to sequence numbers observed for chain %d, "+
 					"sequence numbers: %v",
 					data.SourceChain,

@@ -196,7 +196,8 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observer reading eligibility: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
+	err = validateObservedSequenceNumbers(decodedObservation.CommitReports, decodedObservation.Messages)
+	if err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
