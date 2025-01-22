@@ -45,12 +45,32 @@ func Test_validateObservedMerkleRoots(t *testing.T) {
 		{
 			name: "Valid offRampMaxSeqNums",
 			merkleRoots: []cciptypes.MerkleRootChain{
-				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}},
-				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}},
+				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}, OnRampAddress: []byte{1}},
+				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 24}, MerkleRoot: [32]byte{1, 2, 3}, OnRampAddress: []byte{2}},
 			},
 			observer:                10,
 			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
 			expErr:                  false,
+		},
+		{
+			name: "Missing OnRampAddress",
+			merkleRoots: []cciptypes.MerkleRootChain{
+				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}, OnRampAddress: []byte{1}},
+				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}, OnRampAddress: []byte{}},
+			},
+			observer:                10,
+			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
+			expErr:                  true,
+		},
+		{
+			name: "SeqNums range invalid",
+			merkleRoots: []cciptypes.MerkleRootChain{
+				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 9}, MerkleRoot: [32]byte{1, 2, 3}, OnRampAddress: []byte{1}},
+				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}, OnRampAddress: []byte{2}},
+			},
+			observer:                10,
+			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
+			expErr:                  true,
 		},
 	}
 
@@ -106,6 +126,26 @@ func Test_validateObservedOnRampMaxSeqNums(t *testing.T) {
 			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
 			expErr:                  false,
 		},
+		{
+			name: "Invalid if SeqNum is 0",
+			onRampMaxSeqNums: []plugintypes.SeqNumChain{
+				{ChainSel: 1, SeqNum: 0},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			observer:                10,
+			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
+			expErr:                  true,
+		},
+		{
+			name: "Invalid if chain is 0",
+			onRampMaxSeqNums: []plugintypes.SeqNumChain{
+				{ChainSel: 0, SeqNum: 123},
+				{ChainSel: 2, SeqNum: 20},
+			},
+			observer:                10,
+			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
+			expErr:                  true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -159,6 +199,26 @@ func Test_validateObservedOffRampMaxSeqNums(t *testing.T) {
 			observer:          10,
 			supportsDestChain: true,
 			expErr:            false,
+		},
+		{
+			name: "Invalid if SeqNum is 0",
+			offRampMaxSeqNums: []plugintypes.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 2, SeqNum: 0},
+			},
+			observer:          10,
+			supportsDestChain: true,
+			expErr:            true,
+		},
+		{
+			name: "Invalid if Chain is 0",
+			offRampMaxSeqNums: []plugintypes.SeqNumChain{
+				{ChainSel: 1, SeqNum: 10},
+				{ChainSel: 0, SeqNum: 123},
+			},
+			observer:          10,
+			supportsDestChain: true,
+			expErr:            true,
 		},
 	}
 
