@@ -1,5 +1,11 @@
 # @chainlink/crib
 
+## 2.2.0
+
+### Minor Changes
+
+- [#366](https://github.com/smartcontractkit/crib/pull/366) [`69d0372`](https://github.com/smartcontractkit/crib/commit/69d0372b8455dc7a24c2bbc77908a698d65f543a) Thanks [@scheibinger](https://github.com/scheibinger)! - Sync ccip-v2 setup with updated code for Load testing. Null out GAPConfig, as we'll rely on proxy"
+
 ## 2.1.0
 
 ### Minor Changes
