@@ -189,8 +189,8 @@ pub mod ramps {
         impl UnpackedDoubleU224 {
             pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
                 let mut value = [0u8; 28];
-                value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
-                value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                value[14..].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                value[..14].clone_from_slice(&self.high.to_be_bytes()[2..16]);
                 TimestampedPackedU224 { value, timestamp }
             }
         }
