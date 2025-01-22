@@ -530,3 +530,16 @@ func (t *timeMachine) Now() time.Time {
 func (t *timeMachine) SetNow(now time.Time) {
 	t.now = now
 }
+
+func EmptyMessagesForRange(start, end uint64) []cciptypes.Message {
+	messages := make([]cciptypes.Message, end-start+1)
+	for i := start; i <= end; i++ {
+		messages[i-start] = cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:      cciptypes.Bytes32{byte(i)},
+				SequenceNumber: cciptypes.SeqNum(i),
+			},
+		}
+	}
+	return messages
+}

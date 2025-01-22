@@ -113,10 +113,42 @@ func validateObservedSequenceNumbers(
 					return fmt.Errorf("executed message %d not in observed range %v", seqNum, data.SequenceNumberRange)
 				}
 			}
+
+			// no need to check for missing sequence numbers in the observed messages
+			if len(data.Messages) == 0 {
+				continue
+			}
+
+			if !msgsConformToSeqRange(data.Messages, data.SequenceNumberRange) {
+				return fmt.Errorf("messages don't conform to sequence numbers observed for chain %d, "+
+					"sequence numbers: %v",
+					data.SourceChain,
+					data.SequenceNumberRange,
+				)
+			}
 		}
 	}
 
 	return nil
+}
+
+// msgsConformToSeqRange returns true if all sequence numbers in the range are observed in the messages.
+// messages should map exactly one message to each sequence number in the range with no missing sequence numbers.
+func msgsConformToSeqRange(msgs []cciptypes.Message, numberRange cciptypes.SeqNumRange) bool {
+	msgMap := make(map[cciptypes.SeqNum]struct{})
+	for _, msg := range msgs {
+		msgMap[msg.Header.SequenceNumber] = struct{}{}
+	}
+	if len(msgMap) != numberRange.Length() {
+		return false
+	}
+	// Check for missing sequence numbers in observed messages.
+	for i := numberRange.Start(); i <= numberRange.End(); i++ {
+		if _, ok := msgMap[i]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
