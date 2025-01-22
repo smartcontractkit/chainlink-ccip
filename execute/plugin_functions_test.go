@@ -66,7 +66,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObserverReadingEligibility(tc.observerCfg, tc.observedMsgs)
+			err := validateMsgsReadingEligibility(tc.observerCfg, tc.observedMsgs)
 			if len(tc.expErr) != 0 {
 				assert.Error(t, err)
 				assert.ErrorContains(t, err, tc.expErr)

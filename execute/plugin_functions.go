@@ -20,8 +20,26 @@ import (
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-// validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
-func validateObserverReadingEligibility(
+func validateCommitReportsReadingEligibility(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	observedData exectypes.CommitObservations,
+) error {
+	for chainSel := range observedData {
+		if !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
+		}
+		for _, data := range observedData[chainSel] {
+			if data.SourceChain != chainSel {
+				return fmt.Errorf("observer not allowed to read from chain %d", data.SourceChain)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateMsgsReadingEligibility checks if the observer is eligible to observe the messages it observed.
+func validateMsgsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedMsgs exectypes.MessageObservations,
 ) error {

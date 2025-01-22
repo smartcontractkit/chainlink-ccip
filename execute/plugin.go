@@ -186,14 +186,37 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("unable to decode observation: %w", err)
 	}
 
+	var previousOutcome exectypes.Outcome
+
+	previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
+	if err != nil {
+		return fmt.Errorf("unable to decode previous outcome: %w", err)
+	}
+
 	supportedChains, err := p.supportedChains(ao.Observer)
 	if err != nil {
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	err = validateObserverReadingEligibility(supportedChains, decodedObservation.Messages)
+	state := previousOutcome.State.Next()
+	if state == exectypes.Initialized || state == exectypes.GetCommitReports {
+		if len(decodedObservation.Messages) > 0 {
+			return fmt.Errorf("messages are not expected in initial or GetCommitRerports states")
+		}
+		if len(decodedObservation.TokenData) > 0 {
+			return fmt.Errorf("token data is not expected in initial or GetCommitRerports states")
+		}
+		if len(decodedObservation.CostlyMessages) > 0 {
+			return fmt.Errorf("costly messages are not expected in initial or GetCommitRerports states")
+		}
+		if len(decodedObservation.Hashes) > 0 {
+			return fmt.Errorf("hashes are not expected in initial or GetCommitRerports states")
+		}
+	}
+
+	err = validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports)
 	if err != nil {
-		return fmt.Errorf("validate observer reading eligibility: %w", err)
+		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
 	err = validateObservedSequenceNumbers(decodedObservation.CommitReports, decodedObservation.Messages)
@@ -201,12 +224,19 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
-	if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
-		return fmt.Errorf("validate hashes exist: %w", err)
-	}
+	if state == exectypes.GetMessages || state == exectypes.Filter {
+		err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages)
+		if err != nil {
+			return fmt.Errorf("validate observer reading eligibility: %w", err)
+		}
 
-	if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
-		return fmt.Errorf("validate token data observations: %w", err)
+		if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
+			return fmt.Errorf("validate hashes exist: %w", err)
+		}
+
+		if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
+			return fmt.Errorf("validate token data observations: %w", err)
+		}
 	}
 
 	return nil
