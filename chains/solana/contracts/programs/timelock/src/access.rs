@@ -12,18 +12,6 @@ use crate::state::{Config, Role};
 /// * `$ctx` - The context containing program accounts
 /// * `$role` - One or more roles that are allowed to execute the instruction
 ///
-/// # Examples
-/// ```rust
-/// #[access_control(require_role_or_admin!(ctx, Role::Proposer))]
-/// pub fn single_role_instruction(ctx: Context<...>) -> Result<()> {
-///     // ...
-/// }
-///
-/// #[access_control(require_role_or_admin!(ctx, Role::Proposer, Role::Bypasser))]
-/// pub fn multi_role_instruction(ctx: Context<...>) -> Result<()> {
-///     // ...
-/// }
-/// ```
 #[macro_export]
 macro_rules! require_role_or_admin {
     ($ctx:expr, $($role:expr),+) => {{
@@ -81,14 +69,6 @@ pub fn only_role_or_admin(
 ///
 /// # Arguments
 /// * `$ctx` - The context containing program accounts
-///
-/// # Examples
-/// ```rust
-/// #[access_control(require_only_admin!(ctx))]
-/// pub fn admin_only_instruction(ctx: Context<...>) -> Result<()> {
-///     // ...
-/// }
-/// ```
 #[macro_export]
 macro_rules! require_only_admin {
     ($ctx:expr) => {
