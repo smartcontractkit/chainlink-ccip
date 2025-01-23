@@ -2773,6 +2773,12 @@
           },
           {
             "name": "SourceTokenDataTooLarge"
+          },
+          {
+            "name": "MessageGasLimitTooHigh"
+          },
+          {
+            "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
           }
         ]
       }

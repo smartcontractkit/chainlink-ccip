@@ -68,13 +68,34 @@ func validateObservedMerkleRoots(
 	seenChains := mapset.NewSet[cciptypes.ChainSelector]()
 	for _, root := range merkleRoots {
 		if !observerSupportedChains.Contains(root.ChainSel) {
-			return fmt.Errorf("found merkle root for chain %d, but this chain is not supported by Observer %d",
-				root.ChainSel, observer)
+			return fmt.Errorf("%s invalid: observed chain not supported by Observer %d",
+				root, observer)
 		}
 
 		if seenChains.Contains(root.ChainSel) {
-			return fmt.Errorf("duplicate merkle root for chain %d", root.ChainSel)
+			return fmt.Errorf("%s invalid: chain already appears in another observed root", root)
 		}
+
+		if len(root.OnRampAddress) == 0 {
+			return fmt.Errorf("%s invalid: empty OnRampAddress", root)
+		}
+
+		if root.MerkleRoot.IsEmpty() {
+			return fmt.Errorf("%s invalid: empty MerkleRoot", root)
+		}
+
+		if root.SeqNumsRange.Start() == cciptypes.SeqNum(0) {
+			return fmt.Errorf("%s invalid: start seq num is 0", root)
+		}
+
+		if root.SeqNumsRange.End() == cciptypes.SeqNum(0) {
+			return fmt.Errorf("%s invalid: end seq num is 0", root)
+		}
+
+		if root.SeqNumsRange.End() < root.SeqNumsRange.Start() {
+			return fmt.Errorf("%s invalid: end seq num is less than start seq num", root)
+		}
+
 		seenChains.Add(root.ChainSel)
 	}
 
@@ -101,6 +122,11 @@ func validateObservedOnRampMaxSeqNums(
 		if seenChains.Contains(seqNumChain.ChainSel) {
 			return fmt.Errorf("duplicate onRampMaxSeqNum for chain %d", seqNumChain.ChainSel)
 		}
+
+		if seqNumChain.ChainSel == 0 {
+			return fmt.Errorf("onRampMaxSeqNum for chain %d has chain selector 0", seqNumChain.ChainSel)
+		}
+
 		seenChains.Add(seqNumChain.ChainSel)
 	}
 
@@ -126,6 +152,15 @@ func validateObservedOffRampMaxSeqNums(
 		if seenChains.Contains(seqNumChain.ChainSel) {
 			return fmt.Errorf("duplicate offRampMaxSeqNum for chain %d", seqNumChain.ChainSel)
 		}
+
+		if seqNumChain.SeqNum == 0 {
+			return fmt.Errorf("offRampMaxSeqNum for chain %d is 0", seqNumChain.ChainSel)
+		}
+
+		if seqNumChain.ChainSel == 0 {
+			return fmt.Errorf("offRampMaxSeqNum for chain %d has chain selector 0", seqNumChain.ChainSel)
+		}
+
 		seenChains.Add(seqNumChain.ChainSel)
 	}
 

@@ -120,6 +120,20 @@ pub mod ramps {
             CcipRouterError::UnsupportedNumberOfTokens
         );
 
+        require_gte!(
+            dest_chain.config.max_per_msg_gas_limit as u128,
+            msg.extra_args
+                .gas_limit
+                .unwrap_or(dest_chain.config.default_tx_gas_limit as u128),
+            CcipRouterError::MessageGasLimitTooHigh,
+        );
+
+        require!(
+            !dest_chain.config.enforce_out_of_order
+                || msg.extra_args.allow_out_of_order_execution.unwrap_or(false),
+            CcipRouterError::ExtraArgOutOfOrderExecutionMustBeTrue,
+        );
+
         validate_dest_family_address(msg, dest_chain.config.chain_family_selector)
     }
 
