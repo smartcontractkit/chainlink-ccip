@@ -758,7 +758,6 @@ func Test_getConsensusObservation(t *testing.T) {
 	type args struct {
 		observation []exectypes.Observation
 		F           int
-		fChain      map[cciptypes.ChainSelector]int
 	}
 	dstChain := cciptypes.ChainSelector(1)
 	defaultFChain := map[cciptypes.ChainSelector]int{
