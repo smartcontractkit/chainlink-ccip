@@ -178,7 +178,6 @@ func getPendingExecutedReports(
 	return groupedCommits, nil
 }
 
-//nolint:gocyclo
 func (p *Plugin) ValidateObservation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
@@ -201,20 +200,18 @@ func (p *Plugin) ValidateObservation(
 
 	state := previousOutcome.State.Next()
 	if state == exectypes.Initialized || state == exectypes.GetCommitReports {
-		if len(decodedObservation.Messages) > 0 {
-			return fmt.Errorf("messages are not expected in initial or GetCommitRerports states")
-		}
-		if len(decodedObservation.TokenData) > 0 {
-			return fmt.Errorf("token data is not expected in initial or GetCommitRerports states")
-		}
-		if len(decodedObservation.CostlyMessages) > 0 {
-			return fmt.Errorf("costly messages are not expected in initial or GetCommitRerports states")
-		}
-		if len(decodedObservation.Hashes) > 0 {
-			return fmt.Errorf("hashes are not expected in initial or GetCommitRerports states")
+		err = validateNoMessageRelatedObservations(
+			decodedObservation.Messages,
+			decodedObservation.TokenData,
+			decodedObservation.Hashes,
+			decodedObservation.CostlyMessages,
+		)
+		if err != nil {
+			return err
 		}
 	}
 
+	// These checks are common to all states.
 	err = validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports)
 	if err != nil {
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
@@ -232,22 +229,62 @@ func (p *Plugin) ValidateObservation(
 			return fmt.Errorf("validate observer reading eligibility: %w", err)
 		}
 
-		err = validateMessagesConformToCommitReports(decodedObservation.CommitReports, decodedObservation.Messages)
+		err = validateMessagesRelatedObservations(
+			decodedObservation.CommitReports,
+			decodedObservation.Messages,
+			decodedObservation.TokenData,
+			decodedObservation.Hashes,
+			decodedObservation.CostlyMessages,
+		)
 		if err != nil {
-			return fmt.Errorf("validate messages conform to commit reports: %w", err)
+			return err
 		}
-		if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
-			return fmt.Errorf("validate hashes exist: %w", err)
-		}
+	}
 
-		if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
-			return fmt.Errorf("validate token data observations: %w", err)
-		}
+	return nil
+}
 
-		err = validateCostlyMessagesObservations(decodedObservation.Messages, decodedObservation.CostlyMessages)
-		if err != nil {
-			return fmt.Errorf("validate costly messages: %w", err)
-		}
+func validateNoMessageRelatedObservations(
+	messages exectypes.MessageObservations,
+	tokenData exectypes.TokenDataObservations,
+	hashes exectypes.MessageHashes,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+	if len(messages) > 0 {
+		return fmt.Errorf("messages are not expected in initial or GetCommitRerports states")
+	}
+	if len(tokenData) > 0 {
+		return fmt.Errorf("token data is not expected in initial or GetCommitRerports states")
+	}
+	if len(costlyMessages) > 0 {
+		return fmt.Errorf("costly messages are not expected in initial or GetCommitRerports states")
+	}
+	if len(hashes) > 0 {
+		return fmt.Errorf("hashes are not expected in initial or GetCommitRerports states")
+	}
+
+	return nil
+}
+
+func validateMessagesRelatedObservations(
+	commitReports exectypes.CommitObservations,
+	messages exectypes.MessageObservations,
+	tokenData exectypes.TokenDataObservations,
+	hashes exectypes.MessageHashes,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+
+	if err := validateMessagesConformToCommitReports(commitReports, messages); err != nil {
+		return fmt.Errorf("validate messages conform to commit reports: %w", err)
+	}
+	if err := validateHashesExist(messages, hashes); err != nil {
+		return fmt.Errorf("validate hashes exist: %w", err)
+	}
+	if err := validateTokenDataObservations(messages, tokenData); err != nil {
+		return fmt.Errorf("validate token data observations: %w", err)
+	}
+	if err := validateCostlyMessagesObservations(messages, costlyMessages); err != nil {
+		return fmt.Errorf("validate costly messages: %w", err)
 	}
 
 	return nil

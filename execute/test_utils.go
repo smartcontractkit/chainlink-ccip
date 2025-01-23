@@ -531,7 +531,7 @@ func (t *timeMachine) SetNow(now time.Time) {
 	t.now = now
 }
 
-func EmptyMessagesForRange(start, end uint64) []cciptypes.Message {
+func emptyMessagesForRange(start, end uint64) []cciptypes.Message {
 	messages := make([]cciptypes.Message, end-start+1)
 	for i := start; i <= end; i++ {
 		messages[i-start] = cciptypes.Message{
@@ -544,7 +544,7 @@ func EmptyMessagesForRange(start, end uint64) []cciptypes.Message {
 	return messages
 }
 
-func EmptyMessagesMapForRange(start, end uint64) map[cciptypes.SeqNum]cciptypes.Message {
+func emptyMessagesMapForRange(start, end uint64) map[cciptypes.SeqNum]cciptypes.Message {
 	messages := make(map[cciptypes.SeqNum]cciptypes.Message)
 	for i := start; i <= end; i++ {
 		messages[cciptypes.SeqNum(i)] = cciptypes.Message{
@@ -557,7 +557,7 @@ func EmptyMessagesMapForRange(start, end uint64) map[cciptypes.SeqNum]cciptypes.
 	return messages
 }
 
-func EmptyMessagesMapForRanges(ranges []cciptypes.SeqNumRange) map[cciptypes.SeqNum]cciptypes.Message {
+func emptyMessagesMapForRanges(ranges []cciptypes.SeqNumRange) map[cciptypes.SeqNum]cciptypes.Message {
 	messages := make(map[cciptypes.SeqNum]cciptypes.Message)
 	for _, r := range ranges {
 		for i := r.Start(); i <= r.End(); i++ {

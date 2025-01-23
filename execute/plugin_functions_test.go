@@ -206,7 +206,7 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 				},
 			},
 			observedMsgs: exectypes.MessageObservations{
-				1: EmptyMessagesMapForRanges([]cciptypes.SeqNumRange{{1, 2}, {5, 10}}),
+				1: emptyMessagesMapForRanges([]cciptypes.SeqNumRange{{1, 2}, {5, 10}}),
 			},
 			expErr: true,
 		},
@@ -229,8 +229,8 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 				},
 			},
 			observedMsgs: exectypes.MessageObservations{
-				1: EmptyMessagesMapForRange(1, 3),
-				2: EmptyMessagesMapForRange(11, 15),
+				1: emptyMessagesMapForRange(1, 3),
+				2: emptyMessagesMapForRange(11, 15),
 			},
 		},
 		{
@@ -253,7 +253,7 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 				},
 			},
 			observedMsgs: exectypes.MessageObservations{
-				1: EmptyMessagesMapForRanges([]cciptypes.SeqNumRange{{1, 3}, {4, 6}, {8, 10}}),
+				1: emptyMessagesMapForRanges([]cciptypes.SeqNumRange{{1, 3}, {4, 6}, {8, 10}}),
 			},
 		},
 		{
@@ -267,7 +267,7 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 				},
 			},
 			observedMsgs: exectypes.MessageObservations{
-				1: EmptyMessagesMapForRange(1, 4),
+				1: emptyMessagesMapForRange(1, 4),
 			},
 			expErr: true,
 		},
@@ -282,7 +282,7 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 				},
 			},
 			observedMsgs: exectypes.MessageObservations{
-				1: EmptyMessagesMapForRange(1, 2),
+				1: emptyMessagesMapForRange(1, 2),
 			},
 			expErr: true,
 		},
@@ -1370,19 +1370,19 @@ func Test_allSeqNrsObserved(t *testing.T) {
 	}{
 		{
 			name:        "all sequence numbers observed",
-			msgs:        EmptyMessagesForRange(1, 3),
+			msgs:        emptyMessagesForRange(1, 3),
 			numberRange: cciptypes.NewSeqNumRange(1, 3),
 			want:        true,
 		},
 		{
 			name:        "missing sequence number",
-			msgs:        []cciptypes.Message{EmptyMessagesForRange(1, 1)[0], EmptyMessagesForRange(3, 3)[0]},
+			msgs:        []cciptypes.Message{emptyMessagesForRange(1, 1)[0], emptyMessagesForRange(3, 3)[0]},
 			numberRange: cciptypes.NewSeqNumRange(1, 3),
 			want:        false,
 		},
 		{
 			name:        "extra sequence number",
-			msgs:        EmptyMessagesForRange(1, 4),
+			msgs:        emptyMessagesForRange(1, 4),
 			numberRange: cciptypes.NewSeqNumRange(1, 3),
 			want:        false,
 		},
@@ -1394,7 +1394,7 @@ func Test_allSeqNrsObserved(t *testing.T) {
 		},
 		{
 			name:        "empty range",
-			msgs:        EmptyMessagesForRange(1, 4),
+			msgs:        emptyMessagesForRange(1, 4),
 			numberRange: cciptypes.NewSeqNumRange(0, 0),
 			want:        false,
 		},
