@@ -20,13 +20,30 @@ import (
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-// validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
-func validateObserverReadingEligibility(
+// validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported by observer
+func validateCommitReportsReadingEligibility(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	observedData exectypes.CommitObservations,
+) error {
+	for chainSel := range observedData {
+		if !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
+		}
+		for _, data := range observedData[chainSel] {
+			if data.SourceChain != chainSel {
+				return fmt.Errorf("observer not allowed to read from chain %d", data.SourceChain)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateMsgsReadingEligibility checks all observed messages are from supported chains
+func validateMsgsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedMsgs exectypes.MessageObservations,
 ) error {
-	// TODO: validate that CommitReports and Nonces are only observed if the destChain is supported.
-
 	for chainSel, msgs := range observedMsgs {
 		if len(msgs) == 0 {
 			continue
@@ -40,6 +57,7 @@ func validateObserverReadingEligibility(
 	return nil
 }
 
+// validateTokenDataObservations validates that all token data observations belong to already observed messages
 func validateTokenDataObservations(
 	observedMsgs exectypes.MessageObservations,
 	tokenData exectypes.TokenDataObservations,
@@ -51,6 +69,14 @@ func validateTokenDataObservations(
 	}
 
 	for chain, msgs := range observedMsgs {
+		chainTd, ok := tokenData[chain]
+		if !ok {
+			return fmt.Errorf("token data not found for chain %d", chain)
+		}
+		if len(msgs) != len(chainTd) {
+			return fmt.Errorf("unexpected number of token data observations for chain %d: expected %d, got %d",
+				chain, len(msgs), len(chainTd))
+		}
 		for seq, msg := range msgs {
 			if _, ok := tokenData[chain][seq]; !ok {
 				return fmt.Errorf("token data not found for message %s", msg)
@@ -58,6 +84,24 @@ func validateTokenDataObservations(
 		}
 	}
 
+	return nil
+}
+
+// validateCostlyMessagesObservations validates that all costly messages belong to already observed messages
+func validateCostlyMessagesObservations(
+	observedMsgs exectypes.MessageObservations,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+	msgs := observedMsgs.Flatten()
+	msgsIDMap := make(map[cciptypes.Bytes32]struct{})
+	for _, msg := range msgs {
+		msgsIDMap[msg.Header.MessageID] = struct{}{}
+	}
+	for _, id := range costlyMessages {
+		if _, ok := msgsIDMap[id]; !ok {
+			return fmt.Errorf("costly message %s not found in observed messages", id)
+		}
+	}
 	return nil
 }
 
@@ -72,11 +116,51 @@ func validateHashesExist(
 	}
 
 	for chain, msgs := range observedMsgs {
+		_, ok := hashes[chain]
+		if !ok {
+			return fmt.Errorf("hash not found for chain %d", chain)
+		}
+
 		for seq, msg := range msgs {
 			if _, ok := hashes[chain][seq]; !ok {
 				return fmt.Errorf("hash not found for message %s", msg)
 			}
 		}
+	}
+
+	return nil
+}
+
+// validateMessagesConformToCommitReports cross-checks messages and reports
+// 1. checks if the messages observed are exactly the same as the messages in the commit reports. No more and no less.
+// 2. checks all reports have their messages observed.
+func validateMessagesConformToCommitReports(
+	observedData exectypes.CommitObservations,
+	observedMsgs exectypes.MessageObservations,
+) error {
+	msgsCount := 0
+	for chain, report := range observedData {
+		for _, data := range report {
+			msgsMap, ok := observedMsgs[chain]
+			if !ok {
+				return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
+			}
+
+			for seqNum := data.SequenceNumberRange.Start(); seqNum <= data.SequenceNumberRange.End(); seqNum++ {
+				_, ok = msgsMap[seqNum]
+				if !ok {
+					return fmt.Errorf("no message observed for sequence number %d, "+
+						"while report's range sholud include it for chain %d", seqNum, chain)
+				}
+				msgsCount++
+			}
+		}
+	}
+	allMsgs := observedMsgs.Flatten()
+	// need to make sure that only messages that are in the commit reports are observed
+	if msgsCount != len(allMsgs) {
+		return fmt.Errorf("messages observed %d do not match the messages in the commit reports %d",
+			len(allMsgs), msgsCount)
 	}
 
 	return nil
@@ -112,19 +196,6 @@ func validateObservedSequenceNumbers(
 				if !data.SequenceNumberRange.Contains(seqNum) {
 					return fmt.Errorf("executed message %d not in observed range %v", seqNum, data.SequenceNumberRange)
 				}
-			}
-
-			// no need to check for missing sequence numbers in the observed messages
-			if len(data.Messages) == 0 {
-				continue
-			}
-
-			if !msgsConformToSeqRange(data.Messages, data.SequenceNumberRange) {
-				return fmt.Errorf("messages don't conform to sequence numbers observed for chain %d, "+
-					"sequence numbers: %v",
-					data.SourceChain,
-					data.SequenceNumberRange,
-				)
 			}
 		}
 	}
