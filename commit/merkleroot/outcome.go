@@ -231,7 +231,7 @@ func buildMerkleRootsOutcome(
 				lggr.Infow("Root is signed, appending to the report", "root", rk)
 				rootsToReport = append(rootsToReport, root)
 			} else {
-				lggr.Warnw("Root not signed, skipping from the report", "root", rk)
+				lggr.Infow("Root not signed by RMN, skipping from the report", "root", rk)
 			}
 		}
 		roots = rootsToReport
