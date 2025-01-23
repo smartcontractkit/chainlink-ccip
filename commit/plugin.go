@@ -492,6 +492,7 @@ func (p *Plugin) Close() error {
 		p.tokenPriceProcessor,
 		p.chainFeeProcessor,
 		p.discoveryProcessor,
+		p.rmnHomeReader,
 	)
 }
 

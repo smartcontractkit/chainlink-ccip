@@ -153,13 +153,12 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 				fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
 		}
 
-		rmnHomeReader, err = readerpkg.GetRMNHomePoller(
+		rmnHomeReader, err = readerpkg.NewRMNHome(
 			ctx,
 			lggr,
 			p.homeChainSelector,
 			rmnHomeAddress,
 			rmnCr,
-			readerpkg.HomeChainPollingInterval,
 		)
 		if err != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to initialize RMNHome reader: %w", err)
