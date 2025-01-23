@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 	"time"
 
@@ -42,6 +43,8 @@ var (
 	// ErrNothingToDo is returned when there are no source chains with enough RMN nodes.
 	ErrNothingToDo = errors.New("nothing to observe from the existing RMN nodes, make " +
 		"sure RMN is enabled, nodes configured correctly and F value is correct")
+
+	ErrAllChainsNotReady = errors.New("none of the requested chains is ready to be observed by the RMN nodes")
 
 	// ErrInsufficientObservationResponses is returned when we don't get enough observation responses to cover
 	// all the observation requests.
@@ -184,7 +187,8 @@ func (c *controller) ComputeReportSignatures(
 	for chain, l := range updatesPerChain {
 		homeChainF, exists := homeFMap[cciptypes.ChainSelector(chain)]
 		if !exists {
-			return nil, fmt.Errorf("no home F for chain %d", chain)
+			lggr.Errorw("no home F for chain, chain skipped", "chain", chain)
+			delete(updatesPerChain, chain)
 		}
 
 		if consensus.LtFPlusOne(homeChainF, l.RmnNodes.Cardinality()) {
@@ -202,7 +206,7 @@ func (c *controller) ComputeReportSignatures(
 	}
 
 	tStart := time.Now()
-	rmnSignedObservations, err := c.getRmnSignedObservations(
+	rmnSignedObservations, laneUpdatesToMakeProgressWith, err := c.getRmnSignedObservations(
 		ctx,
 		lggr,
 		destChain,
@@ -225,7 +229,7 @@ func (c *controller) ComputeReportSignatures(
 		lggr,
 		destChain,
 		rmnSignedObservations,
-		updatesPerChain,
+		laneUpdatesToMakeProgressWith,
 		rmnRemoteCfg,
 		rmnNodeInfo)
 	if err != nil {
@@ -292,7 +296,7 @@ func (c *controller) getRmnSignedObservations(
 	configDigest cciptypes.Bytes32,
 	homeFMap map[cciptypes.ChainSelector]int,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
-) ([]rmnSignedObservationWithMeta, error) {
+) ([]rmnSignedObservationWithMeta, map[uint64]updateRequestWithMeta, error) {
 	requestedNodes := make(map[uint64]mapset.Set[rmntypes.NodeID])                   // sourceChain -> requested rmnNodeIDs
 	requestsPerNode := make(map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
 
@@ -321,7 +325,8 @@ func (c *controller) getRmnSignedObservations(
 			// if we already have enough requests for this source chain, mark it
 			homeChainF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
 			if !exist {
-				return nil, fmt.Errorf("no home F for chain %d", sourceChain)
+				lggr.Errorw("no home F for chain", "chain", sourceChain)
+				continue
 			}
 			if consensus.GteFPlusOne(homeChainF, requestedNodes[sourceChain].Cardinality()) {
 				chainsWithEnoughRequests.Add(sourceChain)
@@ -333,17 +338,34 @@ func (c *controller) getRmnSignedObservations(
 
 	signedObservations, err := c.listenForRmnObservationResponses(
 		ctx, lggr, destChain, requestIDs, updateRequestsPerChain, requestedNodes, configDigest, homeFMap, rmnNodeInfo)
-	if err != nil {
-		return nil, fmt.Errorf("listen for rmn observation responses: %w", err)
+	if err != nil && !errors.Is(err, ErrInsufficientObservationResponses) {
+		return nil, nil, fmt.Errorf("listen for rmn observation responses: %w", err)
 	}
 
-	// Sanity check that we got enough signed observations for every source chain.
-	// In practice this should never happen, an error must have been received earlier.
-	if !gotSufficientObservationResponses(lggr, updateRequestsPerChain, signedObservations, homeFMap) {
-		return nil, fmt.Errorf("not enough signed observations after sanity check")
+	laneUpdatesToMakeProgressWith := make(map[uint64]updateRequestWithMeta)
+
+	chainsToMakeProgressWith := chainsWithSufficientObservationResponses(
+		lggr, updateRequestsPerChain, signedObservations, homeFMap)
+	if chainsToMakeProgressWith.Cardinality() == 0 {
+		return nil, nil, ErrAllChainsNotReady
 	}
 
-	return signedObservations, nil
+	for chain := range chainsToMakeProgressWith.Iter() {
+		laneUpdatesToMakeProgressWith[uint64(chain)] = updateRequestsPerChain[uint64(chain)]
+	}
+
+	// Sanity check that we got enough signed observations for every source chain we want to make progress with.
+	chainsWithSufficientResps := chainsWithSufficientObservationResponses(
+		lggr, laneUpdatesToMakeProgressWith, signedObservations, homeFMap)
+	if chainsWithSufficientResps.Cardinality() != len(laneUpdatesToMakeProgressWith) {
+		lggr.Errorw("not enough signed observations after sanity check",
+			"chainsWithSufficientResps", chainsWithSufficientResps.String(),
+			"laneUpdatesToMakeProgressWith", laneUpdatesToMakeProgressWith,
+			"chainsToMakeProgressWith", chainsToMakeProgressWith.String())
+		return nil, nil, fmt.Errorf("not enough signed observations after sanity check")
+	}
+
+	return signedObservations, laneUpdatesToMakeProgressWith, nil
 }
 
 // sendObservationRequests sends observation requests to the RMN nodes.
@@ -367,6 +389,13 @@ func (c *controller) sendObservationRequests(
 		// convert OnRamp address from 32bytes (abi encoded) to 20bytes (evm address) before sending the request
 		// todo: make this part chain-agnostic
 		for _, request := range requests {
+			if destChain.DestChainSelector == request.LaneSource.SourceChainSelector {
+				// explicit check that the destination chain should never be in any of the requested updates.
+				lggr.Errorw("skipping observation request, request source chain is equal to the destination",
+					"request", request)
+				continue
+			}
+
 			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: request.LaneSource.SourceChainSelector,
@@ -463,14 +492,22 @@ func (c *controller) listenForRmnObservationResponses(
 				})
 			}
 
-			allChainsHaveEnoughResponses := gotSufficientObservationResponses(
+			chainsWithSufficientResponses := chainsWithSufficientObservationResponses(
 				lggr,
 				lursPerChain,
 				rmnObservationResponses,
 				homeFMap)
-			if allChainsHaveEnoughResponses {
+
+			if chainsWithSufficientResponses.Cardinality() == len(lursPerChain) {
 				lggr.Info("all chains have enough observation responses with matching roots")
 				return rmnObservationResponses, nil
+			}
+
+			if chainsWithSufficientResponses.Cardinality() > len(lursPerChain) {
+				lggr.Errorw("internal bug, reported chains with sufficient responses more than expected",
+					"chainsWithSufficientResponses", chainsWithSufficientResponses.String(),
+					"lursPerChain", lursPerChain)
+				return nil, fmt.Errorf("reported chains with sufficient responses are more than expected")
 			}
 
 			// We got all the responses we were waiting for, but they are not sufficient for all chains.
@@ -510,14 +547,14 @@ func (c *controller) listenForRmnObservationResponses(
 	}
 }
 
-// gotSufficientObservationResponses checks if we got enough observation responses for each source chain.
+// chainsWithSufficientObservationResponses checks for which chains we got enough observation responses.
 // Enough meaning that we got at least F+1 observing the same merkle root for a target chain.
-func gotSufficientObservationResponses(
+func chainsWithSufficientObservationResponses(
 	lggr logger.Logger,
 	updateRequests map[uint64]updateRequestWithMeta,
 	rmnObservationResponses []rmnSignedObservationWithMeta,
 	homeFMap map[cciptypes.ChainSelector]int,
-) bool {
+) mapset.Set[cciptypes.ChainSelector] {
 	merkleRootsCount := make(map[uint64]map[cciptypes.Bytes32]int)
 	for _, signedObs := range rmnObservationResponses {
 		for _, lu := range signedObs.SignedObservation.Observation.FixedDestLaneUpdates {
@@ -528,26 +565,36 @@ func gotSufficientObservationResponses(
 		}
 	}
 
+	resultChains := mapset.NewSet[cciptypes.ChainSelector]()
+
 	for sourceChain := range updateRequests {
-		// make sure we got at least F+1 observing the same merkle root for a target chain.
 		countsPerRoot, ok := merkleRootsCount[sourceChain]
 		if !ok || len(countsPerRoot) == 0 {
-			return false
+			lggr.Infow("chain skipped, zero roots observed", "chain", sourceChain)
+			continue
 		}
-		homeChainF, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
+
+		fObserve, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exists {
 			lggr.Errorw("no F for chain", "chain", sourceChain)
-			return false
+			continue
 		}
 
-		values := maps.Values(countsPerRoot)
-		sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
-		if consensus.LtFPlusOne(homeChainF, values[len(values)-1]) {
-			return false
+		mostVotedRootVotes := slices.Max(maps.Values(countsPerRoot))
+		if consensus.LtFPlusOne(fObserve, mostVotedRootVotes) {
+			lggr.Infow("chain skipped, maximally voted root doesn't have enough votes",
+				"chain", sourceChain,
+				"fObserve", fObserve,
+				"mostVotedRootVotes", mostVotedRootVotes)
+			continue
 		}
+
+		lggr.Infow("chain has enough observed roots",
+			"chain", sourceChain, "mostVotedRootVotes", mostVotedRootVotes, "fObserve", fObserve)
+		resultChains.Add(cciptypes.ChainSelector(sourceChain))
 	}
 
-	return true
+	return resultChains
 }
 
 //nolint:gocyclo // todo
