@@ -2,6 +2,7 @@ package consensus_test
 
 import (
 	"fmt"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -95,8 +96,8 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 				return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 			}
 			validator := consensus.NewMinObservation[exectypes.CommitData](tt.min, idFunc)
-			for _, report := range tt.reports {
-				validator.Add(report)
+			for i, report := range tt.reports {
+				validator.Add(report, commontypes.OracleID(i))
 			}
 
 			// Test the results
@@ -122,9 +123,9 @@ func Test_CommitReportValidator_Generics(t *testing.T) {
 	wantValue := Generic{number: 1}
 	otherValue := Generic{number: 2}
 
-	validator.Add(wantValue)
-	validator.Add(wantValue)
-	validator.Add(otherValue)
+	validator.Add(wantValue, 1)
+	validator.Add(wantValue, 2)
+	validator.Add(otherValue, 3)
 
 	// Test the results
 
