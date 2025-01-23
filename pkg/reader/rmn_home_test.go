@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
-	tests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -29,7 +31,7 @@ var (
 
 func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
 	homeChainReader := readermock.NewMockContractReaderFacade(t)
-	configPoller := NewRMNHomePoller(
+	configPoller := newRMNHomePoller(
 		homeChainReader,
 		rmnHomeBoundContract,
 		logger.Test(t),
@@ -97,12 +99,12 @@ func TestRMNHomePoller_HealthReport(t *testing.T) {
 				}
 			}).Return(nil)
 
-			poller := NewRMNHomePoller(
+			poller := newRMNHomePoller(
 				homeChainReader,
 				rmnHomeBoundContract,
 				logger.Test(t),
 				10*time.Millisecond,
-			).(*rmnHomePoller)
+			)
 
 			require.NoError(t, poller.Start(context.Background()))
 
@@ -201,7 +203,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 				totalSleepTime = tickTime * 20
 			)
 
-			configPoller := NewRMNHomePoller(
+			configPoller := newRMNHomePoller(
 				homeChainReader,
 				rmnHomeBoundContract,
 				logger.Test(t),
@@ -274,12 +276,12 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 
 func Test_RMNHomePoller_Close(t *testing.T) {
 	homeChainReader := readermock.NewMockContractReaderFacade(t)
-	poller := NewRMNHomePoller(
+	poller := newRMNHomePoller(
 		homeChainReader,
 		rmnHomeBoundContract,
 		logger.Test(t),
 		10*time.Millisecond,
-	).(*rmnHomePoller)
+	)
 
 	homeChainReader.On("GetLatestValue",
 		mock.Anything,
@@ -468,4 +470,94 @@ func createTestRMNHomeConfigs(
 	primary = createConfig(1, primaryEmpty)
 	secondary = createConfig(2, secondaryEmpty)
 	return primary, secondary
+}
+
+func Test_CachingInstances(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+
+	chain1 := readermock.NewMockContractReaderFacade(t)
+	chain2 := readermock.NewMockContractReaderFacade(t)
+
+	for _, chain := range []*readermock.MockContractReaderFacade{chain1, chain2} {
+		chain.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
+		chain.EXPECT().GetLatestValue(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	}
+
+	t.Run("create and cache instance for the same chain and address", func(t *testing.T) {
+		chainSelector := cciptypes.ChainSelector(rand.RandomInt64())
+		address := rand.RandomAddressBytes()
+		poller1, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+
+		poller2, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+
+		poller3, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+
+		require.True(t, poller1 == poller2)
+		require.True(t, poller2 == poller3)
+
+		require.NoError(t, poller1.Close())
+		require.NoError(t, poller2.Close())
+		require.NoError(t, poller3.Close())
+	})
+
+	t.Run("creating new instance for different addresses on a single chain", func(t *testing.T) {
+		chainSelector := cciptypes.ChainSelector(rand.RandomInt64())
+		address1 := rand.RandomAddressBytes()
+		address2 := rand.RandomAddressBytes()
+
+		poller1, err := GetRMNHomePoller(ctx, lggr, chainSelector, address1, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+
+		poller2, err := GetRMNHomePoller(ctx, lggr, chainSelector, address2, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+
+		require.False(t, poller1 == poller2)
+		require.NoError(t, poller1.Close())
+		require.NoError(t, poller2.Close())
+	})
+
+	t.Run("creating new instance for different chains but same addresses", func(t *testing.T) {
+		chainSelector1 := cciptypes.ChainSelector(rand.RandomInt64())
+		chainSelector2 := cciptypes.ChainSelector(rand.RandomInt64())
+		address := rand.RandomAddressBytes()
+
+		poller1, err := GetRMNHomePoller(ctx, lggr, chainSelector1, address, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+
+		poller2, err := GetRMNHomePoller(ctx, lggr, chainSelector2, address, chain2, HomeChainPollingInterval)
+		require.NoError(t, err)
+
+		require.False(t, poller1 == poller2)
+		require.NoError(t, poller1.Close())
+		require.NoError(t, poller2.Close())
+	})
+
+	t.Run("parallel creation of instances", func(t *testing.T) {
+		instancesMu.Lock()
+		instances = make(map[string]*rmnHomePoller)
+		instancesMu.Unlock()
+
+		chainSelector := cciptypes.ChainSelector(rand.RandomInt64())
+		address := rand.RandomAddressBytes()
+
+		eg := new(errgroup.Group)
+		for i := 0; i < 10000; i++ {
+			eg.Go(func() error {
+				poller, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
+				require.NotNil(t, poller)
+				require.NoError(t, err)
+				return nil
+			})
+		}
+		require.NoError(t, eg.Wait())
+		require.Len(t, instances, 1)
+
+		poller, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+		require.NoError(t, poller.Close())
+	})
 }

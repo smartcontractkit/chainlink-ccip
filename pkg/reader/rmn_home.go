@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -21,6 +21,7 @@ import (
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -48,6 +49,11 @@ type RMNHome interface {
 	services.Service
 }
 
+var (
+	instances   = make(map[string]*rmnHomePoller)
+	instancesMu sync.Mutex
+)
+
 type rmnHomeState struct {
 	activeConfigDigest    cciptypes.Bytes32
 	candidateConfigDigest cciptypes.Bytes32
@@ -69,12 +75,67 @@ type rmnHomePoller struct {
 	pollingDuration      time.Duration // How frequently the poller fetches the chain configs
 }
 
-func NewRMNHomePoller(
+// GetRMNHomePoller returns a rmnHomePoller instance if it already exists, else creates a new one.
+// Returned rmnHomePoller is always started, therefore user of that API doesn't need to care about
+// concurrency and accidentally starting the same poller multiple times.
+//
+// In most of the cases, there is going to be only a single RMNHome deployed on a single chain. However,
+// OCR3Config allows to pass different RMNHome addresses for different chains. Therefore, we need to
+// support that and maintain a separate rmnHomePoller for each RMNHome address.
+// Having a singleton here is aimed to reduce the background polling to the underlying RPC node.
+func GetRMNHomePoller(
+	ctx context.Context,
+	lggr logger.Logger,
+	rmnHomeChainSelector cciptypes.ChainSelector,
+	rmnHomeAddress []byte,
+	contractReader contractreader.ContractReaderFacade,
+	pollingInterval time.Duration,
+) (RMNHome, error) {
+	instancesMu.Lock()
+	defer instancesMu.Unlock()
+
+	hexEncodedAddr := " 0x" + hex.EncodeToString(rmnHomeAddress)
+	key := fmt.Sprintf("%s-%s", rmnHomeChainSelector.String(), hexEncodedAddr)
+
+	instance, ok := instances[key]
+	if ok {
+		lggr.Infow("RMNHomePoller already exists, reusing instance",
+			"chainSelector", rmnHomeChainSelector,
+			"address", hexEncodedAddr,
+		)
+		return instance, nil
+	}
+
+	rmnHomeBoundContract := types.BoundContract{
+		Address: hexEncodedAddr,
+		Name:    consts.ContractNameRMNHome,
+	}
+
+	if err := contractReader.Bind(ctx, []types.BoundContract{rmnHomeBoundContract}); err != nil {
+		return nil, fmt.Errorf("failed to bind RMNHome contract: %w", err)
+	}
+
+	rmnHomeReader := newRMNHomePoller(
+		contractReader,
+		rmnHomeBoundContract,
+		logutil.WithComponent(lggr, "RMNHomePoller"),
+		pollingInterval,
+	)
+
+	if err := rmnHomeReader.Start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start RMNHome reader: %w", err)
+	}
+
+	instances[key] = rmnHomeReader
+	return rmnHomeReader, nil
+}
+
+func newRMNHomePoller(
 	contractReader contractreader.ContractReaderFacade,
 	rmnHomeBoundContract types.BoundContract,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
-) RMNHome {
+) *rmnHomePoller {
 	return &rmnHomePoller{
 		stopCh:               make(chan struct{}),
 		contractReader:       contractReader,
@@ -87,7 +148,7 @@ func NewRMNHomePoller(
 	}
 }
 
-func (r *rmnHomePoller) Start(ctx context.Context) error {
+func (r *rmnHomePoller) Start(context.Context) error {
 	return r.sync.StartOnce(r.Name(), func() error {
 		r.lggr.Infow("Start Polling RMNHome")
 		r.wg.Add(1)

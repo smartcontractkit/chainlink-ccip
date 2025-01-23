@@ -2,10 +2,8 @@ package commit
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"time"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
@@ -154,23 +152,17 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 				ocr3types.ReportingPluginInfo{},
 				fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
 		}
-		rmnHomeBoundContract := types.BoundContract{
-			Address: "0x" + hex.EncodeToString(rmnHomeAddress),
-			Name:    consts.ContractNameRMNHome,
-		}
 
-		if err1 := rmnCr.Bind(ctx, []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
-		}
-		rmnHomeReader = readerpkg.NewRMNHomePoller(
+		rmnHomeReader, err = readerpkg.GetRMNHomePoller(
+			ctx,
+			lggr,
+			p.homeChainSelector,
+			rmnHomeAddress,
 			rmnCr,
-			rmnHomeBoundContract,
-			logutil.WithComponent(lggr, "RMNHomePoller"),
-			5*time.Second,
+			readerpkg.HomeChainPollingInterval,
 		)
-
-		if err := rmnHomeReader.Start(ctx); err != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome reader: %w", err)
+		if err != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to initialize RMNHome reader: %w", err)
 		}
 	}
 
