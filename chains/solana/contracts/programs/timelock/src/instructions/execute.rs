@@ -80,8 +80,6 @@ pub fn execute_batch<'info>(
         });
     }
 
-    require!(op.is_ready(current_time), TimelockError::OperationNotReady);
-
     // all executed, update the timestamp
     op.mark_done();
 
@@ -183,6 +181,7 @@ pub struct BypasserExecuteBatch<'info> {
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
+        constraint = !operation.is_done() @ TimelockError::OperationAlreadyExecuted,
         close = authority, // close the operation after execution
     )]
     pub operation: Account<'info, Operation>,
