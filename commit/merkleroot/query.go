@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
@@ -63,10 +64,12 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	ctxQuery, cancel := context.WithTimeout(ctx, p.offchainCfg.RMNSignaturesTimeout)
 	defer cancel()
 
+	rmnReportStart := time.Now()
 	// Get signatures for the requested updates. The signatures might contain a subset of the requested updates.
 	// While building the report the plugin should exclude source chain updates without signatures.
 	sigs, err := p.rmnController.ComputeReportSignatures(ctxQuery, dstChainInfo, reqUpdates, prevOutcome.RMNRemoteCfg)
 	if err != nil {
+		p.metricsReporter.TrackRmnReport(float64(time.Since(rmnReportStart).Milliseconds()), false)
 		if errors.Is(err, rmn.ErrTimeout) {
 			lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
 				len(reqUpdates), dstChainInfo)
@@ -75,5 +78,6 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, fmt.Errorf("compute RMN signatures: %w", err)
 	}
 
+	p.metricsReporter.TrackRmnReport(time.Since(rmnReportStart).Seconds(), true)
 	return Query{RetryRMNSignatures: false, RMNSignatures: sigs}, nil
 }
