@@ -398,7 +398,7 @@ func TestTokenPool(t *testing.T) {
 
 		t.Run("burnOrLock", func(t *testing.T) {
 			raw := token_pool.NewLockOrBurnTokensInstruction(token_pool.LockOrBurnInV1{LocalToken: mint, RemoteChainSelector: config.EvmChainSelector}, admin.PublicKey(), p.PoolConfig, solana.TokenProgramID, mint, p.PoolSigner, p.PoolTokenAccount, p.Chain[config.EvmChainSelector])
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipReceiverProgram, false, false))
+			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipLogicReceiver, false, false))
 			lbI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -415,7 +415,7 @@ func TestTokenPool(t *testing.T) {
 				RemoteChainSelector: config.EvmChainSelector,
 				Amount:              tokens.ToLittleEndianU256(1),
 			}, admin.PublicKey(), p.PoolConfig, solana.TokenProgramID, mint, p.PoolSigner, p.PoolTokenAccount, p.Chain[config.EvmChainSelector], p.PoolTokenAccount)
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipReceiverProgram, false, false))
+			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipLogicReceiver, false, false))
 			rmI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 

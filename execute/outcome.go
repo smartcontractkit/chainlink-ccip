@@ -199,9 +199,11 @@ func (p *Plugin) getFilterOutcome(
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces)),
+		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
+		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),
 	)
 
-	outcomeReports, selectedReports, err := selectReport(
+	outcomeReports, selectedCommitReports, err := selectReport(
 		ctx,
 		lggr,
 		commitReports,
@@ -216,5 +218,5 @@ func (p *Plugin) getFilterOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.Filter, selectedReports, execReport), nil
+	return exectypes.NewOutcome(exectypes.Filter, selectedCommitReports, execReport), nil
 }

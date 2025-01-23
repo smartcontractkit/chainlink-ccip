@@ -205,7 +205,7 @@ func readAllMessages(
 		// Read messages for each range.
 		for _, report := range reports {
 			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
-			if err != nil || len(msgs) != report.SequenceNumberRange.Length() {
+			if err != nil {
 				lggr.Errorw("unable to read all messages for report",
 					"srcChain", srcChain,
 					"seqRange", report.SequenceNumberRange,
@@ -214,6 +214,13 @@ func readAllMessages(
 				)
 				continue
 			}
+
+			if !msgsConformToSeqRange(msgs, report.SequenceNumberRange) {
+				lggr.Errorw("missing messages in range",
+					"srcChain", srcChain, "seqRange", report.SequenceNumberRange)
+				continue
+			}
+
 			for _, msg := range msgs {
 				messageObs[srcChain][msg.Header.SequenceNumber] = msg
 				messageTimestamps[msg.Header.MessageID] = report.Timestamp

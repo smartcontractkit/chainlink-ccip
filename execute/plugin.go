@@ -186,26 +186,105 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("unable to decode observation: %w", err)
 	}
 
+	var previousOutcome exectypes.Outcome
+
+	previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
+	if err != nil {
+		return fmt.Errorf("unable to decode previous outcome: %w", err)
+	}
+
 	supportedChains, err := p.supportedChains(ao.Observer)
 	if err != nil {
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	err = validateObserverReadingEligibility(supportedChains, decodedObservation.Messages)
-	if err != nil {
-		return fmt.Errorf("validate observer reading eligibility: %w", err)
+	state := previousOutcome.State.Next()
+	if state == exectypes.Initialized || state == exectypes.GetCommitReports {
+		err = validateNoMessageRelatedObservations(
+			decodedObservation.Messages,
+			decodedObservation.TokenData,
+			decodedObservation.Hashes,
+			decodedObservation.CostlyMessages,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
-	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
+	// These checks are common to all states.
+	err = validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports)
+	if err != nil {
+		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
+	}
+
+	err = validateObservedSequenceNumbers(decodedObservation.CommitReports)
+	if err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
-	if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
-		return fmt.Errorf("validate hashes exist: %w", err)
+	// check message related validations when states can contain messages
+	if state == exectypes.GetMessages || state == exectypes.Filter {
+		err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages)
+		if err != nil {
+			return fmt.Errorf("validate observer reading eligibility: %w", err)
+		}
+
+		err = validateMessagesRelatedObservations(
+			decodedObservation.CommitReports,
+			decodedObservation.Messages,
+			decodedObservation.TokenData,
+			decodedObservation.Hashes,
+			decodedObservation.CostlyMessages,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
-	if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
+	return nil
+}
+
+func validateNoMessageRelatedObservations(
+	messages exectypes.MessageObservations,
+	tokenData exectypes.TokenDataObservations,
+	hashes exectypes.MessageHashes,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+	if len(messages) > 0 {
+		return fmt.Errorf("messages are not expected in initial or GetCommitRerports states")
+	}
+	if len(tokenData) > 0 {
+		return fmt.Errorf("token data is not expected in initial or GetCommitRerports states")
+	}
+	if len(costlyMessages) > 0 {
+		return fmt.Errorf("costly messages are not expected in initial or GetCommitRerports states")
+	}
+	if len(hashes) > 0 {
+		return fmt.Errorf("hashes are not expected in initial or GetCommitRerports states")
+	}
+
+	return nil
+}
+
+func validateMessagesRelatedObservations(
+	commitReports exectypes.CommitObservations,
+	messages exectypes.MessageObservations,
+	tokenData exectypes.TokenDataObservations,
+	hashes exectypes.MessageHashes,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+
+	if err := validateMessagesConformToCommitReports(commitReports, messages); err != nil {
+		return fmt.Errorf("validate messages conform to commit reports: %w", err)
+	}
+	if err := validateHashesExist(messages, hashes); err != nil {
+		return fmt.Errorf("validate hashes exist: %w", err)
+	}
+	if err := validateTokenDataObservations(messages, tokenData); err != nil {
 		return fmt.Errorf("validate token data observations: %w", err)
+	}
+	if err := validateCostlyMessagesObservations(messages, costlyMessages); err != nil {
+		return fmt.Errorf("validate costly messages: %w", err)
 	}
 
 	return nil
@@ -233,7 +312,6 @@ func selectReport(
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	var selectedReports []exectypes.CommitData
 	pendingReports := 0
 	for i, commitReport := range commitReports {
 		// handle incomplete observations.
@@ -251,8 +329,6 @@ func selectReport(
 			continue
 		}
 
-		selectedReports = append(selectedReports, commitReports[i])
-
 		// If the report has not been fully executed, keep it for the next round.
 		// Detect a report was not fully executed
 		if len(commitReports[i].Messages) > len(commitReports[i].ExecutedMessages) {
@@ -260,7 +336,7 @@ func selectReport(
 		}
 	}
 
-	execReports, err := builder.Build()
+	execReports, selectedReports, err := builder.Build()
 
 	lggr.Infow(
 		"reports have been selected",
