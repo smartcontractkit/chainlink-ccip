@@ -56,6 +56,7 @@ func TestCCIPRouter(t *testing.T) {
 	require.NoError(t, gerr)
 
 	var nonceEvmPDA solana.PublicKey
+	var nonceSvmPDA solana.PublicKey
 
 	// billing
 	type AccountsPerToken struct {
@@ -393,6 +394,8 @@ func TestCCIPRouter(t *testing.T) {
 
 			nonceEvmPDA, err = ccip.GetNoncePDA(config.EvmChainSelector, user.PublicKey())
 			require.NoError(t, err)
+			nonceSvmPDA, err = ccip.GetNoncePDA(config.SVMChainSelector, user.PublicKey())
+			require.NoError(t, err)
 		})
 
 		t.Run("When admin updates the default gas limit it's updated", func(t *testing.T) {
@@ -586,7 +589,9 @@ func TestCCIPRouter(t *testing.T) {
 					// minimal valid config
 					DefaultTxGasLimit:   1,
 					MaxPerMsgGasLimit:   100,
-					ChainFamilySelector: [4]uint8{3, 2, 1, 0}},
+					ChainFamilySelector: [4]uint8{3, 2, 1, 0},
+					EnforceOutOfOrder:   true,
+				},
 				config.SVMSourceChainStatePDA,
 				config.SVMDestChainStatePDA,
 				config.RouterConfigPDA,
@@ -2399,6 +2404,78 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(5), ccipMessageSentEvent.Message.Header.SequenceNumber)
 			require.Equal(t, uint64(3), ccipMessageSentEvent.Message.Header.Nonce)
+		})
+
+		t.Run("When gasLimit is too high, it fails", func(t *testing.T) {
+			destinationChainSelector := config.EvmChainSelector
+			destinationChainStatePDA := config.EvmDestChainStatePDA
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken: token2022.mint,
+				Receiver: validReceiverAddress[:],
+				Data:     []byte{4, 5, 6},
+				ExtraArgs: ccip_router.ExtraArgsInput{
+					GasLimit: &bin.Uint128{Lo: 0, Hi: 1_000_000_000},
+				},
+			}
+
+			raw := ccip_router.NewCcipSendInstruction(
+				destinationChainSelector,
+				message,
+				[]byte{},
+				config.RouterConfigPDA,
+				destinationChainStatePDA,
+				nonceEvmPDA,
+				user.PublicKey(),
+				solana.SystemProgramID,
+				token2022.program,
+				token2022.mint,
+				token2022.billingConfigPDA,
+				token2022.billingConfigPDA,
+				token2022.userATA,
+				token2022.billingATA,
+				config.BillingSignerPDA,
+				config.ExternalTokenPoolsSignerPDA,
+			)
+			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.MessageGasLimitTooHigh_CcipRouterError.String()})
+		})
+
+		t.Run("When out of order execution is enforced, it fails when not enabled", func(t *testing.T) {
+			destinationChainSelector := config.SVMChainSelector // SVM dest chain requires out of order execution
+			destinationChainStatePDA := config.SVMDestChainStatePDA
+			falseVal := false
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken: token2022.mint,
+				Receiver: validReceiverAddress[:],
+				ExtraArgs: ccip_router.ExtraArgsInput{
+					AllowOutOfOrderExecution: &falseVal,
+				},
+			}
+
+			raw := ccip_router.NewCcipSendInstruction(
+				destinationChainSelector,
+				message,
+				[]byte{},
+				config.RouterConfigPDA,
+				destinationChainStatePDA,
+				nonceSvmPDA,
+				user.PublicKey(),
+				solana.SystemProgramID,
+				token2022.program,
+				token2022.mint,
+				token2022.billingConfigPDA,
+				token2022.billingConfigPDA,
+				token2022.userATA,
+				token2022.billingATA,
+				config.BillingSignerPDA,
+				config.ExternalTokenPoolsSignerPDA,
+			)
+			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError.String()})
 		})
 
 		t.Run("When sending a message with an invalid nonce account, it fails", func(t *testing.T) {

@@ -1841,6 +1841,17 @@
             "type": {
               "defined": "MerkleRoot"
             }
+          },
+          {
+            "name": "rmnSignatures",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  64
+                ]
+              }
+            }
           }
         ]
       }
@@ -2787,6 +2798,12 @@
           },
           {
             "name": "SourceTokenDataTooLarge"
+          },
+          {
+            "name": "MessageGasLimitTooHigh"
+          },
+          {
+            "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
           }
         ]
       }

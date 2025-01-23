@@ -298,11 +298,12 @@ func TestProcessor_Query(t *testing.T) {
 			}
 
 			w := Processor{
-				offchainCfg:   tc.cfg,
-				destChain:     tc.destChain,
-				ccipReader:    ccipReader,
-				rmnController: tc.rmnClient(t),
-				lggr:          logger.Test(t),
+				offchainCfg:     tc.cfg,
+				destChain:       tc.destChain,
+				ccipReader:      ccipReader,
+				rmnController:   tc.rmnClient(t),
+				lggr:            logger.Test(t),
+				metricsReporter: NoopMetrics{},
 			}
 
 			w.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller init
