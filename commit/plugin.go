@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync/atomic"
 	"time"
 
@@ -492,12 +493,20 @@ func (p *Plugin) getMainOutcome(
 func (p *Plugin) Close() error {
 	p.lggr.Infow("closing commit plugin")
 
-	return services.CloseAll(
+	closeable := []io.Closer{
 		p.merkleRootProcessor,
 		p.tokenPriceProcessor,
 		p.chainFeeProcessor,
 		p.discoveryProcessor,
-	)
+	}
+
+	// Chains without RMN don't initialize the RMNHomeReader
+	// TODO Consider initializing rmnHomeReader anyway but using some noop implementation
+	if p.rmnHomeReader != nil {
+		closeable = append(closeable, p.rmnHomeReader)
+	}
+
+	return services.CloseAll(closeable...)
 }
 
 // Assuming that we have to delegate a specific amount of time to the observation requests and the report requests.
