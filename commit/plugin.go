@@ -175,6 +175,8 @@ func NewPlugin(
 	}
 }
 
+// Query returns the query for the next round.
+// NOTE: In most cases the Query phase should not return an error based on outCtx to prevent infinite retries.
 func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
 	var err error
 	var q committypes.Query
@@ -214,6 +216,8 @@ func (p *Plugin) ObservationQuorum(
 	), nil
 }
 
+// Observation returns the observation for this round.
+// NOTE: In most cases the Observation phase should not return an error based on outCtx to prevent infinite retries.
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
@@ -403,7 +407,8 @@ func (p *Plugin) Outcome(
 		// we ignore the outcome of the discovery processor.
 		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
-			return nil, fmt.Errorf("discovery processor outcome: %w, seqNr: %d", err, outCtx.SeqNr)
+			p.lggr.Errorw("failed to get discovery processor outcome", "err", err)
+			return nil, nil
 		}
 		p.contractsInitialized.Store(true)
 	}
