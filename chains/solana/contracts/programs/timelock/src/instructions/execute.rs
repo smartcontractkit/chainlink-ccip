@@ -88,6 +88,7 @@ pub fn execute_batch<'info>(
 
 /// execute operation(instructions) w/o checking predecessors and readiness
 /// bypasser_execute also need the operation to be uploaded formerly
+/// NOTE: operation should be closed after execution
 pub fn bypasser_execute_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, BypasserExecuteBatch<'info>>,
     timelock_id: [u8; TIMELOCK_ID_PADDED],
