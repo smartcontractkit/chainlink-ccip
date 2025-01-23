@@ -74,17 +74,33 @@ pub fn fee_for_msg(
             .unwrap_or_else(|| dest_chain.config.default_tx_gas_limit.into()),
     );
 
+    let calldata_length =
+        U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead;
+
+    // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
+    // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
+    let calldata_gas = if calldata_length
+        > U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128)
+    {
+        U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
+            * U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128)
+            + (calldata_length
+                - U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128))
+                * U256::new(dest_chain.config.dest_gas_per_payload_byte_high as u128)
+    } else {
+        calldata_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
+    };
+
     let execution_gas = gas_limit
         + U256::new(dest_chain.config.dest_gas_overhead as u128)
-        + (U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead)
-            * U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
+        + calldata_gas
         + network_fee.transfer_gas;
 
     let execution_cost = execution_gas_price
         * execution_gas
         * U256::new(dest_chain.config.gas_multiplier_wei_per_eth as u128);
 
-    let data_availability_cost = data_availability_cost(
+    let data_availability_cost: Usd18Decimals = data_availability_cost(
         data_availability_gas_price,
         message,
         network_fee.transfer_bytes_overhead,
@@ -92,9 +108,14 @@ pub fn fee_for_msg(
     );
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
+
+    // At this step, every fee component has been raised to 36 decimals
     let fee_token_value =
         (network_fee.premium * premium_multiplier) + execution_cost + data_availability_cost;
 
+    // Fee token value is in 36 decimals
+    // Fee token price is in 18 decimals USD for 1e18 smallest token denominations.
+    // The result is the fee in the fee tokens smallest denominations (e.g. lamport for Sol).
     let fee_token_amount = (fee_token_value.0 / fee_token_price.0)
         .try_into()
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
