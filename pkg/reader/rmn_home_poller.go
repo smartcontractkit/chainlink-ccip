@@ -54,7 +54,7 @@ type rmnHomePoller struct {
 
 	// State
 	observers      []RMNHome
-	observersMu    *sync.RWMutex
+	observersMu    *sync.Mutex
 	rmnHomeState   rmnHomeState
 	rmnHomeStateMu *sync.RWMutex
 	failedPolls    atomic.Uint32
@@ -117,7 +117,7 @@ func getInstance(key string) (*rmnHomePoller, bool) {
 		return nil, false
 	}
 
-	if err := instance.sync.Ready(); err != nil {
+	if notStopped := instance.sync.IfNotStopped(func() {}); !notStopped {
 		return nil, false
 	}
 
@@ -137,7 +137,7 @@ func newRMNHomePoller(
 		contractReader:       contractReader,
 		rmnHomeBoundContract: rmnHomeBoundContract,
 		rmnHomeState:         rmnHomeState{},
-		observersMu:          &sync.RWMutex{},
+		observersMu:          &sync.Mutex{},
 		rmnHomeStateMu:       &sync.RWMutex{},
 		failedPolls:          atomic.Uint32{},
 		lggr:                 lggr,

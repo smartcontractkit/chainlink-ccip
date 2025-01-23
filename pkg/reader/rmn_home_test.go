@@ -117,13 +117,19 @@ func Test_CachingInstances(t *testing.T) {
 		}
 		require.NoError(t, eg.Wait())
 		require.Len(t, instances, 1)
-		requirePollerStarted(t, pollers[0])
 
 		// 999 closed, but still one reference remains therefore bgPoller is running
+		eg = new(errgroup.Group)
 		for i := 0; i < 999; i++ {
-			require.NoError(t, pollers[i].Close())
+			j := i
+			eg.Go(func() error {
+				requirePollerStarted(t, pollers[j])
+				require.NoError(t, pollers[j].Close())
+				requirePollerStarted(t, pollers[j])
+				return nil
+			})
 		}
-		requirePollerStarted(t, pollers[0])
+		require.NoError(t, eg.Wait())
 
 		// All closed, bgPoller should be stopped
 		require.NoError(t, pollers[999].Close())
