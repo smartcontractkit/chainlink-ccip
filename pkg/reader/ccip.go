@@ -374,7 +374,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		msg.Message.Header.OnRamp = onRampAddress
 
 		for i, tokenAmount := range msg.Message.TokenAmounts {
-			tokenAmount.DestExecData, err = r.extraDataCodec.DecodeTokenAmountDestExecData(
+			tokenAmount.DestExecDataDecoded, err = r.extraDataCodec.DecodeTokenAmountDestExecData(
 				tokenAmount.DestExecData,
 				sourceChainSelector,
 			)

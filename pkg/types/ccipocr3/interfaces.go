@@ -24,7 +24,7 @@ type ExtraDataCodec interface {
 	// DecodeExtraArgs reformat bytes into a chain agnostic map[string]any representation for extra args
 	DecodeExtraArgs(extraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
 	// DecodeTokenAmountDestExecData provide special treatment for DestExecData in token message depends on source chain
-	DecodeTokenAmountDestExecData(destExecData Bytes, sourceChainSelector ChainSelector) (Bytes, error)
+	DecodeTokenAmountDestExecData(destExecData Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
 }
 
 // RMNCrypto provides a chain-agnostic interface for verifying RMN signatures.

@@ -203,4 +203,8 @@ type RampTokenAmount struct {
 	// NOTE: this must be decoded before providing it as an execution input to the destination chain
 	// or hashing it. See Internal._hash(Any2EVMRampMessage) for more details as an example.
 	DestExecData Bytes `json:"destExecData"`
+	// DestExecDataDecoded is the same as DestExecData
+	// just decoded into a named collection of arguments in a generic format,
+	// which can be read by any destination chain family.
+	DestExecDataDecoded map[string]any `json:"destExecDataDecoded,omitempty"`
 }
