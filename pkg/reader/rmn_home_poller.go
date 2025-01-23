@@ -193,8 +193,9 @@ func (r *rmnHomePoller) Ready() error {
 }
 
 func (r *rmnHomePoller) HealthReport() map[string]error {
-	if r.failedPolls.Load() >= maxFailedPolls {
-		err := fmt.Errorf("polling failed %d times in a row (maximum allowed: %d)", r.failedPolls, maxFailedPolls)
+	f := r.failedPolls.Load()
+	if f >= maxFailedPolls {
+		err := fmt.Errorf("polling failed %d times in a row (maximum allowed: %d)", f, maxFailedPolls)
 		r.sync.SvcErrBuffer.Append(err)
 	}
 	return map[string]error{r.Name(): r.sync.Healthy()}
