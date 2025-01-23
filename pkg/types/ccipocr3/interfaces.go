@@ -23,7 +23,7 @@ type MessageHasher interface {
 type ExtraDataCodec interface {
 	// DecodeExtraArgs reformat bytes into a chain agnostic map[string]any representation for extra args
 	DecodeExtraArgs(extraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
-	// DecodeTokenAmountDestExecData provide special treatment for DestExecData in token message depends on source chain
+	// DecodeTokenAmountDestExecData reformat bytes into a chain agnostic map[string]any representation for tokenAmount DestExecData field
 	DecodeTokenAmountDestExecData(destExecData Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
 }
 
