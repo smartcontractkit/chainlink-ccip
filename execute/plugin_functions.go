@@ -20,6 +20,8 @@ import (
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
+// validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported
+// by observer
 func validateCommitReportsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedData exectypes.CommitObservations,
@@ -85,6 +87,7 @@ func validateTokenDataObservations(
 	return nil
 }
 
+// validateCostlyMessagesObservations validates that all costly messages belong to already observed messages
 func validateCostlyMessagesObservations(
 	observedMsgs exectypes.MessageObservations,
 	costlyMessages []cciptypes.Bytes32,
