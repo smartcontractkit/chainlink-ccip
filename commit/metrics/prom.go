@@ -1,9 +1,12 @@
 package metrics
 
 import (
+	"strconv"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	sel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
@@ -32,6 +35,7 @@ const (
 )
 
 var (
+	RequestLatencyBucketsMilliseconds     = []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000}
 	promMerkleProcessorObservationDetails = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ccip_commit_merkle_processor_observation_components_sizes",
@@ -45,6 +49,22 @@ var (
 			Help: "This metric tracks the number of different items in the merkle outcome of the commit plugin",
 		},
 		[]string{"chainID", "state", "type"},
+	)
+	promMerkleProcessorRmnReportLatency = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "ccip_commit_merkle_processor_rmn_report_latency_ms",
+			Help:    "This metric tracks the client-observed latency of building an full RMN report with signatures",
+			Buckets: RequestLatencyBucketsMilliseconds,
+		},
+		[]string{"chainID", "success"},
+	)
+	promRmnControllerRmnRequestLatency = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "ccip_commit_rmn_controller_rmn_request_latency_ms",
+			Help:    "This metric tracks the client-observed latency of a single RMN request",
+			Buckets: RequestLatencyBucketsMilliseconds,
+		},
+		[]string{"method", "nodeID", "error"},
 	)
 	promTokenPriceObservationDetails = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -82,6 +102,8 @@ type PromReporter struct {
 	// Prometheus components
 	merkleProcessorObservationCounter   *prometheus.CounterVec
 	merkleProcessorOutcomeCounter       *prometheus.CounterVec
+	merkleProcessorRmnReportHistogram   *prometheus.HistogramVec
+	rmnControllerRmnRequestHistogram    *prometheus.HistogramVec
 	tokenProcessorObservationCounter    *prometheus.CounterVec
 	tokenProcessorOutcomeCounter        *prometheus.CounterVec
 	chainFeeProcessorObservationCounter *prometheus.CounterVec
@@ -100,6 +122,8 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 
 		merkleProcessorObservationCounter:   promMerkleProcessorObservationDetails,
 		merkleProcessorOutcomeCounter:       promMerkleOutcomeDetails,
+		merkleProcessorRmnReportHistogram:   promMerkleProcessorRmnReportLatency,
+		rmnControllerRmnRequestHistogram:    promRmnControllerRmnRequestLatency,
 		tokenProcessorObservationCounter:    promTokenPriceObservationDetails,
 		tokenProcessorOutcomeCounter:        promTokenPriceOutcomeDetails,
 		chainFeeProcessorObservationCounter: promChainFeeObservationDetails,
@@ -151,6 +175,16 @@ func (p *PromReporter) TrackMerkleOutcome(outcome merkleroot.Outcome, state stri
 			WithLabelValues(p.chainID, state, key).
 			Add(float64(count))
 	}
+}
+
+func (p *PromReporter) TrackRmnReport(latency float64, success bool) {
+	successStr := strconv.FormatBool(success)
+	p.merkleProcessorRmnReportHistogram.WithLabelValues(p.chainID, successStr).Observe(latency)
+}
+
+func (p *PromReporter) TrackRmnRequest(method string, latency float64, nodeID uint64, err string) {
+	nodeIDStr := strconv.FormatUint(nodeID, 10)
+	p.rmnControllerRmnRequestHistogram.WithLabelValues(method, nodeIDStr, err).Observe(latency)
 }
 
 func (p *PromReporter) TrackTokenPricesObservation(obs tokenprice.Observation) {

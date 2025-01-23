@@ -101,6 +101,7 @@ func NewPlugin(
 		rmnHomeReader,
 		observationsInitialRequestTimerDuration(reportingCfg.MaxDurationQuery),
 		reportsInitialRequestTimerDuration(reportingCfg.MaxDurationQuery),
+		reporter,
 	)
 
 	merkleRootProcessor := merkleroot.NewProcessor(
