@@ -134,30 +134,44 @@ pub mod ccip_router {
         v1::admin::update_fee_aggregator(ctx, fee_aggregator)
     }
 
-    /// Adds a new chain selector to the router.
+    /// Adds a new source chain selector to the router.
     ///
-    /// The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).
+    /// The Admin needs to add any new chain supported for our offramp,
+    /// with that remote chain being the source of messages.
     /// When adding a new chain, the Admin needs to specify if it's enabled or not.
-    /// They may enable only source, or only destination, or neither, or both.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for adding the chain selector.
+    /// * `_ccip_version` - The version of CCIP to add the chain selector to
+    /// * `new_chain_selector` - The new chain selector to be added.
+    /// * `source_chain_config` - The configuration for the chain as source.
+    pub fn add_source_chain_selector(
+        ctx: Context<AddSourceChainSelector>,
+        _ccip_version: CcipVersion,
+        new_chain_selector: u64,
+        source_chain_config: SourceChainConfig,
+    ) -> Result<()> {
+        v1::admin::add_source_chain_selector(ctx, new_chain_selector, source_chain_config)
+    }
+
+    /// Adds a new dest chain selector to the router.
+    ///
+    /// The Admin needs to add any new chain supported for our onramp,
+    /// with that remote chain being the destination of messages.
+    /// When adding a new chain, the Admin needs to specify if it's enabled or not.
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for adding the chain selector.
     /// * `new_chain_selector` - The new chain selector to be added.
-    /// * `source_chain_config` - The configuration for the chain as source.
     /// * `dest_chain_config` - The configuration for the chain as destination.
-    pub fn add_chain_selector(
-        ctx: Context<AddChainSelector>,
+    pub fn add_dest_chain_selector(
+        ctx: Context<AddDestChainSelector>,
         new_chain_selector: u64,
-        source_chain_config: SourceChainConfig,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::add_chain_selector(
-            ctx,
-            new_chain_selector,
-            source_chain_config,
-            dest_chain_config,
-        )
+        v1::admin::add_dest_chain_selector(ctx, new_chain_selector, dest_chain_config)
     }
 
     /// Disables the source chain selector.
@@ -541,6 +555,7 @@ pub mod ccip_router {
     /// * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
     pub fn commit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
+        _ccip_version: CcipVersion,
         report_context_byte_words: [[u8; 32]; 3],
         report: CommitInput,
         signatures: Vec<[u8; 65]>,
@@ -572,6 +587,7 @@ pub mod ccip_router {
     ///     * report_context_byte_words[2]: ExtraHash
     pub fn execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
+        _ccip_version: CcipVersion,
         execution_report: ExecutionReportSingleChain,
         report_context_byte_words: [[u8; 32]; 3],
         token_indexes: Vec<u8>,
@@ -596,6 +612,7 @@ pub mod ccip_router {
     /// * `execution_report` - The execution report containing the message and proofs.
     pub fn manually_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
+        _ccip_version: CcipVersion,
         execution_report: ExecutionReportSingleChain,
         token_indexes: Vec<u8>,
     ) -> Result<()> {

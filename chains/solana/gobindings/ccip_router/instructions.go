@@ -78,19 +78,32 @@ var (
 	// * `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token).
 	Instruction_UpdateFeeAggregator = ag_binary.TypeID([8]byte{85, 112, 115, 60, 22, 95, 230, 56})
 
-	// Adds a new chain selector to the router.
+	// Adds a new source chain selector to the router.
 	//
-	// The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).
+	// The Admin needs to add any new chain supported for our offramp,
+	// with that remote chain being the source of messages.
 	// When adding a new chain, the Admin needs to specify if it's enabled or not.
-	// They may enable only source, or only destination, or neither, or both.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for adding the chain selector.
+	// * `_ccip_version` - The version of CCIP to add the chain selector to
+	// * `new_chain_selector` - The new chain selector to be added.
+	// * `source_chain_config` - The configuration for the chain as source.
+	Instruction_AddSourceChainSelector = ag_binary.TypeID([8]byte{29, 195, 48, 57, 69, 19, 105, 60})
+
+	// Adds a new dest chain selector to the router.
+	//
+	// The Admin needs to add any new chain supported for our onramp,
+	// with that remote chain being the destination of messages.
+	// When adding a new chain, the Admin needs to specify if it's enabled or not.
 	//
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for adding the chain selector.
 	// * `new_chain_selector` - The new chain selector to be added.
-	// * `source_chain_config` - The configuration for the chain as source.
 	// * `dest_chain_config` - The configuration for the chain as destination.
-	Instruction_AddChainSelector = ag_binary.TypeID([8]byte{28, 60, 171, 0, 195, 113, 56, 7})
+	Instruction_AddDestChainSelector = ag_binary.TypeID([8]byte{122, 156, 151, 20, 138, 6, 172, 213})
 
 	// Disables the source chain selector.
 	//
@@ -399,8 +412,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptOwnership"
 	case Instruction_UpdateFeeAggregator:
 		return "UpdateFeeAggregator"
-	case Instruction_AddChainSelector:
-		return "AddChainSelector"
+	case Instruction_AddSourceChainSelector:
+		return "AddSourceChainSelector"
+	case Instruction_AddDestChainSelector:
+		return "AddDestChainSelector"
 	case Instruction_DisableSourceChainSelector:
 		return "DisableSourceChainSelector"
 	case Instruction_DisableDestChainSelector:
@@ -482,7 +497,10 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"update_fee_aggregator", (*UpdateFeeAggregator)(nil),
 		},
 		{
-			"add_chain_selector", (*AddChainSelector)(nil),
+			"add_source_chain_selector", (*AddSourceChainSelector)(nil),
+		},
+		{
+			"add_dest_chain_selector", (*AddDestChainSelector)(nil),
 		},
 		{
 			"disable_source_chain_selector", (*DisableSourceChainSelector)(nil),

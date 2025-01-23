@@ -2,14 +2,15 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use crate::{
-    AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
-    DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
-    FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved, Ocr3ConfigInfo, OcrPluginType,
-    OwnershipTransferRequested, OwnershipTransferred, RemoveBillingTokenConfig, SetOcrConfig,
-    SetTokenBillingConfig, SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated,
-    SourceChainState, TimestampedPackedU224, TokenBilling, TransferOwnership,
-    UpdateBillingTokenConfig, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
-    UpdateSourceChainSelectorConfig, WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
+    AcceptOwnership, AddBillingTokenConfig, AddDestChainSelector, AddSourceChainSelector,
+    BillingTokenConfig, CcipRouterError, DestChainAdded, DestChainConfig, DestChainConfigUpdated,
+    DestChainState, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved,
+    Ocr3ConfigInfo, OcrPluginType, OwnershipTransferRequested, OwnershipTransferred,
+    RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig, SourceChainAdded,
+    SourceChainConfig, SourceChainConfigUpdated, SourceChainState, TimestampedPackedU224,
+    TokenBilling, TransferOwnership, UpdateBillingTokenConfig, UpdateConfigCCIPRouter,
+    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
+    FEE_BILLING_SIGNER_SEEDS,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -49,11 +50,10 @@ pub fn update_fee_aggregator(
     Ok(())
 }
 
-pub fn add_chain_selector(
-    ctx: Context<AddChainSelector>,
+pub fn add_source_chain_selector(
+    ctx: Context<AddSourceChainSelector>,
     new_chain_selector: u64,
     source_chain_config: SourceChainConfig,
-    dest_chain_config: DestChainConfig,
 ) -> Result<()> {
     // Set source chain config & state
     let source_chain_state = &mut ctx.accounts.source_chain_state;
@@ -63,6 +63,19 @@ pub fn add_chain_selector(
     source_chain_state.config = source_chain_config.clone();
     source_chain_state.state = SourceChainState { min_seq_nr: 1 };
 
+    emit!(SourceChainAdded {
+        source_chain_selector: new_chain_selector,
+        source_chain_config,
+    });
+
+    Ok(())
+}
+
+pub fn add_dest_chain_selector(
+    ctx: Context<AddDestChainSelector>,
+    new_chain_selector: u64,
+    dest_chain_config: DestChainConfig,
+) -> Result<()> {
     // Set dest chain config & state
     let dest_chain_state = &mut ctx.accounts.dest_chain_state;
     validate_dest_chain_config(new_chain_selector, &dest_chain_config)?;
@@ -71,21 +84,17 @@ pub fn add_chain_selector(
     dest_chain_state.config = dest_chain_config.clone();
     dest_chain_state.state = DestChainState {
         sequence_number: 0,
+        rollback_sequence_number: 0,
+        rollback_seq_num_valid: false,
         usd_per_unit_gas: TimestampedPackedU224 {
             value: [0; 28],
             timestamp: 0,
         },
     };
-
-    emit!(SourceChainAdded {
-        source_chain_selector: new_chain_selector,
-        source_chain_config,
-    });
     emit!(DestChainAdded {
         dest_chain_selector: new_chain_selector,
         dest_chain_config,
     });
-
     Ok(())
 }
 

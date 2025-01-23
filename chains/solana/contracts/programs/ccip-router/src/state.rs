@@ -91,7 +91,9 @@ pub struct SourceChain {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainState {
-    pub sequence_number: u64, // The last used sequence number
+    pub sequence_number: u64,          // The last used sequence number
+    pub rollback_sequence_number: u64, // The last used sequence number in the previous live CCIP version. Only to be used for CCIP version rollbacks.
+    pub rollback_seq_num_valid: bool,  // Flag to indicate if the rollback_sequence_number is valid
     pub usd_per_unit_gas: TimestampedPackedU224,
 }
 

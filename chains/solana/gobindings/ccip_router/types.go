@@ -216,6 +216,39 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
+type CcipVersion struct {
+	Major uint8
+	Minor uint8
+}
+
+func (obj CcipVersion) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Major` param:
+	err = encoder.Encode(obj.Major)
+	if err != nil {
+		return err
+	}
+	// Serialize `Minor` param:
+	err = encoder.Encode(obj.Minor)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CcipVersion) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Major`:
+	err = decoder.Decode(&obj.Major)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Minor`:
+	err = decoder.Decode(&obj.Minor)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type RampMessageHeader struct {
 	MessageId           [32]uint8
 	SourceChainSelector uint64
@@ -1128,13 +1161,25 @@ func (obj *SourceChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 }
 
 type DestChainState struct {
-	SequenceNumber uint64
-	UsdPerUnitGas  TimestampedPackedU224
+	SequenceNumber         uint64
+	RollbackSequenceNumber uint64
+	RollbackSeqNumValid    bool
+	UsdPerUnitGas          TimestampedPackedU224
 }
 
 func (obj DestChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `SequenceNumber` param:
 	err = encoder.Encode(obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Serialize `RollbackSequenceNumber` param:
+	err = encoder.Encode(obj.RollbackSequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Serialize `RollbackSeqNumValid` param:
+	err = encoder.Encode(obj.RollbackSeqNumValid)
 	if err != nil {
 		return err
 	}
@@ -1149,6 +1194,16 @@ func (obj DestChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 func (obj *DestChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `SequenceNumber`:
 	err = decoder.Decode(&obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RollbackSequenceNumber`:
+	err = decoder.Decode(&obj.RollbackSequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RollbackSeqNumValid`:
+	err = decoder.Decode(&obj.RollbackSeqNumValid)
 	if err != nil {
 		return err
 	}

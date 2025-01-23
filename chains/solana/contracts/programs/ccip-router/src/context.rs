@@ -29,8 +29,8 @@ pub fn uninitialized(v: u8) -> bool {
 }
 
 // Fixed seeds - different contexts must use different PDA seeds
-pub const DEST_CHAIN_STATE_SEED: &[u8] = b"dest_chain_state";
-pub const SOURCE_CHAIN_STATE_SEED: &[u8] = b"source_chain_state";
+pub const DEST_CHAIN_SEED: &[u8] = b"dest_chain_state";
+pub const SOURCE_CHAIN_SEED: &[u8] = b"source_chain_state";
 pub const COMMIT_REPORT_SEED: &[u8] = b"commit_report";
 pub const NONCE_SEED: &[u8] = b"nonce";
 pub const CONFIG_SEED: &[u8] = b"config";
@@ -99,7 +99,7 @@ impl MerkleRoot {
 #[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct GetFee<'info> {
     #[account(
-        seeds = [DEST_CHAIN_STATE_SEED, destination_chain_selector.to_le_bytes().as_ref()],
+        seeds = [DEST_CHAIN_SEED, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
@@ -231,12 +231,24 @@ pub struct AcceptOwnership<'info> {
     pub authority: Signer<'info>,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub struct CcipVersion {
+    pub major: u8,
+    pub minor: u8,
+}
+
+impl CcipVersion {
+    pub fn to_bytes(self) -> [u8; 2] {
+        [self.major, self.minor]
+    }
+}
+
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64)]
-pub struct AddChainSelector<'info> {
+#[instruction(ccip_version: CcipVersion, new_chain_selector: u64)]
+pub struct AddSourceChainSelector<'info> {
     #[account(
         init,
-        seeds = [SOURCE_CHAIN_STATE_SEED, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [SOURCE_CHAIN_SEED, ccip_version.to_bytes().as_ref(), new_chain_selector.to_le_bytes().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + SourceChain::INIT_SPACE,
@@ -244,8 +256,22 @@ pub struct AddChainSelector<'info> {
     )]
     pub source_chain_state: Account<'info, SourceChain>,
     #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+    )]
+    pub config: AccountLoader<'info, Config>,
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(new_chain_selector: u64)]
+pub struct AddDestChainSelector<'info> {
+    #[account(
         init,
-        seeds = [DEST_CHAIN_STATE_SEED, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [DEST_CHAIN_SEED, new_chain_selector.to_le_bytes().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE,
@@ -264,11 +290,11 @@ pub struct AddChainSelector<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64)]
+#[instruction(ccip_version: CcipVersion, new_chain_selector: u64)]
 pub struct UpdateSourceChainSelectorConfig<'info> {
     #[account(
         mut,
-        seeds = [SOURCE_CHAIN_STATE_SEED, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [SOURCE_CHAIN_SEED, ccip_version.to_bytes().as_ref(), new_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
@@ -288,7 +314,7 @@ pub struct UpdateSourceChainSelectorConfig<'info> {
 pub struct UpdateDestChainSelectorConfig<'info> {
     #[account(
         mut,
-        seeds = [DEST_CHAIN_STATE_SEED, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [DEST_CHAIN_SEED, new_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
@@ -305,20 +331,6 @@ pub struct UpdateDestChainSelectorConfig<'info> {
 
 #[derive(Accounts)]
 pub struct UpdateConfigCCIPRouter<'info> {
-    #[account(
-        mut,
-        seeds = [CONFIG_SEED],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
-    )]
-    pub config: AccountLoader<'info, Config>,
-    #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct UpdateSupportedChainsConfigCCIPRouter<'info> {
     #[account(
         mut,
         seeds = [CONFIG_SEED],
@@ -486,7 +498,7 @@ pub struct CcipSend<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [DEST_CHAIN_STATE_SEED, destination_chain_selector.to_le_bytes().as_ref()],
+        seeds = [DEST_CHAIN_SEED, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
@@ -591,7 +603,7 @@ pub struct CcipSend<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_report_context_byte_words: [[u8; 32]; 3], report: CommitInput)]
+#[instruction(ccip_version: CcipVersion, _report_context_byte_words: [[u8; 32]; 3], report: CommitInput)]
 pub struct CommitReportContext<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -601,14 +613,14 @@ pub struct CommitReportContext<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [SOURCE_CHAIN_STATE_SEED, report.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [SOURCE_CHAIN_SEED, ccip_version.to_bytes().as_ref(), report.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
     pub source_chain_state: Account<'info, SourceChain>,
     #[account(
         init,
-        seeds = [COMMIT_REPORT_SEED, report.merkle_root.source_chain_selector.to_le_bytes().as_ref(), report.merkle_root.merkle_root.as_ref()],
+        seeds = [COMMIT_REPORT_SEED, ccip_version.to_bytes().as_ref(), report.merkle_root.source_chain_selector.to_le_bytes().as_ref(), report.merkle_root.merkle_root.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + CommitReport::INIT_SPACE,
@@ -628,7 +640,7 @@ pub struct CommitReportContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(report: ExecutionReportSingleChain)]
+#[instruction(ccip_version: CcipVersion, report: ExecutionReportSingleChain)]
 pub struct ExecuteReportContext<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -637,14 +649,14 @@ pub struct ExecuteReportContext<'info> {
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
-        seeds = [SOURCE_CHAIN_STATE_SEED, report.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [SOURCE_CHAIN_SEED, ccip_version.to_bytes().as_ref(), report.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
     pub source_chain_state: Account<'info, SourceChain>,
     #[account(
         mut,
-        seeds = [COMMIT_REPORT_SEED, report.source_chain_selector.to_le_bytes().as_ref(), report.root.as_ref()],
+        seeds = [COMMIT_REPORT_SEED, ccip_version.to_bytes().as_ref(), report.source_chain_selector.to_le_bytes().as_ref(), report.root.as_ref()],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]

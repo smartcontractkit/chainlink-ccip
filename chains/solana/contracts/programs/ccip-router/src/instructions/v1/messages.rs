@@ -342,6 +342,8 @@ pub mod ramps {
                 state: crate::DestChainState {
                     sequence_number: 0,
                     usd_per_unit_gas,
+                    rollback_sequence_number: 0,
+                    rollback_seq_num_valid: false,
                 },
                 config: crate::DestChainConfig {
                     is_enabled: true,

@@ -202,20 +202,20 @@
       ]
     },
     {
-      "name": "addChainSelector",
+      "name": "addSourceChainSelector",
       "docs": [
-        "Adds a new chain selector to the router.",
+        "Adds a new source chain selector to the router.",
         "",
-        "The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).",
+        "The Admin needs to add any new chain supported for our offramp,",
+        "with that remote chain being the source of messages.",
         "When adding a new chain, the Admin needs to specify if it's enabled or not.",
-        "They may enable only source, or only destination, or neither, or both.",
         "",
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for adding the chain selector.",
+        "* `_ccip_version` - The version of CCIP to add the chain selector to",
         "* `new_chain_selector` - The new chain selector to be added.",
-        "* `source_chain_config` - The configuration for the chain as source.",
-        "* `dest_chain_config` - The configuration for the chain as destination."
+        "* `source_chain_config` - The configuration for the chain as source."
       ],
       "accounts": [
         {
@@ -223,6 +223,57 @@
           "isMut": true,
           "isSigner": false
         },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "ccipVersion",
+          "type": {
+            "defined": "CcipVersion"
+          }
+        },
+        {
+          "name": "newChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "sourceChainConfig",
+          "type": {
+            "defined": "SourceChainConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "addDestChainSelector",
+      "docs": [
+        "Adds a new dest chain selector to the router.",
+        "",
+        "The Admin needs to add any new chain supported for our onramp,",
+        "with that remote chain being the destination of messages.",
+        "When adding a new chain, the Admin needs to specify if it's enabled or not.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for adding the chain selector.",
+        "* `new_chain_selector` - The new chain selector to be added.",
+        "* `dest_chain_config` - The configuration for the chain as destination."
+      ],
+      "accounts": [
         {
           "name": "destChainState",
           "isMut": true,
@@ -248,12 +299,6 @@
         {
           "name": "newChainSelector",
           "type": "u64"
-        },
-        {
-          "name": "sourceChainConfig",
-          "type": {
-            "defined": "SourceChainConfig"
-          }
         },
         {
           "name": "destChainConfig",
@@ -1305,6 +1350,12 @@
       ],
       "args": [
         {
+          "name": "ccipVersion",
+          "type": {
+            "defined": "CcipVersion"
+          }
+        },
+        {
           "name": "reportContextByteWords",
           "type": {
             "array": [
@@ -1407,6 +1458,12 @@
       ],
       "args": [
         {
+          "name": "ccipVersion",
+          "type": {
+            "defined": "CcipVersion"
+          }
+        },
+        {
           "name": "executionReport",
           "type": {
             "defined": "ExecutionReportSingleChain"
@@ -1489,6 +1546,12 @@
         }
       ],
       "args": [
+        {
+          "name": "ccipVersion",
+          "type": {
+            "defined": "CcipVersion"
+          }
+        },
         {
           "name": "executionReport",
           "type": {
@@ -1926,6 +1989,22 @@
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipVersion",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "major",
+            "type": "u8"
+          },
+          {
+            "name": "minor",
+            "type": "u8"
           }
         ]
       }
@@ -2420,6 +2499,14 @@
           {
             "name": "sequenceNumber",
             "type": "u64"
+          },
+          {
+            "name": "rollbackSequenceNumber",
+            "type": "u64"
+          },
+          {
+            "name": "rollbackSeqNumValid",
+            "type": "bool"
           },
           {
             "name": "usdPerUnitGas",
