@@ -337,7 +337,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 		for _, chain := range versionedConfig.DynamicConfig.SourceChains {
 			homeFMap[chain.ChainSelector] = int(chain.FObserve)
 			for j := 0; j < len(nodes); j++ {
-				isObserver, err := IsNodeObserver(chain, j, len(nodes))
+				isObserver, err := isNodeObserver(chain, j, len(nodes))
 				if err != nil {
 					lggr.Warnw("failed to check if node is observer", "err", err)
 					continue
@@ -358,8 +358,8 @@ func convertOnChainConfigToRMNHomeChainConfig(
 	return rmnHomeConfigs
 }
 
-// IsNodeObserver checks if a node is an observer for the given source chain
-func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (bool, error) {
+// isNodeObserver checks if a node is an observer for the given source chain
+func isNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (bool, error) {
 	if totalNodes > rmnMaxSizeCommittee || totalNodes <= 0 {
 		return false, fmt.Errorf("invalid total nodes: %d", totalNodes)
 	}
