@@ -16,7 +16,7 @@ import (
 const (
 	// HomeChainPollingInterval is the interval at which the home chain is polled for updates.
 	// It should be used by RMNHome and CCIPHome to poll the home chain for updates.
-	// Ethereum was selected for the home chain for CCIP, therefore pooling more frequent
+	// Ethereum was selected for the home chain for CCIP, therefore polling more frequent
 	// than block time doesn't bring any value.
 	// We selected 15 seconds for simplicity, but this could be extended even further as
 	// we accept some delay when fetching the configuration updates.
