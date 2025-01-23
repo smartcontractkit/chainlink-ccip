@@ -77,18 +77,25 @@ func (p *Plugin) Observation(
 	switch state {
 	case exectypes.GetCommitReports:
 		observation, err = p.getCommitReportsObservation(ctx, lggr, observation)
+		if err != nil {
+			return nil, fmt.Errorf("getCommitReportsObservation: %w", err)
+		}
 	case exectypes.GetMessages:
 		// Phase 2: Gather messages from the source chains and build the execution report.
 		observation, err = p.getMessagesObservation(ctx, lggr, previousOutcome, observation)
+		if err != nil {
+			lggr.Errorw("failed to getMessagesObservation", "err", err)
+			return nil, nil
+		}
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
 		observation, err = p.getFilterObservation(ctx, lggr, previousOutcome, observation)
+		if err != nil {
+			lggr.Errorw("failed to getFilterObservation", "err", err)
+			return nil, nil
+		}
 	default:
-		err = fmt.Errorf("unknown state")
-	}
-
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get observation: unknown state")
 	}
 
 	p.observer.TrackObservation(observation, state)

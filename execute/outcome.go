@@ -98,15 +98,13 @@ func (p *Plugin) Outcome(
 		outcome = p.getMessagesOutcome(lggr, observation)
 	case exectypes.Filter:
 		outcome, err = p.getFilterOutcome(ctx, lggr, observation, previousOutcome)
+		if err != nil {
+			// We want to have an empty previousOutcome in the next round. To achieve this we don't return an error.
+			lggr.Errorw("get filter outcome", "err", err)
+			return nil, nil
+		}
 	default:
 		panic("unknown state")
-	}
-
-	if err != nil {
-		lggr.Warnw(
-			fmt.Sprintf("[oracle %d] exec outcome error", p.reportingCfg.OracleID),
-			"err", err)
-		return nil, fmt.Errorf("unable to get outcome: %w", err)
 	}
 
 	// This may happen if there is nothing to observe, or during startup when the contracts have
