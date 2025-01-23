@@ -47,6 +47,11 @@ func (p *Plugin) Observation(
 	}
 	lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 
+	fChain, err := p.homeChain.GetFChain()
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("unable to get FChain: %w", err)
+	}
+
 	var discoveryObs dt.Observation
 	// discovery processor disabled by setting it to nil.
 	if p.discovery != nil {
@@ -58,12 +63,13 @@ func (p *Plugin) Observation(
 		if !p.contractsInitialized {
 			lggr.Infow("contracts not initialized, only making discovery observations",
 				"discoveryObs", discoveryObs)
-			return exectypes.Observation{Contracts: discoveryObs}.Encode()
+			return exectypes.Observation{Contracts: discoveryObs, FChain: fChain}.Encode()
 		}
 	}
 
 	observation := exectypes.Observation{
 		Contracts: discoveryObs,
+		FChain:    fChain,
 	}
 
 	state := previousOutcome.State.Next()

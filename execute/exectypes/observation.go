@@ -106,6 +106,8 @@ type Observation struct {
 
 	// Contracts are part of the initial discovery phase which runs to initialize the CCIP Reader.
 	Contracts dt.Observation `json:"contracts"`
+
+	FChain map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
 func (co CommitObservations) Flatten() []CommitData {

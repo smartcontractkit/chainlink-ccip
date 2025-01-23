@@ -211,6 +211,10 @@ func (p *Plugin) ValidateObservation(
 		}
 	}
 
+	if err := plugincommon.ValidateFChain(decodedObservation.FChain); err != nil {
+		return fmt.Errorf("failed to validate FChain: %w", err)
+	}
+
 	// These checks are common to all states.
 	err = validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports)
 	if err != nil {

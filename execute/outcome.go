@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
@@ -66,10 +68,17 @@ func (p *Plugin) Outcome(
 		p.contractsInitialized = true
 	}
 
-	fChain, err := p.homeChain.GetFChain()
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
+	observedFChains := make(map[cciptypes.ChainSelector][]int)
+	for _, ao := range decodedAos {
+		obs := ao.Observation
+		for chain, f := range obs.FChain {
+			observedFChains[chain] = append(observedFChains[chain], f)
+		}
 	}
+	// consensus on the fChain map uses the role DON F value
+	// because all nodes can observe the home chain.
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.reportingCfg.F))
+	fChain := consensus.GetConsensusMap(lggr, "fChain", observedFChains, donThresh)
 	_, ok := fChain[p.destChain] // check if the destination chain is in the FChain.
 	if !ok {
 		return ocr3types.Outcome{}, fmt.Errorf("destination chain %d is not in FChain", p.destChain)
