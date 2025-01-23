@@ -413,6 +413,7 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 	observation, err := exectypes.Observation{
 		Contracts: dt.Observation{}, FChain: fChainMap,
 	}.Encode()
+	require.NoError(t, err)
 	_, err = p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
 			Observation: observation,
@@ -442,6 +443,7 @@ func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 		Contracts:     dt.Observation{},
 		FChain:        fChainMap,
 	}.Encode()
+	require.NoError(t, err)
 	outcome, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
 			Observation: observation,
