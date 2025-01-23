@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,86 +52,47 @@ func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
 }
 
 func TestRMNHomePoller_HealthReport(t *testing.T) {
-	t.Parallel()
+	homeChainReader := readermock.NewMockContractReaderFacade(t)
 
-	tests := []struct {
-		name        string
-		failedPolls uint32
-		wantErr     bool
-	}{
-		{
-			name:        "Healthy state",
-			failedPolls: 0,
-			wantErr:     false,
-		},
-		{
-			name:        "Unhealthy state",
-			failedPolls: maxFailedPolls,
-			wantErr:     true,
-		},
-	}
+	mocked := homeChainReader.On("GetLatestValue",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Run(func(args mock.Arguments) {
+		result := args.Get(4).(*GetAllConfigsResponse)
+		*result = GetAllConfigsResponse{
+			ActiveConfig: VersionedConfig{
+				ConfigDigest:  [32]byte{1},
+				Version:       1,
+				StaticConfig:  StaticConfig{Nodes: []Node{}},
+				DynamicConfig: DynamicConfig{SourceChains: []SourceChain{}},
+			},
+		}
+	}).Return(nil)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			homeChainReader := readermock.NewMockContractReaderFacade(t)
+	poller := newRMNHomeForTests(
+		t,
+		homeChainReader,
+		rmnHomeBoundContract,
+		2*time.Millisecond,
+	)
+	require.NoError(t, poller.Start(tests.Context(t)))
 
-			homeChainReader.On("GetLatestValue",
-				mock.Anything,
-				mock.Anything,
-				mock.Anything,
-				mock.Anything,
-				mock.Anything,
-			).Run(func(args mock.Arguments) {
-				result := args.Get(4).(*GetAllConfigsResponse)
-				*result = GetAllConfigsResponse{
-					ActiveConfig: VersionedConfig{
-						ConfigDigest:  [32]byte{1},
-						Version:       1,
-						StaticConfig:  StaticConfig{Nodes: []Node{}},
-						DynamicConfig: DynamicConfig{SourceChains: []SourceChain{}},
-					},
-				}
-			}).Return(nil)
+	require.Eventually(t, func() bool {
+		active, _ := poller.GetAllConfigDigests()
+		return active == [32]byte{1}
+	}, tests.WaitTimeout(t), 10*time.Millisecond)
 
-			poller := newRMNHomeForTests(
-				t,
-				homeChainReader,
-				rmnHomeBoundContract,
-				10*time.Millisecond,
-			)
+	mocked.Return(fmt.Errorf("polling failed"))
+	require.Eventually(t, func() bool {
+		report := poller.HealthReport()
+		err := report[poller.bgPoller.Name()]
+		return err != nil && strings.Contains(err.Error(), "polling failed")
+	}, tests.WaitTimeout(t), 10*time.Millisecond)
 
-			require.NoError(t, poller.Start(context.Background()))
-
-			// Wait for the initial fetch to complete
-			require.Eventually(t, func() bool {
-				return homeChainReader.AssertCalled(
-					t,
-					"GetLatestValue",
-					mock.Anything,
-					mock.Anything,
-					mock.Anything,
-					mock.Anything,
-					mock.Anything)
-			}, 5*time.Second, 10*time.Millisecond, "GetLatestValue was not called within the expected timeframe")
-
-			poller.bgPoller.failedPolls.Store(tt.failedPolls)
-
-			report := poller.HealthReport()
-
-			require.Len(t, report, 1)
-			err := report[poller.bgPoller.Name()]
-
-			if tt.wantErr {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "polling failed")
-			} else {
-				require.NoError(t, err)
-			}
-
-			require.NoError(t, poller.Close())
-		})
-	}
+	require.NoError(t, poller.Close())
 }
 
 func Test_RMNHomePollingWorking(t *testing.T) {
