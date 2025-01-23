@@ -186,7 +186,8 @@ func (c *controller) ComputeReportSignatures(
 	for chain, l := range updatesPerChain {
 		homeChainF, exists := homeFMap[cciptypes.ChainSelector(chain)]
 		if !exists {
-			return nil, fmt.Errorf("no home F for chain %d", chain)
+			lggr.Errorw("no home F for chain, chain skipped", "chain", chain)
+			delete(updatesPerChain, chain)
 		}
 
 		if consensus.LtFPlusOne(homeChainF, l.RmnNodes.Cardinality()) {
@@ -323,7 +324,8 @@ func (c *controller) getRmnSignedObservations(
 			// if we already have enough requests for this source chain, mark it
 			homeChainF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
 			if !exist {
-				return nil, nil, fmt.Errorf("no home F for chain %d", sourceChain)
+				lggr.Errorw("no home F for chain", "chain", sourceChain)
+				continue
 			}
 			if consensus.GteFPlusOne(homeChainF, requestedNodes[sourceChain].Cardinality()) {
 				chainsWithEnoughRequests.Add(sourceChain)
