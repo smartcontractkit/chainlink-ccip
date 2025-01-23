@@ -22,6 +22,9 @@ func (q Query) Encode() ([]byte, error) {
 }
 
 func DecodeCommitPluginQuery(encodedQuery []byte) (Query, error) {
+	if len(encodedQuery) == 0 {
+		return Query{}, nil
+	}
 	q := Query{}
 	err := json.Unmarshal(encodedQuery, &q)
 	return q, err
@@ -45,6 +48,9 @@ func (obs Observation) Encode() ([]byte, error) {
 }
 
 func DecodeCommitPluginObservation(encodedObservation []byte) (Observation, error) {
+	if len(encodedObservation) == 0 {
+		return Observation{}, nil
+	}
 	o := Observation{}
 	err := json.Unmarshal(encodedObservation, &o)
 	return o, err
