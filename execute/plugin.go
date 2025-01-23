@@ -225,7 +225,7 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
-        // check message related validations when states can contain messages
+	// check message related validations when states can contain messages
 	if state == exectypes.GetMessages || state == exectypes.Filter {
 		err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages)
 		if err != nil {
