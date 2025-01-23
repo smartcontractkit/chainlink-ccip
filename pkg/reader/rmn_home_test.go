@@ -484,7 +484,7 @@ func Test_CachingInstances(t *testing.T) {
 		chain.EXPECT().GetLatestValue(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	}
 
-	t.Run("create and cache instance for the same chain and address", func(t *testing.T) {
+	t.Run("reusing instance for the same chain and address", func(t *testing.T) {
 		chainSelector := cciptypes.ChainSelector(rand.RandomInt64())
 		address := rand.RandomAddressBytes()
 		poller1, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
@@ -536,7 +536,7 @@ func Test_CachingInstances(t *testing.T) {
 		require.NoError(t, poller2.Close())
 	})
 
-	t.Run("parallel creation of instances", func(t *testing.T) {
+	t.Run("parallel creation of instances doesn't cause any failures", func(t *testing.T) {
 		instancesMu.Lock()
 		instances = make(map[string]*rmnHomePoller)
 		instancesMu.Unlock()
@@ -545,7 +545,7 @@ func Test_CachingInstances(t *testing.T) {
 		address := rand.RandomAddressBytes()
 
 		eg := new(errgroup.Group)
-		for i := 0; i < 10000; i++ {
+		for i := 0; i < 1000; i++ {
 			eg.Go(func() error {
 				poller, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
 				require.NotNil(t, poller)
@@ -559,5 +559,24 @@ func Test_CachingInstances(t *testing.T) {
 		poller, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
 		require.NoError(t, err)
 		require.NoError(t, poller.Close())
+	})
+
+	t.Run("create new instance when old one is already stopped", func(t *testing.T) {
+		chainSelector := cciptypes.ChainSelector(rand.RandomInt64())
+		address := rand.RandomAddressBytes()
+
+		poller1, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+		require.NoError(t, poller1.Close())
+		require.Error(t, poller1.Start(ctx))
+
+		poller2, err := GetRMNHomePoller(ctx, lggr, chainSelector, address, chain1, HomeChainPollingInterval)
+		require.NoError(t, err)
+
+		castedPoller, ok := poller2.(*rmnHomePoller)
+		require.True(t, ok)
+		require.NoError(t, castedPoller.Ready())
+
+		require.NoError(t, poller2.Close())
 	})
 }

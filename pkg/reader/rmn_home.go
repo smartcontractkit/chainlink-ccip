@@ -97,7 +97,7 @@ func GetRMNHomePoller(
 	hexEncodedAddr := " 0x" + hex.EncodeToString(rmnHomeAddress)
 	key := fmt.Sprintf("%s-%s", rmnHomeChainSelector.String(), hexEncodedAddr)
 
-	instance, ok := instances[key]
+	instance, ok := getInstance(key)
 	if ok {
 		lggr.Infow("RMNHomePoller already exists, reusing instance",
 			"chainSelector", rmnHomeChainSelector,
@@ -128,6 +128,19 @@ func GetRMNHomePoller(
 
 	instances[key] = rmnHomeReader
 	return rmnHomeReader, nil
+}
+
+func getInstance(key string) (*rmnHomePoller, bool) {
+	instance, ok := instances[key]
+	if !ok {
+		return nil, false
+	}
+
+	if err := instance.sync.Ready(); err != nil {
+		return nil, false
+	}
+
+	return instance, ok
 }
 
 func newRMNHomePoller(
