@@ -20,6 +20,7 @@ import (
 // * `source_chain_selector` - The source chain selector to be updated.
 // * `source_chain_config` - The new configuration for the source chain.
 type UpdateSourceChainConfig struct {
+	CcipVersion         *CcipVersion
 	SourceChainSelector *uint64
 	SourceChainConfig   *SourceChainConfig
 
@@ -37,6 +38,12 @@ func NewUpdateSourceChainConfigInstructionBuilder() *UpdateSourceChainConfig {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
+}
+
+// SetCcipVersion sets the "ccipVersion" parameter.
+func (inst *UpdateSourceChainConfig) SetCcipVersion(ccipVersion CcipVersion) *UpdateSourceChainConfig {
+	inst.CcipVersion = &ccipVersion
+	return inst
 }
 
 // SetSourceChainSelector sets the "sourceChainSelector" parameter.
@@ -104,6 +111,9 @@ func (inst UpdateSourceChainConfig) ValidateAndBuild() (*Instruction, error) {
 func (inst *UpdateSourceChainConfig) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.CcipVersion == nil {
+			return errors.New("CcipVersion parameter is not set")
+		}
 		if inst.SourceChainSelector == nil {
 			return errors.New("SourceChainSelector parameter is not set")
 		}
@@ -136,7 +146,8 @@ func (inst *UpdateSourceChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("        CcipVersion", *inst.CcipVersion))
 						paramsBranch.Child(ag_format.Param("SourceChainSelector", *inst.SourceChainSelector))
 						paramsBranch.Child(ag_format.Param("  SourceChainConfig", *inst.SourceChainConfig))
 					})
@@ -152,6 +163,11 @@ func (inst *UpdateSourceChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj UpdateSourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `CcipVersion` param:
+	err = encoder.Encode(obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Serialize `SourceChainSelector` param:
 	err = encoder.Encode(obj.SourceChainSelector)
 	if err != nil {
@@ -165,6 +181,11 @@ func (obj UpdateSourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder
 	return nil
 }
 func (obj *UpdateSourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `CcipVersion`:
+	err = decoder.Decode(&obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Deserialize `SourceChainSelector`:
 	err = decoder.Decode(&obj.SourceChainSelector)
 	if err != nil {
@@ -181,6 +202,7 @@ func (obj *UpdateSourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Deco
 // NewUpdateSourceChainConfigInstruction declares a new UpdateSourceChainConfig instruction with the provided parameters and accounts.
 func NewUpdateSourceChainConfigInstruction(
 	// Parameters:
+	ccipVersion CcipVersion,
 	sourceChainSelector uint64,
 	sourceChainConfig SourceChainConfig,
 	// Accounts:
@@ -188,6 +210,7 @@ func NewUpdateSourceChainConfigInstruction(
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *UpdateSourceChainConfig {
 	return NewUpdateSourceChainConfigInstructionBuilder().
+		SetCcipVersion(ccipVersion).
 		SetSourceChainSelector(sourceChainSelector).
 		SetSourceChainConfig(sourceChainConfig).
 		SetSourceChainStateAccount(sourceChainState).

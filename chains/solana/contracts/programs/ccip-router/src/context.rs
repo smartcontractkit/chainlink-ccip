@@ -7,7 +7,7 @@ use solana_program::sysvar::instructions;
 use crate::program::CcipRouter;
 use crate::state::{CommitReport, Config, ExternalExecutionConfig, Nonce};
 use crate::{
-    BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
+    BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, CcipVersion, DestChain,
     ExecutionReportSingleChain, GlobalState, SVM2AnyMessage, SourceChain,
 };
 
@@ -229,18 +229,6 @@ pub struct AcceptOwnership<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(address = config.load()?.proposed_owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
-pub struct CcipVersion {
-    pub major: u8,
-    pub minor: u8,
-}
-
-impl CcipVersion {
-    pub fn to_bytes(self) -> [u8; 2] {
-        [self.major, self.minor]
-    }
 }
 
 #[derive(Accounts)]

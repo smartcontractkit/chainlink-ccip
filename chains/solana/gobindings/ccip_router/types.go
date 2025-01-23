@@ -216,39 +216,6 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
-type CcipVersion struct {
-	Major uint8
-	Minor uint8
-}
-
-func (obj CcipVersion) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Major` param:
-	err = encoder.Encode(obj.Major)
-	if err != nil {
-		return err
-	}
-	// Serialize `Minor` param:
-	err = encoder.Encode(obj.Minor)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *CcipVersion) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Major`:
-	err = decoder.Decode(&obj.Major)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Minor`:
-	err = decoder.Decode(&obj.Minor)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type RampMessageHeader struct {
 	MessageId           [32]uint8
 	SourceChainSelector uint64
@@ -1154,6 +1121,39 @@ func (obj SourceChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err 
 func (obj *SourceChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `MinSeqNr`:
 	err = decoder.Decode(&obj.MinSeqNr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type CcipVersion struct {
+	Major uint8
+	Minor uint8
+}
+
+func (obj CcipVersion) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Major` param:
+	err = encoder.Encode(obj.Major)
+	if err != nil {
+		return err
+	}
+	// Serialize `Minor` param:
+	err = encoder.Encode(obj.Minor)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CcipVersion) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Major`:
+	err = decoder.Decode(&obj.Major)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Minor`:
+	err = decoder.Decode(&obj.Minor)
 	if err != nil {
 		return err
 	}

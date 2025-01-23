@@ -36,9 +36,9 @@ func SignCommitReport(ctx [3][32]byte, report ccip_router.CommitInput, baseSigne
 	return sigs, nil
 }
 
-func GetSourceChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
+func GetSourceChainStatePDA(version ccip_router.CcipVersion, chainSelector uint64) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, config.CcipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), asSeed(version), chainSelectorLE}, config.CcipRouterProgram)
 	return p, err
 }
 
@@ -48,9 +48,9 @@ func GetDestChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
 	return p, err
 }
 
-func GetCommitReportPDA(chainSelector uint64, root [32]byte) (solana.PublicKey, error) {
+func GetCommitReportPDA(version ccip_router.CcipVersion, chainSelector uint64, root [32]byte) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), chainSelectorLE, root[:]}, config.CcipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), asSeed(version), chainSelectorLE, root[:]}, config.CcipRouterProgram)
 	return p, err
 }
 
@@ -58,4 +58,8 @@ func GetNoncePDA(chainSelector uint64, user solana.PublicKey) (solana.PublicKey,
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	p, _, err := solana.FindProgramAddress([][]byte{[]byte("nonce"), chainSelectorLE, user.Bytes()}, config.CcipRouterProgram)
 	return p, err
+}
+
+func asSeed(version ccip_router.CcipVersion) []byte {
+	return []byte{version.Major, version.Minor}
 }

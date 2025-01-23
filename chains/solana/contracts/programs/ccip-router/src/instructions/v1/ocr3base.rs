@@ -13,6 +13,7 @@ pub const MAX_TRANSMITTERS: usize = MAX_ORACLES;
 pub const SIGNATURE_LENGTH: usize = SECP256K1_SIGNATURE_LENGTH + 1; // signature + recovery ID
 
 pub const TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT_NO_SIGNATURES: u128 = 8 // anchor discriminator
+    + 2 // ccip version (major & minor, 1 byte each)
     + 3 * 32; // report context
 pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 = 4; // u32 length of signatures vec (borsh serialization)
 

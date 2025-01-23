@@ -79,11 +79,30 @@ pub struct SourceChainState {
     pub min_seq_nr: u64, // The min sequence number expected for future messages
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
+pub struct CcipVersion {
+    pub major: u8,
+    pub minor: u8,
+}
+
+impl CcipVersion {
+    pub fn to_bytes(self) -> [u8; 2] {
+        [self.major, self.minor]
+    }
+}
+
+impl std::fmt::Display for CcipVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}.{}", self.major, self.minor)
+    }
+}
+
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct SourceChain {
     // Config for Any2SVM
     pub version: u8,
+    pub ccip_version: CcipVersion, // The version of the CCIP protocol
     pub chain_selector: u64,       // Chain selector used for the seed
     pub state: SourceChainState,   // values that are updated automatically
     pub config: SourceChainConfig, // values configured by an admin

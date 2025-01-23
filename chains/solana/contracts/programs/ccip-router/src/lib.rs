@@ -148,11 +148,16 @@ pub mod ccip_router {
     /// * `source_chain_config` - The configuration for the chain as source.
     pub fn add_source_chain_selector(
         ctx: Context<AddSourceChainSelector>,
-        _ccip_version: CcipVersion,
+        ccip_version: CcipVersion,
         new_chain_selector: u64,
         source_chain_config: SourceChainConfig,
     ) -> Result<()> {
-        v1::admin::add_source_chain_selector(ctx, new_chain_selector, source_chain_config)
+        v1::admin::add_source_chain_selector(
+            ctx,
+            ccip_version,
+            new_chain_selector,
+            source_chain_config,
+        )
     }
 
     /// Adds a new dest chain selector to the router.
@@ -184,9 +189,10 @@ pub mod ccip_router {
     /// * `source_chain_selector` - The source chain selector to be disabled.
     pub fn disable_source_chain_selector(
         ctx: Context<UpdateSourceChainSelectorConfig>,
+        ccip_version: CcipVersion,
         source_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
+        v1::admin::disable_source_chain_selector(ctx, ccip_version, source_chain_selector)
     }
 
     /// Disables the destination chain selector.
@@ -215,10 +221,16 @@ pub mod ccip_router {
     /// * `source_chain_config` - The new configuration for the source chain.
     pub fn update_source_chain_config(
         ctx: Context<UpdateSourceChainSelectorConfig>,
+        ccip_version: CcipVersion,
         source_chain_selector: u64,
         source_chain_config: SourceChainConfig,
     ) -> Result<()> {
-        v1::admin::update_source_chain_config(ctx, source_chain_selector, source_chain_config)
+        v1::admin::update_source_chain_config(
+            ctx,
+            ccip_version,
+            source_chain_selector,
+            source_chain_config,
+        )
     }
 
     /// Updates the configuration of the destination chain selector.

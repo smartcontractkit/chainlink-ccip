@@ -237,6 +237,7 @@ func (obj *GlobalState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 
 type SourceChain struct {
 	Version       uint8
+	CcipVersion   CcipVersion
 	ChainSelector uint64
 	State         SourceChainState
 	Config        SourceChainConfig
@@ -252,6 +253,11 @@ func (obj SourceChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `CcipVersion` param:
+	err = encoder.Encode(obj.CcipVersion)
 	if err != nil {
 		return err
 	}
@@ -289,6 +295,11 @@ func (obj *SourceChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CcipVersion`:
+	err = decoder.Decode(&obj.CcipVersion)
 	if err != nil {
 		return err
 	}

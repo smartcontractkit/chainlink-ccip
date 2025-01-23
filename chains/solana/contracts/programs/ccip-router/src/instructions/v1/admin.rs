@@ -3,14 +3,14 @@ use anchor_spl::token_interface;
 
 use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChainSelector, AddSourceChainSelector,
-    BillingTokenConfig, CcipRouterError, DestChainAdded, DestChainConfig, DestChainConfigUpdated,
-    DestChainState, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved,
-    Ocr3ConfigInfo, OcrPluginType, OwnershipTransferRequested, OwnershipTransferred,
-    RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig, SourceChainAdded,
-    SourceChainConfig, SourceChainConfigUpdated, SourceChainState, TimestampedPackedU224,
-    TokenBilling, TransferOwnership, UpdateBillingTokenConfig, UpdateConfigCCIPRouter,
-    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
-    FEE_BILLING_SIGNER_SEEDS,
+    BillingTokenConfig, CcipRouterError, CcipVersion, DestChainAdded, DestChainConfig,
+    DestChainConfigUpdated, DestChainState, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled,
+    FeeTokenRemoved, Ocr3ConfigInfo, OcrPluginType, OwnershipTransferRequested,
+    OwnershipTransferred, RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig,
+    SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated, SourceChainState,
+    TimestampedPackedU224, TokenBilling, TransferOwnership, UpdateBillingTokenConfig,
+    UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig,
+    WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -52,6 +52,7 @@ pub fn update_fee_aggregator(
 
 pub fn add_source_chain_selector(
     ctx: Context<AddSourceChainSelector>,
+    ccip_version: CcipVersion,
     new_chain_selector: u64,
     source_chain_config: SourceChainConfig,
 ) -> Result<()> {
@@ -60,10 +61,12 @@ pub fn add_source_chain_selector(
     validate_source_chain_config(new_chain_selector, &source_chain_config)?;
     source_chain_state.version = 1;
     source_chain_state.chain_selector = new_chain_selector;
+    source_chain_state.ccip_version = ccip_version;
     source_chain_state.config = source_chain_config.clone();
     source_chain_state.state = SourceChainState { min_seq_nr: 1 };
 
     emit!(SourceChainAdded {
+        ccip_version,
         source_chain_selector: new_chain_selector,
         source_chain_config,
     });
@@ -100,6 +103,7 @@ pub fn add_dest_chain_selector(
 
 pub fn disable_source_chain_selector(
     ctx: Context<UpdateSourceChainSelectorConfig>,
+    ccip_version: CcipVersion,
     source_chain_selector: u64,
 ) -> Result<()> {
     let chain_state = &mut ctx.accounts.source_chain_state;
@@ -107,6 +111,7 @@ pub fn disable_source_chain_selector(
     chain_state.config.is_enabled = false;
 
     emit!(SourceChainConfigUpdated {
+        ccip_version,
         source_chain_selector,
         source_chain_config: chain_state.config.clone(),
     });
@@ -132,6 +137,7 @@ pub fn disable_dest_chain_selector(
 
 pub fn update_source_chain_config(
     ctx: Context<UpdateSourceChainSelectorConfig>,
+    ccip_version: CcipVersion,
     source_chain_selector: u64,
     source_chain_config: SourceChainConfig,
 ) -> Result<()> {
@@ -140,6 +146,7 @@ pub fn update_source_chain_config(
     ctx.accounts.source_chain_state.config = source_chain_config.clone();
 
     emit!(SourceChainConfigUpdated {
+        ccip_version,
         source_chain_selector,
         source_chain_config,
     });

@@ -502,15 +502,11 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("When and admin adds a chain selector with invalid dest chain config, it fails", func(t *testing.T) {
 			for _, test := range invalidInputTests {
 				t.Run(test.Name, func(t *testing.T) {
-					sourceChainStatePDA, serr := ccip.GetSourceChainStatePDA(test.Selector)
-					require.NoError(t, serr)
 					destChainStatePDA, derr := ccip.GetDestChainStatePDA(test.Selector)
 					require.NoError(t, derr)
-					instruction, err := ccip_router.NewAddChainSelectorInstruction(
+					instruction, err := ccip_router.NewAddDestChainSelectorInstruction(
 						test.Selector,
-						validSourceChainConfig,
 						test.Conf, // here is the invalid dest config data
-						sourceChainStatePDA,
 						destChainStatePDA,
 						config.RouterConfigPDA,
 						admin.PublicKey(),
@@ -524,48 +520,78 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("When an unauthorized user tries to add a chain selector, it fails", func(t *testing.T) {
-			instruction, err := ccip_router.NewAddChainSelectorInstruction(
-				config.EvmChainSelector,
-				validSourceChainConfig,
-				validDestChainConfig,
-				config.EvmSourceChainStatePDA,
-				config.EvmDestChainStatePDA,
-				config.RouterConfigPDA,
-				user.PublicKey(), // not an admin
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
-			require.NotNil(t, result)
+			t.Run("as source chain", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddSourceChainSelectorInstruction(
+					config.DefaultCcipVersion,
+					config.EvmChainSelector,
+					validSourceChainConfig,
+					config.EvmSourceChainStatePDA,
+					config.RouterConfigPDA,
+					user.PublicKey(), // not an admin
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+				require.NotNil(t, result)
+			})
+
+			t.Run("as dest chain", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddDestChainSelectorInstruction(
+					config.EvmChainSelector,
+					validDestChainConfig,
+					config.EvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					user.PublicKey(), // not an admin
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+				require.NotNil(t, result)
+			})
 		})
 
 		t.Run("When admin adds a chain selector it's added on the list", func(t *testing.T) {
-			instruction, err := ccip_router.NewAddChainSelectorInstruction(
-				config.EvmChainSelector,
-				validSourceChainConfig,
-				validDestChainConfig,
-				config.EvmSourceChainStatePDA,
-				config.EvmDestChainStatePDA,
-				config.RouterConfigPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
-			require.NotNil(t, result)
+			t.Run("Source", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddSourceChainSelectorInstruction(
+					config.DefaultCcipVersion,
+					config.EvmChainSelector,
+					validSourceChainConfig,
+					config.EvmSourceChainStatePDA,
+					config.RouterConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
 
-			var sourceChainStateAccount ccip_router.SourceChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
-			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				var sourceChainStateAccount ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
+				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
+				require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+			})
 
-			var destChainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
-			require.Equal(t, validDestChainConfig, destChainStateAccount.Config)
+			t.Run("Dest", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddDestChainSelectorInstruction(
+					config.EvmChainSelector,
+					validDestChainConfig,
+					config.EvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				var destChainStateAccount ccip_router.DestChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
+				require.Equal(t, validDestChainConfig, destChainStateAccount.Config)
+			})
 		})
 
 		t.Run("When admin adds another chain selector it's also added on the list", func(t *testing.T) {
@@ -578,46 +604,70 @@ func TestCCIPRouter(t *testing.T) {
 
 			onRampConfig := [2][64]byte{paddedCcipRouterProgram, emptyAddress}
 
-			instruction, err := ccip_router.NewAddChainSelectorInstruction(
-				config.SVMChainSelector,
-				ccip_router.SourceChainConfig{
-					OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
-					IsEnabled: true,
-				},
-				ccip_router.DestChainConfig{
-					IsEnabled: true,
-					// minimal valid config
-					DefaultTxGasLimit:   1,
-					MaxPerMsgGasLimit:   100,
-					ChainFamilySelector: [4]uint8{3, 2, 1, 0},
-					EnforceOutOfOrder:   true,
-				},
-				config.SVMSourceChainStatePDA,
-				config.SVMDestChainStatePDA,
-				config.RouterConfigPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
-			require.NotNil(t, result)
+			t.Run("as source chain", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddSourceChainSelectorInstruction(
+					config.DefaultCcipVersion,
+					config.SVMChainSelector,
+					ccip_router.SourceChainConfig{
+						OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
+						IsEnabled: true,
+					},
 
-			var sourceChainStateAccount ccip_router.SourceChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SVMSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
-			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+					config.SVMSourceChainStatePDA,
+					config.RouterConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
 
-			var destChainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SVMDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
+				var sourceChainStateAccount ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SVMSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
+				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
+				require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+			})
+
+			t.Run("as dest chain", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddDestChainSelectorInstruction(
+					config.SVMChainSelector,
+					ccip_router.DestChainConfig{
+						IsEnabled: true,
+						// minimal valid config
+						DefaultTxGasLimit:   1,
+						MaxPerMsgGasLimit:   100,
+						ChainFamilySelector: [4]uint8{3, 2, 1, 0},
+						EnforceOutOfOrder:   true,
+					},
+					config.SVMDestChainStatePDA,
+					config.RouterConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				var sourceChainStateAccount ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SVMSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
+				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
+				require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+
+				var destChainStateAccount ccip_router.DestChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SVMDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
+			})
 		})
 
 		t.Run("When a non-admin tries to disable the chain selector, it fails", func(t *testing.T) {
 			t.Run("Source", func(t *testing.T) {
 				ix, err := ccip_router.NewDisableSourceChainSelectorInstruction(
+					config.DefaultCcipVersion,
 					config.EvmChainSelector,
 					config.EvmSourceChainStatePDA,
 					config.RouterConfigPDA,
@@ -649,6 +699,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, true, initial.Config.IsEnabled)
 
 				ix, err := ccip_router.NewDisableSourceChainSelectorInstruction(
+					config.DefaultCcipVersion,
 					config.EvmChainSelector,
 					config.EvmSourceChainStatePDA,
 					config.RouterConfigPDA,
@@ -710,6 +761,7 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("When an unauthorized user tries to update the chain state config, it fails", func(t *testing.T) {
 			t.Run("Source", func(t *testing.T) {
 				instruction, err := ccip_router.NewUpdateSourceChainConfigInstruction(
+					config.DefaultCcipVersion,
 					config.EvmChainSelector,
 					validSourceChainConfig,
 					config.EvmSourceChainStatePDA,
@@ -746,6 +798,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotEqual(t, initialSource.Config, updated) // at this point, onchain is disabled and we'll re-enable it
 
 				instruction, err := ccip_router.NewUpdateSourceChainConfigInstruction(
+					config.DefaultCcipVersion,
 					config.EvmChainSelector,
 					updated,
 					config.EvmSourceChainStatePDA,
@@ -3541,7 +3594,7 @@ func TestCCIPRouter(t *testing.T) {
 				for i, testcase := range priceUpdatesCases {
 					t.Run(testcase.Name, func(t *testing.T) {
 						_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, uint8(i)})
-						rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+						rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 						require.NoError(t, err)
 
 						minV := currentMinSeqNr
@@ -3576,6 +3629,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter := getTransmitter()
 
 						raw := ccip_router.NewCommitInstruction(
+							config.DefaultCcipVersion,
 							reportContext,
 							report,
 							sigs,
@@ -3642,10 +3696,10 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When committing a report with an invalid source chain selector it fails", func(t *testing.T) {
 					t.Parallel()
 					sourceChainSelector := uint64(34)
-					sourceChainStatePDA, err := ccip.GetSourceChainStatePDA(sourceChainSelector)
+					sourceChainStatePDA, err := ccip.GetSourceChainStatePDA(config.DefaultCcipVersion, sourceChainSelector)
 					require.NoError(t, err)
 					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, sourceChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
-					rootPDA, err := ccip.GetCommitReportPDA(sourceChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, sourceChainSelector, root)
 					require.NoError(t, err)
 
 					minV := currentMinSeqNr
@@ -3665,6 +3719,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -3682,7 +3737,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When committing a report with an invalid interval it fails", func(t *testing.T) {
 					t.Parallel()
 					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := currentMinSeqNr
@@ -3702,6 +3757,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -3719,7 +3775,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When committing a report with an interval size bigger than supported it fails", func(t *testing.T) {
 					t.Parallel()
 					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := currentMinSeqNr
@@ -3739,6 +3795,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -3756,7 +3813,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When committing a report with a zero merkle root it fails", func(t *testing.T) {
 					t.Parallel()
 					root := [32]byte{}
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := currentMinSeqNr
@@ -3776,6 +3833,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -3793,7 +3851,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When committing a report with a repeated merkle root, it fails", func(t *testing.T) {
 					t.Parallel()
 					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, 1}) // repeated root
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := currentMinSeqNr
@@ -3813,6 +3871,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -3831,7 +3890,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When committing a report with an invalid min interval, it fails", func(t *testing.T) {
 					t.Parallel()
 					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := uint64(8) // this is lower than expected
@@ -3851,6 +3910,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -3929,7 +3989,7 @@ func TestCCIPRouter(t *testing.T) {
 					}
 
 					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3})
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					for _, testcase := range testcases {
@@ -3970,6 +4030,7 @@ func TestCCIPRouter(t *testing.T) {
 							require.NoError(t, err)
 
 							raw := ccip_router.NewCommitInstruction(
+								config.DefaultCcipVersion,
 								reportContext,
 								report,
 								sigs,
@@ -3996,7 +4057,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			t.Run("When committing a report with the exact next interval, it succeeds", func(t *testing.T) {
 				_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				minV := currentMinSeqNr
@@ -4018,6 +4079,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				transmitter := getTransmitter()
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					report,
 					sigs,
@@ -4062,7 +4124,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("It rejects mismatch config digest", func(t *testing.T) {
 					t.Parallel()
 					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := msg.Header.SequenceNumber
@@ -4084,6 +4146,7 @@ func TestCCIPRouter(t *testing.T) {
 					emptyReportContext := [3][32]byte{}
 
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						emptyReportContext,
 						report,
 						sigs,
@@ -4101,7 +4164,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("It rejects unauthorized transmitter", func(t *testing.T) {
 					t.Parallel()
 					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := msg.Header.SequenceNumber
@@ -4121,6 +4184,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -4138,7 +4202,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("It rejects incorrect signature count", func(t *testing.T) {
 					t.Parallel()
 					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := msg.Header.SequenceNumber
@@ -4166,6 +4230,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -4183,7 +4248,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("It rejects invalid signature", func(t *testing.T) {
 					t.Parallel()
 					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := msg.Header.SequenceNumber
@@ -4202,6 +4267,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						ccip.NextCommitReportContext(),
 						report,
 						sigs,
@@ -4219,7 +4285,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("It rejects unauthorized signer", func(t *testing.T) {
 					t.Parallel()
 					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := msg.Header.SequenceNumber
@@ -4250,6 +4316,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -4267,7 +4334,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("It rejects duplicate signatures", func(t *testing.T) {
 					t.Parallel()
 					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+					rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 					require.NoError(t, err)
 
 					minV := msg.Header.SequenceNumber
@@ -4289,6 +4356,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 
 					instruction, err := ccip_router.NewCommitInstruction(
+						config.DefaultCcipVersion,
 						reportContext,
 						report,
 						sigs,
@@ -4334,10 +4402,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -4360,6 +4429,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -4420,10 +4490,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -4448,6 +4519,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -4491,10 +4563,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -4510,19 +4583,16 @@ func TestCCIPRouter(t *testing.T) {
 				event := ccip.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
 
-				unsupportedSourceChainStatePDA, err := ccip.GetSourceChainStatePDA(unsupportedChainSelector)
-				require.NoError(t, err)
-				unsupportedDestChainStatePDA, err := ccip.GetDestChainStatePDA(unsupportedChainSelector)
+				unsupportedSourceChainStatePDA, err := ccip.GetSourceChainStatePDA(config.DefaultCcipVersion, unsupportedChainSelector)
 				require.NoError(t, err)
 				message.Header.SourceChainSelector = unsupportedChainSelector
 				message.Header.SequenceNumber = 1
 
-				instruction, err = ccip_router.NewAddChainSelectorInstruction(
+				instruction, err = ccip_router.NewAddSourceChainSelectorInstruction(
+					config.DefaultCcipVersion,
 					unsupportedChainSelector,
 					validSourceChainConfig,
-					validDestChainConfig,
 					unsupportedSourceChainStatePDA,
-					unsupportedDestChainStatePDA,
 					config.RouterConfigPDA,
 					anotherAdmin.PublicKey(),
 					solana.SystemProgramID,
@@ -4538,6 +4608,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -4584,10 +4655,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -4610,6 +4682,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -4639,7 +4712,7 @@ func TestCCIPRouter(t *testing.T) {
 				transmitter := getTransmitter()
 
 				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				executionReport := ccip_router.ExecutionReportSingleChain{
@@ -4649,6 +4722,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -4684,7 +4758,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				executionReport := ccip_router.ExecutionReportSingleChain{
@@ -4694,6 +4768,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -4747,10 +4822,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -4773,6 +4849,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{hash1},
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport1,
 					reportContext,
 					[]byte{},
@@ -4806,6 +4883,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{[32]byte(hash2)},
 				}
 				raw = ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport2,
 					reportContext,
 					[]byte{},
@@ -4880,10 +4958,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -4906,6 +4985,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -4957,10 +5037,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -4983,6 +5064,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -5041,10 +5123,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -5068,6 +5151,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{},
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{4},
@@ -5115,7 +5199,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			t.Run("OffRamp Manual Execution: when executing a non-committed report, it fails", func(t *testing.T) {
 				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				executionReport := ccip_router.ExecutionReportSingleChain{
@@ -5126,6 +5210,7 @@ func TestCCIPRouter(t *testing.T) {
 				}
 
 				raw := ccip_router.NewManuallyExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5174,10 +5259,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -5203,6 +5289,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
+							config.DefaultCcipVersion,
 							executionReport,
 							[]byte{},
 							config.RouterConfigPDA,
@@ -5238,6 +5325,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
+							config.DefaultCcipVersion,
 							executionReport,
 							[]byte{},
 							config.RouterConfigPDA,
@@ -5282,6 +5370,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
+							config.DefaultCcipVersion,
 							executionReport,
 							[]byte{},
 							config.RouterConfigPDA,
@@ -5333,6 +5422,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
+							config.DefaultCcipVersion,
 							executionReport,
 							[]byte{},
 							config.RouterConfigPDA,
@@ -5417,9 +5507,11 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("commit_report"), config.EvmChainLE, root[:]}, config.CcipRouterProgram)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
+				require.NoError(t, err)
 
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -5442,6 +5534,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{},
@@ -5511,9 +5604,10 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
 				require.NoError(t, err)
 				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion,
 					reportContext,
 					commitReport,
 					sigs,
@@ -5539,6 +5633,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{},
 				}
 				raw := ccip_router.NewExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					reportContext,
 					[]byte{0}, // only token transfer message
@@ -5569,6 +5664,7 @@ func TestCCIPRouter(t *testing.T) {
 				// manual re-execution is successful -----------------------------------
 				// NOTE: expects re-execution time to be instantaneous
 				rawManual := ccip_router.NewManuallyExecuteInstruction(
+					config.DefaultCcipVersion,
 					executionReport,
 					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
