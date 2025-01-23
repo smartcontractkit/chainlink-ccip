@@ -121,7 +121,6 @@ func validateHashesExist(
 			return fmt.Errorf("hash not found for chain %d", chain)
 		}
 
-		// hashes lengths can be larger than the observed messages in case of observation truncation.
 		for seq, msg := range msgs {
 			if _, ok := hashes[chain][seq]; !ok {
 				return fmt.Errorf("hash not found for message %s", msg)
