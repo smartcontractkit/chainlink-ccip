@@ -27,8 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
-const MaxCU = 1_400_000 // this is SVM's hard max Compute Unit limit
-
 func TestCCIPRouter(t *testing.T) {
 	t.Parallel()
 
@@ -359,7 +357,7 @@ func TestCCIPRouter(t *testing.T) {
 				invalidSVMChainSelector,
 				defaultGasLimit,
 				allowOutOfOrderExecution,
-				config.EnableExecutionAfter,
+				config.DefaultEnableExecutionAfter,
 				// fee aggregator address, will be changed in later test
 				anotherUser.PublicKey(),
 				// We use token2022 as the LINK address, which will be used as a base
@@ -3516,7 +3514,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						instruction, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
-						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, commitLookupTable, common.AddComputeUnitLimit(MaxCU))
+						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, commitLookupTable, common.AddComputeUnitLimit(testutils.SVMMaxCU))
 
 						commitEvent := ccip.EventCommitReportAccepted{}
 						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
@@ -3911,7 +3909,7 @@ func TestCCIPRouter(t *testing.T) {
 
 							instruction, err := raw.ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, commitLookupTable, []string{testcase.ExpectedError}, common.AddComputeUnitLimit(MaxCU))
+							testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, commitLookupTable, []string{testcase.ExpectedError}, common.AddComputeUnitLimit(testutils.SVMMaxCU))
 						})
 					}
 				})

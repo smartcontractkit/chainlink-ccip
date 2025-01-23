@@ -52,6 +52,10 @@ go-tests:
 ccip-router-contracts-go-tests:
 	go test -run TestCCIPRouter -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
+.PHONY: e2e-ccip-router-contracts-go-tests
+e2e-ccip-router-contracts-go-tests:
+	go test -run TestE2ECCIPRouter -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+
 .PHONY: build-contracts
 build-contracts:
 	cd ./contracts && anchor build

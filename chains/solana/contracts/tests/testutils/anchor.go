@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const SVMMaxCU = 1_400_000 // this is SVM's hard max Compute Unit limit
+
 var PathToAnchorConfig = filepath.Join(ProjectRoot, "Anchor.toml")
 
 func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.PrivateKey) *rpc.Client {

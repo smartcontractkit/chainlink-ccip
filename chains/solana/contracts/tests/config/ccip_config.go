@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/binary"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
@@ -40,9 +41,13 @@ var (
 	EvmSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
 	EvmDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
 
-	OnRampAddress        = []byte{1, 2, 3}
-	OnRampAddressPadded  = [64]byte{1, 2, 3}
-	EnableExecutionAfter = int64(1800) // 30min
+	OnRampAddress       = []byte{1, 2, 3}
+	OnRampAddressPadded = [64]byte{1, 2, 3}
+
+	DefaultEnableExecutionAfter     = int64(1800) // 30min
+	DefaultGasLimit                 = bin.Uint128{Lo: 3000, Hi: 0, Endianness: nil}
+	DefaultMaxFeeJuelsPerMsg        = bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
+	DefaultAllowOutOfOrderExecution = false
 
 	MaxOracles                      = 16
 	OcrF                      uint8 = 5
