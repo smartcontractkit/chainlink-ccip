@@ -18,6 +18,7 @@ impl Ocr3Report for Ocr3ReportForCommit<'_> {
     fn len(&self) -> usize {
         4 + (32 + 28) * self.0.price_updates.token_price_updates.len() + // token_price_updates
       4 + (8 + 28) * self.0.price_updates.gas_price_updates.len() + // gas_price_updates
+      4 + (32 + 32) * self.0.rmn_signatures.len() + // rmn signatures
       self.0.merkle_root.len()
         // + 4 + 65 * self.rmn_signatures.len()
     }
