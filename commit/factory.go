@@ -164,6 +164,10 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		if err != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to initialize RMNHome reader: %w", err)
 		}
+
+		if err := rmnHomeReader.Start(ctx); err != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome: %w", err)
+		}
 	}
 
 	if err := validateOcrConfig(p.ocrConfig.Config); err != nil {

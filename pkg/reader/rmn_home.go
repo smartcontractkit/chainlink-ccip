@@ -44,9 +44,9 @@ type rmnHome struct {
 	bgPoller *rmnHomePoller
 }
 
-// NewRMNHomeChainReader creates a new RMNHome and starts it immediately. RMNHome is very lightweight layer
+// NewRMNHomeChainReader creates a new RMNHome. RMNHome is very lightweight layer
 // on top of RMNHomePoller. Every consumer should follow the `Service` pattern in which they
-// are responsible for properly closing the service when done. (using Close() method)
+// are responsible for properly starting and closing the service when done. (using Start()/Close() methods)
 //
 // RMNHome is a smart component that behind the scenes share the same RMNHomePoller instance.
 // Whenever all RMNHome instances are closed, the underlying RMNHomePoller instance is also closed.
@@ -72,12 +72,7 @@ func NewRMNHomeChainReader(
 		return nil, fmt.Errorf("failed to create RMNHomePoller: %w", err)
 	}
 
-	rmn := &rmnHome{bgPoller: bgPoller}
-
-	if err := rmn.Start(ctx); err != nil {
-		return nil, fmt.Errorf("failed to start RMNHome: %w", err)
-	}
-	return rmn, nil
+	return &rmnHome{bgPoller: bgPoller}, nil
 }
 
 func (r *rmnHome) Start(ctx context.Context) error {

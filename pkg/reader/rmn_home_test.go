@@ -174,6 +174,10 @@ func newRMNHomeCasted(
 ) *rmnHome {
 	rmn, err := NewRMNHomeChainReader(ctx, lggr, 1*time.Millisecond, selector, address, reader)
 	require.NoError(t, err)
+
+	err = rmn.Start(ctx)
+	require.NoError(t, err)
+
 	casted, ok := rmn.(*rmnHome)
 	require.True(t, ok)
 	return casted

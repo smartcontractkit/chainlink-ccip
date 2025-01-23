@@ -79,7 +79,7 @@ func getRMNHomePoller(
 	instancesMu.Lock()
 	defer instancesMu.Unlock()
 
-	hexEncodedAddr := " 0x" + hex.EncodeToString(rmnHomeAddress)
+	hexEncodedAddr := "0x" + hex.EncodeToString(rmnHomeAddress)
 	key := fmt.Sprintf("%s-%s", rmnHomeChainSelector.String(), hexEncodedAddr)
 
 	instance, ok := getInstance(key)
