@@ -8,7 +8,7 @@ type FeeQuoterDestChainConfig struct {
 	MaxPerMsgGasLimit                 uint32  // Maximum gas limit for messages targeting EVMs
 	DestGasOverhead                   uint32  // Gas charged on top of the gasLimit to cover destination chain costs
 	DestGasPerPayloadByteBase         uint32  // Destination gas charged per byte of payload to receiver by default
-	DestGasPerPayloadByteHigh         uint32  // Destination gas charged per byte of payload for every byte over the threshold
+	DestGasPerPayloadByteHigh         uint32  // Destination gas charged per byte of payload over the threshold
 	DestGasPerPayloadByteThreshold    uint32  // Threshold of payload byte size over which the high rate applies
 	DestDataAvailabilityOverheadGas   uint32  // Extra data availability gas charged, e.g., for OCR
 	DestGasPerDataAvailabilityByte    uint16  // Gas charged per byte of message data needing availability
