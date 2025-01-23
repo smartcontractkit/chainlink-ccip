@@ -35,7 +35,7 @@ import (
 )
 
 var ErrSignaturesNotProvidedByLeader = errors.New("rmn signatures were not provided by the leader, " +
-	"in most cases this indicates that the RMN nodes were not able to respond in time")
+	"in most cases this indicates that the RMN nodes did not include any chain in their response")
 
 // ObservationQuorum requires "across all chains" at least 2F+1 observations.
 func (p *Processor) ObservationQuorum(
