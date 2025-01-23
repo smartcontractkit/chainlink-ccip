@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 	"time"
 
@@ -573,24 +574,23 @@ func chainsWithSufficientObservationResponses(
 			continue
 		}
 
-		homeChainF, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
+		fObserve, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exists {
 			lggr.Errorw("no F for chain", "chain", sourceChain)
 			continue
 		}
 
-		values := maps.Values(countsPerRoot)
-		sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
-		if consensus.LtFPlusOne(homeChainF, values[len(values)-1]) {
-			lggr.Infow("chain skipped, not enough observed roots",
+		mostVotedRootVotes := slices.Max(maps.Values(countsPerRoot))
+		if consensus.LtFPlusOne(fObserve, mostVotedRootVotes) {
+			lggr.Infow("chain skipped, maximally voted root doesn't have enough votes",
 				"chain", sourceChain,
-				"homeF", homeChainF,
-				"mostVotedRootVotes", values[len(values)-1])
+				"fObserve", fObserve,
+				"mostVotedRootVotes", mostVotedRootVotes)
 			continue
 		}
 
 		lggr.Infow("chain has enough observed roots",
-			"chain", sourceChain, "mostVotedRootVotes", values[len(values)-1], "homeF", homeChainF)
+			"chain", sourceChain, "mostVotedRootVotes", mostVotedRootVotes, "fObserve", fObserve)
 		resultChains.Add(cciptypes.ChainSelector(sourceChain))
 	}
 
