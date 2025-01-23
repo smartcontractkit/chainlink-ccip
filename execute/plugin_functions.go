@@ -20,8 +20,7 @@ import (
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-// validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported
-// by observer
+// validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported by observer
 func validateCommitReportsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedData exectypes.CommitObservations,
@@ -40,7 +39,7 @@ func validateCommitReportsReadingEligibility(
 	return nil
 }
 
-// validateMsgsReadingEligibility checks if the observer is eligible to observe the messages it observed.
+// validateMsgsReadingEligibility checks all observed messages are from supported chains
 func validateMsgsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedMsgs exectypes.MessageObservations,
@@ -58,6 +57,7 @@ func validateMsgsReadingEligibility(
 	return nil
 }
 
+// validateTokenDataObservations validates that all token data observations belong to already observed messages
 func validateTokenDataObservations(
 	observedMsgs exectypes.MessageObservations,
 	tokenData exectypes.TokenDataObservations,
@@ -132,6 +132,9 @@ func validateHashesExist(
 	return nil
 }
 
+// validateMessagesConformToCommitReports cross-checks messages and reports
+// 1. checks if the messages observed are exactly the same as the messages in the commit reports. No more and no less.
+// 2. checks all reports have their messages observed.
 func validateMessagesConformToCommitReports(
 	observedData exectypes.CommitObservations,
 	observedMsgs exectypes.MessageObservations,
@@ -148,7 +151,7 @@ func validateMessagesConformToCommitReports(
 				_, ok = msgsMap[seqNum]
 				if !ok {
 					return fmt.Errorf("no message observed for sequence number %d, "+
-						"while report's range sholud include it", seqNum)
+						"while report's range sholud include it for chain %d", seqNum, chain)
 				}
 				msgsCount++
 			}
