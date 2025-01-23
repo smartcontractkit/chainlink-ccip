@@ -45,7 +45,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
 		onRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
-			lggr.Warnf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
+			lggr.Warnw("failed to get onRamp address", "chain", sourceChainRange.ChainSel, "err", err)
 			continue
 		}
 
@@ -75,6 +75,12 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 				len(reqUpdates), dstChainInfo)
 			return Query{RetryRMNSignatures: true}, nil
 		}
+
+		if errors.Is(err, rmn.ErrAllChainsNotReady) {
+			lggr.Infow("none of the observation requests were ready to be observed by RMN, got empty responses")
+			return Query{}, nil
+		}
+
 		return Query{}, fmt.Errorf("compute RMN signatures: %w", err)
 	}
 
