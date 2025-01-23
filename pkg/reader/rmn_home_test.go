@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -165,7 +166,7 @@ func newRMNHomeCasted(
 	address cciptypes.Bytes,
 	reader *readermock.MockContractReaderFacade,
 ) *rmnHome {
-	rmn, err := NewRMNHome(ctx, lggr, selector, address, reader)
+	rmn, err := NewRMNHomeChainReader(ctx, lggr, 1*time.Millisecond, selector, address, reader)
 	require.NoError(t, err)
 	casted, ok := rmn.(*rmnHome)
 	require.True(t, ok)

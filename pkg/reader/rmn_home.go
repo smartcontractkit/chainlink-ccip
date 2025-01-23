@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -43,7 +44,7 @@ type rmnHome struct {
 	bgPoller *rmnHomePoller
 }
 
-// NewRMNHome creates a new RMNHome and starts it immediately. RMNHome is very lightweight layer
+// NewRMNHomeChainReader creates a new RMNHome and starts it immediately. RMNHome is very lightweight layer
 // on top of RMNHomePoller. Every consumer should follow the `Service` pattern in which they
 // are responsible for properly closing the service when done. (using Close() method)
 //
@@ -51,9 +52,10 @@ type rmnHome struct {
 // Whenever all RMNHome instances are closed, the underlying RMNHomePoller instance is also closed.
 // As long as RMNHome remembers to Close() upon termination there should not be any orphaned poller instances
 // working in the background
-func NewRMNHome(
+func NewRMNHomeChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
+	pollingInterval time.Duration,
 	rmnHomeChainSelector cciptypes.ChainSelector,
 	rmnHomeAddress []byte,
 	contractReader contractreader.ContractReaderFacade,
@@ -64,7 +66,7 @@ func NewRMNHome(
 		rmnHomeChainSelector,
 		rmnHomeAddress,
 		contractReader,
-		HomeChainPollingInterval,
+		pollingInterval,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create RMNHomePoller: %w", err)
