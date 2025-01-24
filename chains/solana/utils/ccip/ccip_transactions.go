@@ -36,26 +36,26 @@ func SignCommitReport(ctx [3][32]byte, report ccip_router.CommitInput, baseSigne
 	return sigs, nil
 }
 
-func GetSourceChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
+func GetSourceChainStatePDA(chainSelector uint64, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, config.CcipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, ccipRouterProgram)
 	return p, err
 }
 
-func GetDestChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
+func GetDestChainStatePDA(chainSelector uint64, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), chainSelectorLE}, config.CcipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), chainSelectorLE}, ccipRouterProgram)
 	return p, err
 }
 
-func GetCommitReportPDA(chainSelector uint64, root [32]byte) (solana.PublicKey, error) {
+func GetCommitReportPDA(chainSelector uint64, root [32]byte, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), chainSelectorLE, root[:]}, config.CcipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), chainSelectorLE, root[:]}, ccipRouterProgram)
 	return p, err
 }
 
-func GetNoncePDA(chainSelector uint64, user solana.PublicKey) (solana.PublicKey, error) {
+func GetNoncePDA(chainSelector uint64, user solana.PublicKey, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("nonce"), chainSelectorLE, user.Bytes()}, config.CcipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("nonce"), chainSelectorLE, user.Bytes()}, ccipRouterProgram)
 	return p, err
 }

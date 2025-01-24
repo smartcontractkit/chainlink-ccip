@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -62,21 +61,21 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenAdminRegistryPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("token_admin_registry"), mint.PublicKey().Bytes()}, config.CcipRouterProgram)
+	tokenAdminRegistryPDA, _, err := common.FindTokenAdminRegistryPDA(config.CcipRouterProgram, mint.PublicKey())
 	if err != nil {
 		return TokenPool{}, err
 	}
 
 	// preload with defined config.EvmChainSelector
-	chainPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), binary.LittleEndian.AppendUint64([]byte{}, config.EvmChainSelector), mint.PublicKey().Bytes()}, config.CcipTokenPoolProgram)
+	chainPDA, _, err := common.FindCcipTokenpoolChainconfigPDA(config.CcipRouterProgram, mint.PublicKey(), config.EvmChainSelector)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	billingPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_billing"), binary.LittleEndian.AppendUint64([]byte{}, config.EvmChainSelector), mint.PublicKey().Bytes()}, config.CcipRouterProgram)
+	billingPDA, _, err := common.FindCcipTokenpoolBillingPDA(config.CcipRouterProgram, mint.PublicKey(), config.EvmChainSelector)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenConfigPda, _, err := solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), mint.PublicKey().Bytes()}, config.CcipRouterProgram)
+	tokenConfigPda, _, err := common.FindFeeBillingTokenConfigPDA(config.CcipRouterProgram, mint.PublicKey())
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -95,11 +94,11 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 	p.Chain[config.EvmChainSelector] = chainPDA
 	p.Billing[config.EvmChainSelector] = billingPDA
-	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey())
+	p.PoolConfig, err = TokenPoolConfigAddress(config.CcipTokenPoolProgram, p.Mint.PublicKey())
 	if err != nil {
 		return TokenPool{}, err
 	}
-	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey())
+	p.PoolSigner, err = TokenPoolSignerAddress(config.CcipTokenPoolProgram, p.Mint.PublicKey())
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -118,13 +117,13 @@ func (tp *TokenPool) SetupLookupTable(ctx context.Context, client *rpc.Client, a
 	return common.AwaitSlotChange(ctx, client)
 }
 
-func TokenPoolConfigAddress(token solana.PublicKey) (solana.PublicKey, error) {
-	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_config"), token.Bytes()}, config.CcipTokenPoolProgram)
+func TokenPoolConfigAddress(programID, token solana.PublicKey) (solana.PublicKey, error) {
+	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_config"), token.Bytes()}, programID)
 	return addr, err
 }
 
-func TokenPoolSignerAddress(token solana.PublicKey) (solana.PublicKey, error) {
-	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_signer"), token.Bytes()}, config.CcipTokenPoolProgram)
+func TokenPoolSignerAddress(programID, token solana.PublicKey) (solana.PublicKey, error) {
+	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_signer"), token.Bytes()}, programID)
 	return addr, err
 }
 

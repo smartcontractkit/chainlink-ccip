@@ -1,11 +1,10 @@
 package config
 
 import (
-	"encoding/binary"
-
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
@@ -20,25 +19,22 @@ var (
 	CcipTokenPoolProgram       = solana.MustPublicKeyFromBase58("GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH")
 	Token2022Program           = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 
-	RouterConfigPDA, _, _                    = solana.FindProgramAddress([][]byte{[]byte("config")}, CcipRouterProgram)
-	RouterStatePDA, _, _                     = solana.FindProgramAddress([][]byte{[]byte("state")}, CcipRouterProgram)
-	ExternalExecutionConfigPDA, _, _         = solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, CcipRouterProgram)
-	ExternalTokenPoolsSignerPDA, _, _        = solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, CcipRouterProgram)
-	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipLogicReceiver)
-	ReceiverExternalExecutionConfigPDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, CcipLogicReceiver)
-	BillingSignerPDA, _, _                   = solana.FindProgramAddress([][]byte{[]byte("fee_billing_signer")}, CcipRouterProgram)
-
-	BillingTokenConfigPrefix = []byte("fee_billing_token_config")
-	DestChainConfigPrefix    = []byte("destination_billing_config")
+	RouterConfigPDA, _, _                    = common.FindConfigPDA(CcipRouterProgram)
+	RouterStatePDA, _, _                     = common.FindStatePDA(CcipRouterProgram)
+	ExternalExecutionConfigPDA, _, _         = common.FindExternalExecutionConfigPDA(CcipRouterProgram)
+	ExternalTokenPoolsSignerPDA, _, _        = common.FindExternalTokenPoolsSignerPDA(CcipRouterProgram)
+	ReceiverTargetAccountPDA, _, _           = common.FindCounterPDA(CcipLogicReceiver)
+	ReceiverExternalExecutionConfigPDA, _, _ = common.FindExternalExecutionConfigPDA(CcipLogicReceiver)
+	BillingSignerPDA, _, _                   = common.FindFeeBillingSignerPDA(CcipRouterProgram)
 
 	SVMChainSelector uint64 = 15
 	EvmChainSelector uint64 = 21
 	EvmChainLE              = common.Uint64ToLE(EvmChainSelector)
 
-	SVMSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SVMChainSelector)}, CcipRouterProgram)
-	SVMDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SVMChainSelector)}, CcipRouterProgram)
-	EvmSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
-	EvmDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
+	SVMSourceChainStatePDA, _, _ = ccip.FindSourceChainStatePDA(SVMChainSelector, CcipRouterProgram)
+	SVMDestChainStatePDA, _, _   = ccip.FindDestChainStatePDA(SVMChainSelector, CcipRouterProgram)
+	EvmSourceChainStatePDA, _, _ = ccip.FindSourceChainStatePDA(EvmChainSelector, CcipRouterProgram)
+	EvmDestChainStatePDA, _, _   = ccip.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
 
 	OnRampAddress        = []byte{1, 2, 3}
 	OnRampAddressPadded  = [64]byte{1, 2, 3}
