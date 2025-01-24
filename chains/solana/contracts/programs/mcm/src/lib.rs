@@ -26,6 +26,7 @@ use instructions::*;
 /// A single deployed program manages multiple multisig states(configurations) identified by multisig_id
 #[program]
 pub mod mcm {
+    #![warn(missing_docs)]
     use super::*;
 
     /// initialize a new multisig configuration, store the chain_id and multisig_id
