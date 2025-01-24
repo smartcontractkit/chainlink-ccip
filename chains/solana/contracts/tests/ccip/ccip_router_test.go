@@ -109,12 +109,12 @@ func TestCCIPRouter(t *testing.T) {
 	}
 
 	getTokenConfigPDA := func(mint solana.PublicKey) solana.PublicKey {
-		tokenConfigPda, _, _ := common.FindFeeBillingTokenConfigPDA(config.CcipRouterProgram, mint)
+		tokenConfigPda, _, _ := common.FindFeeBillingTokenConfigPDA(mint, config.CcipRouterProgram)
 		return tokenConfigPda
 	}
 
 	getPerChainPerTokenConfigBillingPDA := func(mint solana.PublicKey) solana.PublicKey {
-		tokenBillingPda, _, _ := common.FindCcipTokenpoolBillingPDA(config.CcipRouterProgram, mint, config.EvmChainSelector)
+		tokenBillingPda, _, _ := common.FindCcipTokenpoolBillingPDA(config.EvmChainSelector, mint, config.CcipRouterProgram)
 		return tokenBillingPda
 	}
 
@@ -237,11 +237,11 @@ func TestCCIPRouter(t *testing.T) {
 			// WSOL //
 			//////////
 
-			wsolPDA, _, aerr := common.FindFeeBillingTokenConfigPDA(ccip_router.ProgramID, solana.SolMint)
+			wsolPDA, _, aerr := common.FindFeeBillingTokenConfigPDA(solana.SolMint, ccip_router.ProgramID)
 			require.NoError(t, aerr)
 			wsolReceiver, _, rerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, config.BillingSignerPDA)
 			require.NoError(t, rerr)
-			wsolEvmConfigPDA, _, perr := common.FindCcipTokenpoolBillingPDA(config.CcipRouterProgram, solana.SolMint, config.EvmChainSelector)
+			wsolEvmConfigPDA, _, perr := common.FindCcipTokenpoolBillingPDA(config.EvmChainSelector, solana.SolMint, config.CcipRouterProgram)
 			require.NoError(t, perr)
 			wsolUserATA, _, uerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, user.PublicKey())
 			require.NoError(t, uerr)
@@ -276,9 +276,9 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, terr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, admin, config.DefaultCommitment, common.AddSigners(mintPrivK))
 
-			token2022PDA, _, aerr := common.FindFeeBillingTokenConfigPDA(ccip_router.ProgramID, mintPubK)
+			token2022PDA, _, aerr := common.FindFeeBillingTokenConfigPDA(mintPubK, ccip_router.ProgramID)
 			require.NoError(t, aerr)
-			token2022EvmConfigPDA, _, puerr := common.FindCcipTokenpoolBillingPDA(config.CcipRouterProgram, mintPubK, config.EvmChainSelector)
+			token2022EvmConfigPDA, _, puerr := common.FindCcipTokenpoolBillingPDA(config.EvmChainSelector, mintPubK, config.CcipRouterProgram)
 			require.NoError(t, puerr)
 			token2022Receiver, _, rerr := tokens.FindAssociatedTokenAddress(config.Token2022Program, mintPubK, config.BillingSignerPDA)
 			require.NoError(t, rerr)
@@ -5638,7 +5638,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, terr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 
-			configPDA, _, perr := common.FindFeeBillingTokenConfigPDA(ccip_router.ProgramID, mint)
+			configPDA, _, perr := common.FindFeeBillingTokenConfigPDA(mint, ccip_router.ProgramID)
 			require.NoError(t, perr)
 			receiver, _, terr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, mint, config.BillingSignerPDA)
 			require.NoError(t, terr)

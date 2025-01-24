@@ -86,9 +86,9 @@ func TestTokenPool(t *testing.T) {
 				})
 
 				t.Run("pool:"+poolType.String(), func(t *testing.T) {
-					poolConfig, err := tokens.TokenPoolConfigAddress(config.CcipTokenPoolProgram, mint)
+					poolConfig, err := tokens.TokenPoolConfigAddress(mint, config.CcipTokenPoolProgram)
 					require.NoError(t, err)
-					poolSigner, err := tokens.TokenPoolSignerAddress(config.CcipTokenPoolProgram, mint)
+					poolSigner, err := tokens.TokenPoolSignerAddress(mint, config.CcipTokenPoolProgram)
 					require.NoError(t, err)
 					createI, poolTokenAccount, err := tokens.CreateAssociatedTokenAccount(v.tokenProgram, mint, poolSigner, admin.PublicKey())
 					require.NoError(t, err)
@@ -367,9 +367,9 @@ func TestTokenPool(t *testing.T) {
 
 		t.Run("setup:pool", func(t *testing.T) {
 			var err error
-			p.PoolConfig, err = tokens.TokenPoolConfigAddress(config.CcipTokenPoolProgram, mint)
+			p.PoolConfig, err = tokens.TokenPoolConfigAddress(mint, config.CcipTokenPoolProgram)
 			require.NoError(t, err)
-			p.PoolSigner, err = tokens.TokenPoolSignerAddress(config.CcipTokenPoolProgram, mint)
+			p.PoolSigner, err = tokens.TokenPoolSignerAddress(mint, config.CcipTokenPoolProgram)
 			require.NoError(t, err)
 
 			// create token

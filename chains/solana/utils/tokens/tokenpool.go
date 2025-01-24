@@ -61,21 +61,21 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenAdminRegistryPDA, _, err := common.FindTokenAdminRegistryPDA(config.CcipRouterProgram, mint.PublicKey())
+	tokenAdminRegistryPDA, _, err := common.FindTokenAdminRegistryPDA(mint.PublicKey(), config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
 
 	// preload with defined config.EvmChainSelector
-	chainPDA, _, err := common.FindCcipTokenpoolChainconfigPDA(config.CcipTokenPoolProgram, mint.PublicKey(), config.EvmChainSelector)
+	chainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipTokenPoolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	billingPDA, _, err := common.FindCcipTokenpoolBillingPDA(config.CcipRouterProgram, mint.PublicKey(), config.EvmChainSelector)
+	billingPDA, _, err := common.FindCcipTokenpoolBillingPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenConfigPda, _, err := common.FindFeeBillingTokenConfigPDA(config.CcipRouterProgram, mint.PublicKey())
+	tokenConfigPda, _, err := common.FindFeeBillingTokenConfigPDA(mint.PublicKey(), config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -94,11 +94,11 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 	p.Chain[config.EvmChainSelector] = chainPDA
 	p.Billing[config.EvmChainSelector] = billingPDA
-	p.PoolConfig, err = TokenPoolConfigAddress(config.CcipTokenPoolProgram, p.Mint.PublicKey())
+	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	p.PoolSigner, err = TokenPoolSignerAddress(config.CcipTokenPoolProgram, p.Mint.PublicKey())
+	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -117,14 +117,19 @@ func (tp *TokenPool) SetupLookupTable(ctx context.Context, client *rpc.Client, a
 	return common.AwaitSlotChange(ctx, client)
 }
 
-func TokenPoolConfigAddress(programID, token solana.PublicKey) (solana.PublicKey, error) {
+func TokenPoolConfigAddress(token, programID solana.PublicKey) (solana.PublicKey, error) {
 	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_config"), token.Bytes()}, programID)
 	return addr, err
 }
 
-func TokenPoolSignerAddress(programID, token solana.PublicKey) (solana.PublicKey, error) {
+func TokenPoolSignerAddress(token, programID solana.PublicKey) (solana.PublicKey, error) {
 	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_signer"), token.Bytes()}, programID)
 	return addr, err
+}
+
+func TokenPoolChainConfigPDA(chainSelector uint64, mint, programID solana.PublicKey) (solana.PublicKey, uint8, error) {
+	chainSelectorLE := common.Uint64ToLE(chainSelector)
+	return solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), chainSelectorLE, mint.Bytes()}, programID)
 }
 
 type EventBurnLock struct {
