@@ -36,23 +36,25 @@ var keystoneCmd = &cobra.Command{
 		if viper.GetString(goreleaserKeyKey) == "" {
 			return fmt.Errorf("goreleaser key is required")
 		}
+		// the goreleaser toolchain in core build the capabilities repo
+		// and the keystone crib is leveraging goreleaser to build the chainlink binaries
 		cap_repo := os.Getenv("CAPABILITIES_REPO")
 		if cap_repo == "" {
-			return fmt.Errorf("CAPABILITIES_REPO is required. Check .env or export it: '%v'", os.Environ())
+			return fmt.Errorf("CAPABILITIES_REPO is required. Check .env or export it")
 		}
 
 		// ensure that the capabilities repo exists
 		if _, err := os.Stat(cap_repo); os.IsNotExist(err) {
 			return fmt.Errorf("CAPABILITIES_REPO '%s' does not exist", cap_repo)
 		} else {
-			// resolve the capabilities repo path
-			cap_repo, err = filepath.Abs(cap_repo)
+			// resolve the capabilities repo path to an absolute path b/c goreleaser will change the working directory
+			cap_repo_resolved, err := filepath.Abs(cap_repo)
 			if err != nil {
 				return fmt.Errorf("failed to resolve capabilities repo path: %s", err)
 			}
 			// set the capabilities repo path
-			logger.Info("Setting CAPABILITIES_REPO to", slog.String("cap_repo", cap_repo))
-			os.Setenv("CAPABILITIES_REPO", cap_repo)
+			logger.Info("Setting resolved CAPABILITIES_REPO", slog.String("unresolved", cap_repo), slog.String("cap_repo", cap_repo_resolved))
+			os.Setenv("CAPABILITIES_REPO", cap_repo_resolved)
 		}
 
 		return nil

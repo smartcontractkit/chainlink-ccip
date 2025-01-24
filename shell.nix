@@ -71,30 +71,25 @@ mkShell' {
     export GOBIN=$(go env GOPATH)/bin
     export PATH=$PATH:$repo_root/scripts:$GOBIN
 
-    ${lib.optionalString (!keystone) ''
-      if [ "$CRIB_CI_ENV" = "true" ] && [ "$CLI_CHANGED" != "true" ]; then
-        # in CI, download the CLI from the corresponding GH release if the CLI hasn't changed
-        task fetch-cli
-      else
-        # when CLI has changed or when running in local, build the CLI from source
-        task build
-      fi
 
-      # Set up crib CLI using task
-      task setup
+    if [ "$CRIB_CI_ENV" = "true" ] && [ "$CLI_CHANGED" != "true" ]; then
+      # in CI, download the CLI from the corresponding GH release if the CLI hasn't changed
+      task fetch-cli
+    else
+      # when CLI has changed or when running in local, build the CLI from source
+      task build
+    fi
 
-      # Sourcing the .env file as the last step
-      if [ -f ".env" ]; then
-        #export $(grep -v '^#' .env | xargs)
-        set -a
-        source .env
-        set +a
-      fi
-    ''}
+    # Set up crib CLI using task
+    task setup
 
-    ${lib.optionalString keystone ''
-      echo "Welcome to crib, build the crib CLI via \"task build\". It'll be available as \"crib\" in either your \$(go env GOBIN)' or \$(go env GOPATH)/bin directory, depending on if your GOBIN is set."
-    ''}
+    # Sourcing the .env file as the last step
+    if [ -f ".env" ]; then
+      set -a
+      source .env
+      set +a
+    fi
+    
 
     # Prevent errors from exiting the shell from this point on
     set +e
