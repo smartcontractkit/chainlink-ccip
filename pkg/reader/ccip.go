@@ -371,6 +371,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode ExtraArgs: %w", err)
 		}
+
 		msg.Message.Header.OnRamp = onRampAddress
 
 		for i, tokenAmount := range msg.Message.TokenAmounts {
