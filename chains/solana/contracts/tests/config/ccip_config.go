@@ -4,7 +4,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
@@ -31,10 +30,10 @@ var (
 	EvmChainSelector uint64 = 21
 	EvmChainLE              = common.Uint64ToLE(EvmChainSelector)
 
-	SVMSourceChainStatePDA, _, _ = ccip.FindSourceChainStatePDA(SVMChainSelector, CcipRouterProgram)
-	SVMDestChainStatePDA, _, _   = ccip.FindDestChainStatePDA(SVMChainSelector, CcipRouterProgram)
-	EvmSourceChainStatePDA, _, _ = ccip.FindSourceChainStatePDA(EvmChainSelector, CcipRouterProgram)
-	EvmDestChainStatePDA, _, _   = ccip.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
+	SVMSourceChainStatePDA, _ = common.GetSourceChainStatePDA(SVMChainSelector, CcipRouterProgram)
+	SVMDestChainStatePDA, _   = common.GetDestChainStatePDA(SVMChainSelector, CcipRouterProgram)
+	EvmSourceChainStatePDA, _ = common.GetSourceChainStatePDA(EvmChainSelector, CcipRouterProgram)
+	EvmDestChainStatePDA, _   = common.GetDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
 
 	OnRampAddress        = []byte{1, 2, 3}
 	OnRampAddressPadded  = [64]byte{1, 2, 3}

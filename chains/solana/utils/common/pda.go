@@ -45,3 +45,27 @@ func FindCcipTokenpoolBillingPDA(programID, mint solana.PublicKey, chainSelector
 func FindCcipTokenpoolChainconfigPDA(programID, mint solana.PublicKey, chainSelector uint64) (solana.PublicKey, uint8, error) {
 	return solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), binary.LittleEndian.AppendUint64([]byte{}, chainSelector), mint.Bytes()}, programID)
 }
+
+func GetSourceChainStatePDA(chainSelector uint64, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
+	chainSelectorLE := Uint64ToLE(chainSelector)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, ccipRouterProgram)
+	return p, err
+}
+
+func GetDestChainStatePDA(chainSelector uint64, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
+	chainSelectorLE := Uint64ToLE(chainSelector)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), chainSelectorLE}, ccipRouterProgram)
+	return p, err
+}
+
+func GetCommitReportPDA(chainSelector uint64, root [32]byte, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
+	chainSelectorLE := Uint64ToLE(chainSelector)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), chainSelectorLE, root[:]}, ccipRouterProgram)
+	return p, err
+}
+
+func GetNoncePDA(chainSelector uint64, user solana.PublicKey, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
+	chainSelectorLE := Uint64ToLE(chainSelector)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("nonce"), chainSelectorLE, user.Bytes()}, ccipRouterProgram)
+	return p, err
+}
