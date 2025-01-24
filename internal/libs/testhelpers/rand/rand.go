@@ -75,7 +75,10 @@ func stringToBytes32(s string) cciptypes.Bytes32 {
 }
 
 func RandomAddress() cciptypes.UnknownEncodedAddress {
-	b := make([]byte, 20)
-	_, _ = rand.Read(b) // Assignment for errcheck. Only used in tests so we can ignore.
-	return cciptypes.UnknownEncodedAddress(cciptypes.Bytes(b).String())
+	b := RandomAddressBytes()
+	return cciptypes.UnknownEncodedAddress(b.String())
+}
+
+func RandomAddressBytes() cciptypes.Bytes {
+	return cciptypes.Bytes(RandomBytes(20))
 }
