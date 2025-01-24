@@ -182,8 +182,7 @@ pub struct BypasserExecuteBatch<'info> {
         seeds = [TIMELOCK_BYPASSER_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
-        constraint = !operation.is_done() @ TimelockError::OperationAlreadyExecuted,
-        close = authority, // close the operation after execution
+        close = authority, // close the bypasser operation after execution
     )]
     pub operation: Account<'info, Operation>,
 
