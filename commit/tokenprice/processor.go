@@ -81,6 +81,11 @@ func (p *processor) Outcome(
 		"tokenPrices", tokenPriceOutcome,
 	)
 
+	if len(tokenPriceOutcome) == 0 {
+		lggr.Debugw("No token prices to report")
+		return Outcome{}, nil
+	}
+
 	out := Outcome{TokenPrices: tokenPriceOutcome}
 	p.metricsReporter.TrackTokenPricesOutcome(out)
 	return out, nil

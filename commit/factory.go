@@ -39,7 +39,7 @@ const (
 	// Estimated maximum number of priced tokens that the Commit DON supports.
 	// This value does not indicate a system limitation but just an estimation to properly tune the OCR parameters.
 	// The value can be adjusted as needed.
-	estimatedMaxNumberOfPricedTokens = 10_000
+	estimatedMaxNumberOfPricedTokens = 14_445
 
 	// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
 	// that assumes estimatedMaxNumberOfSourceChains source chains and
@@ -57,7 +57,7 @@ const (
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
-	maxReportLength = 993_982
+	maxReportLength = 128_2900
 
 	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
 	maxReportCount = 1

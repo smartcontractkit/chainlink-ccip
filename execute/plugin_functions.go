@@ -652,10 +652,26 @@ func getConsensusObservation(
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	destChainSelector cciptypes.ChainSelector,
 	F int,
-	fChain map[cciptypes.ChainSelector]int,
+	destChain cciptypes.ChainSelector,
 ) (exectypes.Observation, error) {
 	if len(aos) < F {
 		return exectypes.Observation{}, fmt.Errorf("below F threshold")
+	}
+
+	observedFChains := make(map[cciptypes.ChainSelector][]int)
+	for _, ao := range aos {
+		obs := ao.Observation
+		for chain, f := range obs.FChain {
+			observedFChains[chain] = append(observedFChains[chain], f)
+		}
+	}
+	// consensus on the fChain map uses the role DON F value
+	// because all nodes can observe the home chain.
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(F))
+	fChain := consensus.GetConsensusMap(lggr, "fChain", observedFChains, donThresh)
+	_, ok := fChain[destChain] // check if the destination chain is in the FChain.
+	if !ok {
+		return exectypes.Observation{}, fmt.Errorf("destination chain %d is not in FChain", destChain)
 	}
 
 	lggr.Debugw("getConsensusObservation decoded observations", "aos", aos)
