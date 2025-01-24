@@ -32,6 +32,13 @@ func (p *processor) getConsensusObservation(
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
 	}
 
+	if consensus.LtTwoFPlusOne(fDestChain, len(aggObs.Timestamps)) {
+		return ConsensusObservation{},
+			fmt.Errorf("not enough observations for timestamps to reach consensus, have %d, need %d",
+				len(aggObs.Timestamps), consensus.TwoFPlus1(fDestChain))
+	}
+	timestamp := consensus.Median(aggObs.Timestamps, consensus.TimestampComparator)
+
 	fFeedChain, exists := fChains[p.offChainCfg.PriceFeedChainSelector]
 	if !exists {
 		return ConsensusObservation{},
@@ -60,7 +67,7 @@ func (p *processor) getConsensusObservation(
 
 	consensusObs := ConsensusObservation{
 		FChain:                fChains,
-		Timestamp:             consensus.Median(aggObs.Timestamps, consensus.TimestampComparator),
+		Timestamp:             timestamp,
 		FeedTokenPrices:       feedPricesConsensus,
 		FeeQuoterTokenUpdates: feeQuoterUpdatesConsensus,
 	}
