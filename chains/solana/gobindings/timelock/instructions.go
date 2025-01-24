@@ -32,12 +32,6 @@ var (
 
 	Instruction_BatchAddAccess = ag_binary.TypeID([8]byte{73, 141, 223, 79, 66, 154, 226, 67})
 
-	// initialize_operation, append_instructions, finalize_operation functions are used to create a new operation
-	// and add instructions to it. finalize_operation is used to mark the operation as finalized.
-	// only after the operation is finalized, it can be scheduled.
-	// this is due to the fact that the operation PDA cannot be initialized with CPI call from MCM program.
-	// This pattern also allows to execute larger transaction(multiple instructions) exceeding 1232 bytes
-	// in a single execute_batch transaction ensuring atomicy.
 	Instruction_InitializeOperation = ag_binary.TypeID([8]byte{15, 96, 217, 171, 124, 4, 113, 243})
 
 	Instruction_AppendInstructions = ag_binary.TypeID([8]byte{58, 58, 137, 122, 115, 51, 144, 134})

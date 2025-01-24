@@ -10,12 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// initialize_operation, append_instructions, finalize_operation functions are used to create a new operation
-// and add instructions to it. finalize_operation is used to mark the operation as finalized.
-// only after the operation is finalized, it can be scheduled.
-// this is due to the fact that the operation PDA cannot be initialized with CPI call from MCM program.
-// This pattern also allows to execute larger transaction(multiple instructions) exceeding 1232 bytes
-// in a single execute_batch transaction ensuring atomicy.
+// InitializeOperation is the `initializeOperation` instruction.
 type InitializeOperation struct {
 	TimelockId       *[32]uint8
 	Id               *[32]uint8
