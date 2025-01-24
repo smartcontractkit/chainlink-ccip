@@ -1155,7 +1155,9 @@ type DestChainConfig struct {
 	MaxDataBytes                      uint32
 	MaxPerMsgGasLimit                 uint32
 	DestGasOverhead                   uint32
-	DestGasPerPayloadByte             uint16
+	DestGasPerPayloadByteBase         uint32
+	DestGasPerPayloadByteHigh         uint32
+	DestGasPerPayloadByteThreshold    uint32
 	DestDataAvailabilityOverheadGas   uint32
 	DestGasPerDataAvailabilityByte    uint16
 	DestDataAvailabilityMultiplierBps uint16
@@ -1195,8 +1197,18 @@ func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	if err != nil {
 		return err
 	}
-	// Serialize `DestGasPerPayloadByte` param:
-	err = encoder.Encode(obj.DestGasPerPayloadByte)
+	// Serialize `DestGasPerPayloadByteBase` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteBase)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasPerPayloadByteHigh` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteHigh)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasPerPayloadByteThreshold` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteThreshold)
 	if err != nil {
 		return err
 	}
@@ -1284,8 +1296,18 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	if err != nil {
 		return err
 	}
-	// Deserialize `DestGasPerPayloadByte`:
-	err = decoder.Decode(&obj.DestGasPerPayloadByte)
+	// Deserialize `DestGasPerPayloadByteBase`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteBase)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasPerPayloadByteHigh`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteHigh)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasPerPayloadByteThreshold`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteThreshold)
 	if err != nil {
 		return err
 	}
