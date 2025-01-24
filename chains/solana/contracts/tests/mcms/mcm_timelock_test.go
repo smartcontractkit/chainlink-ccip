@@ -351,10 +351,11 @@ func TestMcmWithTimelock(t *testing.T) {
 						salt, sErr := timelockutil.SimpleSalt()
 						require.NoError(t, sErr)
 						acceptOwnershipOp := timelockutil.Operation{
-							TimelockID:  config.TestTimelockID,
-							Predecessor: config.TimelockEmptyOpID,
-							Salt:        salt,
-							Delay:       uint64(1),
+							TimelockID:   config.TestTimelockID,
+							Predecessor:  config.TimelockEmptyOpID,
+							Salt:         salt,
+							Delay:        uint64(1),
+							IsBypasserOp: true,
 						}
 
 						acceptOwnershipOp.AddInstruction(acceptOwnershipIx, []solana.PublicKey{config.McmProgram})
@@ -362,35 +363,10 @@ func TestMcmWithTimelock(t *testing.T) {
 						id := acceptOwnershipOp.OperationID()
 						operationPDA := acceptOwnershipOp.OperationPDA()
 
-						ixs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, acceptOwnershipOp, admin.PublicKey(), roleMsigs.AccessController.PublicKey())
+						ixs, ierr := timelockutil.GetPreloadBypasserOperationIxs(config.TestTimelockID, acceptOwnershipOp, admin.PublicKey(), roleMsigs.AccessController.PublicKey())
 						require.NoError(t, ierr)
 						for _, ix := range ixs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-						}
-
-						scheduleBatchIx, scErr := timelock.NewScheduleBatchInstruction(
-							config.TestTimelockID,
-							acceptOwnershipOp.OperationID(),
-							acceptOwnershipOp.Delay,
-							operationPDA,
-							timelockutil.GetConfigPDA(config.TestTimelockID),
-							roleMsigs.AccessController.PublicKey(),
-							admin.PublicKey(),
-						).ValidateAndBuild()
-						require.NoError(t, scErr)
-
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleBatchIx}, admin, config.DefaultCommitment)
-						parsed := common.ParseLogMessages(tx.Meta.LogMessages,
-							[]common.EventMapping{
-								common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
-							},
-						)
-
-						for _, ixx := range acceptOwnershipOp.ToInstructionData() {
-							event := parsed[0].EventData[0].Data.(*timelockutil.CallScheduled)
-							require.Equal(t, acceptOwnershipOp.OperationID(), event.ID)
-							require.Equal(t, acceptOwnershipOp.Salt, event.Salt)
-							require.Equal(t, ixx.Data, event.Data)
 						}
 
 						var opAccount timelock.Operation
@@ -398,12 +374,6 @@ func TestMcmWithTimelock(t *testing.T) {
 						if err != nil {
 							require.NoError(t, err, "failed to get account info")
 						}
-
-						require.Equal(t,
-							tx.BlockTime.Time().Add(time.Duration(acceptOwnershipOp.Delay)*time.Second).Unix(),
-							int64(opAccount.Timestamp),
-							"Scheduled Times don't match",
-						)
 
 						require.Equal(t,
 							id,

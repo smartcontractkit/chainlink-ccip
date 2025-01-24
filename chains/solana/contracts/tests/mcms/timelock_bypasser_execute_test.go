@@ -206,14 +206,15 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			require.Equal(t, strconv.Itoa(int(requiredAmount)), adminWsolBalance.Value.Amount)
 		})
 
-		t.Run("success: schedule and execute batch instructions", func(t *testing.T) {
+		t.Run("success: preload and execute batch instructions via bypasser_execute_batch", func(t *testing.T) {
 			salt, err := timelockutil.SimpleSalt()
 			require.NoError(t, err)
 			op := timelockutil.Operation{
-				TimelockID:  config.TestTimelockID,
-				Predecessor: config.TimelockEmptyOpID,
-				Salt:        salt,
-				Delay:       uint64(1000),
+				TimelockID:   config.TestTimelockID,
+				Predecessor:  config.TimelockEmptyOpID,
+				Salt:         salt,
+				Delay:        uint64(1000),
+				IsBypasserOp: true,
 			}
 
 			cIx, _, ciErr := tokens.CreateAssociatedTokenAccount(
@@ -246,7 +247,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			signer := roleMap[timelock.Bypasser_Role].RandomPick()
 			ac := roleMap[timelock.Bypasser_Role].AccessController
 
-			ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, signer.PublicKey(), ac.PublicKey())
+			ixs, err := timelockutil.GetPreloadBypasserOperationIxs(config.TestTimelockID, op, signer.PublicKey(), ac.PublicKey())
 			require.NoError(t, err)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
