@@ -67,7 +67,7 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 
 	// preload with defined config.EvmChainSelector
-	chainPDA, _, err := common.FindCcipTokenpoolChainconfigPDA(config.CcipRouterProgram, mint.PublicKey(), config.EvmChainSelector)
+	chainPDA, _, err := common.FindCcipTokenpoolChainconfigPDA(config.CcipTokenPoolProgram, mint.PublicKey(), config.EvmChainSelector)
 	if err != nil {
 		return TokenPool{}, err
 	}
