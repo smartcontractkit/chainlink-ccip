@@ -18,11 +18,6 @@ func (p *processor) ValidateObservation(
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
-	//observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
-	//if err != nil {
-	//	return fmt.Errorf("failed to get supported chains: %w", err)
-	//}
-
 	if err := validateObservedTokenPrices(obs.FeedTokenPrices); err != nil {
 		return fmt.Errorf("failed to validate observed token prices: %w", err)
 	}
