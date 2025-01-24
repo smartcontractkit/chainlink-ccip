@@ -26,7 +26,7 @@ pub struct Cancel<'info> {
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        close = authority, // todo: check if we send fund back to the signer, otherwise, we'll have additional destination account
+        close = authority,
         constraint = operation.id == id @ TimelockError::InvalidId,
         constraint = operation.is_pending() @ TimelockError::OperationNotCancellable,
     )]

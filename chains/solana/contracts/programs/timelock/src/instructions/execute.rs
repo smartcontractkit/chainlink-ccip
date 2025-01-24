@@ -7,8 +7,8 @@ use access_controller::AccessController;
 use bytemuck::Zeroable;
 
 use crate::constants::{
-    EMPTY_PREDECESSOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED, TIMELOCK_OPERATION_SEED,
-    TIMELOCK_SIGNER_SEED,
+    EMPTY_PREDECESSOR, TIMELOCK_BYPASSER_OPERATION_SEED, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED,
+    TIMELOCK_OPERATION_SEED, TIMELOCK_SIGNER_SEED,
 };
 use crate::error::TimelockError;
 use crate::event::*;
@@ -179,7 +179,7 @@ pub struct ExecuteBatch<'info> {
 pub struct BypasserExecuteBatch<'info> {
     #[account(
         mut,
-        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
+        seeds = [TIMELOCK_BYPASSER_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
         constraint = !operation.is_done() @ TimelockError::OperationAlreadyExecuted,

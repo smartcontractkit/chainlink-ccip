@@ -115,56 +115,15 @@
       ]
     },
     {
-      "name": "scheduleBatch",
-      "accounts": [
-        {
-          "name": "operation",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "roleAccessController",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "timelockId",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "id",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "delay",
-          "type": "u64"
-        }
-      ]
-    },
-    {
       "name": "initializeOperation",
+      "docs": [
+        "initialize_operation, append_instructions, finalize_operation functions are used to create a new operation",
+        "and add instructions to it. finalize_operation is used to mark the operation as finalized.",
+        "only after the operation is finalized, it can be scheduled.",
+        "this is due to the fact that the operation PDA cannot be initialized with CPI call from MCM program.",
+        "This pattern also allows to execute larger transaction(multiple instructions) exceeding 1232 bytes",
+        "in a single execute_batch transaction ensuring atomicy."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -294,6 +253,51 @@
       ]
     },
     {
+      "name": "finalizeOperation",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "clearOperation",
       "accounts": [
         {
@@ -339,7 +343,7 @@
       ]
     },
     {
-      "name": "finalizeOperation",
+      "name": "scheduleBatch",
       "accounts": [
         {
           "name": "operation",
@@ -380,6 +384,10 @@
               32
             ]
           }
+        },
+        {
+          "name": "delay",
+          "type": "u64"
         }
       ]
     },
@@ -448,6 +456,217 @@
         },
         {
           "name": "timelockSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeBypasserOperation",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "instructionCount",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "appendBypasserInstructions",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "instructionsBatch",
+          "type": {
+            "vec": {
+              "defined": "InstructionData"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "finalizeBypasserOperation",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "clearBypasserOperation",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         },
@@ -777,10 +996,6 @@
                 32
               ]
             }
-          },
-          {
-            "name": "authority",
-            "type": "publicKey"
           },
           {
             "name": "isFinalized",

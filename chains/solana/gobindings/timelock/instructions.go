@@ -32,19 +32,33 @@ var (
 
 	Instruction_BatchAddAccess = ag_binary.TypeID([8]byte{73, 141, 223, 79, 66, 154, 226, 67})
 
-	Instruction_ScheduleBatch = ag_binary.TypeID([8]byte{242, 140, 87, 106, 71, 226, 86, 32})
-
+	// initialize_operation, append_instructions, finalize_operation functions are used to create a new operation
+	// and add instructions to it. finalize_operation is used to mark the operation as finalized.
+	// only after the operation is finalized, it can be scheduled.
+	// this is due to the fact that the operation PDA cannot be initialized with CPI call from MCM program.
+	// This pattern also allows to execute larger transaction(multiple instructions) exceeding 1232 bytes
+	// in a single execute_batch transaction ensuring atomicy.
 	Instruction_InitializeOperation = ag_binary.TypeID([8]byte{15, 96, 217, 171, 124, 4, 113, 243})
 
 	Instruction_AppendInstructions = ag_binary.TypeID([8]byte{58, 58, 137, 122, 115, 51, 144, 134})
 
+	Instruction_FinalizeOperation = ag_binary.TypeID([8]byte{63, 208, 32, 98, 85, 182, 236, 140})
+
 	Instruction_ClearOperation = ag_binary.TypeID([8]byte{111, 217, 62, 240, 224, 75, 60, 58})
 
-	Instruction_FinalizeOperation = ag_binary.TypeID([8]byte{63, 208, 32, 98, 85, 182, 236, 140})
+	Instruction_ScheduleBatch = ag_binary.TypeID([8]byte{242, 140, 87, 106, 71, 226, 86, 32})
 
 	Instruction_Cancel = ag_binary.TypeID([8]byte{232, 219, 223, 41, 219, 236, 220, 190})
 
 	Instruction_ExecuteBatch = ag_binary.TypeID([8]byte{112, 159, 211, 51, 238, 70, 212, 60})
+
+	Instruction_InitializeBypasserOperation = ag_binary.TypeID([8]byte{58, 27, 48, 204, 19, 197, 63, 26})
+
+	Instruction_AppendBypasserInstructions = ag_binary.TypeID([8]byte{127, 68, 8, 210, 106, 213, 25, 215})
+
+	Instruction_FinalizeBypasserOperation = ag_binary.TypeID([8]byte{45, 55, 198, 51, 124, 24, 169, 250})
+
+	Instruction_ClearBypasserOperation = ag_binary.TypeID([8]byte{200, 21, 249, 130, 56, 13, 128, 32})
 
 	Instruction_BypasserExecuteBatch = ag_binary.TypeID([8]byte{90, 62, 66, 6, 227, 174, 30, 194})
 
@@ -66,20 +80,28 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Initialize"
 	case Instruction_BatchAddAccess:
 		return "BatchAddAccess"
-	case Instruction_ScheduleBatch:
-		return "ScheduleBatch"
 	case Instruction_InitializeOperation:
 		return "InitializeOperation"
 	case Instruction_AppendInstructions:
 		return "AppendInstructions"
-	case Instruction_ClearOperation:
-		return "ClearOperation"
 	case Instruction_FinalizeOperation:
 		return "FinalizeOperation"
+	case Instruction_ClearOperation:
+		return "ClearOperation"
+	case Instruction_ScheduleBatch:
+		return "ScheduleBatch"
 	case Instruction_Cancel:
 		return "Cancel"
 	case Instruction_ExecuteBatch:
 		return "ExecuteBatch"
+	case Instruction_InitializeBypasserOperation:
+		return "InitializeBypasserOperation"
+	case Instruction_AppendBypasserInstructions:
+		return "AppendBypasserInstructions"
+	case Instruction_FinalizeBypasserOperation:
+		return "FinalizeBypasserOperation"
+	case Instruction_ClearBypasserOperation:
+		return "ClearBypasserOperation"
 	case Instruction_BypasserExecuteBatch:
 		return "BypasserExecuteBatch"
 	case Instruction_UpdateDelay:
@@ -119,25 +141,37 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"batch_add_access", (*BatchAddAccess)(nil),
 		},
 		{
-			"schedule_batch", (*ScheduleBatch)(nil),
-		},
-		{
 			"initialize_operation", (*InitializeOperation)(nil),
 		},
 		{
 			"append_instructions", (*AppendInstructions)(nil),
 		},
 		{
+			"finalize_operation", (*FinalizeOperation)(nil),
+		},
+		{
 			"clear_operation", (*ClearOperation)(nil),
 		},
 		{
-			"finalize_operation", (*FinalizeOperation)(nil),
+			"schedule_batch", (*ScheduleBatch)(nil),
 		},
 		{
 			"cancel", (*Cancel)(nil),
 		},
 		{
 			"execute_batch", (*ExecuteBatch)(nil),
+		},
+		{
+			"initialize_bypasser_operation", (*InitializeBypasserOperation)(nil),
+		},
+		{
+			"append_bypasser_instructions", (*AppendBypasserInstructions)(nil),
+		},
+		{
+			"finalize_bypasser_operation", (*FinalizeBypasserOperation)(nil),
+		},
+		{
+			"clear_bypasser_operation", (*ClearBypasserOperation)(nil),
 		},
 		{
 			"bypasser_execute_batch", (*BypasserExecuteBatch)(nil),
