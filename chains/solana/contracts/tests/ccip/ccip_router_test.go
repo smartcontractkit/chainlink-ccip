@@ -4591,6 +4591,112 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Message: Source chain selector not supported."})
 			})
 
+			t.Run("When executing a report with a matching source chain selector in message but in the wrong CCIP version, it fails", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				sequenceNumber := message.Header.SequenceNumber
+
+				commitReport := ccip_router.CommitInput{
+					MerkleRoot: ccip_router.MerkleRoot{
+						SourceChainSelector: config.EvmChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := ccip.GetCommitReportPDA(config.DefaultCcipVersion, config.EvmChainSelector, root)
+				require.NoError(t, err)
+
+				instruction, err := ccip_router.NewCommitInstruction(
+					config.DefaultCcipVersion, // commit to default CCIP version offramp
+					reportContext,
+					commitReport,
+					sigs,
+					config.RouterConfigPDA,
+					config.EvmSourceChainStatePDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
+				event := ccip.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+
+				message.Header.SourceChainSelector = 89
+
+				executionReport := ccip_router.ExecutionReportSingleChain{
+					SourceChainSelector: config.EvmChainSelector,
+					Message:             message,
+					Root:                root,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+
+				bumpedRootPDA, err := ccip.GetCommitReportPDA(config.BumpedCcipVersion, config.EvmChainSelector, root)
+				require.NoError(t, err)
+
+				type Testcase struct {
+					Name           string
+					CommitPDA      solana.PublicKey
+					SourceChainPDA solana.PublicKey
+					ErrorMsg       string
+				}
+
+				testcases := []Testcase{
+					{
+						Name:           "Default version PDAs",
+						CommitPDA:      rootPDA,
+						SourceChainPDA: config.EvmSourceChainStatePDA,
+						ErrorMsg:       "AnchorError caused by account: source_chain_state. Error Code: ConstraintSeeds. Error Number: 2006.",
+					}, {
+						Name:           "Bumped version in commit",
+						CommitPDA:      bumpedRootPDA,
+						SourceChainPDA: config.EvmSourceChainStatePDA,
+						ErrorMsg:       "AnchorError caused by account: commit_report. Error Code: AccountNotInitialized. Error Number: 3012.",
+					}, {
+						Name:           "Bumped version in source chain",
+						CommitPDA:      rootPDA,
+						SourceChainPDA: config.EvmBumpedSourceChainStatePDA,
+						ErrorMsg:       "AnchorError caused by account: commit_report. Error Code: ConstraintSeeds. Error Number: 2006.",
+					},
+				}
+
+				for _, testcase := range testcases {
+					t.Run(testcase.Name, func(t *testing.T) {
+						raw := ccip_router.NewExecuteInstruction(
+							config.BumpedCcipVersion, // try to execute in new CCIP version offramp
+							executionReport,
+							reportContext,
+							[]byte{},
+							config.RouterConfigPDA,
+							testcase.SourceChainPDA,
+							testcase.CommitPDA,
+							config.ExternalExecutionConfigPDA,
+							transmitter.PublicKey(),
+							solana.SystemProgramID,
+							solana.SysVarInstructionsPubkey,
+							config.ExternalTokenPoolsSignerPDA,
+						)
+						raw.AccountMetaSlice = append(
+							raw.AccountMetaSlice,
+							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+							solana.NewAccountMeta(solana.SystemProgramID, false, false),
+						)
+						instruction, err = raw.ValidateAndBuild()
+						require.NoError(t, err)
+
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{testcase.ErrorMsg})
+					})
+				}
+			})
+
 			t.Run("When executing a report with unsupported source chain selector account, it fails", func(t *testing.T) {
 				transmitter := getTransmitter()
 
@@ -5406,6 +5512,72 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
 					require.NotNil(t, result)
+
+					t.Run("When user tries to manually execute after the period of time has passed but in the wrong CCIP version, it fails", func(t *testing.T) {
+						bumpedRootPDA, err := ccip.GetCommitReportPDA(config.BumpedCcipVersion, config.EvmChainSelector, root)
+
+						executionReport := ccip_router.ExecutionReportSingleChain{
+							SourceChainSelector: config.EvmChainSelector,
+							Message:             message1,
+							Root:                root,
+							Proofs:              [][32]uint8{[32]byte(hash2)},
+						}
+
+						type Testcase struct {
+							Name           string
+							CommitPDA      solana.PublicKey
+							SourceChainPDA solana.PublicKey
+							ErrorMsg       string
+						}
+
+						testcases := []Testcase{
+							{
+								Name:           "Default version PDAs",
+								CommitPDA:      rootPDA,
+								SourceChainPDA: config.EvmSourceChainStatePDA,
+								ErrorMsg:       "AnchorError caused by account: source_chain_state. Error Code: ConstraintSeeds. Error Number: 2006.",
+							}, {
+								Name:           "Bumped version in commit",
+								CommitPDA:      bumpedRootPDA,
+								SourceChainPDA: config.EvmSourceChainStatePDA,
+								ErrorMsg:       "AnchorError caused by account: commit_report. Error Code: AccountNotInitialized. Error Number: 3012.",
+							}, {
+								Name:           "Bumped version in source chain",
+								CommitPDA:      rootPDA,
+								SourceChainPDA: config.EvmBumpedSourceChainStatePDA,
+								ErrorMsg:       "AnchorError caused by account: commit_report. Error Code: ConstraintSeeds. Error Number: 2006.",
+							},
+						}
+
+						for _, testcase := range testcases {
+							t.Run(testcase.Name, func(t *testing.T) {
+								raw := ccip_router.NewManuallyExecuteInstruction(
+									config.BumpedCcipVersion, // try to execute in newer version than where commit is
+									executionReport,
+									[]byte{},
+									config.RouterConfigPDA,
+									testcase.SourceChainPDA,
+									testcase.CommitPDA,
+									config.ExternalExecutionConfigPDA,
+									user.PublicKey(),
+									solana.SystemProgramID,
+									solana.SysVarInstructionsPubkey,
+									config.ExternalTokenPoolsSignerPDA,
+								)
+								raw.AccountMetaSlice = append(
+									raw.AccountMetaSlice,
+									solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+									solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+									solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+									solana.NewAccountMeta(solana.SystemProgramID, false, false),
+								)
+								instruction, err = raw.ValidateAndBuild()
+								require.NoError(t, err)
+
+								testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{testcase.ErrorMsg})
+							})
+						}
+					})
 
 					t.Run("When user manually executing after the period of time has passed, it succeeds", func(t *testing.T) {
 						executionReport := ccip_router.ExecutionReportSingleChain{
