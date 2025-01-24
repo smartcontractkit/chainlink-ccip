@@ -22,6 +22,8 @@ func (p *processor) ValidateObservation(
 		return fmt.Errorf("failed to validate observed token prices: %w", err)
 	}
 
+	//TODO: validate supported feed chain if any token prices were updated
+	//TODO: validate supported destChain if any fee quoter token updates were observed
 	//TODO: validate observed fee quoter token updates
 	//TODO: validate observed timestamp
 

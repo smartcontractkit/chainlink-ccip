@@ -110,10 +110,6 @@ func (p *processor) selectTokensForUpdate(
 		}
 	}
 
-	// sort the token prices by tokenID
-	//sort.Slice(tokenPrices, func(i, j int) bool {
-	//	return tokenPrices[i].TokenID < tokenPrices[j].TokenID
-	//})
 	return tokenPrices
 }
 
