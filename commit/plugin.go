@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync/atomic"
 	"time"
 
@@ -175,6 +176,8 @@ func NewPlugin(
 	}
 }
 
+// Query returns the query for the next round.
+// NOTE: In most cases the Query phase should not return an error based on outCtx to prevent infinite retries.
 func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
 	var err error
 	var q committypes.Query
@@ -214,6 +217,8 @@ func (p *Plugin) ObservationQuorum(
 	), nil
 }
 
+// Observation returns the observation for this round.
+// NOTE: In most cases the Observation phase should not return an error based on outCtx to prevent infinite retries.
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
@@ -403,7 +408,8 @@ func (p *Plugin) Outcome(
 		// we ignore the outcome of the discovery processor.
 		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
-			return nil, fmt.Errorf("discovery processor outcome: %w, seqNr: %d", err, outCtx.SeqNr)
+			p.lggr.Errorw("failed to get discovery processor outcome", "err", err)
+			return nil, nil
 		}
 		p.contractsInitialized.Store(true)
 	}
@@ -487,12 +493,20 @@ func (p *Plugin) getMainOutcome(
 func (p *Plugin) Close() error {
 	p.lggr.Infow("closing commit plugin")
 
-	return services.CloseAll(
+	closeable := []io.Closer{
 		p.merkleRootProcessor,
 		p.tokenPriceProcessor,
 		p.chainFeeProcessor,
 		p.discoveryProcessor,
-	)
+	}
+
+	// Chains without RMN don't initialize the RMNHomeReader
+	// TODO Consider initializing rmnHomeReader anyway but using some noop implementation
+	if p.rmnHomeReader != nil {
+		closeable = append(closeable, p.rmnHomeReader)
+	}
+
+	return services.CloseAll(closeable...)
 }
 
 // Assuming that we have to delegate a specific amount of time to the observation requests and the report requests.
