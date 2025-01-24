@@ -31,16 +31,6 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "dup price",
-			tokenPrices: []cciptypes.TokenPrice{
-				cciptypes.NewTokenPrice("0x1", big.NewInt(1)),
-				cciptypes.NewTokenPrice("0x2", big.NewInt(1)),
-				cciptypes.NewTokenPrice("0x1", big.NewInt(1)), // dup
-				cciptypes.NewTokenPrice("0xa", big.NewInt(1)),
-			},
-			expErr: true,
-		},
-		{
 			name: "nil price",
 			tokenPrices: []cciptypes.TokenPrice{
 				cciptypes.NewTokenPrice("0x1", big.NewInt(1)),
@@ -54,7 +44,11 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedTokenPrices(tc.tokenPrices)
+			tokenPrices := make(cciptypes.TokenPriceMap)
+			for _, tp := range tc.tokenPrices {
+				tokenPrices[tp.TokenID] = tp.Price
+			}
+			err := validateObservedTokenPrices(tokenPrices)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
