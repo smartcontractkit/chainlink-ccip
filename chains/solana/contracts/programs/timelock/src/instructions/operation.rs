@@ -10,6 +10,21 @@ use crate::error::TimelockError;
 use crate::state::{Config, InstructionData, Operation};
 use crate::TIMELOCK_BYPASSER_OPERATION_SEED;
 
+/// Operation management for timelock system, handling both standard (timelock-enforced)
+/// and bypass (emergency) operations.
+///
+/// Standard Operation Flow:
+/// - initialize -> append -> finalize -> schedule -> execute_batch
+/// - Enforces timelock delays and predecessor dependencies
+///
+/// Bypass Operation Flow:
+/// - initialize -> append -> finalize -> bypass_execute_batch
+/// - No delay, immediate execution
+///
+/// Implementation uses separate code paths and PDAs for each operation type
+/// to maintain clear security boundaries and audit trails, despite similar logic.
+/// All operations enforce state transitions, size limits, and role-based access.
+///
 pub fn initialize_operation<'info>(
     ctx: Context<'_, '_, '_, 'info, InitializeOperation<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
