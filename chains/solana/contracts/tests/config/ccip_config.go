@@ -38,11 +38,14 @@ var (
 
 	DefaultCcipVersion      = ccip_router.CcipVersion{Major: 1, Minor: 6}
 	defaultCcipVersionBytes = []byte{DefaultCcipVersion.Major, DefaultCcipVersion.Minor}
+	BumpedCcipVersion       = ccip_router.CcipVersion{Major: DefaultCcipVersion.Major, Minor: DefaultCcipVersion.Minor + 1}
+	bumpedCcipVersionBytes  = []byte{BumpedCcipVersion.Major, BumpedCcipVersion.Minor}
 
-	SVMSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), defaultCcipVersionBytes, binary.LittleEndian.AppendUint64([]byte{}, SVMChainSelector)}, CcipRouterProgram)
-	EvmSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), defaultCcipVersionBytes, binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
-	SVMDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SVMChainSelector)}, CcipRouterProgram)
-	EvmDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
+	SVMSourceChainStatePDA, _, _       = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), defaultCcipVersionBytes, binary.LittleEndian.AppendUint64([]byte{}, SVMChainSelector)}, CcipRouterProgram)
+	EvmSourceChainStatePDA, _, _       = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), defaultCcipVersionBytes, binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
+	EvmBumpedSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), bumpedCcipVersionBytes, binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
+	SVMDestChainStatePDA, _, _         = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SVMChainSelector)}, CcipRouterProgram)
+	EvmDestChainStatePDA, _, _         = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
 
 	OnRampAddress        = []byte{1, 2, 3}
 	OnRampAddressPadded  = [64]byte{1, 2, 3}

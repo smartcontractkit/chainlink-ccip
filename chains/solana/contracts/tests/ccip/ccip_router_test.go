@@ -571,6 +571,30 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
 				require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				require.Equal(t, config.DefaultCcipVersion, sourceChainStateAccount.CcipVersion)
+			})
+
+			t.Run("Source (new version)", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddSourceChainSelectorInstruction(
+					config.BumpedCcipVersion,
+					config.EvmChainSelector,
+					validSourceChainConfig,
+					config.EvmBumpedSourceChainStatePDA,
+					config.RouterConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				var sourceChainStateAccount ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmBumpedSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
+				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
+				require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				require.Equal(t, config.BumpedCcipVersion, sourceChainStateAccount.CcipVersion)
 			})
 
 			t.Run("Dest", func(t *testing.T) {
@@ -612,7 +636,6 @@ func TestCCIPRouter(t *testing.T) {
 						OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
 						IsEnabled: true,
 					},
-
 					config.SVMSourceChainStatePDA,
 					config.RouterConfigPDA,
 					admin.PublicKey(),
@@ -628,6 +651,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
 				require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				require.Equal(t, config.DefaultCcipVersion, sourceChainStateAccount.CcipVersion)
 			})
 
 			t.Run("as dest chain", func(t *testing.T) {
@@ -698,6 +722,11 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, true, initial.Config.IsEnabled)
 
+				var initialBumped ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmBumpedSourceChainStatePDA, config.DefaultCommitment, &initialBumped)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, true, initialBumped.Config.IsEnabled)
+
 				ix, err := ccip_router.NewDisableSourceChainSelectorInstruction(
 					config.DefaultCcipVersion,
 					config.EvmChainSelector,
@@ -712,6 +741,14 @@ func TestCCIPRouter(t *testing.T) {
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmSourceChainStatePDA, config.DefaultCommitment, &final)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, false, final.Config.IsEnabled)
+				require.Equal(t, config.DefaultCcipVersion, final.CcipVersion)
+
+				// it does not affect other versions of the source chain selector
+				var bumpedVersion ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmBumpedSourceChainStatePDA, config.DefaultCommitment, &bumpedVersion)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, true, bumpedVersion.Config.IsEnabled)
+				require.Equal(t, config.BumpedCcipVersion, bumpedVersion.CcipVersion)
 			})
 
 			t.Run("Dest", func(t *testing.T) {
@@ -788,11 +825,15 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("When an admin updates the chain state config, it is configured", func(t *testing.T) {
-			var initialSource ccip_router.SourceChain
-			serr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmSourceChainStatePDA, config.DefaultCommitment, &initialSource)
-			require.NoError(t, serr, "failed to get account info")
-
 			t.Run("Source", func(t *testing.T) {
+				var initialSource ccip_router.SourceChain
+				serr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmSourceChainStatePDA, config.DefaultCommitment, &initialSource)
+				require.NoError(t, serr, "failed to get account info")
+
+				var initialBumpedSource ccip_router.SourceChain
+				serr = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmBumpedSourceChainStatePDA, config.DefaultCommitment, &initialBumpedSource)
+				require.NoError(t, serr, "failed to get account info")
+
 				updated := initialSource.Config
 				updated.IsEnabled = true
 				require.NotEqual(t, initialSource.Config, updated) // at this point, onchain is disabled and we'll re-enable it
@@ -812,14 +853,19 @@ func TestCCIPRouter(t *testing.T) {
 				var final ccip_router.SourceChain
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmSourceChainStatePDA, config.DefaultCommitment, &final)
 				require.NoError(t, err, "failed to get account info")
-				require.Equal(t, updated, final.Config)
+				require.Equal(t, updated, final.Config) // the version targeted by the instruction should be updated
+
+				var finalBumped ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmBumpedSourceChainStatePDA, config.DefaultCommitment, &finalBumped)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, initialBumpedSource.Config, finalBumped.Config) // the bumped version should not be updated
 			})
 
-			var initialDest ccip_router.DestChain
-			derr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDest)
-			require.NoError(t, derr, "failed to get account info")
-
 			t.Run("Dest", func(t *testing.T) {
+				var initialDest ccip_router.DestChain
+				derr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDest)
+				require.NoError(t, derr, "failed to get account info")
+
 				updated := initialDest.Config
 				updated.IsEnabled = true
 				require.NotEqual(t, initialDest.Config, updated) // at this point, onchain is disabled and we'll re-enable it
