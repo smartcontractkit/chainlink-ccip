@@ -178,6 +178,7 @@ func getPendingExecutedReports(
 	return groupedCommits, nil
 }
 
+//nolint:gocyclo
 func (p *Plugin) ValidateObservation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
@@ -211,21 +212,22 @@ func (p *Plugin) ValidateObservation(
 		}
 	}
 
+	if err := plugincommon.ValidateFChain(decodedObservation.FChain); err != nil {
+		return fmt.Errorf("failed to validate FChain: %w", err)
+	}
+
 	// These checks are common to all states.
-	err = validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports)
-	if err != nil {
+	if err := validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
-	err = validateObservedSequenceNumbers(decodedObservation.CommitReports)
-	if err != nil {
+	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
 	// check message related validations when states can contain messages
 	if state == exectypes.GetMessages || state == exectypes.Filter {
-		err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages)
-		if err != nil {
+		if err := validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
 			return fmt.Errorf("validate observer reading eligibility: %w", err)
 		}
 

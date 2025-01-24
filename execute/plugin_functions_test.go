@@ -758,7 +758,10 @@ func Test_getConsensusObservation(t *testing.T) {
 	type args struct {
 		observation []exectypes.Observation
 		F           int
-		fChain      map[cciptypes.ChainSelector]int
+	}
+	dstChain := cciptypes.ChainSelector(1)
+	defaultFChain := map[cciptypes.ChainSelector]int{
+		dstChain: 1,
 	}
 	tests := []struct {
 		name    string
@@ -770,26 +773,23 @@ func Test_getConsensusObservation(t *testing.T) {
 		{
 			name: "empty",
 			args: args{
-				fChain: map[cciptypes.ChainSelector]int{
-					1: 1,
-				},
 				observation: nil,
 			},
 			want:    exectypes.Observation{},
-			wantErr: assert.NoError,
+			wantErr: assert.Error,
 		},
 		{
 			name: "one consensus observation",
 			args: args{
-				fChain: map[cciptypes.ChainSelector]int{
-					1: 0,
-				},
 				observation: []exectypes.Observation{
 					{
 						Nonces: exectypes.NonceObservations{
-							1: {
+							dstChain: {
 								"0x1": 1,
 							},
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							dstChain: 0,
 						},
 					},
 				},
@@ -806,9 +806,7 @@ func Test_getConsensusObservation(t *testing.T) {
 		{
 			name: "one ignored consensus observation",
 			args: args{
-				fChain: map[cciptypes.ChainSelector]int{
-					1: 1,
-				},
+
 				observation: []exectypes.Observation{
 					{
 						Nonces: exectypes.NonceObservations{
@@ -816,7 +814,9 @@ func Test_getConsensusObservation(t *testing.T) {
 								"0x1": 1,
 							},
 						},
-					},
+						FChain: map[cciptypes.ChainSelector]int{
+							1: 1,
+						}},
 				},
 			},
 			want:    exectypes.Observation{},
@@ -825,9 +825,6 @@ func Test_getConsensusObservation(t *testing.T) {
 		{
 			name: "3 observers required to reach consensus on 4 sender values",
 			args: args{
-				fChain: map[cciptypes.ChainSelector]int{
-					1: 1, // f + 1
-				},
 				// Across 3 observers
 				observation: []exectypes.Observation{
 					{
@@ -839,6 +836,7 @@ func Test_getConsensusObservation(t *testing.T) {
 								"0x4": 4,
 							},
 						},
+						FChain: defaultFChain,
 					}, {
 						Nonces: exectypes.NonceObservations{
 							1: {
@@ -846,6 +844,7 @@ func Test_getConsensusObservation(t *testing.T) {
 								"0x4": 4,
 							},
 						},
+						FChain: defaultFChain,
 					}, {
 						Nonces: exectypes.NonceObservations{
 							1: {
@@ -853,6 +852,7 @@ func Test_getConsensusObservation(t *testing.T) {
 								"0x3": 3,
 							},
 						},
+						FChain: defaultFChain,
 					},
 				},
 			},
@@ -871,9 +871,6 @@ func Test_getConsensusObservation(t *testing.T) {
 		{
 			name: "3 observers but different nonce values. No consensus.",
 			args: args{
-				fChain: map[cciptypes.ChainSelector]int{
-					1: 2,
-				},
 				// Across 3 observers
 				observation: []exectypes.Observation{
 					{
@@ -886,6 +883,9 @@ func Test_getConsensusObservation(t *testing.T) {
 								"0x4": 9,
 							},
 						},
+						FChain: map[cciptypes.ChainSelector]int{
+							1: 2,
+						},
 					}, {
 						Nonces: exectypes.NonceObservations{
 							1: {
@@ -893,12 +893,18 @@ func Test_getConsensusObservation(t *testing.T) {
 								"0x4": 4,
 							},
 						},
+						FChain: map[cciptypes.ChainSelector]int{
+							1: 2,
+						},
 					}, {
 						Nonces: exectypes.NonceObservations{
 							1: {
 								"0x2": 2,
 								"0x3": 3,
 							},
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							1: 2,
 						},
 					},
 				},
@@ -919,7 +925,7 @@ func Test_getConsensusObservation(t *testing.T) {
 			}
 
 			lggr := logger.Test(t)
-			got, err := getConsensusObservation(lggr, ao, 1, tt.args.F, tt.args.fChain)
+			got, err := getConsensusObservation(lggr, ao, 1, tt.args.F, 1)
 			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
 				return
 			}

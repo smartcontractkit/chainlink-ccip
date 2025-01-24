@@ -4,7 +4,6 @@ package reader
 
 import (
 	context "context"
-	big "math/big"
 
 	ccipocr3 "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
@@ -87,23 +86,23 @@ func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) RunAndReturn(run func(c
 }
 
 // GetFeedPricesUSD provides a mock function with given fields: ctx, tokens
-func (_m *MockPriceReader) GetFeedPricesUSD(ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error) {
+func (_m *MockPriceReader) GetFeedPricesUSD(ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress) (ccipocr3.TokenPriceMap, error) {
 	ret := _m.Called(ctx, tokens)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetFeedPricesUSD")
 	}
 
-	var r0 map[ccipocr3.UnknownEncodedAddress]*big.Int
+	var r0 ccipocr3.TokenPriceMap
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.UnknownEncodedAddress) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.UnknownEncodedAddress) (ccipocr3.TokenPriceMap, error)); ok {
 		return rf(ctx, tokens)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.UnknownEncodedAddress) map[ccipocr3.UnknownEncodedAddress]*big.Int); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.UnknownEncodedAddress) ccipocr3.TokenPriceMap); ok {
 		r0 = rf(ctx, tokens)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.UnknownEncodedAddress]*big.Int)
+			r0 = ret.Get(0).(ccipocr3.TokenPriceMap)
 		}
 	}
 
@@ -135,12 +134,12 @@ func (_c *MockPriceReader_GetFeedPricesUSD_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockPriceReader_GetFeedPricesUSD_Call) Return(_a0 map[ccipocr3.UnknownEncodedAddress]*big.Int, _a1 error) *MockPriceReader_GetFeedPricesUSD_Call {
+func (_c *MockPriceReader_GetFeedPricesUSD_Call) Return(_a0 ccipocr3.TokenPriceMap, _a1 error) *MockPriceReader_GetFeedPricesUSD_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockPriceReader_GetFeedPricesUSD_Call) RunAndReturn(run func(context.Context, []ccipocr3.UnknownEncodedAddress) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error)) *MockPriceReader_GetFeedPricesUSD_Call {
+func (_c *MockPriceReader_GetFeedPricesUSD_Call) RunAndReturn(run func(context.Context, []ccipocr3.UnknownEncodedAddress) (ccipocr3.TokenPriceMap, error)) *MockPriceReader_GetFeedPricesUSD_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -4,12 +4,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 )
 
 type TokenPrice struct {
 	TokenID UnknownEncodedAddress `json:"tokenID"`
 	Price   BigInt                `json:"price"`
+}
+
+type TokenPriceMap map[UnknownEncodedAddress]BigInt
+
+func (t TokenPriceMap) ToSortedSlice() []TokenPrice {
+	var res []TokenPrice
+	for tokenID, price := range t {
+		res = append(res, TokenPrice{tokenID, price})
+	}
+
+	// sort the token prices by tokenID
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].TokenID < res[j].TokenID
+	})
+
+	return res
 }
 
 func NewTokenPrice(tokenID UnknownEncodedAddress, price *big.Int) TokenPrice {
