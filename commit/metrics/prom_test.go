@@ -49,7 +49,6 @@ func Test_TrackingTokenPrices(t *testing.T) {
 			name: "data is properly reported",
 			observation: tokenprice.Observation{
 				FeedTokenPrices: cciptypes.TokenPriceMap{
-					//cciptypes.UnknownEncodedAddress("0x123"): cciptypes.NewBigInt(big.NewInt(1)),
 					cciptypes.UnknownEncodedAddress("0x123"): {},
 					cciptypes.UnknownEncodedAddress("0x456"): {},
 				},

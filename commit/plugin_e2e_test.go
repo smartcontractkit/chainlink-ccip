@@ -16,8 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 
-	"golang.org/x/exp/maps"
-
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/stretchr/testify/assert"
@@ -258,13 +256,6 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 
 func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 	params := defaultNodeParams(t)
-
-	tokensToQuery := maps.Keys(params.offchainCfg.TokenInfo)
-	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
-	//orderedTokenPrices := make([]ccipocr3.TokenPrice, 0, len(tokensToQuery))
-	//for _, token := range tokensToQuery {
-	//	orderedTokenPrices = append(orderedTokenPrices, tokenPriceMap[token])
-	//}
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 

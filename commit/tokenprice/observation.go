@@ -73,8 +73,6 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context, lggr logger.Logg
 	}
 
 	tokensToQuery := maps.Keys(p.offChainCfg.TokenInfo)
-	// sort tokens to query to ensure deterministic order
-	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
 	tokenPrices, err := p.tokenPriceReader.GetFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
