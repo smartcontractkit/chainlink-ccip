@@ -25,8 +25,6 @@ import (
 
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
 // formed report that will be encoded for final transmission in the reporting phase.
-//
-//nolint:gocyclo
 func (p *Plugin) Outcome(
 	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
@@ -66,16 +64,7 @@ func (p *Plugin) Outcome(
 		p.contractsInitialized = true
 	}
 
-	fChain, err := p.homeChain.GetFChain()
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
-	}
-	_, ok := fChain[p.destChain] // check if the destination chain is in the FChain.
-	if !ok {
-		return ocr3types.Outcome{}, fmt.Errorf("destination chain %d is not in FChain", p.destChain)
-	}
-
-	observation, err := getConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F, fChain)
+	observation, err := getConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F, p.destChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
