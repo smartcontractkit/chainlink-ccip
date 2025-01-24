@@ -5,6 +5,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
 
 var (
@@ -18,22 +19,22 @@ var (
 	CcipTokenPoolProgram       = solana.MustPublicKeyFromBase58("GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH")
 	Token2022Program           = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 
-	RouterConfigPDA, _, _                    = common.FindConfigPDA(CcipRouterProgram)
-	RouterStatePDA, _, _                     = common.FindStatePDA(CcipRouterProgram)
-	ExternalExecutionConfigPDA, _, _         = common.FindExternalExecutionConfigPDA(CcipRouterProgram)
-	ExternalTokenPoolsSignerPDA, _, _        = common.FindExternalTokenPoolsSignerPDA(CcipRouterProgram)
-	ReceiverTargetAccountPDA, _, _           = common.FindCounterPDA(CcipLogicReceiver)
-	ReceiverExternalExecutionConfigPDA, _, _ = common.FindExternalExecutionConfigPDA(CcipLogicReceiver)
-	BillingSignerPDA, _, _                   = common.FindFeeBillingSignerPDA(CcipRouterProgram)
+	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
+	RouterStatePDA, _, _                     = state.FindStatePDA(CcipRouterProgram)
+	ExternalExecutionConfigPDA, _, _         = state.FindExternalExecutionConfigPDA(CcipRouterProgram)
+	ExternalTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipRouterProgram)
+	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipLogicReceiver)
+	ReceiverExternalExecutionConfigPDA, _, _ = state.FindExternalExecutionConfigPDA(CcipLogicReceiver)
+	BillingSignerPDA, _, _                   = state.FindFeeBillingSignerPDA(CcipRouterProgram)
 
 	SVMChainSelector uint64 = 15
 	EvmChainSelector uint64 = 21
 	EvmChainLE              = common.Uint64ToLE(EvmChainSelector)
 
-	SVMSourceChainStatePDA, _ = common.GetSourceChainStatePDA(SVMChainSelector, CcipRouterProgram)
-	SVMDestChainStatePDA, _   = common.GetDestChainStatePDA(SVMChainSelector, CcipRouterProgram)
-	EvmSourceChainStatePDA, _ = common.GetSourceChainStatePDA(EvmChainSelector, CcipRouterProgram)
-	EvmDestChainStatePDA, _   = common.GetDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
+	SVMSourceChainStatePDA, _ = state.FindSourceChainStatePDA(SVMChainSelector, CcipRouterProgram)
+	SVMDestChainStatePDA, _   = state.FindDestChainStatePDA(SVMChainSelector, CcipRouterProgram)
+	EvmSourceChainStatePDA, _ = state.FindSourceChainStatePDA(EvmChainSelector, CcipRouterProgram)
+	EvmDestChainStatePDA, _   = state.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
 
 	OnRampAddress        = []byte{1, 2, 3}
 	OnRampAddressPadded  = [64]byte{1, 2, 3}

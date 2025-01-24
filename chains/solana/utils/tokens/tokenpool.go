@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
 
 type TokenPool struct {
@@ -61,7 +62,7 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenAdminRegistryPDA, _, err := common.FindTokenAdminRegistryPDA(mint.PublicKey(), config.CcipRouterProgram)
+	tokenAdminRegistryPDA, _, err := state.FindTokenAdminRegistryPDA(mint.PublicKey(), config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -71,11 +72,11 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-	billingPDA, _, err := common.FindCcipTokenpoolBillingPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipRouterProgram)
+	billingPDA, _, err := state.FindCcipTokenpoolBillingPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenConfigPda, _, err := common.FindFeeBillingTokenConfigPDA(mint.PublicKey(), config.CcipRouterProgram)
+	tokenConfigPda, _, err := state.FindFeeBillingTokenConfigPDA(mint.PublicKey(), config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
