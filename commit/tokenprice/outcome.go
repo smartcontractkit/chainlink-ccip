@@ -130,7 +130,10 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		obs := ao.Observation
 		// FeedTokenPrices
 		for tokenID, price := range obs.FeedTokenPrices {
-			aggObs.FeedTokenPrices[tokenID] = append(aggObs.FeedTokenPrices[tokenID], cciptypes.NewTokenPrice(tokenID, price.Int))
+			aggObs.FeedTokenPrices[tokenID] = append(
+				aggObs.FeedTokenPrices[tokenID],
+				cciptypes.NewTokenPrice(tokenID, price.Int),
+			)
 		}
 
 		// FeeQuoterTokenUpdates
