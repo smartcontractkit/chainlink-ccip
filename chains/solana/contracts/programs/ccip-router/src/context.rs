@@ -51,7 +51,7 @@ pub const TOKEN_POOL_CONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig";
 pub struct CommitInput {
     pub price_updates: PriceUpdates,
     pub merkle_root: MerkleRoot,
-    // pub rmn_signatures: Vec<[u8; 65]>, // r = 32, s = 32, v = 1; placeholder: RMN not enabled
+    pub rmn_signatures: Vec<[u8; 64]>, // placeholder for stable interface; r = 32, s = 32; https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/interfaces/IRMNRemote.sol#L9
 }
 
 // A collection of token price and gas price updates.

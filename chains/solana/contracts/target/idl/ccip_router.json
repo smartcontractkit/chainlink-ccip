@@ -1816,6 +1816,17 @@
             "type": {
               "defined": "MerkleRoot"
             }
+          },
+          {
+            "name": "rmnSignatures",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  64
+                ]
+              }
+            }
           }
         ]
       }
