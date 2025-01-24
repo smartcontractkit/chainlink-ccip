@@ -138,3 +138,16 @@ func TestMerkleRootChain_Equals_Structs(t *testing.T) {
 		})
 	}
 }
+
+func TestMerkleRootChain_String(t *testing.T) {
+	mrc := MerkleRootChain{
+		ChainSel:      123,
+		OnRampAddress: []byte{0x01, 0x02},
+		SeqNumsRange:  SeqNumRange{123, 456},
+		MerkleRoot:    Bytes32{1, 2, 3},
+	}
+
+	s := mrc.String()
+	assert.Equal(t, "MerkleRoot(chain:123, seqNumsRange:[123 -> 456], "+
+		"merkleRoot:0x0102030000000000000000000000000000000000000000000000000000000000, onRamp:0x0102)", s)
+}

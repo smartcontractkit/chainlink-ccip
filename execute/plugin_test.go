@@ -215,7 +215,7 @@ func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "error finding supported chains by node: oracle ID 0 not found in oracleIDToP2pID")
 }
 
-func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
+func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
@@ -242,11 +242,57 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 	}, nil, nil, nil, dt.Observation{}, nil)
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
+
+	prevOutcome := exectypes.Outcome{
+		State: exectypes.GetCommitReports,
+	}
+	encodedPrevOutcome, err := prevOutcome.Encode()
+	require.NoError(t, err)
+	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{PreviousOutcome: encodedPrevOutcome}, types.Query{},
+		types.AttributedObservation{
+			Observation: encoded,
+		})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validate observer reading eligibility: observer not allowed to read from chain 0")
+}
+
+func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+
+	mockHomeChain := reader_mock.NewMockHomeChain(t)
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet[cciptypes.ChainSelector](), nil)
+	defer mockHomeChain.AssertExpectations(t)
+
+	p := &Plugin{
+		homeChain: mockHomeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+		lggr: lggr,
+	}
+
+	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{
+				MerkleRoot:          cciptypes.Bytes32{},
+				SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2),
+				SourceChain:         1,
+			},
+		},
+	}
+	observation := exectypes.NewObservation(
+		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+	)
+	encoded, err := observation.Encode()
+	require.NoError(t, err)
 	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: encoded,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validate observer reading eligibility: observer not allowed to read from chain 0")
+	assert.Contains(t,
+		err.Error(),
+		"validate commit reports reading eligibility: observer not allowed to read from chain 1")
 }
 
 func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
@@ -254,7 +300,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
-	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(0)), nil)
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
 
 	p := &Plugin{
 		lggr:      lggr,
@@ -268,8 +314,8 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	root := cciptypes.Bytes32{}
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
-			{MerkleRoot: root},
-			{MerkleRoot: root},
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2), SourceChain: 1},
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 5), SourceChain: 1},
 		},
 	}
 	observation := exectypes.NewObservation(
