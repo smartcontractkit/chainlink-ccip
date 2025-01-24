@@ -56,8 +56,8 @@ func TestPluginReports(t *testing.T) {
 					OutcomeType: merkleroot.ReportTransmissionFailed,
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
-					TokenPrices: []ccipocr3.TokenPrice{
-						{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+					TokenPrices: ccipocr3.TokenPriceMap{
+						"a": ccipocr3.NewBigIntFromInt64(123),
 					},
 				},
 				ChainFeeOutcome: chainfee.Outcome{
@@ -120,8 +120,8 @@ func TestPluginReports(t *testing.T) {
 					RMNRemoteCfg: rmntypes.RemoteConfig{FSign: 123},
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
-					TokenPrices: []ccipocr3.TokenPrice{
-						{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+					TokenPrices: ccipocr3.TokenPriceMap{
+						"a": ccipocr3.NewBigIntFromInt64(123),
 					},
 				},
 				ChainFeeOutcome: chainfee.Outcome{
