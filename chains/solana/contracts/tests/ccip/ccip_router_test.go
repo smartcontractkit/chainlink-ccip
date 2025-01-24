@@ -5514,7 +5514,8 @@ func TestCCIPRouter(t *testing.T) {
 					require.NotNil(t, result)
 
 					t.Run("When user tries to manually execute after the period of time has passed but in the wrong CCIP version, it fails", func(t *testing.T) {
-						bumpedRootPDA, err := ccip.GetCommitReportPDA(config.BumpedCcipVersion, config.EvmChainSelector, root)
+						bumpedRootPDA, cerr := ccip.GetCommitReportPDA(config.BumpedCcipVersion, config.EvmChainSelector, root)
+						require.NoError(t, cerr)
 
 						executionReport := ccip_router.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
