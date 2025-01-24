@@ -2,7 +2,6 @@ package tokenprice
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -83,8 +82,8 @@ func (p *processor) getConsensusObservation(
 func (p *processor) selectTokensForUpdate(
 	lggr logger.Logger,
 	obs ConsensusObservation,
-) []cciptypes.TokenPrice {
-	var tokenPrices []cciptypes.TokenPrice
+) cciptypes.TokenPriceMap {
+	tokenPrices := make(cciptypes.TokenPriceMap)
 	cfg := p.offChainCfg
 	tokenInfo := cfg.TokenInfo
 
@@ -92,10 +91,7 @@ func (p *processor) selectTokensForUpdate(
 		lastUpdate, exists := obs.FeeQuoterTokenUpdates[token]
 		if !exists {
 			// if the token is not in the fee quoter updates, then we should update it
-			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
-				TokenID: token,
-				Price:   cciptypes.NewBigInt(feedPrice.Price.Int),
-			})
+			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 			continue
 		}
 
@@ -110,17 +106,14 @@ func (p *processor) selectTokensForUpdate(
 			obs.Timestamp.After(nextUpdateTime) ||
 				mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
 		if shouldUpdate {
-			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
-				TokenID: token,
-				Price:   cciptypes.NewBigInt(feedPrice.Price.Int),
-			})
+			tokenPrices[token] = cciptypes.NewBigInt(feedPrice.Price.Int)
 		}
 	}
 
 	// sort the token prices by tokenID
-	sort.Slice(tokenPrices, func(i, j int) bool {
-		return tokenPrices[i].TokenID < tokenPrices[j].TokenID
-	})
+	//sort.Slice(tokenPrices, func(i, j int) bool {
+	//	return tokenPrices[i].TokenID < tokenPrices[j].TokenID
+	//})
 	return tokenPrices
 }
 
@@ -136,8 +129,8 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 	for _, ao := range aos {
 		obs := ao.Observation
 		// FeedTokenPrices
-		for _, tokenPrice := range obs.FeedTokenPrices {
-			aggObs.FeedTokenPrices[tokenPrice.TokenID] = append(aggObs.FeedTokenPrices[tokenPrice.TokenID], tokenPrice)
+		for tokenID, price := range obs.FeedTokenPrices {
+			aggObs.FeedTokenPrices[tokenID] = append(aggObs.FeedTokenPrices[tokenID], cciptypes.NewTokenPrice(tokenID, price.Int))
 		}
 
 		// FeeQuoterTokenUpdates

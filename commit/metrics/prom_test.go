@@ -39,7 +39,7 @@ func Test_TrackingTokenPrices(t *testing.T) {
 		{
 			name: "empty/missing structs should not report anything",
 			observation: tokenprice.Observation{
-				FeedTokenPrices:       []cciptypes.TokenPrice{},
+				FeedTokenPrices:       nil,
 				FeeQuoterTokenUpdates: nil,
 			},
 			expectedFeedToken:      0,
@@ -48,13 +48,10 @@ func Test_TrackingTokenPrices(t *testing.T) {
 		{
 			name: "data is properly reported",
 			observation: tokenprice.Observation{
-				FeedTokenPrices: []cciptypes.TokenPrice{
-					{
-						TokenID: cciptypes.UnknownEncodedAddress("0x123"),
-					},
-					{
-						TokenID: cciptypes.UnknownEncodedAddress("0x456"),
-					},
+				FeedTokenPrices: cciptypes.TokenPriceMap{
+					//cciptypes.UnknownEncodedAddress("0x123"): cciptypes.NewBigInt(big.NewInt(1)),
+					cciptypes.UnknownEncodedAddress("0x123"): {},
+					cciptypes.UnknownEncodedAddress("0x456"): {},
 				},
 				FeeQuoterTokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
 					cciptypes.UnknownEncodedAddress("0x123"): {},
@@ -90,7 +87,7 @@ func Test_TrackingTokenPrices(t *testing.T) {
 		{
 			name: "empty/missing structs should not report anything",
 			outcome: tokenprice.Outcome{
-				TokenPrices: []cciptypes.TokenPrice{},
+				TokenPrices: cciptypes.TokenPriceMap{},
 			},
 			expectedTokenPrices: 0,
 		},
@@ -104,10 +101,10 @@ func Test_TrackingTokenPrices(t *testing.T) {
 		{
 			name: "data is properly reported",
 			outcome: tokenprice.Outcome{
-				TokenPrices: []cciptypes.TokenPrice{
-					cciptypes.NewTokenPrice("0x123", big.NewInt(1)),
-					cciptypes.NewTokenPrice("0x234", big.NewInt(2)),
-					cciptypes.NewTokenPrice("0x123", big.NewInt(3)),
+				TokenPrices: cciptypes.TokenPriceMap{
+					cciptypes.UnknownEncodedAddress("0x123"): cciptypes.NewBigIntFromInt64(1),
+					cciptypes.UnknownEncodedAddress("0x234"): cciptypes.NewBigIntFromInt64(2),
+					cciptypes.UnknownEncodedAddress("0x125"): cciptypes.NewBigIntFromInt64(3),
 				},
 			},
 			expectedTokenPrices: 3,

@@ -61,7 +61,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		inputTokens   []cciptypes.UnknownEncodedAddress
 		tokenInfo     map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
 		mockPrices    map[cciptypes.UnknownEncodedAddress]*big.Int
-		want          map[cciptypes.UnknownEncodedAddress]*big.Int
+		want          cciptypes.TokenPriceMap
 		errorAccounts []cciptypes.UnknownEncodedAddress
 		wantErr       bool
 	}{
@@ -72,7 +72,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
-			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
+			want:        cciptypes.TokenPriceMap{ArbAddr: cciptypes.NewBigInt(ArbPrice)},
 		},
 		{
 			name: "On-chain multiple prices",
@@ -82,7 +82,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr, EthAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice, EthAddr: EthPrice},
-			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice, EthAddr: EthPrice},
+			want:        cciptypes.TokenPriceMap{ArbAddr: cciptypes.NewBigInt(ArbPrice), EthAddr: cciptypes.NewBigInt(EthPrice)},
 		},
 		{
 			name: "Missing price doesn't fail, return available prices",
@@ -93,7 +93,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			inputTokens:   []cciptypes.UnknownEncodedAddress{ArbAddr, EthAddr},
 			mockPrices:    map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
 			errorAccounts: []cciptypes.UnknownEncodedAddress{EthAddr},
-			want:          map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
+			want:          cciptypes.TokenPriceMap{ArbAddr: cciptypes.NewBigInt(ArbPrice)},
 		},
 		{
 			name: "Empty input tokens list",
@@ -102,7 +102,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{},
-			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{},
+			want:        cciptypes.TokenPriceMap{},
 		},
 		{
 			name: "Repeated token in input",
@@ -111,7 +111,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr, ArbAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
-			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
+			want:        cciptypes.TokenPriceMap{ArbAddr: cciptypes.NewBigInt(ArbPrice)},
 		},
 		{
 			name: "Zero price should succeed",
@@ -120,7 +120,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: big.NewInt(0)},
-			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: big.NewInt(0)},
+			want:        cciptypes.TokenPriceMap{ArbAddr: cciptypes.NewBigInt(big.NewInt(0))},
 		},
 		{
 			name: "Multiple error accounts",
@@ -132,7 +132,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			inputTokens:   []cciptypes.UnknownEncodedAddress{ArbAddr, EthAddr, BtcAddr},
 			mockPrices:    map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
 			errorAccounts: []cciptypes.UnknownEncodedAddress{EthAddr, BtcAddr},
-			want:          map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
+			want:          cciptypes.TokenPriceMap{ArbAddr: cciptypes.NewBigInt(ArbPrice)},
 		},
 	}
 

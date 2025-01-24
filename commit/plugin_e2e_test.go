@@ -69,15 +69,9 @@ var (
 	ethPrice = new(big.Int).Mul(big.NewInt(7), big.NewInt(1e18))
 
 	// a map to ease working with tests
-	tokenPriceMap = map[ccipocr3.UnknownEncodedAddress]ccipocr3.TokenPrice{
-		arbAddr: {
-			TokenID: arbAddr,
-			Price:   ccipocr3.NewBigInt(arbPrice),
-		},
-		ethAddr: {
-			TokenID: ethAddr,
-			Price:   ccipocr3.NewBigInt(ethPrice),
-		},
+	tokenPriceMap = ccipocr3.TokenPriceMap{
+		arbAddr: ccipocr3.NewBigInt(arbPrice),
+		ethAddr: ccipocr3.NewBigInt(ethPrice),
 	}
 
 	decimals18 = uint8(18)
@@ -267,10 +261,10 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 	tokensToQuery := maps.Keys(params.offchainCfg.TokenInfo)
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
-	orderedTokenPrices := make([]ccipocr3.TokenPrice, 0, len(tokensToQuery))
-	for _, token := range tokensToQuery {
-		orderedTokenPrices = append(orderedTokenPrices, tokenPriceMap[token])
-	}
+	//orderedTokenPrices := make([]ccipocr3.TokenPrice, 0, len(tokensToQuery))
+	//for _, token := range tokensToQuery {
+	//	orderedTokenPrices = append(orderedTokenPrices, tokenPriceMap[token])
+	//}
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
@@ -291,9 +285,9 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
-						arbAddr: arbPrice,
-						ethAddr: ethPrice,
+					Return(ccipocr3.TokenPriceMap{
+						arbAddr: ccipocr3.NewBigInt(arbPrice),
+						ethAddr: ccipocr3.NewBigInt(ethPrice),
 					}, nil).Maybe()
 
 				m.EXPECT().
@@ -306,7 +300,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				TokenPriceOutcome: tokenprice.Outcome{
-					TokenPrices: orderedTokenPrices,
+					TokenPrices: tokenPriceMap,
 				},
 				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
@@ -347,9 +341,9 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
-						arbAddr: arbPrice,
-						ethAddr: ethPrice,
+					Return(ccipocr3.TokenPriceMap{
+						arbAddr: ccipocr3.NewBigInt(arbPrice),
+						ethAddr: ccipocr3.NewBigInt(ethPrice),
 					}, nil).
 					Maybe()
 
@@ -376,9 +370,9 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
-						arbAddr: arbPrice,
-						ethAddr: ethPrice,
+					Return(ccipocr3.TokenPriceMap{
+						arbAddr: ccipocr3.NewBigInt(arbPrice),
+						ethAddr: ccipocr3.NewBigInt(ethPrice),
 					}, nil).Maybe()
 
 				m.EXPECT().
@@ -400,8 +394,8 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				TokenPriceOutcome: tokenprice.Outcome{
-					TokenPrices: []ccipocr3.TokenPrice{
-						tokenPriceMap[ethAddr],
+					TokenPrices: ccipocr3.TokenPriceMap{
+						ethAddr: ccipocr3.NewBigInt(ethPrice),
 					},
 				},
 				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
@@ -755,7 +749,7 @@ func preparePriceReaderMock(priceReader *readerpkg_mock.MockPriceReader) {
 
 	priceReader.EXPECT().
 		GetFeedPricesUSD(mock.Anything, mock.Anything).
-		Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{}, nil).Maybe()
+		Return(ccipocr3.TokenPriceMap{}, nil).Maybe()
 }
 
 type nodeSetup struct {

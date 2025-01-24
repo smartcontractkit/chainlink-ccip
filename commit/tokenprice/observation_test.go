@@ -28,9 +28,9 @@ func Test_Observation(t *testing.T) {
 		destChainSel: f,
 	}
 	timestamp := time.Now().UTC()
-	feedTokenPrices := []cciptypes.TokenPrice{
-		cciptypes.NewTokenPrice(tokenA, bi100),
-		cciptypes.NewTokenPrice(tokenB, bi200),
+	feedTokenPrices := cciptypes.TokenPriceMap{
+		tokenA: cciptypes.NewBigInt(bi100),
+		tokenB: cciptypes.NewBigInt(bi200),
 	}
 	feeQuoterTokenUpdates := map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
 		tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
@@ -54,9 +54,9 @@ func Test_Observation(t *testing.T) {
 
 				tokenPriceReader := readerpkg_mock.NewMockPriceReader(t)
 				tokenPriceReader.EXPECT().GetFeedPricesUSD(mock.Anything, []cciptypes.UnknownEncodedAddress{tokenA, tokenB}).
-					Return(map[cciptypes.UnknownEncodedAddress]*big.Int{
-						tokenA: bi100,
-						tokenB: bi200}, nil)
+					Return(cciptypes.TokenPriceMap{
+						tokenA: cciptypes.NewBigInt(bi100),
+						tokenB: cciptypes.NewBigInt(bi200)}, nil)
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
 					map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
