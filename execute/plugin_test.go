@@ -345,6 +345,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
+	mockHomeChain.EXPECT().GetFChain().Return(map[cciptypes.ChainSelector]int{}, nil)
 
 	p := &Plugin{
 		homeChain:       mockHomeChain,
@@ -360,18 +361,23 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 
 func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
-	expectedFChain := map[cciptypes.ChainSelector]int{
+	fChainMap := map[cciptypes.ChainSelector]int{
 		1: 1,
 		2: 2,
 	}
-	homeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 
 	p := &Plugin{
-		homeChain: homeChain,
-		lggr:      logger.Test(t),
+		lggr: logger.Test(t),
 	}
-	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, nil)
+	observation, err := exectypes.Observation{
+		Contracts: dt.Observation{}, FChain: fChainMap,
+	}.Encode()
+	require.NoError(t, err)
+	_, err = p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+		{
+			Observation: observation,
+		},
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "destination chain 0 is not in FChain")
 }
@@ -394,59 +400,49 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {
 	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
-	expectedFChain := map[cciptypes.ChainSelector]int{
+	fChainMap := map[cciptypes.ChainSelector]int{
 		0: 1,
 		2: 2,
 	}
-	homeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	p := &Plugin{
-		homeChain: homeChain,
 		reportingCfg: ocr3types.ReportingPluginConfig{
 			F: 1,
 		},
 		lggr: logger.Test(t),
 	}
-	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil,
-		[]types.AttributedObservation{})
+	observation, err := exectypes.Observation{
+		Contracts: dt.Observation{}, FChain: fChainMap,
+	}.Encode()
+	require.NoError(t, err)
+	_, err = p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+		{
+			Observation: observation,
+		},
+	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "below F threshold")
-}
-
-func TestPlugin_Outcome_HomeChainError(t *testing.T) {
-	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
-	homeChain.On("GetFChain", mock.Anything).Return(nil, fmt.Errorf("test error"))
-
-	p := &Plugin{
-		homeChain: homeChain,
-		lggr:      logger.Test(t),
-	}
-	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to get FChain: test error")
+	// because fChain observations doesn't reach consensus with the low number of observations
+	assert.Contains(t, err.Error(), "destination chain 0 is not in FChain")
 }
 
 func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
 		0:  3,
 	}
-	homeChain.On("GetFChain", mock.Anything).Return(fChainMap, nil)
 
 	p := &Plugin{
-		homeChain: homeChain,
-		lggr:      logger.Test(t),
+		lggr: logger.Test(t),
 	}
 
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {},
 	}
-	observation, err := exectypes.NewObservation(
-		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
-	).Encode()
+	observation, err := exectypes.Observation{
+		CommitReports: commitReports,
+		Contracts:     dt.Observation{},
+		FChain:        fChainMap,
+	}.Encode()
 	require.NoError(t, err)
 	outcome, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -459,16 +455,13 @@ func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 
 func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		0:  3,
 		10: 20,
 	}
-	homeChain.On("GetFChain", mock.Anything).Return(fChainMap, nil)
 
 	p := &Plugin{
-		homeChain: homeChain,
-		lggr:      logger.Test(t),
+		lggr: logger.Test(t),
 	}
 
 	// map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
@@ -481,9 +474,9 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 			},
 		},
 	}
-	observation, err := exectypes.NewObservation(
-		nil, messages, nil, nil, nil, dt.Observation{}, nil,
-	).Encode()
+	observation, err := exectypes.Observation{
+		Messages: messages, Contracts: dt.Observation{}, FChain: fChainMap,
+	}.Encode()
 	require.NoError(t, err)
 	outcome, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
