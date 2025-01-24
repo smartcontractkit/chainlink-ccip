@@ -50,10 +50,14 @@ func Test_Observation(t *testing.T) {
 				chainSupport.EXPECT().SupportedChains(mock.Anything).Return(
 					mapset.NewSet[cciptypes.ChainSelector](feedChainSel, destChainSel), nil,
 				)
-				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
+				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil).Maybe()
 
 				tokenPriceReader := readerpkg_mock.NewMockPriceReader(t)
-				tokenPriceReader.EXPECT().GetFeedPricesUSD(mock.Anything, []cciptypes.UnknownEncodedAddress{tokenA, tokenB}).
+				tokenPriceReader.EXPECT().GetFeedPricesUSD(mock.Anything, mock.MatchedBy(func(tokens []cciptypes.UnknownEncodedAddress) bool {
+					expectedTokens := mapset.NewSet(tokenA, tokenB)
+					actualTokens := mapset.NewSet(tokens...)
+					return expectedTokens.Equal(actualTokens)
+				})).
 					Return(cciptypes.TokenPriceMap{
 						tokenA: cciptypes.NewBigInt(bi100),
 						tokenB: cciptypes.NewBigInt(bi200)}, nil)

@@ -274,8 +274,11 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			prevOutcome: committypes.Outcome{},
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
-					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
+					GetFeedPricesUSD(mock.Anything, mock.MatchedBy(func(tokens []ccipocr3.UnknownEncodedAddress) bool {
+						expectedTokens := mapset.NewSet(arbAddr, ethAddr)
+						actualTokens := mapset.NewSet(tokens...)
+						return expectedTokens.Equal(actualTokens)
+					})).
 					Return(ccipocr3.TokenPriceMap{
 						arbAddr: ccipocr3.NewBigInt(arbPrice),
 						ethAddr: ccipocr3.NewBigInt(ethPrice),
@@ -330,8 +333,11 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			prevOutcome: committypes.Outcome{},
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
-					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
+					GetFeedPricesUSD(mock.Anything, mock.MatchedBy(func(tokens []ccipocr3.UnknownEncodedAddress) bool {
+						expectedTokens := mapset.NewSet(arbAddr, ethAddr)
+						actualTokens := mapset.NewSet(tokens...)
+						return expectedTokens.Equal(actualTokens)
+					})).
 					Return(ccipocr3.TokenPriceMap{
 						arbAddr: ccipocr3.NewBigInt(arbPrice),
 						ethAddr: ccipocr3.NewBigInt(ethPrice),
@@ -360,7 +366,11 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(mock.Anything, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
+					GetFeedPricesUSD(mock.Anything, mock.MatchedBy(func(tokens []ccipocr3.UnknownEncodedAddress) bool {
+						expectedTokens := mapset.NewSet(arbAddr, ethAddr)
+						actualTokens := mapset.NewSet(tokens...)
+						return expectedTokens.Equal(actualTokens)
+					})).
 					Return(ccipocr3.TokenPriceMap{
 						arbAddr: ccipocr3.NewBigInt(arbPrice),
 						ethAddr: ccipocr3.NewBigInt(ethPrice),
