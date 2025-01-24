@@ -10,21 +10,6 @@ use crate::error::TimelockError;
 use crate::state::{Config, InstructionData, Operation};
 use crate::TIMELOCK_BYPASSER_OPERATION_SEED;
 
-/// Operation management for timelock system, handling both standard (timelock-enforced)
-/// and bypass (emergency) operations.
-///
-/// Standard Operation Flow:
-/// - initialize -> append -> finalize -> schedule -> execute_batch
-/// - Enforces timelock delays and predecessor dependencies
-///
-/// Bypass Operation Flow:
-/// - initialize -> append -> finalize -> bypass_execute_batch
-/// - No delay, immediate execution
-///
-/// Implementation uses separate code paths and PDAs for each operation type
-/// to maintain clear security boundaries and audit trails, despite similar logic.
-/// All operations enforce state transitions, size limits, and role-based access.
-///
 pub fn initialize_operation<'info>(
     ctx: Context<'_, '_, '_, 'info, InitializeOperation<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -36,19 +21,18 @@ pub fn initialize_operation<'info>(
     let op = &mut ctx.accounts.operation;
 
     op.set_inner(Operation {
-        timestamp: 0, // not scheduled operation should have timestamp 0, see src/state/operation.rs
-        id, // id should be matched with hashed instructions(will be verified in finalize_operation)
-        predecessor, // required for dependency check
-        salt, // random salt for hash
-        total_instructions: instruction_count, // total number of instructions, used for space calculation and finalization validation
-        instructions: Vec::with_capacity(instruction_count as usize), // create empty vector with total instruction capacity
-        is_finalized: false, // operation should be finalized before scheduling
+        timestamp: 0,
+        id,
+        predecessor,
+        salt,
+        total_instructions: instruction_count,
+        instructions: Vec::with_capacity(instruction_count as usize),
+        is_finalized: false,
     });
 
     Ok(())
 }
 
-/// append instructions to the operation
 pub fn append_instructions<'info>(
     ctx: Context<'_, '_, '_, 'info, AppendInstructions<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -61,8 +45,6 @@ pub fn append_instructions<'info>(
     Ok(())
 }
 
-/// finalize the operation, this is required to schedule the operation
-/// verify the operation status and id before mark it as finalized
 pub fn finalize_operation<'info>(
     ctx: Context<'_, '_, '_, 'info, FinalizeOperation<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -94,19 +76,18 @@ pub fn initialize_bypasser_operation<'info>(
     let op = &mut ctx.accounts.operation;
 
     op.set_inner(Operation {
-        timestamp: 0, // not scheduled operation should have timestamp 0, see src/state/operation.rs
-        id, // id should be matched with hashed instructions(will be verified in finalize_operation)
-        predecessor: [0; 32], // required for dependency check
-        salt, // random salt for hash
-        total_instructions: instruction_count, // total number of instructions, used for space calculation and finalization validation
-        instructions: Vec::with_capacity(instruction_count as usize), // create empty vector with total instruction capacity
-        is_finalized: false, // operation should be finalized before scheduling
+        timestamp: 0,
+        id,
+        predecessor: [0; 32],
+        salt,
+        total_instructions: instruction_count,
+        instructions: Vec::with_capacity(instruction_count as usize),
+        is_finalized: false,
     });
 
     Ok(())
 }
 
-/// append instructions to the operation
 pub fn append_bypasser_instructions<'info>(
     ctx: Context<'_, '_, '_, 'info, AppendBypasserInstructions<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -119,8 +100,6 @@ pub fn append_bypasser_instructions<'info>(
     Ok(())
 }
 
-/// finalize the operation, this is required to schedule the operation
-/// verify the operation status and id before mark it as finalized
 pub fn finalize_bypasser_operation<'info>(
     ctx: Context<'_, '_, '_, 'info, FinalizeBypasserOperation<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],

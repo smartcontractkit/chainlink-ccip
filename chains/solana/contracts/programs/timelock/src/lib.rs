@@ -43,11 +43,18 @@ pub mod timelock {
         initialize::batch_add_access(ctx, timelock_id, role)
     }
 
+    /// Operation management for timelock system, handling both standard (timelock-enforced)
+    /// and bypass (emergency) operations.
+    ///
+    /// Standard Operation Flow:
+    /// - initialize -> append -> finalize -> schedule -> execute_batch
+    /// - Schedule execution time by delays and enforces predecessor dependencies
+    ///
     /// initialize_operation, append_instructions, finalize_operation functions are used to create a new operation
     /// and add instructions to it. finalize_operation is used to mark the operation as finalized.
     /// only after the operation is finalized, it can be scheduled.
     /// this is due to the fact that the operation PDA cannot be initialized with CPI call from MCM program.
-    /// This pattern also allows to execute larger transaction(multiple instructions) exceeding 1232 bytes
+    /// This pattern also allows to execute larger transaction(batching instructions) exceeding 1232 bytes
     /// in a single execute_batch transaction ensuring atomicy.
     #[access_control(require_role_or_admin!(ctx, Role::Proposer))]
     pub fn initialize_operation<'info>(
@@ -61,6 +68,7 @@ pub mod timelock {
         operation::initialize_operation(ctx, timelock_id, id, predecessor, salt, instruction_count)
     }
 
+    /// append instructions to the initialized operation
     #[access_control(require_role_or_admin!(ctx, Role::Proposer))]
     pub fn append_instructions<'info>(
         ctx: Context<'_, '_, '_, 'info, AppendInstructions<'info>>,
@@ -71,6 +79,8 @@ pub mod timelock {
         operation::append_instructions(ctx, timelock_id, id, instructions_batch)
     }
 
+    /// finalize the operation, this is required to schedule the operation
+    /// verify the operation status and id before mark it as finalized
     #[access_control(require_role_or_admin!(ctx, Role::Proposer))]
     pub fn finalize_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, FinalizeOperation<'info>>,
@@ -117,6 +127,13 @@ pub mod timelock {
         execute::execute_batch(ctx, timelock_id, id)
     }
 
+    /// Bypasser Operation management implementation uses separate code paths and PDAs for each operation type
+    /// to maintain clear security boundaries and audit trails, despite similar logic.
+    /// All operations enforce state transitions, size limits, and role-based access.
+    ///
+    /// Bypass Operation Flow:
+    /// - initialize -> append -> finalize -> bypass_execute_batch
+    /// - Bypasser operation account is closed after execution
     #[access_control(require_role_or_admin!(ctx, Role::Bypasser))]
     pub fn initialize_bypasser_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, InitializeBypasserOperation<'info>>,
