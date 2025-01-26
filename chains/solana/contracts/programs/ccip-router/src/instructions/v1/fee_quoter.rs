@@ -74,22 +74,28 @@ pub fn fee_for_msg(
             .unwrap_or_else(|| dest_chain.config.default_tx_gas_limit.into()),
     );
 
+    // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
+    // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
+    // This calculation is not exact, the goal is to not lose money on large payloads.
+    // The fixed calldata gas overhead is accounted for in `dest_gas_overhead`, it is not included for simplicity.
     let calldata_length =
         U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead;
 
-    // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
-    // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
-    let calldata_gas = if calldata_length
-        > U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128)
-    {
-        U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
-            * U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128)
-            + (calldata_length
-                - U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128))
-                * U256::new(dest_chain.config.dest_gas_per_payload_byte_high as u128)
-    } else {
-        calldata_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
-    };
+    let mut calldata_gas =
+        calldata_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128);
+
+    let calldata_threshold =
+        U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128);
+
+    if calldata_length > calldata_threshold {
+        let base_calldata_gas = U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
+            * calldata_threshold;
+
+        let extra_bytes = calldata_length - calldata_threshold;
+        let extra_calldata_gas =
+            extra_bytes * U256::new(dest_chain.config.dest_gas_per_payload_byte_high as u128);
+        calldata_gas = base_calldata_gas + extra_calldata_gas;
+    }
 
     let execution_gas = gas_limit
         + U256::new(dest_chain.config.dest_gas_overhead as u128)
