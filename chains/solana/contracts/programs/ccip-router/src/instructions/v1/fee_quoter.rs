@@ -77,7 +77,8 @@ pub fn fee_for_msg(
     // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
     // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
     // This calculation is not exact, the goal is to not lose money on large payloads.
-    // The fixed calldata gas overhead is accounted for in `dest_gas_overhead`, it is not included for simplicity.
+    // The fixed OCR report calldata overhead gas is accounted for in `dest_gas_overhead`.
+    // It is not included in the calculation below for simplicity.
     let calldata_length =
         U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead;
 
