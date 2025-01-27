@@ -4,12 +4,12 @@ use ethnum::U256;
 use std::ops::AddAssign;
 
 use crate::context::GetFee;
-use crate::messages::{validate_svm2any, SVM2AnyMessage, SVMTokenAmount};
-use crate::state::{
-    validated_try_to, BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224,
-};
+use crate::instructions::v1::safe_deserialize;
+use crate::messages::{SVM2AnyMessage, SVMTokenAmount};
+use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
 use crate::FeeQuoterError;
 
+use super::messages::validate_svm2any;
 use super::price_math::{get_validated_token_price, Exponential, Usd18Decimals};
 
 /// SVM2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, sender and tokenAmounts).
@@ -50,13 +50,13 @@ pub fn get_fee<'info>(
     let token_billing_config_accounts = token_billing_config_accounts
         .iter()
         .zip(message.token_amounts.iter())
-        .map(|(a, SVMTokenAmount { token, .. })| validated_try_to::billing_token_config(a, *token))
+        .map(|(a, SVMTokenAmount { token, .. })| safe_deserialize::billing_token_config(a, *token))
         .collect::<Result<Vec<_>>>()?;
     let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
         .iter()
         .zip(message.token_amounts.iter())
         .map(|(a, SVMTokenAmount { token, .. })| {
-            validated_try_to::per_chain_per_token_config(a, *token, dest_chain_selector)
+            safe_deserialize::per_chain_per_token_config(a, *token, dest_chain_selector)
         })
         .collect::<Result<Vec<_>>>()?;
 

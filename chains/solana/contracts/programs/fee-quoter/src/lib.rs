@@ -11,6 +11,7 @@ use messages::*;
 mod state;
 
 mod instructions;
+use instructions::v1;
 
 #[program]
 pub mod fee_quoter {
@@ -21,7 +22,7 @@ pub mod fee_quoter {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<u64> {
-        instructions::get_fee(ctx, dest_chain_selector, message)
+        v1::get_fee(ctx, dest_chain_selector, message)
     }
 }
 
