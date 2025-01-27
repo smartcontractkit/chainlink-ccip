@@ -24,8 +24,7 @@ const (
 //     in the GetCommitReports phase after checking if each SeqNr is executed (or if the Txm state is finalized).
 //   - remember the oldest pending commit root to limit the database scan to only the unfinalized part of the chain.
 type CommitsRootsCache interface {
-	// TODO: Some function to check if a root is eligible for execution
-	//RootsEligibleForExecution(ctx context.Context) ([]ccip.CommitStoreReport, error)
+	CanExecute(merkleRoot ccipocr3.Bytes32) bool
 	MarkAsExecuted(merkleRoot ccipocr3.Bytes32)
 	Snooze(merkleRoot ccipocr3.Bytes32)
 }
@@ -102,11 +101,18 @@ func (r *commitRootsCache) Snooze(merkleRoot ccipocr3.Bytes32) {
 	r.snoozedRoots.SetDefault(prettyMerkleRoot, struct{}{})
 }
 
+// CanExecute returns true if the root is not snoozed and not executed.
+func (r *commitRootsCache) CanExecute(merkleRoot ccipocr3.Bytes32) bool {
+	return !r.isSnoozed(merkleRoot) && !r.isExecuted(merkleRoot)
+}
+
+// IsSnoozed returns true if the root is snoozed.
 func (r *commitRootsCache) isSnoozed(merkleRoot ccipocr3.Bytes32) bool {
 	_, snoozed := r.snoozedRoots.Get(merkleRoot.String())
 	return snoozed
 }
 
+// isExecuted returns true if the root is executed.
 func (r *commitRootsCache) isExecuted(merkleRoot ccipocr3.Bytes32) bool {
 	_, executed := r.executedRoots.Get(merkleRoot.String())
 	return executed

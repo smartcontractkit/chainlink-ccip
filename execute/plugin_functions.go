@@ -173,8 +173,9 @@ func groupByChainSelector(
 	return commitReportCache
 }
 
-// getPendingAndExecutedReports splits up reports based on whether or not they
-// have pending messages.
+// getPendingAndExecutedReports splits up reports based on whether they
+// have pending messages. This is a pure function to analyze reports based on
+// the executed messages response.
 func getPendingAndExecutedReports(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
 ) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData, error) {

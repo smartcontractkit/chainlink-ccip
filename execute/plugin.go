@@ -118,6 +118,10 @@ func NewPlugin(
 		),
 		observer:             metricsReporter,
 		observationOptimizer: optimizers.NewObservationOptimizer(maxObservationLength),
+		commitRootsCache: cache.NewCommitRootsCache(
+			logutil.WithComponent(lggr, "CommitRootsCache"),
+			offchainCfg.MessageVisibilityInterval.Duration(),
+			time.Minute*5),
 	}
 }
 
@@ -125,10 +129,13 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
+type CanExecuteHandle = func(merkleRoot cciptypes.Bytes32) bool
+
 func getPendingExecutedReports(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
 	dest cciptypes.ChainSelector,
+	canExecute CanExecuteHandle,
 	ts time.Time,
 	lggr logger.Logger,
 ) (exectypes.CommitObservations /* fully executed roots */, []exectypes.CommitData, error) {
@@ -157,6 +164,16 @@ func getPendingExecutedReports(
 		if len(reports) == 0 {
 			continue
 		}
+
+		// Filter out reports that cannot be executed (snoozed).
+		var filtered []exectypes.CommitData
+		for _, report := range reports {
+			if !canExecute(report.MerkleRoot) {
+				continue
+			}
+			filtered = append(filtered, report)
+		}
+		reports = filtered
 
 		ranges, err := computeRanges(reports)
 		if err != nil {

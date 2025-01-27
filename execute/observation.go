@@ -118,6 +118,8 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
+	// TODO: set fetchFrom to the oldest pending commit report.
+	// TODO: or, cache commit reports so that we don't need to fetch them again.
 	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
@@ -146,17 +148,18 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, lggr)
+	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, p.commitRootsCache.CanExecute, fetchFrom, lggr)
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
 
-	// Snooze some stuff...
+	// If fully executed reports are detected, mark them in the cache.
+	// This cache will be re-initialized on each plugin restart.
 	for _, fullyExecutedCommit := range fullyExecutedCommits {
 		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.MerkleRoot)
 	}
 
-	// Remove cursed observations.
+	// Remove and snooze commit reports from cursed chains.
 	for chainSelector, isCursed := range ci.CursedSourceChains {
 		if isCursed {
 			// Snooze everything on a cursed chain.

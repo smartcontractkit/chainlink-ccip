@@ -39,18 +39,24 @@ import (
 )
 
 func Test_getPendingExecutedReports(t *testing.T) {
+	canExecute := func(ret bool) CanExecuteHandle {
+		return func(cciptypes.Bytes32) bool { return ret }
+	}
+
 	tests := []struct {
-		name    string
-		reports []plugintypes2.CommitPluginReportWithMeta
-		ranges  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
-		want    exectypes.CommitObservations
-		wantErr assert.ErrorAssertionFunc
+		name         string
+		reports      []plugintypes2.CommitPluginReportWithMeta
+		ranges       map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
+		canExec      CanExecuteHandle
+		wantObs      exectypes.CommitObservations
+		wantExecuted []exectypes.CommitData
+		wantErr      assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
 			reports: nil,
 			ranges:  nil,
-			want:    exectypes.CommitObservations{},
+			wantObs: exectypes.CommitObservations{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -72,7 +78,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
 				1: nil,
 			},
-			want: exectypes.CommitObservations{
+			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
 						SourceChain:         1,
@@ -106,7 +112,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					cciptypes.NewSeqNumRange(7, 8),
 				},
 			},
-			want: exectypes.CommitObservations{
+			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
 						SourceChain:         1,
@@ -134,14 +140,76 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				},
 			},
 			ranges:  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{},
-			want:    exectypes.CommitObservations{},
+			wantObs: exectypes.CommitObservations{},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "single fully-executed report",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						MerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				1: {
+					cciptypes.NewSeqNumRange(1, 10),
+				},
+			},
+			wantObs: exectypes.CommitObservations{
+				1: nil,
+			},
+			wantExecuted: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+					Timestamp:           time.UnixMilli(10101010101),
+					BlockNum:            999,
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "single known-executed report",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						MerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			canExec: canExecute(false),
+			ranges:  nil,
+			wantObs: exectypes.CommitObservations{
+				1: nil,
+			},
+			wantExecuted: nil, // the executed message is not returned.
+			wantErr:      assert.NoError,
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			if tt.canExec == nil {
+				tt.canExec = canExecute(true)
+			}
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			mockReader.On(
 				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
@@ -155,17 +223,19 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
 			// for each chain selector:
 			//      ExecutedMessageRanges(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNumRange, error)
-			got, err := getPendingExecutedReports(
+			got, got2, err := getPendingExecutedReports(
 				context.Background(),
 				mockReader,
 				123,
+				tt.canExec,
 				time.Now(),
 				logger.Test(t),
 			)
 			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
 				return
 			}
-			assert.Equalf(t, tt.want, got, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantObs, got, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantExecuted, got2, "getPendingExecutedReports(...)")
 		})
 	}
 }
