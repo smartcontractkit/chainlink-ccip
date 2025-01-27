@@ -4,14 +4,14 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
+use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
+use super::price_math::get_validated_token_price;
 
-use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
-use crate::v1::price_math::get_validated_token_price;
 use crate::{
     AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
     DestChainConfig, ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader,
