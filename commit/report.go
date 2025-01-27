@@ -64,6 +64,7 @@ func (p *Plugin) Reports(
 		repInfo = cciptypes.CommitReportInfo{
 			RemoteF:     outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
 			MerkleRoots: rep.MerkleRoots,
+			TokenPrices: rep.PriceUpdates.TokenPriceUpdates,
 		}
 	}
 

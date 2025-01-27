@@ -18,6 +18,12 @@ type ExecutePluginReportSingleChain struct {
 	ProofFlagBits       BigInt        `json:"proofFlagBits"`
 }
 
+type ExecuteReportArgs struct {
+	ReportContext [2][32]byte
+	Report        []byte
+	Info          ExecuteReportInfo
+}
+
 // ExecuteReportInfo contains metadata needed by transmitter and contract
 // writer.
 type ExecuteReportInfo struct {

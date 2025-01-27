@@ -1,9 +1,12 @@
 package ccipocr3
 
 import (
+	"encoding/json"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCommitPluginReport(t *testing.T) {
@@ -150,4 +153,55 @@ func TestMerkleRootChain_String(t *testing.T) {
 	s := mrc.String()
 	assert.Equal(t, "MerkleRoot(chain:123, seqNumsRange:[123 -> 456], "+
 		"merkleRoot:0x0102030000000000000000000000000000000000000000000000000000000000, onRamp:0x0102)", s)
+}
+
+func TestDecodeCommitReportInfo(t *testing.T) {
+	// Empty input
+	{
+		info, err := DecodeCommitReportInfo(nil)
+		require.NoError(t, err)
+		require.Equal(t, CommitReportInfo{}, info)
+	}
+
+	// Unsupported version
+	{
+		data := append([]byte{2}, []byte("{}")...)
+		_, err := DecodeCommitReportInfo(data)
+		require.ErrorContains(t, err, "unknown execute report info version (2)")
+	}
+
+	// Invalid field
+	{
+		data := append([]byte{1}, []byte(`{"InvalidField": 123}`)...)
+		_, err := DecodeCommitReportInfo(data)
+		require.ErrorContains(t, err, "unknown field")
+	}
+
+	// Valid input
+	{
+		validReport := CommitReportInfo{
+			RemoteF:     1,
+			MerkleRoots: []MerkleRootChain{},
+			TokenPrices: []TokenPrice{
+				{
+					TokenID: "0x1234",
+					Price:   NewBigInt(big.NewInt(123)),
+				},
+			},
+		}
+		encoded, err := json.Marshal(validReport)
+		require.NoError(t, err)
+
+		data := append([]byte{1}, encoded...)
+		decoded, err := DecodeCommitReportInfo(data)
+		require.NoError(t, err)
+		require.Equal(t, validReport, decoded)
+	}
+
+	// Non-object input
+	{
+		data := append([]byte{1}, []byte(`["unexpected array"]`)...)
+		_, err := DecodeCommitReportInfo(data)
+		require.ErrorContains(t, err, "cannot unmarshal array")
+	}
 }
