@@ -1971,17 +1971,24 @@ func TestCCIPRouter(t *testing.T) {
 	/////////////////////////////
 	t.Run("Token Pool Configuration", func(t *testing.T) {
 		t.Run("RemoteConfig", func(t *testing.T) {
-			ix0, err := token_pool.NewSetChainRemoteConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), token_pool.RemoteConfig{
-				PoolAddress:  []byte{1, 2, 3},
-				TokenAddress: []byte{1, 2, 3},
+			ix0, err := token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), token_pool.RemoteConfig{
+				// PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
+				TokenAddress: token_pool.RemoteAddress{Address: []byte{1, 2, 3}},
 			}, token0.PoolConfig, token0.Chain[config.EvmChainSelector], tokenPoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			ix1, err := token_pool.NewSetChainRemoteConfigInstruction(config.EvmChainSelector, token1.Mint.PublicKey(), token_pool.RemoteConfig{
-				PoolAddress:  []byte{4, 5, 6},
-				TokenAddress: []byte{4, 5, 6},
+			ix1, err := token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, token1.Mint.PublicKey(), token_pool.RemoteConfig{
+				PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
+				TokenAddress:  token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
 			}, token1.PoolConfig, token1.Chain[config.EvmChainSelector], anotherTokenPoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1}, tokenPoolAdmin, config.DefaultCommitment, common.AddSigners(anotherTokenPoolAdmin))
+		})
+
+		t.Run("AppendRemotePools", func(t *testing.T) {
+			ix, err := token_pool.NewAppendRemotePoolAddressesInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
+				token0.PoolConfig, token0.Chain[config.EvmChainSelector], tokenPoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, tokenPoolAdmin, config.DefaultCommitment)
 		})
 
 		t.Run("RateLimit", func(t *testing.T) {

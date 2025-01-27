@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use anchor_lang::prelude::*;
 use spl_math::uint::U256;
 
@@ -82,15 +84,15 @@ pub mod token_pool {
         Ok(())
     }
 
-    // set remote config
-    pub fn set_chain_remote_config(
-        ctx: Context<SetChainConfig>,
+    // initialize remote config (with no remote pools as it must be zero sized)
+    pub fn init_chain_remote_config(
+        ctx: Context<InitializeChainConfig>,
         remote_chain_selector: u64,
         _mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
         let old_mint = ctx.accounts.chain_config.remote.token_address.clone();
-        let old_pool = ctx.accounts.chain_config.remote.pool_address.clone();
+        let old_pools = ctx.accounts.chain_config.remote.pool_addresses.clone();
 
         ctx.accounts.chain_config.remote = cfg;
 
@@ -98,8 +100,55 @@ pub mod token_pool {
             chain_selector: remote_chain_selector,
             token: ctx.accounts.chain_config.remote.token_address.clone(),
             previous_token: old_mint,
-            pool_address: ctx.accounts.chain_config.remote.pool_address.clone(),
-            previous_pool_address: old_pool,
+            pool_addresses: ctx.accounts.chain_config.remote.pool_addresses.clone(),
+            previous_pool_addresses: old_pools,
+        });
+
+        Ok(())
+    }
+
+    // edit remote config
+    pub fn edit_chain_remote_config(
+        ctx: Context<EditChainConfigDynamicSize>,
+        remote_chain_selector: u64,
+        _mint: Pubkey,
+        cfg: RemoteConfig,
+    ) -> Result<()> {
+        let old_mint = ctx.accounts.chain_config.remote.token_address.clone();
+        let old_pools = ctx.accounts.chain_config.remote.pool_addresses.clone();
+
+        ctx.accounts.chain_config.remote = cfg;
+
+        emit!(RemoteChainConfigured {
+            chain_selector: remote_chain_selector,
+            token: ctx.accounts.chain_config.remote.token_address.clone(),
+            previous_token: old_mint,
+            pool_addresses: ctx.accounts.chain_config.remote.pool_addresses.clone(),
+            previous_pool_addresses: old_pools,
+        });
+
+        Ok(())
+    }
+
+    // Add remote pool addresses
+    pub fn append_remote_pool_addresses(
+        ctx: Context<AppendRemotePoolAddresses>,
+        remote_chain_selector: u64,
+        _mint: Pubkey,
+        addresses: Vec<RemoteAddress>,
+    ) -> Result<()> {
+        let old_pools = ctx.accounts.chain_config.remote.pool_addresses.clone();
+
+        ctx.accounts
+            .chain_config
+            .remote
+            .pool_addresses
+            .append(&mut addresses.clone());
+
+        emit!(RemotePoolsAppended {
+            chain_selector: remote_chain_selector,
+            pool_addresses: ctx.accounts.chain_config.remote.pool_addresses.clone(),
+            previous_pool_addresses: old_pools,
         });
 
         Ok(())
@@ -107,7 +156,7 @@ pub mod token_pool {
 
     // set rate limit
     pub fn set_chain_rate_limit(
-        ctx: Context<SetChainConfig>,
+        ctx: Context<EditChainConfigStaticSize>,
         remote_chain_selector: u64,
         _mint: Pubkey,
         inbound: RateLimitConfig,
@@ -150,12 +199,18 @@ pub mod token_pool {
             ctx.accounts.config.decimals,
         )?;
 
+        let ChainConfig {
+            remote,
+            inbound_rate_limit,
+            ..
+        } = &mut *ctx.accounts.chain_config;
+
         validate_release_or_mint(
             &release_or_mint,
             parsed_amount,
             ctx.accounts.config.mint,
-            &ctx.accounts.chain_config.remote.pool_address.clone(),
-            &mut ctx.accounts.chain_config.inbound_rate_limit,
+            &remote.pool_addresses,
+            inbound_rate_limit,
         )?;
 
         match ctx.accounts.config.pool_type {
@@ -389,7 +444,7 @@ pub mod token_pool {
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.remote.token_address.clone(),
-            dest_pool_data: [0_u8; 0].to_vec(), // empty
+            dest_pool_data: RemoteAddress::ZERO,
         })
     }
 }
@@ -418,7 +473,7 @@ fn validate_release_or_mint(
     release_or_mint_in: &ReleaseOrMintInV1,
     parsed_amount: u64,
     config_mint: Pubkey,
-    pool_address: &[u8],
+    pool_addresses: &[RemoteAddress],
     inbound_rate_limit: &mut RateLimitTokenBucket,
 ) -> Result<()> {
     require_eq!(
@@ -427,7 +482,9 @@ fn validate_release_or_mint(
         CcipTokenPoolError::InvalidToken
     );
     require!(
-        !pool_address.is_empty() && pool_address == release_or_mint_in.source_pool_address,
+        !pool_addresses.is_empty()
+            && !release_or_mint_in.source_pool_address.is_empty()
+            && pool_addresses.contains(&release_or_mint_in.source_pool_address),
         CcipTokenPoolError::InvalidSourcePoolAddress
     );
 
@@ -468,23 +525,23 @@ pub struct LockOrBurnInV1 {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct LockOrBurnOutV1 {
-    pub dest_token_address: Vec<u8>,
-    pub dest_pool_data: Vec<u8>,
+    pub dest_token_address: RemoteAddress,
+    pub dest_pool_data: RemoteAddress,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct ReleaseOrMintInV1 {
-    pub original_sender: Vec<u8>, //          The original sender of the tx on the source chain
-    pub remote_chain_selector: u64, // ─╮ The chain ID of the source chain
+    pub original_sender: RemoteAddress, //          The original sender of the tx on the source chain
+    pub remote_chain_selector: u64,     // ─╮ The chain ID of the source chain
     pub receiver: Pubkey, // ───────────╯ The recipient of the tokens on the destination chain.
     pub amount: [u8; 32], // u256, incoming cross-chain amount - The amount of tokens to release or mint, denominated in the source token's decimals
     pub local_token: Pubkey, //            The address on this chain of the token to release or mint
     /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
     /// expected pool address for the given remoteChainSelector.
-    pub source_pool_address: Vec<u8>, //       The address of the source pool, abi encoded in the case of EVM chains
-    pub source_pool_data: Vec<u8>, //          The data received from the source pool to process the release or mint
+    pub source_pool_address: RemoteAddress, //       The address of the source pool, abi encoded in the case of EVM chains
+    pub source_pool_data: RemoteAddress, //          The data received from the source pool to process the release or mint
     /// @dev WARNING: offchainTokenData is untrusted data.
-    pub offchain_token_data: Vec<u8>, //       The offchain data to process the release or mint
+    pub offchain_token_data: RemoteAddress, //       The offchain data to process the release or mint
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -513,11 +570,46 @@ pub struct ChainConfig {
 
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct RemoteConfig {
-    #[max_len(64)]
-    pub pool_address: Vec<u8>,
-    #[max_len(64)]
-    pub token_address: Vec<u8>,
+    #[max_len(0)]
+    pub pool_addresses: Vec<RemoteAddress>,
+    pub token_address: RemoteAddress,
     pub decimals: u8, // needed to track decimals from remote to convert properly
+}
+
+impl RemoteConfig {
+    pub fn space(&self) -> usize {
+        Self::INIT_SPACE
+            + self
+                .pool_addresses
+                .iter()
+                .map(RemoteAddress::space)
+                .sum::<usize>()
+    }
+}
+
+#[derive(Default, InitSpace, Clone, AnchorDeserialize, AnchorSerialize, PartialEq, Eq)]
+pub struct RemoteAddress {
+    #[max_len(64)]
+    pub address: Vec<u8>,
+}
+
+impl RemoteAddress {
+    const ZERO: Self = Self {
+        address: Vec::new(),
+    };
+
+    pub fn space(&self) -> usize {
+        4 // vector prefix
+            + self.address.len() // data length in bytes
+    }
+}
+
+impl Deref for RemoteAddress {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.address
+    }
 }
 
 pub fn to_svm_token_amount(
