@@ -2,7 +2,9 @@ use std::convert::Into;
 
 use anchor_lang::prelude::*;
 
+// https://github.com/smartcontractkit/chainlink/blob/ff8a597fd9df653f8967427498eaa5a04b19febb/contracts/src/v0.8/ccip/libraries/Internal.sol#L276
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
+pub const CHAIN_FAMILY_SELECTOR_SVM: u32 = 0x1e10bdc4;
 
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic header for OnRamp & OffRamp messages.
@@ -35,25 +37,20 @@ pub struct ExecutionReportSingleChain {
     pub proofs: Vec<[u8; 32]>,
 }
 
+// Any2SVMRampExtraArgs is used during the execute or manual execute calls (offramp only)
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct SVMExtraArgs {
+pub struct Any2SVMRampExtraArgs {
     pub compute_units: u32,
     pub is_writable_bitmap: u64,
     pub accounts: Vec<Pubkey>,
 }
 
-impl SVMExtraArgs {
+impl Any2SVMRampExtraArgs {
     pub fn len(&self) -> usize {
         4 // compute units
         + 8 // isWritable bitmap
         + 4 + self.accounts.len() * 32 // additional accounts
     }
-}
-
-#[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
-pub struct AnyExtraArgs {
-    pub gas_limit: u128,
-    pub allow_out_of_order_execution: bool,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -69,7 +66,7 @@ pub struct Any2SVMRampMessage {
     // If token receiver and message execution, then the token receiver must be a PDA from the logic receiver
     pub token_receiver: Pubkey,
     pub token_amounts: Vec<Any2SVMTokenTransfer>,
-    pub extra_args: SVMExtraArgs,
+    pub extra_args: Any2SVMRampExtraArgs,
     pub on_ramp_address: Vec<u8>,
 }
 
@@ -97,7 +94,7 @@ pub struct SVM2AnyRampMessage {
     pub sender: Pubkey,            // sender address on the source chain
     pub data: Vec<u8>,             // arbitrary data payload supplied by the message sender
     pub receiver: Vec<u8>,         // receiver address on the destination chain
-    pub extra_args: AnyExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
+    pub extra_args: Vec<u8>, // destination-chain specific extra args, such as the gasLimit for EVM chains
     pub fee_token: Pubkey,
     pub token_amounts: Vec<SVM2AnyTokenTransfer>,
     pub fee_token_amount: CrossChainAmount,
@@ -152,19 +149,13 @@ pub struct SVM2AnyMessage {
     pub data: Vec<u8>,
     pub token_amounts: Vec<SVMTokenAmount>,
     pub fee_token: Pubkey, // pass zero address if native SOL
-    pub extra_args: ExtraArgsInput,
+    pub extra_args: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default, Debug, PartialEq, Eq)]
 pub struct SVMTokenAmount {
     pub token: Pubkey,
     pub amount: u64, // u64 - amount local to solana
-}
-
-#[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
-pub struct ExtraArgsInput {
-    pub gas_limit: Option<u128>,
-    pub allow_out_of_order_execution: Option<bool>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
