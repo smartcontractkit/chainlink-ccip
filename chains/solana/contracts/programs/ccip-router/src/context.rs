@@ -607,7 +607,6 @@ pub struct CommitReportContext<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        // seeds = [SOURCE_CHAIN_STATE_SEED, report.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         seeds = [SOURCE_CHAIN_STATE_SEED, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
