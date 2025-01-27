@@ -1,0 +1,586 @@
+{
+  "version": "0.1.0-dev",
+  "name": "fee_quoter",
+  "instructions": [
+    {
+      "name": "getFee",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destChain",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "billingTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "message",
+          "type": {
+            "defined": "SVM2AnyMessage"
+          }
+        }
+      ],
+      "returns": "u64"
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "maxFeeJuelsPerMsg",
+            "type": "u128"
+          },
+          {
+            "name": "linkTokenMint",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": "DestChainState"
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "DestChainConfig"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BillingTokenConfigWrapper",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "BillingTokenConfig"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerChainPerTokenConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "billing",
+            "type": {
+              "defined": "TokenBilling"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "SVM2AnyMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "tokenAmounts",
+            "type": {
+              "vec": {
+                "defined": "SVMTokenAmount"
+              }
+            }
+          },
+          {
+            "name": "feeToken",
+            "type": "publicKey"
+          },
+          {
+            "name": "extraArgs",
+            "type": {
+              "defined": "ExtraArgsInput"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMTokenAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExtraArgsInput",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "gasLimit",
+            "type": {
+              "option": "u128"
+            }
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": {
+              "option": "bool"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "isEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "maxNumberOfTokensPerMsg",
+            "type": "u16"
+          },
+          {
+            "name": "maxDataBytes",
+            "type": "u32"
+          },
+          {
+            "name": "maxPerMsgGasLimit",
+            "type": "u32"
+          },
+          {
+            "name": "destGasOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByte",
+            "type": "u16"
+          },
+          {
+            "name": "destDataAvailabilityOverheadGas",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerDataAvailabilityByte",
+            "type": "u16"
+          },
+          {
+            "name": "destDataAvailabilityMultiplierBps",
+            "type": "u16"
+          },
+          {
+            "name": "defaultTokenFeeUsdcents",
+            "type": "u16"
+          },
+          {
+            "name": "defaultTokenDestGasOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "defaultTxGasLimit",
+            "type": "u32"
+          },
+          {
+            "name": "gasMultiplierWeiPerEth",
+            "type": "u64"
+          },
+          {
+            "name": "networkFeeUsdcents",
+            "type": "u32"
+          },
+          {
+            "name": "gasPriceStalenessThreshold",
+            "type": "u32"
+          },
+          {
+            "name": "enforceOutOfOrder",
+            "type": "bool"
+          },
+          {
+            "name": "chainFamilySelector",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "usdPerUnitGas",
+            "type": {
+              "defined": "TimestampedPackedU224"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TimestampedPackedU224",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BillingTokenConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "usdPerToken",
+            "type": {
+              "defined": "TimestampedPackedU224"
+            }
+          },
+          {
+            "name": "premiumMultiplierWeiPerEth",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenBilling",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "minFeeUsdcents",
+            "type": "u32"
+          },
+          {
+            "name": "maxFeeUsdcents",
+            "type": "u32"
+          },
+          {
+            "name": "deciBps",
+            "type": "u16"
+          },
+          {
+            "name": "destGasOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "destBytesOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "isEnabled",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidSequenceInterval",
+      "msg": "The given sequence interval is invalid"
+    },
+    {
+      "code": 6001,
+      "name": "RootNotCommitted",
+      "msg": "The given Merkle Root is missing"
+    },
+    {
+      "code": 6002,
+      "name": "ExistingMerkleRoot",
+      "msg": "The given Merkle Root is already committed"
+    },
+    {
+      "code": 6003,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidInputs",
+      "msg": "Invalid inputs"
+    },
+    {
+      "code": 6005,
+      "name": "UnsupportedSourceChainSelector",
+      "msg": "Source chain selector not supported"
+    },
+    {
+      "code": 6006,
+      "name": "UnsupportedDestinationChainSelector",
+      "msg": "Destination chain selector not supported"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidProof",
+      "msg": "Invalid Proof for Merkle Root"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidMessage",
+      "msg": "Invalid message format"
+    },
+    {
+      "code": 6009,
+      "name": "ReachedMaxSequenceNumber",
+      "msg": "Reached max sequence number"
+    },
+    {
+      "code": 6010,
+      "name": "ManualExecutionNotAllowed",
+      "msg": "Manual execution not allowed"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidInputsTokenIndices",
+      "msg": "Invalid pool account account indices"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidInputsPoolAccounts",
+      "msg": "Invalid pool accounts"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidInputsConfigAccounts",
+      "msg": "Invalid config account"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidInputsTokenAdminRegistryAccounts",
+      "msg": "Invalid Token Admin Registry account"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidInputsLookupTableAccounts",
+      "msg": "Invalid LookupTable account"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidInputsLookupTableAccountWritable",
+      "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidInputsTokenAmount",
+      "msg": "Cannot send zero tokens"
+    },
+    {
+      "code": 6019,
+      "name": "OfframpReleaseMintBalanceMismatch",
+      "msg": "Release or mint balance mismatch"
+    },
+    {
+      "code": 6020,
+      "name": "OfframpInvalidDataLength",
+      "msg": "Invalid data length"
+    },
+    {
+      "code": 6021,
+      "name": "StaleCommitReport",
+      "msg": "Stale commit report"
+    },
+    {
+      "code": 6022,
+      "name": "DestinationChainDisabled",
+      "msg": "Destination chain disabled"
+    },
+    {
+      "code": 6023,
+      "name": "FeeTokenDisabled",
+      "msg": "Fee token disabled"
+    },
+    {
+      "code": 6024,
+      "name": "MessageTooLarge",
+      "msg": "Message exceeds maximum data size"
+    },
+    {
+      "code": 6025,
+      "name": "UnsupportedNumberOfTokens",
+      "msg": "Message contains an unsupported number of tokens"
+    },
+    {
+      "code": 6026,
+      "name": "UnsupportedChainFamilySelector",
+      "msg": "Chain family selector not supported"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidEVMAddress",
+      "msg": "Invalid EVM address"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidEncoding",
+      "msg": "Invalid encoding"
+    },
+    {
+      "code": 6029,
+      "name": "InvalidInputsAtaAddress",
+      "msg": "Invalid Associated Token Account address"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidInputsAtaWritable",
+      "msg": "Invalid Associated Token Account writable flag"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidTokenPrice",
+      "msg": "Invalid token price"
+    },
+    {
+      "code": 6032,
+      "name": "StaleGasPrice",
+      "msg": "Stale gas price"
+    },
+    {
+      "code": 6033,
+      "name": "InsufficientLamports",
+      "msg": "Insufficient lamports"
+    },
+    {
+      "code": 6034,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 6035,
+      "name": "UnsupportedToken",
+      "msg": "Unsupported token"
+    },
+    {
+      "code": 6036,
+      "name": "InvalidInputsMissingTokenConfig",
+      "msg": "Inputs are missing token configuration"
+    },
+    {
+      "code": 6037,
+      "name": "MessageFeeTooHigh",
+      "msg": "Message fee is too high"
+    },
+    {
+      "code": 6038,
+      "name": "SourceTokenDataTooLarge",
+      "msg": "Source token data is too large"
+    },
+    {
+      "code": 6039,
+      "name": "MessageGasLimitTooHigh",
+      "msg": "Message gas limit too high"
+    },
+    {
+      "code": 6040,
+      "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
+      "msg": "Extra arg out of order execution must be true"
+    }
+  ]
+}

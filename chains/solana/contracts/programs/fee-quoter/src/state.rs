@@ -1,0 +1,156 @@
+use anchor_lang::prelude::*;
+
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct Config {
+    pub version: u8,
+
+    pub max_fee_juels_per_msg: u128, // Maximum fee that can be charged for a message.
+    pub link_token_mint: Pubkey,
+    // The following field is unused until the day we integrate with feeds to fetch fresh values
+    // pub token_price_staleness_threshold: u32,
+}
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
+pub struct DestChainConfig {
+    pub is_enabled: bool, // Whether this destination chain is enabled
+
+    pub max_number_of_tokens_per_msg: u16, // Maximum number of distinct ERC20 token transferred per message
+    pub max_data_bytes: u32,               // Maximum payload data size in bytes
+    pub max_per_msg_gas_limit: u32,        // Maximum gas limit for messages targeting EVMs
+    pub dest_gas_overhead: u32, //  Gas charged on top of the gasLimit to cover destination chain costs
+    pub dest_gas_per_payload_byte: u16, // Destination chain gas charged for passing each byte of `data` payload to receiver
+    pub dest_data_availability_overhead_gas: u32, // Extra data availability gas charged on top of the message, e.g. for OCR
+    pub dest_gas_per_data_availability_byte: u16, // Amount of gas to charge per byte of message data that needs availability
+    pub dest_data_availability_multiplier_bps: u16, // Multiplier for data availability gas, multiples of bps, or 0.0001
+
+    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
+    pub default_token_fee_usdcents: u16, // Default token fee charged per token transfer
+    pub default_token_dest_gas_overhead: u32, //  Default gas charged to execute the token transfer on the destination chain
+    pub default_tx_gas_limit: u32,            // Default gas limit for a tx
+    pub gas_multiplier_wei_per_eth: u64, // Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    pub network_fee_usdcents: u32, // Flat network fee to charge for messages, multiples of 0.01 USD
+    pub gas_price_staleness_threshold: u32, // The amount of time a gas price can be stale before it is considered invalid (0 means disabled)
+    pub enforce_out_of_order: bool, // Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
+    pub chain_family_selector: [u8; 4], // Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+}
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
+pub struct DestChainState {
+    pub usd_per_unit_gas: TimestampedPackedU224,
+}
+
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct DestChain {
+    // Config for SVM2Any
+    pub version: u8,
+    pub chain_selector: u64,     // Chain selector used for the seed
+    pub state: DestChainState,   // values that are updated automatically
+    pub config: DestChainConfig, // values configured by an admin
+}
+
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
+pub struct TimestampedPackedU224 {
+    pub value: [u8; 28],
+    pub timestamp: i64, // maintaining the type that SVM returns for the time (solana_program::clock::UnixTimestamp = i64)
+}
+
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
+pub struct BillingTokenConfig {
+    // NOTE: when modifying this struct, make sure to update the version in the wrapper
+    pub enabled: bool,
+    pub mint: Pubkey,
+
+    // price tracking
+    pub usd_per_token: TimestampedPackedU224,
+    // billing configs
+    pub premium_multiplier_wei_per_eth: u64,
+}
+
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct BillingTokenConfigWrapper {
+    pub version: u8,
+    pub config: BillingTokenConfig,
+}
+
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct PerChainPerTokenConfig {
+    pub version: u8,         // schema version
+    pub chain_selector: u64, // remote chain
+    pub mint: Pubkey,        // token on solana
+
+    // TODO rename to token_transfer_fee_config
+    pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
+}
+
+#[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+// TODO rename to TokenTransferFeeConfig
+pub struct TokenBilling {
+    pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
+    pub max_fee_usdcents: u32, // Maximum fee to charge per token transfer, multiples of 0.01 USD
+    pub deci_bps: u16, // Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
+    pub dest_gas_overhead: u32, // Gas charged to execute the token transfer on the destination chain
+    // Extra data availability bytes that are returned from the source pool and sent
+    pub dest_bytes_overhead: u32, // to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+    pub is_enabled: bool,         // Whether this token has custom transfer fees
+}
+
+/// Methods in this module are used to deserialize AccountInfo into the state structs
+pub mod validated_try_to {
+    use anchor_lang::prelude::*;
+
+    use crate::context::{FEE_BILLING_TOKEN_CONFIG_SEED, TOKEN_POOL_BILLING_SEED};
+    use crate::FeeQuoterError;
+
+    use super::{BillingTokenConfig, BillingTokenConfigWrapper, PerChainPerTokenConfig};
+
+    pub fn per_chain_per_token_config<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+        dest_chain_selector: u64,
+    ) -> Result<PerChainPerTokenConfig> {
+        let (expected, _) = Pubkey::find_program_address(
+            &[
+                TOKEN_POOL_BILLING_SEED,
+                dest_chain_selector.to_le_bytes().as_ref(),
+                token.key().as_ref(),
+            ],
+            &crate::ID,
+        );
+        require_keys_eq!(account.key(), expected, FeeQuoterError::InvalidInputs);
+        let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
+        require_eq!(
+            account.version,
+            1, // the v1 version of the onramp will always be tied to version 1 of the state
+            FeeQuoterError::InvalidInputs
+        );
+        Ok(account.into_inner())
+    }
+
+    // Returns Ok(None) when parsing the ZERO address, which is a valid input from users
+    // specifying a token that has no Billing config.
+    pub fn billing_token_config<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+    ) -> Result<Option<BillingTokenConfig>> {
+        if account.key() == Pubkey::default() {
+            return Ok(None);
+        }
+
+        let (expected, _) = Pubkey::find_program_address(
+            &[FEE_BILLING_TOKEN_CONFIG_SEED, token.as_ref()],
+            &crate::ID,
+        );
+        require_keys_eq!(account.key(), expected, FeeQuoterError::InvalidInputs);
+        let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
+        require_eq!(
+            account.version,
+            1, // the v1 version of the onramp will always be tied to version 1 of the state
+            FeeQuoterError::InvalidInputs
+        );
+        Ok(Some(account.into_inner().config))
+    }
+}
