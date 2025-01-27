@@ -602,7 +602,7 @@ fn parse_messaging_accounts<'info>(
     for (i, acc) in msg_accounts.iter().enumerate().skip(1) {
         require!(
             is_writable(source_bitmap, i as u8) == acc.is_writable,
-            CcipRouterError::InvalidInputs
+            CcipRouterError::InvalidWritabilityBitmap
         );
     }
 

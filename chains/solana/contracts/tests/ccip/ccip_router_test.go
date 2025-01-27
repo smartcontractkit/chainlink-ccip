@@ -5287,7 +5287,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 
 					sourceChainSelector := config.EvmChainSelector
-					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+					msgAccounts := []solana.PublicKey{}
 					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 					message.ExtraArgs = ccip_router.SVMExtraArgs{}
 					message.Data = []byte{}

@@ -1675,6 +1675,7 @@ const (
 	SourceTokenDataTooLarge_CcipRouterError
 	MessageGasLimitTooHigh_CcipRouterError
 	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
+	InvalidWritabilityBitmap_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1761,6 +1762,8 @@ func (value CcipRouterError) String() string {
 		return "MessageGasLimitTooHigh"
 	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError:
 		return "ExtraArgOutOfOrderExecutionMustBeTrue"
+	case InvalidWritabilityBitmap_CcipRouterError:
+		return "InvalidWritabilityBitmap"
 	default:
 		return ""
 	}
