@@ -14,7 +14,7 @@ use crate::{
 
 const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;
 
-pub fn register_token_admin_registry_via_get_ccip_admin(
+pub fn ccip_admin_propose_administrator(
     ctx: Context<RegisterTokenAdminRegistryViaGetCCIPAdmin>,
     mint: Pubkey, // should we validate that this is a real token program?
     token_admin_registry_admin: Pubkey,
@@ -33,9 +33,7 @@ pub fn register_token_admin_registry_via_get_ccip_admin(
     Ok(())
 }
 
-pub fn register_token_admin_registry_via_owner(
-    ctx: Context<RegisterTokenAdminRegistryViaOwner>,
-) -> Result<()> {
+pub fn owner_propose_administrator(ctx: Context<RegisterTokenAdminRegistryViaOwner>) -> Result<()> {
     let token_mint = ctx.accounts.mint.key().to_owned();
     let mint_authority = ctx.accounts.mint.mint_authority.to_owned();
 

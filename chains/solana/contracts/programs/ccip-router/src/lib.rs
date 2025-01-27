@@ -44,6 +44,10 @@ pub mod ccip_router {
 
     use super::*;
 
+    //////////////////////////
+    /// Initialization Flow //
+    //////////////////////////
+
     /// Initializes the CCIP Router.
     ///
     /// The initialization of the Router is responsibility of Admin, nothing more than calling this method should be done first.
@@ -119,6 +123,10 @@ pub mod ccip_router {
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         v1::admin::accept_ownership(ctx)
     }
+
+    /////////////
+    /// Config //
+    /////////////
 
     /// Updates the fee aggregator in the router configuration.
     /// The Admin is the only one able to update the fee aggregator.
@@ -288,6 +296,30 @@ pub mod ccip_router {
         v1::admin::update_enable_manual_execution_after(ctx, new_enable_manual_execution_after)
     }
 
+    /// Sets the OCR configuration.
+    /// Only CCIP Admin can set the OCR configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for setting the OCR configuration.
+    /// * `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].
+    /// * `config_info` - The OCR configuration information.
+    /// * `signers` - The list of signers.
+    /// * `transmitters` - The list of transmitters.
+    pub fn set_ocr_config(
+        ctx: Context<SetOcrConfig>,
+        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
+        config_info: Ocr3ConfigInfo,
+        signers: Vec<[u8; 20]>,
+        transmitters: Vec<Pubkey>,
+    ) -> Result<()> {
+        v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
+    }
+
+    ///////////////////////////
+    /// Token Admin Registry //
+    ///////////////////////////
+
     /// Registers the Token Admin Registry via the CCIP Admin
     ///
     /// # Arguments
@@ -295,12 +327,12 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for registration.
     /// * `mint` - The public key of the token mint.
     /// * `token_admin_registry_admin` - The public key of the token admin registry admin.
-    pub fn register_token_admin_registry_via_get_ccip_admin(
+    pub fn ccip_admin_propose_administrator(
         ctx: Context<RegisterTokenAdminRegistryViaGetCCIPAdmin>,
         mint: Pubkey, // should we validate that this is a real token program?
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::register_token_admin_registry_via_get_ccip_admin(
+        v1::token_admin_registry::ccip_admin_propose_administrator(
             ctx,
             mint,
             token_admin_registry_admin,
@@ -314,10 +346,42 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for registration.
-    pub fn register_token_admin_registry_via_owner(
+    pub fn owner_propose_administrator(
         ctx: Context<RegisterTokenAdminRegistryViaOwner>,
     ) -> Result<()> {
-        v1::token_admin_registry::register_token_admin_registry_via_owner(ctx)
+        v1::token_admin_registry::owner_propose_administrator(ctx)
+    }
+
+    /// Accepts the admin role of the token admin registry.
+    ///
+    /// The Pending Admin must call this function to accept the admin role of the Token Admin Registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for accepting the admin role.
+    /// * `mint` - The public key of the token mint.
+    pub fn accept_admin_role_token_admin_registry(
+        ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
+        mint: Pubkey,
+    ) -> Result<()> {
+        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
+    }
+
+    /// Transfers the admin role of the token admin registry to a new admin.
+    ///
+    /// Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the transfer.
+    /// * `mint` - The public key of the token mint.
+    /// * `new_admin` - The public key of the new admin.
+    pub fn transfer_admin_role_token_admin_registry(
+        ctx: Context<ModifyTokenAdminRegistry>,
+        mint: Pubkey,
+        new_admin: Pubkey,
+    ) -> Result<()> {
+        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
     }
 
     /// Sets the pool lookup table for a given token mint.
@@ -338,37 +402,9 @@ pub mod ccip_router {
         v1::token_admin_registry::set_pool(ctx, mint, writable_indexes)
     }
 
-    /// Transfers the admin role of the token admin registry to a new admin.
-    ///
-    /// Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for the transfer.
-    /// * `mint` - The public key of the token mint.
-    /// * `new_admin` - The public key of the new admin.
-    pub fn transfer_admin_role_token_admin_registry(
-        ctx: Context<ModifyTokenAdminRegistry>,
-        mint: Pubkey,
-        new_admin: Pubkey,
-    ) -> Result<()> {
-        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
-    }
-
-    /// Accepts the admin role of the token admin registry.
-    ///
-    /// The Pending Admin must call this function to accept the admin role of the Token Admin Registry.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for accepting the admin role.
-    /// * `mint` - The public key of the token mint.
-    pub fn accept_admin_role_token_admin_registry(
-        ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
-        mint: Pubkey,
-    ) -> Result<()> {
-        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
-    }
+    //////////////
+    /// Billing //
+    //////////////
 
     /// Sets the token billing configuration.
     ///
@@ -387,26 +423,6 @@ pub mod ccip_router {
         cfg: TokenBilling,
     ) -> Result<()> {
         v1::admin::set_token_billing(ctx, chain_selector, mint, cfg)
-    }
-
-    /// Sets the OCR configuration.
-    /// Only CCIP Admin can set the OCR configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for setting the OCR configuration.
-    /// * `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].
-    /// * `config_info` - The OCR configuration information.
-    /// * `signers` - The list of signers.
-    /// * `transmitters` - The list of transmitters.
-    pub fn set_ocr_config(
-        ctx: Context<SetOcrConfig>,
-        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
-        config_info: Ocr3ConfigInfo,
-        signers: Vec<[u8; 20]>,
-        transmitters: Vec<Pubkey>,
-    ) -> Result<()> {
-        v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
     }
 
     /// Adds a billing token configuration.
@@ -493,7 +509,10 @@ pub mod ccip_router {
         v1::admin::withdraw_billed_funds(ctx, transfer_all, desired_amount)
     }
 
-    /// ON RAMP FLOW
+    ///////////////////
+    /// On Ramp Flow //
+    ///////////////////
+
     /// Sends a message to the destination chain.
     ///
     /// Request a message to be sent to the destination chain.
@@ -516,7 +535,10 @@ pub mod ccip_router {
         v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
 
-    /// OFF RAMP FLOW
+    ////////////////////
+    /// Off Ramp Flow //
+    ////////////////////
+
     /// Commits a report to the router.
     ///
     /// The method name needs to be commit with Anchor encoding.
@@ -548,7 +570,6 @@ pub mod ccip_router {
         v1::offramp::commit(ctx, report_context_byte_words, report, signatures)
     }
 
-    /// OFF RAMP FLOW
     /// Executes a message on the destination chain.
     ///
     /// The method name needs to be execute with Anchor encoding.

@@ -10,6 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
+// Token Admin Registry //
 // Registers the Token Admin Registry via the CCIP Admin
 //
 // # Arguments
@@ -17,7 +18,7 @@ import (
 // * `ctx` - The context containing the accounts required for registration.
 // * `mint` - The public key of the token mint.
 // * `token_admin_registry_admin` - The public key of the token admin registry admin.
-type RegisterTokenAdminRegistryViaGetCcipAdmin struct {
+type CcipAdminProposeAdministrator struct {
 	Mint                    *ag_solanago.PublicKey
 	TokenAdminRegistryAdmin *ag_solanago.PublicKey
 
@@ -31,88 +32,88 @@ type RegisterTokenAdminRegistryViaGetCcipAdmin struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewRegisterTokenAdminRegistryViaGetCcipAdminInstructionBuilder creates a new `RegisterTokenAdminRegistryViaGetCcipAdmin` instruction builder.
-func NewRegisterTokenAdminRegistryViaGetCcipAdminInstructionBuilder() *RegisterTokenAdminRegistryViaGetCcipAdmin {
-	nd := &RegisterTokenAdminRegistryViaGetCcipAdmin{
+// NewCcipAdminProposeAdministratorInstructionBuilder creates a new `CcipAdminProposeAdministrator` instruction builder.
+func NewCcipAdminProposeAdministratorInstructionBuilder() *CcipAdminProposeAdministrator {
+	nd := &CcipAdminProposeAdministrator{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
 
 // SetMint sets the "mint" parameter.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) SetMint(mint ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaGetCcipAdmin {
+func (inst *CcipAdminProposeAdministrator) SetMint(mint ag_solanago.PublicKey) *CcipAdminProposeAdministrator {
 	inst.Mint = &mint
 	return inst
 }
 
 // SetTokenAdminRegistryAdmin sets the "tokenAdminRegistryAdmin" parameter.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaGetCcipAdmin {
+func (inst *CcipAdminProposeAdministrator) SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin ag_solanago.PublicKey) *CcipAdminProposeAdministrator {
 	inst.TokenAdminRegistryAdmin = &tokenAdminRegistryAdmin
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) SetConfigAccount(config ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaGetCcipAdmin {
+func (inst *CcipAdminProposeAdministrator) SetConfigAccount(config ag_solanago.PublicKey) *CcipAdminProposeAdministrator {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *CcipAdminProposeAdministrator) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaGetCcipAdmin {
+func (inst *CcipAdminProposeAdministrator) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *CcipAdminProposeAdministrator {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
 	return inst
 }
 
 // GetTokenAdminRegistryAccount gets the "tokenAdminRegistry" account.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
+func (inst *CcipAdminProposeAdministrator) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) SetAuthorityAccount(authority ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaGetCcipAdmin {
+func (inst *CcipAdminProposeAdministrator) SetAuthorityAccount(authority ag_solanago.PublicKey) *CcipAdminProposeAdministrator {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *CcipAdminProposeAdministrator) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaGetCcipAdmin {
+func (inst *CcipAdminProposeAdministrator) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *CcipAdminProposeAdministrator {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *CcipAdminProposeAdministrator) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
-func (inst RegisterTokenAdminRegistryViaGetCcipAdmin) Build() *Instruction {
+func (inst CcipAdminProposeAdministrator) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_RegisterTokenAdminRegistryViaGetCcipAdmin,
+		TypeID: Instruction_CcipAdminProposeAdministrator,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst RegisterTokenAdminRegistryViaGetCcipAdmin) ValidateAndBuild() (*Instruction, error) {
+func (inst CcipAdminProposeAdministrator) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) Validate() error {
+func (inst *CcipAdminProposeAdministrator) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.Mint == nil {
@@ -141,11 +142,11 @@ func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) Validate() error {
 	return nil
 }
 
-func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *CcipAdminProposeAdministrator) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("RegisterTokenAdminRegistryViaGetCcipAdmin")).
+			programBranch.Child(ag_format.Instruction("CcipAdminProposeAdministrator")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -166,7 +167,7 @@ func (inst *RegisterTokenAdminRegistryViaGetCcipAdmin) EncodeToTree(parent ag_tr
 		})
 }
 
-func (obj RegisterTokenAdminRegistryViaGetCcipAdmin) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj CcipAdminProposeAdministrator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Mint` param:
 	err = encoder.Encode(obj.Mint)
 	if err != nil {
@@ -179,7 +180,7 @@ func (obj RegisterTokenAdminRegistryViaGetCcipAdmin) MarshalWithEncoder(encoder 
 	}
 	return nil
 }
-func (obj *RegisterTokenAdminRegistryViaGetCcipAdmin) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *CcipAdminProposeAdministrator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Mint`:
 	err = decoder.Decode(&obj.Mint)
 	if err != nil {
@@ -193,8 +194,8 @@ func (obj *RegisterTokenAdminRegistryViaGetCcipAdmin) UnmarshalWithDecoder(decod
 	return nil
 }
 
-// NewRegisterTokenAdminRegistryViaGetCcipAdminInstruction declares a new RegisterTokenAdminRegistryViaGetCcipAdmin instruction with the provided parameters and accounts.
-func NewRegisterTokenAdminRegistryViaGetCcipAdminInstruction(
+// NewCcipAdminProposeAdministratorInstruction declares a new CcipAdminProposeAdministrator instruction with the provided parameters and accounts.
+func NewCcipAdminProposeAdministratorInstruction(
 	// Parameters:
 	mint ag_solanago.PublicKey,
 	tokenAdminRegistryAdmin ag_solanago.PublicKey,
@@ -202,8 +203,8 @@ func NewRegisterTokenAdminRegistryViaGetCcipAdminInstruction(
 	config ag_solanago.PublicKey,
 	tokenAdminRegistry ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaGetCcipAdmin {
-	return NewRegisterTokenAdminRegistryViaGetCcipAdminInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *CcipAdminProposeAdministrator {
+	return NewCcipAdminProposeAdministratorInstructionBuilder().
 		SetMint(mint).
 		SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin).
 		SetConfigAccount(config).

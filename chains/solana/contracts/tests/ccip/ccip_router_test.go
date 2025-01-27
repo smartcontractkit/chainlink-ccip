@@ -1464,7 +1464,7 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("Token Admin Registry by Admin", func(t *testing.T) {
 			t.Run("register token admin registry via get ccip admin", func(t *testing.T) {
 				t.Run("When any user wants to set up the token admin registry, it fails", func(t *testing.T) {
-					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaGetCcipAdminInstruction(
+					instruction, err := ccip_router.NewCcipAdminProposeAdministratorInstruction(
 						token0.Mint.PublicKey(),
 						tokenPoolAdmin.PublicKey(),
 						config.RouterConfigPDA,
@@ -1479,7 +1479,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When transmitter wants to set up the token admin registry, it fails", func(t *testing.T) {
 					transmitter := getTransmitter()
-					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaGetCcipAdminInstruction(
+					instruction, err := ccip_router.NewCcipAdminProposeAdministratorInstruction(
 						token0.Mint.PublicKey(),
 						tokenPoolAdmin.PublicKey(),
 						config.RouterConfigPDA,
@@ -1493,7 +1493,7 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("When admin wants to set up the token admin registry, it succeeds", func(t *testing.T) {
-					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaGetCcipAdminInstruction(
+					instruction, err := ccip_router.NewCcipAdminProposeAdministratorInstruction(
 						token0.Mint.PublicKey(),
 						tokenPoolAdmin.PublicKey(),
 						config.RouterConfigPDA,
@@ -1751,7 +1751,7 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("Token Admin Registry by Mint Authority", func(t *testing.T) {
 			t.Run("register token admin registry via token mint authority", func(t *testing.T) {
 				t.Run("When any user wants to set up the token admin registry, it fails", func(t *testing.T) {
-					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+					instruction, err := ccip_router.NewOwnerProposeAdministratorInstruction(
 						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
@@ -1765,7 +1765,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When transmitter wants to set up the token admin registry, it fails", func(t *testing.T) {
 					transmitter := getTransmitter()
-					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+					instruction, err := ccip_router.NewOwnerProposeAdministratorInstruction(
 						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
@@ -1778,7 +1778,7 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("When admin wants to set up the token admin registry, it fails", func(t *testing.T) {
-					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+					instruction, err := ccip_router.NewOwnerProposeAdministratorInstruction(
 						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
@@ -1791,7 +1791,7 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("When invalid mint_authority wants to set up the token admin registry, it fails", func(t *testing.T) {
-					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+					instruction, err := ccip_router.NewOwnerProposeAdministratorInstruction(
 						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
@@ -1804,7 +1804,7 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("When token mint_authority wants to set up the token admin registry, it succeeds", func(t *testing.T) {
-					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+					instruction, err := ccip_router.NewOwnerProposeAdministratorInstruction(
 						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
