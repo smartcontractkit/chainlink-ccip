@@ -476,8 +476,9 @@ fn validate_release_or_mint(
     pool_addresses: &[RemoteAddress],
     inbound_rate_limit: &mut RateLimitTokenBucket,
 ) -> Result<()> {
-    require!(
-        config_mint == release_or_mint_in.local_token,
+    require_eq!(
+        config_mint,
+        release_or_mint_in.local_token,
         CcipTokenPoolError::InvalidToken
     );
     require!(
