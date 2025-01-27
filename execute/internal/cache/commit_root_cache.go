@@ -6,8 +6,9 @@ import (
 
 	"github.com/patrickmn/go-cache"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 const (
@@ -24,9 +25,9 @@ const (
 //     in the GetCommitReports phase after checking if each SeqNr is executed (or if the Txm state is finalized).
 //   - remember the oldest pending commit root to limit the database scan to only the unfinalized part of the chain.
 type CommitsRootsCache interface {
-	CanExecute(merkleRoot ccipocr3.Bytes32) bool
-	MarkAsExecuted(merkleRoot ccipocr3.Bytes32)
-	Snooze(merkleRoot ccipocr3.Bytes32)
+	CanExecute(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) bool
+	MarkAsExecuted(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32)
+	Snooze(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32)
 }
 
 func NewCommitRootsCache(
@@ -34,7 +35,7 @@ func NewCommitRootsCache(
 	messageVisibilityInterval time.Duration,
 	rootSnoozeTime time.Duration,
 ) CommitsRootsCache {
-	return newCommitRootsCache(
+	return internalNewCommitRootsCache(
 		lggr,
 		messageVisibilityInterval,
 		rootSnoozeTime,
@@ -43,7 +44,7 @@ func NewCommitRootsCache(
 	)
 }
 
-func newCommitRootsCache(
+func internalNewCommitRootsCache(
 	lggr logger.Logger,
 	messageVisibilityInterval time.Duration,
 	rootSnoozeTime time.Duration,
@@ -54,13 +55,12 @@ func newCommitRootsCache(
 	executedRoots := cache.New(messageVisibilityInterval+evictionGracePeriod, cleanupInterval)
 
 	return &commitRootsCache{
-		lggr:                        lggr,
-		rootSnoozeTime:              rootSnoozeTime,
-		executedRoots:               executedRoots,
-		snoozedRoots:                snoozedRoots,
-		messageVisibilityInterval:   messageVisibilityInterval,
-		latestFinalizedCommitRootTs: time.Now().Add(-messageVisibilityInterval),
-		cacheMu:                     sync.RWMutex{},
+		lggr:                      lggr,
+		rootSnoozeTime:            rootSnoozeTime,
+		executedRoots:             executedRoots,
+		snoozedRoots:              snoozedRoots,
+		messageVisibilityInterval: messageVisibilityInterval,
+		cacheMu:                   sync.RWMutex{},
 	}
 }
 
@@ -71,21 +71,23 @@ type commitRootsCache struct {
 
 	cacheMu sync.RWMutex
 
-	// snoozedRoots used only for temporary snoozing roots. It's a cache with TTL (usually around 5 minutes, but this configuration is set up on chain using rootSnoozeTime)
+	// snoozedRoots used only for temporary snoozing roots. It's a cache with TTL (usually around 5 minutes,
+	// but this configuration is set up on chain using rootSnoozeTime)
 	snoozedRoots *cache.Cache
-	// executedRoots is a cache with TTL (usually around 8 hours, but this configuration is set up on chain using messageVisibilityInterval).
-	// We keep executed roots there to make sure we don't accidentally try to reprocess already executed CommitReport
+	// executedRoots is a cache with TTL (usually around 8 hours, but this configuration is set up on chain using
+	// messageVisibilityInterval). We keep executed roots there to make sure we don't accidentally try to reprocess
+	// already executed CommitReport
 	executedRoots *cache.Cache
-	// latestFinalizedCommitRootTs is the timestamp of the latest finalized commit root (youngest in terms of timestamp).
-	// It's used get only the logs that were considered as unfinalized in a previous run.
-	// This way we limit database scans to the minimum and keep polling "unfinalized" part of the ReportAccepted events queue.
-	latestFinalizedCommitRootTs time.Time
 }
 
-// MarkAsExecuted marks the root as executed. It means that all the messages from the root were executed and the ExecutionStateChange event was finalized.
-// Executed roots are removed from the cache.
-func (r *commitRootsCache) MarkAsExecuted(merkleRoot ccipocr3.Bytes32) {
-	prettyMerkleRoot := merkleRoot.String()
+func getKey(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) string {
+	return source.String() + "_" + merkleRoot.String()
+}
+
+// MarkAsExecuted marks the root as executed. It means that all the messages from the root were executed and the
+// ExecutionStateChange event was finalized.
+func (r *commitRootsCache) MarkAsExecuted(sel ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) {
+	prettyMerkleRoot := getKey(sel, merkleRoot)
 	r.lggr.Infow("Marking root as executed and removing entirely from cache", "merkleRoot", prettyMerkleRoot)
 
 	r.cacheMu.Lock()
@@ -93,27 +95,28 @@ func (r *commitRootsCache) MarkAsExecuted(merkleRoot ccipocr3.Bytes32) {
 	r.executedRoots.SetDefault(prettyMerkleRoot, struct{}{})
 }
 
-// Snooze temporarily snoozes the root. It means that the root is not eligible for execution for a certain period of time.
-// Snoozed roots are skipped when calling RootsEligibleForExecution
-func (r *commitRootsCache) Snooze(merkleRoot ccipocr3.Bytes32) {
-	prettyMerkleRoot := merkleRoot.String()
+// Snooze temporarily snoozes the root. It means that the root is not eligible for execution for a certain period of
+// time.
+func (r *commitRootsCache) Snooze(sel ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) {
+	prettyMerkleRoot := getKey(sel, merkleRoot)
 	r.lggr.Infow("Snoozing root temporarily", "merkleRoot", prettyMerkleRoot, "rootSnoozeTime", r.rootSnoozeTime)
 	r.snoozedRoots.SetDefault(prettyMerkleRoot, struct{}{})
 }
 
 // CanExecute returns true if the root is not snoozed and not executed.
-func (r *commitRootsCache) CanExecute(merkleRoot ccipocr3.Bytes32) bool {
-	return !r.isSnoozed(merkleRoot) && !r.isExecuted(merkleRoot)
+func (r *commitRootsCache) CanExecute(sel ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) bool {
+	prettyMerkleRoot := getKey(sel, merkleRoot)
+	return !r.isSnoozed(prettyMerkleRoot) && !r.isExecuted(prettyMerkleRoot)
 }
 
 // IsSnoozed returns true if the root is snoozed.
-func (r *commitRootsCache) isSnoozed(merkleRoot ccipocr3.Bytes32) bool {
-	_, snoozed := r.snoozedRoots.Get(merkleRoot.String())
+func (r *commitRootsCache) isSnoozed(key string) bool {
+	_, snoozed := r.snoozedRoots.Get(key)
 	return snoozed
 }
 
 // isExecuted returns true if the root is executed.
-func (r *commitRootsCache) isExecuted(merkleRoot ccipocr3.Bytes32) bool {
-	_, executed := r.executedRoots.Get(merkleRoot.String())
+func (r *commitRootsCache) isExecuted(key string) bool {
+	_, executed := r.executedRoots.Get(key)
 	return executed
 }

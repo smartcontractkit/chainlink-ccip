@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
-	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
-
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
@@ -23,7 +20,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
+	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -129,7 +128,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
-type CanExecuteHandle = func(merkleRoot cciptypes.Bytes32) bool
+type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
 
 func getPendingExecutedReports(
 	ctx context.Context,
@@ -168,7 +167,7 @@ func getPendingExecutedReports(
 		// Filter out reports that cannot be executed (snoozed).
 		var filtered []exectypes.CommitData
 		for _, report := range reports {
-			if !canExecute(report.MerkleRoot) {
+			if !canExecute(report.SourceChain, report.MerkleRoot) {
 				continue
 			}
 			filtered = append(filtered, report)

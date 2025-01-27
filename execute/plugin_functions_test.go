@@ -517,11 +517,11 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got2, err := getPendingAndExecutedReports(tt.args.reports, tt.args.executedMessages)
-			if !tt.wantErr(t, err, fmt.Sprintf("getPendingAndExecutedReports(%v, %v)", tt.args.reports, tt.args.executedMessages)) {
+			if !tt.wantErr(t, err) {
 				return
 			}
-			assert.Equalf(t, tt.wantPending, got, "getPendingAndExecutedReports(%v, %v)", tt.args.reports, tt.args.executedMessages)
-			assert.Equalf(t, tt.wantExecuted, got2, "getPendingAndExecutedReports(%v, %v)", tt.args.reports, tt.args.executedMessages)
+			assert.Equal(t, tt.wantPending, got)
+			assert.Equal(t, tt.wantExecuted, got2)
 		})
 	}
 }

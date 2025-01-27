@@ -40,7 +40,7 @@ import (
 
 func Test_getPendingExecutedReports(t *testing.T) {
 	canExecute := func(ret bool) CanExecuteHandle {
-		return func(cciptypes.Bytes32) bool { return ret }
+		return func(cciptypes.ChainSelector, cciptypes.Bytes32) bool { return ret }
 	}
 
 	tests := []struct {

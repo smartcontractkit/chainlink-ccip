@@ -148,7 +148,14 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, p.commitRootsCache.CanExecute, fetchFrom, lggr)
+	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(
+		ctx,
+		p.ccipReader,
+		p.destChain,
+		p.commitRootsCache.CanExecute,
+		fetchFrom,
+		lggr,
+	)
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
@@ -156,7 +163,7 @@ func (p *Plugin) getCommitReportsObservation(
 	// If fully executed reports are detected, mark them in the cache.
 	// This cache will be re-initialized on each plugin restart.
 	for _, fullyExecutedCommit := range fullyExecutedCommits {
-		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.MerkleRoot)
+		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
 	}
 
 	// Remove and snooze commit reports from cursed chains.
@@ -164,7 +171,7 @@ func (p *Plugin) getCommitReportsObservation(
 		if isCursed {
 			// Snooze everything on a cursed chain.
 			for _, commit := range groupedCommits[chainSelector] {
-				p.commitRootsCache.Snooze(commit.MerkleRoot)
+				p.commitRootsCache.Snooze(chainSelector, commit.MerkleRoot)
 			}
 			delete(groupedCommits, chainSelector)
 		}
