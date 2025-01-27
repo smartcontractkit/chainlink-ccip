@@ -5,6 +5,9 @@ use anchor_lang::prelude::*;
 pub struct Config {
     pub version: u8,
 
+    pub owner: Pubkey,
+    pub onramp: Pubkey,
+
     pub max_fee_juels_per_msg: u128, // Maximum fee that can be charged for a message.
     pub link_token_mint: Pubkey,
     // The following field is unused until the day we integrate with feeds to fetch fresh values

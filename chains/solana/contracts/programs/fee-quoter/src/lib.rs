@@ -9,6 +9,9 @@ mod messages;
 use messages::*;
 
 mod state;
+use state::*;
+
+mod event;
 
 mod instructions;
 use instructions::v1;
@@ -17,12 +20,72 @@ use instructions::v1;
 pub mod fee_quoter {
     use super::*;
 
+    /// Adds a billing token configuration.
+    /// Only CCIP Admin can add a billing token configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for adding the billing token configuration.
+    /// * `config` - The billing token configuration to be added.
+    pub fn add_billing_token_config(
+        ctx: Context<AddBillingTokenConfig>,
+        config: BillingTokenConfig,
+    ) -> Result<()> {
+        v1::admin::add_billing_token_config(ctx, config)
+    }
+
+    /// Updates the billing token configuration.
+    /// Only CCIP Admin can update a billing token configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the billing token configuration.
+    /// * `config` - The new billing token configuration.
+    pub fn update_billing_token_config(
+        ctx: Context<UpdateBillingTokenConfig>,
+        config: BillingTokenConfig,
+    ) -> Result<()> {
+        v1::admin::update_billing_token_config(ctx, config)
+    }
+
+    /// Removes the billing token configuration.
+    /// Only CCIP Admin can remove a billing token configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for removing the billing token configuration.
+    pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
+        v1::admin::remove_billing_token_config(ctx)
+    }
+
+    /// Calculates the fee for sending a message to the destination chain.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the fee calculation.
+    /// * `dest_chain_selector` - The chain selector for the destination chain.
+    /// * `message` - The message to be sent.
+    ///
+    /// # Additional accounts
+    ///
+    /// In addition to the fixed amount of accounts defined in the `GetFee` context,
+    /// the following accounts must be provided:
+    ///
+    /// * First, the billing token config accounts for each token sent with the message, sequentially.
+    ///   For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
+    ///   tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
+    /// * Then, the per chain / per token config of every token sent with the message, sequentially
+    ///   in the same order.
+    ///
+    /// # Returns
+    ///
+    /// The fee amount in u64.
     pub fn get_fee<'info>(
         ctx: Context<'_, '_, 'info, 'info, GetFee>,
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<u64> {
-        v1::get_fee(ctx, dest_chain_selector, message)
+        v1::public::get_fee(ctx, dest_chain_selector, message)
     }
 }
 

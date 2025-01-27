@@ -3,7 +3,189 @@
   "name": "fee_quoter",
   "instructions": [
     {
+      "name": "addBillingTokenConfig",
+      "docs": [
+        "Adds a billing token configuration.",
+        "Only CCIP Admin can add a billing token configuration.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for adding the billing token configuration.",
+        "* `config` - The billing token configuration to be added."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "billingTokenConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": "BillingTokenConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateBillingTokenConfig",
+      "docs": [
+        "Updates the billing token configuration.",
+        "Only CCIP Admin can update a billing token configuration.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the billing token configuration.",
+        "* `config` - The new billing token configuration."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "billingTokenConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": "BillingTokenConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "removeBillingTokenConfig",
+      "docs": [
+        "Removes the billing token configuration.",
+        "Only CCIP Admin can remove a billing token configuration.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for removing the billing token configuration."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "billingTokenConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "getFee",
+      "docs": [
+        "Calculates the fee for sending a message to the destination chain.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the fee calculation.",
+        "* `dest_chain_selector` - The chain selector for the destination chain.",
+        "* `message` - The message to be sent.",
+        "",
+        "# Additional accounts",
+        "",
+        "In addition to the fixed amount of accounts defined in the `GetFee` context,",
+        "the following accounts must be provided:",
+        "",
+        "* First, the billing token config accounts for each token sent with the message, sequentially.",
+        "For each token with no billing config account (i.e. tokens that cannot be possibly used as fee",
+        "tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.",
+        "* Then, the per chain / per token config of every token sent with the message, sequentially",
+        "in the same order.",
+        "",
+        "# Returns",
+        "",
+        "The fee amount in u64."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -45,6 +227,14 @@
           {
             "name": "version",
             "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "onramp",
+            "type": "publicKey"
           },
           {
             "name": "maxFeeJuelsPerMsg",
@@ -374,6 +564,53 @@
           }
         ]
       }
+    }
+  ],
+  "events": [
+    {
+      "name": "FeeTokenAdded",
+      "fields": [
+        {
+          "name": "feeToken",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FeeTokenEnabled",
+      "fields": [
+        {
+          "name": "feeToken",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FeeTokenDisabled",
+      "fields": [
+        {
+          "name": "feeToken",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FeeTokenRemoved",
+      "fields": [
+        {
+          "name": "feeToken",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
