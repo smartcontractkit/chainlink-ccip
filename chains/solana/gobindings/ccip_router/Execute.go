@@ -34,7 +34,7 @@ import (
 // * report_context_byte_words[2]: ExtraHash
 type Execute struct {
 	ExecutionReport        *ExecutionReportSingleChain
-	ReportContextByteWords *[3][32]uint8
+	ReportContextByteWords *[2][32]uint8
 	TokenIndexes           *[]byte
 
 	// [0] = [] config
@@ -70,7 +70,7 @@ func (inst *Execute) SetExecutionReport(executionReport ExecutionReportSingleCha
 }
 
 // SetReportContextByteWords sets the "reportContextByteWords" parameter.
-func (inst *Execute) SetReportContextByteWords(reportContextByteWords [3][32]uint8) *Execute {
+func (inst *Execute) SetReportContextByteWords(reportContextByteWords [2][32]uint8) *Execute {
 	inst.ReportContextByteWords = &reportContextByteWords
 	return inst
 }
@@ -301,7 +301,7 @@ func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 func NewExecuteInstruction(
 	// Parameters:
 	executionReport ExecutionReportSingleChain,
-	reportContextByteWords [3][32]uint8,
+	reportContextByteWords [2][32]uint8,
 	tokenIndexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,

@@ -541,7 +541,7 @@ pub mod ccip_router {
     /// * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
     pub fn commit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
-        report_context_byte_words: [[u8; 32]; 3],
+        report_context_byte_words: [[u8; 32]; 2],
         report: CommitInput,
         signatures: Vec<[u8; 65]>,
     ) -> Result<()> {
@@ -573,7 +573,7 @@ pub mod ccip_router {
     pub fn execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
         execution_report: ExecutionReportSingleChain,
-        report_context_byte_words: [[u8; 32]; 3],
+        report_context_byte_words: [[u8; 32]; 2],
         token_indexes: Vec<u8>,
     ) -> Result<()> {
         v1::offramp::execute(

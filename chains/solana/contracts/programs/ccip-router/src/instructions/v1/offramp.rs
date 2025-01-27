@@ -24,7 +24,7 @@ use crate::{
 
 pub fn commit<'info>(
     ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
-    report_context_byte_words: [[u8; 32]; 3],
+    report_context_byte_words: [[u8; 32]; 2],
     report: CommitInput,
     signatures: Vec<[u8; 65]>,
 ) -> Result<()> {
@@ -195,7 +195,7 @@ pub fn commit<'info>(
 pub fn execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: ExecutionReportSingleChain,
-    report_context_byte_words: [[u8; 32]; 3],
+    report_context_byte_words: [[u8; 32]; 2],
     token_indexes: &[u8],
 ) -> Result<()> {
     let report_context = ReportContext::from_byte_words(report_context_byte_words);

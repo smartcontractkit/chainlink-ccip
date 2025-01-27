@@ -34,7 +34,7 @@ import (
 // * `report` - The commit input report, single merkle root with RMN signatures and price updates
 // * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
 type Commit struct {
-	ReportContextByteWords *[3][32]uint8
+	ReportContextByteWords *[2][32]uint8
 	Report                 *CommitInput
 	Signatures             *[][65]uint8
 
@@ -61,7 +61,7 @@ func NewCommitInstructionBuilder() *Commit {
 }
 
 // SetReportContextByteWords sets the "reportContextByteWords" parameter.
-func (inst *Commit) SetReportContextByteWords(reportContextByteWords [3][32]uint8) *Commit {
+func (inst *Commit) SetReportContextByteWords(reportContextByteWords [2][32]uint8) *Commit {
 	inst.ReportContextByteWords = &reportContextByteWords
 	return inst
 }
@@ -267,7 +267,7 @@ func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 // NewCommitInstruction declares a new Commit instruction with the provided parameters and accounts.
 func NewCommitInstruction(
 	// Parameters:
-	reportContextByteWords [3][32]uint8,
+	reportContextByteWords [2][32]uint8,
 	report CommitInput,
 	signatures [][65]uint8,
 	// Accounts:

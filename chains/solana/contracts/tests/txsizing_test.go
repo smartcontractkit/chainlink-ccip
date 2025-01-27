@@ -148,7 +148,7 @@ func TestTransactionSizing(t *testing.T) {
 	}
 	ixCommit := func(input ccip_router.CommitInput, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewCommitInstruction(
-			[3][32]byte{}, // report context
+			[2][32]byte{}, // report context
 			input,
 			make([][65]byte, 6), // f = 5, estimating f+1 signatures
 			routerTable["routerConfig"],
@@ -228,7 +228,7 @@ func TestTransactionSizing(t *testing.T) {
 	ixExecute := func(report ccip_router.ExecutionReportSingleChain, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewExecuteInstruction(
 			report,
-			[3][32]byte{}, // report context
+			[2][32]byte{}, // report context
 			tokenIndexes,
 			routerTable["routerConfig"],
 			routerTable["originChainConfig"],

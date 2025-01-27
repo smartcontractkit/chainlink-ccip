@@ -597,7 +597,7 @@ pub struct CcipSend<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_report_context_byte_words: [[u8; 32]; 3], report: CommitInput)]
+#[instruction(_report_context_byte_words: [[u8; 32]; 2], report: CommitInput)]
 pub struct CommitReportContext<'info> {
     #[account(
         seeds = [CONFIG_SEED],

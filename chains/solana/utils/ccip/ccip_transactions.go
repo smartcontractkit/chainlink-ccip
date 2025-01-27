@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 )
 
-func SignCommitReport(ctx [3][32]byte, report ccip_router.CommitInput, baseSigners []eth.Signer) (sigs [][65]byte, err error) {
+func SignCommitReport(ctx [2][32]byte, report ccip_router.CommitInput, baseSigners []eth.Signer) (sigs [][65]byte, err error) {
 	hash, err := HashCommitReport(ctx, report)
 	if err != nil {
 		return nil, err

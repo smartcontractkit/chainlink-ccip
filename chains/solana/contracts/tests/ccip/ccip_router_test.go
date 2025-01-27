@@ -3484,7 +3484,7 @@ func TestCCIPRouter(t *testing.T) {
 					RemainingAccounts       []solana.PublicKey
 					RunEventValidations     func(t *testing.T, tx *rpc.GetTransactionResult)
 					RunStateValidations     func(t *testing.T)
-					ReportContext           *[3][32]byte
+					ReportContext           *[2][32]byte
 					PriceSequenceComparator Comparator
 				}{
 					{
@@ -3716,7 +3716,7 @@ func TestCCIPRouter(t *testing.T) {
 							PriceUpdates: testcase.PriceUpdates,
 						}
 
-						var reportContext [3][32]byte
+						var reportContext [2][32]byte
 						var reportSequence uint64
 						if testcase.ReportContext != nil {
 							reportContext = *testcase.ReportContext
@@ -4237,7 +4237,7 @@ func TestCCIPRouter(t *testing.T) {
 					sigs, err := ccip.SignCommitReport(reportContext, report, signers)
 					require.NoError(t, err)
 					transmitter := getTransmitter()
-					emptyReportContext := [3][32]byte{}
+					emptyReportContext := [2][32]byte{}
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						emptyReportContext,

@@ -11,7 +11,7 @@ pub const MAX_TRANSMITTERS: usize = MAX_ORACLES;
 pub const SIGNATURE_LENGTH: usize = SECP256K1_SIGNATURE_LENGTH + 1; // signature + recovery ID
 
 pub const TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT_NO_SIGNATURES: u128 = 8 // anchor discriminator
-    + 3 * 32; // report context
+    + 2 * 32; // report context
 pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 = 4; // u32 length of signatures vec (borsh serialization)
 
 #[zero_copy]
@@ -20,8 +20,7 @@ pub(super) struct ReportContext {
     // byte_words consists of:
     // [0]: ConfigDigest
     // [1]: 24 byte padding, 8 byte sequence number
-    // [2]: ExtraHash
-    byte_words: [[u8; 32]; 3], // private, define methods to use it
+    byte_words: [[u8; 32]; 2], // private, define methods to use it
 }
 
 impl ReportContext {
@@ -30,11 +29,11 @@ impl ReportContext {
         u64::from_be_bytes(sequence_bytes)
     }
 
-    pub fn from_byte_words(byte_words: [[u8; 32]; 3]) -> Self {
+    pub fn from_byte_words(byte_words: [[u8; 32]; 2]) -> Self {
         Self { byte_words }
     }
 
-    pub fn as_bytes(&self) -> [u8; 32 * 3] {
+    pub fn as_bytes(&self) -> [u8; 32 * 2] {
         self.byte_words.concat().as_slice().try_into().unwrap()
     }
 }
