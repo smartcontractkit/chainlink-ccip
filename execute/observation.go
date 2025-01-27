@@ -146,14 +146,23 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, lggr)
+	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, lggr)
 	if err != nil {
 		return exectypes.Observation{}, err
+	}
+
+	// Snooze some stuff...
+	for _, fullyExecutedCommit := range fullyExecutedCommits {
+		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.MerkleRoot)
 	}
 
 	// Remove cursed observations.
 	for chainSelector, isCursed := range ci.CursedSourceChains {
 		if isCursed {
+			// Snooze everything on a cursed chain.
+			for _, commit := range groupedCommits[chainSelector] {
+				p.commitRootsCache.Snooze(commit.MerkleRoot)
+			}
 			delete(groupedCommits, chainSelector)
 		}
 	}
@@ -272,7 +281,6 @@ func (p *Plugin) getMessagesObservation(
 	observation.TokenData = tkData
 
 	// Make sure encoded observation fits within the maximum observation size.
-	//observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)
 	observation, err = p.observationOptimizer.TruncateObservation(observation)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)

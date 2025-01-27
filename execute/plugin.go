@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -59,9 +60,13 @@ type Plugin struct {
 	estimateProvider      cciptypes.EstimateProvider
 	lggr                  logger.Logger
 
-	observationOptimizer optimizers.ObservationOptimizer
 	// state
 	contractsInitialized bool
+	// this cache remembers commit root details to optimize DB lookups.
+	commitRootsCache cache.CommitsRootsCache
+
+	// TODO: remove this, it can be transient. Also its logger is never initialized.
+	observationOptimizer optimizers.ObservationOptimizer
 }
 
 func NewPlugin(
@@ -126,18 +131,19 @@ func getPendingExecutedReports(
 	dest cciptypes.ChainSelector,
 	ts time.Time,
 	lggr logger.Logger,
-) (exectypes.CommitObservations, error) {
+) (exectypes.CommitObservations /* fully executed roots */, []exectypes.CommitData, error) {
 	latestReportTS := time.Time{}
+	var fullyExecuted []exectypes.CommitData
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
-	for _, report := range commitReports {
-		if report.Timestamp.After(latestReportTS) {
-			latestReportTS = report.Timestamp
+	for _, commitReport := range commitReports {
+		if commitReport.Timestamp.After(latestReportTS) {
+			latestReportTS = commitReport.Timestamp
 		}
 	}
 
@@ -146,6 +152,7 @@ func getPendingExecutedReports(
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
 	// Remove fully executed reports.
+	// TODO: Consult commitRootsCache to skip checking seqNum states for known-executed roots.
 	for selector, reports := range groupedCommits {
 		if len(reports) == 0 {
 			continue
@@ -153,29 +160,31 @@ func getPendingExecutedReports(
 
 		ranges, err := computeRanges(reports)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		var executedMessages []cciptypes.SeqNumRange
 		for _, seqRange := range ranges {
 			executedMessagesForRange, err2 := ccipReader.ExecutedMessageRanges(ctx, selector, dest, seqRange)
 			if err2 != nil {
-				return nil, err2
+				return nil, nil, err2
 			}
 			executedMessages = append(executedMessages, executedMessagesForRange...)
 		}
 
 		// Remove fully executed reports.
-		groupedCommits[selector], err = filterOutExecutedMessages(reports, executedMessages)
+		var executedCommits []exectypes.CommitData
+		groupedCommits[selector], executedCommits, err = getPendingAndExecutedReports(reports, executedMessages)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		fullyExecuted = append(fullyExecuted, executedCommits...)
 	}
 
 	lggr.Debugw("grouped commits after removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
-	return groupedCommits, nil
+	return groupedCommits, fullyExecuted, nil
 }
 
 func (p *Plugin) ValidateObservation(
