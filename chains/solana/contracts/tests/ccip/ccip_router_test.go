@@ -1492,6 +1492,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						user.PublicKey(),
@@ -1506,6 +1507,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						transmitter.PublicKey(),
@@ -1519,6 +1521,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						anotherAdmin.PublicKey(),
@@ -1532,6 +1535,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token1.PoolLookupTable, // accounts do not match the expected mint related accounts
 						anotherAdmin.PublicKey(),
@@ -1545,6 +1549,7 @@ func TestCCIPRouter(t *testing.T) {
 					base := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
@@ -1570,6 +1575,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						solana.PublicKey{},
 						tokenPoolAdmin.PublicKey(),
@@ -1591,6 +1597,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
@@ -1606,6 +1613,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
 						token0.Mint.PublicKey(),
 						anotherTokenPoolAdmin.PublicKey(),
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						user.PublicKey(),
 					).ValidateAndBuild()
@@ -1618,6 +1626,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
 						token0.Mint.PublicKey(),
 						anotherTokenPoolAdmin.PublicKey(),
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1638,6 +1647,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
@@ -1650,6 +1660,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
@@ -1662,6 +1673,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When new admin accepts the token admin registry, it succeeds and permissions are updated", func(t *testing.T) {
 					instruction, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
 						token0.Mint.PublicKey(),
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1682,6 +1694,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
@@ -1694,6 +1707,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
+						config.RouterConfigPDA,
 						token0.AdminRegistry,
 						token0.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
@@ -1709,6 +1723,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("register token admin registry via token mint authority", func(t *testing.T) {
 				t.Run("When any user wants to set up the token admin registry, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
 						user.PublicKey(),
@@ -1722,6 +1737,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When transmitter wants to set up the token admin registry, it fails", func(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
 						transmitter.PublicKey(),
@@ -1734,6 +1750,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When admin wants to set up the token admin registry, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
 						anotherAdmin.PublicKey(),
@@ -1746,6 +1763,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When invalid mint_authority wants to set up the token admin registry, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
 						tokenPoolAdmin.PublicKey(), // invalid
@@ -1758,6 +1776,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When token mint_authority wants to set up the token admin registry, it succeeds", func(t *testing.T) {
 					instruction, err := ccip_router.NewRegisterTokenAdminRegistryViaOwnerInstruction(
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.Mint.PublicKey(),
 						anotherTokenPoolAdmin.PublicKey(),
@@ -1783,6 +1802,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
@@ -1807,6 +1827,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
 						token1.Mint.PublicKey(),
 						tokenPoolAdmin.PublicKey(),
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1818,6 +1839,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
 						token1.Mint.PublicKey(),
 						tokenPoolAdmin.PublicKey(),
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1838,6 +1860,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
@@ -1850,6 +1873,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
@@ -1862,6 +1886,7 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When new admin accepts the token admin registry, it succeeds and permissions are updated", func(t *testing.T) {
 					instruction, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
 						token1.Mint.PublicKey(),
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1882,6 +1907,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
@@ -1894,6 +1920,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
+						config.RouterConfigPDA,
 						token1.AdminRegistry,
 						token1.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
@@ -1952,7 +1979,7 @@ func TestCCIPRouter(t *testing.T) {
 				FeeToken: wsol.mint,
 			}
 
-			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
+			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.RouterConfigPDA, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -1984,7 +2011,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
 
-			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
+			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.RouterConfigPDA, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token0BillingConfigPda))
 			raw.AccountMetaSlice.Append(solana.Meta(token0PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
@@ -2011,7 +2038,7 @@ func TestCCIPRouter(t *testing.T) {
 					FeeToken: wsol.mint,
 				}
 
-				raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
+				raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.RouterConfigPDA, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 				instruction, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -2962,7 +2989,7 @@ func TestCCIPRouter(t *testing.T) {
 						Receiver: validReceiverAddress[:],
 						Data:     []byte{4, 5, 6},
 					}
-					rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, token.billingConfigPDA)
+					rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.RouterConfigPDA, config.EvmDestChainStatePDA, token.billingConfigPDA)
 					ix, err := rawGetFeeIx.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -3057,7 +3084,7 @@ func TestCCIPRouter(t *testing.T) {
 			}
 
 			// getFee
-			rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
+			rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.RouterConfigPDA, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 			ix, err := rawGetFeeIx.ValidateAndBuild()
 			require.NoError(t, err)
 

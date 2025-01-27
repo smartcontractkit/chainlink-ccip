@@ -2,12 +2,14 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
+use super::pools::token_admin_registry_writable;
+
 use crate::{
-    v1::pools::token_admin_registry_writable, AcceptAdminRoleTokenAdminRegistry,
-    AdministratorRegistered, AdministratorTransferRequested, AdministratorTransferred,
-    CcipRouterError, ModifyTokenAdminRegistry, PoolSet, RegisterTokenAdminRegistryViaGetCCIPAdmin,
-    RegisterTokenAdminRegistryViaOwner, SetPoolTokenAdminRegistry, CCIP_TOKENPOOL_CONFIG,
-    CCIP_TOKENPOOL_SIGNER, FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
+    AcceptAdminRoleTokenAdminRegistry, AdministratorRegistered, AdministratorTransferRequested,
+    AdministratorTransferred, CcipRouterError, ModifyTokenAdminRegistry, PoolSet,
+    RegisterTokenAdminRegistryViaGetCCIPAdmin, RegisterTokenAdminRegistryViaOwner,
+    SetPoolTokenAdminRegistry, CCIP_TOKENPOOL_CONFIG, CCIP_TOKENPOOL_SIGNER,
+    FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
 };
 
 const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;

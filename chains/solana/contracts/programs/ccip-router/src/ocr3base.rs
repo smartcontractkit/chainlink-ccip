@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
 
+#[constant]
+pub const MAX_ORACLES: usize = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx
+
 #[error_code]
 pub enum Ocr3Error {
     #[msg("Invalid config: F must be positive")]
