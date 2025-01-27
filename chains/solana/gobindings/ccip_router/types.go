@@ -8,8 +8,9 @@ import (
 )
 
 type CommitInput struct {
-	PriceUpdates PriceUpdates
-	MerkleRoot   MerkleRoot
+	PriceUpdates  PriceUpdates
+	MerkleRoot    MerkleRoot
+	RmnSignatures [][64]uint8
 }
 
 func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -20,6 +21,11 @@ func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	}
 	// Serialize `MerkleRoot` param:
 	err = encoder.Encode(obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnSignatures` param:
+	err = encoder.Encode(obj.RmnSignatures)
 	if err != nil {
 		return err
 	}
@@ -34,6 +40,11 @@ func (obj *CommitInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	}
 	// Deserialize `MerkleRoot`:
 	err = decoder.Decode(&obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnSignatures`:
+	err = decoder.Decode(&obj.RmnSignatures)
 	if err != nil {
 		return err
 	}
@@ -1591,21 +1602,6 @@ func (value OcrPluginType) String() string {
 		return "Commit"
 	case Execution_OcrPluginType:
 		return "Execution"
-	default:
-		return ""
-	}
-}
-
-type MerkleError ag_binary.BorshEnum
-
-const (
-	InvalidProof_MerkleError MerkleError = iota
-)
-
-func (value MerkleError) String() string {
-	switch value {
-	case InvalidProof_MerkleError:
-		return "InvalidProof"
 	default:
 		return ""
 	}
