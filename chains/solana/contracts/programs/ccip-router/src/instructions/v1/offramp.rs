@@ -12,6 +12,7 @@ use super::pools::{
     validate_and_parse_token_accounts, TokenAccounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::ocr3base::Signatures;
 use crate::{
     Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
     CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
@@ -190,9 +191,7 @@ pub fn commit<'info>(
         OcrPluginType::Commit as u8,
         report_context,
         &Ocr3ReportForCommit(&report),
-        &rs,
-        &ss,
-        &raw_vs,
+        Signatures { rs, ss, raw_vs },
     )?;
 
     Ok(())
@@ -218,9 +217,11 @@ pub fn execute<'info>(
             OcrPluginType::Execution as u8,
             report_context,
             &Ocr3ReportForExecutionReportSingleChain(&execution_report),
-            &[],
-            &[],
-            &[0u8; 32],
+            Signatures {
+                rs: vec![],
+                ss: vec![],
+                raw_vs: [0u8; 32],
+            },
         )?;
     }
 
