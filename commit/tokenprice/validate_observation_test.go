@@ -1,6 +1,7 @@
 package tokenprice
 
 import (
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"math/big"
 	"testing"
 
@@ -11,9 +12,10 @@ import (
 
 func Test_validateObservedTokenPrices(t *testing.T) {
 	testCases := []struct {
-		name        string
-		tokenPrices []cciptypes.TokenPrice
-		expErr      bool
+		name          string
+		tokenPrices   []cciptypes.TokenPrice
+		tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
+		expErr        bool
 	}{
 		{
 			name:        "empty is valid",
@@ -28,6 +30,12 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 				cciptypes.NewTokenPrice("0x3", big.NewInt(1)),
 				cciptypes.NewTokenPrice("0xa", big.NewInt(1)),
 			},
+			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+				"0x1": {},
+				"0x2": {},
+				"0x3": {},
+				"0xa": {},
+			},
 			expErr: false,
 		},
 		{
@@ -37,6 +45,12 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 				cciptypes.NewTokenPrice("0x2", big.NewInt(1)),
 				cciptypes.NewTokenPrice("0x3", nil), // nil price
 				cciptypes.NewTokenPrice("0xa", big.NewInt(1)),
+			},
+			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+				"0x1": {},
+				"0x2": {},
+				"0x3": {},
+				"0xa": {},
 			},
 			expErr: true,
 		},
@@ -48,7 +62,7 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 			for _, tp := range tc.tokenPrices {
 				tokenPrices[tp.TokenID] = tp.Price
 			}
-			err := validateObservedTokenPrices(tokenPrices)
+			err := validateObservedTokenPrices(tokenPrices, tc.tokensToQuery)
 			if tc.expErr {
 				assert.Error(t, err)
 				return

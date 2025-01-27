@@ -2,9 +2,11 @@ package tokenprice
 
 import (
 	"fmt"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"time"
 )
 
 func (p *processor) ValidateObservation(
@@ -14,28 +16,73 @@ func (p *processor) ValidateObservation(
 ) error {
 	obs := ao.Observation
 
+	if obs.IsEmpty() {
+		return nil
+	}
+
 	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
-	if err := validateObservedTokenPrices(obs.FeedTokenPrices); err != nil {
+	supportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
+	if err != nil {
+		return fmt.Errorf("failed to get supported chains: %w", err)
+	}
+
+	if len(obs.FeedTokenPrices) > 0 && !supportedChains.Contains(p.offChainCfg.PriceFeedChainSelector) {
+		return fmt.Errorf("feed chain must be supported to read feed token prices, oreacleID: %v feedChain: %v",
+			ao.OracleID, p.offChainCfg.PriceFeedChainSelector)
+
+	}
+
+	if err = validateObservedTokenPrices(obs.FeedTokenPrices, p.offChainCfg.TokenInfo); err != nil {
 		return fmt.Errorf("failed to validate observed token prices: %w", err)
 	}
 
-	//TODO: validate supported feed chain if any token prices were updated
-	//TODO: validate supported destChain if any fee quoter token updates were observed
-	//TODO: validate observed fee quoter token updates
-	//TODO: validate observed timestamp
+	if len(obs.FeeQuoterTokenUpdates) > 0 && !supportedChains.Contains(p.destChain) {
+		return fmt.Errorf("dest chain must be supported to read fee quoter token updates "+
+			"oracleID: %v destChain: %v", ao.OracleID, p.destChain)
+	}
+
+	if err = validateObservedTokenUpdates(obs.FeeQuoterTokenUpdates, p.offChainCfg.TokenInfo); err != nil {
+		return fmt.Errorf("failed to validate observed fee quoter token updates: %w", err)
+	}
+	if obs.Timestamp.IsZero() || obs.Timestamp.After(time.Now().UTC()) {
+		return fmt.Errorf("invalid timestamp value %s", obs.Timestamp.String())
+	}
 
 	return nil
 }
 
-func validateObservedTokenPrices(tokenPrices cciptypes.TokenPriceMap) error {
-	// TODO: cross check that only tokens from tokensToQuery are present
+func validateObservedTokenPrices(
+	tokenPrices cciptypes.TokenPriceMap,
+	tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo) error {
 	for tokenID, price := range tokenPrices {
-		if price.IsEmpty() {
-			return fmt.Errorf("token price of token %v must not be empty", tokenID)
+		if _, ok := tokensToQuery[tokenID]; !ok {
+			return fmt.Errorf("observed token %v is not in the list of tokens to query", tokenID)
+		}
+		if !price.IsPositive() {
+			return fmt.Errorf("non positive value for token price of token %v", tokenID)
 		}
 	}
+	return nil
+}
+
+func validateObservedTokenUpdates(
+	tokenUpdates map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig,
+	tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo) error {
+	for tokenID, update := range tokenUpdates {
+		if _, ok := tokensToQuery[tokenID]; !ok {
+			return fmt.Errorf("observed token %v is not in the list of tokens to query", tokenID)
+		}
+		if !update.Value.IsPositive() {
+			return fmt.Errorf("non positive value for token update of token %v", tokenID)
+		}
+		if update.Timestamp.IsZero() || update.Timestamp.After(time.Now().UTC()) {
+			return fmt.Errorf("token update of token %v must have "+
+				"a timestamp in the past that's not 0. timestamp observed: %s", tokenID, update.Timestamp.String())
+		}
+	}
+
 	return nil
 }
