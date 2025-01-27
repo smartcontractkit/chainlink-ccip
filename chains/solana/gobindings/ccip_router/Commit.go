@@ -30,12 +30,11 @@ import (
 // * `report_context_byte_words` - consists of:
 // * report_context_byte_words[0]: ConfigDigest
 // * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-// * report_context_byte_words[2]: ExtraHash
-// * `report` - The commit input report, single merkle root with RMN signatures and price updates
+// * `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates
 // * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
 type Commit struct {
 	ReportContextByteWords *[2][32]uint8
-	Report                 *CommitInput
+	RawReport              *[]byte
 	Signatures             *[][65]uint8
 
 	// [0] = [] config
@@ -66,9 +65,9 @@ func (inst *Commit) SetReportContextByteWords(reportContextByteWords [2][32]uint
 	return inst
 }
 
-// SetReport sets the "report" parameter.
-func (inst *Commit) SetReport(report CommitInput) *Commit {
-	inst.Report = &report
+// SetRawReport sets the "rawReport" parameter.
+func (inst *Commit) SetRawReport(rawReport []byte) *Commit {
+	inst.RawReport = &rawReport
 	return inst
 }
 
@@ -167,8 +166,8 @@ func (inst *Commit) Validate() error {
 		if inst.ReportContextByteWords == nil {
 			return errors.New("ReportContextByteWords parameter is not set")
 		}
-		if inst.Report == nil {
-			return errors.New("Report parameter is not set")
+		if inst.RawReport == nil {
+			return errors.New("RawReport parameter is not set")
 		}
 		if inst.Signatures == nil {
 			return errors.New("Signatures parameter is not set")
@@ -210,7 +209,7 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
-						paramsBranch.Child(ag_format.Param("                Report", *inst.Report))
+						paramsBranch.Child(ag_format.Param("             RawReport", *inst.RawReport))
 						paramsBranch.Child(ag_format.Param("            Signatures", *inst.Signatures))
 					})
 
@@ -233,8 +232,8 @@ func (obj Commit) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `Report` param:
-	err = encoder.Encode(obj.Report)
+	// Serialize `RawReport` param:
+	err = encoder.Encode(obj.RawReport)
 	if err != nil {
 		return err
 	}
@@ -251,8 +250,8 @@ func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Report`:
-	err = decoder.Decode(&obj.Report)
+	// Deserialize `RawReport`:
+	err = decoder.Decode(&obj.RawReport)
 	if err != nil {
 		return err
 	}
@@ -268,7 +267,7 @@ func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 func NewCommitInstruction(
 	// Parameters:
 	reportContextByteWords [2][32]uint8,
-	report CommitInput,
+	rawReport []byte,
 	signatures [][65]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
@@ -279,7 +278,7 @@ func NewCommitInstruction(
 	sysvarInstructions ag_solanago.PublicKey) *Commit {
 	return NewCommitInstructionBuilder().
 		SetReportContextByteWords(reportContextByteWords).
-		SetReport(report).
+		SetRawReport(rawReport).
 		SetSignatures(signatures).
 		SetConfigAccount(config).
 		SetSourceChainStateAccount(sourceChainState).

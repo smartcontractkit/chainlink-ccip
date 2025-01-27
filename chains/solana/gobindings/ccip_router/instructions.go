@@ -346,8 +346,7 @@ var (
 	// * `report_context_byte_words` - consists of:
 	// * report_context_byte_words[0]: ConfigDigest
 	// * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-	// * report_context_byte_words[2]: ExtraHash
-	// * `report` - The commit input report, single merkle root with RMN signatures and price updates
+	// * `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates
 	// * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
 	Instruction_Commit = ag_binary.TypeID([8]byte{223, 140, 142, 165, 229, 208, 156, 74})
 
@@ -367,12 +366,11 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for the execute.
-	// * `execution_report` - the execution report containing only one message and proofs
+	// * `raw_execution_report` - the serialized execution report containing only one message and proofs
 	// * `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)
 	// *  consists of:
 	// * report_context_byte_words[0]: ConfigDigest
 	// * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-	// * report_context_byte_words[2]: ExtraHash
 	Instruction_Execute = ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
 
 	// Manually executes a report to the router.
@@ -384,7 +382,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for the execution.
-	// * `execution_report` - The execution report containing the message and proofs.
+	// * `raw_execution_report` - The execution report containing the message and proofs.
 	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
 )
 

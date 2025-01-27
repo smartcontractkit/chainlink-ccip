@@ -25,9 +25,11 @@ use crate::{
 pub fn commit<'info>(
     ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
     report_context_byte_words: [[u8; 32]; 2],
-    report: CommitInput,
+    raw_report: Vec<u8>,
     signatures: Vec<[u8; 65]>,
 ) -> Result<()> {
+    let report = CommitInput::deserialize(&mut raw_report.as_ref())
+        .map_err(|_| CcipRouterError::InvalidInputs)?;
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
 
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
@@ -194,10 +196,13 @@ pub fn commit<'info>(
 
 pub fn execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    execution_report: ExecutionReportSingleChain,
+    raw_execution_report: Vec<u8>,
     report_context_byte_words: [[u8; 32]; 2],
     token_indexes: &[u8],
 ) -> Result<()> {
+    let execution_report =
+        ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+            .map_err(|_| CcipRouterError::InvalidInputs)?;
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
     // limit borrowing of ctx
     {
@@ -218,7 +223,7 @@ pub fn execute<'info>(
 
 pub fn manually_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    execution_report: ExecutionReportSingleChain,
+    raw_execution_report: Vec<u8>,
     token_indexes: &[u8],
 ) -> Result<()> {
     // limit borrowing of ctx
@@ -234,6 +239,9 @@ pub fn manually_execute<'info>(
             CcipRouterError::ManualExecutionNotAllowed
         );
     }
+    let execution_report =
+        ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+            .map_err(|_| CcipRouterError::InvalidInputs)?;
     internal_execute(ctx, execution_report, token_indexes)
 }
 

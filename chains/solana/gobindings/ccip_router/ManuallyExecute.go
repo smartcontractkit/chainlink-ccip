@@ -19,10 +19,10 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for the execution.
-// * `execution_report` - The execution report containing the message and proofs.
+// * `raw_execution_report` - The execution report containing the message and proofs.
 type ManuallyExecute struct {
-	ExecutionReport *ExecutionReportSingleChain
-	TokenIndexes    *[]byte
+	RawExecutionReport *[]byte
+	TokenIndexes       *[]byte
 
 	// [0] = [] config
 	//
@@ -50,9 +50,9 @@ func NewManuallyExecuteInstructionBuilder() *ManuallyExecute {
 	return nd
 }
 
-// SetExecutionReport sets the "executionReport" parameter.
-func (inst *ManuallyExecute) SetExecutionReport(executionReport ExecutionReportSingleChain) *ManuallyExecute {
-	inst.ExecutionReport = &executionReport
+// SetRawExecutionReport sets the "rawExecutionReport" parameter.
+func (inst *ManuallyExecute) SetRawExecutionReport(rawExecutionReport []byte) *ManuallyExecute {
+	inst.RawExecutionReport = &rawExecutionReport
 	return inst
 }
 
@@ -170,8 +170,8 @@ func (inst ManuallyExecute) ValidateAndBuild() (*Instruction, error) {
 func (inst *ManuallyExecute) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.ExecutionReport == nil {
-			return errors.New("ExecutionReport parameter is not set")
+		if inst.RawExecutionReport == nil {
+			return errors.New("RawExecutionReport parameter is not set")
 		}
 		if inst.TokenIndexes == nil {
 			return errors.New("TokenIndexes parameter is not set")
@@ -218,8 +218,8 @@ func (inst *ManuallyExecute) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ExecutionReport", *inst.ExecutionReport))
-						paramsBranch.Child(ag_format.Param("   TokenIndexes", *inst.TokenIndexes))
+						paramsBranch.Child(ag_format.Param("RawExecutionReport", *inst.RawExecutionReport))
+						paramsBranch.Child(ag_format.Param("      TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
@@ -238,8 +238,8 @@ func (inst *ManuallyExecute) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj ManuallyExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ExecutionReport` param:
-	err = encoder.Encode(obj.ExecutionReport)
+	// Serialize `RawExecutionReport` param:
+	err = encoder.Encode(obj.RawExecutionReport)
 	if err != nil {
 		return err
 	}
@@ -251,8 +251,8 @@ func (obj ManuallyExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	return nil
 }
 func (obj *ManuallyExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ExecutionReport`:
-	err = decoder.Decode(&obj.ExecutionReport)
+	// Deserialize `RawExecutionReport`:
+	err = decoder.Decode(&obj.RawExecutionReport)
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func (obj *ManuallyExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewManuallyExecuteInstruction declares a new ManuallyExecute instruction with the provided parameters and accounts.
 func NewManuallyExecuteInstruction(
 	// Parameters:
-	executionReport ExecutionReportSingleChain,
+	rawExecutionReport []byte,
 	tokenIndexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
@@ -279,7 +279,7 @@ func NewManuallyExecuteInstruction(
 	sysvarInstructions ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *ManuallyExecute {
 	return NewManuallyExecuteInstructionBuilder().
-		SetExecutionReport(executionReport).
+		SetRawExecutionReport(rawExecutionReport).
 		SetTokenIndexes(tokenIndexes).
 		SetConfigAccount(config).
 		SetSourceChainStateAccount(sourceChainState).

@@ -3733,7 +3733,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewCommitInstruction(
 							reportContext,
-							report,
+							testutils.MustMarshalBorsh(t, report),
 							sigs,
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -3822,7 +3822,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						sourceChainStatePDA,
@@ -3859,7 +3859,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -3896,7 +3896,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -3933,7 +3933,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -3970,7 +3970,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -4008,7 +4008,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -4127,7 +4127,7 @@ func TestCCIPRouter(t *testing.T) {
 
 							raw := ccip_router.NewCommitInstruction(
 								reportContext,
-								report,
+								testutils.MustMarshalBorsh(t, report),
 								sigs,
 								config.RouterConfigPDA,
 								config.EvmSourceChainStatePDA,
@@ -4175,7 +4175,7 @@ func TestCCIPRouter(t *testing.T) {
 				transmitter := getTransmitter()
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					report,
+					testutils.MustMarshalBorsh(t, report),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -4241,7 +4241,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						emptyReportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -4278,7 +4278,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -4323,7 +4323,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -4359,7 +4359,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						ccip.NextCommitReportContext(),
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -4407,7 +4407,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -4446,7 +4446,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
+						testutils.MustMarshalBorsh(t, report),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -4495,7 +4495,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -4516,7 +4516,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4581,7 +4581,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -4604,7 +4604,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4652,7 +4652,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -4694,7 +4694,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4745,7 +4745,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -4766,7 +4766,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4805,7 +4805,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4850,7 +4850,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4908,7 +4908,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -4929,7 +4929,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{hash1},
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport1,
+					testutils.MustMarshalBorsh(t, executionReport1),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4962,7 +4962,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{[32]byte(hash2)},
 				}
 				raw = ccip_router.NewExecuteInstruction(
-					executionReport2,
+					testutils.MustMarshalBorsh(t, executionReport2),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5041,7 +5041,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -5062,7 +5062,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5118,7 +5118,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -5139,7 +5139,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5203,7 +5203,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						commitReport,
+						testutils.MustMarshalBorsh(t, commitReport),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -5225,7 +5225,7 @@ func TestCCIPRouter(t *testing.T) {
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_router.NewExecuteInstruction(
-						executionReport,
+						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
 						[]byte{4},
 						config.RouterConfigPDA,
@@ -5315,7 +5315,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						commitReport,
+						testutils.MustMarshalBorsh(t, commitReport),
 						sigs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
@@ -5337,7 +5337,7 @@ func TestCCIPRouter(t *testing.T) {
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_router.NewExecuteInstruction(
-						executionReport,
+						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
 						[]byte{0, 13},
 						config.RouterConfigPDA,
@@ -5387,7 +5387,7 @@ func TestCCIPRouter(t *testing.T) {
 				}
 
 				raw := ccip_router.NewManuallyExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -5440,7 +5440,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -5464,7 +5464,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
-							executionReport,
+							testutils.MustMarshalBorsh(t, executionReport),
 							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -5499,7 +5499,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
-							executionReport,
+							testutils.MustMarshalBorsh(t, executionReport),
 							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -5543,7 +5543,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
-							executionReport,
+							testutils.MustMarshalBorsh(t, executionReport),
 							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -5594,7 +5594,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
-							executionReport,
+							testutils.MustMarshalBorsh(t, executionReport),
 							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -5682,7 +5682,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -5703,7 +5703,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5776,7 +5776,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
+					testutils.MustMarshalBorsh(t, commitReport),
 					sigs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -5800,7 +5800,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{},
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
@@ -5830,7 +5830,7 @@ func TestCCIPRouter(t *testing.T) {
 				// manual re-execution is successful -----------------------------------
 				// NOTE: expects re-execution time to be instantaneous
 				rawManual := ccip_router.NewManuallyExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,

@@ -597,7 +597,7 @@ pub struct CcipSend<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_report_context_byte_words: [[u8; 32]; 2], report: CommitInput)]
+#[instruction(_report_context_byte_words: [[u8; 32]; 2], raw_report: Vec<u8>)]
 pub struct CommitReportContext<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -607,14 +607,15 @@ pub struct CommitReportContext<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [SOURCE_CHAIN_STATE_SEED, report.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
+        // seeds = [SOURCE_CHAIN_STATE_SEED, report.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [SOURCE_CHAIN_STATE_SEED, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
     pub source_chain_state: Account<'info, SourceChain>,
     #[account(
         init,
-        seeds = [COMMIT_REPORT_SEED, report.merkle_root.source_chain_selector.to_le_bytes().as_ref(), report.merkle_root.merkle_root.as_ref()],
+        seeds = [COMMIT_REPORT_SEED, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref(), CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.merkle_root.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + CommitReport::INIT_SPACE,
@@ -634,7 +635,7 @@ pub struct CommitReportContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(report: ExecutionReportSingleChain)]
+#[instruction(raw_report: Vec<u8>)]
 pub struct ExecuteReportContext<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -643,14 +644,14 @@ pub struct ExecuteReportContext<'info> {
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
-        seeds = [SOURCE_CHAIN_STATE_SEED, report.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [SOURCE_CHAIN_STATE_SEED, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
     pub source_chain_state: Account<'info, SourceChain>,
     #[account(
         mut,
-        seeds = [COMMIT_REPORT_SEED, report.source_chain_selector.to_le_bytes().as_ref(), report.root.as_ref()],
+        seeds = [COMMIT_REPORT_SEED, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.root.as_ref()],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
