@@ -204,6 +204,10 @@ commands:
     command: devspace run-pipeline ccip-v2-infra-only -p default
     description: Run the ccip v2 pipeline without onchain deployment, just infra.
     appendArgs: true
+  deploy-dashboard:
+    command: crib dashboard deploy --product=ccip
+    description: Deploy Grafana Dashboards
+    appendArgs: true
   geth:
     command: devspace run-pipeline geth -p ccip-v2
     description: Run the ccip v2 pipeline.

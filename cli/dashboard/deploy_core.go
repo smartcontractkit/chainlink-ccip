@@ -1,6 +1,8 @@
-package main
+package dashboard
 
 import (
+	"strings"
+
 	"github.com/K-Phoen/grabana/dashboard"
 	waspdb "github.com/smartcontractkit/chainlink-testing-framework/wasp/dashboard"
 	lib "github.com/smartcontractkit/chainlink/dashboard-lib"
@@ -8,10 +10,9 @@ import (
 	core_don "github.com/smartcontractkit/chainlink/dashboard-lib/core-don"
 	core_node_components "github.com/smartcontractkit/chainlink/dashboard-lib/core-node-components"
 	k8spods "github.com/smartcontractkit/chainlink/dashboard-lib/k8s-pods"
-	"strings"
 )
 
-func main() {
+func DeployCore() {
 	cfg := lib.ReadEnvDeployOpts()
 	db := lib.NewDashboard(cfg.Name, cfg,
 		[]dashboard.Option{

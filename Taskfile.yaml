@@ -221,7 +221,7 @@ tasks:
       gh release download $CLI_RELEASE --repo smartcontractkit/crib --pattern "crib-{{OS}}-{{ARCH}}" --clobber -O $GOBIN/crib
       chmod +x $GOBIN/crib
       rm -f $checksums
-
+  # cli tasks
   setup:
     desc: Sets up the crib CLI in the current environment
     dir: '{{.USER_WORKING_DIR}}'
@@ -239,6 +239,30 @@ tasks:
       GOBIN:
         sh: echo ${GOBIN:-$(go env GOPATH)/bin}
     cmd: go test ./...
+
+  cli:lint:
+    desc: Go Lint cli module
+    dir: cli
+    cmd: golangci-lint run --path-prefix=./cli
+  cli:lint-fix-gci:
+    desc: Fix gci errors
+    dir: cli
+    cmds:
+      - gci write --skip-generated .
+  cli:lint-fix-gofumpt:
+    desc: Fix gofumpt errors
+    dir: cli
+    cmds:
+      - find . -name '*.go' | grep -v "mock" | xargs gofumpt -w
+  cli:fix-all:
+    desc: Fix all possible lint errors
+    deps:
+      - cli:lint-fix-gofumpt
+      - cli:lint-fix-gci
+  cli:update-dependencies:
+    dir: cli
+    desc: sync dependencies
+    cmd: go mod tidy
 
   # ccip-v2-scripts tasks
   ccip-v2-scripts:build:
@@ -267,7 +291,7 @@ tasks:
     desc: Fix gci errors
     dir: dependencies/ccip-v2-scripts
     cmds:
-      - gci write -s standard -s default -s "prefix(github.com/smartcontractkit/crib/ccip-v2-scripts)" .
+      - gci write --skip-generated .
   ccip-v2-scripts:lint-fix-gofumpt:
     desc: Fix gofumpt errors
     dir: dependencies/ccip-v2-scripts

@@ -1,4 +1,4 @@
-package main
+package dashboard
 
 import (
 	"strings"
@@ -14,7 +14,7 @@ import (
 	k8spods "github.com/smartcontractkit/chainlink/dashboard-lib/k8s-pods"
 )
 
-func main() {
+func DeployCCIP() {
 	cfg := lib.ReadEnvDeployOpts()
 	db := lib.NewDashboard(cfg.Name, cfg,
 		[]dashboard.Option{

@@ -1,10 +1,10 @@
-package main
+package dashboard
 
 import (
 	lib "github.com/smartcontractkit/chainlink/dashboard-lib"
 )
 
-func main() {
+func Delete() {
 	cfg := lib.ReadEnvDeployOpts()
 	db := lib.NewDashboard(cfg.Name, cfg, nil)
 	err := db.Delete()

@@ -338,7 +338,6 @@ When defining profiles, we recommend using `overwriteVars: true`, that will make
 Scripts which are used in devspace pipelines should follow the guidelines below.
 
 One option is to have scripts fully embedded in the CRIB repo. Examples:
-* dashboard-lib
 * `dependencies/atlas/init` scripts
 
 So far we use bash and golang for scripting. Try to refrain from adding additional technologies, unless you have a very special use case that requires it.
