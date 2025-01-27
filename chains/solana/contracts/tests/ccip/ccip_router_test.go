@@ -2894,7 +2894,7 @@ func TestCCIPRouter(t *testing.T) {
 						},
 						{
 							Token:  token1.Mint.PublicKey(),
-							Amount: 1,
+							Amount: 2,
 						},
 					},
 				}
@@ -2937,7 +2937,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				ixApprove0, err := tokens.TokenApproveChecked(1, 0, token0.Program, userTokenAccount0, token0.Mint.PublicKey(), config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
-				ixApprove1, err := tokens.TokenApproveChecked(1, 0, token1.Program, userTokenAccount1, token1.Mint.PublicKey(), config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, userTokenAccount1, token1.Mint.PublicKey(), config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
@@ -2949,7 +2949,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, 1, initBal0-currBal0) // burned amount
 				_, currBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[user.PublicKey()], config.DefaultCommitment)
 				require.NoError(t, err)
-				require.Equal(t, 1, initBal1-currBal1) // burned amount
+				require.Equal(t, 2, initBal1-currBal1) // burned amount
 			})
 		})
 
@@ -5284,7 +5284,7 @@ func TestCCIPRouter(t *testing.T) {
 					}, {
 						SourcePoolAddress: []byte{4, 5, 6},
 						DestTokenAddress:  token1.Mint.PublicKey(),
-						Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
+						Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(2)},
 					}}
 					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 					require.NoError(t, err)
@@ -5363,7 +5363,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, 1, finalBal0-initBal0)
 					_, finalBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
 					require.NoError(t, err)
-					require.Equal(t, 1, finalBal1-initBal1)
+					require.Equal(t, 2, finalBal1-initBal1)
 				})
 			})
 
