@@ -680,6 +680,11 @@
       ],
       "accounts": [
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAdminRegistry",
           "isMut": true,
           "isSigner": false
@@ -717,6 +722,11 @@
         "* `is_writable` - index of account in lookup table that is writable"
       ],
       "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
@@ -759,6 +769,11 @@
       ],
       "accounts": [
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAdminRegistry",
           "isMut": true,
           "isSigner": false
@@ -793,6 +808,11 @@
         "* `mint` - The public key of the token mint."
       ],
       "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
@@ -1110,6 +1130,11 @@
         "The fee amount in u64."
       ],
       "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "destChainState",
           "isMut": false,
@@ -2733,17 +2758,6 @@
           },
           {
             "name": "Execution"
-          }
-        ]
-      }
-    },
-    {
-      "name": "MerkleError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "InvalidProof"
           }
         ]
       }

@@ -1662,21 +1662,6 @@ func (value OcrPluginType) String() string {
 	}
 }
 
-type MerkleError ag_binary.BorshEnum
-
-const (
-	InvalidProof_MerkleError MerkleError = iota
-)
-
-func (value MerkleError) String() string {
-	switch value {
-	case InvalidProof_MerkleError:
-		return "InvalidProof"
-	default:
-		return ""
-	}
-}
-
 type MessageExecutionState ag_binary.BorshEnum
 
 const (
