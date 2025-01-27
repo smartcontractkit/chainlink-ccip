@@ -26,7 +26,9 @@ pub fn commit<'info>(
     ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
     report_context_byte_words: [[u8; 32]; 2],
     raw_report: Vec<u8>,
-    signatures: Vec<[u8; 65]>,
+    rs: Vec<[u8; 32]>,
+    ss: Vec<[u8; 32]>,
+    raw_vs: [u8; 32],
 ) -> Result<()> {
     let report = CommitInput::deserialize(&mut raw_report.as_ref())
         .map_err(|_| CcipRouterError::InvalidInputs)?;
@@ -188,7 +190,9 @@ pub fn commit<'info>(
         OcrPluginType::Commit as u8,
         report_context,
         &Ocr3ReportForCommit(&report),
-        &signatures,
+        &rs,
+        &ss,
+        &raw_vs,
     )?;
 
     Ok(())
@@ -215,6 +219,8 @@ pub fn execute<'info>(
             report_context,
             &Ocr3ReportForExecutionReportSingleChain(&execution_report),
             &[],
+            &[],
+            &[0u8; 32],
         )?;
     }
 

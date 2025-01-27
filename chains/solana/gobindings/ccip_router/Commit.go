@@ -35,7 +35,9 @@ import (
 type Commit struct {
 	ReportContextByteWords *[2][32]uint8
 	RawReport              *[]byte
-	Signatures             *[][65]uint8
+	Rs                     *[][32]uint8
+	Ss                     *[][32]uint8
+	RawVs                  *[32]uint8
 
 	// [0] = [] config
 	//
@@ -71,9 +73,21 @@ func (inst *Commit) SetRawReport(rawReport []byte) *Commit {
 	return inst
 }
 
-// SetSignatures sets the "signatures" parameter.
-func (inst *Commit) SetSignatures(signatures [][65]uint8) *Commit {
-	inst.Signatures = &signatures
+// SetRs sets the "rs" parameter.
+func (inst *Commit) SetRs(rs [][32]uint8) *Commit {
+	inst.Rs = &rs
+	return inst
+}
+
+// SetSs sets the "ss" parameter.
+func (inst *Commit) SetSs(ss [][32]uint8) *Commit {
+	inst.Ss = &ss
+	return inst
+}
+
+// SetRawVs sets the "rawVs" parameter.
+func (inst *Commit) SetRawVs(rawVs [32]uint8) *Commit {
+	inst.RawVs = &rawVs
 	return inst
 }
 
@@ -169,8 +183,14 @@ func (inst *Commit) Validate() error {
 		if inst.RawReport == nil {
 			return errors.New("RawReport parameter is not set")
 		}
-		if inst.Signatures == nil {
-			return errors.New("Signatures parameter is not set")
+		if inst.Rs == nil {
+			return errors.New("Rs parameter is not set")
+		}
+		if inst.Ss == nil {
+			return errors.New("Ss parameter is not set")
+		}
+		if inst.RawVs == nil {
+			return errors.New("RawVs parameter is not set")
 		}
 	}
 
@@ -207,10 +227,12 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
 						paramsBranch.Child(ag_format.Param("             RawReport", *inst.RawReport))
-						paramsBranch.Child(ag_format.Param("            Signatures", *inst.Signatures))
+						paramsBranch.Child(ag_format.Param("                    Rs", *inst.Rs))
+						paramsBranch.Child(ag_format.Param("                    Ss", *inst.Ss))
+						paramsBranch.Child(ag_format.Param("                 RawVs", *inst.RawVs))
 					})
 
 					// Accounts of the instruction:
@@ -237,8 +259,18 @@ func (obj Commit) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `Signatures` param:
-	err = encoder.Encode(obj.Signatures)
+	// Serialize `Rs` param:
+	err = encoder.Encode(obj.Rs)
+	if err != nil {
+		return err
+	}
+	// Serialize `Ss` param:
+	err = encoder.Encode(obj.Ss)
+	if err != nil {
+		return err
+	}
+	// Serialize `RawVs` param:
+	err = encoder.Encode(obj.RawVs)
 	if err != nil {
 		return err
 	}
@@ -255,8 +287,18 @@ func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Signatures`:
-	err = decoder.Decode(&obj.Signatures)
+	// Deserialize `Rs`:
+	err = decoder.Decode(&obj.Rs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Ss`:
+	err = decoder.Decode(&obj.Ss)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RawVs`:
+	err = decoder.Decode(&obj.RawVs)
 	if err != nil {
 		return err
 	}
@@ -268,7 +310,9 @@ func NewCommitInstruction(
 	// Parameters:
 	reportContextByteWords [2][32]uint8,
 	rawReport []byte,
-	signatures [][65]uint8,
+	rs [][32]uint8,
+	ss [][32]uint8,
+	rawVs [32]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	sourceChainState ag_solanago.PublicKey,
@@ -279,7 +323,9 @@ func NewCommitInstruction(
 	return NewCommitInstructionBuilder().
 		SetReportContextByteWords(reportContextByteWords).
 		SetRawReport(rawReport).
-		SetSignatures(signatures).
+		SetRs(rs).
+		SetSs(ss).
+		SetRawVs(rawVs).
 		SetConfigAccount(config).
 		SetSourceChainStateAccount(sourceChainState).
 		SetCommitReportAccount(commitReport).

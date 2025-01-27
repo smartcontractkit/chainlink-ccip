@@ -542,9 +542,11 @@ pub mod ccip_router {
         ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
         report_context_byte_words: [[u8; 32]; 2],
         raw_report: Vec<u8>,
-        signatures: Vec<[u8; 65]>,
+        rs: Vec<[u8; 32]>,
+        ss: Vec<[u8; 32]>,
+        raw_vs: [u8; 32],
     ) -> Result<()> {
-        v1::offramp::commit(ctx, report_context_byte_words, raw_report, signatures)
+        v1::offramp::commit(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
     }
 
     /// OFF RAMP FLOW

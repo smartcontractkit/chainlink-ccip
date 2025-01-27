@@ -11,10 +11,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 )
 
-func SignCommitReport(ctx [2][32]byte, report ccip_router.CommitInput, baseSigners []eth.Signer) (sigs [][65]byte, err error) {
+type Signatures struct {
+	Rs    [][32]byte
+	Ss    [][32]byte
+	RawVs [32]byte
+}
+
+func SignCommitReport(ctx [2][32]byte, report ccip_router.CommitInput, baseSigners []eth.Signer) (sigs Signatures, err error) {
 	hash, err := HashCommitReport(ctx, report)
 	if err != nil {
-		return nil, err
+		return Signatures{}, err
 	}
 
 	// make copy to avoid race flakiness when randomizing with parallel tests
@@ -28,8 +34,9 @@ func SignCommitReport(ctx [2][32]byte, report ccip_router.CommitInput, baseSigne
 
 	for i := uint8(0); i < config.OcrF+1; i++ {
 		baseSig := ecdsa.SignCompact(secp256k1.PrivKeyFromBytes(signers[i].PrivateKey), hash, false)
-		baseSig[0] = baseSig[0] - 27 // key signs 27 or 28, but verification expects 0 or 1 (remove offset)
-		sigs = append(sigs, [65]byte(baseSig))
+		sigs.RawVs[i] = baseSig[0] - 27 // key signs 27 or 28, but verification expects 0 or 1 (remove offset)
+		sigs.Rs = append(sigs.Rs, [32]byte(baseSig[1:33]))
+		sigs.Ss = append(sigs.Ss, [32]byte(baseSig[33:65]))
 	}
 	return sigs, nil
 }

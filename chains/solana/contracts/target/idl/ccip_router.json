@@ -1347,14 +1347,34 @@
           "type": "bytes"
         },
         {
-          "name": "signatures",
+          "name": "rs",
           "type": {
             "vec": {
               "array": [
                 "u8",
-                65
+                32
               ]
             }
+          }
+        },
+        {
+          "name": "ss",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "rawVs",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
           }
         }
       ]
@@ -3360,6 +3380,11 @@
       "code": 6014,
       "name": "InvalidSignature",
       "msg": "Invalid signature"
+    },
+    {
+      "code": 6015,
+      "name": "SignaturesOutOfRegistration",
+      "msg": "Signatures out of registration"
     }
   ]
 }

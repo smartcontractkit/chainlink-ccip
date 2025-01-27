@@ -151,7 +151,9 @@ func TestTransactionSizing(t *testing.T) {
 		base := ccip_router.NewCommitInstruction(
 			[2][32]byte{}, // report context
 			testutils.MustMarshalBorsh(t, input),
-			make([][65]byte, 6), // f = 5, estimating f+1 signatures
+			make([][32]byte, 6), // f = 5, estimating f+1 signatures
+			make([][32]byte, 6), // f = 5, estimating f+1 signatures
+			[32]byte{},          // f = 5, estimating f+1 signatures
 			routerTable["routerConfig"],
 			routerTable["originChainConfig"],
 			mustRandomPubkey(), // commit report PDA
