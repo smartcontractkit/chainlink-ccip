@@ -67,6 +67,13 @@ For CCIP Deployment:
 ```bash
 devspace run ccip-local
 ```
+For [Keystone Deployment](https://smartcontract-it.atlassian.net/wiki/spaces/CRIB/pages/1128956020/Keystone-Kind+CRIB):
+```bash
+cd crib/deployments/chainlink
+nix develop .#keystone
+crib keystone
+```
+Note: currently only KIND deployment supported and limited to YAML workflows
 
 3. Inspect the DevSpace Configuration:
    You can inspect the DevSpace config with the following command:

@@ -366,6 +366,7 @@ func executeCommand(
 	name string,
 	args ...string,
 ) error {
+	slog.Info("executing command", slog.String("name", name), slog.String("args", strings.Join(args, " ")))
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = env
