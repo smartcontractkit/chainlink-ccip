@@ -3,6 +3,7 @@ package execute
 import (
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -382,7 +383,7 @@ func mergeMessageObservations(
 			}
 			// Add reports
 			for _, msg := range messages {
-				validator.Add(msg)
+				validator.Add(msg, ao.OracleID)
 			}
 		}
 	}
@@ -429,7 +430,7 @@ func mergeCommitObservations(
 			}
 			// Add reports
 			for _, commitReport := range commitReports {
-				validator.Add(commitReport)
+				validator.Add(commitReport, ao.OracleID)
 			}
 		}
 	}
@@ -478,14 +479,14 @@ func mergeMessageHashes(
 					validators[selector][seqNr] =
 						consensus.NewMinObservation[cciptypes.Bytes32](consensus.FPlus1(f), nil)
 				}
-				validators[selector][seqNr].Add(hash)
+				validators[selector][seqNr].Add(hash, ao.OracleID)
 			}
 
 		}
 	}
 
-	for selector, seqNrs := range validators {
-		for seqNum, validator := range seqNrs {
+	for selector, seqNumValidator := range validators {
+		for seqNum, validator := range seqNumValidator {
 			if hashes := validator.GetValid(); len(hashes) == 1 {
 				results[selector][seqNum] = hashes[0]
 			}
@@ -524,7 +525,7 @@ func mergeTokenObservations(
 				validators[selector] = make(map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 			}
 
-			initResultsAndValidators(selector, f, seqMap, results, validators)
+			initResultsAndValidators(selector, f, seqMap, results, validators, ao.OracleID)
 		}
 	}
 
@@ -554,6 +555,7 @@ func initResultsAndValidators(
 	seqMap map[cciptypes.SeqNum]exectypes.MessageTokenData,
 	results exectypes.TokenDataObservations,
 	validators map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData],
+	oracleID commontypes.OracleID,
 ) {
 	for seqNr, msgTokenData := range seqMap {
 		if _, ok := results[selector][seqNr]; !ok {
@@ -566,7 +568,7 @@ func initResultsAndValidators(
 				validators[selector][messageTokenID] =
 					consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
 			}
-			validators[selector][messageTokenID].Add(tokenData)
+			validators[selector][messageTokenID].Add(tokenData, oracleID)
 		}
 	}
 }
@@ -599,7 +601,7 @@ func mergeNonceObservations(
 					source: sourceSelector,
 					sender: []byte(sender),
 					nonce:  nonce,
-				})
+				}, ao.OracleID)
 			}
 		}
 	}
