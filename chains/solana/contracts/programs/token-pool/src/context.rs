@@ -6,7 +6,7 @@ use anchor_spl::{
 
 use crate::{
     ChainConfig, Config, ExternalExecutionConfig, LockOrBurnInV1, RateLimitConfig,
-    ReleaseOrMintInV1,
+    ReleaseOrMintInV1, RemoteAddress, RemoteConfig,
 };
 
 const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
@@ -151,18 +151,83 @@ pub struct TokenOnramp<'info> {
 
 #[derive(Accounts)]
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
-pub struct SetChainConfig<'info> {
+pub struct InitializeChainConfig<'info> {
     #[account(
         seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
     #[account(
-        init_if_needed,
+        init,
         seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
         payer = authority,
-        space = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE,
+        space = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
+    )]
+    pub chain_config: Account<'info, ChainConfig>,
+    #[account(mut, address = config.owner)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey)]
+pub struct EditChainConfigStaticSize<'info> {
+    #[account(
+        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        bump,
+    )]
+    pub config: Account<'info, Config>,
+    #[account(
+        mut,
+        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        bump,
+    )]
+    pub chain_config: Account<'info, ChainConfig>,
+    #[account(mut, address = config.owner)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey, cfg: RemoteConfig)]
+pub struct EditChainConfigDynamicSize<'info> {
+    #[account(
+        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        bump,
+    )]
+    pub config: Account<'info, Config>,
+    #[account(
+        mut,
+        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE + cfg.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>(),
+        realloc::payer = authority,
+        realloc::zero = false
+    )]
+    pub chain_config: Account<'info, ChainConfig>,
+    #[account(mut, address = config.owner)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(remote_chain_selector: u64, mint: Pubkey, addresses: Vec<RemoteAddress>)]
+pub struct AppendRemotePoolAddresses<'info> {
+    #[account(
+        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        bump,
+    )]
+    pub config: Account<'info, Config>,
+    #[account(
+        mut,
+        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
+            + chain_config.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
+            + addresses.iter().map(RemoteAddress::space).sum::<usize>(),
+        realloc::payer = authority,
+        realloc::zero = false
     )]
     pub chain_config: Account<'info, ChainConfig>,
     #[account(mut, address = config.owner)]
@@ -250,10 +315,10 @@ pub struct Released {
 #[event]
 pub struct RemoteChainConfigured {
     pub chain_selector: u64,
-    pub token: Vec<u8>,
-    pub previous_token: Vec<u8>,
-    pub pool_address: Vec<u8>,
-    pub previous_pool_address: Vec<u8>,
+    pub token: RemoteAddress,
+    pub previous_token: RemoteAddress,
+    pub pool_addresses: Vec<RemoteAddress>,
+    pub previous_pool_addresses: Vec<RemoteAddress>,
 }
 
 #[event]
@@ -261,6 +326,13 @@ pub struct RateLimitConfigured {
     pub chain_selector: u64,
     pub outbound_rate_limit: RateLimitConfig,
     pub inbound_rate_limit: RateLimitConfig,
+}
+
+#[event]
+pub struct RemotePoolsAppended {
+    pub chain_selector: u64,
+    pub pool_addresses: Vec<RemoteAddress>,
+    pub previous_pool_addresses: Vec<RemoteAddress>,
 }
 
 #[event]
