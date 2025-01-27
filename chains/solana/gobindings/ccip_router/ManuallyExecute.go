@@ -19,7 +19,7 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for the execution.
-// * `raw_execution_report` - The execution report containing the message and proofs.
+// * `raw_execution_report` - The serialized execution report containing the message and proofs.
 type ManuallyExecute struct {
 	RawExecutionReport *[]byte
 	TokenIndexes       *[]byte

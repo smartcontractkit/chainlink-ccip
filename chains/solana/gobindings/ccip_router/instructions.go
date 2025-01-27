@@ -347,7 +347,9 @@ var (
 	// * report_context_byte_words[0]: ConfigDigest
 	// * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
 	// * `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates
-	// * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
+	// * `rs` - slice of R components of signatures
+	// * `ss` - slice of S components of signatures
+	// * `raw_vs` - array of V components of signatures
 	Instruction_Commit = ag_binary.TypeID([8]byte{223, 140, 142, 165, 229, 208, 156, 74})
 
 	// OFF RAMP FLOW
@@ -382,7 +384,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for the execution.
-	// * `raw_execution_report` - The execution report containing the message and proofs.
+	// * `raw_execution_report` - The serialized execution report containing the message and proofs.
 	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
 )
 
