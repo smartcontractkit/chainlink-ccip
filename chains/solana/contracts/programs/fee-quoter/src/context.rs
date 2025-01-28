@@ -13,16 +13,18 @@ use crate::FeeQuoterError;
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // size in bytes
 
 // Fixed seeds - different contexts must use different PDA seeds
-pub const CONFIG_SEED: &[u8] = b"config";
-pub const DEST_CHAIN_SEED: &[u8] = b"dest_chain";
-pub const FEE_BILLING_SIGNER_SEEDS: &[u8] = b"fee_billing_signer"; // signer for billing fee token transfer
-pub const FEE_BILLING_TOKEN_CONFIG_SEED: &[u8] = b"fee_billing_token_config";
-pub const TOKEN_POOL_BILLING_SEED: &[u8] = b"ccip_tokenpool_billing";
+pub mod seed {
+    pub const CONFIG: &[u8] = b"config";
+    pub const DEST_CHAIN: &[u8] = b"dest_chain";
+    pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer"; // signer for billing fee token transfer
+    pub const FEE_BILLING_TOKEN_CONFIG: &[u8] = b"fee_billing_token_config";
+    pub const TOKEN_POOL_BILLING: &[u8] = b"ccip_tokenpool_billing";
+}
 
 // valid_version validates that the passed in version is not 0 (uninitialized)
 // and it is within the expected maximum supported version bounds
 pub fn valid_version(v: u8, max_v: u8) -> bool {
-    v != 0 && v <= max_v
+    !uninitialized(v) && v <= max_v
 }
 pub fn uninitialized(v: u8) -> bool {
     v == 0
@@ -36,7 +38,7 @@ const MAX_TOKEN_AND_CHAIN_CONFIG_V: u8 = 1;
 pub struct Initialize<'info> {
     #[account(
         init,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
@@ -52,7 +54,7 @@ pub struct Initialize<'info> {
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, FeeQuoter>,
 
-    // initialization only allowed by program upgrade authority
+    // Initialization only allowed by program upgrade authority
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ FeeQuoterError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
 }
@@ -61,9 +63,9 @@ pub struct Initialize<'info> {
 pub struct UpdateConfig<'info> {
     #[account(
         mut,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
@@ -78,9 +80,9 @@ pub struct UpdateConfig<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
@@ -95,21 +97,21 @@ pub struct AcceptOwnership<'info> {
 #[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct GetFee<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
     #[account(
-        seeds = [DEST_CHAIN_SEED, destination_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::DEST_CHAIN, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub dest_chain: Account<'info, DestChain>,
 
     #[account(
-        seeds = [FEE_BILLING_TOKEN_CONFIG_SEED,
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG,
             if message.fee_token == Pubkey::default() {
                 native_mint::ID.as_ref() // pre-2022 WSOL
             } else {
@@ -125,15 +127,15 @@ pub struct GetFee<'info> {
 #[instruction(token_config: BillingTokenConfig)]
 pub struct AddBillingTokenConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
     #[account(
         init,
-        seeds = [FEE_BILLING_TOKEN_CONFIG_SEED, token_config.mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + BillingTokenConfigWrapper::INIT_SPACE,
@@ -152,21 +154,21 @@ pub struct AddBillingTokenConfig<'info> {
         init,
         payer = authority,
         associated_token::mint = fee_token_mint,
-        associated_token::authority = fee_billing_signer, // use the signer account as the authority
+        associated_token::authority = fee_billing_signer,
         associated_token::token_program = token_program,
     )]
     pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
-        // validate signer is registered admin
+        // Only the registered admin can add a new billing token config
         address = config.owner @ FeeQuoterError::Unauthorized
     )]
     pub authority: Signer<'info>,
 
     /// CHECK: This is the signer for the billing CPIs, used here to initialize the receiver token account
     #[account(
-        seeds = [FEE_BILLING_SIGNER_SEEDS],
+        seeds = [seed::FEE_BILLING_SIGNER],
         bump,
         seeds::program = config.onramp,
     )]
@@ -181,20 +183,20 @@ pub struct AddBillingTokenConfig<'info> {
 #[instruction(token_config: BillingTokenConfig)]
 pub struct UpdateBillingTokenConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
     #[account(
         mut,
-        seeds = [FEE_BILLING_TOKEN_CONFIG_SEED, token_config.mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
         bump,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
 
-    // validate signer is registered admin
+    // Only the registered admin can update a billing token config
     #[account(address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -202,16 +204,16 @@ pub struct UpdateBillingTokenConfig<'info> {
 #[derive(Accounts)]
 pub struct RemoveBillingTokenConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
     #[account(
         mut,
         close = authority,
-        seeds = [FEE_BILLING_TOKEN_CONFIG_SEED, fee_token_mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()],
         bump,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
@@ -235,14 +237,14 @@ pub struct RemoveBillingTokenConfig<'info> {
     /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
     #[account(
         mut,
-        seeds = [FEE_BILLING_SIGNER_SEEDS],
+        seeds = [seed::FEE_BILLING_SIGNER],
         bump
     )]
     pub fee_billing_signer: UncheckedAccount<'info>,
 
     #[account(
         mut,
-        // validate signer is registered admin
+        // Only the registered admin can remove a billing token config
         address = config.owner @ FeeQuoterError::Unauthorized
     )]
     pub authority: Signer<'info>,
@@ -254,15 +256,15 @@ pub struct RemoveBillingTokenConfig<'info> {
 #[instruction(dest_chain_selector: u64)]
 pub struct AddDestChain<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
     #[account(
         init,
-        seeds = [DEST_CHAIN_SEED, dest_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::DEST_CHAIN, dest_chain_selector.to_le_bytes().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE,
@@ -271,7 +273,7 @@ pub struct AddDestChain<'info> {
 
     #[account(
         mut,
-        // validate signer is registered admin
+        // Only the registered admin can perform this action
         address = config.owner @ FeeQuoterError::Unauthorized
     )]
     pub authority: Signer<'info>,
@@ -283,21 +285,21 @@ pub struct AddDestChain<'info> {
 #[instruction(chain_selector: u64)]
 pub struct UpdateDestChainConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
     #[account(
         mut,
-        seeds = [DEST_CHAIN_SEED, chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::DEST_CHAIN, chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub dest_chain: Account<'info, DestChain>,
 
-    // validate signer is registered admin
+    // Only the registered admin can perform this action
     #[account(mut, address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
 
@@ -308,15 +310,15 @@ pub struct UpdateDestChainConfig<'info> {
 #[instruction(chain_selector: u64, mint: Pubkey)]
 pub struct SetTokenBillingConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
     #[account(
         init_if_needed,
-        seeds = [TOKEN_POOL_BILLING_SEED, chain_selector.to_le_bytes().as_ref(), mint.as_ref()],
+        seeds = [seed::TOKEN_POOL_BILLING, chain_selector.to_le_bytes().as_ref(), mint.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + PerChainPerTokenConfig::INIT_SPACE,
@@ -324,7 +326,7 @@ pub struct SetTokenBillingConfig<'info> {
     )]
     pub per_chain_per_token_config: Account<'info, PerChainPerTokenConfig>,
 
-    // validate signer is registered admin
+    // Only the registered admin can perform this action
     #[account(mut, address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
 
@@ -334,13 +336,13 @@ pub struct SetTokenBillingConfig<'info> {
 #[derive(Accounts)]
 pub struct UpdatePrices<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
-    // validate signer is registered offramp
+    // Only the offramp can update prices
     #[account(address = config.offramp @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -348,13 +350,13 @@ pub struct UpdatePrices<'info> {
 // Token price in USD.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct TokenPriceUpdate {
-    pub source_token: Pubkey, // Source token. It is the mint, but called "token" for EVM compatibility.
+    pub source_token: Pubkey, // It is the mint, but called "token" for EVM compatibility.
     pub usd_per_token: [u8; 28], // EVM uses u224, 1e18 USD per 1e18 of the smallest token denomination.
 }
 
-// Gas price for a given chain in USD, its value may contain tightly packed fields.
+/// Gas price for a given chain in USD; its value may contain tightly packed fields.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct GasPriceUpdate {
-    pub dest_chain_selector: u64,   // Destination chain selector
+    pub dest_chain_selector: u64,
     pub usd_per_unit_gas: [u8; 28], // EVM uses u224, 1e18 USD per smallest unit (e.g. wei) of destination chain gas
 }

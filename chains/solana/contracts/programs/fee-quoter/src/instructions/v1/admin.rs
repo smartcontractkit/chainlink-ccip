@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
+use crate::context::seed::FEE_BILLING_SIGNER;
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, RemoveBillingTokenConfig,
     SetTokenBillingConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
-    FEE_BILLING_SIGNER_SEEDS,
 };
 use crate::event::{
     DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled,
@@ -98,7 +98,7 @@ pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Re
         authority: ctx.accounts.fee_billing_signer.to_account_info(),
     };
     let cpi_program = ctx.accounts.token_program.to_account_info();
-    let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[ctx.bumps.fee_billing_signer]];
+    let seeds = &[FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
     let signer_seeds = &[&seeds[..]];
     let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
 

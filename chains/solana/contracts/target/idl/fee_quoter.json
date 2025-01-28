@@ -706,6 +706,9 @@
     },
     {
       "name": "GasPriceUpdate",
+      "docs": [
+        "Gas price for a given chain in USD; its value may contain tightly packed fields."
+      ],
       "type": {
         "kind": "struct",
         "fields": [

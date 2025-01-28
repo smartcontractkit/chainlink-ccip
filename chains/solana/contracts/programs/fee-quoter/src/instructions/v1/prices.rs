@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::context::{
-    GasPriceUpdate, TokenPriceUpdate, UpdatePrices, DEST_CHAIN_SEED, FEE_BILLING_TOKEN_CONFIG_SEED,
-};
+use crate::context::seed::{DEST_CHAIN, FEE_BILLING_TOKEN_CONFIG};
+use crate::context::{GasPriceUpdate, TokenPriceUpdate, UpdatePrices};
 use crate::event::{UsdPerTokenUpdated, UsdPerUnitGasUpdated};
 use crate::state::{BillingTokenConfigWrapper, DestChain, TimestampedPackedU224};
 use crate::FeeQuoterError;
@@ -57,10 +56,7 @@ fn apply_token_price_update<'info>(
     token_config_account_info: &'info AccountInfo<'info>,
 ) -> Result<()> {
     let (expected, _) = Pubkey::find_program_address(
-        &[
-            FEE_BILLING_TOKEN_CONFIG_SEED,
-            token_update.source_token.as_ref(),
-        ],
+        &[FEE_BILLING_TOKEN_CONFIG, token_update.source_token.as_ref()],
         &crate::ID,
     );
     require_keys_eq!(
@@ -107,7 +103,7 @@ fn apply_gas_price_update<'info>(
 ) -> Result<()> {
     let (expected, _) = Pubkey::find_program_address(
         &[
-            DEST_CHAIN_SEED,
+            DEST_CHAIN,
             gas_update.dest_chain_selector.to_le_bytes().as_ref(),
         ],
         &crate::ID,
