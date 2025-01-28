@@ -39,6 +39,15 @@ func GetOperationPDA(timelockID [32]byte, opID [32]byte) solana.PublicKey {
 	return pda
 }
 
+func GetBypasserOperationPDA(timelockID [32]byte, opID [32]byte) solana.PublicKey {
+	pda, _, _ := solana.FindProgramAddress([][]byte{
+		[]byte("timelock_bypasser_operation"),
+		timelockID[:],
+		opID[:],
+	}, config.TimelockProgram)
+	return pda
+}
+
 // instruction builder for initializing access controllers
 func GetInitAccessControllersIxs(ctx context.Context, roleAcAccount solana.PublicKey, authority solana.PrivateKey, client *rpc.Client) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
@@ -111,7 +120,7 @@ func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccoun
 }
 
 // instructions builder for preloading instructions to timelock operation
-func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey) ([]solana.Instruction, error) {
+func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey, proposerAc solana.PublicKey) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 	initOpIx, ioErr := timelock.NewInitializeOperationInstruction(
 		timelockID,
@@ -121,6 +130,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		op.IxsCountU32(),
 		op.OperationPDA(),
 		GetConfigPDA(timelockID),
+		proposerAc,
 		authority,
 		solana.SystemProgramID,
 	).ValidateAndBuild()
@@ -136,6 +146,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 			[]timelock.InstructionData{instruction}, // this should be a slice of instruction within 1232 bytes
 			op.OperationPDA(),
 			GetConfigPDA(timelockID),
+			proposerAc,
 			authority,
 			solana.SystemProgramID, // for reallocation
 		).ValidateAndBuild()
@@ -150,6 +161,59 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		op.OperationID(),
 		op.OperationPDA(),
 		GetConfigPDA(timelockID),
+		proposerAc,
+		authority,
+	).ValidateAndBuild()
+	if foErr != nil {
+		return nil, fmt.Errorf("failed to build finalize operation instruction: %w", foErr)
+	}
+	ixs = append(ixs, finOpIx)
+
+	return ixs, nil
+}
+
+// instructions builder for preloading instructions to timelock bypasser operation
+func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey, bypasserAc solana.PublicKey) ([]solana.Instruction, error) {
+	ixs := []solana.Instruction{}
+	initOpIx, ioErr := timelock.NewInitializeBypasserOperationInstruction(
+		timelockID,
+		op.OperationID(),
+		op.Salt,
+		op.IxsCountU32(),
+		op.OperationPDA(),
+		GetConfigPDA(timelockID),
+		bypasserAc,
+		authority,
+		solana.SystemProgramID,
+	).ValidateAndBuild()
+	if ioErr != nil {
+		return nil, fmt.Errorf("failed to build initialize operation instruction: %w", ioErr)
+	}
+	ixs = append(ixs, initOpIx)
+
+	for _, instruction := range op.ToInstructionData() {
+		appendIxsIx, apErr := timelock.NewAppendBypasserInstructionsInstruction(
+			timelockID,
+			op.OperationID(),
+			[]timelock.InstructionData{instruction}, // this should be a slice of instruction within 1232 bytes
+			op.OperationPDA(),
+			GetConfigPDA(timelockID),
+			bypasserAc,
+			authority,
+			solana.SystemProgramID, // for reallocation
+		).ValidateAndBuild()
+		if apErr != nil {
+			return nil, fmt.Errorf("failed to build append instructions instruction: %w", apErr)
+		}
+		ixs = append(ixs, appendIxsIx)
+	}
+
+	finOpIx, foErr := timelock.NewFinalizeBypasserOperationInstruction(
+		timelockID,
+		op.OperationID(),
+		op.OperationPDA(),
+		GetConfigPDA(timelockID),
+		bypasserAc,
 		authority,
 	).ValidateAndBuild()
 	if foErr != nil {

@@ -10,7 +10,6 @@ pub struct Operation {
     pub id: [u8; 32],                       // hashed operation id
     pub predecessor: [u8; 32],              // hash of the previous operation
     pub salt: [u8; 32],                     // random salt for the operation
-    pub authority: Pubkey,                  // authority of the operation
     pub is_finalized: bool,                 // flag to indicate if the operation is finalized
     pub total_instructions: u32,            // total number of instructions in the operation
     pub instructions: Vec<InstructionData>, // list of instructions
@@ -79,8 +78,8 @@ impl Operation {
 }
 
 impl Space for Operation {
-    // timestamp + id + predecessor + salt + total_ixs + is_finalized + authority + vec prefix for instructions
-    const INIT_SPACE: usize = 8 + 32 + 32 + 32 + 4 + 1 + 32 + 4;
+    // timestamp + id + predecessor + salt + total_ixs + is_finalized + vec prefix for instructions
+    const INIT_SPACE: usize = 8 + 32 + 32 + 32 + 4 + 1 + 4;
 }
 
 // The native SVM's Instruction type from solana_program doesn't implement the AnchorSerialize trait.
@@ -150,7 +149,6 @@ mod tests {
             id: [0u8; 32],
             predecessor,
             salt: [0u8; 32],
-            authority: Pubkey::new_unique(),
             is_finalized: false,
             total_instructions: instructions.len() as u32,
             instructions,

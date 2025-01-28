@@ -10,6 +10,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
@@ -148,9 +149,11 @@ func TestTransactionSizing(t *testing.T) {
 	}
 	ixCommit := func(input ccip_router.CommitInput, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewCommitInstruction(
-			[3][32]byte{}, // report context
-			input,
-			make([][65]byte, 6), // f = 5, estimating f+1 signatures
+			[2][32]byte{}, // report context
+			testutils.MustMarshalBorsh(t, input),
+			make([][32]byte, 6), // f = 5, estimating f+1 signatures
+			make([][32]byte, 6), // f = 5, estimating f+1 signatures
+			[32]byte{},          // f = 5, estimating f+1 signatures
 			routerTable["routerConfig"],
 			routerTable["originChainConfig"],
 			mustRandomPubkey(), // commit report PDA
@@ -181,12 +184,10 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:        make([]byte, 20), // EVM sender
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
-			LogicReceiver: [32]byte{},
 			TokenAmounts:  []ccip_router.Any2SVMTokenTransfer{},
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
-				Accounts:         []solana.PublicKey{},
 			},
 		},
 		OffchainTokenData: [][]byte{},
@@ -206,7 +207,6 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:        make([]byte, 20), // EVM sender
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
-			LogicReceiver: [32]byte{},
 			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{{
 				SourcePoolAddress: make([]byte, 20), // EVM origin token pool
 				DestTokenAddress:  [32]byte{},
@@ -217,7 +217,6 @@ func TestTransactionSizing(t *testing.T) {
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
-				Accounts:         []solana.PublicKey{},
 			},
 		},
 		OffchainTokenData: [][]byte{},
@@ -227,8 +226,8 @@ func TestTransactionSizing(t *testing.T) {
 
 	ixExecute := func(report ccip_router.ExecutionReportSingleChain, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewExecuteInstruction(
-			report,
-			[3][32]byte{}, // report context
+			testutils.MustMarshalBorsh(t, report),
+			[2][32]byte{}, // report context
 			tokenIndexes,
 			routerTable["routerConfig"],
 			routerTable["originChainConfig"],

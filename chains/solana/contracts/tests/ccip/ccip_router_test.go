@@ -3484,7 +3484,7 @@ func TestCCIPRouter(t *testing.T) {
 					RemainingAccounts       []solana.PublicKey
 					RunEventValidations     func(t *testing.T, tx *rpc.GetTransactionResult)
 					RunStateValidations     func(t *testing.T)
-					ReportContext           *[3][32]byte
+					ReportContext           *[2][32]byte
 					PriceSequenceComparator Comparator
 				}{
 					{
@@ -3696,7 +3696,8 @@ func TestCCIPRouter(t *testing.T) {
 
 				for i, testcase := range priceUpdatesCases {
 					t.Run(testcase.Name, func(t *testing.T) {
-						_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, uint8(i)})
+						msgAccounts := []solana.PublicKey{}
+						_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, uint8(i)}, msgAccounts)
 						rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 						require.NoError(t, err)
 
@@ -3716,7 +3717,7 @@ func TestCCIPRouter(t *testing.T) {
 							PriceUpdates: testcase.PriceUpdates,
 						}
 
-						var reportContext [3][32]byte
+						var reportContext [2][32]byte
 						var reportSequence uint64
 						if testcase.ReportContext != nil {
 							reportContext = *testcase.ReportContext
@@ -3733,8 +3734,10 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewCommitInstruction(
 							reportContext,
-							report,
-							sigs,
+							testutils.MustMarshalBorsh(t, report),
+							sigs.Rs,
+							sigs.Ss,
+							sigs.RawVs,
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -3800,7 +3803,8 @@ func TestCCIPRouter(t *testing.T) {
 					sourceChainSelector := uint64(34)
 					sourceChainStatePDA, err := state.FindSourceChainStatePDA(sourceChainSelector, config.CcipRouterProgram)
 					require.NoError(t, err)
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, sourceChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					msgAccounts := []solana.PublicKey{}
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, sourceChainSelector, config.SVMChainSelector, []byte{4, 5, 6}, msgAccounts)
 					rootPDA, err := state.FindCommitReportPDA(sourceChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -3822,8 +3826,10 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						sourceChainStatePDA,
 						rootPDA,
@@ -3837,7 +3843,8 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an invalid interval it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					msgAccounts := []solana.PublicKey{}
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6}, msgAccounts)
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -3859,8 +3866,10 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -3874,7 +3883,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an interval size bigger than supported it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6}, []solana.PublicKey{})
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -3896,8 +3905,10 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -3933,8 +3944,10 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -3948,7 +3961,8 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with a repeated merkle root, it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, 1}) // repeated root
+					msgAccounts := []solana.PublicKey{}
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, 1}, msgAccounts) // repeated root
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -3970,8 +3984,10 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -3986,7 +4002,8 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an invalid min interval, it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					msgAccounts := []solana.PublicKey{}
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6}, msgAccounts)
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -4008,8 +4025,10 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -4084,7 +4103,8 @@ func TestCCIPRouter(t *testing.T) {
 						// TODO right now I'm allowing sending too many remaining_accounts, but if we want to be restrictive with that we can add a test here
 					}
 
-					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3})
+					msgAccounts := []solana.PublicKey{}
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3}, msgAccounts)
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -4127,8 +4147,10 @@ func TestCCIPRouter(t *testing.T) {
 
 							raw := ccip_router.NewCommitInstruction(
 								reportContext,
-								report,
-								sigs,
+								testutils.MustMarshalBorsh(t, report),
+								sigs.Rs,
+								sigs.Ss,
+								sigs.RawVs,
 								config.RouterConfigPDA,
 								config.EvmSourceChainStatePDA,
 								rootPDA,
@@ -4151,7 +4173,8 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("When committing a report with the exact next interval, it succeeds", func(t *testing.T) {
-				_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.CcipLogicReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+				msgAccounts := []solana.PublicKey{}
+				_, root := testutils.MakeAnyToSVMMessage(t, config.CcipTokenReceiver, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6}, msgAccounts)
 				rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 				require.NoError(t, err)
 
@@ -4175,8 +4198,10 @@ func TestCCIPRouter(t *testing.T) {
 				transmitter := getTransmitter()
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					report,
-					sigs,
+					testutils.MustMarshalBorsh(t, report),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4217,7 +4242,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("Ocr3Base::Transmit edge cases", func(t *testing.T) {
 				t.Run("It rejects mismatch config digest", func(t *testing.T) {
 					t.Parallel()
-					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{})
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -4237,12 +4262,14 @@ func TestCCIPRouter(t *testing.T) {
 					sigs, err := ccip.SignCommitReport(reportContext, report, signers)
 					require.NoError(t, err)
 					transmitter := getTransmitter()
-					emptyReportContext := [3][32]byte{}
+					emptyReportContext := [2][32]byte{}
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						emptyReportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -4256,7 +4283,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("It rejects unauthorized transmitter", func(t *testing.T) {
 					t.Parallel()
-					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{})
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -4278,8 +4305,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -4293,7 +4322,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("It rejects incorrect signature count", func(t *testing.T) {
 					t.Parallel()
-					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{})
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -4310,21 +4339,19 @@ func TestCCIPRouter(t *testing.T) {
 						},
 					}
 					reportContext := ccip.NextCommitReportContext()
-					hash, err := ccip.HashCommitReport(reportContext, report)
-					require.NoError(t, err)
-
-					baseSig := ecdsa.SignCompact(secp256k1.PrivKeyFromBytes(signers[0].PrivateKey), hash, false)
-					baseSig[0] = baseSig[0] - 27 // key signs 27 or 28, but verification expects 0 or 1 (remove offset)
-					sigs := [][65]byte{}
-					sigs = append(sigs, [65]byte(baseSig))
-
+					sigs, err := ccip.SignCommitReport(reportContext, report, signers)
 					require.NoError(t, err)
 					transmitter := getTransmitter()
+					// remove signers
+					sigs.Rs = sigs.Rs[1:]
+					sigs.Ss = sigs.Ss[1:]
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -4338,7 +4365,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("It rejects invalid signature", func(t *testing.T) {
 					t.Parallel()
-					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{})
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -4354,13 +4381,15 @@ func TestCCIPRouter(t *testing.T) {
 							MerkleRoot:          root,
 						},
 					}
-					sigs := [][65]byte{}
+					sigs := ccip.Signatures{}
 					transmitter := getTransmitter()
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						ccip.NextCommitReportContext(),
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -4374,7 +4403,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("It rejects unauthorized signer", func(t *testing.T) {
 					t.Parallel()
-					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{})
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -4399,16 +4428,18 @@ func TestCCIPRouter(t *testing.T) {
 					randomPrivateKey, err := secp256k1.GeneratePrivateKey()
 					require.NoError(t, err)
 					baseSig := ecdsa.SignCompact(randomPrivateKey, hash, false)
-					baseSig[0] = baseSig[0] - 27 // key signs 27 or 28, but verification expects 0 or 1 (remove offset)
-
-					sigs[0] = [65]byte(baseSig)
+					sigs.RawVs[0] = baseSig[0] - 27 // key signs 27 or 28, but verification expects 0 or 1 (remove offset)
+					sigs.Rs[0] = [32]byte(baseSig[1:33])
+					sigs.Ss[0] = [32]byte(baseSig[33:65])
 
 					transmitter := getTransmitter()
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -4422,7 +4453,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("It rejects duplicate signatures", func(t *testing.T) {
 					t.Parallel()
-					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+					msg, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{})
 					rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 					require.NoError(t, err)
 
@@ -4441,13 +4472,17 @@ func TestCCIPRouter(t *testing.T) {
 					reportContext := ccip.NextCommitReportContext()
 					sigs, err := ccip.SignCommitReport(reportContext, report, signers)
 					require.NoError(t, err)
-					sigs[0] = sigs[1]
+					sigs.RawVs[0] = sigs.RawVs[1]
+					sigs.Rs[0] = sigs.Rs[1]
+					sigs.Ss[0] = sigs.Ss[1]
 					transmitter := getTransmitter()
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						report,
-						sigs,
+						testutils.MustMarshalBorsh(t, report),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -4473,10 +4508,8 @@ func TestCCIPRouter(t *testing.T) {
 				transmitter := getTransmitter()
 
 				sourceChainSelector := config.EvmChainSelector
-				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID})
 				sequenceNumber := message.Header.SequenceNumber
-
 				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
 
 				commitReport := ccip_router.CommitInput{
@@ -4495,8 +4528,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4516,7 +4551,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4528,6 +4563,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.ExternalTokenPoolsSignerPDA,
 				)
+
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
@@ -4562,7 +4598,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("When executing a report with not matching source chain selector in message, it fails", func(t *testing.T) {
 				transmitter := getTransmitter()
 
-				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID})
 				sequenceNumber := message.Header.SequenceNumber
 
 				commitReport := ccip_router.CommitInput{
@@ -4581,8 +4617,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4604,7 +4642,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4633,7 +4671,7 @@ func TestCCIPRouter(t *testing.T) {
 				transmitter := getTransmitter()
 
 				unsupportedChainSelector := uint64(34)
-				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID})
 				sequenceNumber := message.Header.SequenceNumber
 
 				commitReport := ccip_router.CommitInput{
@@ -4652,8 +4690,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4694,7 +4734,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4722,10 +4762,12 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("When executing a report with incorrect solana chain selector, it fails", func(t *testing.T) {
 				transmitter := getTransmitter()
 
-				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message.Header.DestChainSelector = 89 // invalid dest chain selector
 				sequenceNumber := message.Header.SequenceNumber
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -4745,8 +4787,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4766,7 +4810,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4794,7 +4838,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("When executing a report with nonexisting PDA for the Merkle Root, it fails", func(t *testing.T) {
 				transmitter := getTransmitter()
 
-				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{})
 				rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 				require.NoError(t, err)
 
@@ -4805,7 +4849,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4836,7 +4880,8 @@ func TestCCIPRouter(t *testing.T) {
 				sourceChainSelector := config.EvmChainSelector
 
 				message := ccip.CreateDefaultMessageWith(sourceChainSelector, executedSequenceNumber) // already executed seq number
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -4850,7 +4895,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4885,9 +4930,10 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("When executing a report for an already executed root, but not message, it succeeds", func(t *testing.T) {
 				transmitter := getTransmitter()
 
-				message1, hash1 := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+				message1, hash1 := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message2 := ccip.CreateDefaultMessageWith(config.EvmChainSelector, message1.Header.SequenceNumber+1)
-				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress)
+				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1[:], hash2[:]}))
@@ -4908,8 +4954,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4918,7 +4966,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 				event := ccip.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
 
@@ -4929,7 +4977,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{hash1},
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport1,
+					testutils.MustMarshalBorsh(t, executionReport1),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -4962,7 +5010,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{[32]byte(hash2)},
 				}
 				raw = ccip_router.NewExecuteInstruction(
-					executionReport2,
+					testutils.MustMarshalBorsh(t, executionReport2),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5010,18 +5058,12 @@ func TestCCIPRouter(t *testing.T) {
 				transmitter := getTransmitter()
 
 				stubAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("counter")}, config.CcipInvalidReceiverProgram)
-
-				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				msgAccounts := []solana.PublicKey{config.CcipInvalidReceiverProgram, stubAccountPDA, solana.SystemProgramID}
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message.TokenReceiver = stubAccountPDA
-				message.LogicReceiver = config.CcipInvalidReceiverProgram
 				sequenceNumber := message.Header.SequenceNumber
 				message.ExtraArgs.IsWritableBitmap = 0
-				message.ExtraArgs.Accounts = []solana.PublicKey{
-					stubAccountPDA,
-					solana.SystemProgramID,
-				}
-
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -5041,8 +5083,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5062,7 +5106,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5093,9 +5137,10 @@ func TestCCIPRouter(t *testing.T) {
 				transmitter := getTransmitter()
 
 				sourceChainSelector := config.EvmChainSelector
-				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message.Data = []byte{} // empty message data
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -5118,8 +5163,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5139,7 +5186,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5151,6 +5198,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.ExternalTokenPoolsSignerPDA,
 				)
+
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
@@ -5158,6 +5206,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
+
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -5174,14 +5223,15 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 
 					sourceChainSelector := config.EvmChainSelector
-					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 					message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
 					message.TokenAmounts = []ccip_router.Any2SVMTokenTransfer{{
 						SourcePoolAddress: []byte{1, 2, 3},
 						DestTokenAddress:  token0.Mint.PublicKey(),
 						Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 					}}
-					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 					require.NoError(t, err)
 
 					root := [32]byte(rootBytes)
@@ -5203,8 +5253,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						commitReport,
-						sigs,
+						testutils.MustMarshalBorsh(t, commitReport),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -5225,7 +5277,7 @@ func TestCCIPRouter(t *testing.T) {
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_router.NewExecuteInstruction(
-						executionReport,
+						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
 						[]byte{4},
 						config.RouterConfigPDA,
@@ -5279,8 +5331,8 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 
 					sourceChainSelector := config.EvmChainSelector
-					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-					message.LogicReceiver = solana.PublicKey{}
+					msgAccounts := []solana.PublicKey{}
+					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 					message.ExtraArgs = ccip_router.SVMExtraArgs{}
 					message.Data = []byte{}
 					message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
@@ -5293,7 +5345,7 @@ func TestCCIPRouter(t *testing.T) {
 						DestTokenAddress:  token1.Mint.PublicKey(),
 						Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(2)},
 					}}
-					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 					require.NoError(t, err)
 
 					root := [32]byte(rootBytes)
@@ -5315,8 +5367,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					instruction, err := ccip_router.NewCommitInstruction(
 						reportContext,
-						commitReport,
-						sigs,
+						testutils.MustMarshalBorsh(t, commitReport),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
 						config.RouterConfigPDA,
 						config.EvmSourceChainStatePDA,
 						rootPDA,
@@ -5337,7 +5391,7 @@ func TestCCIPRouter(t *testing.T) {
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_router.NewExecuteInstruction(
-						executionReport,
+						testutils.MustMarshalBorsh(t, executionReport),
 						reportContext,
 						[]byte{0, 13},
 						config.RouterConfigPDA,
@@ -5375,7 +5429,7 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("OffRamp Manual Execution: when executing a non-committed report, it fails", func(t *testing.T) {
-				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{})
 				rootPDA, err := state.FindCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
 				require.NoError(t, err)
 
@@ -5387,7 +5441,7 @@ func TestCCIPRouter(t *testing.T) {
 				}
 
 				raw := ccip_router.NewManuallyExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
@@ -5414,12 +5468,14 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("OffRamp Manual execution", func(t *testing.T) {
 				transmitter := getTransmitter()
 
-				message1, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-				hash1, err := ccip.HashAnyToSVMMessage(message1, config.OnRampAddress)
+				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+				message1, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+
+				hash1, err := ccip.HashAnyToSVMMessage(message1, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
 				message2 := ccip.CreateDefaultMessageWith(config.EvmChainSelector, message1.Header.SequenceNumber+1)
-				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress)
+				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1, hash2}))
@@ -5440,8 +5496,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5464,7 +5522,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
-							executionReport,
+							testutils.MustMarshalBorsh(t, executionReport),
 							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -5477,6 +5535,7 @@ func TestCCIPRouter(t *testing.T) {
 						)
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
+							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -5499,7 +5558,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
-							executionReport,
+							testutils.MustMarshalBorsh(t, executionReport),
 							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -5512,6 +5571,7 @@ func TestCCIPRouter(t *testing.T) {
 						)
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
+							solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
 							solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
 							solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
 							solana.NewAccountMeta(solana.SystemProgramID, false, false),
@@ -5543,7 +5603,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
-							executionReport,
+							testutils.MustMarshalBorsh(t, executionReport),
 							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -5594,7 +5654,7 @@ func TestCCIPRouter(t *testing.T) {
 						}
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
-							executionReport,
+							testutils.MustMarshalBorsh(t, executionReport),
 							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
@@ -5646,23 +5706,25 @@ func TestCCIPRouter(t *testing.T) {
 				receiverContractEvmPDA, err := state.FindNoncePDA(config.EvmChainSelector, config.ReceiverExternalExecutionConfigPDA, config.CcipRouterProgram)
 				require.NoError(t, err)
 
-				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-
-				// To make the message go through the validations we need to specify all additional accounts used when executing the CPI
-				message.ExtraArgs.IsWritableBitmap = ccip.GenerateBitMapForIndexes([]int{0, 1, 5, 6, 7})
-				message.ExtraArgs.Accounts = []solana.PublicKey{
-					config.ReceiverExternalExecutionConfigPDA, // writable (index = 0)
-					config.ReceiverTargetAccountPDA,           // writable (index = 1)
+				msgAccounts := []solana.PublicKey{
+					config.CcipLogicReceiver,
+					config.ReceiverExternalExecutionConfigPDA,
+					config.ReceiverTargetAccountPDA,
 					solana.SystemProgramID,
 					config.CcipRouterProgram,
 					config.RouterConfigPDA,
-					config.ReceiverExternalExecutionConfigPDA, // writable (index = 5)
-					config.EvmSourceChainStatePDA,             // writable (index = 6)
-					receiverContractEvmPDA,                    // writable (index = 7)
-					solana.SystemProgramID,
-				}
+					config.ReceiverExternalExecutionConfigPDA,
+					config.EvmSourceChainStatePDA,
+					receiverContractEvmPDA,
+					solana.SystemProgramID}
 
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+
+				// To make the message go through the validations we need to specify the correct bitmap in the order
+				// of the remaining accounts (writable accounts at positions 1, 5, 6 and 7, i.e. ReceiverTargetAccountPDA,
+				// ReceiverExternalExecutionConfigPDA, EVMSourceChainStatePDA and receiverContractEVMPDA)
+				message.ExtraArgs.IsWritableBitmap = ccip.GenerateBitMapForIndexes([]int{0, 1, 5, 6, 7})
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -5682,8 +5744,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5703,7 +5767,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{},
 					config.RouterConfigPDA,
@@ -5748,15 +5812,15 @@ func TestCCIPRouter(t *testing.T) {
 				// create commit report ---------------------
 				transmitter := getTransmitter()
 				sourceChainSelector := config.EvmChainSelector
-				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				msgAccounts := []solana.PublicKey{}
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message.TokenAmounts = []ccip_router.Any2SVMTokenTransfer{{
 					SourcePoolAddress: []byte{1, 2, 3},
 					DestTokenAddress:  token0.Mint.PublicKey(),
 					Amount:            ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 				}}
 				message.TokenReceiver = receiver.PublicKey()
-				message.LogicReceiver = solana.PublicKey{} // no logic receiver
-				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
+				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(rootBytes)
@@ -5776,8 +5840,10 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				instruction, err := ccip_router.NewCommitInstruction(
 					reportContext,
-					commitReport,
-					sigs,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5800,7 +5866,7 @@ func TestCCIPRouter(t *testing.T) {
 					Proofs:              [][32]uint8{},
 				}
 				raw := ccip_router.NewExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					reportContext,
 					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
@@ -5816,6 +5882,7 @@ func TestCCIPRouter(t *testing.T) {
 				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
 				require.NoError(t, err)
 				raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
+
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -5830,7 +5897,7 @@ func TestCCIPRouter(t *testing.T) {
 				// manual re-execution is successful -----------------------------------
 				// NOTE: expects re-execution time to be instantaneous
 				rawManual := ccip_router.NewManuallyExecuteInstruction(
-					executionReport,
+					testutils.MustMarshalBorsh(t, executionReport),
 					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
