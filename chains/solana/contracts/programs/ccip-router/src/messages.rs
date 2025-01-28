@@ -167,10 +167,6 @@ pub struct CrossChainAmount {
 }
 
 impl CrossChainAmount {
-    pub const ZERO: Self = Self {
-        le_bytes: [0u8; 32],
-    };
-
     pub fn to_bytes(self) -> [u8; 32] {
         self.le_bytes
     }

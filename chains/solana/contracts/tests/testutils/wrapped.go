@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -98,4 +99,10 @@ func MakeAnyToSVMMessage(t *testing.T, tokenReceiver solana.PublicKey, evmChainS
 	msg, hash, err := ccip.MakeAnyToSVMMessage(tokenReceiver, evmChainSelector, solanaChainSelector, data, msgAccounts)
 	require.NoError(t, err)
 	return msg, hash
+}
+
+func MustMarshalBorsh(t *testing.T, v interface{}) []byte {
+	bz, err := bin.MarshalBorsh(v)
+	require.NoError(t, err)
+	return bz
 }
