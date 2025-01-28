@@ -437,13 +437,12 @@ func Test_groupByChainSelector(t *testing.T) {
 func Test_filterOutFullyExecutedMessages(t *testing.T) {
 	type args struct {
 		reports          []exectypes.CommitData
-		executedMessages []cciptypes.SeqNumRange
+		executedMessages []cciptypes.SeqNum
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []exectypes.CommitData
-		wantErr assert.ErrorAssertionFunc
+		name string
+		args args
+		want []exectypes.CommitData
 	}{
 		{
 			name: "empty",
@@ -451,8 +450,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				reports:          nil,
 				executedMessages: nil,
 			},
-			want:    nil,
-			wantErr: assert.NoError,
+			want: nil,
 		},
 		{
 			name: "empty2",
@@ -460,8 +458,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				reports:          []exectypes.CommitData{},
 				executedMessages: nil,
 			},
-			want:    []exectypes.CommitData{},
-			wantErr: assert.NoError,
+			want: []exectypes.CommitData{},
 		},
 		{
 			name: "no executed messages",
@@ -478,7 +475,6 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "executed messages",
@@ -488,12 +484,9 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 				},
-				executedMessages: []cciptypes.SeqNumRange{
-					cciptypes.NewSeqNumRange(0, 100),
-				},
+				executedMessages: cciptypes.NewSeqNumRange(0, 100).ToSlice(),
 			},
-			want:    nil,
-			wantErr: assert.NoError,
+			want: nil,
 		},
 		{
 			name: "2 partially executed",
@@ -503,9 +496,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 				},
-				executedMessages: []cciptypes.SeqNumRange{
-					cciptypes.NewSeqNumRange(15, 35),
-				},
+				executedMessages: cciptypes.NewSeqNumRange(15, 35).ToSlice(),
 			},
 			want: []exectypes.CommitData{
 				{
@@ -520,7 +511,6 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 				},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "2 partially executed 1 fully executed",
@@ -530,9 +520,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 				},
-				executedMessages: []cciptypes.SeqNumRange{
-					cciptypes.NewSeqNumRange(15, 55),
-				},
+				executedMessages: cciptypes.NewSeqNumRange(15, 55).ToSlice(),
 			},
 			want: []exectypes.CommitData{
 				{
@@ -544,7 +532,6 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					ExecutedMessages:    []cciptypes.SeqNum{50, 51, 52, 53, 54, 55},
 				},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "first report executed",
@@ -554,15 +541,12 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 				},
-				executedMessages: []cciptypes.SeqNumRange{
-					cciptypes.NewSeqNumRange(10, 20),
-				},
+				executedMessages: cciptypes.NewSeqNumRange(10, 20).ToSlice(),
 			},
 			want: []exectypes.CommitData{
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "last report executed",
@@ -572,28 +556,25 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 					{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 				},
-				executedMessages: []cciptypes.SeqNumRange{
-					cciptypes.NewSeqNumRange(50, 60),
-				},
+				executedMessages: cciptypes.NewSeqNumRange(50, 60).ToSlice(),
 			},
 			want: []exectypes.CommitData{
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "sort-report",
 			args: args{
 				reports: []exectypes.CommitData{
 					{
+						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
+					},
+					{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 					},
 					{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					},
 				},
 				executedMessages: nil,
@@ -609,7 +590,6 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 				},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "sort-executed",
@@ -625,23 +605,15 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 					},
 				},
-				executedMessages: []cciptypes.SeqNumRange{
-					cciptypes.NewSeqNumRange(50, 60),
-					cciptypes.NewSeqNumRange(10, 20),
-					cciptypes.NewSeqNumRange(30, 40),
-				},
+				executedMessages: cciptypes.NewSeqNumRange(10, 60).ToSlice(),
 			},
-			want:    nil,
-			wantErr: assert.NoError,
+			want: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := filterOutExecutedMessages(tt.args.reports, tt.args.executedMessages)
-			if !tt.wantErr(t, err, fmt.Sprintf("filterOutExecutedMessages(%v, %v)", tt.args.reports, tt.args.executedMessages)) {
-				return
-			}
+			got := filterOutExecutedMessages(tt.args.reports, tt.args.executedMessages)
 			assert.Equalf(t, tt.want, got, "filterOutExecutedMessages(%v, %v)", tt.args.reports, tt.args.executedMessages)
 		})
 	}

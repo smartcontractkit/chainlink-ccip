@@ -230,9 +230,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	return reports[:limit], nil
 }
 
-func (r *ccipChainReader) ExecutedMessageRanges(
+func (r *ccipChainReader) ExecutedMessages(
 	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
-) ([]cciptypes.SeqNumRange, error) {
+) ([]cciptypes.SeqNum, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, dest); err != nil {
 		return nil, err
 	}
@@ -285,13 +285,13 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
 
-	executed := make([]cciptypes.SeqNumRange, 0)
+	executed := make([]cciptypes.SeqNum, 0)
 	for _, item := range iter {
 		stateChange, ok := item.Data.(*ExecutionStateChangedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
 		}
-		executed = append(executed, cciptypes.NewSeqNumRange(stateChange.SequenceNumber, stateChange.SequenceNumber))
+		executed = append(executed, stateChange.SequenceNumber)
 	}
 
 	return executed, nil
