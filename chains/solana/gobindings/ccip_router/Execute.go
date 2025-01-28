@@ -10,7 +10,6 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// OFF RAMP FLOW
 // Executes a message on the destination chain.
 //
 // The method name needs to be execute with Anchor encoding.

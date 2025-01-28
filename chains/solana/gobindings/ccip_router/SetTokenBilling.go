@@ -10,6 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
+// Billing //
 // Sets the token billing configuration.
 //
 // Only CCIP Admin can set the token billing configuration.
