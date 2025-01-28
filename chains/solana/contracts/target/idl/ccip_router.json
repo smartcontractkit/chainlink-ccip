@@ -679,9 +679,53 @@
       ]
     },
     {
+      "name": "ccipAdminOverridePendingAdministrator",
+      "docs": [
+        "Overrides the pending admin of the Token Admin Registry",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenAdminRegistryAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "ownerProposeAdministrator",
       "docs": [
-        "Registers the Token Admin Registry via the token owner.",
+        "Registers the Token Admin Registry by the token owner.",
         "",
         "The Authority of the Mint Token can claim the registry of the token.",
         "",
@@ -699,6 +743,50 @@
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenAdminRegistryAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "ownerOverridePendingAdministrator",
+      "docs": [
+        "Overrides the pending admin of the Token Admin Registry by the token owner",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1850,6 +1938,10 @@
                 2
               ]
             }
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
           }
         ]
       }

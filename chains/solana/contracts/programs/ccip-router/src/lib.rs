@@ -333,7 +333,23 @@ pub mod ccip_router {
         v1::token_admin_registry::ccip_admin_propose_administrator(ctx, token_admin_registry_admin)
     }
 
-    /// Registers the Token Admin Registry via the token owner.
+    /// Overrides the pending admin of the Token Admin Registry
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for registration.
+    /// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+    pub fn ccip_admin_override_pending_administrator(
+        ctx: Context<OverridePendingTokenAdminRegistryByCCIPAdmin>,
+        token_admin_registry_admin: Pubkey,
+    ) -> Result<()> {
+        v1::token_admin_registry::ccip_admin_override_pending_administrator(
+            ctx,
+            token_admin_registry_admin,
+        )
+    }
+
+    /// Registers the Token Admin Registry by the token owner.
     ///
     /// The Authority of the Mint Token can claim the registry of the token.
     ///
@@ -346,6 +362,22 @@ pub mod ccip_router {
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
         v1::token_admin_registry::owner_propose_administrator(ctx, token_admin_registry_admin)
+    }
+
+    /// Overrides the pending admin of the Token Admin Registry by the token owner
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for registration.
+    /// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+    pub fn owner_override_pending_administrator(
+        ctx: Context<OverridePendingTokenAdminRegistryByOwner>,
+        token_admin_registry_admin: Pubkey,
+    ) -> Result<()> {
+        v1::token_admin_registry::owner_override_pending_administrator(
+            ctx,
+            token_admin_registry_admin,
+        )
     }
 
     /// Accepts the admin role of the token admin registry.

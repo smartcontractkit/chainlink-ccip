@@ -198,7 +198,15 @@ var (
 	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
 	Instruction_CcipAdminProposeAdministrator = ag_binary.TypeID([8]byte{218, 37, 139, 107, 142, 228, 51, 219})
 
-	// Registers the Token Admin Registry via the token owner.
+	// Overrides the pending admin of the Token Admin Registry
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for registration.
+	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+	Instruction_CcipAdminOverridePendingAdministrator = ag_binary.TypeID([8]byte{163, 206, 164, 199, 248, 92, 36, 46})
+
+	// Registers the Token Admin Registry by the token owner.
 	//
 	// The Authority of the Mint Token can claim the registry of the token.
 	//
@@ -207,6 +215,14 @@ var (
 	// * `ctx` - The context containing the accounts required for registration.
 	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
 	Instruction_OwnerProposeAdministrator = ag_binary.TypeID([8]byte{175, 81, 160, 246, 206, 132, 18, 22})
+
+	// Overrides the pending admin of the Token Admin Registry by the token owner
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for registration.
+	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+	Instruction_OwnerOverridePendingAdministrator = ag_binary.TypeID([8]byte{230, 111, 134, 149, 203, 168, 118, 201})
 
 	// Accepts the admin role of the token admin registry.
 	//
@@ -424,8 +440,12 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "SetOcrConfig"
 	case Instruction_CcipAdminProposeAdministrator:
 		return "CcipAdminProposeAdministrator"
+	case Instruction_CcipAdminOverridePendingAdministrator:
+		return "CcipAdminOverridePendingAdministrator"
 	case Instruction_OwnerProposeAdministrator:
 		return "OwnerProposeAdministrator"
+	case Instruction_OwnerOverridePendingAdministrator:
+		return "OwnerOverridePendingAdministrator"
 	case Instruction_AcceptAdminRoleTokenAdminRegistry:
 		return "AcceptAdminRoleTokenAdminRegistry"
 	case Instruction_TransferAdminRoleTokenAdminRegistry:
@@ -518,7 +538,13 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"ccip_admin_propose_administrator", (*CcipAdminProposeAdministrator)(nil),
 		},
 		{
+			"ccip_admin_override_pending_administrator", (*CcipAdminOverridePendingAdministrator)(nil),
+		},
+		{
 			"owner_propose_administrator", (*OwnerProposeAdministrator)(nil),
+		},
+		{
+			"owner_override_pending_administrator", (*OwnerOverridePendingAdministrator)(nil),
 		},
 		{
 			"accept_admin_role_token_admin_registry", (*AcceptAdminRoleTokenAdminRegistry)(nil),

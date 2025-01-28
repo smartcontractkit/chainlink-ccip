@@ -10,20 +10,18 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Registers the Token Admin Registry by the token owner.
-//
-// The Authority of the Mint Token can claim the registry of the token.
+// Overrides the pending admin of the Token Admin Registry by the token owner
 //
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for registration.
 // * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
-type OwnerProposeAdministrator struct {
+type OwnerOverridePendingAdministrator struct {
 	TokenAdminRegistryAdmin *ag_solanago.PublicKey
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] tokenAdminRegistry
+	// [1] = [] tokenAdminRegistry
 	//
 	// [2] = [] mint
 	//
@@ -33,93 +31,93 @@ type OwnerProposeAdministrator struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewOwnerProposeAdministratorInstructionBuilder creates a new `OwnerProposeAdministrator` instruction builder.
-func NewOwnerProposeAdministratorInstructionBuilder() *OwnerProposeAdministrator {
-	nd := &OwnerProposeAdministrator{
+// NewOwnerOverridePendingAdministratorInstructionBuilder creates a new `OwnerOverridePendingAdministrator` instruction builder.
+func NewOwnerOverridePendingAdministratorInstructionBuilder() *OwnerOverridePendingAdministrator {
+	nd := &OwnerOverridePendingAdministrator{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
 
 // SetTokenAdminRegistryAdmin sets the "tokenAdminRegistryAdmin" parameter.
-func (inst *OwnerProposeAdministrator) SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin ag_solanago.PublicKey) *OwnerProposeAdministrator {
+func (inst *OwnerOverridePendingAdministrator) SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
 	inst.TokenAdminRegistryAdmin = &tokenAdminRegistryAdmin
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *OwnerProposeAdministrator) SetConfigAccount(config ag_solanago.PublicKey) *OwnerProposeAdministrator {
+func (inst *OwnerOverridePendingAdministrator) SetConfigAccount(config ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *OwnerProposeAdministrator) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *OwnerOverridePendingAdministrator) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
-func (inst *OwnerProposeAdministrator) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *OwnerProposeAdministrator {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
+func (inst *OwnerOverridePendingAdministrator) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry)
 	return inst
 }
 
 // GetTokenAdminRegistryAccount gets the "tokenAdminRegistry" account.
-func (inst *OwnerProposeAdministrator) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
+func (inst *OwnerOverridePendingAdministrator) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetMintAccount sets the "mint" account.
-func (inst *OwnerProposeAdministrator) SetMintAccount(mint ag_solanago.PublicKey) *OwnerProposeAdministrator {
+func (inst *OwnerOverridePendingAdministrator) SetMintAccount(mint ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint)
 	return inst
 }
 
 // GetMintAccount gets the "mint" account.
-func (inst *OwnerProposeAdministrator) GetMintAccount() *ag_solanago.AccountMeta {
+func (inst *OwnerOverridePendingAdministrator) GetMintAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *OwnerProposeAdministrator) SetAuthorityAccount(authority ag_solanago.PublicKey) *OwnerProposeAdministrator {
+func (inst *OwnerOverridePendingAdministrator) SetAuthorityAccount(authority ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *OwnerProposeAdministrator) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *OwnerOverridePendingAdministrator) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *OwnerProposeAdministrator) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *OwnerProposeAdministrator {
+func (inst *OwnerOverridePendingAdministrator) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *OwnerProposeAdministrator) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *OwnerOverridePendingAdministrator) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
-func (inst OwnerProposeAdministrator) Build() *Instruction {
+func (inst OwnerOverridePendingAdministrator) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_OwnerProposeAdministrator,
+		TypeID: Instruction_OwnerOverridePendingAdministrator,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst OwnerProposeAdministrator) ValidateAndBuild() (*Instruction, error) {
+func (inst OwnerOverridePendingAdministrator) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *OwnerProposeAdministrator) Validate() error {
+func (inst *OwnerOverridePendingAdministrator) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.TokenAdminRegistryAdmin == nil {
@@ -148,11 +146,11 @@ func (inst *OwnerProposeAdministrator) Validate() error {
 	return nil
 }
 
-func (inst *OwnerProposeAdministrator) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *OwnerOverridePendingAdministrator) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("OwnerProposeAdministrator")).
+			programBranch.Child(ag_format.Instruction("OwnerOverridePendingAdministrator")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -173,7 +171,7 @@ func (inst *OwnerProposeAdministrator) EncodeToTree(parent ag_treeout.Branches) 
 		})
 }
 
-func (obj OwnerProposeAdministrator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj OwnerOverridePendingAdministrator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `TokenAdminRegistryAdmin` param:
 	err = encoder.Encode(obj.TokenAdminRegistryAdmin)
 	if err != nil {
@@ -181,7 +179,7 @@ func (obj OwnerProposeAdministrator) MarshalWithEncoder(encoder *ag_binary.Encod
 	}
 	return nil
 }
-func (obj *OwnerProposeAdministrator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *OwnerOverridePendingAdministrator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TokenAdminRegistryAdmin`:
 	err = decoder.Decode(&obj.TokenAdminRegistryAdmin)
 	if err != nil {
@@ -190,8 +188,8 @@ func (obj *OwnerProposeAdministrator) UnmarshalWithDecoder(decoder *ag_binary.De
 	return nil
 }
 
-// NewOwnerProposeAdministratorInstruction declares a new OwnerProposeAdministrator instruction with the provided parameters and accounts.
-func NewOwnerProposeAdministratorInstruction(
+// NewOwnerOverridePendingAdministratorInstruction declares a new OwnerOverridePendingAdministrator instruction with the provided parameters and accounts.
+func NewOwnerOverridePendingAdministratorInstruction(
 	// Parameters:
 	tokenAdminRegistryAdmin ag_solanago.PublicKey,
 	// Accounts:
@@ -199,8 +197,8 @@ func NewOwnerProposeAdministratorInstruction(
 	tokenAdminRegistry ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *OwnerProposeAdministrator {
-	return NewOwnerProposeAdministratorInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
+	return NewOwnerOverridePendingAdministratorInstructionBuilder().
 		SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin).
 		SetConfigAccount(config).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).

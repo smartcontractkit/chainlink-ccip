@@ -1,4 +1,9 @@
-use crate::events::token_admin_registry as events;
+use crate::{
+    events::token_admin_registry as events,
+    token_context::{
+        OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
+    },
+};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
@@ -22,7 +27,18 @@ pub fn ccip_admin_propose_administrator(
     let token_mint = ctx.accounts.mint.key().to_owned();
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
 
-    set_pending_administrator(token_mint, token_admin_registry, token_admin_registry_admin)?;
+    init_with_pending_administrator(token_admin_registry, token_mint, token_admin_registry_admin)?;
+
+    Ok(())
+}
+
+// Overrides the pending administrator for the given token
+pub fn ccip_admin_override_pending_administrator(
+    ctx: Context<OverridePendingTokenAdminRegistryByCCIPAdmin>,
+    token_admin_registry_admin: Pubkey,
+) -> Result<()> {
+    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+    token_admin_registry.pending_administrator = token_admin_registry_admin;
 
     Ok(())
 }
@@ -35,14 +51,25 @@ pub fn owner_propose_administrator(
     let token_mint = ctx.accounts.mint.key().to_owned();
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
 
-    set_pending_administrator(token_mint, token_admin_registry, token_admin_registry_admin)?;
+    init_with_pending_administrator(token_admin_registry, token_mint, token_admin_registry_admin)?;
 
     Ok(())
 }
 
-fn set_pending_administrator(
-    token_mint: Pubkey,
+// Overrides the pending administrator for the given token
+pub fn owner_override_pending_administrator(
+    ctx: Context<OverridePendingTokenAdminRegistryByOwner>,
+    token_admin_registry_admin: Pubkey,
+) -> Result<()> {
+    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+    token_admin_registry.pending_administrator = token_admin_registry_admin;
+
+    Ok(())
+}
+
+fn init_with_pending_administrator(
     token_admin_registry: &mut Account<'_, crate::TokenAdminRegistry>,
+    token_mint: Pubkey,
     new_admin: Pubkey,
 ) -> Result<()> {
     require_neq!(
@@ -51,12 +78,11 @@ fn set_pending_administrator(
         CcipRouterError::InvalidTokenAdminRegistryInputsZeroAddress
     );
 
-    // TODO: Revert if administrator != 0 AlreadyRegistered
-
     token_admin_registry.version = 1;
     token_admin_registry.administrator = Pubkey::new_from_array([0; 32]);
     token_admin_registry.pending_administrator = new_admin;
     token_admin_registry.lookup_table = Pubkey::new_from_array([0; 32]);
+    token_admin_registry.mint = token_mint;
 
     emit!(events::AdministratorTransferRequested {
         token: token_mint,

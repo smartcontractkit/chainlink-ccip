@@ -710,6 +710,7 @@ type TokenAdminRegistry struct {
 	PendingAdministrator ag_solanago.PublicKey
 	LookupTable          ag_solanago.PublicKey
 	WritableIndexes      [2]ag_binary.Uint128
+	Mint                 ag_solanago.PublicKey
 }
 
 var TokenAdminRegistryDiscriminator = [8]byte{70, 92, 207, 200, 76, 17, 57, 114}
@@ -742,6 +743,11 @@ func (obj TokenAdminRegistry) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `WritableIndexes` param:
 	err = encoder.Encode(obj.WritableIndexes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Mint` param:
+	err = encoder.Encode(obj.Mint)
 	if err != nil {
 		return err
 	}
@@ -784,6 +790,11 @@ func (obj *TokenAdminRegistry) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `WritableIndexes`:
 	err = decoder.Decode(&obj.WritableIndexes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Mint`:
+	err = decoder.Decode(&obj.Mint)
 	if err != nil {
 		return err
 	}
