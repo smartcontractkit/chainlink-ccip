@@ -6,21 +6,23 @@ use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
-    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
-    SolanaTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
+    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, SVM2AnyMessage,
+    SVMTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
-use super::messages::ramps::validate_solana2any;
+use super::messages::ramps::validate_svm2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+use super::price_math::get_validated_token_price;
 use super::price_math::{Exponential, Usd18Decimals};
 
-/// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
+/// SVM2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, sender and tokenAmounts).
 /// Each variable array takes 1 more slot to store its length.
 /// When abi encoded, excluding array contents,
-/// Any2EVMMessage takes up a fixed number of 13 slots, 32 bytes each.
-/// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 14.
-/// The fixed bytes does not cover struct data (this is represented by ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
-pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 14);
+/// SVM2AnyMessage takes up a fixed number of 13 slots, 32 bytes each.
+/// We assume sender always takes 1 slot.
+/// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 15.
+/// The fixed bytes does not cover struct data (this is represented by SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
+pub const SVM_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 
 /// Each token transfer adds 1 RampTokenAmount
 /// RampTokenAmount has 5 fields, 2 of which are bytes type, 1 Address, 1 uint256 and 1 uint32.
@@ -28,16 +30,15 @@ pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 14);
 /// address
 /// uint256 amount takes 1 slot.
 /// uint32 destGasAmount takes 1 slot.
-pub const ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
+pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
 
 pub fn fee_for_msg(
-    _dest_chain_selector: u64,
-    message: &Solana2AnyMessage,
+    message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     fee_token_config: &BillingTokenConfig,
     additional_token_configs: &[Option<BillingTokenConfig>],
     additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
-) -> Result<SolanaTokenAmount> {
+) -> Result<SVMTokenAmount> {
     let fee_token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
     } else {
@@ -51,7 +52,7 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         CcipRouterError::InvalidInputsMissingTokenConfig
     );
-    validate_solana2any(message, dest_chain, fee_token_config)?;
+    validate_svm2any(message, dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
@@ -73,17 +74,40 @@ pub fn fee_for_msg(
             .unwrap_or_else(|| dest_chain.config.default_tx_gas_limit.into()),
     );
 
+    // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
+    // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
+    // This calculation is not exact, the goal is to not lose money on large payloads.
+    // The fixed OCR report calldata overhead gas is accounted for in `dest_gas_overhead`.
+    // It is not included in the calculation below for simplicity.
+    let calldata_length =
+        U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead;
+
+    let mut calldata_gas =
+        calldata_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128);
+
+    let calldata_threshold =
+        U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128);
+
+    if calldata_length > calldata_threshold {
+        let base_calldata_gas = U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
+            * calldata_threshold;
+
+        let extra_bytes = calldata_length - calldata_threshold;
+        let extra_calldata_gas =
+            extra_bytes * U256::new(dest_chain.config.dest_gas_per_payload_byte_high as u128);
+        calldata_gas = base_calldata_gas + extra_calldata_gas;
+    }
+
     let execution_gas = gas_limit
         + U256::new(dest_chain.config.dest_gas_overhead as u128)
-        + U256::new(message.data.len() as u128)
-            * U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
+        + calldata_gas
         + network_fee.transfer_gas;
 
     let execution_cost = execution_gas_price
         * execution_gas
         * U256::new(dest_chain.config.gas_multiplier_wei_per_eth as u128);
 
-    let data_availability_cost = data_availability_cost(
+    let data_availability_cost: Usd18Decimals = data_availability_cost(
         data_availability_gas_price,
         message,
         network_fee.transfer_bytes_overhead,
@@ -91,14 +115,19 @@ pub fn fee_for_msg(
     );
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
+
+    // At this step, every fee component has been raised to 36 decimals
     let fee_token_value =
         (network_fee.premium * premium_multiplier) + execution_cost + data_availability_cost;
 
+    // Fee token value is in 36 decimals
+    // Fee token price is in 18 decimals USD for 1e18 smallest token denominations.
+    // The result is the fee in the fee tokens smallest denominations (e.g. lamport for Sol).
     let fee_token_amount = (fee_token_value.0 / fee_token_price.0)
         .try_into()
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
 
-    Ok(SolanaTokenAmount {
+    Ok(SVMTokenAmount {
         token: fee_token,
         amount: fee_token_amount,
     })
@@ -106,16 +135,16 @@ pub fn fee_for_msg(
 
 fn data_availability_cost(
     data_availability_gas_price: Usd18Decimals,
-    message: &Solana2AnyMessage,
+    message: &SVM2AnyMessage,
     token_transfer_bytes_overhead: U256,
     dest_chain: &DestChain,
 ) -> Usd18Decimals {
     // Sums up byte lengths of fixed message fields and dynamic message fields.
     // Fixed message fields do account for the offset and length slot of the dynamic fields.
-    let data_availability_length_bytes = ANY_2_EVM_MESSAGE_FIXED_BYTES
+    let data_availability_length_bytes = SVM_2_EVM_MESSAGE_FIXED_BYTES
         + U256::new(message.data.len() as u128)
         + (U256::new(message.token_amounts.len() as u128)
-            * ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
+            * SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
         + token_transfer_bytes_overhead;
 
     // dest_data_availability_overhead_gas is a separate config value for flexibility to be updated
@@ -149,7 +178,7 @@ impl AddAssign for NetworkFee {
 }
 
 fn network_fee(
-    message: &Solana2AnyMessage,
+    message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     token_configs: &[Option<BillingTokenConfig>],
     token_configs_for_dest_chain: &[PerChainPerTokenConfig],
@@ -170,7 +199,7 @@ fn network_fee(
             token_network_fees(&token_configs[i], token_amount, config_for_dest_chain)?
         } else {
             // If the token has no specific overrides configured, we use the global defaults.
-            global_network_fees(dest_chain)
+            default_token_network_fees(dest_chain)
         };
 
         fee += token_network_fee;
@@ -181,7 +210,7 @@ fn network_fee(
 
 fn token_network_fees(
     billing_config: &Option<BillingTokenConfig>,
-    token_amount: &SolanaTokenAmount,
+    token_amount: &SVMTokenAmount,
     config_for_dest_chain: &PerChainPerTokenConfig,
 ) -> Result<NetworkFee> {
     let bps_fee = match billing_config {
@@ -212,7 +241,7 @@ fn token_network_fees(
     })
 }
 
-fn global_network_fees(dest_chain: &DestChain) -> NetworkFee {
+fn default_token_network_fees(dest_chain: &DestChain) -> NetworkFee {
     let (premium, global_gas, global_overhead) = (
         Usd18Decimals::from_usd_cents(dest_chain.config.default_token_fee_usdcents.into()),
         U256::new(dest_chain.config.default_token_dest_gas_overhead.into()),
@@ -226,7 +255,7 @@ fn global_network_fees(dest_chain: &DestChain) -> NetworkFee {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackedPrice {
+pub(super) struct PackedPrice {
     // L1 gas price (encoded in the lower 112 bits)
     pub execution_gas_price: Usd18Decimals,
     // L2 gas price (encoded in the higher 112 bits)
@@ -240,7 +269,7 @@ impl From<&TimestampedPackedU224> for PackedPrice {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnpackedDoubleU224 {
+pub(super) struct UnpackedDoubleU224 {
     pub high: u128,
     pub low: u128,
 }
@@ -249,9 +278,9 @@ impl From<&TimestampedPackedU224> for UnpackedDoubleU224 {
     fn from(packed: &TimestampedPackedU224) -> Self {
         let mut u128_buffer = [0u8; 16];
         u128_buffer[2..16].clone_from_slice(&packed.value[14..]);
-        let high = u128::from_be_bytes(u128_buffer);
-        u128_buffer[2..16].clone_from_slice(&packed.value[..14]);
         let low = u128::from_be_bytes(u128_buffer);
+        u128_buffer[2..16].clone_from_slice(&packed.value[..14]);
+        let high = u128::from_be_bytes(u128_buffer);
         Self { high, low }
     }
 }
@@ -299,21 +328,6 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
     Ok(price)
 }
 
-fn get_validated_token_price(token_config: &BillingTokenConfig) -> Result<Usd18Decimals> {
-    let timestamp = token_config.usd_per_token.timestamp;
-    let price: Usd18Decimals = (&token_config.usd_per_token).into();
-
-    // NOTE: There's no validation done with respect to token price staleness since data feeds are not
-    // supported in solana. Only the existence of `any` timestamp is checked, to ensure the price
-    // was set at least once.
-    require!(
-        price.0 != 0 && timestamp != 0,
-        CcipRouterError::InvalidTokenPrice
-    );
-
-    Ok(price)
-}
-
 pub fn wrap_native_sol<'info>(
     token_program: &AccountInfo<'info>,
     from: &mut Signer<'info>,
@@ -343,7 +357,7 @@ pub fn wrap_native_sol<'info>(
 }
 
 pub fn transfer_fee<'info>(
-    fee: &SolanaTokenAmount,
+    fee: &SVMTokenAmount,
     token_program: AccountInfo<'info>,
     transfer: token_interface::TransferChecked<'info>,
     decimals: u8,
@@ -371,7 +385,7 @@ pub fn do_billing_transfer<'info>(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use solana_program::{
         entrypoint::SUCCESS,
         program_stubs::{set_syscall_stubs, SyscallStubs},
@@ -396,14 +410,13 @@ mod tests {
     // NOTE: This test is unique in that the return value of `fee_for_msg` has been
     // directly validated against a `getFee` query in the Ethereum mainnet -> Avalanche Fuji
     // lane, using the same configuration. This ensures that at least on a simple execution
-    // path, the Solana fee quoter behaves identically to the EVM implementation. Further
+    // path, the SVM fee quoter behaves identically to the EVM implementation. Further
     // tests after this one simply observe the impact of modifying certain parameters on the
     // output.
     fn retrieving_fee_from_valid_message() {
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &sample_dest_chain(),
                 &sample_billing_config(),
@@ -411,7 +424,7 @@ mod tests {
                 &[]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 48282184443231661
             }
@@ -425,7 +438,6 @@ mod tests {
         chain.config.network_fee_usdcents *= 12;
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &chain,
                 &sample_billing_config(),
@@ -433,7 +445,7 @@ mod tests {
                 &[]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the network fee component of the sum
                 amount: 298071755652939846
@@ -444,14 +456,13 @@ mod tests {
     #[test]
     fn network_fee_for_an_unsupported_token_fails() {
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: Pubkey::new_unique(),
             amount: 1,
         }];
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &sample_dest_chain(),
                 &sample_billing_config(),
@@ -480,14 +491,13 @@ mod tests {
         per_chain_per_token.billing.max_fee_usdcents = 0;
 
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: per_chain_per_token.mint,
             amount: 1,
         }];
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -495,9 +505,9 @@ mod tests {
                 &[per_chain_per_token]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 52885511932309044,
+                amount: 52911699750913573,
             }
         );
     }
@@ -515,14 +525,13 @@ mod tests {
         another_per_chain_per_token_config.billing.max_fee_usdcents = 1600;
 
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: another_token_config.mint,
             amount: 1,
         }];
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -530,10 +539,10 @@ mod tests {
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the min_fee
-                amount: 398110981980079407
+                amount: 398634738352169990
             }
         );
     }
@@ -553,14 +562,13 @@ mod tests {
         another_per_chain_per_token_config.billing.deci_bps = 10000;
 
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: another_token_config.mint,
             amount: 15_000_000_000_000_000,
         }];
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -568,9 +576,9 @@ mod tests {
                 &[another_per_chain_per_token_config.clone()]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 36130696584140229
+                amount: 36654452956230811
             }
         );
 
@@ -579,7 +587,6 @@ mod tests {
 
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -587,10 +594,10 @@ mod tests {
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 // Slight increase in price
-                amount: 37480696584140229
+                amount: 38004452956230811
             }
         );
     }
@@ -608,14 +615,13 @@ mod tests {
         another_per_chain_per_token_config.billing.deci_bps = 10000;
 
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: another_per_chain_per_token_config.mint,
             amount: 15_000_000_000_000_000,
         }];
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -623,9 +629,9 @@ mod tests {
                 &[another_per_chain_per_token_config.clone()]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 35234859440885153
+                amount: 35758615812975735
             }
         );
 
@@ -634,7 +640,6 @@ mod tests {
 
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -642,9 +647,9 @@ mod tests {
                 &[another_per_chain_per_token_config.clone()]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
-                amount: 35234859440885153
+                amount: 35758615812975735
             }
         );
     }
@@ -657,13 +662,13 @@ mod tests {
         let mut message = sample_message();
         message.token_amounts = tokens
             .iter()
-            .map(|t| SolanaTokenAmount {
+            .map(|t| SVMTokenAmount {
                 token: t.mint,
                 amount: 1,
             })
             .collect();
 
-        let tokens: Vec<_> = tokens.into_iter().map(|t| Some(t)).collect();
+        let tokens: Vec<_> = tokens.into_iter().map(Some).collect();
         let per_chains: Vec<_> = per_chains.into_iter().collect();
         set_syscall_stubs(Box::new(TestStubs));
 
@@ -671,7 +676,6 @@ mod tests {
         chain.config.max_number_of_tokens_per_msg = 5;
         assert_eq!(
             fee_for_msg(
-                0,
                 &message,
                 &chain,
                 &sample_billing_config(),
@@ -679,15 +683,15 @@ mod tests {
                 &per_chains
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens
-                amount: 153233232867589323
+                amount: 155328258355951652
             }
         );
     }
 
-    fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
+    pub fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
         let mint = Pubkey::new_unique();
         (
             sample_billing_config(),
@@ -713,7 +717,6 @@ mod tests {
         billing_config.usd_per_token.timestamp = 0;
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &sample_dest_chain(),
                 &billing_config,
@@ -731,7 +734,6 @@ mod tests {
         billing_config.usd_per_token.value = [0u8; 28];
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &sample_dest_chain(),
                 &billing_config,
@@ -753,7 +755,6 @@ mod tests {
             -2 * chain.config.gas_price_staleness_threshold as i64;
         assert_eq!(
             fee_for_msg(
-                0,
                 &sample_message(),
                 &chain,
                 &sample_billing_config(),
@@ -777,5 +778,24 @@ mod tests {
         let roundtrip: PackedPrice = (&ts_packed).into();
 
         assert_eq!(price, roundtrip);
+    }
+
+    #[test]
+    fn test_packed_price_from_bytes() {
+        // 2gwei DA encoded in higher order 112 bits, 1gwei Exec gas price encoded in lower order 112 bits
+        let bytes = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1b, 0xc1, 0x6d, 0x67, 0x4e, 0xc8, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0xe0, 0xb6, 0xb3, 0xa7, 0x64, 0x00, 0x00,
+        ];
+
+        let ts_packed = TimestampedPackedU224 {
+            value: bytes,
+            timestamp: 0,
+        };
+
+        let price: PackedPrice = (&ts_packed).into();
+
+        assert_eq!(price.execution_gas_price, Usd18Decimals(1u32.e(18)));
+        assert_eq!(price.data_availability_gas_price, Usd18Decimals(2u32.e(18)));
     }
 }

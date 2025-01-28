@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -92,8 +93,10 @@ func (o *observer) Observe(
 	messages []cciptypes.Message,
 	messageTimestamps map[cciptypes.Bytes32]time.Time,
 ) ([]cciptypes.Bytes32, error) {
+	lggr := logutil.WithContextValues(ctx, o.lggr)
+
 	if !o.enabled {
-		o.lggr.Infof("Observer is disabled")
+		lggr.Infof("Observer is disabled")
 		return nil, nil
 	}
 
@@ -117,18 +120,34 @@ func (o *observer) Observe(
 		if !ok {
 			return nil, fmt.Errorf("missing fee for message %s", msg.Header.MessageID)
 		}
+		if err := validatePositive(fee); err != nil {
+			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
+		}
 		execCost, ok := execCosts[msg.Header.MessageID]
 		if !ok {
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
 		}
+		if err := validatePositive(execCost); err != nil {
+			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
+		}
 		if fee.Cmp(execCost) < 0 {
-			o.lggr.Warnw("Message is too costly to execute", "messageID",
+			lggr.Warnw("Message is too costly to execute", "messageID",
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
 		}
 	}
 
 	return costlyMessages, nil
+}
+
+func validatePositive(fee *big.Int) error {
+	if fee == nil {
+		return fmt.Errorf("fee is nil")
+	}
+	if fee.Cmp(big.NewInt(0)) <= 0 {
+		return fmt.Errorf("fee is non positive %d", fee)
+	}
+	return nil
 }
 
 var _ Observer = &observer{}
@@ -143,27 +162,29 @@ type MessageFeeE18USDCalculator interface {
 	) (map[cciptypes.Bytes32]plugintypes.USD18, error)
 }
 
-// ZeroMessageFeeUSD18Calculator returns a fee of 0 for all messages.
-type ZeroMessageFeeUSD18Calculator struct{}
+// ConstMessageFeeUSD18Calculator returns a fee of 0 for all messages.
+type ConstMessageFeeUSD18Calculator struct {
+	fee *big.Int
+}
 
-func NewZeroMessageFeeUSD18Calculator() *ZeroMessageFeeUSD18Calculator {
-	return &ZeroMessageFeeUSD18Calculator{}
+func NewConstMessageFeeUSD18Calculator(fee *big.Int) *ConstMessageFeeUSD18Calculator {
+	return &ConstMessageFeeUSD18Calculator{fee: fee}
 }
 
 // MessageFeeUSD18 returns a fee of 0 for all messages.
-func (n *ZeroMessageFeeUSD18Calculator) MessageFeeUSD18(
+func (n *ConstMessageFeeUSD18Calculator) MessageFeeUSD18(
 	_ context.Context,
 	messages []cciptypes.Message,
 	_ map[cciptypes.Bytes32]time.Time,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
 	messageFees := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
-		messageFees[msg.Header.MessageID] = plugintypes.NewUSD18(0)
+		messageFees[msg.Header.MessageID] = n.fee
 	}
 	return messageFees, nil
 }
 
-var _ MessageFeeE18USDCalculator = &ZeroMessageFeeUSD18Calculator{}
+var _ MessageFeeE18USDCalculator = &ConstMessageFeeUSD18Calculator{}
 
 // MessageExecCostUSD18Calculator Calculates the execution cost of a set of messages in USD18s.
 type MessageExecCostUSD18Calculator interface {
@@ -171,26 +192,30 @@ type MessageExecCostUSD18Calculator interface {
 	MessageExecCostUSD18(context.Context, []cciptypes.Message) (map[cciptypes.Bytes32]plugintypes.USD18, error)
 }
 
-// ZeroMessageExecCostUSD18Calculator returns a cost of 0 for all messages.
-type ZeroMessageExecCostUSD18Calculator struct{}
+// ConstMessageExecCostUSD18Calculator returns a cost of 0 for all messages.
+type ConstMessageExecCostUSD18Calculator struct {
+	cost *big.Int
+}
 
-func NewZeroMessageExecCostUSD18Calculator() *ZeroMessageExecCostUSD18Calculator {
-	return &ZeroMessageExecCostUSD18Calculator{}
+func NewConstMessageExecCostUSD18Calculator(cost *big.Int) *ConstMessageExecCostUSD18Calculator {
+	return &ConstMessageExecCostUSD18Calculator{
+		cost: cost,
+	}
 }
 
 // MessageExecCostUSD18 returns a cost of 0 for all messages.
-func (n *ZeroMessageExecCostUSD18Calculator) MessageExecCostUSD18(
+func (n *ConstMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	_ context.Context,
 	messages []cciptypes.Message,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
 	messageExecCosts := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
-		messageExecCosts[msg.Header.MessageID] = plugintypes.NewUSD18(0)
+		messageExecCosts[msg.Header.MessageID] = n.cost
 	}
 	return messageExecCosts, nil
 }
 
-var _ MessageExecCostUSD18Calculator = &ZeroMessageExecCostUSD18Calculator{}
+var _ MessageExecCostUSD18Calculator = &ConstMessageExecCostUSD18Calculator{}
 
 // StaticMessageFeeUSD18Calculator returns a static fee for all messages.
 type StaticMessageFeeUSD18Calculator struct {
@@ -296,6 +321,8 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 	messages []cciptypes.Message,
 	messageTimeStamps map[cciptypes.Bytes32]time.Time,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
+	lggr := logutil.WithContextValues(ctx, c.lggr)
+
 	linkPriceUSD, err := c.ccipReader.LinkPriceUSD(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get LINK price in USD: %w", err)
@@ -303,16 +330,14 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 
 	messageFees := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
-		feeUSD18 := new(big.Int).Div(
-			new(big.Int).Mul(linkPriceUSD.Int, msg.FeeValueJuels.Int),
-			new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
-		)
+		feeUSD18 := mathslib.CalculateUsdPerUnitGas(msg.FeeValueJuels.Int, linkPriceUSD.Int)
 		timestamp, ok := messageTimeStamps[msg.Header.MessageID]
 		if !ok {
 			// If a timestamp is missing we can't do fee boosting, but we still record the fee. In the worst case, the
 			// message will not be executed (as it will be considered too costly).
-			c.lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
+			lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
 		} else {
+			// TODO: What's the blockchain timestamp? Should we use now().UTC instead?
 			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
@@ -351,6 +376,8 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	ctx context.Context,
 	messages []cciptypes.Message,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
+	lggr := logutil.WithContextValues(ctx, c.lggr)
+
 	if len(messages) == 0 {
 		return nil, fmt.Errorf("no messages provided")
 	}
@@ -367,7 +394,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 		return nil, fmt.Errorf("missing data availability fee")
 	}
 
-	executionFee, daFee, err := c.getFeesUSD18(ctx, feeComponents, messages[0].Header.DestChainSelector)
+	executionFee, daFee, err := c.getFeesUSD18(ctx, lggr, feeComponents, messages[0].Header.DestChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert fee components to USD18: %w", err)
 	}
@@ -389,6 +416,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 
 func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	ctx context.Context,
+	lggr logger.Logger,
 	feeComponents types.ChainFeeComponents,
 	destChainSelector cciptypes.ChainSelector,
 ) (plugintypes.USD18, plugintypes.USD18, error) {
@@ -406,7 +434,8 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	executionFee := mathslib.CalculateUsdPerUnitGas(feeComponents.ExecutionFee, nativeTokenPrice.Int)
 	dataAvailabilityFee := mathslib.CalculateUsdPerUnitGas(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int)
 
-	c.lggr.Debugw("Fee calculation", "nativeTokenPrice", nativeTokenPrice,
+	lggr.Debugw("Fee calculation",
+		"nativeTokenPrice", nativeTokenPrice,
 		"feeComponents.ExecutionFee", feeComponents.ExecutionFee,
 		"feeComponents.DataAvailabilityFee", feeComponents.DataAvailabilityFee,
 		"executionFee", executionFee,
@@ -469,6 +498,17 @@ func calculateMessageMaxDAGas(
 	dataGas = new(big.Int).Div(dataGas, big.NewInt(daMultiplierBase))
 
 	return dataGas
+}
+
+type NoopObserver struct{}
+
+func (n *NoopObserver) Observe(
+	_ context.Context,
+	_ []cciptypes.Message,
+	_ map[cciptypes.Bytes32]time.Time,
+) ([]cciptypes.Bytes32, error) {
+	costlyMessages := make([]cciptypes.Bytes32, 0)
+	return costlyMessages, nil
 }
 
 var _ MessageExecCostUSD18Calculator = &CCIPMessageExecCostUSD18Calculator{}

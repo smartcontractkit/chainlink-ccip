@@ -5,18 +5,22 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 )
 
-func SignCommitReport(ctx [3][32]byte, report ccip_router.CommitInput, baseSigners []eth.Signer) (sigs [][65]byte, err error) {
+type Signatures struct {
+	Rs    [][32]byte
+	Ss    [][32]byte
+	RawVs [32]byte
+}
+
+func SignCommitReport(ctx [2][32]byte, report ccip_router.CommitInput, baseSigners []eth.Signer) (sigs Signatures, err error) {
 	hash, err := HashCommitReport(ctx, report)
 	if err != nil {
-		return nil, err
+		return Signatures{}, err
 	}
 
 	// make copy to avoid race flakiness when randomizing with parallel tests
@@ -30,32 +34,9 @@ func SignCommitReport(ctx [3][32]byte, report ccip_router.CommitInput, baseSigne
 
 	for i := uint8(0); i < config.OcrF+1; i++ {
 		baseSig := ecdsa.SignCompact(secp256k1.PrivKeyFromBytes(signers[i].PrivateKey), hash, false)
-		baseSig[0] = baseSig[0] - 27 // key signs 27 or 28, but verification expects 0 or 1 (remove offset)
-		sigs = append(sigs, [65]byte(baseSig))
+		sigs.RawVs[i] = baseSig[0] - 27 // key signs 27 or 28, but verification expects 0 or 1 (remove offset)
+		sigs.Rs = append(sigs.Rs, [32]byte(baseSig[1:33]))
+		sigs.Ss = append(sigs.Ss, [32]byte(baseSig[33:65]))
 	}
 	return sigs, nil
-}
-
-func GetSourceChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
-	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, config.CcipRouterProgram)
-	return p, err
-}
-
-func GetDestChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
-	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), chainSelectorLE}, config.CcipRouterProgram)
-	return p, err
-}
-
-func GetCommitReportPDA(chainSelector uint64, root [32]byte) (solana.PublicKey, error) {
-	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), chainSelectorLE, root[:]}, config.CcipRouterProgram)
-	return p, err
-}
-
-func GetNoncePDA(chainSelector uint64, user solana.PublicKey) (solana.PublicKey, error) {
-	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("nonce"), chainSelectorLE, user.Bytes()}, config.CcipRouterProgram)
-	return p, err
 }

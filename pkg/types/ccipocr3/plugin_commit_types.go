@@ -1,6 +1,10 @@
 package ccipocr3
 
-import "bytes"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+)
 
 // CommitPluginReport contains the necessary information to commit CCIP
 // messages from potentially many source chains, to a single destination chain.
@@ -44,6 +48,12 @@ type MerkleRootChain struct {
 	MerkleRoot    Bytes32        `json:"merkleRoot"`
 }
 
+// String returns a string representation of the MerkleRootChain
+func (m MerkleRootChain) String() string {
+	return fmt.Sprintf("MerkleRoot(chain:%d, seqNumsRange:%s, merkleRoot:%s, onRamp:%s)",
+		m.ChainSel, m.SeqNumsRange, m.MerkleRoot, m.OnRampAddress)
+}
+
 func (m MerkleRootChain) Equals(other MerkleRootChain) bool {
 	return m.ChainSel == other.ChainSel &&
 		bytes.Equal(m.OnRampAddress, other.OnRampAddress) &&
@@ -54,4 +64,37 @@ func (m MerkleRootChain) Equals(other MerkleRootChain) bool {
 type PriceUpdates struct {
 	TokenPriceUpdates []TokenPrice    `json:"tokenPriceUpdates"`
 	GasPriceUpdates   []GasPriceChain `json:"gasPriceUpdates"`
+}
+
+// ReportInfo is the info data that will be sent with the along with the report
+// It will be used to determine if the report should be accepted or not
+type CommitReportInfo struct {
+	// RemoteF Max number of faulty RMN nodes; f+1 signers are required to verify a report.
+	RemoteF     uint64            `json:"remoteF"`
+	MerkleRoots []MerkleRootChain `json:"merkleRoots"`
+}
+
+func (cri CommitReportInfo) Encode() ([]byte, error) {
+	data, err := json.Marshal(cri)
+	data = append([]byte{01}, data...)
+	return data, err
+}
+
+// DecodeCommitReportInfo is a version aware decode function for the commit
+// report info bytes.
+func DecodeCommitReportInfo(data []byte) (CommitReportInfo, error) {
+	if len(data) == 0 {
+		return CommitReportInfo{}, nil
+	}
+
+	switch data[0] {
+	case 1:
+		var result CommitReportInfo
+		dec := json.NewDecoder(bytes.NewReader(data[1:]))
+		dec.DisallowUnknownFields()
+		err := dec.Decode(&result)
+		return result, err
+	default:
+		return CommitReportInfo{}, fmt.Errorf("unknown execute report info version (%d)", data[0])
+	}
 }

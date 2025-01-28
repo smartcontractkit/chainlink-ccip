@@ -7,15 +7,15 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Any2SolanaMessage struct {
+type Any2SVMMessage struct {
 	MessageId           [32]uint8
 	SourceChainSelector uint64
 	Sender              []byte
 	Data                []byte
-	TokenAmounts        []SolanaTokenAmount
+	TokenAmounts        []SVMTokenAmount
 }
 
-func (obj Any2SolanaMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Any2SVMMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `MessageId` param:
 	err = encoder.Encode(obj.MessageId)
 	if err != nil {
@@ -44,7 +44,7 @@ func (obj Any2SolanaMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 
-func (obj *Any2SolanaMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Any2SVMMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `MessageId`:
 	err = decoder.Decode(&obj.MessageId)
 	if err != nil {
@@ -73,12 +73,12 @@ func (obj *Any2SolanaMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-type SolanaTokenAmount struct {
+type SVMTokenAmount struct {
 	Token  ag_solanago.PublicKey
 	Amount uint64
 }
 
-func (obj SolanaTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SVMTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Token` param:
 	err = encoder.Encode(obj.Token)
 	if err != nil {
@@ -92,7 +92,7 @@ func (obj SolanaTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 
-func (obj *SolanaTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SVMTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Token`:
 	err = decoder.Decode(&obj.Token)
 	if err != nil {

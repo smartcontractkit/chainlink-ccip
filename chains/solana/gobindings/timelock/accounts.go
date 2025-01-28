@@ -143,7 +143,6 @@ type Operation struct {
 	Id                [32]uint8
 	Predecessor       [32]uint8
 	Salt              [32]uint8
-	Authority         ag_solanago.PublicKey
 	IsFinalized       bool
 	TotalInstructions uint32
 	Instructions      []InstructionData
@@ -174,11 +173,6 @@ func (obj Operation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	}
 	// Serialize `Salt` param:
 	err = encoder.Encode(obj.Salt)
-	if err != nil {
-		return err
-	}
-	// Serialize `Authority` param:
-	err = encoder.Encode(obj.Authority)
 	if err != nil {
 		return err
 	}
@@ -231,11 +225,6 @@ func (obj *Operation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	}
 	// Deserialize `Salt`:
 	err = decoder.Decode(&obj.Salt)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Authority`:
-	err = decoder.Decode(&obj.Authority)
 	if err != nil {
 		return err
 	}

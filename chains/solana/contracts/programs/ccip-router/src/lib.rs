@@ -13,6 +13,8 @@ use crate::state::*;
 mod event;
 use crate::event::*;
 
+mod ocr3base;
+
 mod messages;
 use crate::messages::*;
 
@@ -49,24 +51,29 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
-    /// * `solana_chain_selector` - The chain selector for Solana.
+    /// * `svm_chain_selector` - The chain selector for SVM.
     /// * `default_gas_limit` - The default gas limit for other destination chains.
     /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<InitializeCCIPRouter>,
-        solana_chain_selector: u64,
+        svm_chain_selector: u64,
         default_gas_limit: u128,
         default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
         fee_aggregator: Pubkey,
+        link_token_mint: Pubkey,
+        max_fee_juels_per_msg: u128,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
         config.version = 1;
-        config.solana_chain_selector = solana_chain_selector;
+        config.svm_chain_selector = svm_chain_selector;
         config.default_gas_limit = default_gas_limit;
         config.enable_manual_execution_after = enable_execution_after;
+        config.link_token_mint = link_token_mint;
+        config.max_fee_juels_per_msg = max_fee_juels_per_msg;
 
         if default_allow_out_of_order_execution {
             config.default_allow_out_of_order_execution = 1;
@@ -217,19 +224,19 @@ pub mod ccip_router {
         v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
     }
 
-    /// Updates the Solana chain selector in the router configuration.
+    /// Updates the SVM chain selector in the router configuration.
     ///
     /// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for updating the configuration.
-    /// * `new_chain_selector` - The new chain selector for Solana.
-    pub fn update_solana_chain_selector(
+    /// * `new_chain_selector` - The new chain selector for SVM.
+    pub fn update_svm_chain_selector(
         ctx: Context<UpdateConfigCCIPRouter>,
         new_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::update_solana_chain_selector(ctx, new_chain_selector)
+        v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
     }
 
     /// Updates the default gas limit in the router configuration.
@@ -267,7 +274,7 @@ pub mod ccip_router {
 
     /// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
     ///
-    /// This is part of the OffRamp Configuration for Solana.
+    /// This is part of the OffRamp Configuration for SVM.
     /// The Admin is the only one able to update this config.
     ///
     /// # Arguments
@@ -465,7 +472,7 @@ pub mod ccip_router {
     pub fn get_fee<'info>(
         ctx: Context<'_, '_, 'info, 'info, GetFee>,
         dest_chain_selector: u64,
-        message: Solana2AnyMessage,
+        message: SVM2AnyMessage,
     ) -> Result<u64> {
         v1::onramp::get_fee(ctx, dest_chain_selector, message)
     }
@@ -503,9 +510,10 @@ pub mod ccip_router {
     pub fn ccip_send<'info>(
         ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
         dest_chain_selector: u64,
-        message: Solana2AnyMessage,
+        message: SVM2AnyMessage,
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::onramp::ccip_send(ctx, dest_chain_selector, message)
+        v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
 
     /// OFF RAMP FLOW
@@ -513,7 +521,7 @@ pub mod ccip_router {
     ///
     /// The method name needs to be commit with Anchor encoding.
     ///
-    /// This function is called by the OffChain when committing one Report to the Solana Router.
+    /// This function is called by the OffChain when committing one Report to the SVM Router.
     /// In this Flow only one report is sent, the Commit Report. This is different as EVM does,
     /// this is because here all the chain state is stored in one account per Merkle Tree Root.
     /// So, to avoid having to send a dynamic size array of accounts, in this message only one Commit Report Account is sent.
@@ -528,16 +536,19 @@ pub mod ccip_router {
     /// * `report_context_byte_words` - consists of:
     ///     * report_context_byte_words[0]: ConfigDigest
     ///     * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-    ///     * report_context_byte_words[2]: ExtraHash
-    /// * `report` - The commit input report, single merkle root with RMN signatures and price updates
-    /// * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
+    /// * `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates
+    /// * `rs` - slice of R components of signatures
+    /// * `ss` - slice of S components of signatures
+    /// * `raw_vs` - array of V components of signatures
     pub fn commit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
-        report_context_byte_words: [[u8; 32]; 3],
-        report: CommitInput,
-        signatures: Vec<[u8; 65]>,
+        report_context_byte_words: [[u8; 32]; 2],
+        raw_report: Vec<u8>,
+        rs: Vec<[u8; 32]>,
+        ss: Vec<[u8; 32]>,
+        raw_vs: [u8; 32],
     ) -> Result<()> {
-        v1::offramp::commit(ctx, report_context_byte_words, report, signatures)
+        v1::offramp::commit(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
     }
 
     /// OFF RAMP FLOW
@@ -545,7 +556,7 @@ pub mod ccip_router {
     ///
     /// The method name needs to be execute with Anchor encoding.
     ///
-    /// This function is called by the OffChain when executing one Report to the Solana Router.
+    /// This function is called by the OffChain when executing one Report to the SVM Router.
     /// In this Flow only one message is sent, the Execution Report. This is different as EVM does,
     /// this is because there is no try/catch mechanism to allow batch execution.
     /// This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.
@@ -556,18 +567,23 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for the execute.
-    /// * `execution_report` - the execution report containing only one message and proofs
+    /// * `raw_execution_report` - the serialized execution report containing only one message and proofs
     /// * `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)
     /// *  consists of:
     ///     * report_context_byte_words[0]: ConfigDigest
     ///     * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-    ///     * report_context_byte_words[2]: ExtraHash
     pub fn execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-        execution_report: ExecutionReportSingleChain,
-        report_context_byte_words: [[u8; 32]; 3],
+        raw_execution_report: Vec<u8>,
+        report_context_byte_words: [[u8; 32]; 2],
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::execute(ctx, execution_report, report_context_byte_words)
+        v1::offramp::execute(
+            ctx,
+            raw_execution_report,
+            report_context_byte_words,
+            &token_indexes,
+        )
     }
 
     /// Manually executes a report to the router.
@@ -579,12 +595,13 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for the execution.
-    /// * `execution_report` - The execution report containing the message and proofs.
+    /// * `raw_execution_report` - The serialized execution report containing the message and proofs.
     pub fn manually_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-        execution_report: ExecutionReportSingleChain,
+        raw_execution_report: Vec<u8>,
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::manually_execute(ctx, execution_report)
+        v1::offramp::manually_execute(ctx, raw_execution_report, &token_indexes)
     }
 }
 
@@ -664,4 +681,12 @@ pub enum CcipRouterError {
     UnsupportedToken,
     #[msg("Inputs are missing token configuration")]
     InvalidInputsMissingTokenConfig,
+    #[msg("Message fee is too high")]
+    MessageFeeTooHigh,
+    #[msg("Source token data is too large")]
+    SourceTokenDataTooLarge,
+    #[msg("Message gas limit too high")]
+    MessageGasLimitTooHigh,
+    #[msg("Extra arg out of order execution must be true")]
+    ExtraArgOutOfOrderExecutionMustBeTrue,
 }

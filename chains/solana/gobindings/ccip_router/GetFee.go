@@ -34,18 +34,20 @@ import (
 // The fee amount in u64.
 type GetFee struct {
 	DestChainSelector *uint64
-	Message           *Solana2AnyMessage
+	Message           *SVM2AnyMessage
 
-	// [0] = [] destChainState
+	// [0] = [] config
 	//
-	// [1] = [] billingTokenConfig
+	// [1] = [] destChainState
+	//
+	// [2] = [] billingTokenConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewGetFeeInstructionBuilder creates a new `GetFee` instruction builder.
 func NewGetFeeInstructionBuilder() *GetFee {
 	nd := &GetFee{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -57,31 +59,42 @@ func (inst *GetFee) SetDestChainSelector(destChainSelector uint64) *GetFee {
 }
 
 // SetMessage sets the "message" parameter.
-func (inst *GetFee) SetMessage(message Solana2AnyMessage) *GetFee {
+func (inst *GetFee) SetMessage(message SVM2AnyMessage) *GetFee {
 	inst.Message = &message
 	return inst
 }
 
+// SetConfigAccount sets the "config" account.
+func (inst *GetFee) SetConfigAccount(config ag_solanago.PublicKey) *GetFee {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *GetFee) GetConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
 // SetDestChainStateAccount sets the "destChainState" account.
 func (inst *GetFee) SetDestChainStateAccount(destChainState ag_solanago.PublicKey) *GetFee {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(destChainState)
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(destChainState)
 	return inst
 }
 
 // GetDestChainStateAccount gets the "destChainState" account.
 func (inst *GetFee) GetDestChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice[1]
 }
 
 // SetBillingTokenConfigAccount sets the "billingTokenConfig" account.
 func (inst *GetFee) SetBillingTokenConfigAccount(billingTokenConfig ag_solanago.PublicKey) *GetFee {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(billingTokenConfig)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(billingTokenConfig)
 	return inst
 }
 
 // GetBillingTokenConfigAccount gets the "billingTokenConfig" account.
 func (inst *GetFee) GetBillingTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst GetFee) Build() *Instruction {
@@ -115,9 +128,12 @@ func (inst *GetFee) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.DestChainState is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.DestChainState is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.BillingTokenConfig is not set")
 		}
 	}
@@ -139,9 +155,10 @@ func (inst *GetFee) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    destChainState", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("billingTokenConfig", inst.AccountMetaSlice[1]))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    destChainState", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("billingTokenConfig", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -178,13 +195,15 @@ func (obj *GetFee) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 func NewGetFeeInstruction(
 	// Parameters:
 	destChainSelector uint64,
-	message Solana2AnyMessage,
+	message SVM2AnyMessage,
 	// Accounts:
+	config ag_solanago.PublicKey,
 	destChainState ag_solanago.PublicKey,
 	billingTokenConfig ag_solanago.PublicKey) *GetFee {
 	return NewGetFeeInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
 		SetMessage(message).
+		SetConfigAccount(config).
 		SetDestChainStateAccount(destChainState).
 		SetBillingTokenConfigAccount(billingTokenConfig)
 }

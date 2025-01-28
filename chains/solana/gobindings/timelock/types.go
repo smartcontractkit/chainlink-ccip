@@ -141,6 +141,7 @@ const (
 	DelayInsufficient_TimelockError
 	OperationNotCancellable_TimelockError
 	OperationNotReady_TimelockError
+	OperationAlreadyExecuted_TimelockError
 	MissingDependency_TimelockError
 	InvalidAccessController_TimelockError
 	BlockedSelector_TimelockError
@@ -171,6 +172,8 @@ func (value TimelockError) String() string {
 		return "OperationNotCancellable"
 	case OperationNotReady_TimelockError:
 		return "OperationNotReady"
+	case OperationAlreadyExecuted_TimelockError:
+		return "OperationAlreadyExecuted"
 	case MissingDependency_TimelockError:
 		return "MissingDependency"
 	case InvalidAccessController_TimelockError:

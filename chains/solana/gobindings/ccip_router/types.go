@@ -8,8 +8,9 @@ import (
 )
 
 type CommitInput struct {
-	PriceUpdates PriceUpdates
-	MerkleRoot   MerkleRoot
+	PriceUpdates  PriceUpdates
+	MerkleRoot    MerkleRoot
+	RmnSignatures [][64]uint8
 }
 
 func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -20,6 +21,11 @@ func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	}
 	// Serialize `MerkleRoot` param:
 	err = encoder.Encode(obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnSignatures` param:
+	err = encoder.Encode(obj.RmnSignatures)
 	if err != nil {
 		return err
 	}
@@ -34,6 +40,11 @@ func (obj *CommitInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	}
 	// Deserialize `MerkleRoot`:
 	err = decoder.Decode(&obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnSignatures`:
+	err = decoder.Decode(&obj.RmnSignatures)
 	if err != nil {
 		return err
 	}
@@ -205,253 +216,6 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
-type LockOrBurnInV1 struct {
-	Receiver            []byte
-	RemoteChainSelector uint64
-	OriginalSender      ag_solanago.PublicKey
-	Amount              uint64
-	LocalToken          ag_solanago.PublicKey
-}
-
-func (obj LockOrBurnInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Receiver` param:
-	err = encoder.Encode(obj.Receiver)
-	if err != nil {
-		return err
-	}
-	// Serialize `RemoteChainSelector` param:
-	err = encoder.Encode(obj.RemoteChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `OriginalSender` param:
-	err = encoder.Encode(obj.OriginalSender)
-	if err != nil {
-		return err
-	}
-	// Serialize `Amount` param:
-	err = encoder.Encode(obj.Amount)
-	if err != nil {
-		return err
-	}
-	// Serialize `LocalToken` param:
-	err = encoder.Encode(obj.LocalToken)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *LockOrBurnInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Receiver`:
-	err = decoder.Decode(&obj.Receiver)
-	if err != nil {
-		return err
-	}
-	// Deserialize `RemoteChainSelector`:
-	err = decoder.Decode(&obj.RemoteChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OriginalSender`:
-	err = decoder.Decode(&obj.OriginalSender)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Amount`:
-	err = decoder.Decode(&obj.Amount)
-	if err != nil {
-		return err
-	}
-	// Deserialize `LocalToken`:
-	err = decoder.Decode(&obj.LocalToken)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type ReleaseOrMintInV1 struct {
-	OriginalSender      []byte
-	RemoteChainSelector uint64
-	Receiver            ag_solanago.PublicKey
-	Amount              [32]uint8
-	LocalToken          ag_solanago.PublicKey
-
-	// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
-	// expected pool address for the given remoteChainSelector.
-	SourcePoolAddress []byte
-	SourcePoolData    []byte
-
-	// @dev WARNING: offchainTokenData is untrusted data.
-	OffchainTokenData []byte
-}
-
-func (obj ReleaseOrMintInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `OriginalSender` param:
-	err = encoder.Encode(obj.OriginalSender)
-	if err != nil {
-		return err
-	}
-	// Serialize `RemoteChainSelector` param:
-	err = encoder.Encode(obj.RemoteChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `Receiver` param:
-	err = encoder.Encode(obj.Receiver)
-	if err != nil {
-		return err
-	}
-	// Serialize `Amount` param:
-	err = encoder.Encode(obj.Amount)
-	if err != nil {
-		return err
-	}
-	// Serialize `LocalToken` param:
-	err = encoder.Encode(obj.LocalToken)
-	if err != nil {
-		return err
-	}
-	// Serialize `SourcePoolAddress` param:
-	err = encoder.Encode(obj.SourcePoolAddress)
-	if err != nil {
-		return err
-	}
-	// Serialize `SourcePoolData` param:
-	err = encoder.Encode(obj.SourcePoolData)
-	if err != nil {
-		return err
-	}
-	// Serialize `OffchainTokenData` param:
-	err = encoder.Encode(obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ReleaseOrMintInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `OriginalSender`:
-	err = decoder.Decode(&obj.OriginalSender)
-	if err != nil {
-		return err
-	}
-	// Deserialize `RemoteChainSelector`:
-	err = decoder.Decode(&obj.RemoteChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Receiver`:
-	err = decoder.Decode(&obj.Receiver)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Amount`:
-	err = decoder.Decode(&obj.Amount)
-	if err != nil {
-		return err
-	}
-	// Deserialize `LocalToken`:
-	err = decoder.Decode(&obj.LocalToken)
-	if err != nil {
-		return err
-	}
-	// Deserialize `SourcePoolAddress`:
-	err = decoder.Decode(&obj.SourcePoolAddress)
-	if err != nil {
-		return err
-	}
-	// Deserialize `SourcePoolData`:
-	err = decoder.Decode(&obj.SourcePoolData)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OffchainTokenData`:
-	err = decoder.Decode(&obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type LockOrBurnOutV1 struct {
-	DestTokenAddress []byte
-	DestPoolData     []byte
-}
-
-func (obj LockOrBurnOutV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `DestTokenAddress` param:
-	err = encoder.Encode(obj.DestTokenAddress)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestPoolData` param:
-	err = encoder.Encode(obj.DestPoolData)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *LockOrBurnOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `DestTokenAddress`:
-	err = decoder.Decode(&obj.DestTokenAddress)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestPoolData`:
-	err = decoder.Decode(&obj.DestPoolData)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type ReleaseOrMintOutV1 struct {
-	DestinationAmount uint64
-}
-
-func (obj ReleaseOrMintOutV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `DestinationAmount` param:
-	err = encoder.Encode(obj.DestinationAmount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `DestinationAmount`:
-	err = decoder.Decode(&obj.DestinationAmount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type ReportContext struct {
-	ByteWords [3][32]uint8
-}
-
-func (obj ReportContext) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ByteWords` param:
-	err = encoder.Encode(obj.ByteWords)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ReportContext) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ByteWords`:
-	err = decoder.Decode(&obj.ByteWords)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type RampMessageHeader struct {
 	MessageId           [32]uint8
 	SourceChainSelector uint64
@@ -520,11 +284,10 @@ func (obj *RampMessageHeader) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 
 type ExecutionReportSingleChain struct {
 	SourceChainSelector uint64
-	Message             Any2SolanaRampMessage
+	Message             Any2SVMRampMessage
 	OffchainTokenData   [][]byte
 	Root                [32]uint8
 	Proofs              [][32]uint8
-	TokenIndexes        []byte
 }
 
 func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -550,11 +313,6 @@ func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *ag_binary.Enco
 	}
 	// Serialize `Proofs` param:
 	err = encoder.Encode(obj.Proofs)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenIndexes` param:
-	err = encoder.Encode(obj.TokenIndexes)
 	if err != nil {
 		return err
 	}
@@ -587,55 +345,23 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenIndexes`:
-	err = decoder.Decode(&obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-type SolanaAccountMeta struct {
-	Pubkey     ag_solanago.PublicKey
-	IsWritable bool
+type SVMExtraArgs struct {
+	ComputeUnits     uint32
+	IsWritableBitmap uint64
+	Accounts         []ag_solanago.PublicKey
 }
 
-func (obj SolanaAccountMeta) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Pubkey` param:
-	err = encoder.Encode(obj.Pubkey)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsWritable` param:
-	err = encoder.Encode(obj.IsWritable)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *SolanaAccountMeta) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Pubkey`:
-	err = decoder.Decode(&obj.Pubkey)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsWritable`:
-	err = decoder.Decode(&obj.IsWritable)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type SolanaExtraArgs struct {
-	ComputeUnits uint32
-	Accounts     []SolanaAccountMeta
-}
-
-func (obj SolanaExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ComputeUnits` param:
 	err = encoder.Encode(obj.ComputeUnits)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsWritableBitmap` param:
+	err = encoder.Encode(obj.IsWritableBitmap)
 	if err != nil {
 		return err
 	}
@@ -647,9 +373,14 @@ func (obj SolanaExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	return nil
 }
 
-func (obj *SolanaExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SVMExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ComputeUnits`:
 	err = decoder.Decode(&obj.ComputeUnits)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsWritableBitmap`:
+	err = decoder.Decode(&obj.IsWritableBitmap)
 	if err != nil {
 		return err
 	}
@@ -694,16 +425,18 @@ func (obj *AnyExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	return nil
 }
 
-type Any2SolanaRampMessage struct {
-	Header       RampMessageHeader
-	Sender       []byte
-	Data         []byte
-	Receiver     ag_solanago.PublicKey
-	TokenAmounts []Any2SolanaTokenTransfer
-	ExtraArgs    SolanaExtraArgs
+type Any2SVMRampMessage struct {
+	Header        RampMessageHeader
+	Sender        []byte
+	Data          []byte
+	LogicReceiver ag_solanago.PublicKey
+	TokenReceiver ag_solanago.PublicKey
+	TokenAmounts  []Any2SVMTokenTransfer
+	ExtraArgs     SVMExtraArgs
+	OnRampAddress []byte
 }
 
-func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Header` param:
 	err = encoder.Encode(obj.Header)
 	if err != nil {
@@ -719,8 +452,13 @@ func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	if err != nil {
 		return err
 	}
-	// Serialize `Receiver` param:
-	err = encoder.Encode(obj.Receiver)
+	// Serialize `LogicReceiver` param:
+	err = encoder.Encode(obj.LogicReceiver)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenReceiver` param:
+	err = encoder.Encode(obj.TokenReceiver)
 	if err != nil {
 		return err
 	}
@@ -734,10 +472,15 @@ func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	if err != nil {
 		return err
 	}
+	// Serialize `OnRampAddress` param:
+	err = encoder.Encode(obj.OnRampAddress)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (obj *Any2SolanaRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Header`:
 	err = decoder.Decode(&obj.Header)
 	if err != nil {
@@ -753,8 +496,13 @@ func (obj *Any2SolanaRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	if err != nil {
 		return err
 	}
-	// Deserialize `Receiver`:
-	err = decoder.Decode(&obj.Receiver)
+	// Deserialize `LogicReceiver`:
+	err = decoder.Decode(&obj.LogicReceiver)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
 	if err != nil {
 		return err
 	}
@@ -768,21 +516,27 @@ func (obj *Any2SolanaRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	if err != nil {
 		return err
 	}
+	// Deserialize `OnRampAddress`:
+	err = decoder.Decode(&obj.OnRampAddress)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-type Solana2AnyRampMessage struct {
+type SVM2AnyRampMessage struct {
 	Header         RampMessageHeader
 	Sender         ag_solanago.PublicKey
 	Data           []byte
 	Receiver       []byte
 	ExtraArgs      AnyExtraArgs
 	FeeToken       ag_solanago.PublicKey
-	FeeTokenAmount uint64
-	TokenAmounts   []Solana2AnyTokenTransfer
+	TokenAmounts   []SVM2AnyTokenTransfer
+	FeeTokenAmount CrossChainAmount
+	FeeValueJuels  CrossChainAmount
 }
 
-func (obj Solana2AnyRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SVM2AnyRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Header` param:
 	err = encoder.Encode(obj.Header)
 	if err != nil {
@@ -813,20 +567,25 @@ func (obj Solana2AnyRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	if err != nil {
 		return err
 	}
+	// Serialize `TokenAmounts` param:
+	err = encoder.Encode(obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
 	// Serialize `FeeTokenAmount` param:
 	err = encoder.Encode(obj.FeeTokenAmount)
 	if err != nil {
 		return err
 	}
-	// Serialize `TokenAmounts` param:
-	err = encoder.Encode(obj.TokenAmounts)
+	// Serialize `FeeValueJuels` param:
+	err = encoder.Encode(obj.FeeValueJuels)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *Solana2AnyRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SVM2AnyRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Header`:
 	err = decoder.Decode(&obj.Header)
 	if err != nil {
@@ -857,28 +616,33 @@ func (obj *Solana2AnyRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	if err != nil {
 		return err
 	}
+	// Deserialize `TokenAmounts`:
+	err = decoder.Decode(&obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
 	// Deserialize `FeeTokenAmount`:
 	err = decoder.Decode(&obj.FeeTokenAmount)
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenAmounts`:
-	err = decoder.Decode(&obj.TokenAmounts)
+	// Deserialize `FeeValueJuels`:
+	err = decoder.Decode(&obj.FeeValueJuels)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-type Solana2AnyTokenTransfer struct {
+type SVM2AnyTokenTransfer struct {
 	SourcePoolAddress ag_solanago.PublicKey
 	DestTokenAddress  []byte
 	ExtraData         []byte
-	Amount            [32]uint8
+	Amount            CrossChainAmount
 	DestExecData      []byte
 }
 
-func (obj Solana2AnyTokenTransfer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SVM2AnyTokenTransfer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `SourcePoolAddress` param:
 	err = encoder.Encode(obj.SourcePoolAddress)
 	if err != nil {
@@ -907,7 +671,7 @@ func (obj Solana2AnyTokenTransfer) MarshalWithEncoder(encoder *ag_binary.Encoder
 	return nil
 }
 
-func (obj *Solana2AnyTokenTransfer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SVM2AnyTokenTransfer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `SourcePoolAddress`:
 	err = decoder.Decode(&obj.SourcePoolAddress)
 	if err != nil {
@@ -936,15 +700,15 @@ func (obj *Solana2AnyTokenTransfer) UnmarshalWithDecoder(decoder *ag_binary.Deco
 	return nil
 }
 
-type Any2SolanaTokenTransfer struct {
+type Any2SVMTokenTransfer struct {
 	SourcePoolAddress []byte
 	DestTokenAddress  ag_solanago.PublicKey
 	DestGasAmount     uint32
 	ExtraData         []byte
-	Amount            [32]uint8
+	Amount            CrossChainAmount
 }
 
-func (obj Any2SolanaTokenTransfer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Any2SVMTokenTransfer) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `SourcePoolAddress` param:
 	err = encoder.Encode(obj.SourcePoolAddress)
 	if err != nil {
@@ -973,7 +737,7 @@ func (obj Any2SolanaTokenTransfer) MarshalWithEncoder(encoder *ag_binary.Encoder
 	return nil
 }
 
-func (obj *Any2SolanaTokenTransfer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Any2SVMTokenTransfer) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `SourcePoolAddress`:
 	err = decoder.Decode(&obj.SourcePoolAddress)
 	if err != nil {
@@ -1002,16 +766,15 @@ func (obj *Any2SolanaTokenTransfer) UnmarshalWithDecoder(decoder *ag_binary.Deco
 	return nil
 }
 
-type Solana2AnyMessage struct {
+type SVM2AnyMessage struct {
 	Receiver     []byte
 	Data         []byte
-	TokenAmounts []SolanaTokenAmount
+	TokenAmounts []SVMTokenAmount
 	FeeToken     ag_solanago.PublicKey
 	ExtraArgs    ExtraArgsInput
-	TokenIndexes []byte
 }
 
-func (obj Solana2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SVM2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Receiver` param:
 	err = encoder.Encode(obj.Receiver)
 	if err != nil {
@@ -1037,15 +800,10 @@ func (obj Solana2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	if err != nil {
 		return err
 	}
-	// Serialize `TokenIndexes` param:
-	err = encoder.Encode(obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (obj *Solana2AnyMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SVM2AnyMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Receiver`:
 	err = decoder.Decode(&obj.Receiver)
 	if err != nil {
@@ -1071,20 +829,15 @@ func (obj *Solana2AnyMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenIndexes`:
-	err = decoder.Decode(&obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-type SolanaTokenAmount struct {
+type SVMTokenAmount struct {
 	Token  ag_solanago.PublicKey
 	Amount uint64
 }
 
-func (obj SolanaTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SVMTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Token` param:
 	err = encoder.Encode(obj.Token)
 	if err != nil {
@@ -1098,7 +851,7 @@ func (obj SolanaTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 
-func (obj *SolanaTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SVMTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Token`:
 	err = decoder.Decode(&obj.Token)
 	if err != nil {
@@ -1187,66 +940,22 @@ func (obj *ExtraArgsInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
-type Any2SolanaMessage struct {
-	MessageId           [32]uint8
-	SourceChainSelector uint64
-	Sender              []byte
-	Data                []byte
-	TokenAmounts        []SolanaTokenAmount
+type CrossChainAmount struct {
+	LeBytes [32]uint8
 }
 
-func (obj Any2SolanaMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MessageId` param:
-	err = encoder.Encode(obj.MessageId)
-	if err != nil {
-		return err
-	}
-	// Serialize `SourceChainSelector` param:
-	err = encoder.Encode(obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `Sender` param:
-	err = encoder.Encode(obj.Sender)
-	if err != nil {
-		return err
-	}
-	// Serialize `Data` param:
-	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenAmounts` param:
-	err = encoder.Encode(obj.TokenAmounts)
+func (obj CrossChainAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `LeBytes` param:
+	err = encoder.Encode(obj.LeBytes)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *Any2SolanaMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MessageId`:
-	err = decoder.Decode(&obj.MessageId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `SourceChainSelector`:
-	err = decoder.Decode(&obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Sender`:
-	err = decoder.Decode(&obj.Sender)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Data`:
-	err = decoder.Decode(&obj.Data)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenAmounts`:
-	err = decoder.Decode(&obj.TokenAmounts)
+func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `LeBytes`:
+	err = decoder.Decode(&obj.LeBytes)
 	if err != nil {
 		return err
 	}
@@ -1365,7 +1074,7 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 
 type SourceChainConfig struct {
 	IsEnabled bool
-	OnRamp    []byte
+	OnRamp    [2][64]uint8
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -1457,7 +1166,9 @@ type DestChainConfig struct {
 	MaxDataBytes                      uint32
 	MaxPerMsgGasLimit                 uint32
 	DestGasOverhead                   uint32
-	DestGasPerPayloadByte             uint16
+	DestGasPerPayloadByteBase         uint32
+	DestGasPerPayloadByteHigh         uint32
+	DestGasPerPayloadByteThreshold    uint32
 	DestDataAvailabilityOverheadGas   uint32
 	DestGasPerDataAvailabilityByte    uint16
 	DestDataAvailabilityMultiplierBps uint16
@@ -1497,8 +1208,18 @@ func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	if err != nil {
 		return err
 	}
-	// Serialize `DestGasPerPayloadByte` param:
-	err = encoder.Encode(obj.DestGasPerPayloadByte)
+	// Serialize `DestGasPerPayloadByteBase` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteBase)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasPerPayloadByteHigh` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteHigh)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasPerPayloadByteThreshold` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteThreshold)
 	if err != nil {
 		return err
 	}
@@ -1586,8 +1307,18 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	if err != nil {
 		return err
 	}
-	// Deserialize `DestGasPerPayloadByte`:
-	err = decoder.Decode(&obj.DestGasPerPayloadByte)
+	// Deserialize `DestGasPerPayloadByteBase`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteBase)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasPerPayloadByteHigh`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteHigh)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasPerPayloadByteThreshold`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteThreshold)
 	if err != nil {
 		return err
 	}
@@ -1898,21 +1629,6 @@ func (value OcrPluginType) String() string {
 	}
 }
 
-type MerkleError ag_binary.BorshEnum
-
-const (
-	InvalidProof_MerkleError MerkleError = iota
-)
-
-func (value MerkleError) String() string {
-	switch value {
-	case InvalidProof_MerkleError:
-		return "InvalidProof"
-	default:
-		return ""
-	}
-}
-
 type MessageExecutionState ag_binary.BorshEnum
 
 const (
@@ -1977,6 +1693,10 @@ const (
 	InsufficientFunds_CcipRouterError
 	UnsupportedToken_CcipRouterError
 	InvalidInputsMissingTokenConfig_CcipRouterError
+	MessageFeeTooHigh_CcipRouterError
+	SourceTokenDataTooLarge_CcipRouterError
+	MessageGasLimitTooHigh_CcipRouterError
+	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -2055,6 +1775,14 @@ func (value CcipRouterError) String() string {
 		return "UnsupportedToken"
 	case InvalidInputsMissingTokenConfig_CcipRouterError:
 		return "InvalidInputsMissingTokenConfig"
+	case MessageFeeTooHigh_CcipRouterError:
+		return "MessageFeeTooHigh"
+	case SourceTokenDataTooLarge_CcipRouterError:
+		return "SourceTokenDataTooLarge"
+	case MessageGasLimitTooHigh_CcipRouterError:
+		return "MessageGasLimitTooHigh"
+	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError:
+		return "ExtraArgOutOfOrderExecutionMustBeTrue"
 	default:
 		return ""
 	}

@@ -4,12 +4,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 )
 
 type TokenPrice struct {
 	TokenID UnknownEncodedAddress `json:"tokenID"`
 	Price   BigInt                `json:"price"`
+}
+
+type TokenPriceMap map[UnknownEncodedAddress]BigInt
+
+func (t TokenPriceMap) ToSortedSlice() []TokenPrice {
+	var res []TokenPrice
+	for tokenID, price := range t {
+		res = append(res, TokenPrice{tokenID, price})
+	}
+
+	// sort the token prices by tokenID
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].TokenID < res[j].TokenID
+	})
+
+	return res
 }
 
 func NewTokenPrice(tokenID UnknownEncodedAddress, price *big.Int) TokenPrice {
@@ -122,8 +139,14 @@ type Message struct {
 	// This is encoded in the destination chain family specific encoding.
 	// i.e if the destination is EVM, this is abi.encode(receiver).
 	Receiver UnknownAddress `json:"receiver"`
-	// ExtraArgs is destination-chain specific extra args, such as the gasLimit for EVM chains.
+	// ExtraArgs is destination-chain specific extra args,
+	// such as the gasLimit for EVM chains.
+	// This field is encoded in the source chain encoding scheme.
 	ExtraArgs Bytes `json:"extraArgs"`
+	// ExtraArgsDecoded is same as ExtraArgs,
+	// just decoded into a named collection of arguments in a generic format,
+	// which can be read by any destination chain family.
+	ExtraArgsDecoded map[string]any `json:"extraArgsDecoded,omitempty"`
 	// FeeToken is the fee token address.
 	// i.e if the source chain is EVM, len(FeeToken) == 20 (i.e, is not abi-encoded).
 	FeeToken UnknownAddress `json:"feeToken"`

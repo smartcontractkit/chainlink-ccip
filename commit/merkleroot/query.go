@@ -4,13 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
 func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
+	lggr := logutil.WithContextValues(ctx, p.lggr)
+
 	if !p.offchainCfg.RMNEnabled {
 		return Query{}, nil
 	}
@@ -24,7 +28,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, fmt.Errorf("RMN report config is empty")
 	}
 
-	if err := p.prepareRMNController(ctx, prevOutcome); err != nil {
+	if err := p.prepareRMNController(ctx, lggr, prevOutcome); err != nil {
 		return Query{}, fmt.Errorf("initialize RMN controller: %w", err)
 	}
 
@@ -41,7 +45,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
 		onRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
-			p.lggr.Warnf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
+			lggr.Warnw("failed to get onRamp address", "chain", sourceChainRange.ChainSel, "err", err)
 			continue
 		}
 
@@ -60,17 +64,26 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	ctxQuery, cancel := context.WithTimeout(ctx, p.offchainCfg.RMNSignaturesTimeout)
 	defer cancel()
 
+	rmnReportStart := time.Now()
 	// Get signatures for the requested updates. The signatures might contain a subset of the requested updates.
 	// While building the report the plugin should exclude source chain updates without signatures.
 	sigs, err := p.rmnController.ComputeReportSignatures(ctxQuery, dstChainInfo, reqUpdates, prevOutcome.RMNRemoteCfg)
 	if err != nil {
+		p.metricsReporter.TrackRmnReport(float64(time.Since(rmnReportStart).Milliseconds()), false)
 		if errors.Is(err, rmn.ErrTimeout) {
-			p.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
+			lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
 				len(reqUpdates), dstChainInfo)
 			return Query{RetryRMNSignatures: true}, nil
 		}
+
+		if errors.Is(err, rmn.ErrAllChainsNotReady) {
+			lggr.Infow("none of the observation requests were ready to be observed by RMN, got empty responses")
+			return Query{}, nil
+		}
+
 		return Query{}, fmt.Errorf("compute RMN signatures: %w", err)
 	}
 
+	p.metricsReporter.TrackRmnReport(time.Since(rmnReportStart).Seconds(), true)
 	return Query{RetryRMNSignatures: false, RMNSignatures: sigs}, nil
 }

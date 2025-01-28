@@ -15,7 +15,7 @@ import (
 //
 // The method name needs to be execute with Anchor encoding.
 //
-// This function is called by the OffChain when executing one Report to the Solana Router.
+// This function is called by the OffChain when executing one Report to the SVM Router.
 // In this Flow only one message is sent, the Execution Report. This is different as EVM does,
 // this is because there is no try/catch mechanism to allow batch execution.
 // This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.
@@ -26,15 +26,15 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for the execute.
-// * `execution_report` - the execution report containing only one message and proofs
+// * `raw_execution_report` - the serialized execution report containing only one message and proofs
 // * `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)
 // *  consists of:
 // * report_context_byte_words[0]: ConfigDigest
 // * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-// * report_context_byte_words[2]: ExtraHash
 type Execute struct {
-	ExecutionReport        *ExecutionReportSingleChain
-	ReportContextByteWords *[3][32]uint8
+	RawExecutionReport     *[]byte
+	ReportContextByteWords *[2][32]uint8
+	TokenIndexes           *[]byte
 
 	// [0] = [] config
 	//
@@ -62,15 +62,21 @@ func NewExecuteInstructionBuilder() *Execute {
 	return nd
 }
 
-// SetExecutionReport sets the "executionReport" parameter.
-func (inst *Execute) SetExecutionReport(executionReport ExecutionReportSingleChain) *Execute {
-	inst.ExecutionReport = &executionReport
+// SetRawExecutionReport sets the "rawExecutionReport" parameter.
+func (inst *Execute) SetRawExecutionReport(rawExecutionReport []byte) *Execute {
+	inst.RawExecutionReport = &rawExecutionReport
 	return inst
 }
 
 // SetReportContextByteWords sets the "reportContextByteWords" parameter.
-func (inst *Execute) SetReportContextByteWords(reportContextByteWords [3][32]uint8) *Execute {
+func (inst *Execute) SetReportContextByteWords(reportContextByteWords [2][32]uint8) *Execute {
 	inst.ReportContextByteWords = &reportContextByteWords
+	return inst
+}
+
+// SetTokenIndexes sets the "tokenIndexes" parameter.
+func (inst *Execute) SetTokenIndexes(tokenIndexes []byte) *Execute {
+	inst.TokenIndexes = &tokenIndexes
 	return inst
 }
 
@@ -182,11 +188,14 @@ func (inst Execute) ValidateAndBuild() (*Instruction, error) {
 func (inst *Execute) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.ExecutionReport == nil {
-			return errors.New("ExecutionReport parameter is not set")
+		if inst.RawExecutionReport == nil {
+			return errors.New("RawExecutionReport parameter is not set")
 		}
 		if inst.ReportContextByteWords == nil {
 			return errors.New("ReportContextByteWords parameter is not set")
+		}
+		if inst.TokenIndexes == nil {
+			return errors.New("TokenIndexes parameter is not set")
 		}
 	}
 
@@ -229,9 +238,10 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("       ExecutionReport", *inst.ExecutionReport))
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("    RawExecutionReport", *inst.RawExecutionReport))
 						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
+						paramsBranch.Child(ag_format.Param("          TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
@@ -250,8 +260,8 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Execute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ExecutionReport` param:
-	err = encoder.Encode(obj.ExecutionReport)
+	// Serialize `RawExecutionReport` param:
+	err = encoder.Encode(obj.RawExecutionReport)
 	if err != nil {
 		return err
 	}
@@ -260,16 +270,26 @@ func (obj Execute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Serialize `TokenIndexes` param:
+	err = encoder.Encode(obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ExecutionReport`:
-	err = decoder.Decode(&obj.ExecutionReport)
+	// Deserialize `RawExecutionReport`:
+	err = decoder.Decode(&obj.RawExecutionReport)
 	if err != nil {
 		return err
 	}
 	// Deserialize `ReportContextByteWords`:
 	err = decoder.Decode(&obj.ReportContextByteWords)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenIndexes`:
+	err = decoder.Decode(&obj.TokenIndexes)
 	if err != nil {
 		return err
 	}
@@ -279,8 +299,9 @@ func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 // NewExecuteInstruction declares a new Execute instruction with the provided parameters and accounts.
 func NewExecuteInstruction(
 	// Parameters:
-	executionReport ExecutionReportSingleChain,
-	reportContextByteWords [3][32]uint8,
+	rawExecutionReport []byte,
+	reportContextByteWords [2][32]uint8,
+	tokenIndexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	sourceChainState ag_solanago.PublicKey,
@@ -291,8 +312,9 @@ func NewExecuteInstruction(
 	sysvarInstructions ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *Execute {
 	return NewExecuteInstructionBuilder().
-		SetExecutionReport(executionReport).
+		SetRawExecutionReport(rawExecutionReport).
 		SetReportContextByteWords(reportContextByteWords).
+		SetTokenIndexes(tokenIndexes).
 		SetConfigAccount(config).
 		SetSourceChainStateAccount(sourceChainState).
 		SetCommitReportAccount(commitReport).

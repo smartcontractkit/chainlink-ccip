@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -21,13 +20,30 @@ import (
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-// validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
-func validateObserverReadingEligibility(
+// validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported by observer
+func validateCommitReportsReadingEligibility(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	observedData exectypes.CommitObservations,
+) error {
+	for chainSel := range observedData {
+		if !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
+		}
+		for _, data := range observedData[chainSel] {
+			if data.SourceChain != chainSel {
+				return fmt.Errorf("observer not allowed to read from chain %d", data.SourceChain)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateMsgsReadingEligibility checks all observed messages are from supported chains
+func validateMsgsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedMsgs exectypes.MessageObservations,
 ) error {
-	// TODO: validate that CommitReports and Nonces are only observed if the destChain is supported.
-
 	for chainSel, msgs := range observedMsgs {
 		if len(msgs) == 0 {
 			continue
@@ -41,6 +57,7 @@ func validateObserverReadingEligibility(
 	return nil
 }
 
+// validateTokenDataObservations validates that all token data observations belong to already observed messages
 func validateTokenDataObservations(
 	observedMsgs exectypes.MessageObservations,
 	tokenData exectypes.TokenDataObservations,
@@ -52,6 +69,14 @@ func validateTokenDataObservations(
 	}
 
 	for chain, msgs := range observedMsgs {
+		chainTd, ok := tokenData[chain]
+		if !ok {
+			return fmt.Errorf("token data not found for chain %d", chain)
+		}
+		if len(msgs) != len(chainTd) {
+			return fmt.Errorf("unexpected number of token data observations for chain %d: expected %d, got %d",
+				chain, len(msgs), len(chainTd))
+		}
 		for seq, msg := range msgs {
 			if _, ok := tokenData[chain][seq]; !ok {
 				return fmt.Errorf("token data not found for message %s", msg)
@@ -59,6 +84,24 @@ func validateTokenDataObservations(
 		}
 	}
 
+	return nil
+}
+
+// validateCostlyMessagesObservations validates that all costly messages belong to already observed messages
+func validateCostlyMessagesObservations(
+	observedMsgs exectypes.MessageObservations,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+	msgs := observedMsgs.Flatten()
+	msgsIDMap := make(map[cciptypes.Bytes32]struct{})
+	for _, msg := range msgs {
+		msgsIDMap[msg.Header.MessageID] = struct{}{}
+	}
+	for _, id := range costlyMessages {
+		if _, ok := msgsIDMap[id]; !ok {
+			return fmt.Errorf("costly message %s not found in observed messages", id)
+		}
+	}
 	return nil
 }
 
@@ -73,11 +116,51 @@ func validateHashesExist(
 	}
 
 	for chain, msgs := range observedMsgs {
+		_, ok := hashes[chain]
+		if !ok {
+			return fmt.Errorf("hash not found for chain %d", chain)
+		}
+
 		for seq, msg := range msgs {
 			if _, ok := hashes[chain][seq]; !ok {
 				return fmt.Errorf("hash not found for message %s", msg)
 			}
 		}
+	}
+
+	return nil
+}
+
+// validateMessagesConformToCommitReports cross-checks messages and reports
+// 1. checks if the messages observed are exactly the same as the messages in the commit reports. No more and no less.
+// 2. checks all reports have their messages observed.
+func validateMessagesConformToCommitReports(
+	observedData exectypes.CommitObservations,
+	observedMsgs exectypes.MessageObservations,
+) error {
+	msgsCount := 0
+	for chain, report := range observedData {
+		for _, data := range report {
+			msgsMap, ok := observedMsgs[chain]
+			if !ok {
+				return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
+			}
+
+			for seqNum := data.SequenceNumberRange.Start(); seqNum <= data.SequenceNumberRange.End(); seqNum++ {
+				_, ok = msgsMap[seqNum]
+				if !ok {
+					return fmt.Errorf("no message observed for sequence number %d, "+
+						"while report's range sholud include it for chain %d", seqNum, chain)
+				}
+				msgsCount++
+			}
+		}
+	}
+	allMsgs := observedMsgs.Flatten()
+	// need to make sure that only messages that are in the commit reports are observed
+	if msgsCount != len(allMsgs) {
+		return fmt.Errorf("messages observed %d do not match the messages in the commit reports %d",
+			len(allMsgs), msgsCount)
 	}
 
 	return nil
@@ -118,6 +201,25 @@ func validateObservedSequenceNumbers(
 	}
 
 	return nil
+}
+
+// msgsConformToSeqRange returns true if all sequence numbers in the range are observed in the messages.
+// messages should map exactly one message to each sequence number in the range with no missing sequence numbers.
+func msgsConformToSeqRange(msgs []cciptypes.Message, numberRange cciptypes.SeqNumRange) bool {
+	msgMap := make(map[cciptypes.SeqNum]struct{})
+	for _, msg := range msgs {
+		msgMap[msg.Header.SequenceNumber] = struct{}{}
+	}
+	if len(msgMap) != numberRange.Length() {
+		return false
+	}
+	// Check for missing sequence numbers in observed messages.
+	for i := numberRange.Start(); i <= numberRange.End(); i++ {
+		if _, ok := msgMap[i]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
@@ -261,8 +363,9 @@ func decodeAttributedObservations(
 }
 
 func mergeMessageObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
-) (exectypes.MessageObservations, error) {
+) exectypes.MessageObservations {
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[cciptypes.Message])
 	for selector, f := range fChain {
@@ -274,7 +377,8 @@ func mergeMessageObservations(
 		for selector, messages := range ao.Observation.Messages {
 			validator, ok := validators[selector]
 			if !ok {
-				return exectypes.MessageObservations{}, fmt.Errorf("no validator for chain %d", selector)
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
 			}
 			// Add reports
 			for _, msg := range messages {
@@ -296,17 +400,18 @@ func mergeMessageObservations(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
 }
 
 // mergeCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeCommitObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
-) (exectypes.CommitObservations, error) {
+) exectypes.CommitObservations {
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[exectypes.CommitData])
 	for selector, f := range fChain {
@@ -319,7 +424,8 @@ func mergeCommitObservations(
 		for selector, commitReports := range ao.Observation.CommitReports {
 			validator, ok := validators[selector]
 			if !ok {
-				return exectypes.CommitObservations{}, fmt.Errorf("no validator for chain %d", selector)
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
 			}
 			// Add reports
 			for _, commitReport := range commitReports {
@@ -336,16 +442,17 @@ func mergeCommitObservations(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
 }
 
 func mergeMessageHashes(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
-) (exectypes.MessageHashes, error) {
+) exectypes.MessageHashes {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
 	validators := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]consensus.MinObservation[cciptypes.Bytes32])
 	results := make(exectypes.MessageHashes)
@@ -354,7 +461,8 @@ func mergeMessageHashes(
 		for selector, seqMap := range ao.Observation.Hashes {
 			f, ok := fChain[selector]
 			if !ok {
-				return exectypes.MessageHashes{}, fmt.Errorf("no F defined for chain %d", selector)
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
 			}
 
 			if _, ok1 := results[selector]; !ok1 {
@@ -385,16 +493,17 @@ func mergeMessageHashes(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
 }
 
 func mergeTokenObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
-) (exectypes.TokenDataObservations, error) {
+) exectypes.TokenDataObservations {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
 	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
@@ -403,7 +512,8 @@ func mergeTokenObservations(
 		for selector, seqMap := range ao.Observation.TokenData {
 			f, ok := fChain[selector]
 			if !ok {
-				return exectypes.TokenDataObservations{}, fmt.Errorf("no F defined for chain %d", selector)
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
 			}
 
 			if _, ok1 := results[selector]; !ok1 {
@@ -432,10 +542,10 @@ func mergeTokenObservations(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
 }
 
 func initResultsAndValidators(
@@ -542,36 +652,42 @@ func getConsensusObservation(
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	destChainSelector cciptypes.ChainSelector,
 	F int,
-	fChain map[cciptypes.ChainSelector]int,
+	destChain cciptypes.ChainSelector,
 ) (exectypes.Observation, error) {
 	if len(aos) < F {
 		return exectypes.Observation{}, fmt.Errorf("below F threshold")
 	}
 
+	observedFChains := make(map[cciptypes.ChainSelector][]int)
+	for _, ao := range aos {
+		obs := ao.Observation
+		for chain, f := range obs.FChain {
+			observedFChains[chain] = append(observedFChains[chain], f)
+		}
+	}
+	// consensus on the fChain map uses the role DON F value
+	// because all nodes can observe the home chain.
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(F))
+	fChain := consensus.GetConsensusMap(lggr, "fChain", observedFChains, donThresh)
+	_, ok := fChain[destChain] // check if the destination chain is in the FChain.
+	if !ok {
+		return exectypes.Observation{}, fmt.Errorf("destination chain %d is not in FChain", destChain)
+	}
+
 	lggr.Debugw("getConsensusObservation decoded observations", "aos", aos)
 
-	mergedCommitObservations, err := mergeCommitObservations(aos, fChain)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge commit report observations: %w", err)
-	}
+	mergedCommitObservations := mergeCommitObservations(lggr, aos, fChain)
+
 	lggr.Debugw("merged commit observations", "mergedCommitObservations", mergedCommitObservations)
 
-	mergedMessageObservations, err := mergeMessageObservations(aos, fChain)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge message observations: %w", err)
-	}
+	mergedMessageObservations := mergeMessageObservations(lggr, aos, fChain)
 	lggr.Debugw("merged message observations", "mergedMessageObservations", mergedMessageObservations)
 
-	mergedTokenObservations, err := mergeTokenObservations(aos, fChain)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge token data observations: %w", err)
-	}
+	mergedTokenObservations := mergeTokenObservations(lggr, aos, fChain)
+
 	lggr.Debugw("merged token data observations", "mergedTokenObservations", mergedTokenObservations)
 
-	mergedHashes, err := mergeMessageHashes(aos, fChain)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge message hashes: %w", err)
-	}
+	mergedHashes := mergeMessageHashes(lggr, aos, fChain)
 	lggr.Debugw("merged message hashes", "mergedHashes", mergedHashes)
 
 	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])
@@ -592,30 +708,4 @@ func getConsensusObservation(
 	)
 
 	return observation, nil
-}
-
-// getMessageTimestampMap returns a map of message IDs to their timestamps.
-// cciptypes.Message does not contain a timestamp, so we need to derive the timestamp from the commit data.
-func getMessageTimestampMap(
-	commitReportCache map[cciptypes.ChainSelector][]exectypes.CommitData,
-	messages exectypes.MessageObservations,
-) (map[cciptypes.Bytes32]time.Time, error) {
-	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
-
-	for chainSel, SeqNumToMsg := range messages {
-		commitData, ok := commitReportCache[chainSel]
-		if !ok {
-			return nil, fmt.Errorf("missing commit data for chain %s", chainSel)
-		}
-
-		for seqNum, msg := range SeqNumToMsg {
-			for _, commit := range commitData {
-				if commit.SequenceNumberRange.Contains(seqNum) {
-					messageTimestamps[msg.Header.MessageID] = commit.Timestamp
-				}
-			}
-		}
-	}
-
-	return messageTimestamps, nil
 }

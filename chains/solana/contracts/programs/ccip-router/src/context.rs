@@ -8,7 +8,7 @@ use crate::program::CcipRouter;
 use crate::state::{CommitReport, Config, ExternalExecutionConfig, Nonce};
 use crate::{
     BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
-    ExecutionReportSingleChain, GlobalState, Solana2AnyMessage, SourceChain,
+    ExecutionReportSingleChain, GlobalState, SVM2AnyMessage, SourceChain,
 };
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -51,7 +51,7 @@ pub const TOKEN_POOL_CONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig";
 pub struct CommitInput {
     pub price_updates: PriceUpdates,
     pub merkle_root: MerkleRoot,
-    // pub rmn_signatures: Vec<[u8; 65]>, // r = 32, s = 32, v = 1; placeholder: RMN not enabled
+    pub rmn_signatures: Vec<[u8; 64]>, // placeholder for stable interface; r = 32, s = 32; https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/interfaces/IRMNRemote.sol#L9
 }
 
 // A collection of token price and gas price updates.
@@ -96,8 +96,14 @@ impl MerkleRoot {
 }
 
 #[derive(Accounts)]
-#[instruction(destination_chain_selector: u64, message: Solana2AnyMessage)]
+#[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct GetFee<'info> {
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+    )]
+    pub config: AccountLoader<'info, Config>,
     #[account(
         seeds = [DEST_CHAIN_STATE_SEED, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
@@ -476,7 +482,7 @@ pub struct RemoveBillingTokenConfig<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(destination_chain_selector: u64, message: Solana2AnyMessage)]
+#[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct CcipSend<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -518,12 +524,18 @@ pub struct CcipSend<'info> {
     pub fee_token_mint: InterfaceAccount<'info, Mint>, // pass pre-2022 wSOL if using native SOL
 
     #[account(
-        // `message.fee_token` would ideally be named `message.fee_mint` in Solana,
+        // `message.fee_token` would ideally be named `message.fee_mint` in SVM,
         // but using the `token` nomenclature is more compatible with EVM
         seeds = [FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()], // the arg would ideally be named mint, but message.fee_token was set for EVM consistency
         bump,
     )]
     pub fee_token_config: Account<'info, BillingTokenConfigWrapper>, // pass pre-2022 wSOL config if using native SOL
+
+    #[account(
+        seeds = [FEE_BILLING_TOKEN_CONFIG, config.load()?.link_token_mint.key().as_ref()],
+        bump,
+    )]
+    pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
 
     /// CHECK this is the associated token account for the user paying the fee.
     /// If paying with native SOL, this must be the zero address.
@@ -585,7 +597,7 @@ pub struct CcipSend<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_report_context_byte_words: [[u8; 32]; 3], report: CommitInput)]
+#[instruction(_report_context_byte_words: [[u8; 32]; 2], raw_report: Vec<u8>)]
 pub struct CommitReportContext<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -595,14 +607,14 @@ pub struct CommitReportContext<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [SOURCE_CHAIN_STATE_SEED, report.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [SOURCE_CHAIN_STATE_SEED, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
     pub source_chain_state: Account<'info, SourceChain>,
     #[account(
         init,
-        seeds = [COMMIT_REPORT_SEED, report.merkle_root.source_chain_selector.to_le_bytes().as_ref(), report.merkle_root.merkle_root.as_ref()],
+        seeds = [COMMIT_REPORT_SEED, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref(), CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.merkle_root.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + CommitReport::INIT_SPACE,
@@ -622,7 +634,7 @@ pub struct CommitReportContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(report: ExecutionReportSingleChain)]
+#[instruction(raw_report: Vec<u8>)]
 pub struct ExecuteReportContext<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -631,14 +643,14 @@ pub struct ExecuteReportContext<'info> {
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
-        seeds = [SOURCE_CHAIN_STATE_SEED, report.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [SOURCE_CHAIN_STATE_SEED, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
     pub source_chain_state: Account<'info, SourceChain>,
     #[account(
         mut,
-        seeds = [COMMIT_REPORT_SEED, report.source_chain_selector.to_le_bytes().as_ref(), report.root.as_ref()],
+        seeds = [COMMIT_REPORT_SEED, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.root.as_ref()],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]

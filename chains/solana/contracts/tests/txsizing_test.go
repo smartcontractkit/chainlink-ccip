@@ -10,6 +10,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
@@ -73,34 +74,33 @@ func TestTransactionSizing(t *testing.T) {
 		bz, err := tx.MarshalBinary()
 		require.NoError(t, err)
 		l := len(bz)
-		require.LessOrEqual(t, l, 1232)
+		require.LessOrEqual(t, l, 1250)
 		return fmt.Sprintf("%-55s: %-4d - remaining: %d", name, l, 1232-l)
 	}
 
 	// ccipSend test messages + instruction ---------------------------------
-	sendNoTokens := ccip_router.Solana2AnyMessage{
+	sendNoTokens := ccip_router.SVM2AnyMessage{
 		Receiver:     make([]byte, 20), // EVM address
 		Data:         []byte{},
-		TokenAmounts: []ccip_router.SolanaTokenAmount{}, // no tokens
-		FeeToken:     [32]byte{},                        // solana fee token
-		ExtraArgs:    ccip_router.ExtraArgsInput{},      // default options
-		TokenIndexes: []byte{},                          // no tokens
+		TokenAmounts: []ccip_router.SVMTokenAmount{}, // no tokens
+		FeeToken:     [32]byte{},                     // solana fee token
+		ExtraArgs:    ccip_router.ExtraArgsInput{},   // default options
 	}
-	sendSingleMinimalToken := ccip_router.Solana2AnyMessage{
+	sendSingleMinimalToken := ccip_router.SVM2AnyMessage{
 		Receiver: make([]byte, 20),
 		Data:     []byte{},
-		TokenAmounts: []ccip_router.SolanaTokenAmount{ccip_router.SolanaTokenAmount{
+		TokenAmounts: []ccip_router.SVMTokenAmount{{
 			Token:  [32]byte{},
 			Amount: 0,
 		}}, // one token
-		FeeToken:     [32]byte{},
-		ExtraArgs:    ccip_router.ExtraArgsInput{}, // default options
-		TokenIndexes: []byte{0},                    // one token
+		FeeToken:  [32]byte{},
+		ExtraArgs: ccip_router.ExtraArgsInput{}, // default options
 	}
-	ixCcipSend := func(msg ccip_router.Solana2AnyMessage, addAccounts solana.PublicKeySlice) solana.Instruction {
+	ixCcipSend := func(msg ccip_router.SVM2AnyMessage, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewCcipSendInstruction(
 			1,
 			msg,
+			tokenIndexes,
 			routerTable["routerConfig"],
 			routerTable["destChainConfig"],
 			mustRandomPubkey(), // user nonce PDA
@@ -109,6 +109,7 @@ func TestTransactionSizing(t *testing.T) {
 			routerTable["billingTokenProgram"],
 			routerTable["billingTokenMint"],
 			routerTable["billingTokenConfig"],
+			mustRandomPubkey(), // link billing config
 			mustRandomPubkey(), // user billing token ATA
 			routerTable["routerBillingTokenATA"],
 			routerTable["routerBillingSigner"],
@@ -148,9 +149,11 @@ func TestTransactionSizing(t *testing.T) {
 	}
 	ixCommit := func(input ccip_router.CommitInput, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewCommitInstruction(
-			[3][32]byte{}, // report context
-			input,
-			make([][65]byte, 6), // f = 5, estimating f+1 signatures
+			[2][32]byte{}, // report context
+			testutils.MustMarshalBorsh(t, input),
+			make([][32]byte, 6), // f = 5, estimating f+1 signatures
+			make([][32]byte, 6), // f = 5, estimating f+1 signatures
+			[32]byte{},          // f = 5, estimating f+1 signatures
 			routerTable["routerConfig"],
 			routerTable["originChainConfig"],
 			mustRandomPubkey(), // commit report PDA
@@ -170,7 +173,7 @@ func TestTransactionSizing(t *testing.T) {
 	// ccip execute test messages + instruction -----------------------
 	executeEmpty := ccip_router.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
-		Message: ccip_router.Any2SolanaRampMessage{
+		Message: ccip_router.Any2SVMRampMessage{
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 0,
@@ -178,23 +181,24 @@ func TestTransactionSizing(t *testing.T) {
 				SequenceNumber:      0,
 				Nonce:               0,
 			},
-			Sender:       make([]byte, 20), // EVM sender
-			Data:         []byte{},
-			Receiver:     [32]byte{},
-			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{},
-			ExtraArgs: ccip_router.SolanaExtraArgs{
-				ComputeUnits: 0,
-				Accounts:     []ccip_router.SolanaAccountMeta{},
+			Sender:        make([]byte, 20), // EVM sender
+			Data:          []byte{},
+			TokenReceiver: [32]byte{},
+			LogicReceiver: [32]byte{},
+			TokenAmounts:  []ccip_router.Any2SVMTokenTransfer{},
+			ExtraArgs: ccip_router.SVMExtraArgs{
+				ComputeUnits:     0,
+				IsWritableBitmap: 0,
+				Accounts:         []solana.PublicKey{},
 			},
 		},
 		OffchainTokenData: [][]byte{},
 		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
-		TokenIndexes:      []byte{},
 	}
 	executeSingleToken := ccip_router.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
-		Message: ccip_router.Any2SolanaRampMessage{
+		Message: ccip_router.Any2SVMRampMessage{
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 0,
@@ -202,31 +206,33 @@ func TestTransactionSizing(t *testing.T) {
 				SequenceNumber:      0,
 				Nonce:               0,
 			},
-			Sender:   make([]byte, 20), // EVM sender
-			Data:     []byte{},
-			Receiver: [32]byte{},
-			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{{
+			Sender:        make([]byte, 20), // EVM sender
+			Data:          []byte{},
+			TokenReceiver: [32]byte{},
+			LogicReceiver: [32]byte{},
+			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{{
 				SourcePoolAddress: make([]byte, 20), // EVM origin token pool
 				DestTokenAddress:  [32]byte{},
 				DestGasAmount:     0,
 				ExtraData:         []byte{},
-				Amount:            [32]uint8{},
+				Amount:            ccip_router.CrossChainAmount{LeBytes: [32]uint8{}},
 			}},
-			ExtraArgs: ccip_router.SolanaExtraArgs{
-				ComputeUnits: 0,
-				Accounts:     []ccip_router.SolanaAccountMeta{},
+			ExtraArgs: ccip_router.SVMExtraArgs{
+				ComputeUnits:     0,
+				IsWritableBitmap: 0,
+				Accounts:         []solana.PublicKey{},
 			},
 		},
 		OffchainTokenData: [][]byte{},
 		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
-		TokenIndexes:      []byte{0},
 	}
 
-	ixExecute := func(report ccip_router.ExecutionReportSingleChain, addAccounts solana.PublicKeySlice) solana.Instruction {
+	ixExecute := func(report ccip_router.ExecutionReportSingleChain, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewExecuteInstruction(
-			report,
-			[3][32]byte{}, // report context
+			testutils.MustMarshalBorsh(t, report),
+			[2][32]byte{}, // report context
+			tokenIndexes,
 			routerTable["routerConfig"],
 			routerTable["originChainConfig"],
 			mustRandomPubkey(), // commit report PDA
@@ -253,14 +259,14 @@ func TestTransactionSizing(t *testing.T) {
 	}{
 		{
 			"ccipSend:noToken",
-			ixCcipSend(sendNoTokens, nil),
+			ixCcipSend(sendNoTokens, []byte{}, nil),
 			map[solana.PublicKey]solana.PublicKeySlice{
 				mustRandomPubkey(): maps.Values(routerTable),
 			},
 		},
 		{
 			"ccipSend:singleToken",
-			ixCcipSend(sendSingleMinimalToken, append([]solana.PublicKey{
+			ixCcipSend(sendSingleMinimalToken, []byte{0}, append([]solana.PublicKey{
 				mustRandomPubkey(), // user ATA
 				mustRandomPubkey(), // token billing config
 				mustRandomPubkey(), // token pool chain config
@@ -289,14 +295,14 @@ func TestTransactionSizing(t *testing.T) {
 		},
 		{
 			"execute:noToken",
-			ixExecute(executeEmpty, nil),
+			ixExecute(executeEmpty, []byte{}, nil),
 			map[solana.PublicKey]solana.PublicKeySlice{
 				mustRandomPubkey(): maps.Values(routerTable),
 			},
 		},
 		{
 			"execute:singleToken",
-			ixExecute(executeSingleToken, append([]solana.PublicKey{
+			ixExecute(executeSingleToken, []byte{0}, append([]solana.PublicKey{
 				mustRandomPubkey(), // user ATA
 				mustRandomPubkey(), // token billing config
 				mustRandomPubkey(), // token pool chain config

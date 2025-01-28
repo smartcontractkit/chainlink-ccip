@@ -1,3 +1,5 @@
+use std::convert::Into;
+
 use anchor_lang::prelude::*;
 
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
@@ -27,31 +29,24 @@ impl RampMessageHeader {
 /// Report that is submitted by the execution DON at the execution phase. (including chain selector data)
 pub struct ExecutionReportSingleChain {
     pub source_chain_selector: u64,
-    pub message: Any2SolanaRampMessage,
+    pub message: Any2SVMRampMessage,
     pub offchain_token_data: Vec<Vec<u8>>, // https://github.com/smartcontractkit/chainlink/blob/885baff9479e935e0fc34d9f52214a32c158eac5/contracts/src/v0.8/ccip/libraries/Internal.sol#L72
     pub root: [u8; 32],
     pub proofs: Vec<[u8; 32]>,
-
-    // NOT HASHED
-    pub token_indexes: Vec<u8>, // outside of message because this is not available during commit stage
-}
-
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace)]
-pub struct SolanaAccountMeta {
-    pub pubkey: Pubkey,
-    pub is_writable: bool,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct SolanaExtraArgs {
+pub struct SVMExtraArgs {
     pub compute_units: u32,
-    pub accounts: Vec<SolanaAccountMeta>,
+    pub is_writable_bitmap: u64,
+    pub accounts: Vec<Pubkey>,
 }
 
-impl SolanaExtraArgs {
+impl SVMExtraArgs {
     pub fn len(&self) -> usize {
         4 // compute units
-        + 4 + self.accounts.len() * SolanaAccountMeta::INIT_SPACE // additional accounts
+        + 8 // isWritable bitmap
+        + 4 + self.accounts.len() * 32 // additional accounts
     }
 }
 
@@ -62,48 +57,55 @@ pub struct AnyExtraArgs {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaRampMessage {
+pub struct Any2SVMRampMessage {
     pub header: RampMessageHeader,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
-    // receiver is used as the target for the two main functionalities
-    // token transfers: recipient of token transfers (associated token addresses are validated against this address)
-    // arbitrary messaging: expected account in the declared arbitrary messaging accounts (2nd in the list of the accounts)
-    pub receiver: Pubkey,
-    pub token_amounts: Vec<Any2SolanaTokenTransfer>,
-    pub extra_args: SolanaExtraArgs,
+    // In EVM receiver means the address that all the listed tokens will transfer to and the address of the message execution.
+    // In Solana the receiver is split into two:
+    // Logic Receiver is the Program ID of the user's program that will execute the message
+    pub logic_receiver: Pubkey,
+    // Token Receiver is the address which the ATA will be calculated from.
+    // If token receiver and message execution, then the token receiver must be a PDA from the logic receiver
+    pub token_receiver: Pubkey,
+    pub token_amounts: Vec<Any2SVMTokenTransfer>,
+    pub extra_args: SVMExtraArgs,
+    pub on_ramp_address: Vec<u8>,
 }
 
-impl Any2SolanaRampMessage {
+impl Any2SVMRampMessage {
     pub fn len(&self) -> usize {
         let token_len = self.token_amounts.iter().fold(0, |acc, e| acc + e.len());
 
         self.header.len() // header
         + 4 + self.sender.len() // sender
         + 4 + self.data.len() // data
-        + 32 // receiver
+        + 32 // logic receiver
+        + 32 // token receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
+        + 4 + self.on_ramp_address.len() // on_ramp_address
     }
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic message emitted from the OnRamp
-// Note: hash(Any2SolanaRampMessage) != hash(Solana2AnyRampMessage) due to encoding & parameter differences
-// messageId = hash(Solana2AnyRampMessage) using the source EVM chain's encoding format
-pub struct Solana2AnyRampMessage {
+// Note: hash(Any2SVMRampMessage) != hash(SVM2AnyRampMessage) due to encoding & parameter differences
+// messageId = hash(SVM2AnyRampMessage) using the source EVM chain's encoding format
+pub struct SVM2AnyRampMessage {
     pub header: RampMessageHeader, // Message header
     pub sender: Pubkey,            // sender address on the source chain
     pub data: Vec<u8>,             // arbitrary data payload supplied by the message sender
     pub receiver: Vec<u8>,         // receiver address on the destination chain
     pub extra_args: AnyExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
     pub fee_token: Pubkey,
-    pub fee_token_amount: u64,
-    pub token_amounts: Vec<Solana2AnyTokenTransfer>,
+    pub token_amounts: Vec<SVM2AnyTokenTransfer>,
+    pub fee_token_amount: CrossChainAmount,
+    pub fee_value_juels: CrossChainAmount,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct Solana2AnyTokenTransfer {
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
+pub struct SVM2AnyTokenTransfer {
     // The source pool address. This value is trusted as it was obtained through the onRamp. It can be relied
     // upon by the destination pool to validate the source pool.
     pub source_pool_address: Pubkey,
@@ -114,14 +116,14 @@ pub struct Solana2AnyTokenTransfer {
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
     pub extra_data: Vec<u8>,
-    pub amount: [u8; 32], // LE encoded u256 -  cross-chain token amount is always u256
+    pub amount: CrossChainAmount, // LE encoded u256 -  cross-chain token amount is always u256
     // Destination chain data used to execute the token transfer on the destination chain. For an EVM destination, it
     // consists of the amount of gas available for the releaseOrMint and transfer calls made by the offRamp.
     pub dest_exec_data: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaTokenTransfer {
+pub struct Any2SVMTokenTransfer {
     // The source pool address encoded to bytes. This value is trusted as it is obtained through the onRamp. It can be
     // relied upon by the destination pool to validate the source pool.
     pub source_pool_address: Vec<u8>,
@@ -131,10 +133,10 @@ pub struct Any2SolanaTokenTransfer {
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
     pub extra_data: Vec<u8>,
-    pub amount: [u8; 32], // LE encoded u256, any cross-chain token amounts are u256
+    pub amount: CrossChainAmount,
 }
 
-impl Any2SolanaTokenTransfer {
+impl Any2SVMTokenTransfer {
     pub fn len(&self) -> usize {
         4 + self.source_pool_address.len() // source_pool
         + 32 // token_address
@@ -145,19 +147,16 @@ impl Any2SolanaTokenTransfer {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Solana2AnyMessage {
+pub struct SVM2AnyMessage {
     pub receiver: Vec<u8>,
     pub data: Vec<u8>,
-    pub token_amounts: Vec<SolanaTokenAmount>,
+    pub token_amounts: Vec<SVMTokenAmount>,
     pub fee_token: Pubkey, // pass zero address if native SOL
     pub extra_args: ExtraArgsInput,
-
-    // solana specific parameter for mapping tokens to set of accounts
-    pub token_indexes: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default, Debug, PartialEq, Eq)]
-pub struct SolanaTokenAmount {
+pub struct SVMTokenAmount {
     pub token: Pubkey,
     pub amount: u64, // u64 - amount local to solana
 }
@@ -168,11 +167,21 @@ pub struct ExtraArgsInput {
     pub allow_out_of_order_execution: Option<bool>,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaMessage {
-    pub message_id: [u8; 32],
-    pub source_chain_selector: u64,
-    pub sender: Vec<u8>,
-    pub data: Vec<u8>,
-    pub token_amounts: Vec<SolanaTokenAmount>,
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
+pub struct CrossChainAmount {
+    le_bytes: [u8; 32],
+}
+
+impl CrossChainAmount {
+    pub fn to_bytes(self) -> [u8; 32] {
+        self.le_bytes
+    }
+}
+
+impl<T: Into<ethnum::U256>> From<T> for CrossChainAmount {
+    fn from(value: T) -> Self {
+        Self {
+            le_bytes: value.into().to_le_bytes(),
+        }
+    }
 }

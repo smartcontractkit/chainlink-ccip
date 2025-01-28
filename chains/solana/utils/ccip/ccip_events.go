@@ -13,7 +13,7 @@ type EventCCIPMessageSent struct {
 	Discriminator            [8]byte
 	DestinationChainSelector uint64
 	SequenceNumber           uint64
-	Message                  ccip_router.Solana2AnyRampMessage
+	Message                  ccip_router.SVM2AnyRampMessage
 }
 
 type EventCommitReportAccepted struct {

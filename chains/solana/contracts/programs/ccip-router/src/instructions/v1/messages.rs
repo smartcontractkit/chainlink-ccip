@@ -1,11 +1,14 @@
 pub mod pools {
-    use crate::{TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR, TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR};
+    use crate::{
+        CrossChainAmount, TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR,
+        TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR,
+    };
 
     use super::super::pools::ToTxData;
     use anchor_lang::prelude::*;
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct LockOrBurnInV1 {
+    pub(in super::super) struct LockOrBurnInV1 {
         pub receiver: Vec<u8>, //  The recipient of the tokens on the destination chain
         pub remote_chain_selector: u64, // The chain ID of the destination chain
         pub original_sender: Pubkey, // The original sender of the tx on the source chain
@@ -23,12 +26,12 @@ pub mod pools {
     }
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct ReleaseOrMintInV1 {
+    pub(in super::super) struct ReleaseOrMintInV1 {
         pub original_sender: Vec<u8>, //          The original sender of the tx on the source chain
         pub remote_chain_selector: u64, // ─╮ The chain ID of the source chain
         pub receiver: Pubkey, // ───────────╯ The Token Associated Account that will receive the tokens on the destination chain.
-        pub amount: [u8; 32], // LE u256 amount - The amount of tokens to release or mint, denominated in the source token's decimals, pool expected to handle conversation to solana token specifics
-        pub local_token: Pubkey, //            The address of the Token Mint Account on Solana
+        pub amount: CrossChainAmount, // LE u256 amount - The amount of tokens to release or mint, denominated in the source token's decimals, pool expected to handle conversation to solana token specifics
+        pub local_token: Pubkey,      //            The address of the Token Mint Account on SVM
         /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
         /// expected pool address for the given remoteChainSelector.
         pub source_pool_address: Vec<u8>, //       The address bytes of the source pool
@@ -47,13 +50,13 @@ pub mod pools {
     }
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct LockOrBurnOutV1 {
+    pub(in super::super) struct LockOrBurnOutV1 {
         pub dest_token_address: Vec<u8>,
         pub dest_pool_data: Vec<u8>,
     }
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct ReleaseOrMintOutV1 {
+    pub(in super::super) struct ReleaseOrMintOutV1 {
         pub destination_amount: u64, // TODO: u256 on EVM?
     }
 }
@@ -63,14 +66,38 @@ pub mod ramps {
     use ethnum::U256;
 
     use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage,
-        CHAIN_FAMILY_SELECTOR_EVM,
+        BillingTokenConfig, CcipRouterError, DestChain, SVM2AnyMessage, SVMTokenAmount,
+        CCIP_RECEIVE_DISCRIMINATOR, CHAIN_FAMILY_SELECTOR_EVM,
     };
 
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
-    pub fn validate_solana2any(
-        msg: &Solana2AnyMessage,
+    #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+    pub(in super::super) struct Any2SVMMessage {
+        pub message_id: [u8; 32],
+        pub source_chain_selector: u64,
+        pub sender: Vec<u8>,
+        pub data: Vec<u8>,
+        pub token_amounts: Vec<SVMTokenAmount>,
+    }
+
+    /// Build the instruction data (discriminator + any other data)
+    impl Any2SVMMessage {
+        pub fn build_receiver_discriminator_and_data(&self) -> Result<Vec<u8>> {
+            let m: std::result::Result<Vec<u8>, std::io::Error> = self.try_to_vec();
+            require!(m.is_ok(), CcipRouterError::InvalidMessage);
+            let message = m.unwrap();
+
+            let mut data = Vec::with_capacity(8);
+            data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
+            data.extend_from_slice(&message);
+
+            Ok(data)
+        }
+    }
+
+    pub fn validate_svm2any(
+        msg: &SVM2AnyMessage,
         dest_chain: &DestChain,
         token_config: &BillingTokenConfig,
     ) -> Result<()> {
@@ -93,11 +120,25 @@ pub mod ramps {
             CcipRouterError::UnsupportedNumberOfTokens
         );
 
+        require_gte!(
+            dest_chain.config.max_per_msg_gas_limit as u128,
+            msg.extra_args
+                .gas_limit
+                .unwrap_or(dest_chain.config.default_tx_gas_limit as u128),
+            CcipRouterError::MessageGasLimitTooHigh,
+        );
+
+        require!(
+            !dest_chain.config.enforce_out_of_order
+                || msg.extra_args.allow_out_of_order_execution.unwrap_or(false),
+            CcipRouterError::ExtraArgOutOfOrderExecutionMustBeTrue,
+        );
+
         validate_dest_family_address(msg, dest_chain.config.chain_family_selector)
     }
 
     fn validate_dest_family_address(
-        msg: &Solana2AnyMessage,
+        msg: &SVM2AnyMessage,
         chain_family_selector: [u8; 4],
     ) -> Result<()> {
         const PRECOMPILE_SPACE: u32 = 1024;
@@ -132,20 +173,24 @@ pub mod ramps {
         Ok(())
     }
 
+    pub fn is_writable(bitmap: &u64, index: u8) -> bool {
+        index < 64 && (bitmap & 1 << index != 0) // check valid index and that bit at index is 1
+    }
+
     #[cfg(test)]
     pub mod tests {
         use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
         use super::super::super::price_math::Usd18Decimals;
         use super::*;
-        use crate::{ExtraArgsInput, SolanaTokenAmount, TimestampedPackedU224};
+        use crate::{ExtraArgsInput, SVMTokenAmount, TimestampedPackedU224};
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
 
         impl UnpackedDoubleU224 {
             pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
                 let mut value = [0u8; 28];
-                value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
-                value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                value[14..].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                value[..14].clone_from_slice(&self.high.to_be_bytes()[2..16]);
                 TimestampedPackedU224 { value, timestamp }
             }
         }
@@ -154,22 +199,13 @@ pub mod ramps {
             single.to_be_bytes()[4..32].try_into().unwrap()
         }
 
-        impl TimestampedPackedU224 {
-            pub fn from_single(timestamp: i64, single: U256) -> Self {
-                let mut value = [0u8; 28];
-                value.clone_from_slice(&single.to_be_bytes()[4..32]);
-                Self { value, timestamp }
-            }
-        }
-
         #[test]
         fn message_not_validated_for_disabled_destination_chain() {
             let mut chain = sample_dest_chain();
             chain.config.is_enabled = false;
 
             assert_eq!(
-                validate_solana2any(&sample_message(), &chain, &sample_billing_config())
-                    .unwrap_err(),
+                validate_svm2any(&sample_message(), &chain, &sample_billing_config()).unwrap_err(),
                 CcipRouterError::DestinationChainDisabled.into()
             );
         }
@@ -180,7 +216,7 @@ pub mod ramps {
             billing_config.enabled = false;
 
             assert_eq!(
-                validate_solana2any(&sample_message(), &sample_dest_chain(), &billing_config)
+                validate_svm2any(&sample_message(), &sample_dest_chain(), &billing_config)
                     .unwrap_err(),
                 CcipRouterError::FeeTokenDisabled.into()
             );
@@ -192,7 +228,7 @@ pub mod ramps {
             let mut message = sample_message();
             message.data = vec![0; dest_chain.config.max_data_bytes as usize + 1];
             assert_eq!(
-                validate_solana2any(&message, &sample_dest_chain(), &sample_billing_config())
+                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                     .unwrap_err(),
                 CcipRouterError::MessageTooLarge.into()
             );
@@ -216,7 +252,7 @@ pub mod ramps {
             for address in invalid_addresses {
                 message.receiver = address;
                 assert_eq!(
-                    validate_solana2any(&message, &sample_dest_chain(), &sample_billing_config())
+                    validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                         .unwrap_err(),
                     CcipRouterError::InvalidEVMAddress.into()
                 );
@@ -228,27 +264,27 @@ pub mod ramps {
             let dest_chain = sample_dest_chain();
             let mut message = sample_message();
             message.token_amounts = vec![
-                SolanaTokenAmount {
+                SVMTokenAmount {
                     token: Pubkey::new_unique(),
                     amount: 1
                 };
                 dest_chain.config.max_number_of_tokens_per_msg as usize + 1
             ];
             assert_eq!(
-                validate_solana2any(&message, &sample_dest_chain(), &sample_billing_config())
+                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                     .unwrap_err(),
                 CcipRouterError::UnsupportedNumberOfTokens.into()
             );
         }
 
-        pub fn sample_message() -> Solana2AnyMessage {
+        pub fn sample_message() -> SVM2AnyMessage {
             let mut receiver = vec![0u8; 32];
 
             // Arbitrary value that pushes the address to the right EVM range
             // (above precompile space, under u160::max)
             receiver[20] = 0xA;
 
-            Solana2AnyMessage {
+            SVM2AnyMessage {
                 receiver,
                 data: vec![],
                 token_amounts: vec![],
@@ -257,7 +293,6 @@ pub mod ramps {
                     gas_limit: None,
                     allow_out_of_order_execution: None,
                 },
-                token_indexes: vec![],
             }
         }
 
@@ -306,7 +341,9 @@ pub mod ramps {
                     max_data_bytes: 30000,
                     max_per_msg_gas_limit: 3000000,
                     dest_gas_overhead: 300000,
-                    dest_gas_per_payload_byte: 16,
+                    dest_gas_per_payload_byte_base: 16,
+                    dest_gas_per_payload_byte_high: 40,
+                    dest_gas_per_payload_byte_threshold: 3000,
                     dest_data_availability_overhead_gas: 0,
                     dest_gas_per_data_availability_byte: 16,
                     dest_data_availability_multiplier_bps: 0,
