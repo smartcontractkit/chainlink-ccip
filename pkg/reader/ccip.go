@@ -367,7 +367,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
-		msg.Message.ExtraArgsDecoded, err = r.extraDataCodec.DecodeExtraArgs(msg.Message.ExtraArgs, sourceChainSelector)
+		msg.Message.ExtraArgsDecoded, err = r.extraDataCodec.DecodeExtraData(msg.Message.ExtraArgs, sourceChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode ExtraArgs: %w", err)
 		}
