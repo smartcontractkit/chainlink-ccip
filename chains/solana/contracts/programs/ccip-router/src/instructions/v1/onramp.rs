@@ -4,19 +4,19 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
+use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
+use super::price_math::get_validated_token_price;
 
-use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
-use crate::v1::price_math::get_validated_token_price;
+use crate::seed;
 use crate::{
     AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
     DestChainConfig, ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader,
     SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
-    EXTERNAL_TOKEN_POOL_SEED,
 };
 
 pub fn get_fee<'info>(
@@ -195,7 +195,7 @@ pub fn ccip_send<'info>(
         token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count],
     };
 
-    let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
+    let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
     for (i, (current_token_accounts, token_amount)) in accounts_per_sent_token
         .iter()
         .zip(message.token_amounts.iter())
@@ -410,8 +410,8 @@ mod validated_try_to {
     use anchor_lang::prelude::*;
 
     use crate::{
+        seed::{self},
         BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, PerChainPerTokenConfig,
-        FEE_BILLING_TOKEN_CONFIG, TOKEN_POOL_BILLING_SEED,
     };
 
     pub fn per_chain_per_token_config<'info>(
@@ -421,7 +421,7 @@ mod validated_try_to {
     ) -> Result<PerChainPerTokenConfig> {
         let (expected, _) = Pubkey::find_program_address(
             &[
-                TOKEN_POOL_BILLING_SEED,
+                seed::TOKEN_POOL_BILLING,
                 dest_chain_selector.to_le_bytes().as_ref(),
                 token.key().as_ref(),
             ],
@@ -447,8 +447,10 @@ mod validated_try_to {
             return Ok(None);
         }
 
-        let (expected, _) =
-            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
+        let (expected, _) = Pubkey::find_program_address(
+            &[seed::FEE_BILLING_TOKEN_CONFIG, token.as_ref()],
+            &crate::ID,
+        );
         require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
         let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
         require_eq!(

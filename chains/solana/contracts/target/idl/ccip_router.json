@@ -221,7 +221,11 @@
         {
           "name": "sourceChainState",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Adding a chain selector implies initializing the state for a new chain,",
+            "hence the need to initialize two accounts."
+          ]
         },
         {
           "name": "destChainState",
@@ -623,6 +627,11 @@
       ],
       "accounts": [
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAdminRegistry",
           "isMut": true,
           "isSigner": false
@@ -660,6 +669,11 @@
         "* `is_writable` - index of account in lookup table that is writable"
       ],
       "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
@@ -702,6 +716,11 @@
       ],
       "accounts": [
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAdminRegistry",
           "isMut": true,
           "isSigner": false
@@ -736,6 +755,11 @@
         "* `mint` - The public key of the token mint."
       ],
       "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
@@ -1054,6 +1078,11 @@
       ],
       "accounts": [
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "destChainState",
           "isMut": false,
           "isSigner": false
@@ -1207,7 +1236,6 @@
           "isMut": false,
           "isSigner": false,
           "docs": [
-            "CHECK this is the associated token account for the user paying the fee.",
             "If paying with native SOL, this must be the zero address."
           ]
         },
@@ -1224,7 +1252,10 @@
         {
           "name": "tokenPoolsSigner",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "CPI signers, optional if no tokens are being transferred."
+          ]
         }
       ],
       "args": [
@@ -1267,9 +1298,10 @@
         "* `report_context_byte_words` - consists of:",
         "* report_context_byte_words[0]: ConfigDigest",
         "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number",
-        "* report_context_byte_words[2]: ExtraHash",
-        "* `report` - The commit input report, single merkle root with RMN signatures and price updates",
-        "* `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH"
+        "* `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates",
+        "* `rs` - slice of R components of signatures",
+        "* `ss` - slice of S components of signatures",
+        "* `raw_vs` - array of V components of signatures"
       ],
       "accounts": [
         {
@@ -1314,25 +1346,43 @@
                   32
                 ]
               },
-              3
+              2
             ]
           }
         },
         {
-          "name": "report",
-          "type": {
-            "defined": "CommitInput"
-          }
+          "name": "rawReport",
+          "type": "bytes"
         },
         {
-          "name": "signatures",
+          "name": "rs",
           "type": {
             "vec": {
               "array": [
                 "u8",
-                65
+                32
               ]
             }
+          }
+        },
+        {
+          "name": "ss",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "rawVs",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
           }
         }
       ]
@@ -1356,12 +1406,11 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for the execute.",
-        "* `execution_report` - the execution report containing only one message and proofs",
+        "* `raw_execution_report` - the serialized execution report containing only one message and proofs",
         "* `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)",
         "*  consists of:",
         "* report_context_byte_words[0]: ConfigDigest",
-        "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number",
-        "* report_context_byte_words[2]: ExtraHash"
+        "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number"
       ],
       "accounts": [
         {
@@ -1407,10 +1456,8 @@
       ],
       "args": [
         {
-          "name": "executionReport",
-          "type": {
-            "defined": "ExecutionReportSingleChain"
-          }
+          "name": "rawExecutionReport",
+          "type": "bytes"
         },
         {
           "name": "reportContextByteWords",
@@ -1422,7 +1469,7 @@
                   32
                 ]
               },
-              3
+              2
             ]
           }
         },
@@ -1444,7 +1491,7 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for the execution.",
-        "* `execution_report` - The execution report containing the message and proofs."
+        "* `raw_execution_report` - The serialized execution report containing the message and proofs."
       ],
       "accounts": [
         {
@@ -1490,10 +1537,8 @@
       ],
       "args": [
         {
-          "name": "executionReport",
-          "type": {
-            "defined": "ExecutionReportSingleChain"
-          }
+          "name": "rawExecutionReport",
+          "type": "bytes"
         },
         {
           "name": "tokenIndexes",
@@ -1802,6 +1847,10 @@
   "types": [
     {
       "name": "CommitInput",
+      "docs": [
+        "Input from an offchain node, containing the Merkle root and interval for",
+        "the source chain, and optionally some price updates alongside it."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1878,6 +1927,9 @@
     },
     {
       "name": "GasPriceUpdate",
+      "docs": [
+        "Gas price for a given chain in USD; its value may contain tightly packed fields."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1899,6 +1951,9 @@
     },
     {
       "name": "MerkleRoot",
+      "docs": [
+        "Struct to hold a merkle root and an interval for a source chain"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -2022,12 +2077,6 @@
           {
             "name": "isWritableBitmap",
             "type": "u64"
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": "publicKey"
-            }
           }
         ]
       }
@@ -2066,10 +2115,6 @@
           {
             "name": "data",
             "type": "bytes"
-          },
-          {
-            "name": "logicReceiver",
-            "type": "publicKey"
           },
           {
             "name": "tokenReceiver",
@@ -2456,8 +2501,16 @@
             "type": "u32"
           },
           {
-            "name": "destGasPerPayloadByte",
-            "type": "u16"
+            "name": "destGasPerPayloadByteBase",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteHigh",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteThreshold",
+            "type": "u32"
           },
           {
             "name": "destDataAvailabilityOverheadGas",
@@ -2633,17 +2686,6 @@
       }
     },
     {
-      "name": "MerkleError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "InvalidProof"
-          }
-        ]
-      }
-    },
-    {
       "name": "MessageExecutionState",
       "type": {
         "kind": "enum",
@@ -2790,6 +2832,9 @@
           },
           {
             "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
+          },
+          {
+            "name": "InvalidWritabilityBitmap"
           }
         ]
       }
@@ -3354,6 +3399,11 @@
       "code": 6014,
       "name": "InvalidSignature",
       "msg": "Invalid signature"
+    },
+    {
+      "code": 6015,
+      "name": "SignaturesOutOfRegistration",
+      "msg": "Signatures out of registration"
     }
   ]
 }

@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -279,13 +280,15 @@ func TestTimelockRBAC(t *testing.T) {
 		nonExecutableOp.AddInstruction(ix, []solana.PublicKey{})
 
 		t.Run("rbac: when try to schedule from non proposer role, it fails", func(t *testing.T) {
+			proposer := roleMap[timelock.Proposer_Role].RandomPick()
 			nonProposer := roleMap[timelock.Executor_Role].RandomPick()
 			ac := roleMap[timelock.Proposer_Role].AccessController
 
-			ixs, prierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp, nonProposer.PublicKey())
+			// preload the operation with proposer for access testing on schedule_batch
+			prixs, prierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp, proposer.PublicKey(), ac.PublicKey())
 			require.NoError(t, prierr)
-			for _, ix := range ixs {
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment)
+			for _, ix := range prixs {
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 			}
 
 			ix, scerr := timelock.NewScheduleBatchInstruction(
@@ -354,7 +357,7 @@ func TestTimelockRBAC(t *testing.T) {
 			ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockID)).Build()
 			nonExecutableOp2.AddInstruction(ix, []solana.PublicKey{})
 
-			ixs, prerr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp2, proposer.PublicKey())
+			ixs, prerr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp2, proposer.PublicKey(), ac.PublicKey())
 			require.NoError(t, prerr)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
@@ -534,6 +537,152 @@ func TestTimelockRBAC(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 			}
 			require.Equal(t, newMinDelay, newConfigAccount.MinDelay, "MinDelay is not updated")
+		})
+
+		t.Run("rbac: preloading normal operation is only accessible from proposer and admin", func(t *testing.T) {
+			cfgs := []struct {
+				Name          string
+				Ac            solana.PrivateKey
+				Signer        solana.PrivateKey
+				ShouldFail    bool
+				ExpectedError string
+			}{
+				{
+					Name:   "authorized proposer",
+					Ac:     roleMap[timelock.Proposer_Role].AccessController,
+					Signer: roleMap[timelock.Proposer_Role].RandomPick(),
+				},
+				{
+					Name:          "proper proposer ac, unauthorized signer",
+					Ac:            roleMap[timelock.Proposer_Role].AccessController, // valid
+					Signer:        roleMap[timelock.Bypasser_Role].RandomPick(),     // unauthorized signer
+					ShouldFail:    true,
+					ExpectedError: "Error Code: " + timelockutil.UnauthorizedError.String(),
+				},
+				{
+					Name:          "invalid access controller",
+					Ac:            roleMap[timelock.Bypasser_Role].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Bypasser_Role].RandomPick(),
+					ShouldFail:    true,
+					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+				},
+				{
+					Name:          "invalid access controller",
+					Ac:            roleMap[timelock.Canceller_Role].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Canceller_Role].RandomPick(),
+					ShouldFail:    true,
+					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+				},
+				{
+					Name:          "invalid access controller",
+					Ac:            roleMap[timelock.Executor_Role].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Executor_Role].RandomPick(),
+					ShouldFail:    true,
+					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+				},
+			}
+
+			for _, cfg := range cfgs {
+				t.Run(fmt.Sprintf("rbac: preloading operation test case - %s", cfg.Name), func(t *testing.T) {
+					t.Parallel()
+					signer := cfg.Signer
+					ac := cfg.Ac
+
+					salt, serr := timelockutil.SimpleSalt()
+					require.NoError(t, serr)
+					op := timelockutil.Operation{
+						TimelockID:  config.TestTimelockID,
+						Predecessor: config.TimelockEmptyOpID,
+						Salt:        salt,
+						Delay:       uint64(1),
+					}
+					ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockID)).Build()
+					op.AddInstruction(ix, []solana.PublicKey{})
+
+					ixs, prerr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, signer.PublicKey(), ac.PublicKey())
+					require.NoError(t, prerr)
+					if cfg.ShouldFail {
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, ixs, signer, config.DefaultCommitment, []string{cfg.ExpectedError})
+					} else {
+						for _, ix := range ixs {
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
+						}
+					}
+				})
+			}
+		})
+		t.Run("rbac: preloading bypasser operation is only accessible from bypasser and admin", func(t *testing.T) {
+			cfgs := []struct {
+				Name          string
+				Ac            solana.PrivateKey
+				Signer        solana.PrivateKey
+				ShouldFail    bool
+				ExpectedError string
+			}{
+				{
+					Name:   "authorized bypasser",
+					Ac:     roleMap[timelock.Bypasser_Role].AccessController,
+					Signer: roleMap[timelock.Bypasser_Role].RandomPick(),
+				},
+				{
+					Name:          "proper bypasser ac, unauthorized signer",
+					Ac:            roleMap[timelock.Bypasser_Role].AccessController, // valid
+					Signer:        roleMap[timelock.Proposer_Role].RandomPick(),     // unauthorized signer
+					ShouldFail:    true,
+					ExpectedError: "Error Code: " + timelockutil.UnauthorizedError.String(),
+				},
+				{
+					Name:          "invalid access controller",
+					Ac:            roleMap[timelock.Canceller_Role].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Canceller_Role].RandomPick(),
+					ShouldFail:    true,
+					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+				},
+				{
+					Name:          "invalid access controller",
+					Ac:            roleMap[timelock.Executor_Role].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Executor_Role].RandomPick(),
+					ShouldFail:    true,
+					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+				},
+				{
+					Name:          "invalid access controller",
+					Ac:            roleMap[timelock.Proposer_Role].AccessController, // invalid access controller
+					Signer:        roleMap[timelock.Proposer_Role].RandomPick(),
+					ShouldFail:    true,
+					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
+				},
+			}
+
+			for _, cfg := range cfgs {
+				t.Run(fmt.Sprintf("rbac: preloading bypasser operation test case - %s", cfg.Name), func(t *testing.T) {
+					t.Parallel()
+					signer := cfg.Signer
+					ac := cfg.Ac
+
+					salt, serr := timelockutil.SimpleSalt()
+					require.NoError(t, serr)
+					op := timelockutil.Operation{
+						TimelockID:   config.TestTimelockID,
+						Predecessor:  config.TimelockEmptyOpID,
+						Salt:         salt,
+						Delay:        uint64(1),
+						IsBypasserOp: true,
+					}
+					ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockID)).Build()
+					op.AddInstruction(ix, []solana.PublicKey{})
+
+					ixs, prerr := timelockutil.GetPreloadBypasserOperationIxs(config.TestTimelockID, op, signer.PublicKey(), ac.PublicKey())
+					require.NoError(t, prerr)
+					if cfg.ShouldFail {
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, ixs, signer, config.DefaultCommitment, []string{cfg.ExpectedError})
+					} else {
+						for _, ix := range ixs {
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
+						}
+					}
+				})
+			}
 		})
 	})
 }

@@ -1,6 +1,7 @@
 /// PDA seeds
 pub const TIMELOCK_CONFIG_SEED: &[u8] = b"timelock_config";
 pub const TIMELOCK_OPERATION_SEED: &[u8] = b"timelock_operation";
+pub const TIMELOCK_BYPASSER_OPERATION_SEED: &[u8] = b"timelock_bypasser_operation";
 pub const TIMELOCK_SIGNER_SEED: &[u8] = b"timelock_signer";
 pub const TIMELOCK_BLOCKED_FUNCITON_SELECTOR_SEED: &[u8] = b"timelock_blocked_function_selector";
 

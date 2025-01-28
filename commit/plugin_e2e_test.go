@@ -744,13 +744,13 @@ func preparePriceReaderMock(priceReader *readerpkg_mock.MockPriceReader) {
 	priceReader.EXPECT().
 		GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).
 		Return(
-			map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
+			nil, nil,
 		).
 		Maybe()
 
 	priceReader.EXPECT().
 		GetFeedPricesUSD(mock.Anything, mock.Anything).
-		Return(ccipocr3.TokenPriceMap{}, nil).Maybe()
+		Return(nil, nil).Maybe()
 }
 
 type nodeSetup struct {

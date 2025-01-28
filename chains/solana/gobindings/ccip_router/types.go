@@ -351,7 +351,6 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 type SVMExtraArgs struct {
 	ComputeUnits     uint32
 	IsWritableBitmap uint64
-	Accounts         []ag_solanago.PublicKey
 }
 
 func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -362,11 +361,6 @@ func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	}
 	// Serialize `IsWritableBitmap` param:
 	err = encoder.Encode(obj.IsWritableBitmap)
-	if err != nil {
-		return err
-	}
-	// Serialize `Accounts` param:
-	err = encoder.Encode(obj.Accounts)
 	if err != nil {
 		return err
 	}
@@ -381,11 +375,6 @@ func (obj *SVMExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	}
 	// Deserialize `IsWritableBitmap`:
 	err = decoder.Decode(&obj.IsWritableBitmap)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Accounts`:
-	err = decoder.Decode(&obj.Accounts)
 	if err != nil {
 		return err
 	}
@@ -429,7 +418,6 @@ type Any2SVMRampMessage struct {
 	Header        RampMessageHeader
 	Sender        []byte
 	Data          []byte
-	LogicReceiver ag_solanago.PublicKey
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
 	ExtraArgs     SVMExtraArgs
@@ -449,11 +437,6 @@ func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `Data` param:
 	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `LogicReceiver` param:
-	err = encoder.Encode(obj.LogicReceiver)
 	if err != nil {
 		return err
 	}
@@ -493,11 +476,6 @@ func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `Data`:
 	err = decoder.Decode(&obj.Data)
-	if err != nil {
-		return err
-	}
-	// Deserialize `LogicReceiver`:
-	err = decoder.Decode(&obj.LogicReceiver)
 	if err != nil {
 		return err
 	}
@@ -1166,7 +1144,9 @@ type DestChainConfig struct {
 	MaxDataBytes                      uint32
 	MaxPerMsgGasLimit                 uint32
 	DestGasOverhead                   uint32
-	DestGasPerPayloadByte             uint16
+	DestGasPerPayloadByteBase         uint32
+	DestGasPerPayloadByteHigh         uint32
+	DestGasPerPayloadByteThreshold    uint32
 	DestDataAvailabilityOverheadGas   uint32
 	DestGasPerDataAvailabilityByte    uint16
 	DestDataAvailabilityMultiplierBps uint16
@@ -1206,8 +1186,18 @@ func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	if err != nil {
 		return err
 	}
-	// Serialize `DestGasPerPayloadByte` param:
-	err = encoder.Encode(obj.DestGasPerPayloadByte)
+	// Serialize `DestGasPerPayloadByteBase` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteBase)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasPerPayloadByteHigh` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteHigh)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasPerPayloadByteThreshold` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByteThreshold)
 	if err != nil {
 		return err
 	}
@@ -1295,8 +1285,18 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	if err != nil {
 		return err
 	}
-	// Deserialize `DestGasPerPayloadByte`:
-	err = decoder.Decode(&obj.DestGasPerPayloadByte)
+	// Deserialize `DestGasPerPayloadByteBase`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteBase)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasPerPayloadByteHigh`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteHigh)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasPerPayloadByteThreshold`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByteThreshold)
 	if err != nil {
 		return err
 	}
@@ -1607,21 +1607,6 @@ func (value OcrPluginType) String() string {
 	}
 }
 
-type MerkleError ag_binary.BorshEnum
-
-const (
-	InvalidProof_MerkleError MerkleError = iota
-)
-
-func (value MerkleError) String() string {
-	switch value {
-	case InvalidProof_MerkleError:
-		return "InvalidProof"
-	default:
-		return ""
-	}
-}
-
 type MessageExecutionState ag_binary.BorshEnum
 
 const (
@@ -1690,6 +1675,7 @@ const (
 	SourceTokenDataTooLarge_CcipRouterError
 	MessageGasLimitTooHigh_CcipRouterError
 	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
+	InvalidWritabilityBitmap_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1776,6 +1762,8 @@ func (value CcipRouterError) String() string {
 		return "MessageGasLimitTooHigh"
 	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError:
 		return "ExtraArgOutOfOrderExecutionMustBeTrue"
+	case InvalidWritabilityBitmap_CcipRouterError:
+		return "InvalidWritabilityBitmap"
 	default:
 		return ""
 	}
