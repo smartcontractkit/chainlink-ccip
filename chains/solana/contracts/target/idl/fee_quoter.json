@@ -3,6 +3,136 @@
   "name": "fee_quoter",
   "instructions": [
     {
+      "name": "initialize",
+      "docs": [
+        "Initializes the Fee Quoter.",
+        "",
+        "The initialization is responsibility of Admin, nothing more than calling this method should be done first.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for initialization.",
+        "* `svm_chain_selector` - The chain selector for SVM.",
+        "* `default_gas_limit` - The default gas limit for other destination chains.",
+        "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
+        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "onramp",
+          "type": "publicKey"
+        },
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey"
+        },
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "updateConfigMaxFeeJuelsPerMsg",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "transferOwnership",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "newOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "acceptOwnership",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "addBillingTokenConfig",
       "docs": [
         "Adds a billing token configuration.",
@@ -161,6 +291,111 @@
       "args": []
     },
     {
+      "name": "addDestChain",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destChain",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "chainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "destChainConfig",
+          "type": {
+            "defined": "DestChainConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "disableDestChain",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destChain",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "chainSelector",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "updateDestChainConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destChain",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "chainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "destChainConfig",
+          "type": {
+            "defined": "DestChainConfig"
+          }
+        }
+      ]
+    },
+    {
       "name": "getFee",
       "docs": [
         "Calculates the fee for sending a message to the destination chain.",
@@ -230,6 +465,10 @@
           },
           {
             "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposedOwner",
             "type": "publicKey"
           },
           {
@@ -608,6 +847,40 @@
         {
           "name": "feeToken",
           "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DestChainAdded",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "destChainConfig",
+          "type": {
+            "defined": "DestChainConfig"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DestChainConfigUpdated",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "destChainConfig",
+          "type": {
+            "defined": "DestChainConfig"
+          },
           "index": false
         }
       ]

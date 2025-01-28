@@ -6,6 +6,8 @@ pub struct Config {
     pub version: u8,
 
     pub owner: Pubkey,
+    pub proposed_owner: Pubkey,
+
     pub onramp: Pubkey,
 
     pub max_fee_juels_per_msg: u128, // Maximum fee that can be charged for a message.

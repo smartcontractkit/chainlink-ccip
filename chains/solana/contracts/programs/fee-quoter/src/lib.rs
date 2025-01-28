@@ -20,6 +20,53 @@ use instructions::v1;
 pub mod fee_quoter {
     use super::*;
 
+    /// Initializes the Fee Quoter.
+    ///
+    /// The initialization is responsibility of Admin, nothing more than calling this method should be done first.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for initialization.
+    /// * `svm_chain_selector` - The chain selector for SVM.
+    /// * `default_gas_limit` - The default gas limit for other destination chains.
+    /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
+    /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        onramp: Pubkey,
+        link_token_mint: Pubkey,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()> {
+        ctx.accounts.config.set_inner(Config {
+            version: 1,
+            owner: ctx.accounts.authority.key(),
+            proposed_owner: Pubkey::default(),
+            onramp,
+            max_fee_juels_per_msg,
+            link_token_mint,
+        });
+
+        // ctx.accounts.state.latest_price_sequence_number = 0; // TODO each offramp has its own price seq_nr?
+
+        Ok(())
+    }
+
+    pub fn update_config_max_fee_juels_per_msg(
+        ctx: Context<UpdateConfig>,
+        max_fee_juels_per_msg: u128,
+    ) -> Result<()> {
+        v1::admin::update_config_max_fee_juels_per_msg(ctx, max_fee_juels_per_msg)
+    }
+
+    pub fn transfer_ownership(ctx: Context<UpdateConfig>, new_owner: Pubkey) -> Result<()> {
+        v1::admin::transfer_ownership(ctx, new_owner)
+    }
+
+    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
+        v1::admin::accept_ownership(ctx)
+    }
+
     /// Adds a billing token configuration.
     /// Only CCIP Admin can add a billing token configuration.
     ///
@@ -56,6 +103,29 @@ pub mod fee_quoter {
     /// * `ctx` - The context containing the accounts required for removing the billing token configuration.
     pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
         v1::admin::remove_billing_token_config(ctx)
+    }
+
+    pub fn add_dest_chain(
+        ctx: Context<AddDestChain>,
+        chain_selector: u64,
+        dest_chain_config: DestChainConfig,
+    ) -> Result<()> {
+        v1::admin::add_dest_chain(ctx, chain_selector, dest_chain_config)
+    }
+
+    pub fn disable_dest_chain(
+        ctx: Context<UpdateDestChainConfig>,
+        chain_selector: u64,
+    ) -> Result<()> {
+        v1::admin::disable_dest_chain(ctx, chain_selector)
+    }
+
+    pub fn update_dest_chain_config(
+        ctx: Context<UpdateDestChainConfig>,
+        chain_selector: u64,
+        dest_chain_config: DestChainConfig,
+    ) -> Result<()> {
+        v1::admin::update_dest_chain_config(ctx, chain_selector, dest_chain_config)
     }
 
     /// Calculates the fee for sending a message to the destination chain.

@@ -4,6 +4,7 @@ use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::messages::SVM2AnyMessage;
+use crate::program::FeeQuoter;
 use crate::state::{BillingTokenConfig, BillingTokenConfigWrapper, Config, DestChain};
 use crate::FeeQuoterError;
 
@@ -11,7 +12,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8; // size in bytes
 
 // Fixed seeds - different contexts must use different PDA seeds
 pub const CONFIG_SEED: &[u8] = b"config";
-pub const DEST_CHAIN_STATE_SEED: &[u8] = b"dest_chain_state";
+pub const DEST_CHAIN_SEED: &[u8] = b"dest_chain";
 pub const FEE_BILLING_SIGNER_SEEDS: &[u8] = b"fee_billing_signer"; // signer for billing fee token transfer
 pub const FEE_BILLING_TOKEN_CONFIG_SEED: &[u8] = b"fee_billing_token_config";
 pub const TOKEN_POOL_BILLING_SEED: &[u8] = b"ccip_tokenpool_billing";
@@ -29,6 +30,58 @@ const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
 
 #[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(
+        init,
+        seeds = [CONFIG_SEED],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
+        constraint = uninitialized(config.version) @ FeeQuoterError::InvalidInputs,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, FeeQuoter>,
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ FeeQuoterError::Unauthorized)]
+    // initialization only allowed by program upgrade authority
+    pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateConfig<'info> {
+    #[account(
+        mut,
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+    )]
+    pub config: Account<'info, Config>,
+    #[account(address = config.owner @ FeeQuoterError::Unauthorized)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptOwnership<'info> {
+    #[account(
+        mut,
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+    )]
+    pub config: Account<'info, Config>,
+    #[account(address = config.proposed_owner @ FeeQuoterError::Unauthorized)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 #[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct GetFee<'info> {
     #[account(
@@ -38,7 +91,7 @@ pub struct GetFee<'info> {
     )]
     pub config: Account<'info, Config>,
     #[account(
-        seeds = [DEST_CHAIN_STATE_SEED, destination_chain_selector.to_le_bytes().as_ref()],
+        seeds = [DEST_CHAIN_SEED, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidInputs, // validate state version
     )]
@@ -178,6 +231,57 @@ pub struct RemoveBillingTokenConfig<'info> {
         mut,
         address = config.owner @ FeeQuoterError::Unauthorized
     )]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(dest_chain_selector: u64)]
+pub struct AddDestChain<'info> {
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+    )]
+    pub config: Account<'info, Config>,
+    #[account(
+        init,
+        seeds = [DEST_CHAIN_SEED, dest_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE,
+    )]
+    pub dest_chain: Account<'info, DestChain>,
+
+    #[account(
+        mut,
+        address = config.owner @ FeeQuoterError::Unauthorized
+    )]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(chain_selector: u64)]
+pub struct UpdateDestChainConfig<'info> {
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [DEST_CHAIN_SEED, chain_selector.to_le_bytes().as_ref()],
+        bump,
+        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidInputs, // validate state version
+    )]
+    pub dest_chain: Account<'info, DestChain>,
+
+    #[account(mut, address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
