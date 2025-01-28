@@ -38,7 +38,7 @@ pub fn fee_for_msg(
     fee_token_config: &BillingTokenConfig,
     additional_token_configs: &[Option<BillingTokenConfig>],
     additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
-) -> Result<SVMTokenAmount> {
+) -> Result<(SVMTokenAmount, Vec<u8>, bool)> {
     let fee_token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
     } else {
@@ -52,7 +52,8 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         CcipRouterError::InvalidInputsMissingTokenConfig
     );
-    validate_svm2any(message, dest_chain, fee_token_config)?;
+    let (extra_args, gas_limit, allow_out_of_order) =
+        validate_svm2any(message, dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
@@ -67,12 +68,7 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain,
     )?;
 
-    let gas_limit = U256::new(
-        message
-            .extra_args
-            .gas_limit
-            .unwrap_or_else(|| dest_chain.config.default_tx_gas_limit.into()),
-    );
+    let gas_limit = U256::new(gas_limit);
 
     // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
     // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
@@ -127,10 +123,14 @@ pub fn fee_for_msg(
         .try_into()
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
 
-    Ok(SVMTokenAmount {
-        token: fee_token,
-        amount: fee_token_amount,
-    })
+    Ok((
+        SVMTokenAmount {
+            token: fee_token,
+            amount: fee_token_amount,
+        },
+        extra_args,
+        allow_out_of_order,
+    ))
 }
 
 fn data_availability_cost(
@@ -423,7 +423,8 @@ pub mod tests {
                 &[],
                 &[]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 48282184443231661
@@ -444,7 +445,8 @@ pub mod tests {
                 &[],
                 &[]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the network fee component of the sum
@@ -504,7 +506,8 @@ pub mod tests {
                 &[Some(token_config)],
                 &[per_chain_per_token]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 52911699750913573,
@@ -538,7 +541,8 @@ pub mod tests {
                 &[Some(another_token_config)],
                 &[another_per_chain_per_token_config]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the min_fee
@@ -575,7 +579,8 @@ pub mod tests {
                 &[Some(another_token_config.clone())],
                 &[another_per_chain_per_token_config.clone()]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 36654452956230811
@@ -593,7 +598,8 @@ pub mod tests {
                 &[Some(another_token_config)],
                 &[another_per_chain_per_token_config]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Slight increase in price
@@ -628,7 +634,8 @@ pub mod tests {
                 &[None],
                 &[another_per_chain_per_token_config.clone()]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 35758615812975735
@@ -646,7 +653,8 @@ pub mod tests {
                 &[None],
                 &[another_per_chain_per_token_config.clone()]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 35758615812975735
@@ -682,7 +690,8 @@ pub mod tests {
                 &tokens,
                 &per_chains
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens

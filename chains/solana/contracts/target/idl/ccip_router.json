@@ -2066,7 +2066,7 @@
       }
     },
     {
-      "name": "SVMExtraArgs",
+      "name": "Any2SVMRampExtraArgs",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2077,22 +2077,6 @@
           {
             "name": "isWritableBitmap",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AnyExtraArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": "u128"
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": "bool"
           }
         ]
       }
@@ -2131,7 +2115,7 @@
           {
             "name": "extraArgs",
             "type": {
-              "defined": "SVMExtraArgs"
+              "defined": "Any2SVMRampExtraArgs"
             }
           },
           {
@@ -2166,9 +2150,7 @@
           },
           {
             "name": "extraArgs",
-            "type": {
-              "defined": "AnyExtraArgs"
-            }
+            "type": "bytes"
           },
           {
             "name": "feeToken",
@@ -2284,9 +2266,7 @@
           },
           {
             "name": "extraArgs",
-            "type": {
-              "defined": "ExtraArgsInput"
-            }
+            "type": "bytes"
           }
         ]
       }
@@ -2303,26 +2283,6 @@
           {
             "name": "amount",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExtraArgsInput",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": {
-              "option": "u128"
-            }
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": {
-              "option": "bool"
-            }
           }
         ]
       }
@@ -2835,6 +2795,15 @@
           },
           {
             "name": "InvalidWritabilityBitmap"
+          },
+          {
+            "name": "InvalidExtraArgsTag"
+          },
+          {
+            "name": "InvalidChainFamilySelector"
+          },
+          {
+            "name": "InvalidTokenReceiver"
           }
         ]
       }

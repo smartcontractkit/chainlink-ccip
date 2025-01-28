@@ -66,8 +66,9 @@ pub mod ramps {
     use ethnum::U256;
 
     use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, SVM2AnyMessage, SVMTokenAmount,
-        CCIP_RECEIVE_DISCRIMINATOR, CHAIN_FAMILY_SELECTOR_EVM,
+        v1::onramp::process_extra_args, BillingTokenConfig, CcipRouterError, DestChain,
+        DestChainConfig, SVM2AnyMessage, SVMTokenAmount, CCIP_RECEIVE_DISCRIMINATOR,
+        CHAIN_FAMILY_SELECTOR_EVM,
     };
 
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
@@ -96,11 +97,62 @@ pub mod ramps {
         }
     }
 
+    // bytes4(keccak256("CCIP EVMExtraArgsV2"));
+    pub const EVM_EXTRA_ARGS_V2_TAG: u32 = 0x181dcf10;
+
+    // bytes4(keccak256("CCIP SVMExtraArgsV1"));
+    pub const SVM_EXTRA_ARGS_V1_TAG: u32 = 0x1f3b3aba;
+
+    #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
+    pub(in super::super) struct EVMExtraArgsV2 {
+        pub gas_limit: u128,
+        pub allow_out_of_order_execution: bool,
+    }
+
+    impl EVMExtraArgsV2 {
+        pub fn serialize_with_tag(&self) -> Vec<u8> {
+            let mut buffer = EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
+            let mut data = self.try_to_vec().unwrap();
+
+            buffer.append(&mut data);
+            buffer
+        }
+        pub fn default_config(cfg: &DestChainConfig) -> EVMExtraArgsV2 {
+            let mut obj = EVMExtraArgsV2::default();
+            obj.gas_limit = cfg.default_tx_gas_limit as u128;
+            obj
+        }
+    }
+
+    #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
+    pub(in super::super) struct SVMExtraArgsV1 {
+        pub compute_units: u32,
+        pub account_is_writable_bitmap: u64,
+        pub allow_out_of_order_execution: bool,
+        pub token_receiver: [u8; 32],
+        pub accounts: Vec<[u8; 32]>,
+    }
+
+    impl SVMExtraArgsV1 {
+        pub fn serialize_with_tag(&self) -> Vec<u8> {
+            let mut buffer = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+            let mut data = self.try_to_vec().unwrap();
+
+            buffer.append(&mut data);
+            buffer
+        }
+        pub fn default_config(cfg: &DestChainConfig) -> SVMExtraArgsV1 {
+            let mut obj = SVMExtraArgsV1::default();
+            obj.compute_units = cfg.default_tx_gas_limit;
+            obj
+        }
+    }
+
     pub fn validate_svm2any(
         msg: &SVM2AnyMessage,
         dest_chain: &DestChain,
         token_config: &BillingTokenConfig,
-    ) -> Result<()> {
+    ) -> Result<(Vec<u8>, u128, bool)> {
         require!(
             dest_chain.config.is_enabled,
             CcipRouterError::DestinationChainDisabled
@@ -120,21 +172,26 @@ pub mod ramps {
             CcipRouterError::UnsupportedNumberOfTokens
         );
 
+        let (extra_args, gas_limit, allow_out_of_order_execution) = process_extra_args(
+            &dest_chain.config,
+            &msg.extra_args,
+            msg.token_amounts.len() != 0,
+        )?;
+
         require_gte!(
             dest_chain.config.max_per_msg_gas_limit as u128,
-            msg.extra_args
-                .gas_limit
-                .unwrap_or(dest_chain.config.default_tx_gas_limit as u128),
+            gas_limit,
             CcipRouterError::MessageGasLimitTooHigh,
         );
 
         require!(
-            !dest_chain.config.enforce_out_of_order
-                || msg.extra_args.allow_out_of_order_execution.unwrap_or(false),
+            !dest_chain.config.enforce_out_of_order || allow_out_of_order_execution,
             CcipRouterError::ExtraArgOutOfOrderExecutionMustBeTrue,
         );
 
-        validate_dest_family_address(msg, dest_chain.config.chain_family_selector)
+        validate_dest_family_address(msg, dest_chain.config.chain_family_selector)?;
+
+        Ok((extra_args, gas_limit, allow_out_of_order_execution))
     }
 
     fn validate_dest_family_address(
@@ -182,7 +239,7 @@ pub mod ramps {
         use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
         use super::super::super::price_math::Usd18Decimals;
         use super::*;
-        use crate::{ExtraArgsInput, SVMTokenAmount, TimestampedPackedU224};
+        use crate::{SVMTokenAmount, TimestampedPackedU224};
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
 
@@ -280,7 +337,11 @@ pub mod ramps {
         #[test]
         fn message_exceeds_gas_limit_fails_to_validate() {
             let mut message = sample_message();
-            message.extra_args.gas_limit = Some(1_000_000_000);
+            message.extra_args = EVMExtraArgsV2 {
+                gas_limit: 1_000_000_000,
+                allow_out_of_order_execution: false,
+            }
+            .serialize_with_tag();
             assert_eq!(
                 validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                     .unwrap_err(),
@@ -296,9 +357,17 @@ pub mod ramps {
             dest_chain_not_enforce.config.enforce_out_of_order = false;
 
             let mut message_ooo = sample_message();
-            message_ooo.extra_args.allow_out_of_order_execution = Some(true);
+            message_ooo.extra_args = EVMExtraArgsV2 {
+                gas_limit: 1_000,
+                allow_out_of_order_execution: true,
+            }
+            .serialize_with_tag();
             let mut message_not_ooo = sample_message();
-            message_not_ooo.extra_args.allow_out_of_order_execution = Some(false);
+            message_not_ooo.extra_args = EVMExtraArgsV2 {
+                gas_limit: 1_000,
+                allow_out_of_order_execution: false,
+            }
+            .serialize_with_tag();
 
             // allowed cases
             validate_svm2any(&message_ooo, &dest_chain_enforce, &sample_billing_config()).unwrap();
@@ -339,10 +408,7 @@ pub mod ramps {
                 data: vec![],
                 token_amounts: vec![],
                 fee_token: native_mint::ID,
-                extra_args: ExtraArgsInput {
-                    gas_limit: None,
-                    allow_out_of_order_execution: None,
-                },
+                extra_args: EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec(), // empty extraArgs, use defaults
             }
         }
 

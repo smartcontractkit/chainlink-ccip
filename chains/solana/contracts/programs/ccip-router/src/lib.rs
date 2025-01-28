@@ -691,4 +691,10 @@ pub enum CcipRouterError {
     ExtraArgOutOfOrderExecutionMustBeTrue,
     #[msg("Invalid writability bitmap")]
     InvalidWritabilityBitmap,
+    #[msg("Invalid extra args tag")]
+    InvalidExtraArgsTag,
+    #[msg("Invalid chain family selector")]
+    InvalidChainFamilySelector,
+    #[msg("Invalid token receiver")]
+    InvalidTokenReceiver,
 }

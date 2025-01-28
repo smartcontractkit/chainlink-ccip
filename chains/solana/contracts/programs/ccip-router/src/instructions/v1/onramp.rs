@@ -1,21 +1,22 @@
-use std::cell::Ref;
-
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
 use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
+use super::messages::ramps::{
+    EVMExtraArgsV2, SVMExtraArgsV1, EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
+};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
 use super::price_math::get_validated_token_price;
 
-use crate::seed;
+use crate::{seed, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 use crate::{
-    BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config, DestChainConfig,
-    GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
+    BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, DestChainConfig, GetFee, Nonce,
+    PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
     SVM2AnyTokenTransfer, SVMTokenAmount,
 };
 
@@ -55,6 +56,7 @@ pub fn get_fee<'info>(
         &token_billing_config_accounts,
         &per_chain_per_token_config_accounts,
     )?
+    .0
     .amount)
 }
 
@@ -107,7 +109,7 @@ pub fn ccip_send<'info>(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let fee = fee_for_msg(
+    let (fee, extra_args, allow_out_of_order) = fee_for_msg(
         &message,
         dest_chain,
         &ctx.accounts.fee_token_config.config,
@@ -166,10 +168,8 @@ pub fn ccip_send<'info>(
     let sender = ctx.accounts.authority.key.to_owned();
     let receiver = message.receiver.clone();
     let source_chain_selector = config.svm_chain_selector;
-    let extra_args = extra_args_or_default(config, message.extra_args);
-
     let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
-    let final_nonce = bump_nonce(nonce_counter_account, extra_args).unwrap();
+    let final_nonce = bump_nonce(nonce_counter_account, allow_out_of_order).unwrap();
 
     let token_count = message.token_amounts.len();
     require!(
@@ -307,24 +307,87 @@ fn token_transfer(
 /////////////
 // Helpers //
 /////////////
-fn extra_args_or_default(default_config: Ref<Config>, extra_args: ExtraArgsInput) -> AnyExtraArgs {
-    let mut result_args = AnyExtraArgs {
-        gas_limit: default_config.default_gas_limit.to_owned(),
-        allow_out_of_order_execution: default_config.default_allow_out_of_order_execution != 0,
-    };
 
-    if let Some(gas_limit) = extra_args.gas_limit {
-        gas_limit.clone_into(&mut result_args.gas_limit)
+// process_extra_args returns serialized extraArgs, gas_limit, allow_out_of_order_execution
+// it calls the chain-specific extra args validation logic
+pub fn process_extra_args(
+    dest_config: &DestChainConfig,
+    extra_args: &[u8],
+    message_contains_tokens: bool,
+) -> Result<(Vec<u8>, u128, bool)> {
+    require_gte!(extra_args.len(), 4, CcipRouterError::InvalidInputs);
+
+    let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
+    let mut data = &extra_args[4..];
+
+    match u32::from_be_bytes(dest_config.chain_family_selector) {
+        CHAIN_FAMILY_SELECTOR_EVM => parse_and_validate_evm_extra_args(dest_config, tag, &mut data),
+        CHAIN_FAMILY_SELECTOR_SVM => {
+            parse_and_validate_svm_extra_args(dest_config, tag, &mut data, message_contains_tokens)
+        }
+
+        _ => Err(CcipRouterError::InvalidChainFamilySelector.into()),
     }
-
-    if let Some(allow_out_of_order_execution) = extra_args.allow_out_of_order_execution {
-        allow_out_of_order_execution.clone_into(&mut result_args.allow_out_of_order_execution)
-    }
-
-    result_args
 }
 
-fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraArgs) -> Result<u64> {
+fn parse_and_validate_evm_extra_args(
+    cfg: &DestChainConfig,
+    tag: [u8; 4],
+    data: &mut &[u8],
+) -> Result<(Vec<u8>, u128, bool)> {
+    match u32::from_be_bytes(tag) {
+        EVM_EXTRA_ARGS_V2_TAG => {
+            let args = if data.is_empty() {
+                EVMExtraArgsV2::default_config(cfg)
+            } else {
+                EVMExtraArgsV2::deserialize(data)?
+            };
+            Ok((
+                args.serialize_with_tag(),
+                args.gas_limit,
+                args.allow_out_of_order_execution,
+            ))
+        }
+        _ => Err(CcipRouterError::InvalidExtraArgsTag.into()),
+    }
+}
+
+fn parse_and_validate_svm_extra_args(
+    cfg: &DestChainConfig,
+    tag: [u8; 4],
+    data: &mut &[u8],
+    message_contains_tokens: bool,
+) -> Result<(Vec<u8>, u128, bool)> {
+    match u32::from_be_bytes(tag) {
+        SVM_EXTRA_ARGS_V1_TAG => {
+            let args = if data.is_empty() {
+                SVMExtraArgsV1::default_config(cfg)
+            } else {
+                SVMExtraArgsV1::deserialize(data)?
+            };
+
+            // token_receiver != 0 when tokens are present
+            // token_receiver == 0 when tokens are not present
+            let receiver_is_zero_address = args.token_receiver == [0; 32];
+            require!(
+                message_contains_tokens == !receiver_is_zero_address,
+                CcipRouterError::InvalidTokenReceiver
+            );
+
+            Ok((
+                args.serialize_with_tag(),
+                args.compute_units as u128,
+                args.allow_out_of_order_execution,
+            ))
+        }
+        _ => Err(CcipRouterError::InvalidExtraArgsTag.into()),
+    }
+}
+
+fn bump_nonce(
+    nonce_counter_account: &mut Account<Nonce>,
+    allow_out_of_order_execution: bool,
+) -> Result<u64> {
     // Avoid Re-initialization attack as the account is init_if_needed
     // https://solana.com/developers/courses/program-security/reinitialization-attacks#add-is-initialized-check
     if nonce_counter_account.version == 0 {
@@ -334,9 +397,9 @@ fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraAr
         nonce_counter_account.counter = 0;
     }
 
-    // TODO: Require config.enforce_out_of_order => extra_args.allow_out_of_order_execution
+    // config.enforce_out_of_order checked in `validate_svm2any`
     let mut final_nonce = 0;
-    if !extra_args.allow_out_of_order_execution {
+    if !allow_out_of_order_execution {
         nonce_counter_account.counter = nonce_counter_account.counter.checked_add(1).unwrap();
         final_nonce = nonce_counter_account.counter;
     }
@@ -466,11 +529,13 @@ mod validated_try_to {
 mod tests {
     use ethnum::U256;
 
+    use crate::v1::messages::ramps::SVM_EXTRA_ARGS_V1_TAG;
+
     use super::super::{
         fee_quoter::tests::sample_additional_token, messages::ramps::tests::sample_dest_chain,
     };
 
-    use super::*;
+    use super::{process_extra_args, *};
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
@@ -490,10 +555,11 @@ mod tests {
                 0, 0, 0, 0,
             ]
             .to_vec(),
-            extra_args: AnyExtraArgs {
+            extra_args: EVMExtraArgsV2 {
                 gas_limit: 1,
                 allow_out_of_order_execution: true,
-            },
+            }
+            .serialize_with_tag(),
             fee_token: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
             fee_token_amount: 50u32.into(),
             token_amounts: [SVM2AnyTokenTransfer {
@@ -513,7 +579,7 @@ mod tests {
         let hash_result = hash(&message);
 
         assert_eq!(
-            "009bc51872fe41ea096bd881bf52e3daf07c80e112ffeeba6aa503d8281b6bfd",
+            "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7",
             hex::encode(hash_result)
         );
     }
@@ -610,6 +676,105 @@ mod tests {
             )
             .unwrap_err(),
             CcipRouterError::SourceTokenDataTooLarge.into()
+        );
+    }
+
+    #[test]
+    fn process_extra_args_matches_family() {
+        let evm_dest_chain = sample_dest_chain();
+        let mut svm_dest_chain = sample_dest_chain();
+        svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+        let evm_extra_args = EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
+        let svm_extra_args = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+        let mut none_dest_chain = sample_dest_chain();
+        none_dest_chain.config.chain_family_selector = [0; 4];
+
+        // match family
+        process_extra_args(&evm_dest_chain.config, &evm_extra_args, false).unwrap();
+        process_extra_args(&svm_dest_chain.config, &svm_extra_args, false).unwrap();
+        assert_eq!(
+            process_extra_args(&none_dest_chain.config, &evm_extra_args, false).unwrap_err(),
+            CcipRouterError::InvalidChainFamilySelector.into()
+        );
+        assert_eq!(
+            process_extra_args(&none_dest_chain.config, &[0; 0], false).unwrap_err(),
+            CcipRouterError::InvalidInputs.into()
+        );
+
+        // evm - default case
+        let (extra_args, gas_limit, ooo) =
+            process_extra_args(&evm_dest_chain.config, &evm_extra_args, false).unwrap();
+        assert_eq!(extra_args[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(
+            gas_limit,
+            evm_dest_chain.config.default_tx_gas_limit as u128
+        );
+        assert_eq!(ooo, false);
+
+        // evm - passed in data
+        let (extra_args, gas_limit, ooo) = process_extra_args(
+            &evm_dest_chain.config,
+            &EVMExtraArgsV2 {
+                gas_limit: 100,
+                allow_out_of_order_execution: true,
+            }
+            .serialize_with_tag(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(extra_args[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(gas_limit, 100);
+        assert_eq!(ooo, true);
+
+        // evm - fail to match
+        assert_eq!(
+            process_extra_args(&evm_dest_chain.config, &svm_extra_args, false).unwrap_err(),
+            CcipRouterError::InvalidExtraArgsTag.into()
+        );
+
+        // svm - default case
+        let (extra_args, gas_limit, ooo) =
+            process_extra_args(&svm_dest_chain.config, &svm_extra_args, false).unwrap();
+        assert_eq!(extra_args[..4], SVM_EXTRA_ARGS_V1_TAG.to_be_bytes());
+        assert_eq!(
+            gas_limit,
+            svm_dest_chain.config.default_tx_gas_limit as u128
+        );
+        assert_eq!(ooo, false);
+
+        // svm - contains tokens but no receiver address
+        assert_eq!(
+            process_extra_args(&svm_dest_chain.config, &svm_extra_args, true).unwrap_err(),
+            CcipRouterError::InvalidTokenReceiver.into(),
+        );
+
+        // svm - passed in data
+        let args = SVMExtraArgsV1 {
+            compute_units: 100,
+            account_is_writable_bitmap: 3,
+            allow_out_of_order_execution: true,
+            token_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
+                .unwrap()
+                .to_bytes(),
+            accounts: vec![
+                Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
+                    .unwrap()
+                    .to_bytes(),
+                Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
+                    .unwrap()
+                    .to_bytes(),
+            ],
+        };
+        let (extra_args, gas_limit, ooo) =
+            process_extra_args(&svm_dest_chain.config, &args.serialize_with_tag(), true).unwrap();
+        assert_eq!(extra_args, args.serialize_with_tag());
+        assert_eq!(gas_limit, 100);
+        assert_eq!(ooo, true);
+
+        // svm - fail to match
+        assert_eq!(
+            process_extra_args(&svm_dest_chain.config, &evm_extra_args, false).unwrap_err(),
+            CcipRouterError::InvalidExtraArgsTag.into()
         );
     }
 }
