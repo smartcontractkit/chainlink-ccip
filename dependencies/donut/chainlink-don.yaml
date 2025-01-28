@@ -233,6 +233,12 @@ profiles:
                   repository: ${DEVSPACE_IMAGE}
                   tag: ${DEVSPACE_IMAGE_TAG}
                   pullPolicy: Always
+  # monitoring
+  - name: monitoring-service-monitor
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/monitoring.service-monitor.yaml
   # overrides
   - name: overrides
     patches:

@@ -173,6 +173,7 @@ profiles:
               - network-geth-chain-1337
               - network-geth-chain-2337
               - network-additional-geth-chains
+              - monitoring-service-monitor
   - name: load-tests
     patches:
       - op: add
@@ -191,6 +192,7 @@ profiles:
             profiles:
               - version-from-env
               - network-generated
+              - monitoring-service-monitor
 commands:
   ccip-v2:
     command: devspace run-pipeline ccip-v2 -p default

@@ -1,0 +1,5 @@
+---
+common:
+  # -- prometheus servicemonitor to scrape metrics
+  servicemonitor:
+    enabled: true
