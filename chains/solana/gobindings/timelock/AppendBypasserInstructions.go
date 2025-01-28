@@ -10,13 +10,11 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeOperation is the `initializeOperation` instruction.
-type InitializeOperation struct {
-	TimelockId       *[32]uint8
-	Id               *[32]uint8
-	Predecessor      *[32]uint8
-	Salt             *[32]uint8
-	InstructionCount *uint32
+// AppendBypasserInstructions is the `appendBypasserInstructions` instruction.
+type AppendBypasserInstructions struct {
+	TimelockId        *[32]uint8
+	Id                *[32]uint8
+	InstructionsBatch *[]InstructionData
 
 	// [0] = [WRITE] operation
 	//
@@ -30,117 +28,105 @@ type InitializeOperation struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewInitializeOperationInstructionBuilder creates a new `InitializeOperation` instruction builder.
-func NewInitializeOperationInstructionBuilder() *InitializeOperation {
-	nd := &InitializeOperation{
+// NewAppendBypasserInstructionsInstructionBuilder creates a new `AppendBypasserInstructions` instruction builder.
+func NewAppendBypasserInstructionsInstructionBuilder() *AppendBypasserInstructions {
+	nd := &AppendBypasserInstructions{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
 
 // SetTimelockId sets the "timelockId" parameter.
-func (inst *InitializeOperation) SetTimelockId(timelockId [32]uint8) *InitializeOperation {
+func (inst *AppendBypasserInstructions) SetTimelockId(timelockId [32]uint8) *AppendBypasserInstructions {
 	inst.TimelockId = &timelockId
 	return inst
 }
 
 // SetId sets the "id" parameter.
-func (inst *InitializeOperation) SetId(id [32]uint8) *InitializeOperation {
+func (inst *AppendBypasserInstructions) SetId(id [32]uint8) *AppendBypasserInstructions {
 	inst.Id = &id
 	return inst
 }
 
-// SetPredecessor sets the "predecessor" parameter.
-func (inst *InitializeOperation) SetPredecessor(predecessor [32]uint8) *InitializeOperation {
-	inst.Predecessor = &predecessor
-	return inst
-}
-
-// SetSalt sets the "salt" parameter.
-func (inst *InitializeOperation) SetSalt(salt [32]uint8) *InitializeOperation {
-	inst.Salt = &salt
-	return inst
-}
-
-// SetInstructionCount sets the "instructionCount" parameter.
-func (inst *InitializeOperation) SetInstructionCount(instructionCount uint32) *InitializeOperation {
-	inst.InstructionCount = &instructionCount
+// SetInstructionsBatch sets the "instructionsBatch" parameter.
+func (inst *AppendBypasserInstructions) SetInstructionsBatch(instructionsBatch []InstructionData) *AppendBypasserInstructions {
+	inst.InstructionsBatch = &instructionsBatch
 	return inst
 }
 
 // SetOperationAccount sets the "operation" account.
-func (inst *InitializeOperation) SetOperationAccount(operation ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendBypasserInstructions) SetOperationAccount(operation ag_solanago.PublicKey) *AppendBypasserInstructions {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(operation).WRITE()
 	return inst
 }
 
 // GetOperationAccount gets the "operation" account.
-func (inst *InitializeOperation) GetOperationAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructions) GetOperationAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *InitializeOperation) SetConfigAccount(config ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendBypasserInstructions) SetConfigAccount(config ag_solanago.PublicKey) *AppendBypasserInstructions {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *InitializeOperation) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructions) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetRoleAccessControllerAccount sets the "roleAccessController" account.
-func (inst *InitializeOperation) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendBypasserInstructions) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *AppendBypasserInstructions {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
 // GetRoleAccessControllerAccount gets the "roleAccessController" account.
-func (inst *InitializeOperation) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructions) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *InitializeOperation) SetAuthorityAccount(authority ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendBypasserInstructions) SetAuthorityAccount(authority ag_solanago.PublicKey) *AppendBypasserInstructions {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *InitializeOperation) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructions) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *InitializeOperation) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendBypasserInstructions) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AppendBypasserInstructions {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *InitializeOperation) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructions) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
-func (inst InitializeOperation) Build() *Instruction {
+func (inst AppendBypasserInstructions) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_InitializeOperation,
+		TypeID: Instruction_AppendBypasserInstructions,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst InitializeOperation) ValidateAndBuild() (*Instruction, error) {
+func (inst AppendBypasserInstructions) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *InitializeOperation) Validate() error {
+func (inst *AppendBypasserInstructions) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.TimelockId == nil {
@@ -149,14 +135,8 @@ func (inst *InitializeOperation) Validate() error {
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
-		if inst.Predecessor == nil {
-			return errors.New("Predecessor parameter is not set")
-		}
-		if inst.Salt == nil {
-			return errors.New("Salt parameter is not set")
-		}
-		if inst.InstructionCount == nil {
-			return errors.New("InstructionCount parameter is not set")
+		if inst.InstructionsBatch == nil {
+			return errors.New("InstructionsBatch parameter is not set")
 		}
 	}
 
@@ -181,21 +161,19 @@ func (inst *InitializeOperation) Validate() error {
 	return nil
 }
 
-func (inst *InitializeOperation) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *AppendBypasserInstructions) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("InitializeOperation")).
+			programBranch.Child(ag_format.Instruction("AppendBypasserInstructions")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("      TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("              Id", *inst.Id))
-						paramsBranch.Child(ag_format.Param("     Predecessor", *inst.Predecessor))
-						paramsBranch.Child(ag_format.Param("            Salt", *inst.Salt))
-						paramsBranch.Child(ag_format.Param("InstructionCount", *inst.InstructionCount))
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("       TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("               Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param("InstructionsBatch", *inst.InstructionsBatch))
 					})
 
 					// Accounts of the instruction:
@@ -210,7 +188,7 @@ func (inst *InitializeOperation) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj InitializeOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj AppendBypasserInstructions) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `TimelockId` param:
 	err = encoder.Encode(obj.TimelockId)
 	if err != nil {
@@ -221,24 +199,14 @@ func (obj InitializeOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (e
 	if err != nil {
 		return err
 	}
-	// Serialize `Predecessor` param:
-	err = encoder.Encode(obj.Predecessor)
-	if err != nil {
-		return err
-	}
-	// Serialize `Salt` param:
-	err = encoder.Encode(obj.Salt)
-	if err != nil {
-		return err
-	}
-	// Serialize `InstructionCount` param:
-	err = encoder.Encode(obj.InstructionCount)
+	// Serialize `InstructionsBatch` param:
+	err = encoder.Encode(obj.InstructionsBatch)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *InitializeOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *AppendBypasserInstructions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TimelockId`:
 	err = decoder.Decode(&obj.TimelockId)
 	if err != nil {
@@ -249,44 +217,30 @@ func (obj *InitializeOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Predecessor`:
-	err = decoder.Decode(&obj.Predecessor)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Salt`:
-	err = decoder.Decode(&obj.Salt)
-	if err != nil {
-		return err
-	}
-	// Deserialize `InstructionCount`:
-	err = decoder.Decode(&obj.InstructionCount)
+	// Deserialize `InstructionsBatch`:
+	err = decoder.Decode(&obj.InstructionsBatch)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewInitializeOperationInstruction declares a new InitializeOperation instruction with the provided parameters and accounts.
-func NewInitializeOperationInstruction(
+// NewAppendBypasserInstructionsInstruction declares a new AppendBypasserInstructions instruction with the provided parameters and accounts.
+func NewAppendBypasserInstructionsInstruction(
 	// Parameters:
 	timelockId [32]uint8,
 	id [32]uint8,
-	predecessor [32]uint8,
-	salt [32]uint8,
-	instructionCount uint32,
+	instructionsBatch []InstructionData,
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *InitializeOperation {
-	return NewInitializeOperationInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *AppendBypasserInstructions {
+	return NewAppendBypasserInstructionsInstructionBuilder().
 		SetTimelockId(timelockId).
 		SetId(id).
-		SetPredecessor(predecessor).
-		SetSalt(salt).
-		SetInstructionCount(instructionCount).
+		SetInstructionsBatch(instructionsBatch).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).
 		SetRoleAccessControllerAccount(roleAccessController).

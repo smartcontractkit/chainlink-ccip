@@ -551,16 +551,19 @@ pub mod ccip_router {
     /// * `report_context_byte_words` - consists of:
     ///     * report_context_byte_words[0]: ConfigDigest
     ///     * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-    ///     * report_context_byte_words[2]: ExtraHash
-    /// * `report` - The commit input report, single merkle root with RMN signatures and price updates
-    /// * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
+    /// * `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates
+    /// * `rs` - slice of R components of signatures
+    /// * `ss` - slice of S components of signatures
+    /// * `raw_vs` - array of V components of signatures
     pub fn commit<'info>(
         ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
-        report_context_byte_words: [[u8; 32]; 3],
-        report: CommitInput,
-        signatures: Vec<[u8; 65]>,
+        report_context_byte_words: [[u8; 32]; 2],
+        raw_report: Vec<u8>,
+        rs: Vec<[u8; 32]>,
+        ss: Vec<[u8; 32]>,
+        raw_vs: [u8; 32],
     ) -> Result<()> {
-        v1::offramp::commit(ctx, report_context_byte_words, report, signatures)
+        v1::offramp::commit(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
     }
 
     /// Executes a message on the destination chain.
@@ -578,21 +581,20 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for the execute.
-    /// * `execution_report` - the execution report containing only one message and proofs
+    /// * `raw_execution_report` - the serialized execution report containing only one message and proofs
     /// * `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)
     /// *  consists of:
     ///     * report_context_byte_words[0]: ConfigDigest
     ///     * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-    ///     * report_context_byte_words[2]: ExtraHash
     pub fn execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-        execution_report: ExecutionReportSingleChain,
-        report_context_byte_words: [[u8; 32]; 3],
+        raw_execution_report: Vec<u8>,
+        report_context_byte_words: [[u8; 32]; 2],
         token_indexes: Vec<u8>,
     ) -> Result<()> {
         v1::offramp::execute(
             ctx,
-            execution_report,
+            raw_execution_report,
             report_context_byte_words,
             &token_indexes,
         )
@@ -607,13 +609,13 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for the execution.
-    /// * `execution_report` - The execution report containing the message and proofs.
+    /// * `raw_execution_report` - The serialized execution report containing the message and proofs.
     pub fn manually_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-        execution_report: ExecutionReportSingleChain,
+        raw_execution_report: Vec<u8>,
         token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::manually_execute(ctx, execution_report, &token_indexes)
+        v1::offramp::manually_execute(ctx, raw_execution_report, &token_indexes)
     }
 }
 
@@ -703,4 +705,6 @@ pub enum CcipRouterError {
     ExtraArgOutOfOrderExecutionMustBeTrue,
     #[msg("New Admin can not be zero address")]
     InvalidTokenAdminRegistryInputsZeroAddress,
+    #[msg("Invalid writability bitmap")]
+    InvalidWritabilityBitmap,
 }

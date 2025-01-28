@@ -5,10 +5,10 @@ use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_l
 use super::pools::token_admin_registry_writable;
 
 use crate::{
+    seed,
+    token_context::{RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner},
     AcceptAdminRoleTokenAdminRegistry, AdministratorTransferRequested, AdministratorTransferred,
-    CcipRouterError, ModifyTokenAdminRegistry, PoolSet, RegisterTokenAdminRegistryByCCIPAdmin,
-    RegisterTokenAdminRegistryByOwner, SetPoolTokenAdminRegistry, CCIP_TOKENPOOL_CONFIG,
-    CCIP_TOKENPOOL_SIGNER, FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
+    CcipRouterError, ModifyTokenAdminRegistry, PoolSet, SetPoolTokenAdminRegistry,
 };
 
 const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;
@@ -141,21 +141,21 @@ pub fn set_pool(ctx: Context<SetPoolTokenAdminRegistry>, writable_indexes: Vec<u
 
         // The mandatory accounts (PDAs) are stored in the lookup table to save space even if they can be infered
         let (token_admin_registry, _) = Pubkey::find_program_address(
-            &[TOKEN_ADMIN_REGISTRY_SEED, token_mint.as_ref()],
+            &[seed::TOKEN_ADMIN_REGISTRY, token_mint.as_ref()],
             ctx.program_id,
         );
         let pool_program = lookup_table_account.addresses[2]; // cannot be calculated, can be custom per pool
         let token_program = lookup_table_account.addresses[6]; // cannot be calculated, can be custom per token
         let (pool_config, _) = Pubkey::find_program_address(
-            &[CCIP_TOKENPOOL_CONFIG, token_mint.as_ref()],
+            &[seed::CCIP_TOKENPOOL_CONFIG, token_mint.as_ref()],
             &pool_program,
         );
         let (pool_signer, _) = Pubkey::find_program_address(
-            &[CCIP_TOKENPOOL_SIGNER, token_mint.as_ref()],
+            &[seed::CCIP_TOKENPOOL_SIGNER, token_mint.as_ref()],
             &pool_program,
         );
         let (fee_billing_config, _) = Pubkey::find_program_address(
-            &[FEE_BILLING_TOKEN_CONFIG, token_mint.as_ref()],
+            &[seed::FEE_BILLING_TOKEN_CONFIG, token_mint.as_ref()],
             ctx.program_id,
         );
 

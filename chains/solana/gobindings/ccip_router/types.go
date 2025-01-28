@@ -351,7 +351,6 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 type SVMExtraArgs struct {
 	ComputeUnits     uint32
 	IsWritableBitmap uint64
-	Accounts         []ag_solanago.PublicKey
 }
 
 func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -362,11 +361,6 @@ func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	}
 	// Serialize `IsWritableBitmap` param:
 	err = encoder.Encode(obj.IsWritableBitmap)
-	if err != nil {
-		return err
-	}
-	// Serialize `Accounts` param:
-	err = encoder.Encode(obj.Accounts)
 	if err != nil {
 		return err
 	}
@@ -381,11 +375,6 @@ func (obj *SVMExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	}
 	// Deserialize `IsWritableBitmap`:
 	err = decoder.Decode(&obj.IsWritableBitmap)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Accounts`:
-	err = decoder.Decode(&obj.Accounts)
 	if err != nil {
 		return err
 	}
@@ -429,7 +418,6 @@ type Any2SVMRampMessage struct {
 	Header        RampMessageHeader
 	Sender        []byte
 	Data          []byte
-	LogicReceiver ag_solanago.PublicKey
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
 	ExtraArgs     SVMExtraArgs
@@ -449,11 +437,6 @@ func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `Data` param:
 	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `LogicReceiver` param:
-	err = encoder.Encode(obj.LogicReceiver)
 	if err != nil {
 		return err
 	}
@@ -493,11 +476,6 @@ func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `Data`:
 	err = decoder.Decode(&obj.Data)
-	if err != nil {
-		return err
-	}
-	// Deserialize `LogicReceiver`:
-	err = decoder.Decode(&obj.LogicReceiver)
 	if err != nil {
 		return err
 	}
@@ -1698,6 +1676,7 @@ const (
 	MessageGasLimitTooHigh_CcipRouterError
 	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
 	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
+	InvalidWritabilityBitmap_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1786,6 +1765,8 @@ func (value CcipRouterError) String() string {
 		return "ExtraArgOutOfOrderExecutionMustBeTrue"
 	case InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError:
 		return "InvalidTokenAdminRegistryInputsZeroAddress"
+	case InvalidWritabilityBitmap_CcipRouterError:
+		return "InvalidWritabilityBitmap"
 	default:
 		return ""
 	}
