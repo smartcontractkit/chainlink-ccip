@@ -71,7 +71,7 @@ jobs:
           GREAT_PR_DESCRIPTION_HERE
           )
             echo "$comment"
-            core_ref=$(echo "$comment" | grep -oE 'core ref: [a-f0-9]{40}' | cut -d' ' -f3 || true)
+            core_ref=$(echo "$comment" | grep -oE 'core ref:\s*[a-f0-9]{40}' | awk '{print $NF}' || true)
             if [ -n "$core_ref" ]; then
               echo "Overriding chainlink repository commit hash with: $core_ref"
               echo "::set-output name=ref::$core_ref"
