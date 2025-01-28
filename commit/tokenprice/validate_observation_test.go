@@ -1,22 +1,23 @@
 package tokenprice
 
 import (
+	"math/big"
+	"testing"
+	"time"
+
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	commonmock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/stretchr/testify/assert"
-	"math/big"
-	"testing"
-	"time"
 )
 
 var (
 	oneBig                = cciptypes.NewBigInt(big.NewInt(1))
-	twoBig                = cciptypes.NewBigInt(big.NewInt(2))
 	negativeOneBig        = cciptypes.NewBigInt(big.NewInt(-1))
 	zeroBig               = cciptypes.NewBigInt(big.NewInt(0))
 	nilBig                = cciptypes.NewBigInt(nil)
