@@ -38,15 +38,13 @@ pub struct ExecutionReportSingleChain {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct SVMExtraArgs {
     pub compute_units: u32,
-    pub is_writable_bitmap: u64,
-    pub accounts: Vec<Pubkey>,
+    pub is_writable_bitmap: u64, // part of the message to avoid calculating it onchain
 }
 
 impl SVMExtraArgs {
     pub fn len(&self) -> usize {
         4 // compute units
         + 8 // isWritable bitmap
-        + 4 + self.accounts.len() * 32 // additional accounts
     }
 }
 
@@ -61,12 +59,9 @@ pub struct Any2SVMRampMessage {
     pub header: RampMessageHeader,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
-    // In EVM receiver means the address that all the listed tokens will transfer to and the address of the message execution.
-    // In Solana the receiver is split into two:
-    // Logic Receiver is the Program ID of the user's program that will execute the message
-    pub logic_receiver: Pubkey,
     // Token Receiver is the address which the ATA will be calculated from.
     // If token receiver and message execution, then the token receiver must be a PDA from the logic receiver
+    // (Logic receiver is passed into relevant instructions through `remaining_accounts`)
     pub token_receiver: Pubkey,
     pub token_amounts: Vec<Any2SVMTokenTransfer>,
     pub extra_args: SVMExtraArgs,
@@ -80,7 +75,6 @@ impl Any2SVMRampMessage {
         self.header.len() // header
         + 4 + self.sender.len() // sender
         + 4 + self.data.len() // data
-        + 32 // logic receiver
         + 32 // token receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
@@ -173,10 +167,6 @@ pub struct CrossChainAmount {
 }
 
 impl CrossChainAmount {
-    pub const ZERO: Self = Self {
-        le_bytes: [0u8; 32],
-    };
-
     pub fn to_bytes(self) -> [u8; 32] {
         self.le_bytes
     }

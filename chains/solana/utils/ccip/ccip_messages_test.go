@@ -28,7 +28,6 @@ func TestMessageHashing(t *testing.T) {
 		h, err := HashAnyToSVMMessage(ccip_router.Any2SVMRampMessage{
 			Sender:        sender,
 			TokenReceiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
-			LogicReceiver: solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
 			Data:          []byte{4, 5, 6},
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{8, 5, 3},
@@ -40,9 +39,6 @@ func TestMessageHashing(t *testing.T) {
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     1000,
 				IsWritableBitmap: GenerateBitMapForIndexes([]int{0}),
-				Accounts: []solana.PublicKey{
-					solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
-				},
 			},
 			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{
 				{
@@ -53,10 +49,14 @@ func TestMessageHashing(t *testing.T) {
 					Amount:            ccip_router.CrossChainAmount{LeBytes: tokenAmount},
 				},
 			},
-		}, config.OnRampAddress)
+		}, config.OnRampAddress,
+			[]solana.PublicKey{
+				solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
+				solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
+			})
 
 		require.NoError(t, err)
-		require.Equal(t, "4db316059ebdabdb76b8b090d4df866c00de34c4f1ab959fc3ad142c8bde3bfa", hex.EncodeToString(h))
+		require.Equal(t, "8ceebcae8acd670231be9eb13203797bf6cb09e7a4851dd57600af3ed3945eb0", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {

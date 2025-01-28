@@ -6,8 +6,8 @@ use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
-    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, SVM2AnyMessage,
-    SVMTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
+    seed::FEE_BILLING_SIGNER, BillingTokenConfig, CcipRouterError, DestChain,
+    PerChainPerTokenConfig, SVM2AnyMessage, SVMTokenAmount, TimestampedPackedU224,
 };
 
 use super::messages::ramps::validate_svm2any;
@@ -74,17 +74,40 @@ pub fn fee_for_msg(
             .unwrap_or_else(|| dest_chain.config.default_tx_gas_limit.into()),
     );
 
+    // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
+    // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
+    // This calculation is not exact, the goal is to not lose money on large payloads.
+    // The fixed OCR report calldata overhead gas is accounted for in `dest_gas_overhead`.
+    // It is not included in the calculation below for simplicity.
+    let calldata_length =
+        U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead;
+
+    let mut calldata_gas =
+        calldata_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128);
+
+    let calldata_threshold =
+        U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128);
+
+    if calldata_length > calldata_threshold {
+        let base_calldata_gas = U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
+            * calldata_threshold;
+
+        let extra_bytes = calldata_length - calldata_threshold;
+        let extra_calldata_gas =
+            extra_bytes * U256::new(dest_chain.config.dest_gas_per_payload_byte_high as u128);
+        calldata_gas = base_calldata_gas + extra_calldata_gas;
+    }
+
     let execution_gas = gas_limit
         + U256::new(dest_chain.config.dest_gas_overhead as u128)
-        + (U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead)
-            * U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
+        + calldata_gas
         + network_fee.transfer_gas;
 
     let execution_cost = execution_gas_price
         * execution_gas
         * U256::new(dest_chain.config.gas_multiplier_wei_per_eth as u128);
 
-    let data_availability_cost = data_availability_cost(
+    let data_availability_cost: Usd18Decimals = data_availability_cost(
         data_availability_gas_price,
         message,
         network_fee.transfer_bytes_overhead,
@@ -92,9 +115,14 @@ pub fn fee_for_msg(
     );
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
+
+    // At this step, every fee component has been raised to 36 decimals
     let fee_token_value =
         (network_fee.premium * premium_multiplier) + execution_cost + data_availability_cost;
 
+    // Fee token value is in 36 decimals
+    // Fee token price is in 18 decimals USD for 1e18 smallest token denominations.
+    // The result is the fee in the fee tokens smallest denominations (e.g. lamport for Sol).
     let fee_token_amount = (fee_token_value.0 / fee_token_price.0)
         .try_into()
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
@@ -316,10 +344,10 @@ pub fn wrap_native_sol<'info>(
     invoke_signed(
         &system_instruction::transfer(&from.key(), &to.key(), amount),
         &[from.to_account_info(), to.to_account_info()],
-        &[&[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]]],
+        &[&[FEE_BILLING_SIGNER, &[signer_bump]]],
     )?;
 
-    let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]];
+    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
     let signer_seeds = &[&seeds[..]];
     let account = to.to_account_info();
     let sync: anchor_spl::token_2022::SyncNative = anchor_spl::token_2022::SyncNative { account };
@@ -350,7 +378,7 @@ pub fn do_billing_transfer<'info>(
     decimals: u8,
     signer_bump: u8,
 ) -> Result<()> {
-    let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]];
+    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
     let signer_seeds = &[&seeds[..]];
     let cpi_ctx = CpiContext::new_with_signer(token_program, transfer, signer_seeds);
     token_interface::transfer_checked(cpi_ctx, amount, decimals)
