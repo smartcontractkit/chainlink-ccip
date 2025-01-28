@@ -184,12 +184,10 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:        make([]byte, 20), // EVM sender
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
-			LogicReceiver: [32]byte{},
 			TokenAmounts:  []ccip_router.Any2SVMTokenTransfer{},
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
-				Accounts:         []solana.PublicKey{},
 			},
 		},
 		OffchainTokenData: [][]byte{},
@@ -209,7 +207,6 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:        make([]byte, 20), // EVM sender
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
-			LogicReceiver: [32]byte{},
 			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{{
 				SourcePoolAddress: make([]byte, 20), // EVM origin token pool
 				DestTokenAddress:  [32]byte{},
@@ -220,7 +217,6 @@ func TestTransactionSizing(t *testing.T) {
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
-				Accounts:         []solana.PublicKey{},
 			},
 		},
 		OffchainTokenData: [][]byte{},

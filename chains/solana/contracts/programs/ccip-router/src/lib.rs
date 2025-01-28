@@ -689,4 +689,6 @@ pub enum CcipRouterError {
     MessageGasLimitTooHigh,
     #[msg("Extra arg out of order execution must be true")]
     ExtraArgOutOfOrderExecutionMustBeTrue,
+    #[msg("Invalid writability bitmap")]
+    InvalidWritabilityBitmap,
 }
