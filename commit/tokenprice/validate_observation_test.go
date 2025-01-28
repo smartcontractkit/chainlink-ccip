@@ -29,6 +29,12 @@ var (
 			"0xa": {},
 		},
 	}
+	defaultTokensToQuery = map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
+		"0x1": {},
+		"0x2": {},
+		"0x3": {},
+		"0xa": {},
+	}
 )
 
 func Test_validateObservedTokenPrices(t *testing.T) {
@@ -47,17 +53,11 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 			name: "all valid",
 			tokenPrices: cciptypes.TokenPriceMap{
 				"0x1": oneBig,
-				"0x2": oneBig,
 				"0x3": oneBig,
 				"0xa": oneBig,
 			},
-			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-				"0x1": {},
-				"0x2": {},
-				"0x3": {},
-				"0xa": {},
-			},
-			expErr: false,
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        false,
 		},
 		{
 			name: "nil price",
@@ -65,47 +65,28 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 				"0x1": oneBig,
 				"0x2": oneBig,
 				"0x3": nilBig, // nil price
-				"0xa": oneBig,
 			},
-			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-				"0x1": {},
-				"0x2": {},
-				"0x3": {},
-				"0xa": {},
-			},
-			expErr: true,
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        true,
 		},
 		{
 			name: "negative price",
 			tokenPrices: cciptypes.TokenPriceMap{
 				"0x1": oneBig,
-				"0x2": oneBig,
 				"0x3": negativeOneBig, // negative price
 				"0xa": oneBig,
 			},
-			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-				"0x1": {},
-				"0x2": {},
-				"0x3": {},
-				"0xa": {},
-			},
-			expErr: true,
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        true,
 		},
 		{
 			name: "zero price",
 			tokenPrices: cciptypes.TokenPriceMap{
 				"0x1": oneBig,
-				"0x2": oneBig,
 				"0x3": zeroBig, // zero price
-				"0xa": oneBig,
 			},
-			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-				"0x1": {},
-				"0x2": {},
-				"0x3": {},
-				"0xa": {},
-			},
-			expErr: true,
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        true,
 		},
 	}
 
@@ -276,143 +257,55 @@ func TestValidateObservation(t *testing.T) {
 	}
 }
 
-//
-//func TestValidateObservedTokenPrices(t *testing.T) {
-//	testCases := []struct {
-//		name          string
-//		tokenPrices   cciptypes.TokenPriceMap
-//		tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
-//		expErr        bool
-//	}{
-//		{
-//			name:        "empty is valid",
-//			tokenPrices: cciptypes.TokenPriceMap{},
-//			expErr:      false,
-//		},
-//		{
-//			name: "all valid",
-//			tokenPrices: cciptypes.TokenPriceMap{
-//				"0x1": oneBig,
-//				"0x2": oneBig,
-//				"0x3": oneBig,
-//				"0xa": oneBig,
-//			},
-//			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-//				"0x1": {},
-//				"0x2": {},
-//				"0x3": {},
-//				"0xa": {},
-//			},
-//			expErr: false,
-//		},
-//		{
-//			name: "nil price",
-//			tokenPrices: cciptypes.TokenPriceMap{
-//				"0x1": oneBig,
-//				"0x2": oneBig,
-//				"0x3": nil, // nil price
-//				"0xa": oneBig,
-//			},
-//			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-//				"0x1": {},
-//				"0x2": {},
-//				"0x3": {},
-//				"0xa": {},
-//			},
-//			expErr: true,
-//		},
-//	}
-//
-//	for _, tc := range testCases {
-//		t.Run(tc.name, func(t *testing.T) {
-//			err := validateObservedTokenPrices(tc.tokenPrices, tc.tokensToQuery)
-//			if tc.expErr {
-//				assert.Error(t, err)
-//			} else {
-//				assert.NoError(t, err)
-//			}
-//		})
-//	}
-//}
-//
-//func TestValidateObservedTokenUpdates(t *testing.T) {
-//	testCases := []struct {
-//		name          string
-//		tokenUpdates  map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig
-//		tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
-//		expErr        bool
-//	}{
-//		{
-//			name:         "empty is valid",
-//			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{},
-//			expErr:       false,
-//		},
-//		{
-//			name: "all valid",
-//			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
-//				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//				"0x2": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//				"0x3": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//				"0xa": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//			},
-//			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-//				"0x1": {},
-//				"0x2": {},
-//				"0x3": {},
-//				"0xa": {},
-//			},
-//			expErr: false,
-//		},
-//		{
-//			name: "nil value",
-//			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
-//				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//				"0x2": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//				"0x3": {Value: nil, Timestamp: time.Now().Add(-time.Hour)}, // nil value
-//				"0xa": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//			},
-//			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-//				"0x1": {},
-//				"0x2": {},
-//				"0x3": {},
-//				"0xa": {},
-//			},
-//			expErr: true,
-//		},
-//		{
-//			name: "invalid timestamp",
-//			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
-//				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//				"0x2": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//				"0x3": {Value: oneBig, Timestamp: time.Now().Add(time.Hour)}, // future timestamp
-//				"0xa": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
-//			},
-//			tokensToQuery: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
-//				"0x1": {},
-//				"0x2": {},
-//				"0x3": {},
-//				"0xa": {},
-//			},
-//			expErr: true,
-//		},
-//	}
-//
-//	for _, tc := range testCases {
-//		t.Run(tc.name, func(t *testing.T) {
-//			err := validateObservedTokenUpdates(tc.tokenUpdates, tc.tokensToQuery)
-//			if tc.expErr {
-//				assert.Error(t, err)
-//			} else {
-//				assert.NoError(t, err)
-//			}
-//		})
-//	}
-//}
-//
-//// Mock implementations for testing
-//type mockChainSupport struct{}
-//
-//func (m mockChainSupport) SupportedChains(oracleID string) ([]string, error) {
-//	return []string{"validChain", "destChain"}, nil
-//}
-//
+func TestValidateObservedTokenUpdates(t *testing.T) {
+	testCases := []struct {
+		name          string
+		tokenUpdates  map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig
+		tokensToQuery map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
+		expErr        bool
+	}{
+		{
+			name:         "empty is valid",
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{},
+			expErr:       false,
+		},
+		{
+			name: "all valid",
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
+				"0xa": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
+			},
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        false,
+		},
+		{
+			name: "nil value",
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
+				"0x3": {Value: nilBig, Timestamp: time.Now().Add(-time.Hour)}, // nil value
+			},
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        true,
+		},
+		{
+			name: "invalid timestamp",
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
+				"0x3": {Value: oneBig, Timestamp: time.Now().Add(time.Hour)}, // future timestamp
+			},
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateObservedTokenUpdates(tc.tokenUpdates, tc.tokensToQuery)
+			if tc.expErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
