@@ -277,72 +277,34 @@ func groupByChainSelector(
 }
 
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
-// Unordered inputs are supported.
+// Reports that have all of their messages executed are not included in the result.
+// The provided reports must be sorted by sequence number range starting sequence number.
 func filterOutExecutedMessages(
-	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
-) ([]exectypes.CommitData, error) {
-	sort.Slice(reports, func(i, j int) bool {
-		return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
-	})
-
-	// If none are executed, return the (sorted) input.
+	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum) []exectypes.CommitData {
 	if len(executedMessages) == 0 {
-		return reports, nil
+		return reports
 	}
 
-	sort.Slice(executedMessages, func(i, j int) bool {
-		return executedMessages[i].Start() < executedMessages[j].Start()
-	})
-
-	// Make sure they do not overlap
-	previousMax := cciptypes.SeqNum(0)
-	for _, seqRange := range executedMessages {
-		if seqRange.Start() < previousMax {
-			return nil, errOverlappingRanges
-		}
-		previousMax = seqRange.End()
-	}
-
+	// filtered contains the reports with fully executed messages removed
+	// and the executed messages appended to the report sorted by sequence number.
 	var filtered []exectypes.CommitData
 
-	reportIdx := 0
-	for _, executed := range executedMessages {
-		for i := reportIdx; i < len(reports); i++ {
-			reportRange := reports[i].SequenceNumberRange
-			if executed.End() < reportRange.Start() {
-				// No messages in current executed range are in reports[i]
-				// need to go to the next set of executed range.
-				break
-			}
+	for i, report := range reports {
+		reportRange := report.SequenceNumberRange
 
-			if reportRange.Start() >= executed.Start() && reportRange.End() <= executed.End() {
-				// skip fully executed report.
-				reportIdx++
-				continue
-			}
-
-			s := executed.Start()
-			if reportRange.Start() > executed.Start() {
-				s = reportRange.Start()
-			}
-			for ; s <= executed.End(); s++ {
-				// This range runs into the next report.
-				if s > reports[i].SequenceNumberRange.End() {
-					reportIdx++
-					filtered = append(filtered, reports[i])
-					break
-				}
-				reports[i].ExecutedMessages = append(reports[i].ExecutedMessages, s)
-			}
+		executedMsgsInReportRange := reportRange.FilterSlice(executedMessages)
+		if len(executedMsgsInReportRange) == reportRange.Length() { // skip fully executed report.
+			continue
 		}
+
+		sort.Slice(executedMsgsInReportRange, func(i, j int) bool {
+			return executedMsgsInReportRange[i] < executedMsgsInReportRange[j]
+		})
+		report.ExecutedMessages = append(reports[i].ExecutedMessages, executedMsgsInReportRange...)
+		filtered = append(filtered, report)
 	}
 
-	// Add any remaining reports that were not fully executed.
-	for i := reportIdx; i < len(reports); i++ {
-		filtered = append(filtered, reports[i])
-	}
-
-	return filtered, nil
+	return filtered
 }
 
 func decodeAttributedObservations(

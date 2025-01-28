@@ -84,13 +84,13 @@ type CCIPReader interface {
 		limit int,
 	) ([]plugintypes2.CommitPluginReportWithMeta, error)
 
-	// ExecutedMessageRanges reads the destination chain and finds which messages are executed.
-	// A slice of sequence number ranges is returned to express which messages are executed.
-	ExecutedMessageRanges(
+	// ExecutedMessages reads the destination chain and finds which messages are executed.
+	// A slice of sequence numbers is returned to express which messages are executed.
+	ExecutedMessages(
 		ctx context.Context,
 		source, dest cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
-	) ([]cciptypes.SeqNumRange, error)
+	) ([]cciptypes.SeqNum, error)
 
 	// MsgsBetweenSeqNums reads the provided chains.
 	// Finds and returns ccip messages submitted between the provided sequence numbers.

@@ -154,24 +154,24 @@ func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// ExecutedMessageRanges provides a mock function with given fields: ctx, source, dest, seqNumRange
-func (_m *MockCCIPReader) ExecutedMessageRanges(ctx context.Context, source ccipocr3.ChainSelector, dest ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange) ([]ccipocr3.SeqNumRange, error) {
+// ExecutedMessages provides a mock function with given fields: ctx, source, dest, seqNumRange
+func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.ChainSelector, dest ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange) ([]ccipocr3.SeqNum, error) {
 	ret := _m.Called(ctx, source, dest, seqNumRange)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ExecutedMessageRanges")
+		panic("no return value specified for ExecutedMessages")
 	}
 
-	var r0 []ccipocr3.SeqNumRange
+	var r0 []ccipocr3.SeqNum
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) ([]ccipocr3.SeqNumRange, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) ([]ccipocr3.SeqNum, error)); ok {
 		return rf(ctx, source, dest, seqNumRange)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) []ccipocr3.SeqNumRange); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) []ccipocr3.SeqNum); ok {
 		r0 = rf(ctx, source, dest, seqNumRange)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ccipocr3.SeqNumRange)
+			r0 = ret.Get(0).([]ccipocr3.SeqNum)
 		}
 	}
 
@@ -184,33 +184,33 @@ func (_m *MockCCIPReader) ExecutedMessageRanges(ctx context.Context, source ccip
 	return r0, r1
 }
 
-// MockCCIPReader_ExecutedMessageRanges_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecutedMessageRanges'
-type MockCCIPReader_ExecutedMessageRanges_Call struct {
+// MockCCIPReader_ExecutedMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecutedMessages'
+type MockCCIPReader_ExecutedMessages_Call struct {
 	*mock.Call
 }
 
-// ExecutedMessageRanges is a helper method to define mock.On call
+// ExecutedMessages is a helper method to define mock.On call
 //   - ctx context.Context
 //   - source ccipocr3.ChainSelector
 //   - dest ccipocr3.ChainSelector
 //   - seqNumRange ccipocr3.SeqNumRange
-func (_e *MockCCIPReader_Expecter) ExecutedMessageRanges(ctx interface{}, source interface{}, dest interface{}, seqNumRange interface{}) *MockCCIPReader_ExecutedMessageRanges_Call {
-	return &MockCCIPReader_ExecutedMessageRanges_Call{Call: _e.mock.On("ExecutedMessageRanges", ctx, source, dest, seqNumRange)}
+func (_e *MockCCIPReader_Expecter) ExecutedMessages(ctx interface{}, source interface{}, dest interface{}, seqNumRange interface{}) *MockCCIPReader_ExecutedMessages_Call {
+	return &MockCCIPReader_ExecutedMessages_Call{Call: _e.mock.On("ExecutedMessages", ctx, source, dest, seqNumRange)}
 }
 
-func (_c *MockCCIPReader_ExecutedMessageRanges_Call) Run(run func(ctx context.Context, source ccipocr3.ChainSelector, dest ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange)) *MockCCIPReader_ExecutedMessageRanges_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) Run(run func(ctx context.Context, source ccipocr3.ChainSelector, dest ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange)) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].(ccipocr3.ChainSelector), args[3].(ccipocr3.SeqNumRange))
 	})
 	return _c
 }
 
-func (_c *MockCCIPReader_ExecutedMessageRanges_Call) Return(_a0 []ccipocr3.SeqNumRange, _a1 error) *MockCCIPReader_ExecutedMessageRanges_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) Return(_a0 []ccipocr3.SeqNum, _a1 error) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_ExecutedMessageRanges_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) ([]ccipocr3.SeqNumRange, error)) *MockCCIPReader_ExecutedMessageRanges_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) ([]ccipocr3.SeqNum, error)) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }

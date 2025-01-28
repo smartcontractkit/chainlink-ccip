@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
@@ -156,20 +157,22 @@ func getPendingExecutedReports(
 			return nil, err
 		}
 
-		var executedMessages []cciptypes.SeqNumRange
+		var executedMessages []cciptypes.SeqNum
 		for _, seqRange := range ranges {
-			executedMessagesForRange, err2 := ccipReader.ExecutedMessageRanges(ctx, selector, dest, seqRange)
+			executedMessagesForRange, err2 := ccipReader.ExecutedMessages(ctx, selector, dest, seqRange)
 			if err2 != nil {
 				return nil, err2
 			}
 			executedMessages = append(executedMessages, executedMessagesForRange...)
 		}
 
+		sort.Slice(reports, func(i, j int) bool {
+			return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
+		})
+
 		// Remove fully executed reports.
-		groupedCommits[selector], err = filterOutExecutedMessages(reports, executedMessages)
-		if err != nil {
-			return nil, err
-		}
+		// Populate executed messages on the reports.
+		groupedCommits[selector] = filterOutExecutedMessages(reports, executedMessages)
 	}
 
 	lggr.Debugw("grouped commits after removing fully executed reports",
