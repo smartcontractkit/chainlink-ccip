@@ -423,6 +423,61 @@
       ]
     },
     {
+      "name": "setTokenBilling",
+      "docs": [
+        "Sets the token billing configuration.",
+        "It is an upsert, initializing the token billing config account if it doesn't exist",
+        "and overwriting it if it does.",
+        "",
+        "Only the Admin can set the token billing configuration.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
+        "* `chain_selector` - The chain selector.",
+        "* `mint` - The public key of the token mint.",
+        "* `cfg` - The token billing configuration."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perChainPerTokenConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "chainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": "TokenBilling"
+          }
+        }
+      ]
+    },
+    {
       "name": "getFee",
       "docs": [
         "Calculates the fee for sending a message to the destination chain.",

@@ -3,14 +3,16 @@ use anchor_spl::token_interface;
 
 use crate::context::{
     AcceptOwnership, AddBillingTokenConfig, AddDestChain, RemoveBillingTokenConfig,
-    UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig, FEE_BILLING_SIGNER_SEEDS,
+    SetTokenBillingConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
+    FEE_BILLING_SIGNER_SEEDS,
 };
 use crate::event::{
     DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled,
     FeeTokenRemoved,
 };
 use crate::state::{
-    BillingTokenConfig, DestChain, DestChainConfig, DestChainState, TimestampedPackedU224,
+    BillingTokenConfig, DestChain, DestChainConfig, DestChainState, PerChainPerTokenConfig,
+    TimestampedPackedU224, TokenBilling,
 };
 use crate::FeeQuoterError;
 
@@ -127,6 +129,25 @@ pub fn update_dest_chain_config(
     });
     Ok(())
 }
+
+pub fn set_token_billing(
+    ctx: Context<SetTokenBillingConfig>,
+    chain_selector: u64,
+    mint: Pubkey,
+    cfg: TokenBilling,
+) -> Result<()> {
+    ctx.accounts
+        .per_chain_per_token_config
+        .set_inner(PerChainPerTokenConfig {
+            version: 1, // update this if we change the account struct
+            chain_selector,
+            mint,
+            billing: cfg,
+        });
+    Ok(())
+}
+
+// --- helpers ---
 
 fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig) -> Result<()> {
     // TODO improve errors

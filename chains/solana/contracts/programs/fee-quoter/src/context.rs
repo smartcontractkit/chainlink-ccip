@@ -5,7 +5,9 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::messages::SVM2AnyMessage;
 use crate::program::FeeQuoter;
-use crate::state::{BillingTokenConfig, BillingTokenConfigWrapper, Config, DestChain};
+use crate::state::{
+    BillingTokenConfig, BillingTokenConfigWrapper, Config, DestChain, PerChainPerTokenConfig,
+};
 use crate::FeeQuoterError;
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // size in bytes
@@ -28,6 +30,7 @@ pub fn uninitialized(v: u8) -> bool {
 
 const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
+const MAX_TOKEN_AND_CHAIN_CONFIG_V: u8 = 1;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -48,8 +51,9 @@ pub struct Initialize<'info> {
 
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, FeeQuoter>,
-    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ FeeQuoterError::Unauthorized)]
+
     // initialization only allowed by program upgrade authority
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ FeeQuoterError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
 }
 
@@ -62,8 +66,11 @@ pub struct UpdateConfig<'info> {
         constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
     )]
     pub config: Account<'info, Config>,
+
+    // validate signer is registered admin
     #[account(address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
+
     pub system_program: Program<'info, System>,
 }
 
@@ -76,8 +83,11 @@ pub struct AcceptOwnership<'info> {
         constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
     )]
     pub config: Account<'info, Config>,
+
+    // validate signer is the new admin, accepting ownership of the contract
     #[account(address = config.proposed_owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
+
     pub system_program: Program<'info, System>,
 }
 
@@ -90,6 +100,7 @@ pub struct GetFee<'info> {
         constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
     )]
     pub config: Account<'info, Config>,
+
     #[account(
         seeds = [DEST_CHAIN_SEED, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
@@ -148,6 +159,7 @@ pub struct AddBillingTokenConfig<'info> {
 
     #[account(
         mut,
+        // validate signer is registered admin
         address = config.owner @ FeeQuoterError::Unauthorized
     )]
     pub authority: Signer<'info>,
@@ -174,15 +186,16 @@ pub struct UpdateBillingTokenConfig<'info> {
         constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
     )]
     pub config: Account<'info, Config>,
+
     #[account(
         mut,
         seeds = [FEE_BILLING_TOKEN_CONFIG_SEED, token_config.mint.key().as_ref()],
         bump,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
-    #[account(
-        address = config.owner @ FeeQuoterError::Unauthorized
-    )]
+
+    // validate signer is registered admin
+    #[account(address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -229,6 +242,7 @@ pub struct RemoveBillingTokenConfig<'info> {
 
     #[account(
         mut,
+        // validate signer is registered admin
         address = config.owner @ FeeQuoterError::Unauthorized
     )]
     pub authority: Signer<'info>,
@@ -245,6 +259,7 @@ pub struct AddDestChain<'info> {
         constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
     )]
     pub config: Account<'info, Config>,
+
     #[account(
         init,
         seeds = [DEST_CHAIN_SEED, dest_chain_selector.to_le_bytes().as_ref()],
@@ -256,6 +271,7 @@ pub struct AddDestChain<'info> {
 
     #[account(
         mut,
+        // validate signer is registered admin
         address = config.owner @ FeeQuoterError::Unauthorized
     )]
     pub authority: Signer<'info>,
@@ -281,6 +297,34 @@ pub struct UpdateDestChainConfig<'info> {
     )]
     pub dest_chain: Account<'info, DestChain>,
 
+    // validate signer is registered admin
+    #[account(mut, address = config.owner @ FeeQuoterError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(chain_selector: u64, mint: Pubkey)]
+pub struct SetTokenBillingConfig<'info> {
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(
+        init_if_needed,
+        seeds = [TOKEN_POOL_BILLING_SEED, chain_selector.to_le_bytes().as_ref(), mint.as_ref()],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + PerChainPerTokenConfig::INIT_SPACE,
+        constraint = uninitialized(per_chain_per_token_config.version) || valid_version(per_chain_per_token_config.version, MAX_TOKEN_AND_CHAIN_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+    )]
+    pub per_chain_per_token_config: Account<'info, PerChainPerTokenConfig>,
+
+    // validate signer is registered admin
     #[account(mut, address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
 
