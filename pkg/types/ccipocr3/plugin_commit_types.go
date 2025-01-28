@@ -66,12 +66,22 @@ type PriceUpdates struct {
 	GasPriceUpdates   []GasPriceChain `json:"gasPriceUpdates"`
 }
 
+type CommitReportArgs struct {
+	ReportContext [2][32]byte
+	Report        []byte
+	Rs            [][32]byte
+	Ss            [][32]byte
+	RawVs         [32]byte
+	Info          CommitReportInfo
+}
+
 // ReportInfo is the info data that will be sent with the along with the report
 // It will be used to determine if the report should be accepted or not
 type CommitReportInfo struct {
 	// RemoteF Max number of faulty RMN nodes; f+1 signers are required to verify a report.
 	RemoteF     uint64            `json:"remoteF"`
 	MerkleRoots []MerkleRootChain `json:"merkleRoots"`
+	TokenPrices []TokenPrice      `json:"tokenPrices"`
 }
 
 func (cri CommitReportInfo) Encode() ([]byte, error) {
