@@ -221,7 +221,11 @@
         {
           "name": "sourceChainState",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Adding a chain selector implies initializing the state for a new chain,",
+            "hence the need to initialize two accounts."
+          ]
         },
         {
           "name": "destChainState",
@@ -1232,7 +1236,6 @@
           "isMut": false,
           "isSigner": false,
           "docs": [
-            "CHECK this is the associated token account for the user paying the fee.",
             "If paying with native SOL, this must be the zero address."
           ]
         },
@@ -1249,7 +1252,10 @@
         {
           "name": "tokenPoolsSigner",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "CPI signers, optional if no tokens are being transferred."
+          ]
         }
       ],
       "args": [
@@ -1841,6 +1847,10 @@
   "types": [
     {
       "name": "CommitInput",
+      "docs": [
+        "Input from an offchain node, containing the Merkle root and interval for",
+        "the source chain, and optionally some price updates alongside it."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1917,6 +1927,9 @@
     },
     {
       "name": "GasPriceUpdate",
+      "docs": [
+        "Gas price for a given chain in USD; its value may contain tightly packed fields."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1938,6 +1951,9 @@
     },
     {
       "name": "MerkleRoot",
+      "docs": [
+        "Struct to hold a merkle root and an interval for a source chain"
+      ],
       "type": {
         "kind": "struct",
         "fields": [

@@ -5,48 +5,57 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use solana_program::sysvar::instructions;
 
 use crate::program::CcipRouter;
-use crate::state::{CommitReport, Config, ExternalExecutionConfig, Nonce};
+use crate::state::{CommitReport, Config, Nonce};
 use crate::{
     BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
-    ExecutionReportSingleChain, GlobalState, SVM2AnyMessage, SourceChain,
+    ExecutionReportSingleChain, ExternalExecutionConfig, GlobalState, SVM2AnyMessage, SourceChain,
 };
 
+/// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
 
-// track state versions
+/// Maximum acceptable config version accepted by this module: any accounts with higher
+/// version numbers than this will be rejected.
 pub const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
 const MAX_NONCE_V: u8 = 1;
 const MAX_COMMITREPORT_V: u8 = 1;
 
-// valid_version validates that the passed in version is not 0 (uninitialized)
-// and it is within the expected maximum supported version bounds
-pub fn valid_version(v: u8, max_v: u8) -> bool {
-    v != 0 && v <= max_v
+pub const fn valid_version(v: u8, max_version: u8) -> bool {
+    !uninitialized(v) && v <= max_version
 }
-pub fn uninitialized(v: u8) -> bool {
+
+pub const fn uninitialized(v: u8) -> bool {
     v == 0
 }
 
-// Fixed seeds - different contexts must use different PDA seeds
-pub const DEST_CHAIN_STATE_SEED: &[u8] = b"dest_chain_state";
-pub const SOURCE_CHAIN_STATE_SEED: &[u8] = b"source_chain_state";
-pub const COMMIT_REPORT_SEED: &[u8] = b"commit_report";
-pub const NONCE_SEED: &[u8] = b"nonce";
-pub const CONFIG_SEED: &[u8] = b"config";
-pub const STATE_SEED: &[u8] = b"state";
-pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config"; // arbitrary messaging signer
-pub const EXTERNAL_TOKEN_POOL_SEED: &[u8] = b"external_token_pools_signer"; // token pool interaction signer
-pub const FEE_BILLING_SIGNER_SEEDS: &[u8] = b"fee_billing_signer"; // signer for billing fee token transfer
-pub const FEE_BILLING_TOKEN_CONFIG: &[u8] = b"fee_billing_token_config";
+/// Fixed seeds for PDA derivation: different context must use different seeds.
+pub mod seed {
+    pub const DEST_CHAIN_STATE: &[u8] = b"dest_chain_state";
+    pub const SOURCE_CHAIN_STATE: &[u8] = b"source_chain_state";
+    pub const COMMIT_REPORT: &[u8] = b"commit_report";
+    pub const NONCE: &[u8] = b"nonce";
+    pub const CONFIG: &[u8] = b"config";
+    pub const STATE: &[u8] = b"state";
+    pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
 
-// Token
-pub const TOKEN_ADMIN_REGISTRY_SEED: &[u8] = b"token_admin_registry";
-pub const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
-pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
-pub const TOKEN_POOL_BILLING_SEED: &[u8] = b"ccip_tokenpool_billing";
-pub const TOKEN_POOL_CONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig";
+    // arbitrary messaging signer
+    pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
+    // token pool interaction signer
+    pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
+    // signer for billing fee token transfer
+    pub const FEE_BILLING_TOKEN_CONFIG: &[u8] = b"fee_billing_token_config";
 
+    // token specific
+    pub const TOKEN_ADMIN_REGISTRY: &[u8] = b"token_admin_registry";
+    pub const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
+    pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
+    pub const TOKEN_POOL_BILLING: &[u8] = b"ccip_tokenpool_billing";
+    pub const TOKEN_POOL_CONFIG: &[u8] = b"ccip_tokenpool_chainconfig";
+}
+
+/// Input from an offchain node, containing the Merkle root and interval for
+/// the source chain, and optionally some price updates alongside it.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct CommitInput {
     pub price_updates: PriceUpdates,
@@ -54,29 +63,27 @@ pub struct CommitInput {
     pub rmn_signatures: Vec<[u8; 64]>, // placeholder for stable interface; r = 32, s = 32; https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/interfaces/IRMNRemote.sol#L9
 }
 
-// A collection of token price and gas price updates.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct PriceUpdates {
     pub token_price_updates: Vec<TokenPriceUpdate>,
     pub gas_price_updates: Vec<GasPriceUpdate>,
 }
 
-// Token price in USD.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct TokenPriceUpdate {
-    pub source_token: Pubkey, // Source token. It is the mint, but called "token" for EVM compatibility.
+    pub source_token: Pubkey, // It is the mint, but called "token" for EVM compatibility.
     pub usd_per_token: [u8; 28], // EVM uses u224, 1e18 USD per 1e18 of the smallest token denomination.
 }
 
-// Gas price for a given chain in USD, its value may contain tightly packed fields.
+/// Gas price for a given chain in USD; its value may contain tightly packed fields.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct GasPriceUpdate {
-    pub dest_chain_selector: u64,   // Destination chain selector
+    pub dest_chain_selector: u64,
     pub usd_per_unit_gas: [u8; 28], // EVM uses u224, 1e18 USD per smallest unit (e.g. wei) of destination chain gas
 }
 
+/// Struct to hold a merkle root and an interval for a source chain
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-// Struct to hold a merkle root and an interval for a source chain
 pub struct MerkleRoot {
     pub source_chain_selector: u64, // Remote source chain selector that the Merkle Root is scoped to
     pub on_ramp_address: Vec<u8>,   // Generic onramp address, to support arbitrary sources
@@ -99,20 +106,21 @@ impl MerkleRoot {
 #[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct GetFee<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(
-        seeds = [DEST_CHAIN_STATE_SEED, destination_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::DEST_CHAIN_STATE, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
     )]
     pub dest_chain_state: Account<'info, DestChain>,
 
     #[account(
-        seeds = [FEE_BILLING_TOKEN_CONFIG,
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG,
             if message.fee_token == Pubkey::default() {
                 native_mint::ID.as_ref() // pre-2022 WSOL
             } else {
@@ -151,15 +159,15 @@ pub struct WithdrawBilledFunds<'info> {
 
     /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
     #[account(
-        seeds = [FEE_BILLING_SIGNER_SEEDS],
+        seeds = [seed::FEE_BILLING_SIGNER],
         bump
     )]
     pub fee_billing_signer: UncheckedAccount<'info>,
 
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -171,39 +179,45 @@ pub struct WithdrawBilledFunds<'info> {
 pub struct InitializeCCIPRouter<'info> {
     #[account(
         init,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(
         init,
-        seeds = [STATE_SEED],
+        seeds = [seed::STATE],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + GlobalState::INIT_SPACE,
     )]
     pub state: Account<'info, GlobalState>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, CcipRouter>,
+
+    // Initialization only allowed by program upgrade authority
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipRouterError::Unauthorized)]
-    // initialization only allowed by program upgrade authority
     pub program_data: Account<'info, ProgramData>,
+
     #[account(
         init,
-        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED],
+        seeds = [seed::EXTERNAL_EXECUTION_CONFIG],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ExternalExecutionConfig::INIT_SPACE,
     )]
     pub external_execution_config: Account<'info, ExternalExecutionConfig>, // messaging CPI signer initialization
+
     #[account(
         init,
-        seeds = [EXTERNAL_TOKEN_POOL_SEED],
+        seeds = [seed::EXTERNAL_TOKEN_POOL],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ExternalExecutionConfig::INIT_SPACE,
@@ -215,11 +229,12 @@ pub struct InitializeCCIPRouter<'info> {
 pub struct TransferOwnership<'info> {
     #[account(
         mut,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -228,11 +243,12 @@ pub struct TransferOwnership<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(address = config.load()?.proposed_owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -240,30 +256,36 @@ pub struct AcceptOwnership<'info> {
 #[derive(Accounts)]
 #[instruction(new_chain_selector: u64)]
 pub struct AddChainSelector<'info> {
+    /// Adding a chain selector implies initializing the state for a new chain,
+    /// hence the need to initialize two accounts.
+
     #[account(
         init,
-        seeds = [SOURCE_CHAIN_STATE_SEED, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + SourceChain::INIT_SPACE,
-        constraint = uninitialized(source_chain_state.version) @ CcipRouterError::InvalidInputs, // validate uninitialized
+        constraint = uninitialized(source_chain_state.version) @ CcipRouterError::InvalidInputs,
     )]
     pub source_chain_state: Account<'info, SourceChain>,
+
     #[account(
         init,
-        seeds = [DEST_CHAIN_STATE_SEED, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE,
         constraint = uninitialized(dest_chain_state.version) @ CcipRouterError::InvalidInputs, // validate uninitialized
     )]
     pub dest_chain_state: Account<'info, DestChain>,
+
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -274,17 +296,19 @@ pub struct AddChainSelector<'info> {
 pub struct UpdateSourceChainSelectorConfig<'info> {
     #[account(
         mut,
-        seeds = [SOURCE_CHAIN_STATE_SEED, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
     )]
     pub source_chain_state: Account<'info, SourceChain>,
+
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -294,17 +318,19 @@ pub struct UpdateSourceChainSelectorConfig<'info> {
 pub struct UpdateDestChainSelectorConfig<'info> {
     #[account(
         mut,
-        seeds = [DEST_CHAIN_STATE_SEED, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
     )]
     pub dest_chain_state: Account<'info, DestChain>,
+
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -313,11 +339,12 @@ pub struct UpdateDestChainSelectorConfig<'info> {
 pub struct UpdateConfigCCIPRouter<'info> {
     #[account(
         mut,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -327,11 +354,12 @@ pub struct UpdateConfigCCIPRouter<'info> {
 pub struct UpdateSupportedChainsConfigCCIPRouter<'info> {
     #[account(
         mut,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -341,17 +369,19 @@ pub struct UpdateSupportedChainsConfigCCIPRouter<'info> {
 pub struct SetOcrConfig<'info> {
     #[account(
         mut,
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(
         mut,
-        seeds = [STATE_SEED],
+        seeds = [seed::STATE],
         bump,
     )]
     pub state: Account<'info, GlobalState>,
+
     #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -360,15 +390,15 @@ pub struct SetOcrConfig<'info> {
 #[instruction(token_config: BillingTokenConfig)]
 pub struct AddBillingTokenConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
 
     #[account(
         init,
-        seeds = [FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + BillingTokenConfigWrapper::INIT_SPACE,
@@ -387,7 +417,7 @@ pub struct AddBillingTokenConfig<'info> {
         init,
         payer = authority,
         associated_token::mint = fee_token_mint,
-        associated_token::authority = fee_billing_signer, // use the signer account as the authority
+        associated_token::authority = fee_billing_signer,
         associated_token::token_program = token_program,
     )]
     pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
@@ -400,7 +430,7 @@ pub struct AddBillingTokenConfig<'info> {
 
     /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
     #[account(
-        seeds = [FEE_BILLING_SIGNER_SEEDS],
+        seeds = [seed::FEE_BILLING_SIGNER],
         bump
     )]
     pub fee_billing_signer: UncheckedAccount<'info>,
@@ -414,17 +444,19 @@ pub struct AddBillingTokenConfig<'info> {
 #[instruction(token_config: BillingTokenConfig)]
 pub struct UpdateBillingTokenConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(
         mut,
-        seeds = [FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
         bump,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
+
     #[account(
         address = config.load()?.owner @ CcipRouterError::Unauthorized
     )]
@@ -434,16 +466,16 @@ pub struct UpdateBillingTokenConfig<'info> {
 #[derive(Accounts)]
 pub struct RemoveBillingTokenConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
 
     #[account(
         mut,
         close = authority,
-        seeds = [FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()],
         bump,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
@@ -465,9 +497,10 @@ pub struct RemoveBillingTokenConfig<'info> {
     pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
 
     /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
+
     #[account(
         mut,
-        seeds = [FEE_BILLING_SIGNER_SEEDS],
+        seeds = [seed::FEE_BILLING_SIGNER],
         bump
     )]
     pub fee_billing_signer: UncheckedAccount<'info>,
@@ -485,27 +518,30 @@ pub struct RemoveBillingTokenConfig<'info> {
 #[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
 pub struct CcipSend<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(
         mut,
-        seeds = [DEST_CHAIN_STATE_SEED, destination_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::DEST_CHAIN_STATE, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
     )]
     pub dest_chain_state: Account<'info, DestChain>,
+
     #[account(
         init_if_needed,
-        seeds = [NONCE_SEED, destination_chain_selector.to_le_bytes().as_ref(), authority.key().as_ref()],
+        seeds = [seed::NONCE, destination_chain_selector.to_le_bytes().as_ref(), authority.key().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Nonce::INIT_SPACE,
-        constraint = uninitialized(nonce.version) || valid_version(nonce.version, MAX_NONCE_V) @ CcipRouterError::InvalidInputs, // if initialized (v != 0), validate state version
+        constraint = uninitialized(nonce.version) || valid_version(nonce.version, MAX_NONCE_V) @ CcipRouterError::InvalidInputs,
     )]
     pub nonce: Account<'info, Nonce>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -513,7 +549,6 @@ pub struct CcipSend<'info> {
     ///////////////////
     // billing token //
     ///////////////////
-    // TODO improve all usages of CcipRouterError::InvalidInputs to be more specific
     pub fee_token_program: Interface<'info, TokenInterface>,
 
     #[account(
@@ -526,18 +561,18 @@ pub struct CcipSend<'info> {
     #[account(
         // `message.fee_token` would ideally be named `message.fee_mint` in SVM,
         // but using the `token` nomenclature is more compatible with EVM
-        seeds = [FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()], // the arg would ideally be named mint, but message.fee_token was set for EVM consistency
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()],
         bump,
     )]
     pub fee_token_config: Account<'info, BillingTokenConfigWrapper>, // pass pre-2022 wSOL config if using native SOL
 
     #[account(
-        seeds = [FEE_BILLING_TOKEN_CONFIG, config.load()?.link_token_mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, config.load()?.link_token_mint.key().as_ref()],
         bump,
     )]
     pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
 
-    /// CHECK this is the associated token account for the user paying the fee.
+    /// CHECK: This is the associated token account for the user paying the fee.
     /// If paying with native SOL, this must be the zero address.
     #[account(
         // address must be either zero (paying with native SOL) or must be a WRITABLE associated token account
@@ -552,33 +587,27 @@ pub struct CcipSend<'info> {
                 &fee_token_program.key(),
             ) @ CcipRouterError::InvalidInputsAtaAddress,
     )]
-    pub fee_token_user_associated_account: UncheckedAccount<'info>, // pass zero address is using native SOL
+    pub fee_token_user_associated_account: UncheckedAccount<'info>,
 
     #[account(
         mut,
         associated_token::mint = fee_token_mint,
-        associated_token::authority = fee_billing_signer, // use the signer account as the authority
+        associated_token::authority = fee_billing_signer,
         associated_token::token_program = fee_token_program,
     )]
     pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>, // pass pre-2022 wSOL receiver if using native SOL
 
     /// CHECK: This is the signer for the billing transfer CPI.
     #[account(
-        seeds = [FEE_BILLING_SIGNER_SEEDS],
+        seeds = [seed::FEE_BILLING_SIGNER],
         bump
     )]
     pub fee_billing_signer: UncheckedAccount<'info>,
 
-    // CPI signers
-    // optional if no tokens are being transferred
-    /// CHECK: Using this to sign
-    #[account(mut, seeds = [EXTERNAL_TOKEN_POOL_SEED], bump)]
+    /// CPI signers, optional if no tokens are being transferred.
+    /// CHECK: Using this to sign.
+    #[account(mut, seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]
     pub token_pools_signer: Account<'info, ExternalExecutionConfig>,
-    // /// CHECK: Using this to sign
-    // #[account(mut, seeds = [BILLING_EXECUTION_SEED], bump)]
-    // pub billing_signer: Account<'info, ExternalExecutionConfig>,
-    // pub fee_token_billing_signer_associated_account: Account<'info, ?>, // pass wSOL associated address if using native SOL
-
     // remaining accounts (not explicitly listed)
     // [
     // user/sender token account (must be associated token account - derivable PDA [wallet_addr, token_program, mint])
@@ -600,30 +629,34 @@ pub struct CcipSend<'info> {
 #[instruction(_report_context_byte_words: [[u8; 32]; 2], raw_report: Vec<u8>)]
 pub struct CommitReportContext<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(
         mut,
-        seeds = [SOURCE_CHAIN_STATE_SEED, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN_STATE, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
     )]
     pub source_chain_state: Account<'info, SourceChain>,
+
     #[account(
         init,
-        seeds = [COMMIT_REPORT_SEED, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref(), CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.merkle_root.as_ref()],
+        seeds = [seed::COMMIT_REPORT, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref(), CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.merkle_root.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + CommitReport::INIT_SPACE,
         constraint = uninitialized(commit_report.version) @ CcipRouterError::InvalidInputs, // validate uninitialized
     )]
     pub commit_report: Account<'info, CommitReport>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+
     /// CHECK: This is the sysvar instructions account
     #[account(address = instructions::ID @ CcipRouterError::InvalidInputs)]
     pub sysvar_instructions: UncheckedAccount<'info>,
@@ -637,36 +670,40 @@ pub struct CommitReportContext<'info> {
 #[instruction(raw_report: Vec<u8>)]
 pub struct ExecuteReportContext<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
     #[account(
-        seeds = [SOURCE_CHAIN_STATE_SEED, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN_STATE, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
     )]
     pub source_chain_state: Account<'info, SourceChain>,
+
     #[account(
         mut,
-        seeds = [COMMIT_REPORT_SEED, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.root.as_ref()],
+        seeds = [seed::COMMIT_REPORT, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.root.as_ref()],
         bump,
-        constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipRouterError::InvalidInputs, // validate state version
+        constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipRouterError::InvalidInputs,
     )]
     pub commit_report: Account<'info, CommitReport>,
+
     /// CHECK: Using this to sign
-    #[account(seeds = [EXTERNAL_EXECUTION_CONFIG_SEED], bump)]
+    #[account(seeds = [seed::EXTERNAL_EXECUTION_CONFIG], bump)]
     pub external_execution_config: Account<'info, ExternalExecutionConfig>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+
     /// CHECK: This is a sysvar account
     #[account(address = instructions::ID @ CcipRouterError::InvalidInputs)]
     pub sysvar_instructions: AccountInfo<'info>,
-    // CPI signers
-    /// CHECK: Using this to sign
-    #[account(seeds = [EXTERNAL_TOKEN_POOL_SEED], bump)]
+
+    #[account(seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]
     pub token_pools_signer: Account<'info, ExternalExecutionConfig>,
     // remaining accounts
     // [receiver_program, receiver_account, ...user specified accounts from message data for arbitrary messaging]
