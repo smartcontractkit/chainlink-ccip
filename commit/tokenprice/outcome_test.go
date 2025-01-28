@@ -25,11 +25,11 @@ var feedTokenPricesMap = map[cciptypes.UnknownEncodedAddress]cciptypes.TokenPric
 	tokenD: {TokenID: tokenD, Price: cbi200},
 }
 
-var feedTokenPrices = []cciptypes.TokenPrice{
-	feedTokenPricesMap[tokenA],
-	feedTokenPricesMap[tokenB],
-	feedTokenPricesMap[tokenC],
-	feedTokenPricesMap[tokenD],
+var feedTokenPrices = cciptypes.TokenPriceMap{
+	tokenA: feedTokenPricesMap[tokenA].Price,
+	tokenB: feedTokenPricesMap[tokenB].Price,
+	tokenC: feedTokenPricesMap[tokenC].Price,
+	tokenD: feedTokenPricesMap[tokenD].Price,
 }
 
 var feeQuoterUpdates = map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
@@ -127,9 +127,9 @@ func TestSelectTokensForUpdate(t *testing.T) {
 	// tokenD will not be updated because it's same price and time is not passed
 	tokenPrices := p.selectTokensForUpdate(lggr, conObs)
 	assert.Len(t, tokenPrices, 3)
-	assert.Equal(t, conObs.FeedTokenPrices[tokenA], tokenPrices[0])
-	assert.Equal(t, conObs.FeedTokenPrices[tokenB], tokenPrices[1])
-	assert.Equal(t, conObs.FeedTokenPrices[tokenC], tokenPrices[2])
+	assert.Equal(t, conObs.FeedTokenPrices[tokenA].Price, tokenPrices[tokenA])
+	assert.Equal(t, conObs.FeedTokenPrices[tokenB].Price, tokenPrices[tokenB])
+	assert.Equal(t, conObs.FeedTokenPrices[tokenC].Price, tokenPrices[tokenC])
 }
 
 // Test Plugin Outcome method returns the correct token prices
@@ -152,10 +152,10 @@ func TestOutcome(t *testing.T) {
 		{OracleID: 5, Observation: obs},
 	})
 
-	expectedOutcome := []cciptypes.TokenPrice{
-		feedTokenPricesMap[tokenA],
-		feedTokenPricesMap[tokenB],
-		feedTokenPricesMap[tokenC],
+	expectedOutcome := cciptypes.TokenPriceMap{
+		tokenA: feedTokenPricesMap[tokenA].Price,
+		tokenB: feedTokenPricesMap[tokenB].Price,
+		tokenC: feedTokenPricesMap[tokenC].Price,
 		// tokenD is not updated because it's the same price and time is not passed
 	}
 

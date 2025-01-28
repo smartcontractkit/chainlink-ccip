@@ -36,7 +36,11 @@ var (
 
 	Instruction_SetRampAuthority = ag_binary.TypeID([8]byte{181, 180, 204, 162, 156, 188, 239, 153})
 
-	Instruction_SetChainRemoteConfig = ag_binary.TypeID([8]byte{147, 161, 6, 246, 121, 59, 37, 28})
+	Instruction_InitChainRemoteConfig = ag_binary.TypeID([8]byte{21, 150, 133, 36, 2, 116, 199, 129})
+
+	Instruction_EditChainRemoteConfig = ag_binary.TypeID([8]byte{149, 112, 186, 72, 116, 217, 159, 175})
+
+	Instruction_AppendRemotePoolAddresses = ag_binary.TypeID([8]byte{172, 57, 83, 55, 70, 112, 26, 197})
 
 	Instruction_SetChainRateLimit = ag_binary.TypeID([8]byte{188, 188, 161, 37, 100, 249, 123, 170})
 
@@ -58,8 +62,12 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptOwnership"
 	case Instruction_SetRampAuthority:
 		return "SetRampAuthority"
-	case Instruction_SetChainRemoteConfig:
-		return "SetChainRemoteConfig"
+	case Instruction_InitChainRemoteConfig:
+		return "InitChainRemoteConfig"
+	case Instruction_EditChainRemoteConfig:
+		return "EditChainRemoteConfig"
+	case Instruction_AppendRemotePoolAddresses:
+		return "AppendRemotePoolAddresses"
 	case Instruction_SetChainRateLimit:
 		return "SetChainRateLimit"
 	case Instruction_DeleteChainConfig:
@@ -101,7 +109,13 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"set_ramp_authority", (*SetRampAuthority)(nil),
 		},
 		{
-			"set_chain_remote_config", (*SetChainRemoteConfig)(nil),
+			"init_chain_remote_config", (*InitChainRemoteConfig)(nil),
+		},
+		{
+			"edit_chain_remote_config", (*EditChainRemoteConfig)(nil),
+		},
+		{
+			"append_remote_pool_addresses", (*AppendRemotePoolAddresses)(nil),
 		},
 		{
 			"set_chain_rate_limit", (*SetChainRateLimit)(nil),

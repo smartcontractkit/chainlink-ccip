@@ -115,7 +115,7 @@
       ]
     },
     {
-      "name": "scheduleBatch",
+      "name": "initializeOperation",
       "accounts": [
         {
           "name": "operation",
@@ -129,50 +129,6 @@
         },
         {
           "name": "roleAccessController",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "timelockId",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "id",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "delay",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "initializeOperation",
-      "accounts": [
-        {
-          "name": "operation",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
           "isMut": false,
           "isSigner": false
         },
@@ -244,6 +200,11 @@
           "isSigner": false
         },
         {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -284,7 +245,7 @@
       ]
     },
     {
-      "name": "clearOperation",
+      "name": "finalizeOperation",
       "accounts": [
         {
           "name": "operation",
@@ -293,6 +254,11 @@
         },
         {
           "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
           "isMut": false,
           "isSigner": false
         },
@@ -324,7 +290,7 @@
       ]
     },
     {
-      "name": "finalizeOperation",
+      "name": "clearOperation",
       "accounts": [
         {
           "name": "operation",
@@ -333,6 +299,11 @@
         },
         {
           "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
           "isMut": false,
           "isSigner": false
         },
@@ -360,6 +331,55 @@
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "scheduleBatch",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "delay",
+          "type": "u64"
         }
       ]
     },
@@ -428,6 +448,217 @@
         },
         {
           "name": "timelockSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeBypasserOperation",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "instructionCount",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "appendBypasserInstructions",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "instructionsBatch",
+          "type": {
+            "vec": {
+              "defined": "InstructionData"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "finalizeBypasserOperation",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "clearBypasserOperation",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
           "isMut": false,
           "isSigner": false
         },
@@ -759,10 +990,6 @@
             }
           },
           {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
             "name": "isFinalized",
             "type": "bool"
           },
@@ -887,6 +1114,9 @@
           },
           {
             "name": "OperationNotReady"
+          },
+          {
+            "name": "OperationAlreadyExecuted"
           },
           {
             "name": "MissingDependency"
