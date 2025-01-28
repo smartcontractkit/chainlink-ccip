@@ -23,44 +23,46 @@ pub enum TimelockError {
     #[msg("Provided ID is invalid")]
     InvalidId,
 
-    #[msg("RBACTimelock: operation not finalized")]
+    #[msg("operation not finalized")]
     OperationNotFinalized,
 
-    #[msg("RBACTimelock: operation is already finalized")]
+    #[msg("operation is already finalized")]
     OperationAlreadyFinalized,
 
-    #[msg("RBACTimelock: too many instructions in the operation")]
+    #[msg("too many instructions in the operation")]
     TooManyInstructions,
 
     // on attempt to create PDA with the same seed(existing operation)
-    #[msg("RBACTimelock: operation already scheduled")]
+    #[msg("operation already scheduled")]
     OperationAlreadyScheduled,
 
-    #[msg("RBACTimelock: insufficient delay")]
+    #[msg("insufficient delay")]
     DelayInsufficient,
 
-    // cancel
-    #[msg("RBACTimelock: operation cannot be cancelled")]
+    #[msg("operation cannot be cancelled")]
     OperationNotCancellable,
 
     #[msg("operation is not ready")]
     OperationNotReady,
 
+    #[msg("operation is already executed")]
+    OperationAlreadyExecuted,
+
     #[msg("Predecessor operation is not found")]
     MissingDependency,
 
-    #[msg("RBACTimelock: Provided access controller is invalid")]
+    #[msg("Provided access controller is invalid")]
     InvalidAccessController,
 
-    #[msg("RBACTimelock: selector is blocked")]
+    #[msg("selector is blocked")]
     BlockedSelector,
 
-    #[msg("RBACTimelock: selector is already blocked")]
+    #[msg("selector is already blocked")]
     AlreadyBlocked,
 
-    #[msg("RBACTimelock: selector not found")]
+    #[msg("selector not found")]
     SelectorNotFound,
 
-    #[msg("RBACTimelock: maximum capacity reached for function blocker")]
+    #[msg("maximum capacity reached for function blocker")]
     MaxCapacityReached,
 }
