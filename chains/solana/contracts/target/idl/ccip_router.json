@@ -2077,12 +2077,6 @@
           {
             "name": "isWritableBitmap",
             "type": "u64"
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": "publicKey"
-            }
           }
         ]
       }
@@ -2121,10 +2115,6 @@
           {
             "name": "data",
             "type": "bytes"
-          },
-          {
-            "name": "logicReceiver",
-            "type": "publicKey"
           },
           {
             "name": "tokenReceiver",
@@ -2842,6 +2832,9 @@
           },
           {
             "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
+          },
+          {
+            "name": "InvalidWritabilityBitmap"
           }
         ]
       }
