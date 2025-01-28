@@ -129,26 +129,26 @@ pub struct OwnershipTransferred {
     pub to: Pubkey,
 }
 
-/////////////////////////////////
-// Token Admin Registry Events //
-/////////////////////////////////
+pub mod token_admin_registry_events {
+    use super::*;
 
-#[event]
-pub struct PoolSet {
-    pub token: Pubkey,
-    pub previous_pool_lookup_table: Pubkey,
-    pub new_pool_lookup_table: Pubkey,
-}
+    #[event]
+    pub struct PoolSet {
+        pub token: Pubkey,
+        pub previous_pool_lookup_table: Pubkey,
+        pub new_pool_lookup_table: Pubkey,
+    }
 
-#[event]
-pub struct AdministratorTransferRequested {
-    pub token: Pubkey,
-    pub current_admin: Pubkey,
-    pub new_admin: Pubkey,
-}
+    #[event]
+    pub struct AdministratorTransferRequested {
+        pub token: Pubkey,
+        pub current_admin: Pubkey,
+        pub new_admin: Pubkey,
+    }
 
-#[event]
-pub struct AdministratorTransferred {
-    pub token: Pubkey,
-    pub new_admin: Pubkey,
+    #[event]
+    pub struct AdministratorTransferred {
+        pub token: Pubkey,
+        pub new_admin: Pubkey,
+    }
 }

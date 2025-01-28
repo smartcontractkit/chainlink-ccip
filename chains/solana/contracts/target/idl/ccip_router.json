@@ -2856,6 +2856,61 @@
   ],
   "events": [
     {
+      "name": "PoolSet",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "previousPoolLookupTable",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newPoolLookupTable",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "AdministratorTransferRequested",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "currentAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "AdministratorTransferred",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "CCIPMessageSent",
       "fields": [
         {
@@ -3208,61 +3263,6 @@
         },
         {
           "name": "to",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "PoolSet",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "previousPoolLookupTable",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newPoolLookupTable",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "AdministratorTransferRequested",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "currentAdmin",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newAdmin",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "AdministratorTransferred",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newAdmin",
           "type": "publicKey",
           "index": false
         }
