@@ -3239,36 +3239,6 @@
       ]
     },
     {
-      "name": "AdministratorRegistered",
-      "fields": [
-        {
-          "name": "tokenMint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "administrator",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "AlreadyAttempted",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "sequenceNumber",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
       "name": "ConfigSet",
       "fields": [
         {

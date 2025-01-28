@@ -147,30 +147,16 @@ pub mod events {
 }
 
 #[event]
+// TODO: Check why this is not used
 pub struct TokenTransferFeeConfigUpdated {
-    // TODO: Check why this is not used
     pub dest_chain_selector: u64,
     pub token: Pubkey,
     pub token_transfer_fee_config: TokenBilling,
 }
 
 #[event]
+// TODO: Check why this is not used
 pub struct PremiumMultiplierWeiPerEthUpdated {
-    // TODO: Check why this is not used
     pub token: Pubkey,
     pub premium_multiplier_wei_per_eth: u64,
-}
-
-#[event]
-pub struct AdministratorRegistered {
-    // TODO: Check why this is not used
-    pub token_mint: Pubkey,
-    pub administrator: Pubkey,
-}
-
-#[event]
-pub struct AlreadyAttempted {
-    // TODO: Check why this is not used
-    pub source_chain_selector: u64,
-    pub sequence_number: u64,
 }
