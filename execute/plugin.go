@@ -157,14 +157,17 @@ func getPendingExecutedReports(
 			return nil, err
 		}
 
-		var executedMessages []cciptypes.SeqNum
+		executedMessageSet := mapset.NewSet[cciptypes.SeqNum]()
 		for _, seqRange := range ranges {
 			executedMessagesForRange, err2 := ccipReader.ExecutedMessages(ctx, selector, dest, seqRange)
 			if err2 != nil {
 				return nil, err2
 			}
-			executedMessages = append(executedMessages, executedMessagesForRange...)
+			executedMessageSet = executedMessageSet.Union(mapset.NewSet(executedMessagesForRange...))
 		}
+
+		executedMessages := executedMessageSet.ToSlice()
+		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
 
 		sort.Slice(reports, func(i, j int) bool {
 			return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
