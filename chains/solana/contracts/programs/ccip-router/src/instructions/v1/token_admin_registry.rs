@@ -1,4 +1,4 @@
-use crate::token_admin_registry_events;
+use crate::events::token_admin_registry as events;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
@@ -58,13 +58,11 @@ fn set_pending_administrator(
     token_admin_registry.pending_administrator = new_admin;
     token_admin_registry.lookup_table = Pubkey::new_from_array([0; 32]);
 
-    emit!(
-        token_admin_registry_events::AdministratorTransferRequested {
-            token: token_mint,
-            current_admin: Pubkey::new_from_array([0; 32]),
-            new_admin,
-        }
-    );
+    emit!(events::AdministratorTransferRequested {
+        token: token_mint,
+        current_admin: Pubkey::new_from_array([0; 32]),
+        new_admin,
+    });
 
     Ok(())
 }
@@ -79,13 +77,11 @@ pub fn transfer_admin_role_token_admin_registry(
 
     token_admin_registry.pending_administrator = new_admin;
 
-    emit!(
-        token_admin_registry_events::AdministratorTransferRequested {
-            token: token_mint,
-            current_admin: token_admin_registry.administrator,
-            new_admin,
-        }
-    );
+    emit!(events::AdministratorTransferRequested {
+        token: token_mint,
+        current_admin: token_admin_registry.administrator,
+        new_admin,
+    });
 
     Ok(())
 }
@@ -101,7 +97,7 @@ pub fn accept_admin_role_token_admin_registry(
     token_admin_registry.administrator = new_admin;
     token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
 
-    emit!(token_admin_registry_events::AdministratorTransferred {
+    emit!(events::AdministratorTransferred {
         token: token_mint,
         new_admin,
     });
@@ -195,7 +191,7 @@ pub fn set_pool(ctx: Context<SetPoolTokenAdminRegistry>, writable_indexes: Vec<u
         }
     }
 
-    emit!(token_admin_registry_events::PoolSet {
+    emit!(events::PoolSet {
         token: token_mint,
         previous_pool_lookup_table: previous_pool,
         new_pool_lookup_table: new_pool,

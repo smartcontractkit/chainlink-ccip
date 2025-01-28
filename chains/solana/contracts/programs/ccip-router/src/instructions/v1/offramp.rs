@@ -1,3 +1,4 @@
+use crate::events::off_ramp as events;
 use anchor_lang::prelude::*;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
@@ -15,11 +16,9 @@ use super::pools::{
 use crate::v1::ocr3base::Signatures;
 use crate::{
     seed, Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput,
-    CommitReport, CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
-    ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
-    MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
-    SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
-    UsdPerTokenUpdated, UsdPerUnitGasUpdated,
+    CommitReport, CommitReportContext, DestChain, ExecuteReportContext, ExecutionReportSingleChain,
+    GasPriceUpdate, GlobalState, MessageExecutionState, OcrPluginType, RampMessageHeader,
+    SVMTokenAmount, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
 };
 
 pub fn commit<'info>(
@@ -178,7 +177,7 @@ pub fn commit<'info>(
     commit_report.min_msg_nr = root.min_seq_nr;
     commit_report.max_msg_nr = root.max_seq_nr;
 
-    emit!(CommitReportAccepted {
+    emit!(events::CommitReportAccepted {
         merkle_root: root.clone(),
         price_updates: report.price_updates.clone(),
     });
@@ -290,7 +289,7 @@ fn apply_token_price_update<'info>(
         timestamp: Clock::get()?.unix_timestamp,
     };
 
-    emit!(UsdPerTokenUpdated {
+    emit!(events::UsdPerTokenUpdated {
         token: token_config_account.config.mint,
         value: token_config_account.config.usd_per_token.value,
         timestamp: token_config_account.config.usd_per_token.timestamp,
@@ -347,7 +346,7 @@ fn update_chain_state_gas_price(
         timestamp: Clock::get()?.unix_timestamp,
     };
 
-    emit!(UsdPerUnitGasUpdated {
+    emit!(events::UsdPerUnitGasUpdated {
         dest_chain: gas_update.dest_chain_selector,
         value: chain_state_account.state.usd_per_unit_gas.value,
         timestamp: chain_state_account.state.usd_per_unit_gas.timestamp,
@@ -398,7 +397,7 @@ fn internal_execute<'info>(
     let original_state = execution_state::get(commit_report, message_header.sequence_number);
 
     if original_state == MessageExecutionState::Success {
-        emit!(SkippedAlreadyExecutedMessage {
+        emit!(events::SkippedAlreadyExecutedMessage {
             source_chain_selector: message_header.source_chain_selector,
             sequence_number: message_header.sequence_number,
         });
@@ -544,7 +543,7 @@ fn internal_execute<'info>(
         new_state.to_owned(),
     );
 
-    emit!(ExecutionStateChanged {
+    emit!(events::ExecutionStateChanged {
         source_chain_selector: message_header.source_chain_selector,
         sequence_number: message_header.sequence_number,
         message_id: message_header.message_id, // Unique identifier for the message, generated with the source chain's encoding scheme

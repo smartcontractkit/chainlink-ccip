@@ -1,5 +1,6 @@
 use std::cell::Ref;
 
+use crate::events::on_ramp as events;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
@@ -14,9 +15,9 @@ use super::price_math::get_validated_token_price;
 
 use crate::seed;
 use crate::{
-    AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
-    DestChainConfig, ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader,
-    SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
+    AnyExtraArgs, BillingTokenConfig, CcipRouterError, CcipSend, Config, DestChainConfig,
+    ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage,
+    SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
 };
 
 pub fn get_fee<'info>(
@@ -257,7 +258,7 @@ pub fn ccip_send<'info>(
     let message_id = &hash(&new_message);
     new_message.header.message_id.clone_from(message_id);
 
-    emit!(CCIPMessageSent {
+    emit!(events::CCIPMessageSent {
         dest_chain_selector,
         sequence_number: new_message.header.sequence_number,
         message: new_message,
