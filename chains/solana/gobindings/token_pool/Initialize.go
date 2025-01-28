@@ -18,8 +18,10 @@ type Initialize struct {
 	// [0] = [WRITE] config
 	//
 	// [1] = [] mint
+	// ··········· Underlying token that the pool wraps
 	//
 	// [2] = [WRITE] poolSigner
+	// ··········· PDA for managing tokens
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
@@ -59,23 +61,27 @@ func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
 }
 
 // SetMintAccount sets the "mint" account.
+// Underlying token that the pool wraps
 func (inst *Initialize) SetMintAccount(mint ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(mint)
 	return inst
 }
 
 // GetMintAccount gets the "mint" account.
+// Underlying token that the pool wraps
 func (inst *Initialize) GetMintAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetPoolSignerAccount sets the "poolSigner" account.
+// PDA for managing tokens
 func (inst *Initialize) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(poolSigner).WRITE()
 	return inst
 }
 
 // GetPoolSignerAccount gets the "poolSigner" account.
+// PDA for managing tokens
 func (inst *Initialize) GetPoolSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }

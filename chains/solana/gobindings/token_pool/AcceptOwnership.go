@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AcceptOwnership is the `acceptOwnership` instruction.
+// Must be signed by the proposed owner
 type AcceptOwnership struct {
 
 	// [0] = [WRITE] config

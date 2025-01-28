@@ -12,7 +12,7 @@ import (
 
 // ReleaseOrMintTokens is the `releaseOrMintTokens` instruction.
 type ReleaseOrMintTokens struct {
-	ReleaseOrMint *ReleaseOrMintInV1
+	ReleaseOrMint *ReleaseOrMintInputV1
 
 	// [0] = [SIGNER] authority
 	//
@@ -41,7 +41,7 @@ func NewReleaseOrMintTokensInstructionBuilder() *ReleaseOrMintTokens {
 }
 
 // SetReleaseOrMint sets the "releaseOrMint" parameter.
-func (inst *ReleaseOrMintTokens) SetReleaseOrMint(releaseOrMint ReleaseOrMintInV1) *ReleaseOrMintTokens {
+func (inst *ReleaseOrMintTokens) SetReleaseOrMint(releaseOrMint ReleaseOrMintInputV1) *ReleaseOrMintTokens {
 	inst.ReleaseOrMint = &releaseOrMint
 	return inst
 }
@@ -237,7 +237,7 @@ func (obj *ReleaseOrMintTokens) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 // NewReleaseOrMintTokensInstruction declares a new ReleaseOrMintTokens instruction with the provided parameters and accounts.
 func NewReleaseOrMintTokensInstruction(
 	// Parameters:
-	releaseOrMint ReleaseOrMintInV1,
+	releaseOrMint ReleaseOrMintInputV1,
 	// Accounts:
 	authority ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,

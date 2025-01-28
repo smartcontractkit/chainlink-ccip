@@ -219,7 +219,7 @@ func TestTokenPool(t *testing.T) {
 					t.Run(releaseOrMint, func(t *testing.T) {
 						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
 
-						rmI, err := token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
+						rmI, err := token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInputV1{
 							LocalToken:          mint,
 							SourcePoolAddress:   remotePool,
 							Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
@@ -305,7 +305,7 @@ func TestTokenPool(t *testing.T) {
 							t.Parallel()
 
 							// exceed capacity of bucket
-							rmI, err := token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
+							rmI, err := token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInputV1{
 								LocalToken:          mint,
 								SourcePoolAddress:   remotePool,
 								Amount:              tokens.ToLittleEndianU256(amount * amount * 1e9),
@@ -320,7 +320,7 @@ func TestTokenPool(t *testing.T) {
 							// if first does not exceed limit, the second one should
 							transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{}) // ensure pool is funded
 							require.NoError(t, err)
-							rmI, err = token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
+							rmI, err = token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInputV1{
 								LocalToken:          mint,
 								SourcePoolAddress:   remotePool,
 								Amount:              tokens.ToLittleEndianU256(amount * 1e9),
@@ -333,7 +333,7 @@ func TestTokenPool(t *testing.T) {
 							// pool should refill automatically, but slowly
 							// small amount should pass
 							time.Sleep(time.Second) // wait for refill
-							rmI, err = token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
+							rmI, err = token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInputV1{
 								LocalToken:          mint,
 								SourcePoolAddress:   remotePool,
 								Amount:              tokens.ToLittleEndianU256(1e9),
@@ -424,7 +424,7 @@ func TestTokenPool(t *testing.T) {
 		})
 
 		t.Run("mintOrRelease", func(t *testing.T) {
-			raw := token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
+			raw := token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInputV1{
 				LocalToken:          mint,
 				SourcePoolAddress:   remotePool,
 				Receiver:            p.PoolSigner,
