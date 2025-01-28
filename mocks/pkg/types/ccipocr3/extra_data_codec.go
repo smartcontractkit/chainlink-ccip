@@ -79,65 +79,6 @@ func (_c *MockExtraDataCodec_DecodeExtraArgs_Call) RunAndReturn(run func(ccipocr
 	return _c
 }
 
-// DecodeExtraData provides a mock function with given fields: extraArgs, sourceChainSelector
-func (_m *MockExtraDataCodec) DecodeExtraData(extraArgs ccipocr3.Bytes, sourceChainSelector ccipocr3.ChainSelector) (map[string]interface{}, error) {
-	ret := _m.Called(extraArgs, sourceChainSelector)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DecodeExtraData")
-	}
-
-	var r0 map[string]interface{}
-	var r1 error
-	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes, ccipocr3.ChainSelector) (map[string]interface{}, error)); ok {
-		return rf(extraArgs, sourceChainSelector)
-	}
-	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes, ccipocr3.ChainSelector) map[string]interface{}); ok {
-		r0 = rf(extraArgs, sourceChainSelector)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]interface{})
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(ccipocr3.Bytes, ccipocr3.ChainSelector) error); ok {
-		r1 = rf(extraArgs, sourceChainSelector)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockExtraDataCodec_DecodeExtraData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DecodeExtraData'
-type MockExtraDataCodec_DecodeExtraData_Call struct {
-	*mock.Call
-}
-
-// DecodeExtraData is a helper method to define mock.On call
-//   - extraArgs ccipocr3.Bytes
-//   - sourceChainSelector ccipocr3.ChainSelector
-func (_e *MockExtraDataCodec_Expecter) DecodeExtraData(extraArgs interface{}, sourceChainSelector interface{}) *MockExtraDataCodec_DecodeExtraData_Call {
-	return &MockExtraDataCodec_DecodeExtraData_Call{Call: _e.mock.On("DecodeExtraData", extraArgs, sourceChainSelector)}
-}
-
-func (_c *MockExtraDataCodec_DecodeExtraData_Call) Run(run func(extraArgs ccipocr3.Bytes, sourceChainSelector ccipocr3.ChainSelector)) *MockExtraDataCodec_DecodeExtraData_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(ccipocr3.Bytes), args[1].(ccipocr3.ChainSelector))
-	})
-	return _c
-}
-
-func (_c *MockExtraDataCodec_DecodeExtraData_Call) Return(_a0 map[string]interface{}, _a1 error) *MockExtraDataCodec_DecodeExtraData_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockExtraDataCodec_DecodeExtraData_Call) RunAndReturn(run func(ccipocr3.Bytes, ccipocr3.ChainSelector) (map[string]interface{}, error)) *MockExtraDataCodec_DecodeExtraData_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // DecodeTokenAmountDestExecData provides a mock function with given fields: destExecData, sourceChainSelector
 func (_m *MockExtraDataCodec) DecodeTokenAmountDestExecData(destExecData ccipocr3.Bytes, sourceChainSelector ccipocr3.ChainSelector) (map[string]interface{}, error) {
 	ret := _m.Called(destExecData, sourceChainSelector)
