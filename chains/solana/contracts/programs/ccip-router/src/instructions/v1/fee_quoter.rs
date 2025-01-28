@@ -6,8 +6,8 @@ use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
-    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, SVM2AnyMessage,
-    SVMTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
+    seed::FEE_BILLING_SIGNER, BillingTokenConfig, CcipRouterError, DestChain,
+    PerChainPerTokenConfig, SVM2AnyMessage, SVMTokenAmount, TimestampedPackedU224,
 };
 
 use super::messages::ramps::validate_svm2any;
@@ -344,10 +344,10 @@ pub fn wrap_native_sol<'info>(
     invoke_signed(
         &system_instruction::transfer(&from.key(), &to.key(), amount),
         &[from.to_account_info(), to.to_account_info()],
-        &[&[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]]],
+        &[&[FEE_BILLING_SIGNER, &[signer_bump]]],
     )?;
 
-    let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]];
+    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
     let signer_seeds = &[&seeds[..]];
     let account = to.to_account_info();
     let sync: anchor_spl::token_2022::SyncNative = anchor_spl::token_2022::SyncNative { account };
@@ -378,7 +378,7 @@ pub fn do_billing_transfer<'info>(
     decimals: u8,
     signer_bump: u8,
 ) -> Result<()> {
-    let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]];
+    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
     let signer_seeds = &[&seeds[..]];
     let cpi_ctx = CpiContext::new_with_signer(token_program, transfer, signer_seeds);
     token_interface::transfer_checked(cpi_ctx, amount, decimals)
