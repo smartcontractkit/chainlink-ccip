@@ -13,9 +13,9 @@ spec:
           command: ["sh", "-c", "--"]
           args:
             - |
-              rpk topic create beholder__beholderdemo__messages -X brokers=redpanda:9093
-              rpk topic create beholder__test_domain__messages -X brokers=redpanda:9093
-              rpk topic create beholder__load_test__messages -X brokers=redpanda:9093
+              rpk topic create beholder__beholderdemo__messages___pb -X brokers=redpanda:9093
+              rpk topic create beholder__test_domain__messages___pb -X brokers=redpanda:9093
+              rpk topic create beholder__load_test__messages___pb -X brokers=redpanda:9093
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
