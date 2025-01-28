@@ -330,3 +330,31 @@ pub struct SetTokenBillingConfig<'info> {
 
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+pub struct UpdatePrices<'info> {
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs, // validate state version
+    )]
+    pub config: Account<'info, Config>,
+
+    // validate signer is registered offramp
+    #[account(address = config.offramp @ FeeQuoterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+// Token price in USD.
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct TokenPriceUpdate {
+    pub source_token: Pubkey, // Source token. It is the mint, but called "token" for EVM compatibility.
+    pub usd_per_token: [u8; 28], // EVM uses u224, 1e18 USD per 1e18 of the smallest token denomination.
+}
+
+// Gas price for a given chain in USD, its value may contain tightly packed fields.
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct GasPriceUpdate {
+    pub dest_chain_selector: u64,   // Destination chain selector
+    pub usd_per_unit_gas: [u8; 28], // EVM uses u224, 1e18 USD per smallest unit (e.g. wei) of destination chain gas
+}

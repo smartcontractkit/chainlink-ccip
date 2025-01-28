@@ -34,17 +34,19 @@ pub mod fee_quoter {
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
-        onramp: Pubkey,
         link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
+        onramp: Pubkey,
+        offramp: Pubkey,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             version: 1,
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
-            onramp,
             max_fee_juels_per_msg,
             link_token_mint,
+            onramp,
+            offramp,
         });
 
         // ctx.accounts.state.latest_price_sequence_number = 0; // TODO each offramp has its own price seq_nr?
@@ -213,6 +215,14 @@ pub mod fee_quoter {
         message: SVM2AnyMessage,
     ) -> Result<u64> {
         v1::public::get_fee(ctx, dest_chain_selector, message)
+    }
+
+    pub fn update_prices<'info>(
+        ctx: Context<'_, '_, 'info, 'info, UpdatePrices<'info>>,
+        token_updates: Vec<TokenPriceUpdate>,
+        gas_updates: Vec<GasPriceUpdate>,
+    ) -> Result<()> {
+        v1::prices::update_prices(ctx, token_updates, gas_updates)
     }
 }
 

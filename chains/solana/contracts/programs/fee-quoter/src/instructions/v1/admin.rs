@@ -8,7 +8,8 @@ use crate::context::{
 };
 use crate::event::{
     DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled,
-    FeeTokenRemoved,
+    FeeTokenRemoved, OwnershipTransferRequested, OwnershipTransferred,
+    TokenTransferFeeConfigUpdated,
 };
 use crate::state::{
     BillingTokenConfig, DestChain, DestChainConfig, DestChainState, PerChainPerTokenConfig,
@@ -16,16 +17,42 @@ use crate::state::{
 };
 use crate::FeeQuoterError;
 
-pub fn transfer_ownership(ctx: Context<UpdateConfig>, new_owner: Pubkey) -> Result<()> {
-    ctx.accounts.config.proposed_owner = new_owner;
+pub fn transfer_ownership(ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
+    let config = &mut ctx.accounts.config;
+    require!(
+        proposed_owner != config.owner,
+        FeeQuoterError::InvalidInputs
+    );
+    emit!(OwnershipTransferRequested {
+        from: config.owner,
+        to: proposed_owner,
+    });
+    ctx.accounts.config.proposed_owner = proposed_owner;
     Ok(())
 }
 
 pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
+    let config = &mut ctx.accounts.config;
+    emit!(OwnershipTransferred {
+        from: config.owner,
+        to: config.proposed_owner,
+    });
     ctx.accounts.config.owner = ctx.accounts.config.proposed_owner;
     ctx.accounts.config.proposed_owner = Pubkey::default();
     Ok(())
 }
+
+// pub fn update_onramp(ctx: Context<UpdateConfig>, onramp: Pubkey) -> Result<()> {
+//     ctx.accounts.config.onramp = onramp;
+//     // TODO emit event
+//     Ok(())
+// }
+
+// pub fn update_offramp(ctx: Context<UpdateConfig>, offramp: Pubkey) -> Result<()> {
+//     ctx.accounts.config.offramp = offramp;
+//     // TODO emit event
+//     Ok(())
+// }
 
 pub fn add_billing_token_config(
     ctx: Context<AddBillingTokenConfig>,
@@ -142,8 +169,13 @@ pub fn set_token_billing(
             version: 1, // update this if we change the account struct
             chain_selector,
             mint,
-            billing: cfg,
+            billing: cfg.clone(),
         });
+    emit!(TokenTransferFeeConfigUpdated {
+        dest_chain_selector: chain_selector,
+        token: mint,
+        token_transfer_fee_config: cfg,
+    });
     Ok(())
 }
 

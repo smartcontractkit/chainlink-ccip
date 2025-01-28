@@ -46,16 +46,20 @@
       ],
       "args": [
         {
-          "name": "onramp",
-          "type": "publicKey"
-        },
-        {
           "name": "linkTokenMint",
           "type": "publicKey"
         },
         {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128"
+        },
+        {
+          "name": "onramp",
+          "type": "publicKey"
+        },
+        {
+          "name": "offramp",
+          "type": "publicKey"
         }
       ]
     },
@@ -533,6 +537,39 @@
         }
       ],
       "returns": "u64"
+    },
+    {
+      "name": "updatePrices",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenUpdates",
+          "type": {
+            "vec": {
+              "defined": "TokenPriceUpdate"
+            }
+          }
+        },
+        {
+          "name": "gasUpdates",
+          "type": {
+            "vec": {
+              "defined": "GasPriceUpdate"
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -554,15 +591,19 @@
             "type": "publicKey"
           },
           {
-            "name": "onramp",
-            "type": "publicKey"
-          },
-          {
             "name": "maxFeeJuelsPerMsg",
             "type": "u128"
           },
           {
             "name": "linkTokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "onramp",
+            "type": "publicKey"
+          },
+          {
+            "name": "offramp",
             "type": "publicKey"
           }
         ]
@@ -642,6 +683,48 @@
     }
   ],
   "types": [
+    {
+      "name": "TokenPriceUpdate",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sourceToken",
+            "type": "publicKey"
+          },
+          {
+            "name": "usdPerToken",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GasPriceUpdate",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "usdPerUnitGas",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "SVM2AnyMessage",
       "type": {
@@ -962,6 +1045,108 @@
           "name": "destChainConfig",
           "type": {
             "defined": "DestChainConfig"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UsdPerUnitGasUpdated",
+      "fields": [
+        {
+          "name": "destChain",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UsdPerTokenUpdated",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenTransferFeeConfigUpdated",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenTransferFeeConfig",
+          "type": {
+            "defined": "TokenBilling"
           },
           "index": false
         }
