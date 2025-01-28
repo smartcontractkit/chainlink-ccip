@@ -325,18 +325,12 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for registration.
-    /// * `mint` - The public key of the token mint.
-    /// * `token_admin_registry_admin` - The public key of the token admin registry admin.
+    /// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
     pub fn ccip_admin_propose_administrator(
-        ctx: Context<RegisterTokenAdminRegistryViaGetCCIPAdmin>,
-        mint: Pubkey, // should we validate that this is a real token program?
+        ctx: Context<RegisterTokenAdminRegistryByCCIPAdmin>,
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::ccip_admin_propose_administrator(
-            ctx,
-            mint,
-            token_admin_registry_admin,
-        )
+        v1::token_admin_registry::ccip_admin_propose_administrator(ctx, token_admin_registry_admin)
     }
 
     /// Registers the Token Admin Registry via the token owner.
@@ -346,10 +340,12 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for registration.
+    /// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
     pub fn owner_propose_administrator(
-        ctx: Context<RegisterTokenAdminRegistryViaOwner>,
+        ctx: Context<RegisterTokenAdminRegistryByOwner>,
+        token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::owner_propose_administrator(ctx)
+        v1::token_admin_registry::owner_propose_administrator(ctx, token_admin_registry_admin)
     }
 
     /// Accepts the admin role of the token admin registry.
@@ -362,9 +358,8 @@ pub mod ccip_router {
     /// * `mint` - The public key of the token mint.
     pub fn accept_admin_role_token_admin_registry(
         ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
-        mint: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
+        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx)
     }
 
     /// Transfers the admin role of the token admin registry to a new admin.

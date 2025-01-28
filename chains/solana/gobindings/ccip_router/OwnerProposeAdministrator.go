@@ -17,7 +17,9 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for registration.
+// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
 type OwnerProposeAdministrator struct {
+	TokenAdminRegistryAdmin *ag_solanago.PublicKey
 
 	// [0] = [] config
 	//
@@ -37,6 +39,12 @@ func NewOwnerProposeAdministratorInstructionBuilder() *OwnerProposeAdministrator
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
+}
+
+// SetTokenAdminRegistryAdmin sets the "tokenAdminRegistryAdmin" parameter.
+func (inst *OwnerProposeAdministrator) SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin ag_solanago.PublicKey) *OwnerProposeAdministrator {
+	inst.TokenAdminRegistryAdmin = &tokenAdminRegistryAdmin
+	return inst
 }
 
 // SetConfigAccount sets the "config" account.
@@ -112,6 +120,13 @@ func (inst OwnerProposeAdministrator) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *OwnerProposeAdministrator) Validate() error {
+	// Check whether all (required) parameters are set:
+	{
+		if inst.TokenAdminRegistryAdmin == nil {
+			return errors.New("TokenAdminRegistryAdmin parameter is not set")
+		}
+	}
+
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -142,7 +157,9 @@ func (inst *OwnerProposeAdministrator) EncodeToTree(parent ag_treeout.Branches) 
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TokenAdminRegistryAdmin", *inst.TokenAdminRegistryAdmin))
+					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -157,14 +174,26 @@ func (inst *OwnerProposeAdministrator) EncodeToTree(parent ag_treeout.Branches) 
 }
 
 func (obj OwnerProposeAdministrator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TokenAdminRegistryAdmin` param:
+	err = encoder.Encode(obj.TokenAdminRegistryAdmin)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *OwnerProposeAdministrator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TokenAdminRegistryAdmin`:
+	err = decoder.Decode(&obj.TokenAdminRegistryAdmin)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewOwnerProposeAdministratorInstruction declares a new OwnerProposeAdministrator instruction with the provided parameters and accounts.
 func NewOwnerProposeAdministratorInstruction(
+	// Parameters:
+	tokenAdminRegistryAdmin ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	tokenAdminRegistry ag_solanago.PublicKey,
@@ -172,6 +201,7 @@ func NewOwnerProposeAdministratorInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *OwnerProposeAdministrator {
 	return NewOwnerProposeAdministratorInstructionBuilder().
+		SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin).
 		SetConfigAccount(config).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
 		SetMintAccount(mint).

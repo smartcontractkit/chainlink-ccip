@@ -638,8 +638,7 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for registration.",
-        "* `mint` - The public key of the token mint.",
-        "* `token_admin_registry_admin` - The public key of the token admin registry admin."
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
       ],
       "accounts": [
         {
@@ -649,6 +648,11 @@
         },
         {
           "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
           "isMut": true,
           "isSigner": false
         },
@@ -665,10 +669,6 @@
       ],
       "args": [
         {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
           "name": "tokenAdminRegistryAdmin",
           "type": "publicKey"
         }
@@ -683,7 +683,8 @@
         "",
         "# Arguments",
         "",
-        "* `ctx` - The context containing the accounts required for registration."
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
       ],
       "accounts": [
         {
@@ -712,7 +713,12 @@
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "tokenAdminRegistryAdmin",
+          "type": "publicKey"
+        }
+      ]
     },
     {
       "name": "acceptAdminRoleTokenAdminRegistry",
@@ -738,17 +744,17 @@
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
         }
       ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "transferAdminRoleTokenAdminRegistry",

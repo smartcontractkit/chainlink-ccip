@@ -23,8 +23,7 @@ pub struct TokenAdminRegistry {
 }
 
 #[derive(Accounts)]
-#[instruction(mint: Pubkey)]
-pub struct RegisterTokenAdminRegistryViaGetCCIPAdmin<'info> {
+pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
     #[account(
         seeds = [CONFIG_SEED],
         bump,
@@ -32,29 +31,7 @@ pub struct RegisterTokenAdminRegistryViaGetCCIPAdmin<'info> {
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
-        init,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
-        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
-    )]
-    pub token_admin_registry: Account<'info, TokenAdminRegistry>,
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct RegisterTokenAdminRegistryViaOwner<'info> {
-    #[account(
-        seeds = [CONFIG_SEED],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-    #[account(
-        init,
+        init, // TODO: change to init_if_needed
         seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.key().as_ref()],
         bump,
         payer = authority,
@@ -64,6 +41,34 @@ pub struct RegisterTokenAdminRegistryViaOwner<'info> {
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+    // The following validation is the only difference between the two contexts
+    // Only CCIP Admin can propose an owner for the token admin registry if not the mint authority
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RegisterTokenAdminRegistryByOwner<'info> {
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub config: AccountLoader<'info, Config>,
+    #[account(
+        init, // TODO: change to init_if_needed
+        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.key().as_ref()],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
+        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
+    )]
+    pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    #[account(mut)]
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+    // The following validation is the only difference between the two contexts
+    // Only the mint authority can propose an owner for the token admin registry
     #[account(
         mut,
         address = mint.mint_authority.unwrap() @ CcipRouterError::Unauthorized,
@@ -115,7 +120,6 @@ pub struct SetPoolTokenAdminRegistry<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(mint: Pubkey)]
 pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -125,11 +129,13 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.key().as_ref()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    #[account(mut)]
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(mut, address = token_admin_registry.pending_administrator @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }

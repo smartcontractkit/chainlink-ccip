@@ -195,8 +195,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for registration.
-	// * `mint` - The public key of the token mint.
-	// * `token_admin_registry_admin` - The public key of the token admin registry admin.
+	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
 	Instruction_CcipAdminProposeAdministrator = ag_binary.TypeID([8]byte{218, 37, 139, 107, 142, 228, 51, 219})
 
 	// Registers the Token Admin Registry via the token owner.
@@ -206,6 +205,7 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for registration.
+	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
 	Instruction_OwnerProposeAdministrator = ag_binary.TypeID([8]byte{175, 81, 160, 246, 206, 132, 18, 22})
 
 	// Accepts the admin role of the token admin registry.
