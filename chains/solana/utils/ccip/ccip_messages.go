@@ -18,7 +18,7 @@ import (
 
 var leafDomainSeparator = [32]byte{}
 
-func HashCommitReport(ctx [3][32]byte, report ccip_router.CommitInput) ([]byte, error) {
+func HashCommitReport(ctx [2][32]byte, report ccip_router.CommitInput) ([]byte, error) {
 	hash := sha3.NewLegacyKeccak256()
 	encodedReport, err := bin.MarshalBorsh(report)
 	if err != nil {
@@ -38,23 +38,19 @@ func HashCommitReport(ctx [3][32]byte, report ccip_router.CommitInput) ([]byte, 
 	if _, err := hash.Write(ctx[1][:]); err != nil {
 		return nil, err
 	}
-	if _, err := hash.Write(ctx[2][:]); err != nil {
-		return nil, err
-	}
 	return hash.Sum(nil), nil
 }
 
 var reportSequence uint64 = 1
 
-func CreateReportContext(sequence uint64) [3][32]byte {
-	return [3][32]byte{
+func CreateReportContext(sequence uint64) [2][32]byte {
+	return [2][32]byte{
 		config.ConfigDigest,
 		[32]byte(binary.BigEndian.AppendUint64(config.Empty24Byte[:], sequence)),
-		common.MakeRandom32ByteArray(),
 	}
 }
 
-func ParseSequenceNumber(ctx [3][32]byte) uint64 {
+func ParseSequenceNumber(ctx [2][32]byte) uint64 {
 	return binary.BigEndian.Uint64(ctx[1][24:])
 }
 
@@ -62,7 +58,7 @@ func ReportSequence() uint64 {
 	return reportSequence
 }
 
-func NextCommitReportContext() [3][32]byte {
+func NextCommitReportContext() [2][32]byte {
 	reportSequence++
 	return CreateReportContext(reportSequence)
 }
