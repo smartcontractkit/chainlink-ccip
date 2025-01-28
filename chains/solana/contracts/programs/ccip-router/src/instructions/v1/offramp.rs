@@ -14,13 +14,12 @@ use super::pools::{
 
 use crate::v1::ocr3base::Signatures;
 use crate::{
-    Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
-    CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
+    seed, Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput,
+    CommitReport, CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
     ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
     MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
     SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
-    UsdPerTokenUpdated, UsdPerUnitGasUpdated, DEST_CHAIN_STATE_SEED,
-    EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+    UsdPerTokenUpdated, UsdPerUnitGasUpdated,
 };
 
 pub fn commit<'info>(
@@ -89,7 +88,7 @@ pub fn commit<'info>(
         let ocr_sequence_number = report_context.sequence_number();
 
         // The Global state PDA is sent as a remaining_account as it is optional to avoid having the lock when not modifying it, so all validations need to be done manually
-        let (expected_state_key, _) = Pubkey::find_program_address(&[STATE_SEED], &crate::ID);
+        let (expected_state_key, _) = Pubkey::find_program_address(&[seed::STATE], &crate::ID);
         require_keys_eq!(
             ctx.remaining_accounts[0].key(),
             expected_state_key,
@@ -261,7 +260,10 @@ fn apply_token_price_update<'info>(
     token_config_account_info: &'info AccountInfo<'info>,
 ) -> Result<()> {
     let (expected, _) = Pubkey::find_program_address(
-        &[FEE_BILLING_TOKEN_CONFIG, token_update.source_token.as_ref()],
+        &[
+            seed::FEE_BILLING_TOKEN_CONFIG,
+            token_update.source_token.as_ref(),
+        ],
         &crate::ID,
     );
     require_keys_eq!(
@@ -305,7 +307,7 @@ fn apply_gas_price_update<'info>(
 ) -> Result<()> {
     let (expected, _) = Pubkey::find_program_address(
         &[
-            DEST_CHAIN_STATE_SEED,
+            seed::DEST_CHAIN_STATE,
             gas_update.dest_chain_selector.to_le_bytes().as_ref(),
         ],
         &crate::ID,
@@ -411,7 +413,7 @@ fn internal_execute<'info>(
             && token_indexes.len() == execution_report.offchain_token_data.len(),
         CcipRouterError::InvalidInputs,
     );
-    let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
+    let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
     let mut token_amounts = vec![SVMTokenAmount::default(); token_indexes.len()];
 
     // handle tokens
@@ -528,7 +530,7 @@ fn internal_execute<'info>(
         };
 
         let seeds = &[
-            EXTERNAL_EXECUTION_CONFIG_SEED,
+            seed::EXTERNAL_EXECUTION_CONFIG,
             &[ctx.bumps.external_execution_config],
         ];
         let signer = &[&seeds[..]];
