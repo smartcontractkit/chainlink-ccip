@@ -35,6 +35,8 @@ pub enum Ocr3Error {
     InvalidPluginType,
     #[msg("Invalid signature")]
     InvalidSignature,
+    #[msg("Signatures out of registration")]
+    SignaturesOutOfRegistration,
 }
 
 #[event]

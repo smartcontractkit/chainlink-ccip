@@ -8,11 +8,12 @@ use crate::state::{Ocr3Config, Ocr3ConfigInfo};
 pub const MAX_SIGNERS: usize = MAX_ORACLES;
 pub const MAX_TRANSMITTERS: usize = MAX_ORACLES;
 
-pub const SIGNATURE_LENGTH: usize = SECP256K1_SIGNATURE_LENGTH + 1; // signature + recovery ID
-
 pub const TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT_NO_SIGNATURES: u128 = 8 // anchor discriminator
-    + 3 * 32; // report context
-pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 = 4; // u32 length of signatures vec (borsh serialization)
+    + 2 * 32 // report context
+    + 4; // length component of serialized report
+pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 = 4 // u32 length of rs vec
+    + 4 // u32 length of ss vec
+    + 32; // length of rawVs
 
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
@@ -20,8 +21,14 @@ pub(super) struct ReportContext {
     // byte_words consists of:
     // [0]: ConfigDigest
     // [1]: 24 byte padding, 8 byte sequence number
-    // [2]: ExtraHash
-    byte_words: [[u8; 32]; 3], // private, define methods to use it
+    byte_words: [[u8; 32]; 2], // private, define methods to use it
+}
+
+// Signature struct used to reduce total number of input parameters to function
+pub struct Signatures {
+    pub rs: Vec<[u8; 32]>,
+    pub ss: Vec<[u8; 32]>,
+    pub raw_vs: [u8; 32],
 }
 
 impl ReportContext {
@@ -30,11 +37,11 @@ impl ReportContext {
         u64::from_be_bytes(sequence_bytes)
     }
 
-    pub fn from_byte_words(byte_words: [[u8; 32]; 3]) -> Self {
+    pub fn from_byte_words(byte_words: [[u8; 32]; 2]) -> Self {
         Self { byte_words }
     }
 
-    pub fn as_bytes(&self) -> [u8; 32 * 3] {
+    pub fn as_bytes(&self) -> [u8; 32 * 2] {
         self.byte_words.concat().as_slice().try_into().unwrap()
     }
 }
@@ -124,7 +131,7 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
     plugin_type: u8,
     report_context: ReportContext,
     report: &R,
-    signatures: &[[u8; SIGNATURE_LENGTH]],
+    signatures: Signatures,
 ) -> Result<()> {
     require!(
         plugin_type == ocr3_config.plugin_type,
@@ -137,8 +144,8 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
     if ocr3_config.config_info.is_signature_verification_enabled != 0 {
         expected_data_len = expected_data_len
             .saturating_add(TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES);
-        expected_data_len =
-            expected_data_len.saturating_add((signatures.len() * SIGNATURE_LENGTH) as u128);
+        expected_data_len = expected_data_len
+            .saturating_add((signatures.rs.len() * SECP256K1_SIGNATURE_LENGTH) as u128);
     }
     // validates instruction sysvar is correct address
     let instruction_index = sysvar::instructions::load_current_index_checked(instruction_sysvar)?;
@@ -167,9 +174,15 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
         .map_err(|_| Ocr3Error::UnauthorizedTransmitter)?;
 
     if ocr3_config.config_info.is_signature_verification_enabled != 0 {
-        require!(
-            signatures.len() == (ocr3_config.config_info.f + 1) as usize,
+        require_eq!(
+            signatures.rs.len(),
+            (ocr3_config.config_info.f + 1) as usize,
             Ocr3Error::WrongNumberOfSignatures
+        );
+        require_eq!(
+            signatures.rs.len(),
+            signatures.ss.len(),
+            Ocr3Error::SignaturesOutOfRegistration
         );
 
         verify_signatures(ocr3_config, report.hash(&report_context), signatures)?;
@@ -187,16 +200,18 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
 fn verify_signatures(
     ocr3_config: &Ocr3Config,
     hashed_report: [u8; 32],
-    signatures: &[[u8; SIGNATURE_LENGTH]],
+    signatures: Signatures,
 ) -> Result<()> {
     let mut uniques: u16 = 0;
     assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_SIGNERS as u32); // ensure MAX_SIGNERS fit in the bits of uniques
 
-    for raw_sig in signatures {
-        let (recovery_id, signature) = raw_sig.split_first().ok_or(Ocr3Error::InvalidSignature)?;
-
-        let signer = secp256k1_recover(&hashed_report, *recovery_id, signature)
-            .map_err(|_| Ocr3Error::InvalidSignature)?;
+    for (i, _) in signatures.rs.iter().enumerate() {
+        let signer = secp256k1_recover(
+            &hashed_report,
+            signatures.raw_vs[i],
+            [signatures.rs[i], signatures.ss[i]].concat().as_ref(),
+        )
+        .map_err(|_| Ocr3Error::InvalidSignature)?;
         // convert to a raw 20 byte Ethereum address
         let address: [u8; 20] = keccak::hash(&signer.0).to_bytes()[12..32]
             .try_into()
@@ -210,7 +225,7 @@ fn verify_signatures(
     }
 
     require!(
-        uniques.count_ones() as usize == signatures.len(),
+        uniques.count_ones() as usize == signatures.rs.len(),
         Ocr3Error::NonUniqueSignatures
     );
 

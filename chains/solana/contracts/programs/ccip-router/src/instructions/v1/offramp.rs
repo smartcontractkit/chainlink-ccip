@@ -12,6 +12,7 @@ use super::pools::{
     validate_and_parse_token_accounts, TokenAccounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::ocr3base::Signatures;
 use crate::{
     Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
     CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
@@ -24,10 +25,14 @@ use crate::{
 
 pub fn commit<'info>(
     ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
-    report_context_byte_words: [[u8; 32]; 3],
-    report: CommitInput,
-    signatures: Vec<[u8; 65]>,
+    report_context_byte_words: [[u8; 32]; 2],
+    raw_report: Vec<u8>,
+    rs: Vec<[u8; 32]>,
+    ss: Vec<[u8; 32]>,
+    raw_vs: [u8; 32],
 ) -> Result<()> {
+    let report = CommitInput::deserialize(&mut raw_report.as_ref())
+        .map_err(|_| CcipRouterError::InvalidInputs)?;
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
 
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
@@ -186,7 +191,7 @@ pub fn commit<'info>(
         OcrPluginType::Commit as u8,
         report_context,
         &Ocr3ReportForCommit(&report),
-        &signatures,
+        Signatures { rs, ss, raw_vs },
     )?;
 
     Ok(())
@@ -194,10 +199,13 @@ pub fn commit<'info>(
 
 pub fn execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    execution_report: ExecutionReportSingleChain,
-    report_context_byte_words: [[u8; 32]; 3],
+    raw_execution_report: Vec<u8>,
+    report_context_byte_words: [[u8; 32]; 2],
     token_indexes: &[u8],
 ) -> Result<()> {
+    let execution_report =
+        ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+            .map_err(|_| CcipRouterError::InvalidInputs)?;
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
     // limit borrowing of ctx
     {
@@ -209,7 +217,11 @@ pub fn execute<'info>(
             OcrPluginType::Execution as u8,
             report_context,
             &Ocr3ReportForExecutionReportSingleChain(&execution_report),
-            &[],
+            Signatures {
+                rs: vec![],
+                ss: vec![],
+                raw_vs: [0u8; 32],
+            },
         )?;
     }
 
@@ -218,7 +230,7 @@ pub fn execute<'info>(
 
 pub fn manually_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    execution_report: ExecutionReportSingleChain,
+    raw_execution_report: Vec<u8>,
     token_indexes: &[u8],
 ) -> Result<()> {
     // limit borrowing of ctx
@@ -234,6 +246,9 @@ pub fn manually_execute<'info>(
             CcipRouterError::ManualExecutionNotAllowed
         );
     }
+    let execution_report =
+        ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+            .map_err(|_| CcipRouterError::InvalidInputs)?;
     internal_execute(ctx, execution_report, token_indexes)
 }
 
