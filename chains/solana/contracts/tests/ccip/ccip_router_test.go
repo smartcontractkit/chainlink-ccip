@@ -1529,7 +1529,6 @@ func TestCCIPRouter(t *testing.T) {
 
 			t.Run("accept token admin registry as token admin", func(t *testing.T) {
 				t.Run("When any user wants to accept the token admin registry, it fails", func(t *testing.T) {
-
 					instruction, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
@@ -1553,7 +1552,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
 				})
 
-				t.Run("When proposed admin wants to accept the token admin registry, it suceeds", func(t *testing.T) {
+				t.Run("When proposed admin wants to accept the token admin registry, it succeeds", func(t *testing.T) {
 					instruction, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
@@ -1878,7 +1877,6 @@ func TestCCIPRouter(t *testing.T) {
 
 			t.Run("accept token admin registry as token admin", func(t *testing.T) {
 				t.Run("When any user wants to accept the token admin registry, it fails", func(t *testing.T) {
-
 					instruction, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
@@ -1902,7 +1900,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
 				})
 
-				t.Run("When proposed admin wants to accept the token admin registry, it suceeds", func(t *testing.T) {
+				t.Run("When proposed admin wants to accept the token admin registry, it succeeds", func(t *testing.T) {
 					instruction, err := ccip_router.NewAcceptAdminRoleTokenAdminRegistryInstruction(
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
