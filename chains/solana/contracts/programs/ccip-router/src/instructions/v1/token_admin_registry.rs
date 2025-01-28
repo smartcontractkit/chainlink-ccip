@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use anchor_spl::{associated_token::get_associated_token_address_with_program_id, token::Mint};
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
 use super::pools::token_admin_registry_writable;
@@ -19,18 +19,9 @@ pub fn ccip_admin_propose_administrator(
     token_admin_registry_admin: Pubkey,
 ) -> Result<()> {
     let token_mint = ctx.accounts.mint.key().to_owned();
-
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
 
-    token_admin_registry.version = 1;
-    token_admin_registry.administrator = Pubkey::new_from_array([0; 32]);
-    token_admin_registry.pending_administrator = token_admin_registry_admin;
-    token_admin_registry.lookup_table = Pubkey::new_from_array([0; 32]);
-
-    emit!(AdministratorRegistered {
-        token_mint,
-        administrator: token_admin_registry_admin,
-    });
+    set_pending_administrator(token_mint, token_admin_registry, token_admin_registry_admin)?;
 
     Ok(())
 }
@@ -40,17 +31,75 @@ pub fn owner_propose_administrator(
     token_admin_registry_admin: Pubkey,
 ) -> Result<()> {
     let token_mint = ctx.accounts.mint.key().to_owned();
-
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+    set_pending_administrator(token_mint, token_admin_registry, token_admin_registry_admin)?;
+
+    Ok(())
+}
+
+fn set_pending_administrator(
+    token_mint: Pubkey,
+    token_admin_registry: &mut Account<'_, crate::TokenAdminRegistry>,
+    token_admin_registry_admin: Pubkey,
+) -> Result<()> {
+    require_neq!(
+        token_admin_registry_admin,
+        Pubkey::new_from_array([0; 32]),
+        CcipRouterError::InvalidTokenAdminRegistryInputsZeroAddress
+    );
+
+    // TODO: Revert if administrator != 0 AlreadyRegistered
 
     token_admin_registry.version = 1;
     token_admin_registry.administrator = Pubkey::new_from_array([0; 32]);
     token_admin_registry.pending_administrator = token_admin_registry_admin;
     token_admin_registry.lookup_table = Pubkey::new_from_array([0; 32]);
 
-    emit!(AdministratorRegistered {
-        token_mint,
-        administrator: token_admin_registry_admin,
+    emit!(AdministratorTransferRequested {
+        token: token_mint,
+        current_admin: Pubkey::new_from_array([0; 32]),
+        new_admin: token_admin_registry_admin,
+    });
+
+    Ok(())
+}
+
+pub fn transfer_admin_role_token_admin_registry(
+    ctx: Context<ModifyTokenAdminRegistry>,
+    mint: Pubkey,
+    new_admin: Pubkey,
+) -> Result<()> {
+    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+    if new_admin == Pubkey::new_from_array([0; 32]) {
+        token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
+    } else {
+        token_admin_registry.pending_administrator = new_admin;
+    }
+
+    emit!(AdministratorTransferRequested {
+        token: mint,
+        current_admin: token_admin_registry.administrator,
+        new_admin,
+    });
+
+    Ok(())
+}
+
+pub fn accept_admin_role_token_admin_registry(
+    ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
+) -> Result<()> {
+    let token_mint = ctx.accounts.mint.key().to_owned();
+    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+    let new_admin = token_admin_registry.pending_administrator;
+
+    token_admin_registry.administrator = new_admin;
+    token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
+
+    emit!(AdministratorTransferred {
+        token: token_mint,
+        new_admin,
     });
 
     Ok(())
@@ -140,46 +189,6 @@ pub fn set_pool(
         token: mint,
         previous_pool_lookup_table: previous_pool,
         new_pool_lookup_table: new_pool,
-    });
-
-    Ok(())
-}
-
-pub fn transfer_admin_role_token_admin_registry(
-    ctx: Context<ModifyTokenAdminRegistry>,
-    mint: Pubkey,
-    new_admin: Pubkey,
-) -> Result<()> {
-    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
-
-    if new_admin == Pubkey::new_from_array([0; 32]) {
-        token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
-    } else {
-        token_admin_registry.pending_administrator = new_admin;
-    }
-
-    emit!(AdministratorTransferRequested {
-        token: mint,
-        current_admin: token_admin_registry.administrator,
-        new_admin,
-    });
-
-    Ok(())
-}
-
-pub fn accept_admin_role_token_admin_registry(
-    ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
-) -> Result<()> {
-    let token_mint = ctx.accounts.mint.key().to_owned();
-    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
-    let new_admin = token_admin_registry.pending_administrator;
-
-    token_admin_registry.administrator = new_admin;
-    token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
-
-    emit!(AdministratorTransferred {
-        token: token_mint,
-        new_admin,
     });
 
     Ok(())

@@ -703,4 +703,6 @@ pub enum CcipRouterError {
     MessageGasLimitTooHigh,
     #[msg("Extra arg out of order execution must be true")]
     ExtraArgOutOfOrderExecutionMustBeTrue,
+    #[msg("New Admin can not be zero address")]
+    InvalidTokenAdminRegistryInputsZeroAddress,
 }
