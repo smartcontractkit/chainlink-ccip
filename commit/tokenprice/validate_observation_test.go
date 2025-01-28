@@ -1,18 +1,20 @@
 package tokenprice
 
 import (
-	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	commonmock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/libocr/commontypes"
 )
 
 var (
