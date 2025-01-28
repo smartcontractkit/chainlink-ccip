@@ -440,10 +440,11 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		executedMessages []cciptypes.SeqNumRange
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []exectypes.CommitData
-		wantErr assert.ErrorAssertionFunc
+		name         string
+		args         args
+		wantPending  []exectypes.CommitData
+		wantExecuted []exectypes.CommitData
+		wantErr      assert.ErrorAssertionFunc
 	}{
 		{
 			name: "empty",
@@ -451,8 +452,8 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				reports:          nil,
 				executedMessages: nil,
 			},
-			want:    nil,
-			wantErr: assert.NoError,
+			wantPending: nil,
+			wantErr:     assert.NoError,
 		},
 		{
 			name: "empty2",
@@ -460,8 +461,8 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				reports:          []exectypes.CommitData{},
 				executedMessages: nil,
 			},
-			want:    []exectypes.CommitData{},
-			wantErr: assert.NoError,
+			wantPending: []exectypes.CommitData{},
+			wantErr:     assert.NoError,
 		},
 		{
 			name: "no executed messages",
@@ -473,7 +474,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				},
 				executedMessages: nil,
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
@@ -492,7 +493,12 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(0, 100),
 				},
 			},
-			want:    nil,
+			wantPending: nil,
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
+			},
 			wantErr: assert.NoError,
 		},
 		{
@@ -507,7 +513,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(15, 35),
 				},
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{
 					SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					ExecutedMessages:    []cciptypes.SeqNum{15, 16, 17, 18, 19, 20},
@@ -534,7 +540,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(15, 55),
 				},
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{
 					SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					ExecutedMessages:    []cciptypes.SeqNum{15, 16, 17, 18, 19, 20},
@@ -543,6 +549,9 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 					ExecutedMessages:    []cciptypes.SeqNum{50, 51, 52, 53, 54, 55},
 				},
+			},
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 			},
 			wantErr: assert.NoError,
 		},
@@ -558,9 +567,12 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(10, 20),
 				},
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
+			},
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 			},
 			wantErr: assert.NoError,
 		},
@@ -576,9 +588,12 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(50, 60),
 				},
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+			},
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 			},
 			wantErr: assert.NoError,
 		},
@@ -586,28 +601,16 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 			name: "sort-report",
 			args: args{
 				reports: []exectypes.CommitData{
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
-					},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 				},
 				executedMessages: nil,
 			},
-			want: []exectypes.CommitData{
-				{
-					SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
-				},
-				{
-					SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
-				},
-				{
-					SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
-				},
+			wantPending: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 			},
 			wantErr: assert.NoError,
 		},
@@ -615,15 +618,9 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 			name: "sort-executed",
 			args: args{
 				reports: []exectypes.CommitData{
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
-					},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 				},
 				executedMessages: []cciptypes.SeqNumRange{
 					cciptypes.NewSeqNumRange(50, 60),
@@ -631,18 +628,24 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(30, 40),
 				},
 			},
-			want:    nil,
+			wantPending: nil,
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
+			},
 			wantErr: assert.NoError,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := filterOutExecutedMessages(tt.args.reports, tt.args.executedMessages)
-			if !tt.wantErr(t, err, fmt.Sprintf("filterOutExecutedMessages(%v, %v)", tt.args.reports, tt.args.executedMessages)) {
+			got, got2, err := getPendingAndExecutedReports(tt.args.reports, tt.args.executedMessages)
+			if !tt.wantErr(t, err) {
 				return
 			}
-			assert.Equalf(t, tt.want, got, "filterOutExecutedMessages(%v, %v)", tt.args.reports, tt.args.executedMessages)
+			assert.Equal(t, tt.wantPending, got)
+			assert.Equal(t, tt.wantExecuted, got2)
 		})
 	}
 }

@@ -276,18 +276,19 @@ func groupByChainSelector(
 	return commitReportCache
 }
 
-// filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
-// Unordered inputs are supported.
-func filterOutExecutedMessages(
+// getPendingAndExecutedReports splits up reports based on whether they
+// have pending messages. This is a pure function to analyze reports based on
+// the executed messages response.
+func getPendingAndExecutedReports(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
-) ([]exectypes.CommitData, error) {
+) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData, error) {
 	sort.Slice(reports, func(i, j int) bool {
 		return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
 	})
 
 	// If none are executed, return the (sorted) input.
 	if len(executedMessages) == 0 {
-		return reports, nil
+		return reports, nil, nil
 	}
 
 	sort.Slice(executedMessages, func(i, j int) bool {
@@ -298,12 +299,13 @@ func filterOutExecutedMessages(
 	previousMax := cciptypes.SeqNum(0)
 	for _, seqRange := range executedMessages {
 		if seqRange.Start() < previousMax {
-			return nil, errOverlappingRanges
+			return nil, nil, errOverlappingRanges
 		}
 		previousMax = seqRange.End()
 	}
 
-	var filtered []exectypes.CommitData
+	var pending []exectypes.CommitData
+	var fullyExecuted []exectypes.CommitData
 
 	reportIdx := 0
 	for _, executed := range executedMessages {
@@ -317,6 +319,7 @@ func filterOutExecutedMessages(
 
 			if reportRange.Start() >= executed.Start() && reportRange.End() <= executed.End() {
 				// skip fully executed report.
+				fullyExecuted = append(fullyExecuted, reports[i])
 				reportIdx++
 				continue
 			}
@@ -329,7 +332,7 @@ func filterOutExecutedMessages(
 				// This range runs into the next report.
 				if s > reports[i].SequenceNumberRange.End() {
 					reportIdx++
-					filtered = append(filtered, reports[i])
+					pending = append(pending, reports[i])
 					break
 				}
 				reports[i].ExecutedMessages = append(reports[i].ExecutedMessages, s)
@@ -339,10 +342,10 @@ func filterOutExecutedMessages(
 
 	// Add any remaining reports that were not fully executed.
 	for i := reportIdx; i < len(reports); i++ {
-		filtered = append(filtered, reports[i])
+		pending = append(pending, reports[i])
 	}
 
-	return filtered, nil
+	return pending, fullyExecuted, nil
 }
 
 func decodeAttributedObservations(
