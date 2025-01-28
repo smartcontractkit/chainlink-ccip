@@ -10,9 +10,10 @@ pub struct Config {
 
     pub onramp: Pubkey,
 
+    // Static config fields
     pub max_fee_juels_per_msg: u128, // Maximum fee that can be charged for a message.
     pub link_token_mint: Pubkey,
-    // The following field is unused until the day we integrate with feeds to fetch fresh values
+    // TODO The following field is unused until the day we integrate with feeds to fetch fresh values
     // pub token_price_staleness_threshold: u32,
 }
 

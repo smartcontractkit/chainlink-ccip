@@ -52,17 +52,26 @@ pub mod fee_quoter {
         Ok(())
     }
 
-    pub fn update_config_max_fee_juels_per_msg(
-        ctx: Context<UpdateConfig>,
-        max_fee_juels_per_msg: u128,
-    ) -> Result<()> {
-        v1::admin::update_config_max_fee_juels_per_msg(ctx, max_fee_juels_per_msg)
-    }
-
+    /// Transfers the ownership of the fee quoter to a new proposed owner.
+    ///
+    /// Shared func signature with other programs
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the transfer.
+    /// * `proposed_owner` - The public key of the new proposed owner.
     pub fn transfer_ownership(ctx: Context<UpdateConfig>, new_owner: Pubkey) -> Result<()> {
         v1::admin::transfer_ownership(ctx, new_owner)
     }
 
+    /// Accepts the ownership of the fee quoter by the proposed owner.
+    ///
+    /// Shared func signature with other programs
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for accepting ownership.
+    /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         v1::admin::accept_ownership(ctx)
     }
@@ -105,6 +114,16 @@ pub mod fee_quoter {
         v1::admin::remove_billing_token_config(ctx)
     }
 
+    /// Adds a new destination chain selector to the fee quoter.
+    ///
+    /// The Admin needs to add any new chain supported.
+    /// When adding a new chain, the Admin needs to specify if it's enabled or not.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for adding the chain selector.
+    /// * `chain_selector` - The new chain selector to be added.
+    /// * `dest_chain_config` - The configuration for the chain as destination.
     pub fn add_dest_chain(
         ctx: Context<AddDestChain>,
         chain_selector: u64,
@@ -113,6 +132,14 @@ pub mod fee_quoter {
         v1::admin::add_dest_chain(ctx, chain_selector, dest_chain_config)
     }
 
+    /// Disables the destination chain selector.
+    ///
+    /// The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for disabling the chain selector.
+    /// * `chain_selector` - The destination chain selector to be disabled.
     pub fn disable_dest_chain(
         ctx: Context<UpdateDestChainConfig>,
         chain_selector: u64,
@@ -120,6 +147,15 @@ pub mod fee_quoter {
         v1::admin::disable_dest_chain(ctx, chain_selector)
     }
 
+    /// Updates the configuration of the destination chain selector.
+    ///
+    /// The Admin is the only one able to update the destination chain config.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the chain selector.
+    /// * `chain_selector` - The destination chain selector to be updated.
+    /// * `dest_chain_config` - The new configuration for the destination chain.
     pub fn update_dest_chain_config(
         ctx: Context<UpdateDestChainConfig>,
         chain_selector: u64,

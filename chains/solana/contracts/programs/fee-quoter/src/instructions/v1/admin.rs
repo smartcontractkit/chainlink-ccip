@@ -14,14 +14,6 @@ use crate::state::{
 };
 use crate::FeeQuoterError;
 
-pub fn update_config_max_fee_juels_per_msg(
-    ctx: Context<UpdateConfig>,
-    max_fee_juels_per_msg: u128,
-) -> Result<()> {
-    ctx.accounts.config.max_fee_juels_per_msg = max_fee_juels_per_msg;
-    Ok(())
-}
-
 pub fn transfer_ownership(ctx: Context<UpdateConfig>, new_owner: Pubkey) -> Result<()> {
     ctx.accounts.config.proposed_owner = new_owner;
     Ok(())
