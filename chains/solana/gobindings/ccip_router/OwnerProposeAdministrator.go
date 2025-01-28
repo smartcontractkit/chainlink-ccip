@@ -25,7 +25,7 @@ type OwnerProposeAdministrator struct {
 	//
 	// [1] = [WRITE] tokenAdminRegistry
 	//
-	// [2] = [WRITE] mint
+	// [2] = [] mint
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
@@ -71,7 +71,7 @@ func (inst *OwnerProposeAdministrator) GetTokenAdminRegistryAccount() *ag_solana
 
 // SetMintAccount sets the "mint" account.
 func (inst *OwnerProposeAdministrator) SetMintAccount(mint ag_solanago.PublicKey) *OwnerProposeAdministrator {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint).WRITE()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint)
 	return inst
 }
 

@@ -24,7 +24,7 @@ type CcipAdminProposeAdministrator struct {
 	//
 	// [1] = [WRITE] tokenAdminRegistry
 	//
-	// [2] = [WRITE] mint
+	// [2] = [] mint
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
@@ -70,7 +70,7 @@ func (inst *CcipAdminProposeAdministrator) GetTokenAdminRegistryAccount() *ag_so
 
 // SetMintAccount sets the "mint" account.
 func (inst *CcipAdminProposeAdministrator) SetMintAccount(mint ag_solanago.PublicKey) *CcipAdminProposeAdministrator {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint).WRITE()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint)
 	return inst
 }
 

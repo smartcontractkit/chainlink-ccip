@@ -1577,10 +1577,10 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("set pool", func(t *testing.T) {
 				t.Run("When any user wants to set up the pool, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						user.PublicKey(),
 					).ValidateAndBuild()
@@ -1592,10 +1592,10 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When transmitter wants to set up the pool, it fails", func(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						transmitter.PublicKey(),
 					).ValidateAndBuild()
@@ -1606,10 +1606,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When admin wants to set up the pool, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						ccipAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1620,10 +1620,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When setting pool to incorrect addresses in lookup table, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token1.PoolLookupTable, // accounts do not match the expected mint related accounts
 						ccipAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1634,10 +1634,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When Token Pool Admin wants to set up the pool, it succeeds", func(t *testing.T) {
 					base := ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						token0PoolAdmin.PublicKey(),
 					)
@@ -1660,10 +1660,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When Token Pool Admin wants to set up the pool again to zero, it is none", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						solana.PublicKey{},
 						token0PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1682,10 +1682,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// Rollback to previous state
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						token0PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1698,10 +1698,10 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("Transfer admin role for token admin registry", func(t *testing.T) {
 				t.Run("When any user wants to transfer the token admin registry, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
-						token0.Mint.PublicKey(),
 						token1PoolAdmin.PublicKey(),
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						user.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1711,10 +1711,10 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When admin wants to transfer the token admin registry, it succeeds and permissions stay with no changes", func(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
-						token0.Mint.PublicKey(),
 						token1PoolAdmin.PublicKey(),
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1732,10 +1732,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// check if the admin is still the same
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						token0PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1745,10 +1745,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// new one cant make changes yet
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						token1PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1779,10 +1779,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// check old admin can not make changes anymore
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						token0PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1792,10 +1792,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// new one can make changes now
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token0.Mint.PublicKey(),
 						token0.WritableIndexes,
 						config.RouterConfigPDA,
 						token0.AdminRegistryPDA,
+						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
 						token1PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1925,10 +1925,10 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("set pool", func(t *testing.T) {
 				t.Run("When Mint Authority wants to set up the pool, it succeeds", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
-						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
+						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
 						token1PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1954,10 +1954,10 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("Transfer admin role for token admin registry", func(t *testing.T) {
 				t.Run("When invalid wants to transfer the token admin registry, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
-						token1.Mint.PublicKey(),
 						token0PoolAdmin.PublicKey(),
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
+						token1.Mint.PublicKey(),
 						token0PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1966,10 +1966,10 @@ func TestCCIPRouter(t *testing.T) {
 				})
 				t.Run("When mint authority wants to transfer the token admin registry, it succeeds and permissions stay with no changes", func(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
-						token1.Mint.PublicKey(),
 						token0PoolAdmin.PublicKey(),
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
+						token1.Mint.PublicKey(),
 						token1PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1987,10 +1987,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// check if the admin is still the same
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
+						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
 						token1PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -2000,10 +2000,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// new one cant make changes yet
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
+						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
 						token0PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -2034,10 +2034,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// check old admin can not make changes anymore
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
+						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
 						token1PoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -2047,10 +2047,10 @@ func TestCCIPRouter(t *testing.T) {
 
 					// new one can make changes now
 					instruction, err = ccip_router.NewSetPoolInstruction(
-						token1.Mint.PublicKey(),
 						token1.WritableIndexes,
 						config.RouterConfigPDA,
 						token1.AdminRegistryPDA,
+						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
 						token0PoolAdmin.PublicKey(),
 					).ValidateAndBuild()

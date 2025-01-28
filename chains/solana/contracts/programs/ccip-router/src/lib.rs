@@ -373,10 +373,9 @@ pub mod ccip_router {
     /// * `new_admin` - The public key of the new admin.
     pub fn transfer_admin_role_token_admin_registry(
         ctx: Context<ModifyTokenAdminRegistry>,
-        mint: Pubkey,
         new_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
+        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, new_admin)
     }
 
     /// Sets the pool lookup table for a given token mint.
@@ -391,10 +390,9 @@ pub mod ccip_router {
     /// * `is_writable` - index of account in lookup table that is writable
     pub fn set_pool(
         ctx: Context<SetPoolTokenAdminRegistry>,
-        mint: Pubkey,
         writable_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::token_admin_registry::set_pool(ctx, mint, writable_indexes)
+        v1::token_admin_registry::set_pool(ctx, writable_indexes)
     }
 
     //////////////

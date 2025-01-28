@@ -39,7 +39,6 @@ pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
         constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
-    #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     // The following validation is the only difference between the two contexts
     // Only CCIP Admin can propose an owner for the token admin registry if not the mint authority
@@ -65,7 +64,6 @@ pub struct RegisterTokenAdminRegistryByOwner<'info> {
         constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
-    #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     // The following validation is the only difference between the two contexts
     // Only the mint authority can propose an owner for the token admin registry
@@ -78,7 +76,6 @@ pub struct RegisterTokenAdminRegistryByOwner<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(mint: Pubkey)]
 pub struct ModifyTokenAdminRegistry<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -88,17 +85,17 @@ pub struct ModifyTokenAdminRegistry<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.key().as_ref()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
-#[instruction(mint: Pubkey)]
 pub struct SetPoolTokenAdminRegistry<'info> {
     #[account(
         seeds = [CONFIG_SEED],
@@ -108,11 +105,12 @@ pub struct SetPoolTokenAdminRegistry<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.key().as_ref()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     /// CHECK: anchor does not support automatic lookup table deserialization
     pub pool_lookuptable: UncheckedAccount<'info>,
     #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
@@ -134,7 +132,6 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
-    #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(mut, address = token_admin_registry.pending_administrator @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,

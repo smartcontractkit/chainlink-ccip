@@ -24,7 +24,7 @@ type AcceptAdminRoleTokenAdminRegistry struct {
 	//
 	// [1] = [WRITE] tokenAdminRegistry
 	//
-	// [2] = [WRITE] mint
+	// [2] = [] mint
 	//
 	// [3] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -62,7 +62,7 @@ func (inst *AcceptAdminRoleTokenAdminRegistry) GetTokenAdminRegistryAccount() *a
 
 // SetMintAccount sets the "mint" account.
 func (inst *AcceptAdminRoleTokenAdminRegistry) SetMintAccount(mint ag_solanago.PublicKey) *AcceptAdminRoleTokenAdminRegistry {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint).WRITE()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint)
 	return inst
 }
 

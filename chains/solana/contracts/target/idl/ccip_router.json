@@ -653,7 +653,7 @@
         },
         {
           "name": "mint",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -699,7 +699,7 @@
         },
         {
           "name": "mint",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -745,7 +745,7 @@
         },
         {
           "name": "mint",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -781,16 +781,17 @@
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
         }
       ],
       "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
         {
           "name": "newAdmin",
           "type": "publicKey"
@@ -823,6 +824,11 @@
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "poolLookuptable",
           "isMut": false,
           "isSigner": false
@@ -834,10 +840,6 @@
         }
       ],
       "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
         {
           "name": "writableIndexes",
           "type": "bytes"
