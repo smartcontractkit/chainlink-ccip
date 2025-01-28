@@ -371,6 +371,16 @@ func Test_computeRanges(t *testing.T) {
 			}},
 			want: []cciptypes.SeqNumRange{{10, 40}, {50, 60}},
 		},
+		{
+			name: "contiguous and non-contiguous ranges",
+			args: args{reports: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 12)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(13, 15)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(16, 20)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(22, 33)},
+			}},
+			want: []cciptypes.SeqNumRange{{10, 20}, {22, 33}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

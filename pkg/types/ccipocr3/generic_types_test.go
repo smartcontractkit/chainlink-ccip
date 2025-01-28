@@ -135,7 +135,7 @@ func TestSeqNumRangeLimit(t *testing.T) {
 	}
 }
 
-func TestSeqNumContainsSlice(t *testing.T) {
+func TestSeqNumFilterSlice(t *testing.T) {
 	testCases := []struct {
 		name     string
 		r        SeqNumRange

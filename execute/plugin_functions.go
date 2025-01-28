@@ -226,7 +226,9 @@ var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
 
 // computeRanges takes a slice of reports and computes the smallest number of contiguous ranges
 // that cover all the sequence numbers in the reports.
+// Example: computeRanges([10, 12], [13, 15], [20, 22]) = [10,15], [20,22]
 // Note: reports need all messages to create a proof even if some are already executed.
+// Note: the provided reports must be sorted by sequence number range starting sequence number.
 func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, error) {
 	var ranges []cciptypes.SeqNumRange
 
