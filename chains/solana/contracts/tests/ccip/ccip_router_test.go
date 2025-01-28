@@ -144,7 +144,7 @@ func TestCCIPRouter(t *testing.T) {
 	// Small enough to fit in u160, big enough to not fall in the precompile space.
 	validReceiverAddress := [32]byte{}
 	validReceiverAddress[12] = 1
-	emptyEVMExtraArgsV2 := testutils.MustSerializeExtraArgs(t, struct{}{}, ccip.EVM_EXTRA_ARGS_V2_TAG)
+	emptyEVMExtraArgsV2 := testutils.MustSerializeExtraArgs(t, struct{}{}, ccip.EVMExtraArgsV2Tag)
 
 	var commitLookupTable map[solana.PublicKey]solana.PublicKeySlice
 
@@ -2193,8 +2193,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: uint64(validDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).GasLimit) // default gas limit
-			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).AllowOutOfOrderExecution)                                                  // default OOO Execution
+			require.Equal(t, bin.Uint128{Lo: uint64(validDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // default gas limit
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)                                                  // default OOO Execution
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2215,7 +2215,7 @@ func TestCCIPRouter(t *testing.T) {
 				ExtraArgs: testutils.MustSerializeExtraArgs(t, ccip_router.EVMExtraArgsV2{
 					GasLimit:                 bin.Uint128{Lo: 99, Hi: 0},
 					AllowOutOfOrderExecution: trueValue,
-				}, ccip.EVM_EXTRA_ARGS_V2_TAG),
+				}, ccip.EVMExtraArgsV2Tag),
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2261,8 +2261,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 99, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).GasLimit) // check it's overwritten
-			require.Equal(t, true, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).AllowOutOfOrderExecution)       // check it's overwritten
+			require.Equal(t, bin.Uint128{Lo: 99, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // check it's overwritten
+			require.Equal(t, true, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)       // check it's overwritten
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(2), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2278,7 +2278,7 @@ func TestCCIPRouter(t *testing.T) {
 				Data:     []byte{4, 5, 6},
 				ExtraArgs: testutils.MustSerializeExtraArgs(t, ccip_router.EVMExtraArgsV2{
 					GasLimit: bin.Uint128{Lo: 99, Hi: 0},
-				}, ccip.EVM_EXTRA_ARGS_V2_TAG),
+				}, ccip.EVMExtraArgsV2Tag),
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2324,8 +2324,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 99, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).GasLimit) // check it's overwritten
-			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).AllowOutOfOrderExecution)      // check it's default value
+			require.Equal(t, bin.Uint128{Lo: 99, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // check it's overwritten
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)      // check it's default value
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(3), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2342,7 +2342,7 @@ func TestCCIPRouter(t *testing.T) {
 				ExtraArgs: testutils.MustSerializeExtraArgs(t, ccip_router.EVMExtraArgsV2{
 					AllowOutOfOrderExecution: true,
 					GasLimit:                 bin.Uint128{Lo: 5000, Hi: 0},
-				}, ccip.EVM_EXTRA_ARGS_V2_TAG),
+				}, ccip.EVMExtraArgsV2Tag),
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2388,8 +2388,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).GasLimit) // default gas limit
-			require.Equal(t, true, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).AllowOutOfOrderExecution)         // check it's overwritten
+			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // default gas limit
+			require.Equal(t, true, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)         // check it's overwritten
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(4), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2405,7 +2405,7 @@ func TestCCIPRouter(t *testing.T) {
 				Data:     []byte{4, 5, 6},
 				ExtraArgs: testutils.MustSerializeExtraArgs(t, ccip_router.EVMExtraArgsV2{
 					GasLimit: bin.Uint128{Lo: 0, Hi: 0},
-				}, ccip.EVM_EXTRA_ARGS_V2_TAG),
+				}, ccip.EVMExtraArgsV2Tag),
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2451,8 +2451,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 0, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).GasLimit)
-			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).AllowOutOfOrderExecution)
+			require.Equal(t, bin.Uint128{Lo: 0, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit)
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(5), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2715,8 +2715,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: uint64(validDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).GasLimit)
-			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVM_EXTRA_ARGS_V2_TAG).AllowOutOfOrderExecution)
+			require.Equal(t, bin.Uint128{Lo: uint64(validDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit)
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(6), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -5208,7 +5208,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 					event := ccip.EventCommitReportAccepted{}
 					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
 

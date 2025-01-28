@@ -368,7 +368,7 @@ fn parse_and_validate_svm_extra_args(
             // token_receiver == 0 when tokens are not present
             let receiver_is_zero_address = args.token_receiver == [0; 32];
             require!(
-                message_contains_tokens == !receiver_is_zero_address,
+                message_contains_tokens != receiver_is_zero_address,
                 CcipRouterError::InvalidTokenReceiver
             );
 

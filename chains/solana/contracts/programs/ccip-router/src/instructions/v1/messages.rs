@@ -123,7 +123,7 @@ pub mod ramps {
         let (extra_args, gas_limit, allow_out_of_order_execution) = process_extra_args(
             &dest_chain.config,
             &msg.extra_args,
-            msg.token_amounts.len() != 0,
+            !msg.token_amounts.is_empty(),
         )?;
 
         require_gte!(

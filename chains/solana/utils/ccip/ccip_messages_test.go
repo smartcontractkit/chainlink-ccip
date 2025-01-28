@@ -65,7 +65,7 @@ func TestMessageHashing(t *testing.T) {
 		extraArgs, err := SerializeExtraArgs(ccip_router.EVMExtraArgsV2{
 			GasLimit:                 bin.Uint128{Lo: 1},
 			AllowOutOfOrderExecution: true,
-		}, EVM_EXTRA_ARGS_V2_TAG)
+		}, EVMExtraArgsV2Tag)
 		require.NoError(t, err)
 
 		h, err := HashSVMToAnyMessage(ccip_router.SVM2AnyRampMessage{

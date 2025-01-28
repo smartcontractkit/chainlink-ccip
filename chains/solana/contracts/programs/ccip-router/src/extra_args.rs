@@ -23,9 +23,10 @@ impl EVMExtraArgsV2 {
         buffer
     }
     pub fn default_config(cfg: &DestChainConfig) -> EVMExtraArgsV2 {
-        let mut obj = EVMExtraArgsV2::default();
-        obj.gas_limit = cfg.default_tx_gas_limit as u128;
-        obj
+        EVMExtraArgsV2 {
+            gas_limit: cfg.default_tx_gas_limit as u128,
+            ..Default::default()
+        }
     }
 }
 
@@ -47,8 +48,9 @@ impl SVMExtraArgsV1 {
         buffer
     }
     pub fn default_config(cfg: &DestChainConfig) -> SVMExtraArgsV1 {
-        let mut obj = SVMExtraArgsV1::default();
-        obj.compute_units = cfg.default_tx_gas_limit;
-        obj
+        SVMExtraArgsV1 {
+            compute_units: cfg.default_tx_gas_limit,
+            ..Default::default()
+        }
     }
 }
