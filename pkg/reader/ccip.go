@@ -685,7 +685,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	lggr.Debugw("got RMNRemote address", "address", rmnRemoteAddress)
 
 	// TODO: make the calls in parallel using errgroup
-	var vc versionedConfig
+	var vc VersionedConfig
 	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameRMNRemote,
@@ -837,9 +837,12 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		}
 	}
 
+	allConfig := r.bgReader.getConfig()
+	staticConfig := allConfig.staticConfig
+
 	// NonceManager and RMNRemote are in the offramp static config.
 	{
-		var staticConfig offRampStaticChainConfig
+		var staticConfig OffRampStaticChainConfig
 		err := r.getDestinationData(
 			ctx,
 			chain,
@@ -857,7 +860,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// FeeQuoter from the offRamp dynamic config.
 	{
-		var dynamicConfig offRampDynamicChainConfig
+		var dynamicConfig OffRampDynamicChainConfig
 		err := r.getDestinationData(
 			ctx,
 			chain,
@@ -993,19 +996,19 @@ func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, e
 	return linkPriceUSD, nil
 }
 
-// feeQuoterStaticConfig is used to parse the response from the feeQuoter contract's getStaticConfig method.
+// FeeQuoterStaticConfig is used to parse the response from the feeQuoter contract's getStaticConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/FeeQuoter.sol#L946
 //
 //nolint:lll // It's a URL.
-type feeQuoterStaticConfig struct {
+type FeeQuoterStaticConfig struct {
 	MaxFeeJuelsPerMsg  cciptypes.BigInt `json:"maxFeeJuelsPerMsg"`
 	LinkToken          []byte           `json:"linkToken"`
 	StalenessThreshold uint32           `json:"stalenessThreshold"`
 }
 
 // getDestFeeQuoterStaticConfig returns the destination chain's Fee Quoter's StaticConfig
-func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (feeQuoterStaticConfig, error) {
-	var staticConfig feeQuoterStaticConfig
+func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (FeeQuoterStaticConfig, error) {
+	var staticConfig FeeQuoterStaticConfig
 	err := r.getDestinationData(
 		ctx,
 		r.destChain,
@@ -1015,7 +1018,7 @@ func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (fee
 	)
 
 	if err != nil {
-		return feeQuoterStaticConfig{}, fmt.Errorf("unable to lookup fee quoter (offramp static config): %w", err)
+		return FeeQuoterStaticConfig{}, fmt.Errorf("unable to lookup fee quoter (offramp static config): %w", err)
 	}
 
 	return staticConfig, nil
@@ -1145,8 +1148,8 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	return res, nil
 }
 
-// selectorsAndConfigs wraps the return values from getAllSourceChainConfigs.
-type selectorsAndConfigs struct {
+// SelectorsAndConfigs wraps the return values from getAllSourceChainConfigs.
+type SelectorsAndConfigs struct {
 	Selectors          []uint64            `mapstructure:"F0"`
 	SourceChainConfigs []sourceChainConfig `mapstructure:"F1"`
 }
@@ -1163,7 +1166,7 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 
 	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
 
-	var resp selectorsAndConfigs
+	var resp SelectorsAndConfigs
 	err := r.contractReaders[chain].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameOffRamp,
@@ -1204,9 +1207,9 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	return configs, nil
 }
 
-// offRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
+// OffRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
 // See: <chainlink repo>/contracts/src/v0.8/ccip/offRamp/OffRamp.sol:StaticConfig
-type offRampStaticChainConfig struct {
+type OffRampStaticChainConfig struct {
 	ChainSelector        cciptypes.ChainSelector `json:"chainSelector"`
 	GasForCallExactCheck uint16                  `json:"gasForCallExactCheck"`
 	RmnRemote            []byte                  `json:"rmnRemote"`
@@ -1214,8 +1217,8 @@ type offRampStaticChainConfig struct {
 	NonceManager         []byte                  `json:"nonceManager"`
 }
 
-// offRampDynamicChainConfig maps to DynamicConfig in OffRamp.sol
-type offRampDynamicChainConfig struct {
+// OffRampDynamicChainConfig maps to DynamicConfig in OffRamp.sol
+type OffRampDynamicChainConfig struct {
 	FeeQuoter                               []byte `json:"feeQuoter"`
 	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
 	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
@@ -1261,7 +1264,7 @@ type onRampDynamicConfig struct {
 // https://github.com/smartcontractkit/chainlink/blob/12af1de88238e0e918177d6b5622070417f48adf/contracts/src/v0.8/ccip/onRamp/OnRamp.sol#L328
 //
 //nolint:lll
-type getOnRampDynamicConfigResponse struct {
+type GetOnRampDynamicConfigResponse struct {
 	DynamicConfig onRampDynamicConfig `json:"dynamicConfig"`
 }
 
@@ -1269,8 +1272,8 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 	ctx context.Context,
 	lggr logger.Logger,
 	srcChains []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]getOnRampDynamicConfigResponse {
-	result := make(map[cciptypes.ChainSelector]getOnRampDynamicConfigResponse)
+) map[cciptypes.ChainSelector]GetOnRampDynamicConfigResponse {
+	result := make(map[cciptypes.ChainSelector]GetOnRampDynamicConfigResponse)
 
 	mu := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
@@ -1288,7 +1291,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 		go func(chainSel cciptypes.ChainSelector) {
 			defer wg.Done()
 			// read onramp dynamic config
-			resp := getOnRampDynamicConfigResponse{}
+			resp := GetOnRampDynamicConfigResponse{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOnRamp,
@@ -1401,9 +1404,9 @@ type config struct {
 	F                           uint64            `json:"f"` // previously: MinSigners
 }
 
-// versionedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.
+// VersionedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L167-L169
-type versionedConfig struct {
+type VersionedConfig struct {
 	Version uint32 `json:"version"`
 	Config  config `json:"config"`
 }

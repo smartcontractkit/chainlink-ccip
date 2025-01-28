@@ -402,7 +402,7 @@ func addDestinationContractAssertions(
 		map[string]any{},
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*offRampStaticChainConfig)
+		v := returnVal.(*OffRampStaticChainConfig)
 		v.NonceManager = destNonceMgr
 		v.RmnRemote = destRMNRemote
 	}))
@@ -415,7 +415,7 @@ func addDestinationContractAssertions(
 		map[string]any{},
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*offRampDynamicChainConfig)
+		v := returnVal.(*OffRampDynamicChainConfig)
 		v.FeeQuoter = destFeeQuoter
 	}))
 }
@@ -459,7 +459,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		map[string]any{},
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*selectorsAndConfigs)
+		v := returnVal.(*SelectorsAndConfigs)
 		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
 		v.SourceChainConfigs = []sourceChainConfig{
 			{
@@ -602,7 +602,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		map[string]any{},
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*selectorsAndConfigs)
+		v := returnVal.(*SelectorsAndConfigs)
 		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
 		v.SourceChainConfigs = []sourceChainConfig{
 			{
@@ -630,7 +630,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 			map[string]any{},
 			mock.Anything,
 		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-			v := returnVal.(*getOnRampDynamicConfigResponse)
+			v := returnVal.(*GetOnRampDynamicConfigResponse)
 			v.DynamicConfig.FeeQuoter = srcFeeQuoters[i]
 		}))
 
@@ -787,7 +787,7 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 		params interface{},
 		returnVal interface{},
 	) {
-		cfg := returnVal.(*feeQuoterStaticConfig)
+		cfg := returnVal.(*FeeQuoterStaticConfig)
 		cfg.MaxFeeJuelsPerMsg = cciptypes.NewBigIntFromInt64(10)
 		cfg.LinkToken = []byte{0x3, 0x4}
 		cfg.StalenessThreshold = 12
@@ -932,7 +932,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 		map[string]any{},
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		cfg := returnVal.(*feeQuoterStaticConfig)
+		cfg := returnVal.(*FeeQuoterStaticConfig)
 		cfg.MaxFeeJuelsPerMsg = cciptypes.NewBigIntFromInt64(10)
 		cfg.LinkToken = []byte{0x3, 0x4}
 		cfg.StalenessThreshold = 12
