@@ -18,8 +18,8 @@ use crate::{
     ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
     MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
     SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
-    UsdPerTokenUpdated, UsdPerUnitGasUpdated, DEST_CHAIN_STATE_SEED,
-    EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+    UsdPerTokenUpdated, UsdPerUnitGasUpdated, DEST_CHAIN_SEED, EXTERNAL_EXECUTION_CONFIG_SEED,
+    EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
 };
 
 pub fn commit<'info>(
@@ -290,7 +290,7 @@ fn apply_gas_price_update<'info>(
 ) -> Result<()> {
     let (expected, _) = Pubkey::find_program_address(
         &[
-            DEST_CHAIN_STATE_SEED,
+            DEST_CHAIN_SEED,
             gas_update.dest_chain_selector.to_le_bytes().as_ref(),
         ],
         &crate::ID,

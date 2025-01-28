@@ -19,6 +19,7 @@ import (
 // * `ctx` - The context containing the accounts required for disabling the chain selector.
 // * `source_chain_selector` - The source chain selector to be disabled.
 type DisableSourceChainSelector struct {
+	CcipVersion         *CcipVersion
 	SourceChainSelector *uint64
 
 	// [0] = [WRITE] sourceChainState
@@ -35,6 +36,12 @@ func NewDisableSourceChainSelectorInstructionBuilder() *DisableSourceChainSelect
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
+}
+
+// SetCcipVersion sets the "ccipVersion" parameter.
+func (inst *DisableSourceChainSelector) SetCcipVersion(ccipVersion CcipVersion) *DisableSourceChainSelector {
+	inst.CcipVersion = &ccipVersion
+	return inst
 }
 
 // SetSourceChainSelector sets the "sourceChainSelector" parameter.
@@ -96,6 +103,9 @@ func (inst DisableSourceChainSelector) ValidateAndBuild() (*Instruction, error) 
 func (inst *DisableSourceChainSelector) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.CcipVersion == nil {
+			return errors.New("CcipVersion parameter is not set")
+		}
 		if inst.SourceChainSelector == nil {
 			return errors.New("SourceChainSelector parameter is not set")
 		}
@@ -125,7 +135,8 @@ func (inst *DisableSourceChainSelector) EncodeToTree(parent ag_treeout.Branches)
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("        CcipVersion", *inst.CcipVersion))
 						paramsBranch.Child(ag_format.Param("SourceChainSelector", *inst.SourceChainSelector))
 					})
 
@@ -140,6 +151,11 @@ func (inst *DisableSourceChainSelector) EncodeToTree(parent ag_treeout.Branches)
 }
 
 func (obj DisableSourceChainSelector) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `CcipVersion` param:
+	err = encoder.Encode(obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Serialize `SourceChainSelector` param:
 	err = encoder.Encode(obj.SourceChainSelector)
 	if err != nil {
@@ -148,6 +164,11 @@ func (obj DisableSourceChainSelector) MarshalWithEncoder(encoder *ag_binary.Enco
 	return nil
 }
 func (obj *DisableSourceChainSelector) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `CcipVersion`:
+	err = decoder.Decode(&obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Deserialize `SourceChainSelector`:
 	err = decoder.Decode(&obj.SourceChainSelector)
 	if err != nil {
@@ -159,12 +180,14 @@ func (obj *DisableSourceChainSelector) UnmarshalWithDecoder(decoder *ag_binary.D
 // NewDisableSourceChainSelectorInstruction declares a new DisableSourceChainSelector instruction with the provided parameters and accounts.
 func NewDisableSourceChainSelectorInstruction(
 	// Parameters:
+	ccipVersion CcipVersion,
 	sourceChainSelector uint64,
 	// Accounts:
 	sourceChainState ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *DisableSourceChainSelector {
 	return NewDisableSourceChainSelectorInstructionBuilder().
+		SetCcipVersion(ccipVersion).
 		SetSourceChainSelector(sourceChainSelector).
 		SetSourceChainStateAccount(sourceChainState).
 		SetConfigAccount(config).

@@ -34,6 +34,7 @@ import (
 // * `report` - The commit input report, single merkle root with RMN signatures and price updates
 // * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
 type Commit struct {
+	CcipVersion            *CcipVersion
 	ReportContextByteWords *[3][32]uint8
 	Report                 *CommitInput
 	Signatures             *[][65]uint8
@@ -58,6 +59,12 @@ func NewCommitInstructionBuilder() *Commit {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
+}
+
+// SetCcipVersion sets the "ccipVersion" parameter.
+func (inst *Commit) SetCcipVersion(ccipVersion CcipVersion) *Commit {
+	inst.CcipVersion = &ccipVersion
+	return inst
 }
 
 // SetReportContextByteWords sets the "reportContextByteWords" parameter.
@@ -164,6 +171,9 @@ func (inst Commit) ValidateAndBuild() (*Instruction, error) {
 func (inst *Commit) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.CcipVersion == nil {
+			return errors.New("CcipVersion parameter is not set")
+		}
 		if inst.ReportContextByteWords == nil {
 			return errors.New("ReportContextByteWords parameter is not set")
 		}
@@ -208,7 +218,8 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("           CcipVersion", *inst.CcipVersion))
 						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
 						paramsBranch.Child(ag_format.Param("                Report", *inst.Report))
 						paramsBranch.Child(ag_format.Param("            Signatures", *inst.Signatures))
@@ -228,6 +239,11 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Commit) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `CcipVersion` param:
+	err = encoder.Encode(obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Serialize `ReportContextByteWords` param:
 	err = encoder.Encode(obj.ReportContextByteWords)
 	if err != nil {
@@ -246,6 +262,11 @@ func (obj Commit) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `CcipVersion`:
+	err = decoder.Decode(&obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Deserialize `ReportContextByteWords`:
 	err = decoder.Decode(&obj.ReportContextByteWords)
 	if err != nil {
@@ -267,6 +288,7 @@ func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 // NewCommitInstruction declares a new Commit instruction with the provided parameters and accounts.
 func NewCommitInstruction(
 	// Parameters:
+	ccipVersion CcipVersion,
 	reportContextByteWords [3][32]uint8,
 	report CommitInput,
 	signatures [][65]uint8,
@@ -278,6 +300,7 @@ func NewCommitInstruction(
 	systemProgram ag_solanago.PublicKey,
 	sysvarInstructions ag_solanago.PublicKey) *Commit {
 	return NewCommitInstructionBuilder().
+		SetCcipVersion(ccipVersion).
 		SetReportContextByteWords(reportContextByteWords).
 		SetReport(report).
 		SetSignatures(signatures).

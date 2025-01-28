@@ -3,6 +3,7 @@ package state
 import (
 	"github.com/gagliardetto/solana-go"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
@@ -39,9 +40,9 @@ func FindCcipTokenpoolBillingPDA(chainSelector uint64, mint solana.PublicKey, cc
 	return solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_billing"), chainSelectorLE, mint.Bytes()}, ccipRouterProgram)
 }
 
-func FindSourceChainStatePDA(chainSelector uint64, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
+func FindSourceChainStatePDA(ccipVersion ccip_router.CcipVersion, chainSelector uint64, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, ccipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), asSeed(ccipVersion), chainSelectorLE}, ccipRouterProgram)
 	return p, err
 }
 
@@ -51,9 +52,9 @@ func FindDestChainStatePDA(chainSelector uint64, ccipRouterProgram solana.Public
 	return p, err
 }
 
-func FindCommitReportPDA(chainSelector uint64, root [32]byte, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
+func FindCommitReportPDA(ccipVersion ccip_router.CcipVersion, chainSelector uint64, root [32]byte, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), chainSelectorLE, root[:]}, ccipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), asSeed(ccipVersion), chainSelectorLE, root[:]}, ccipRouterProgram)
 	return p, err
 }
 
@@ -61,4 +62,8 @@ func FindNoncePDA(chainSelector uint64, user solana.PublicKey, ccipRouterProgram
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	p, _, err := solana.FindProgramAddress([][]byte{[]byte("nonce"), chainSelectorLE, user.Bytes()}, ccipRouterProgram)
 	return p, err
+}
+
+func asSeed(version ccip_router.CcipVersion) []byte {
+	return []byte{version.Major, version.Minor}
 }

@@ -33,6 +33,7 @@ import (
 // * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
 // * report_context_byte_words[2]: ExtraHash
 type Execute struct {
+	CcipVersion            *CcipVersion
 	ExecutionReport        *ExecutionReportSingleChain
 	ReportContextByteWords *[3][32]uint8
 	TokenIndexes           *[]byte
@@ -61,6 +62,12 @@ func NewExecuteInstructionBuilder() *Execute {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 8),
 	}
 	return nd
+}
+
+// SetCcipVersion sets the "ccipVersion" parameter.
+func (inst *Execute) SetCcipVersion(ccipVersion CcipVersion) *Execute {
+	inst.CcipVersion = &ccipVersion
+	return inst
 }
 
 // SetExecutionReport sets the "executionReport" parameter.
@@ -189,6 +196,9 @@ func (inst Execute) ValidateAndBuild() (*Instruction, error) {
 func (inst *Execute) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.CcipVersion == nil {
+			return errors.New("CcipVersion parameter is not set")
+		}
 		if inst.ExecutionReport == nil {
 			return errors.New("ExecutionReport parameter is not set")
 		}
@@ -239,7 +249,8 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("           CcipVersion", *inst.CcipVersion))
 						paramsBranch.Child(ag_format.Param("       ExecutionReport", *inst.ExecutionReport))
 						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
 						paramsBranch.Child(ag_format.Param("          TokenIndexes", *inst.TokenIndexes))
@@ -261,6 +272,11 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Execute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `CcipVersion` param:
+	err = encoder.Encode(obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Serialize `ExecutionReport` param:
 	err = encoder.Encode(obj.ExecutionReport)
 	if err != nil {
@@ -279,6 +295,11 @@ func (obj Execute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `CcipVersion`:
+	err = decoder.Decode(&obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Deserialize `ExecutionReport`:
 	err = decoder.Decode(&obj.ExecutionReport)
 	if err != nil {
@@ -300,6 +321,7 @@ func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 // NewExecuteInstruction declares a new Execute instruction with the provided parameters and accounts.
 func NewExecuteInstruction(
 	// Parameters:
+	ccipVersion CcipVersion,
 	executionReport ExecutionReportSingleChain,
 	reportContextByteWords [3][32]uint8,
 	tokenIndexes []byte,
@@ -313,6 +335,7 @@ func NewExecuteInstruction(
 	sysvarInstructions ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *Execute {
 	return NewExecuteInstructionBuilder().
+		SetCcipVersion(ccipVersion).
 		SetExecutionReport(executionReport).
 		SetReportContextByteWords(reportContextByteWords).
 		SetTokenIndexes(tokenIndexes).

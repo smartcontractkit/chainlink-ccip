@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    context::MerkleRoot, DestChainConfig, MessageExecutionState, PriceUpdates, SVM2AnyRampMessage,
-    SourceChainConfig, TokenBilling,
+    context::MerkleRoot, CcipVersion, DestChainConfig, MessageExecutionState, PriceUpdates,
+    SVM2AnyRampMessage, SourceChainConfig, TokenBilling,
 };
 
 #[event]
@@ -109,12 +109,14 @@ pub struct PremiumMultiplierWeiPerEthUpdated {
 
 #[event]
 pub struct SourceChainConfigUpdated {
+    pub ccip_version: CcipVersion,
     pub source_chain_selector: u64,
     pub source_chain_config: SourceChainConfig,
 }
 
 #[event]
 pub struct SourceChainAdded {
+    pub ccip_version: CcipVersion,
     pub source_chain_selector: u64,
     pub source_chain_config: SourceChainConfig,
 }

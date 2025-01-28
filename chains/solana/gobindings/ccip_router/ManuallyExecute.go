@@ -21,6 +21,7 @@ import (
 // * `ctx` - The context containing the accounts required for the execution.
 // * `execution_report` - The execution report containing the message and proofs.
 type ManuallyExecute struct {
+	CcipVersion     *CcipVersion
 	ExecutionReport *ExecutionReportSingleChain
 	TokenIndexes    *[]byte
 
@@ -48,6 +49,12 @@ func NewManuallyExecuteInstructionBuilder() *ManuallyExecute {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 8),
 	}
 	return nd
+}
+
+// SetCcipVersion sets the "ccipVersion" parameter.
+func (inst *ManuallyExecute) SetCcipVersion(ccipVersion CcipVersion) *ManuallyExecute {
+	inst.CcipVersion = &ccipVersion
+	return inst
 }
 
 // SetExecutionReport sets the "executionReport" parameter.
@@ -170,6 +177,9 @@ func (inst ManuallyExecute) ValidateAndBuild() (*Instruction, error) {
 func (inst *ManuallyExecute) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.CcipVersion == nil {
+			return errors.New("CcipVersion parameter is not set")
+		}
 		if inst.ExecutionReport == nil {
 			return errors.New("ExecutionReport parameter is not set")
 		}
@@ -217,7 +227,8 @@ func (inst *ManuallyExecute) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("    CcipVersion", *inst.CcipVersion))
 						paramsBranch.Child(ag_format.Param("ExecutionReport", *inst.ExecutionReport))
 						paramsBranch.Child(ag_format.Param("   TokenIndexes", *inst.TokenIndexes))
 					})
@@ -238,6 +249,11 @@ func (inst *ManuallyExecute) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj ManuallyExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `CcipVersion` param:
+	err = encoder.Encode(obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Serialize `ExecutionReport` param:
 	err = encoder.Encode(obj.ExecutionReport)
 	if err != nil {
@@ -251,6 +267,11 @@ func (obj ManuallyExecute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	return nil
 }
 func (obj *ManuallyExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `CcipVersion`:
+	err = decoder.Decode(&obj.CcipVersion)
+	if err != nil {
+		return err
+	}
 	// Deserialize `ExecutionReport`:
 	err = decoder.Decode(&obj.ExecutionReport)
 	if err != nil {
@@ -267,6 +288,7 @@ func (obj *ManuallyExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewManuallyExecuteInstruction declares a new ManuallyExecute instruction with the provided parameters and accounts.
 func NewManuallyExecuteInstruction(
 	// Parameters:
+	ccipVersion CcipVersion,
 	executionReport ExecutionReportSingleChain,
 	tokenIndexes []byte,
 	// Accounts:
@@ -279,6 +301,7 @@ func NewManuallyExecuteInstruction(
 	sysvarInstructions ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *ManuallyExecute {
 	return NewManuallyExecuteInstructionBuilder().
+		SetCcipVersion(ccipVersion).
 		SetExecutionReport(executionReport).
 		SetTokenIndexes(tokenIndexes).
 		SetConfigAccount(config).

@@ -73,8 +73,9 @@ func TestTransactionSizing(t *testing.T) {
 		bz, err := tx.MarshalBinary()
 		require.NoError(t, err)
 		l := len(bz)
-		require.LessOrEqual(t, l, 1250)
-		return fmt.Sprintf("%-55s: %-4d - remaining: %d", name, l, 1232-l)
+		const solanaTxSizeHardLimit int = 1232
+		require.LessOrEqual(t, l, solanaTxSizeHardLimit, fmt.Sprintf("failed on test %s. Tx: %+v", name, tx))
+		return fmt.Sprintf("%-55s: %-4d - remaining: %d", name, l, solanaTxSizeHardLimit-l)
 	}
 
 	// ccipSend test messages + instruction ---------------------------------
@@ -148,6 +149,7 @@ func TestTransactionSizing(t *testing.T) {
 	}
 	ixCommit := func(input ccip_router.CommitInput, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewCommitInstruction(
+			config.DefaultCcipVersion,
 			[3][32]byte{}, // report context
 			input,
 			make([][65]byte, 6), // f = 5, estimating f+1 signatures
@@ -227,6 +229,7 @@ func TestTransactionSizing(t *testing.T) {
 
 	ixExecute := func(report ccip_router.ExecutionReportSingleChain, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewExecuteInstruction(
+			config.DefaultCcipVersion,
 			report,
 			[3][32]byte{}, // report context
 			tokenIndexes,
@@ -300,7 +303,6 @@ func TestTransactionSizing(t *testing.T) {
 		{
 			"execute:singleToken",
 			ixExecute(executeSingleToken, []byte{0}, append([]solana.PublicKey{
-				mustRandomPubkey(), // user ATA
 				mustRandomPubkey(), // token billing config
 				mustRandomPubkey(), // token pool chain config
 			}, maps.Values(tokenTable)...)),

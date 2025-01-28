@@ -4,6 +4,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
@@ -31,10 +32,14 @@ var (
 	EvmChainSelector uint64 = 21
 	EvmChainLE              = common.Uint64ToLE(EvmChainSelector)
 
-	SVMSourceChainStatePDA, _ = state.FindSourceChainStatePDA(SVMChainSelector, CcipRouterProgram)
-	SVMDestChainStatePDA, _   = state.FindDestChainStatePDA(SVMChainSelector, CcipRouterProgram)
-	EvmSourceChainStatePDA, _ = state.FindSourceChainStatePDA(EvmChainSelector, CcipRouterProgram)
-	EvmDestChainStatePDA, _   = state.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
+	DefaultCcipVersion = ccip_router.CcipVersion{Major: 1, Minor: 6}
+	BumpedCcipVersion  = ccip_router.CcipVersion{Major: DefaultCcipVersion.Major, Minor: DefaultCcipVersion.Minor + 1}
+
+	SVMSourceChainStatePDA, _       = state.FindSourceChainStatePDA(DefaultCcipVersion, SVMChainSelector, CcipRouterProgram)
+	SVMDestChainStatePDA, _         = state.FindDestChainStatePDA(SVMChainSelector, CcipRouterProgram)
+	EvmSourceChainStatePDA, _       = state.FindSourceChainStatePDA(DefaultCcipVersion, EvmChainSelector, CcipRouterProgram)
+	EvmBumpedSourceChainStatePDA, _ = state.FindSourceChainStatePDA(BumpedCcipVersion, EvmChainSelector, CcipRouterProgram)
+	EvmDestChainStatePDA, _         = state.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
 
 	OnRampAddress        = []byte{1, 2, 3}
 	OnRampAddressPadded  = [64]byte{1, 2, 3}
