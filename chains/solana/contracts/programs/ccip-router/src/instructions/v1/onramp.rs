@@ -4,9 +4,6 @@ use anchor_spl::token_interface;
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
 use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
-use super::messages::ramps::{
-    EVMExtraArgsV2, SVMExtraArgsV1, EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
-};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
@@ -15,9 +12,10 @@ use super::price_math::get_validated_token_price;
 
 use crate::{seed, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 use crate::{
-    BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, DestChainConfig, GetFee, Nonce,
-    PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
-    SVM2AnyTokenTransfer, SVMTokenAmount,
+    BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, DestChainConfig,
+    EVMExtraArgsV2, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage,
+    SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMExtraArgsV1, SVMTokenAmount,
+    EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
 };
 
 pub fn get_fee<'info>(
@@ -528,8 +526,6 @@ mod validated_try_to {
 #[cfg(test)]
 mod tests {
     use ethnum::U256;
-
-    use crate::v1::messages::ramps::SVM_EXTRA_ARGS_V1_TAG;
 
     use super::super::{
         fee_quoter::tests::sample_additional_token, messages::ramps::tests::sample_dest_chain,

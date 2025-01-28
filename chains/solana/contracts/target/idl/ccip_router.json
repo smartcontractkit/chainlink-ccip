@@ -1986,6 +1986,62 @@
       }
     },
     {
+      "name": "EVMExtraArgsV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "gasLimit",
+            "type": "u128"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMExtraArgsV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "computeUnits",
+            "type": "u32"
+          },
+          {
+            "name": "accountIsWritableBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "RampMessageHeader",
       "type": {
         "kind": "struct",
