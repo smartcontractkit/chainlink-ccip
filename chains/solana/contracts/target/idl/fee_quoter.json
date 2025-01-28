@@ -821,8 +821,16 @@
             "type": "u32"
           },
           {
-            "name": "destGasPerPayloadByte",
-            "type": "u16"
+            "name": "destGasPerPayloadByteBase",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteHigh",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteThreshold",
+            "type": "u32"
           },
           {
             "name": "destDataAvailabilityOverheadGas",
