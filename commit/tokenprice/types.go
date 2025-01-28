@@ -13,11 +13,11 @@ type Query struct {
 }
 
 type Outcome struct {
-	TokenPrices []cciptypes.TokenPrice `json:"tokenPrices"`
+	TokenPrices cciptypes.TokenPriceMap `json:"tokenPrices"`
 }
 
 type Observation struct {
-	FeedTokenPrices       []cciptypes.TokenPrice                                         `json:"feedTokenPrices"`
+	FeedTokenPrices       cciptypes.TokenPriceMap                                        `json:"feedTokenPrices"`
 	FeeQuoterTokenUpdates map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig `json:"feeQuoterTokenUpdates"`
 	FChain                map[cciptypes.ChainSelector]int                                `json:"fChain"`
 	Timestamp             time.Time                                                      `json:"timestamp"`

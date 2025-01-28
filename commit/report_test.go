@@ -29,7 +29,7 @@ func TestPluginReports(t *testing.T) {
 		outc          committypes.Outcome
 		expErr        bool
 		expReports    []ccipocr3.CommitPluginReport
-		expReportInfo ReportInfo
+		expReportInfo ccipocr3.CommitReportInfo
 	}{
 		{
 			name: "wrong outcome type gives an empty report but no error",
@@ -56,8 +56,8 @@ func TestPluginReports(t *testing.T) {
 					OutcomeType: merkleroot.ReportTransmissionFailed,
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
-					TokenPrices: []ccipocr3.TokenPrice{
-						{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+					TokenPrices: ccipocr3.TokenPriceMap{
+						"a": ccipocr3.NewBigIntFromInt64(123),
 					},
 				},
 				ChainFeeOutcome: chainfee.Outcome{
@@ -79,7 +79,7 @@ func TestPluginReports(t *testing.T) {
 					RMNSignatures: nil,
 				},
 			},
-			expReportInfo: ReportInfo{},
+			expReportInfo: ccipocr3.CommitReportInfo{},
 			expErr:        false,
 		},
 		{
@@ -101,7 +101,7 @@ func TestPluginReports(t *testing.T) {
 					RMNSignatures: nil,
 				},
 			},
-			expReportInfo: ReportInfo{},
+			expReportInfo: ccipocr3.CommitReportInfo{},
 			expErr:        false,
 		},
 		{
@@ -120,8 +120,8 @@ func TestPluginReports(t *testing.T) {
 					RMNRemoteCfg: rmntypes.RemoteConfig{FSign: 123},
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
-					TokenPrices: []ccipocr3.TokenPrice{
-						{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+					TokenPrices: ccipocr3.TokenPriceMap{
+						"a": ccipocr3.NewBigIntFromInt64(123),
 					},
 				},
 				ChainFeeOutcome: chainfee.Outcome{
@@ -151,7 +151,16 @@ func TestPluginReports(t *testing.T) {
 					RMNSignatures: nil,
 				},
 			},
-			expReportInfo: ReportInfo{RemoteF: 123},
+			expReportInfo: ccipocr3.CommitReportInfo{
+				RemoteF: 123,
+				MerkleRoots: []ccipocr3.MerkleRootChain{
+					{
+						ChainSel:      3,
+						OnRampAddress: []byte{1, 2, 3},
+						SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
+						MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
+					},
+				}},
 		},
 	}
 

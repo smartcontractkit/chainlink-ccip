@@ -199,14 +199,6 @@ pub mod ramps {
             single.to_be_bytes()[4..32].try_into().unwrap()
         }
 
-        impl TimestampedPackedU224 {
-            pub fn from_single(timestamp: i64, single: U256) -> Self {
-                let mut value = [0u8; 28];
-                value.clone_from_slice(&single.to_be_bytes()[4..32]);
-                Self { value, timestamp }
-            }
-        }
-
         #[test]
         fn message_not_validated_for_disabled_destination_chain() {
             let mut chain = sample_dest_chain();
@@ -349,7 +341,9 @@ pub mod ramps {
                     max_data_bytes: 30000,
                     max_per_msg_gas_limit: 3000000,
                     dest_gas_overhead: 300000,
-                    dest_gas_per_payload_byte: 16,
+                    dest_gas_per_payload_byte_base: 16,
+                    dest_gas_per_payload_byte_high: 40,
+                    dest_gas_per_payload_byte_threshold: 3000,
                     dest_data_availability_overhead_gas: 0,
                     dest_gas_per_data_availability_byte: 16,
                     dest_data_availability_multiplier_bps: 0,

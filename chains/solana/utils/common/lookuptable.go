@@ -29,10 +29,7 @@ func NewCreateLookupTableInstruction(
 	funder solana.PublicKey,
 	slot uint64,
 ) (solana.PublicKey, solana.Instruction, error) {
-	// https://github.com/solana-labs/solana-web3.js/blob/c1c98715b0c7900ce37c59bffd2056fa0037213d/src/programs/address-lookup-table/index.ts#L274
-	slotLE := make([]byte, 8)
-	binary.LittleEndian.PutUint64(slotLE, slot)
-	account, bumpSeed, err := solana.FindProgramAddress([][]byte{authority.Bytes(), slotLE}, AddressLookupTableProgram)
+	account, bumpSeed, err := FindLookupTablePDA(authority, slot)
 	if err != nil {
 		return solana.PublicKey{}, nil, err
 	}
@@ -154,4 +151,11 @@ func GetAddressLookupTable(ctx context.Context, client *rpc.Client, lookupTableP
 	}
 
 	return lookupTableState.Addresses, nil
+}
+
+// https://github.com/solana-labs/solana-web3.js/blob/c1c98715b0c7900ce37c59bffd2056fa0037213d/src/programs/address-lookup-table/index.ts#L274
+func FindLookupTablePDA(authority solana.PublicKey, slot uint64) (solana.PublicKey, uint8, error) {
+	slotLE := make([]byte, 8)
+	binary.LittleEndian.PutUint64(slotLE, slot)
+	return solana.FindProgramAddress([][]byte{authority.Bytes(), slotLE}, AddressLookupTableProgram)
 }
