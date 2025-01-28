@@ -88,6 +88,14 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 			tokensToQuery: defaultTokensToQuery,
 			expErr:        true,
 		},
+		{
+			name: "non queryable token",
+			tokenPrices: cciptypes.TokenPriceMap{
+				"0x5": oneBig,
+			},
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -292,6 +300,14 @@ func TestValidateObservedTokenUpdates(t *testing.T) {
 			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
 				"0x1": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
 				"0x3": {Value: oneBig, Timestamp: time.Now().Add(time.Hour)}, // future timestamp
+			},
+			tokensToQuery: defaultTokensToQuery,
+			expErr:        true,
+		},
+		{
+			name: "non queryable token",
+			tokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
+				"0x5": {Value: oneBig, Timestamp: time.Now().Add(-time.Hour)},
 			},
 			tokensToQuery: defaultTokensToQuery,
 			expErr:        true,
