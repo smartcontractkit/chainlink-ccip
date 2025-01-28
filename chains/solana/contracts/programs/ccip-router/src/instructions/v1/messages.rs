@@ -68,6 +68,7 @@ pub mod ramps {
     use crate::{
         v1::onramp::process_extra_args, BillingTokenConfig, CcipRouterError, DestChain,
         SVM2AnyMessage, SVMTokenAmount, CCIP_RECEIVE_DISCRIMINATOR, CHAIN_FAMILY_SELECTOR_EVM,
+        CHAIN_FAMILY_SELECTOR_SVM,
     };
 
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
@@ -146,21 +147,21 @@ pub mod ramps {
         msg: &SVM2AnyMessage,
         chain_family_selector: [u8; 4],
     ) -> Result<()> {
+        let selector = u32::from_be_bytes(chain_family_selector);
+        match selector {
+            CHAIN_FAMILY_SELECTOR_EVM => validate_evm_dest_address(&msg.receiver),
+            CHAIN_FAMILY_SELECTOR_SVM => validate_svm_dest_address(&msg.receiver),
+            _ => Err(CcipRouterError::UnsupportedChainFamilySelector.into()),
+        }
+    }
+
+    fn validate_evm_dest_address(address: &[u8]) -> Result<()> {
         const PRECOMPILE_SPACE: u32 = 1024;
 
-        let selector = u32::from_be_bytes(chain_family_selector);
-        // Only EVM is supported as a destination family.
-        require_eq!(
-            selector,
-            CHAIN_FAMILY_SELECTOR_EVM,
-            CcipRouterError::UnsupportedChainFamilySelector
-        );
-
-        require_eq!(msg.receiver.len(), 32, CcipRouterError::InvalidEVMAddress);
+        require_eq!(address.len(), 32, CcipRouterError::InvalidEVMAddress);
 
         let address: U256 = U256::from_be_bytes(
-            msg.receiver
-                .clone()
+            address
                 .try_into()
                 .map_err(|_| CcipRouterError::InvalidEncoding)?,
         );
@@ -176,6 +177,13 @@ pub mod ramps {
         };
 
         Ok(())
+    }
+
+    fn validate_svm_dest_address(address: &[u8]) -> Result<()> {
+        require_eq!(address.len(), 32, CcipRouterError::InvalidSVMAddress);
+        Pubkey::try_from_slice(&address)
+            .map(|_| ())
+            .map_err(|_| CcipRouterError::InvalidSVMAddress.into())
     }
 
     pub fn is_writable(bitmap: &u64, index: u8) -> bool {

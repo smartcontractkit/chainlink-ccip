@@ -700,4 +700,6 @@ pub enum CcipRouterError {
     InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
     InvalidTokenReceiver,
+    #[msg("Invalid SVM address")]
+    InvalidSVMAddress,
 }
