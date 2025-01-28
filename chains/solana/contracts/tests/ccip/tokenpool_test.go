@@ -36,8 +36,8 @@ func TestTokenPool(t *testing.T) {
 		return balanceRes.Value.Amount
 	}
 
-	remotePool := []byte{1, 2, 3}
-	remoteToken := []byte{4, 5, 6}
+	remotePool := token_pool.RemoteAddress{Address: []byte{1, 2, 3}}
+	remoteToken := token_pool.RemoteAddress{Address: []byte{4, 5, 6}}
 
 	t.Run("setup:funding", func(t *testing.T) {
 		testutils.FundAccounts(ctx, []solana.PrivateKey{admin, anotherAdmin}, solanaGoClient, t)
@@ -108,13 +108,6 @@ func TestTokenPool(t *testing.T) {
 						authI, err := tokens.SetTokenMintAuthority(v.tokenProgram, poolSigner, mint, admin.PublicKey())
 						require.NoError(t, err)
 
-						// set pool config
-						ixConfigure, err := token_pool.NewSetChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint.PublicKey(), token_pool.RemoteConfig{
-							PoolAddress:  remotePool,
-							TokenAddress: remoteToken,
-							Decimals:     9,
-						}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
-						require.NoError(t, err)
 						// set rate limit
 						ixRates, err := token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint.PublicKey(), token_pool.RateLimitConfig{
 							Enabled:  true,
@@ -127,7 +120,19 @@ func TestTokenPool(t *testing.T) {
 						}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, createI, authI, ixConfigure, ixRates}, admin, config.DefaultCommitment)
+						// set pool config
+						ixConfigure, err := token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint.PublicKey(), token_pool.RemoteConfig{
+							TokenAddress: remoteToken,
+							Decimals:     9,
+						}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						require.NoError(t, err)
+
+						ixAppend, err := token_pool.NewAppendRemotePoolAddressesInstruction(
+							config.EvmChainSelector, p.Mint.PublicKey(), []token_pool.RemoteAddress{remotePool}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, createI, authI, ixConfigure, ixAppend, ixRates}, admin, config.DefaultCommitment)
 						require.NotNil(t, res)
 
 						var configAccount token_pool.Config
@@ -137,10 +142,16 @@ func TestTokenPool(t *testing.T) {
 						eventConfigured := tokens.EventChainConfigured{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainConfigured", &eventConfigured, config.PrintEvents))
 						require.Equal(t, config.EvmChainSelector, eventConfigured.ChainSelector)
-						require.Equal(t, remotePool, eventConfigured.PoolAddress)
-						require.Equal(t, 0, len(eventConfigured.PreviousPoolAddress))
+						require.Equal(t, 0, len(eventConfigured.PoolAddresses))
+						require.Equal(t, 0, len(eventConfigured.PreviousPoolAddresses))
 						require.Equal(t, remoteToken, eventConfigured.Token)
-						require.Equal(t, 0, len(eventConfigured.PreviousToken))
+						require.Equal(t, 0, len(eventConfigured.PreviousToken.Address))
+
+						eventAppended := tokens.EventRemotePoolsAppended{}
+						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemotePoolsAppended", &eventAppended, config.PrintEvents))
+						require.Equal(t, config.EvmChainSelector, eventAppended.ChainSelector)
+						require.Equal(t, []token_pool.RemoteAddress{remotePool}, eventAppended.PoolAddresses)
+						require.Equal(t, 0, len(eventAppended.PreviousPoolAddresses))
 
 						eventRateLimit := tokens.EventRateLimitConfigured{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RateLimitConfigured", &eventRateLimit, config.PrintEvents))
@@ -385,14 +396,19 @@ func TestTokenPool(t *testing.T) {
 			createI, p.PoolTokenAccount, err = tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, mint, p.PoolSigner, admin.PublicKey())
 			require.NoError(t, err)
 
-			// set pool config
-			configureI, err := token_pool.NewSetChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint.PublicKey(), token_pool.RemoteConfig{
-				PoolAddress:  remotePool,
+			// initialize pool config
+			configureI, err := token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint.PublicKey(), token_pool.RemoteConfig{
 				TokenAddress: remoteToken,
 			}, p.PoolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 
-			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, append(instructions, poolInitI, createI, configureI), admin, config.DefaultCommitment, common.AddSigners(p.Mint))
+			// append remote pools
+			appendI, err := token_pool.NewAppendRemotePoolAddressesInstruction(
+				config.EvmChainSelector, p.Mint.PublicKey(), []token_pool.RemoteAddress{remotePool}, p.PoolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, append(instructions, poolInitI, createI, configureI, appendI), admin, config.DefaultCommitment, common.AddSigners(p.Mint))
 			require.NotNil(t, res)
 		})
 
