@@ -1,19 +1,18 @@
 package tokenprice
 
 import (
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	commonmock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/libocr/commontypes"
 )
 
 var (
@@ -103,10 +102,10 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateObservedTokenPrices(tc.tokenPrices, tc.tokensToQuery)
 			if tc.expErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -258,9 +257,9 @@ func TestValidateObservation(t *testing.T) {
 			}
 			err := p.ValidateObservation(prevOutcome, query, ao)
 			if tc.expErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -319,9 +318,9 @@ func TestValidateObservedTokenUpdates(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateObservedTokenUpdates(tc.tokenUpdates, tc.tokensToQuery)
 			if tc.expErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

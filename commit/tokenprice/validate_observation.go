@@ -31,7 +31,7 @@ func (p *processor) ValidateObservation(
 	}
 
 	if len(obs.FeedTokenPrices) > 0 && !supportedChains.Contains(p.offChainCfg.PriceFeedChainSelector) {
-		return fmt.Errorf("feed chain must be supported to read feed token prices, oreacleID: %v feedChain: %v",
+		return fmt.Errorf("feed chain must be supported to read feed token prices, oreacleID: %d feedChain: %d",
 			ao.OracleID, p.offChainCfg.PriceFeedChainSelector)
 
 	}
@@ -42,7 +42,7 @@ func (p *processor) ValidateObservation(
 
 	if len(obs.FeeQuoterTokenUpdates) > 0 && !supportedChains.Contains(p.destChain) {
 		return fmt.Errorf("dest chain must be supported to read fee quoter token updates "+
-			"oracleID: %v destChain: %v", ao.OracleID, p.destChain)
+			"oracleID: %d destChain: %d", ao.OracleID, p.destChain)
 	}
 
 	if err = validateObservedTokenUpdates(obs.FeeQuoterTokenUpdates, p.offChainCfg.TokenInfo); err != nil {
