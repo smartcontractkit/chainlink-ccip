@@ -23,6 +23,10 @@ type Observation struct {
 	Timestamp             time.Time                                                      `json:"timestamp"`
 }
 
+func (obs Observation) IsEmpty() bool {
+	return len(obs.FeedTokenPrices) == 0 && len(obs.FeeQuoterTokenUpdates) == 0 && len(obs.FChain) == 0
+}
+
 // AggregateObservation is the aggregation of a list of observations
 type AggregateObservation struct {
 	FeedTokenPrices       map[cciptypes.UnknownEncodedAddress][]cciptypes.TokenPrice
