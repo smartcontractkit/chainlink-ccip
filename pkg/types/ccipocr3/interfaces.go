@@ -21,7 +21,8 @@ type MessageHasher interface {
 }
 
 type ExtraDataCodec interface {
-	// DecodeExtraData reformat bytes into a chain agnostic map[string]any representation for extra args. This function will be deprecated and replaced with DecodeExtraArgs
+	// DecodeExtraData reformat bytes into a chain agnostic map[string]any representation for extra args.
+	// This function will be deprecated and replaced with DecodeExtraArgs
 	DecodeExtraData(extraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
 	// DecodeExtraArgs reformat bytes into a chain agnostic map[string]any representation for extra args
 	DecodeExtraArgs(extraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
