@@ -1,0 +1,91 @@
+name: CRIB DaaS Smoke Test
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/crib-daas-smoke-test.yml"
+      - "dependencies/daas/**"
+      - "deployments/daas/**"
+      # Exclude doc updates
+      - "!**/*.md" # Exclude doc updates
+      # Exclude .gitignore
+      - "!.gitignore"
+      # Exclude changesets version bumps
+      - "!package.json"
+      # Exclude CODEOWNERS
+      - "!CODEOWNERS"
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: |
+          Enables debug mode to disable CRIB env teardown
+        default: "false"
+        required: false
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Prevent running on draft or changesets PRs
+        id: check-prereqs-for-running
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PR_DRAFT: ${{ github.event.pull_request.draft }}
+          GITHUB_EVENT_PR_TITLE: ${{ github.event.pull_request.title }}
+          GITHUB_EVENT_PR_USER_LOGIN: ${{ github.event.pull_request.user.login }}
+        run: |
+          should_run=true
+          if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
+            if [ "${GITHUB_EVENT_PR_DRAFT}" == "true" ]; then
+              should_run=false
+            elif [ "${GITHUB_EVENT_PR_USER_LOGIN}" == "app-token-issuer-infra-releng[bot]" ] && [[ "${GITHUB_EVENT_PR_TITLE}" == "Version Packages" ]]; then
+              should_run=false
+            fi
+          fi
+          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+
+      - name: Install nix
+        uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b # v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Deploy and validate crib environment
+        if: steps.check-prereqs-for-running.outputs.should_run == 'true'
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@4616ed15e4a00f8b146a73a9abb6b3c9055dcb95 # crib-deploy-environment@unreleased
+        id: deploy
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-role-arn: ${{ secrets.AWS_OIDC_CRIB_ROLE_ARN_STAGE }}
+          aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
+          ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
+          k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
+          command: "daas"
+          product-image: ${{ secrets.AWS_ACCOUNT_ID_SDLC }}.dkr.ecr.us-west-2.amazonaws.com/ccip
+          product-image-tag: develop
+          product-dir: "daas"
+          chainlink-team: dona
+          chainlink-product: daas
+          crib-repo-ref: ${{ github.ref }}
+          main-dns-zone: ${{ secrets.MAIN_DNS_ZONE_STAGE_PUBLIC }}
+          ns-name-prefix: "crib-daas-ci"
+
+      - name: Destroy crib environment
+        if: always() && steps.deploy.outputs.devspace-namespace != '' && inputs.debug != 'true' && steps.check-prereqs-for-running.outputs.should_run == 'true'
+        uses: smartcontractkit/.github/actions/crib-purge-environment@142671bc21953c8cc3edbd21848c50b5ec201c2a # crib-purge-environment@0.3.0
+        id: destroy
+        with:
+          namespace: ${{ steps.deploy.outputs.devspace-namespace }}

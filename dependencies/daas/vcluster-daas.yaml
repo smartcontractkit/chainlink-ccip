@@ -1,0 +1,103 @@
+---
+# chart: https://github.com/loft-sh/vcluster/tree/main/chart
+version: v2beta1
+name: vcluster-daas
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments vcluster-daas
+  purge:
+    run: |-
+      purge_deployments vcluster-daas
+      kubectl delete pvc data-vcluster-daas-0 --ignore-not-found
+
+deployments:
+  vcluster-daas:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: vcluster
+        repo: https://charts.loft.sh
+      values:
+        controlPlane:
+          distro:
+            k8s:
+              enabled: true
+              securityContext:
+                runAsUser: 12345
+                runAsNonRoot: true
+          statefulSet:
+            security:
+              podSecurityContext:
+                fsGroup: 12345
+              containerSecurityContext:
+                runAsUser: 12345
+                runAsNonRoot: true
+          advanced:
+            serviceAccount:
+              enabled: true
+        rbac:
+          role:
+            enabled: true
+        sync:
+          toHost:
+            configMaps:
+              enabled: true
+            pods:
+              enabled: true
+            secrets:
+              enabled: true
+            services:
+              enabled: true
+            serviceAccounts:
+              enabled: false
+        experimental:
+          deploy:
+            vcluster:
+              helm:
+                - bundle: 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
+                  chart:
+                    name: daas-operator
+                    version: 0.1.0
+                  values: |-
+                    image:
+                      repository: 389435844244.dkr.ecr.us-west-2.amazonaws.com/daas/operator
+                      pullPolicy: Always
+                      tag: 0.0.5
+                  release:
+                    name: daas
+                    namespace: daas
+                - bundle: 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
+                  chart:
+                    name: daas-operator-resources
+                    version: 0.0.1
+                  values: |-
+                    dapi:
+                      enabled: true
+                  release:
+                    name: dapi
+                    namespace: daas
+
+profiles:
+  - name: crib-stage
+    patches:
+      - op: add
+        path: deployments.vcluster-daas.helm.values.controlPlane.advanced.serviceAccount.name
+        value: vc-daas
+      - op: replace
+        path: deployments.vcluster-daas.helm.values.rbac.role.enabled
+        value: false
+  - name: sync-sa
+    patches:
+      - op: replace
+        path: deployments.vcluster-daas.helm.values.sync.toHost.serviceAccounts.enabled
+        value: true
