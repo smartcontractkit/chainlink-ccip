@@ -120,6 +120,12 @@ pub struct GetFee<'info> {
         bump,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
+
+    #[account(
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, config.link_token_mint.as_ref()],
+        bump,
+    )]
+    pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
 }
 
 #[derive(Accounts)]

@@ -3,20 +3,19 @@ use std::cell::Ref;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
-use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
+use super::fee_quoter::{transfer_fee, wrap_native_sol};
 use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
-use super::price_math::get_validated_token_price;
 
 use crate::seed;
 use crate::{
-    AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
-    DestChainConfig, ExtraArgsInput, Nonce, PerChainPerTokenConfig, RampMessageHeader,
-    SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
+    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, DestChainConfig,
+    ExtraArgsInput, Nonce, PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage,
+    SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
 };
 
 pub fn ccip_send<'info>(
@@ -27,8 +26,6 @@ pub fn ccip_send<'info>(
 ) -> Result<()> {
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
-
-    let dest_chain = &mut ctx.accounts.dest_chain_state;
 
     let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
 
@@ -52,11 +49,6 @@ pub fn ccip_send<'info>(
         accounts_per_sent_token.push(current_token_accounts);
     }
 
-    let token_billing_config_accounts = accounts_per_sent_token
-        .iter()
-        .map(|accs| validated_try_to::billing_token_config(accs.fee_token_config, accs.mint.key()))
-        .collect::<Result<Vec<_>>>()?;
-
     let per_chain_per_token_config_accounts = accounts_per_sent_token
         .iter()
         .map(|accs| {
@@ -68,25 +60,9 @@ pub fn ccip_send<'info>(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let fee = fee_for_msg(
-        &message,
-        dest_chain,
-        &ctx.accounts.fee_token_config.config,
-        &token_billing_config_accounts,
-        &per_chain_per_token_config_accounts,
-    )?;
-
-    let link_fee = convert(
-        &fee,
-        &ctx.accounts.fee_token_config.config,
-        &ctx.accounts.link_token_config.config,
-    )?;
-
-    require_gte!(
-        config.max_fee_juels_per_msg,
-        link_fee.amount as u128,
-        CcipRouterError::MessageFeeTooHigh,
-    );
+    // Fee Quoter validates the message, calculates the fee in both the billing token
+    // and LINK, asserts that it doesn't exceed a maximum, and returns it
+    let fee = get_fee_cpi(&ctx, dest_chain_selector, &message)?;
 
     let is_paying_with_native_sol = message.fee_token == Pubkey::default();
     if is_paying_with_native_sol {
@@ -108,14 +84,21 @@ pub fn ccip_send<'info>(
             authority: ctx.accounts.fee_billing_signer.to_account_info(),
         };
 
+        let transferable_fee = SVMTokenAmount {
+            token: fee.token,
+            amount: fee.amount,
+        };
+
         transfer_fee(
-            &fee,
+            &transferable_fee,
             ctx.accounts.fee_token_program.to_account_info(),
             transfer,
             ctx.accounts.fee_token_mint.decimals,
             ctx.bumps.fee_billing_signer,
         )?;
     }
+
+    let dest_chain = &mut ctx.accounts.dest_chain_state;
 
     let overflow_add = dest_chain.state.sequence_number.checked_add(1);
     require!(
@@ -152,7 +135,7 @@ pub fn ccip_send<'info>(
         extra_args,
         fee_token: message.fee_token,
         fee_token_amount: fee.amount.into(),
-        fee_value_juels: link_fee.amount.into(),
+        fee_value_juels: fee.juels.into(),
         token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count],
     };
 
@@ -227,6 +210,52 @@ pub fn ccip_send<'info>(
     Ok(())
 }
 
+fn get_fee_cpi<'info>(
+    ctx: &Context<'_, '_, 'info, 'info, CcipSend<'info>>,
+    dest_chain_selector: u64,
+    message: &SVM2AnyMessage,
+) -> Result<fee_quoter::messages::GetFeeResult> {
+    let get_fee_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
+
+    let get_fee_signer = &[&get_fee_seeds[..]];
+
+    let cpi_program = ctx.accounts.fee_quoter.to_account_info();
+
+    let cpi_accounts = fee_quoter::cpi::accounts::GetFee {
+        config: ctx.accounts.fee_quoter_config.to_account_info(),
+        dest_chain: ctx.accounts.fee_quoter_dest_chain.to_account_info(),
+        billing_token_config: ctx
+            .accounts
+            .fee_quoter_billing_token_config
+            .to_account_info(),
+        link_token_config: ctx.accounts.fee_quoter_link_token_config.to_account_info(),
+    };
+
+    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, get_fee_signer);
+
+    let cpi_message = fee_quoter::messages::SVM2AnyMessage {
+        receiver: message.receiver.clone(),
+        data: message.data.clone(),
+        token_amounts: message
+            .token_amounts
+            .iter()
+            .map(|x| fee_quoter::messages::SVMTokenAmount {
+                token: x.token.clone(),
+                amount: x.amount,
+            })
+            .collect(),
+        fee_token: message.fee_token.clone(),
+        extra_args: fee_quoter::messages::ExtraArgsInput {
+            gas_limit: message.extra_args.gas_limit,
+            allow_out_of_order_execution: message.extra_args.allow_out_of_order_execution,
+        },
+    };
+
+    let fee = fee_quoter::cpi::get_fee(cpi_ctx, dest_chain_selector, cpi_message)?.get();
+
+    Ok(fee)
+}
+
 fn token_transfer(
     lock_or_burn_out_data: LockOrBurnOutV1,
     source_pool_address: Pubkey,
@@ -245,7 +274,7 @@ fn token_transfer(
 
     require!(
         extra_data_length <= CCIP_LOCK_OR_BURN_V1_RET_BYTES
-            || extra_data_length <= token_config.billing.dest_bytes_overhead,
+            || extra_data_length <= token_config.billing.dest_bytes_overhead, // TODO is this ok here?
         CcipRouterError::SourceTokenDataTooLarge
     );
 
@@ -348,31 +377,13 @@ fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
     result.to_bytes()
 }
 
-// Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
-pub fn convert(
-    source_token_amount: &SVMTokenAmount,
-    source_config: &BillingTokenConfig,
-    target_config: &BillingTokenConfig,
-) -> Result<SVMTokenAmount> {
-    assert!(source_config.mint == source_token_amount.token);
-    let source_price = get_validated_token_price(source_config)?;
-    let target_price = get_validated_token_price(target_config)?;
-
-    Ok(SVMTokenAmount {
-        token: target_config.mint,
-        amount: ((source_price * source_token_amount.amount).0 / target_price.0)
-            .try_into()
-            .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
-    })
-}
-
 /// Methods in this module are used to deserialize AccountInfo into the state structs
 mod validated_try_to {
     use anchor_lang::prelude::*;
 
     use crate::{
         seed::{self},
-        BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, PerChainPerTokenConfig,
+        CcipRouterError, PerChainPerTokenConfig,
     };
 
     pub fn per_chain_per_token_config<'info>(
@@ -397,37 +408,13 @@ mod validated_try_to {
         );
         Ok(account.into_inner())
     }
-
-    // Returns Ok(None) when parsing the ZERO address, which is a valid input from users
-    // specifying a token that has no Billing config.
-    pub fn billing_token_config<'info>(
-        account: &'info AccountInfo<'info>,
-        token: Pubkey,
-    ) -> Result<Option<BillingTokenConfig>> {
-        if account.key() == Pubkey::default() {
-            return Ok(None);
-        }
-
-        let (expected, _) = Pubkey::find_program_address(
-            &[seed::FEE_BILLING_TOKEN_CONFIG, token.as_ref()],
-            &crate::ID,
-        );
-        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
-        let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
-        require_eq!(
-            account.version,
-            1, // the v1 version of the onramp will always be tied to version 1 of the state
-            CcipRouterError::InvalidInputs
-        );
-        Ok(Some(account.into_inner().config))
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use ethnum::U256;
 
-    use crate::state::TokenBilling;
+    use crate::state::{BillingTokenConfig, TokenBilling};
 
     use super::super::messages::ramps::tests::{sample_billing_config, sample_dest_chain};
 

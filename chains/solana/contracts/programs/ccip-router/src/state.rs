@@ -19,6 +19,7 @@ pub struct Config {
 
     pub ocr3: [Ocr3Config; 2],
     // TODO: token pool global config
+    pub fee_quoter: Pubkey, // TODO configure this
 
     // TODO: billing global configs'
     pub max_fee_juels_per_msg: u128,

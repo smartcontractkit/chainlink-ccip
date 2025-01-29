@@ -522,6 +522,11 @@
           "name": "billingTokenConfig",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "linkTokenConfig",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -536,7 +541,9 @@
           }
         }
       ],
-      "returns": "u64"
+      "returns": {
+        "defined": "GetFeeResult"
+      }
     },
     {
       "name": "updatePrices",
@@ -794,6 +801,26 @@
             "type": {
               "option": "bool"
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetFeeResult",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "juels",
+            "type": "u64"
           }
         ]
       }

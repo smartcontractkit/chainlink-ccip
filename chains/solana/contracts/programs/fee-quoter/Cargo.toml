@@ -6,7 +6,7 @@ edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "ccip_router"
+name = "fee_quoter"
 
 [features]
 no-entrypoint = []

@@ -2,23 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use solana_program::{program::invoke_signed, system_instruction};
 
-use crate::{
-    seed::FEE_BILLING_SIGNER, BillingTokenConfig, CcipRouterError, DestChain,
-    PerChainPerTokenConfig, SVM2AnyMessage, SVMTokenAmount,
-};
-
-pub fn fee_for_msg(
-    message: &SVM2AnyMessage,
-    dest_chain: &DestChain,
-    fee_token_config: &BillingTokenConfig,
-    additional_token_configs: &[Option<BillingTokenConfig>],
-    additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
-) -> Result<SVMTokenAmount> {
-    Ok(SVMTokenAmount {
-        token: Pubkey::default(),
-        amount: 1,
-    })
-}
+use crate::{seed::FEE_BILLING_SIGNER, CcipRouterError, SVMTokenAmount};
 
 pub fn wrap_native_sol<'info>(
     token_program: &AccountInfo<'info>,

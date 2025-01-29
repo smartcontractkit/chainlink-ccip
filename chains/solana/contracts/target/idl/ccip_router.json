@@ -1193,6 +1193,31 @@
           "isSigner": false
         },
         {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterDestChain",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterBillingTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterLinkTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenPoolsSigner",
           "isMut": true,
           "isSigner": false,
@@ -1561,6 +1586,10 @@
                 2
               ]
             }
+          },
+          {
+            "name": "feeQuoter",
+            "type": "publicKey"
           },
           {
             "name": "maxFeeJuelsPerMsg",

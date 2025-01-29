@@ -2,13 +2,13 @@ use anchor_lang::prelude::*;
 
 declare_id!("FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw");
 
-mod context;
+pub mod context;
 use context::*;
 
-mod messages;
+pub mod messages;
 use messages::*;
 
-mod state;
+pub mod state;
 use state::*;
 
 mod event;
@@ -213,7 +213,7 @@ pub mod fee_quoter {
         ctx: Context<'_, '_, 'info, 'info, GetFee>,
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
-    ) -> Result<u64> {
+    ) -> Result<GetFeeResult> {
         v1::public::get_fee(ctx, dest_chain_selector, message)
     }
 

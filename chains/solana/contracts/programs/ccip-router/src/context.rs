@@ -516,9 +516,9 @@ pub struct CcipSend<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 
-    ///////////////////
-    // billing token //
-    ///////////////////
+    /////////////
+    // billing //
+    /////////////
     pub fee_token_program: Interface<'info, TokenInterface>,
 
     #[account(
@@ -573,6 +573,55 @@ pub struct CcipSend<'info> {
         bump
     )]
     pub fee_billing_signer: UncheckedAccount<'info>,
+
+    ////////////////////
+    // fee quoter CPI //
+    ////////////////////
+    /// CHECK: This is the account for the Fee Quoter program
+    #[account(
+        address = config.load()?.fee_quoter @ CcipRouterError::InvalidInputs,
+    )]
+    pub fee_quoter: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [fee_quoter::context::seed::CONFIG],
+        bump,
+        seeds::program = config.load()?.fee_quoter,
+    )]
+    pub fee_quoter_config: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [fee_quoter::context::seed::DEST_CHAIN, destination_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        seeds::program = config.load()?.fee_quoter,
+    )]
+    pub fee_quoter_dest_chain: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+            if message.fee_token == Pubkey::default() {
+                native_mint::ID.as_ref() // pre-2022 WSOL
+            } else {
+                message.fee_token.as_ref()
+            },
+        ],
+        bump,
+        seeds::program = config.load()?.fee_quoter,
+    )]
+    pub fee_quoter_billing_token_config: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+            config.load()?.link_token_mint.key().as_ref(),
+        ],
+        bump,
+        seeds::program = config.load()?.fee_quoter,
+    )]
+    pub fee_quoter_link_token_config: UncheckedAccount<'info>,
 
     /// CPI signers, optional if no tokens are being transferred.
     /// CHECK: Using this to sign.

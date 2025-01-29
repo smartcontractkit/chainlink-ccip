@@ -22,3 +22,10 @@ pub struct ExtraArgsInput {
     pub gas_limit: Option<u128>,
     pub allow_out_of_order_execution: Option<bool>,
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug)]
+pub struct GetFeeResult {
+    pub token: Pubkey,
+    pub amount: u64,
+    pub juels: u64,
+}

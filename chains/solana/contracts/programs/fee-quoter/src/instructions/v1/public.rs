@@ -5,7 +5,7 @@ use std::ops::AddAssign;
 
 use crate::context::GetFee;
 use crate::instructions::v1::safe_deserialize;
-use crate::messages::{SVM2AnyMessage, SVMTokenAmount};
+use crate::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount};
 use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
 use crate::FeeQuoterError;
 
@@ -35,7 +35,7 @@ pub fn get_fee<'info>(
     ctx: Context<'_, '_, 'info, 'info, GetFee>,
     dest_chain_selector: u64,
     message: SVM2AnyMessage,
-) -> Result<u64> {
+) -> Result<GetFeeResult> {
     let remaining_accounts = &ctx.remaining_accounts;
     let message = &message;
     require_eq!(
@@ -60,14 +60,50 @@ pub fn get_fee<'info>(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    Ok(fee_for_msg(
+    let fee = fee_for_msg(
         message,
         &ctx.accounts.dest_chain,
         &ctx.accounts.billing_token_config.config,
         &token_billing_config_accounts,
         &per_chain_per_token_config_accounts,
+    )?;
+
+    let juels = convert(
+        &fee,
+        &ctx.accounts.billing_token_config.config,
+        &ctx.accounts.link_token_config.config, // TODO this should be LINK
     )?
-    .amount)
+    .amount;
+
+    require_gte!(
+        ctx.accounts.config.max_fee_juels_per_msg,
+        juels as u128,
+        FeeQuoterError::MessageFeeTooHigh
+    );
+
+    Ok(GetFeeResult {
+        token: fee.token,
+        amount: fee.amount,
+        juels,
+    })
+}
+
+// Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
+pub fn convert(
+    source_token_amount: &SVMTokenAmount,
+    source_config: &BillingTokenConfig,
+    target_config: &BillingTokenConfig,
+) -> Result<SVMTokenAmount> {
+    assert!(source_config.mint == source_token_amount.token);
+    let source_price = get_validated_token_price(source_config)?;
+    let target_price = get_validated_token_price(target_config)?;
+
+    Ok(SVMTokenAmount {
+        token: target_config.mint,
+        amount: ((source_price * source_token_amount.amount).0 / target_price.0)
+            .try_into()
+            .map_err(|_| FeeQuoterError::InvalidTokenPrice)?,
+    })
 }
 
 fn fee_for_msg(

@@ -16,4 +16,3 @@ mod messages;
 mod ocr3base;
 mod ocr3impl;
 mod pools;
-mod price_math;
