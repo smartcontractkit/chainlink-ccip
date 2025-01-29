@@ -370,6 +370,7 @@ pub mod token_admin_registry_writable {
                 pending_administrator: Pubkey::default(),
                 lookup_table: Pubkey::default(),
                 writable_indexes: [0, 0],
+                mint: Pubkey::default(),
             };
 
             set(state, 0);
@@ -408,6 +409,7 @@ pub mod token_admin_registry_writable {
                     2u128.pow(127 - 7) + 2u128.pow(127 - 2) + 2u128.pow(127 - 4),
                     2u128.pow(127 - 8) + 2u128.pow(127 - 56) + 2u128.pow(127 - 100),
                 ],
+                mint: Pubkey::default(),
             };
 
             assert!(!is(state, 0));
