@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
+use super::pools::token_admin_registry_writable;
+
 use crate::{
     AcceptAdminRoleTokenAdminRegistry, AdministratorRegistered, AdministratorTransferRequested,
     AdministratorTransferred, CcipRouterError, ModifyTokenAdminRegistry, PoolSet,
@@ -73,9 +75,9 @@ pub fn set_pool(
     // used to build offchain tokenpool accounts in a transaction
     // indexes can be checked to indicate is_writable for the specific account
     // this is also used to validate to ensure the correct write permissions are used according the admin
-    token_admin_registry.reset_writable();
+    token_admin_registry_writable::reset(token_admin_registry);
     for ind in writable_indexes {
-        token_admin_registry.set_writable(ind)
+        token_admin_registry_writable::set(token_admin_registry, ind)
     }
 
     // validate lookup table contains minimum required accounts if not zero address

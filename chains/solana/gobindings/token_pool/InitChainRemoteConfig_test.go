@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_SetChainRemoteConfig(t *testing.T) {
+func TestEncodeDecode_InitChainRemoteConfig(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("SetChainRemoteConfig"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("InitChainRemoteConfig"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(SetChainRemoteConfig)
+				params := new(InitChainRemoteConfig)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(SetChainRemoteConfig)
+				got := new(InitChainRemoteConfig)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

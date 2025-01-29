@@ -134,6 +134,7 @@ func (r *peerClient) Close() error {
 	return nil
 }
 
+// TODO: pass in ctx to get OCR seqNr. Then can include seqNr in the log.
 func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

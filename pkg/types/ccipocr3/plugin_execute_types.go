@@ -20,7 +20,10 @@ type ExecutePluginReportSingleChain struct {
 
 // ExecuteReportInfo contains metadata needed by transmitter and contract
 // writer.
-type ExecuteReportInfo []MerkleRootChain
+type ExecuteReportInfo struct {
+	AbstractReports []ExecutePluginReportSingleChain
+	MerkleRoots     []MerkleRootChain
+}
 
 // Encode v1 execute report info. Very basic versioning in the first byte to
 // allow for future encoding optimizations.

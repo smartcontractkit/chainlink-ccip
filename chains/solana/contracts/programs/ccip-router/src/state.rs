@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use ethnum::U256;
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -8,7 +7,7 @@ pub struct Config {
     pub version: u8,
     pub default_allow_out_of_order_execution: u8, // bytemuck::Pod compliant required for zero_copy
     _padding0: [u8; 6],
-    pub solana_chain_selector: u64,
+    pub svm_chain_selector: u64,
     pub default_gas_limit: u128,
     _padding1: [u8; 8],
 
@@ -22,6 +21,8 @@ pub struct Config {
     // TODO: token pool global config
 
     // TODO: billing global configs'
+    pub max_fee_juels_per_msg: u128,
+    pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
 
@@ -67,8 +68,10 @@ pub struct GlobalState {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct SourceChainConfig {
     pub is_enabled: bool, // Flag whether the source chain is enabled or not
-    #[max_len(64)]
-    pub on_ramp: Vec<u8>, // OnRamp address on the source chain
+    // OnRamp addresses supported from the source chain, each of them has a 64 byte address. So this can hold 2 addresses.
+    // If only one address is configured, then the space for the second address must be zeroed.
+    // Each address must be right padded with zeros if it is less than 64 bytes.
+    pub on_ramp: [[u8; 64]; 2],
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
@@ -79,7 +82,7 @@ pub struct SourceChainState {
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct SourceChain {
-    // Config for Any2Solana
+    // Config for Any2SVM
     pub version: u8,
     pub chain_selector: u64,       // Chain selector used for the seed
     pub state: SourceChainState,   // values that are updated automatically
@@ -100,7 +103,9 @@ pub struct DestChainConfig {
     pub max_data_bytes: u32,               // Maximum payload data size in bytes
     pub max_per_msg_gas_limit: u32,        // Maximum gas limit for messages targeting EVMs
     pub dest_gas_overhead: u32, //  Gas charged on top of the gasLimit to cover destination chain costs
-    pub dest_gas_per_payload_byte: u16, // Destination chain gas charged for passing each byte of `data` payload to receiver
+    pub dest_gas_per_payload_byte_base: u32, // Base gas cost per byte up to threshold
+    pub dest_gas_per_payload_byte_high: u32, // Higher gas cost per byte after threshold
+    pub dest_gas_per_payload_byte_threshold: u32, // Threshold in bytes for higher gas cost
     pub dest_data_availability_overhead_gas: u32, // Extra data availability gas charged on top of the message, e.g. for OCR
     pub dest_gas_per_data_availability_byte: u16, // Amount of gas to charge per byte of message data that needs availability
     pub dest_data_availability_multiplier_bps: u16, // Multiplier for data availability gas, multiples of bps, or 0.0001
@@ -119,7 +124,7 @@ pub struct DestChainConfig {
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct DestChain {
-    // Config for Solana2Any
+    // Config for SVM2Any
     pub version: u8,
     pub chain_selector: u64,     // Chain selector used for the seed
     pub state: DestChainState,   // values that are updated automatically
@@ -179,7 +184,6 @@ pub struct RateLimitTokenBucket {
     pub rate: u128,        // Number of tokens per second that the bucket is refilled.
 }
 
-// WIP
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct BillingTokenConfig {
     // NOTE: when modifying this struct, make sure to update the version in the wrapper
@@ -202,51 +206,14 @@ pub struct BillingTokenConfigWrapper {
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
-    pub timestamp: i64, // maintaining the type that Solana returns for the time (solana_program::clock::UnixTimestamp = i64)
-}
-
-impl TimestampedPackedU224 {
-    pub fn as_single(&self) -> U256 {
-        let mut u256_buffer = [0u8; 32];
-        u256_buffer[4..32].clone_from_slice(&self.value);
-        U256::from_be_bytes(u256_buffer)
-    }
-
-    pub fn from_single(timestamp: i64, single: U256) -> Self {
-        let mut value = [0u8; 28];
-        value.clone_from_slice(&single.to_be_bytes()[4..32]);
-        Self { value, timestamp }
-    }
-
-    pub fn unpack(&self) -> UnpackedDoubleU224 {
-        let mut u128_buffer = [0u8; 16];
-        u128_buffer[2..16].clone_from_slice(&self.value[14..]);
-        let high = u128::from_be_bytes(u128_buffer);
-        u128_buffer[2..16].clone_from_slice(&self.value[..14]);
-        let low = u128::from_be_bytes(u128_buffer);
-        UnpackedDoubleU224 { high, low }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct UnpackedDoubleU224 {
-    pub high: u128,
-    pub low: u128,
-}
-
-impl UnpackedDoubleU224 {
-    pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
-        let mut value = [0u8; 28];
-        value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
-        value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
-        TimestampedPackedU224 { value, timestamp }
-    }
+    pub timestamp: i64, // maintaining the type that SVM returns for the time (solana_program::clock::UnixTimestamp = i64)
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
+// used in the commit report execution_states field
 pub enum MessageExecutionState {
     Untouched = 0,
-    InProgress = 1, // Not used in Solana, but used in EVM
+    InProgress = 1, // Not used in SVM, but used in EVM
     Success = 2,
     Failure = 3,
 }
@@ -267,6 +234,7 @@ impl TryFrom<u128> for MessageExecutionState {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use std::convert::TryFrom;
 

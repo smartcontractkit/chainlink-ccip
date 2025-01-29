@@ -17,16 +17,16 @@ func TestDecodeExecuteReportInfo(t *testing.T) {
 
 	// unknown field
 	{
-		data := append([]byte{1}, []byte(`[{"Bogus":1}]`)...)
+		data := append([]byte{1}, []byte(`{"Bogus":1}`)...)
 		_, err := DecodeExecuteReportInfo(data)
 		require.ErrorContains(t, err, "unknown field")
 	}
 
-	// Not a slice
+	// Not an object
 	{
-		data := append([]byte{1}, []byte(`{"Bogus":1}`)...)
+		data := append([]byte{1}, []byte(`[{"Bogus":1}]`)...)
 		_, err := DecodeExecuteReportInfo(data)
-		require.ErrorContains(t, err, "object") // not super helpful...
+		require.ErrorContains(t, err, "array") // not super helpful...
 	}
 
 	// empty
@@ -46,16 +46,27 @@ func TestExecuteReportInfo_EncodeDecode(t *testing.T) {
 	}{
 		{
 			name: "object",
-			reportInfo: []MerkleRootChain{
-				{
-					ChainSel:      10,
-					OnRampAddress: mustNewUnknownAddress(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
-					SeqNumsRange:  NewSeqNumRange(100, 200),
-					MerkleRoot:    Bytes32{},
+			reportInfo: ExecuteReportInfo{
+				AbstractReports: []ExecutePluginReportSingleChain{
+					{
+						SourceChainSelector: ChainSelector(1),
+						Messages:            []Message{},
+						OffchainTokenData:   [][][]byte{},
+						Proofs:              []Bytes32{},
+						ProofFlagBits:       BigInt{},
+					},
+				},
+				MerkleRoots: []MerkleRootChain{
+					{
+						ChainSel:      10,
+						OnRampAddress: mustNewUnknownAddress(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
+						SeqNumsRange:  NewSeqNumRange(100, 200),
+						MerkleRoot:    Bytes32{},
+					},
 				},
 			},
 			//nolint:lll
-			want:    append([]byte{1}, []byte(`[{"chain":10,"onRampAddress":"0x04d4cc5972ad487f71b85654d48b27d32b13a22f","seqNumsRange":[100,200],"merkleRoot":"0x0000000000000000000000000000000000000000000000000000000000000000"}]`)...),
+			want:    append([]byte{1}, []byte(`{"AbstractReports":[{"sourceChainSelector":1,"messages":[],"offchainTokenData":[],"proofs":[],"proofFlagBits":null}],"MerkleRoots":[{"chain":10,"onRampAddress":"0x04d4cc5972ad487f71b85654d48b27d32b13a22f","seqNumsRange":[100,200],"merkleRoot":"0x0000000000000000000000000000000000000000000000000000000000000000"}]}`)...),
 			wantErr: require.NoError,
 		},
 	}

@@ -24,6 +24,8 @@ type Reporter interface {
 
 	TrackMerkleObservation(obs merkleroot.Observation, state string)
 	TrackMerkleOutcome(outcome merkleroot.Outcome, state string)
+	TrackRmnReport(latency float64, success bool)
+	TrackRmnRequest(method string, latency float64, nodeID uint64, err string)
 
 	TrackChainFeeObservation(obs chainfee.Observation)
 	TrackChainFeeOutcome(outcome chainfee.Outcome)
@@ -50,6 +52,10 @@ func (n *Noop) TrackChainFeeOutcome(chainfee.Outcome) {}
 func (n *Noop) TrackMerkleObservation(merkleroot.Observation, string) {}
 
 func (n *Noop) TrackMerkleOutcome(merkleroot.Outcome, string) {}
+
+func (n *Noop) TrackRmnReport(float64, bool) {}
+
+func (n *Noop) TrackRmnRequest(string, float64, uint64, string) {}
 
 func (n *Noop) TrackTokenPricesObservation(tokenprice.Observation) {}
 
