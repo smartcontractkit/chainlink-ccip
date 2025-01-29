@@ -8,10 +8,6 @@ import (
 	"sort"
 	"time"
 
-	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-
-	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
-
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
@@ -25,12 +21,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
+	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -64,9 +63,13 @@ type Plugin struct {
 	estimateProvider      cciptypes.EstimateProvider
 	lggr                  logger.Logger
 
-	observationOptimizer optimizers.ObservationOptimizer
 	// state
 	contractsInitialized bool
+	// this cache remembers commit root details to optimize DB lookups.
+	commitRootsCache cache.CommitsRootsCache
+
+	// TODO: remove this, it can be transient. Also its logger is never initialized.
+	observationOptimizer optimizers.ObservationOptimizer
 }
 
 func NewPlugin(
@@ -118,6 +121,10 @@ func NewPlugin(
 		),
 		observer:             metricsReporter,
 		observationOptimizer: optimizers.NewObservationOptimizer(maxObservationLength),
+		commitRootsCache: cache.NewCommitRootsCache(
+			logutil.WithComponent(lggr, "CommitRootsCache"),
+			offchainCfg.MessageVisibilityInterval.Duration(),
+			time.Minute*5),
 	}
 }
 
@@ -125,15 +132,19 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
+type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
+
 func getPendingExecutedReports(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
+	canExecute CanExecuteHandle,
 	ts time.Time,
 	lggr logger.Logger,
-) (exectypes.CommitObservations, error) {
+) (exectypes.CommitObservations /* fully executed roots */, []exectypes.CommitData, error) {
+	var fullyExecuted []exectypes.CommitData
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
@@ -147,6 +158,17 @@ func getPendingExecutedReports(
 			continue
 		}
 
+		// Filter out reports that cannot be executed (snoozed).
+		// TODO: filter func instead of 'canExecute'?
+		var filtered []exectypes.CommitData
+		for _, commitReport := range reports {
+			if !canExecute(commitReport.SourceChain, commitReport.MerkleRoot) {
+				continue
+			}
+			filtered = append(filtered, commitReport)
+		}
+		reports = filtered
+
 		lggr.Debugw("grouped reports", "selector", selector, "reports", reports, "count", len(reports))
 		sort.Slice(reports, func(i, j int) bool {
 			return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
@@ -156,14 +178,14 @@ func getPendingExecutedReports(
 
 		ranges, err := computeRanges(reports)
 		if err != nil {
-			return nil, fmt.Errorf("compute report ranges: %w", err)
+			return nil, nil, fmt.Errorf("compute report ranges: %w", err)
 		}
 
 		executedMessageSet := mapset.NewSet[cciptypes.SeqNum]()
 		for _, seqRange := range ranges {
 			executedMessagesForRange, err2 := ccipReader.ExecutedMessages(ctx, selector, seqRange)
 			if err2 != nil {
-				return nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err2)
+				return nil, nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err2)
 			}
 			executedMessageSet = executedMessageSet.Union(mapset.NewSet(executedMessagesForRange...))
 		}
@@ -173,13 +195,15 @@ func getPendingExecutedReports(
 
 		// Remove fully executed reports.
 		// Populate executed messages on the reports.
-		groupedCommits[selector] = filterOutExecutedMessages(reports, executedMessages)
+		var executedCommits []exectypes.CommitData
+		groupedCommits[selector], executedCommits = filterOutExecutedMessages(reports, executedMessages)
+		fullyExecuted = append(fullyExecuted, executedCommits...)
 	}
 
 	lggr.Debugw("grouped commits after removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
-	return groupedCommits, nil
+	return groupedCommits, fullyExecuted, nil
 }
 
 func (p *Plugin) ValidateObservation(

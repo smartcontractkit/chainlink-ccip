@@ -282,21 +282,25 @@ func groupByChainSelector(
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Reports that have all of their messages executed are not included in the result.
 // The provided reports must be sorted by sequence number range starting sequence number.
+// TODO: rename to filterMessages or combineReportsAndMessages?
 func filterOutExecutedMessages(
-	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum) []exectypes.CommitData {
+	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum,
+) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData) {
 	if len(executedMessages) == 0 {
-		return reports
+		return reports, nil
 	}
 
 	// filtered contains the reports with fully executed messages removed
 	// and the executed messages appended to the report sorted by sequence number.
-	var filtered []exectypes.CommitData
+	var pending []exectypes.CommitData
+	var fullyExecuted []exectypes.CommitData
 
 	for i, report := range reports {
 		reportRange := report.SequenceNumberRange
 
 		executedMsgsInReportRange := reportRange.FilterSlice(executedMessages)
 		if len(executedMsgsInReportRange) == reportRange.Length() { // skip fully executed report.
+			fullyExecuted = append(fullyExecuted, report)
 			continue
 		}
 
@@ -304,10 +308,10 @@ func filterOutExecutedMessages(
 			return executedMsgsInReportRange[i] < executedMsgsInReportRange[j]
 		})
 		report.ExecutedMessages = append(reports[i].ExecutedMessages, executedMsgsInReportRange...)
-		filtered = append(filtered, report)
+		pending = append(pending, report)
 	}
 
-	return filtered
+	return pending, fullyExecuted
 }
 
 func decodeAttributedObservations(
