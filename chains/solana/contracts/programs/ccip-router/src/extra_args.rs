@@ -11,6 +11,7 @@ pub const EVM_EXTRA_ARGS_V2_TAG: u32 = 0x181dcf10;
 // bytes4(keccak256("CCIP SVMExtraArgsV1"));
 pub const SVM_EXTRA_ARGS_V1_TAG: u32 = 0x1f3b3aba;
 
+// Extra Args of message when SVM -> EVM
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
 pub struct EVMExtraArgsV2 {
     pub gas_limit: u128,                    // message gas limit for EVM execution
@@ -33,6 +34,7 @@ impl EVMExtraArgsV2 {
     }
 }
 
+// Extra Args of message when SVM -> SVM
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
 pub struct SVMExtraArgsV1 {
     pub compute_units: u32, // compute units are used by the offchain to add computeUnitLimits to the execute stage
