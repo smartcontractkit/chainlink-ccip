@@ -381,6 +381,16 @@ func Test_computeRanges(t *testing.T) {
 			}},
 			want: []cciptypes.SeqNumRange{{10, 20}, {22, 33}},
 		},
+		{
+			name: "overlap on range bound",
+			args: args{reports: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 12)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(13, 15)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(15, 20)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(22, 33)},
+			}},
+			err: errOverlappingRanges,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
