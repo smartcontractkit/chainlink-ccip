@@ -61,6 +61,9 @@ in: |
           {{- if ne $.Env.PROVIDER "kind" }}
           - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
           {{- end }}
+          {{- if eq $.Env.PROVIDER "aws" }}
+          - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
+          {{- end }}
         values:
           fullnameOverride: ${DON_TYPE}-db-{{ $i }}
     {{- end }}

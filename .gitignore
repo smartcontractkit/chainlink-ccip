@@ -17,6 +17,8 @@ debug.env
 repos
 node_modules
 tmp
+.tmp
+.tmp*
 *.tar.gz
 
 # Ignore DevSpace cache and log folder
