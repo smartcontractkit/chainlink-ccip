@@ -652,22 +652,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ccip_invalid_receiver"
-version = "0.0.0-dev"
-dependencies = [
- "anchor-lang",
-]
-
-[[package]]
-name = "ccip_receiver"
-version = "0.1.0-dev"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "solana-program",
-]
-
-[[package]]
 name = "ccip_router"
 version = "0.1.0-dev"
 dependencies = [
@@ -2374,6 +2358,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "test_ccip_invalid_receiver"
+version = "0.0.0-dev"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
+name = "test_ccip_receiver"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-program",
 ]
 
 [[package]]

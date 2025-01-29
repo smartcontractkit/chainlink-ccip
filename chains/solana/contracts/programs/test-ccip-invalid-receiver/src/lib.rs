@@ -7,7 +7,7 @@ use anchor_lang::prelude::*;
 declare_id!("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8");
 
 #[program]
-pub mod ccip_invalid_receiver {
+pub mod test_ccip_invalid_receiver {
     use super::*;
 
     pub fn ccip_receive(ctx: Context<Initialize>, _message: Any2SVMMessage) -> Result<()> {

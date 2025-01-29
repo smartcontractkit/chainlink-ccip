@@ -8,7 +8,7 @@ pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
 #[program]
-pub mod ccip_receiver {
+pub mod test_ccip_receiver {
     use solana_program::{instruction::Instruction, program::invoke_signed};
 
     use super::*;

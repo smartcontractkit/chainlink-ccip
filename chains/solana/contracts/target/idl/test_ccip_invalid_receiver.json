@@ -1,6 +1,6 @@
 {
   "version": "0.0.0-dev",
-  "name": "ccip_invalid_receiver",
+  "name": "test_ccip_invalid_receiver",
   "instructions": [
     {
       "name": "ccipReceive",
