@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
@@ -47,30 +48,36 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	destCR.EXPECT().HealthReport().Return(nil)
-	destCR.EXPECT().GetLatestValue(
+	destCR.EXPECT().BatchGetLatestValues(
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Run(func(
+	).RunAndReturn(func(
 		ctx context.Context,
-		readIdentifier string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params interface{},
-		returnVal interface{},
-	) {
-		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
-		v := returnVal.(*sourceChainConfig)
+		request types.BatchGetLatestValuesRequest,
+	) (types.BatchGetLatestValuesResult, error) {
+		results := make(types.BatchGetLatestValuesResult, 0)
+		for contractName, batch := range request {
+			for _, readReq := range batch {
+				res := types.BatchReadResult{
+					ReadName: readReq.ReadName,
+				}
+				params := readReq.Params.(map[string]any)
+				sourceChain := params["sourceChainSelector"].(cciptypes.ChainSelector)
+				v := readReq.ReturnVal.(*sourceChainConfig)
 
-		fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
-			"0x%d000000000000000000000000000000000000000", sourceChain),
-		)
-		require.NoError(t, err)
-		v.OnRamp = cciptypes.UnknownAddress(fromString)
-		v.IsEnabled = true
-		v.Router = cciptypes.UnknownAddress(fromString)
-	}).Return(nil)
+				fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
+					"0x%d000000000000000000000000000000000000000", sourceChain),
+				)
+				require.NoError(t, err)
+				v.OnRamp = cciptypes.UnknownAddress(fromString)
+				v.IsEnabled = true
+				v.Router = fromString
+				res.SetResult(v, nil)
+				results[contractName] = append(results[contractName], res)
+			}
+		}
+		return results, nil
+	})
 
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
@@ -93,7 +100,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			Address: typeconv.AddressBytesToString(offrampAddress, 111_111)}}))
 
 	ctx := context.Background()
-	cfgs, err := ccipReader.getOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})
+	cfgs, err := ccipReader.getOffRampSourceChainsConfig(ctx, logger.Test(t), []cciptypes.ChainSelector{chainA, chainB})
 	assert.NoError(t, err)
 	assert.Len(t, cfgs, 2)
 	assert.Equal(t, "0x1000000000000000000000000000000000000000", cfgs[chainA].OnRamp.String())
@@ -432,8 +439,18 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	destRMNRemote := []byte{0x4}
 	destFeeQuoter := []byte{0x5}
 	destRouter := []byte{0x6}
-	//srcRouters := []byte{0x7, 0x8}
+	srcRouters := [][]byte{{0x7}, {0x8}}
 	//srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
+
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]sourceChainConfig, len(sourceChain))
+	for i, chain := range sourceChain {
+		sourceChainConfigs[chain] = sourceChainConfig{
+			Router:    srcRouters[i],
+			IsEnabled: true,
+			MinSeqNr:  0,
+			OnRamp:    onramps[i],
+		}
+	}
 
 	// Build expected addresses.
 	var expectedContractAddresses ContractAddresses
@@ -452,29 +469,22 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
 	addDestinationContractAssertions(mockReaders[destChain], destNonceMgr, destRMNRemote, destFeeQuoter)
 
-	mockReaders[destChain].EXPECT().ExtendedGetLatestValue(
+	mockReaders[destChain].EXPECT().ExtendedBatchGetLatestValues(
 		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
 		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*selectorsAndConfigs)
-		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
-		v.SourceChainConfigs = []sourceChainConfig{
-			{
-				OnRamp:    onramps[0],
-				Router:    destRouter,
-				IsEnabled: true,
-			},
-			{
-				OnRamp:    onramps[1],
-				Router:    destRouter,
-				IsEnabled: true,
-			},
-		}
-	}))
+		mock.Anything,
+	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
+		"0x1234567890123456789012345678901234567890",
+		[]any{&sourceChainConfig{
+			OnRamp:    onramps[0],
+			Router:    destRouter,
+			IsEnabled: true,
+		}, &sourceChainConfig{
+			OnRamp:    onramps[1],
+			Router:    destRouter,
+			IsEnabled: true,
+		}},
+	))
 
 	// mock calls to get fee quoter from onramps and source chain config from offramp.
 	for _, selector := range sourceChain {
@@ -515,7 +525,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		lggr:            lggr,
 	}
 
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, sourceChain[:])
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedContractAddresses, contractAddresses)
@@ -595,29 +605,23 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
 	addDestinationContractAssertions(mockReaders[destChain], destNonceMgr, destRMNRemote, destFeeQuoter)
 
-	mockReaders[destChain].EXPECT().ExtendedGetLatestValue(
+	mockReaders[destChain].EXPECT().ExtendedBatchGetLatestValues(
 		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
 		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*selectorsAndConfigs)
-		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
-		v.SourceChainConfigs = []sourceChainConfig{
-			{
-				OnRamp:    onramps[0],
-				Router:    destRouter[0],
-				IsEnabled: true,
-			},
-			{
+		mock.Anything,
+	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
+		"0x1234567890123456789012345678901234567890",
+		[]any{&sourceChainConfig{
+			OnRamp:    onramps[0],
+			Router:    destRouter[0],
+			IsEnabled: true,
+		},
+			&sourceChainConfig{
 				OnRamp:    onramps[1],
 				Router:    destRouter[1],
 				IsEnabled: true,
 			},
-		}
-	}))
+		}))
 
 	// mock calls to get fee quoter from onramps and source chain config from offramp.
 	for i, selector := range sourceChain {
@@ -662,7 +666,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		lggr:            logger.Test(t),
 	}
 
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, sourceChain[:])
 	require.NoError(t, err)
 
 	require.Equal(t, expectedContractAddresses, contractAddresses)
@@ -677,14 +681,11 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 
 	// mock the call for sourceChain2 - failure
 	getLatestValueErr := errors.New("some error")
-	destExtended.EXPECT().ExtendedGetLatestValue(
+	destExtended.EXPECT().ExtendedBatchGetLatestValues(
 		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
 		mock.Anything,
-	).Return(getLatestValueErr)
+		mock.Anything,
+	).Return(nil, nil, getLatestValueErr)
 
 	// get static config call won't occur because the source chain config call failed.
 
@@ -702,7 +703,7 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 		lggr: logger.Test(t),
 	}
 
-	_, err := ccipChainReader.DiscoverContracts(ctx)
+	_, err := ccipChainReader.DiscoverContracts(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
 }
@@ -715,15 +716,15 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	destExtended := reader_mocks.NewMockExtended(t)
 
 	// mock the call for source chain configs
-	destExtended.EXPECT().ExtendedGetLatestValue(
+	destExtended.EXPECT().ExtendedBatchGetLatestValues(
 		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
 		mock.Anything,
-	).Return(nil) // doesn't matter for this test
-	// mock the call to get the nonce manager - failure
+		mock.Anything,
+	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
+		"0x1234567890123456789012345678901234567890",
+		[]any{&sourceChainConfig{}, &sourceChainConfig{}}))
+
+	// mock the call to get the static config - failure
 	getLatestValueErr := errors.New("some error")
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
@@ -748,7 +749,7 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		lggr: logger.Test(t),
 	}
 
-	_, err := ccipChainReader.DiscoverContracts(ctx)
+	_, err := ccipChainReader.DiscoverContracts(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
 }
@@ -768,6 +769,42 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 		params,
 		returnVal interface{}) {
 		mapper(returnVal)
+	}
+}
+
+// withBatchGetLatestValuesRetValues returns a mock ExtendedBatchGetLatestValues() method
+// which can be passed to RunAndReturn(), given a set of return values and an address as input
+// Only supports a single contract
+func withBatchGetLatestValuesRetValues(
+	t testing.TB,
+	address string,
+	retVals []any) func(
+	context.Context,
+	contractreader.ExtendedBatchGetLatestValuesRequest,
+	bool) (types.BatchGetLatestValuesResult, []string, error) {
+	return func(
+		ctx context.Context, req contractreader.ExtendedBatchGetLatestValuesRequest, graceful bool,
+	) (types.BatchGetLatestValuesResult, []string, error) {
+		require.GreaterOrEqual(t, len(retVals), 1)
+		_, ok := retVals[0].(*sourceChainConfig)
+		require.True(t, ok)
+		require.Len(t, req, 1)
+		contract := maps.Keys(req)[0]
+		batchRequest := maps.Values(req)[0]
+		require.Equal(t, len(retVals), len(batchRequest))
+
+		results := make(types.ContractBatchResults, 0, len(retVals))
+		for i, retVal := range retVals {
+			res := types.BatchReadResult{ReadName: batchRequest[i].ReadName}
+			res.SetResult(retVal, nil)
+			results = append(results, res)
+		}
+		boundContract := types.BoundContract{
+			Address: address,
+			Name:    contract,
+		}
+
+		return types.BatchGetLatestValuesResult{boundContract: results}, nil, nil
 	}
 }
 
