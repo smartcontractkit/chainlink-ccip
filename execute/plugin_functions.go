@@ -244,7 +244,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 		} else if seqRange.End()+1 == report.SequenceNumberRange.Start() {
 			// extend the contiguous range
 			seqRange.SetEnd(report.SequenceNumberRange.End())
-		} else if report.SequenceNumberRange.Start() < seqRange.End() {
+		} else if report.SequenceNumberRange.Overlaps(seqRange) {
 			return nil, errOverlappingRanges
 		} else {
 			ranges = append(ranges, seqRange)
