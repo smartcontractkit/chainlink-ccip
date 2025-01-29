@@ -103,36 +103,6 @@ impl MerkleRoot {
 }
 
 #[derive(Accounts)]
-#[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
-pub struct GetFee<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(
-        seeds = [seed::DEST_CHAIN_STATE, destination_chain_selector.to_le_bytes().as_ref()],
-        bump,
-        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub dest_chain_state: Account<'info, DestChain>,
-
-    #[account(
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG,
-            if message.fee_token == Pubkey::default() {
-                native_mint::ID.as_ref() // pre-2022 WSOL
-            } else {
-                message.fee_token.as_ref()
-            }
-        ],
-        bump,
-    )]
-    pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
-}
-
-#[derive(Accounts)]
 pub struct WithdrawBilledFunds<'info> {
     #[account(
         owner = token_program.key() @ CcipRouterError::InvalidInputs,

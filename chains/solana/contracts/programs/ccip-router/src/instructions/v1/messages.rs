@@ -63,14 +63,8 @@ pub mod pools {
 
 pub mod ramps {
     use anchor_lang::prelude::*;
-    use ethnum::U256;
 
-    use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, SVM2AnyMessage, SVMTokenAmount,
-        CCIP_RECEIVE_DISCRIMINATOR, CHAIN_FAMILY_SELECTOR_EVM,
-    };
-
-    const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
+    use crate::{CcipRouterError, SVMTokenAmount, CCIP_RECEIVE_DISCRIMINATOR};
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
     pub(in super::super) struct Any2SVMMessage {
@@ -96,205 +90,42 @@ pub mod ramps {
         }
     }
 
-    pub fn validate_svm2any(
-        msg: &SVM2AnyMessage,
-        dest_chain: &DestChain,
-        token_config: &BillingTokenConfig,
-    ) -> Result<()> {
-        require!(
-            dest_chain.config.is_enabled,
-            CcipRouterError::DestinationChainDisabled
-        );
-
-        require!(token_config.enabled, CcipRouterError::FeeTokenDisabled);
-
-        require_gte!(
-            dest_chain.config.max_data_bytes,
-            msg.data.len() as u32,
-            CcipRouterError::MessageTooLarge
-        );
-
-        require_gte!(
-            dest_chain.config.max_number_of_tokens_per_msg as usize,
-            msg.token_amounts.len(),
-            CcipRouterError::UnsupportedNumberOfTokens
-        );
-
-        require_gte!(
-            dest_chain.config.max_per_msg_gas_limit as u128,
-            msg.extra_args
-                .gas_limit
-                .unwrap_or(dest_chain.config.default_tx_gas_limit as u128),
-            CcipRouterError::MessageGasLimitTooHigh,
-        );
-
-        require!(
-            !dest_chain.config.enforce_out_of_order
-                || msg.extra_args.allow_out_of_order_execution.unwrap_or(false),
-            CcipRouterError::ExtraArgOutOfOrderExecutionMustBeTrue,
-        );
-
-        validate_dest_family_address(msg, dest_chain.config.chain_family_selector)
-    }
-
-    fn validate_dest_family_address(
-        msg: &SVM2AnyMessage,
-        chain_family_selector: [u8; 4],
-    ) -> Result<()> {
-        const PRECOMPILE_SPACE: u32 = 1024;
-
-        let selector = u32::from_be_bytes(chain_family_selector);
-        // Only EVM is supported as a destination family.
-        require_eq!(
-            selector,
-            CHAIN_FAMILY_SELECTOR_EVM,
-            CcipRouterError::UnsupportedChainFamilySelector
-        );
-
-        require_eq!(msg.receiver.len(), 32, CcipRouterError::InvalidEVMAddress);
-
-        let address: U256 = U256::from_be_bytes(
-            msg.receiver
-                .clone()
-                .try_into()
-                .map_err(|_| CcipRouterError::InvalidEncoding)?,
-        );
-
-        require!(address <= U160_MAX, CcipRouterError::InvalidEVMAddress);
-
-        if let Ok(small_address) = TryInto::<u32>::try_into(address) {
-            require_gte!(
-                small_address,
-                PRECOMPILE_SPACE,
-                CcipRouterError::InvalidEVMAddress
-            )
-        };
-
-        Ok(())
-    }
-
     pub fn is_writable(bitmap: &u64, index: u8) -> bool {
         index < 64 && (bitmap & 1 << index != 0) // check valid index and that bit at index is 1
     }
 
+    // TODO move this as it is fairly unrelated to other things in this file now
     #[cfg(test)]
     pub mod tests {
-        use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
-        use super::super::super::price_math::Usd18Decimals;
-        use super::*;
-        use crate::{ExtraArgsInput, SVMTokenAmount, TimestampedPackedU224};
-        use anchor_lang::solana_program::pubkey::Pubkey;
+        use crate::state::{BillingTokenConfig, DestChain};
+        use crate::TimestampedPackedU224;
         use anchor_spl::token::spl_token::native_mint;
+        use ethnum::U256;
 
-        impl UnpackedDoubleU224 {
-            pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
-                let mut value = [0u8; 28];
-                value[14..].clone_from_slice(&self.low.to_be_bytes()[2..16]);
-                value[..14].clone_from_slice(&self.high.to_be_bytes()[2..16]);
-                TimestampedPackedU224 { value, timestamp }
-            }
-        }
+        pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
 
         fn as_u8_28(single: U256) -> [u8; 28] {
             single.to_be_bytes()[4..32].try_into().unwrap()
         }
 
-        #[test]
-        fn message_not_validated_for_disabled_destination_chain() {
-            let mut chain = sample_dest_chain();
-            chain.config.is_enabled = false;
+        // pub fn sample_message() -> SVM2AnyMessage {
+        //     let mut receiver = vec![0u8; 32];
 
-            assert_eq!(
-                validate_svm2any(&sample_message(), &chain, &sample_billing_config()).unwrap_err(),
-                CcipRouterError::DestinationChainDisabled.into()
-            );
-        }
+        //     // Arbitrary value that pushes the address to the right EVM range
+        //     // (above precompile space, under u160::max)
+        //     receiver[20] = 0xA;
 
-        #[test]
-        fn message_not_validated_for_disabled_token() {
-            let mut billing_config = sample_billing_config();
-            billing_config.enabled = false;
-
-            assert_eq!(
-                validate_svm2any(&sample_message(), &sample_dest_chain(), &billing_config)
-                    .unwrap_err(),
-                CcipRouterError::FeeTokenDisabled.into()
-            );
-        }
-
-        #[test]
-        fn large_message_fails_to_validate() {
-            let dest_chain = sample_dest_chain();
-            let mut message = sample_message();
-            message.data = vec![0; dest_chain.config.max_data_bytes as usize + 1];
-            assert_eq!(
-                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
-                    .unwrap_err(),
-                CcipRouterError::MessageTooLarge.into()
-            );
-        }
-
-        #[test]
-        fn invalid_addresses_fail_to_validate() {
-            let mut address_bigger_than_u160_max = vec![0u8; 32];
-            address_bigger_than_u160_max[11] = 1;
-            let mut address_in_precompile_space = vec![0u8; 32];
-            address_in_precompile_space[30] = 1;
-            let incorrect_length_address = vec![1u8, 12];
-
-            let invalid_addresses = [
-                address_bigger_than_u160_max,
-                address_in_precompile_space,
-                incorrect_length_address,
-            ];
-
-            let mut message = sample_message();
-            for address in invalid_addresses {
-                message.receiver = address;
-                assert_eq!(
-                    validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
-                        .unwrap_err(),
-                    CcipRouterError::InvalidEVMAddress.into()
-                );
-            }
-        }
-
-        #[test]
-        fn message_with_too_many_tokens_fails_to_validate() {
-            let dest_chain = sample_dest_chain();
-            let mut message = sample_message();
-            message.token_amounts = vec![
-                SVMTokenAmount {
-                    token: Pubkey::new_unique(),
-                    amount: 1
-                };
-                dest_chain.config.max_number_of_tokens_per_msg as usize + 1
-            ];
-            assert_eq!(
-                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
-                    .unwrap_err(),
-                CcipRouterError::UnsupportedNumberOfTokens.into()
-            );
-        }
-
-        pub fn sample_message() -> SVM2AnyMessage {
-            let mut receiver = vec![0u8; 32];
-
-            // Arbitrary value that pushes the address to the right EVM range
-            // (above precompile space, under u160::max)
-            receiver[20] = 0xA;
-
-            SVM2AnyMessage {
-                receiver,
-                data: vec![],
-                token_amounts: vec![],
-                fee_token: native_mint::ID,
-                extra_args: ExtraArgsInput {
-                    gas_limit: None,
-                    allow_out_of_order_execution: None,
-                },
-            }
-        }
+        //     SVM2AnyMessage {
+        //         receiver,
+        //         data: vec![],
+        //         token_amounts: vec![],
+        //         fee_token: native_mint::ID,
+        //         extra_args: ExtraArgsInput {
+        //             gas_limit: None,
+        //             allow_out_of_order_execution: None,
+        //         },
+        //     }
+        // }
 
         pub fn sample_billing_config() -> BillingTokenConfig {
             // All values are derived from inspecting the Ethereum Mainnet -> Avalanche lane as of Jan 9 2025,
@@ -319,14 +150,11 @@ pub mod ramps {
             // All values are derived from inspecting the Ethereum Mainnet -> Avalanche lane as of Jan 9 2025,
             // using USDC as transfer token and LINK as fee token wherever applicable (these are not important,
             // they were used to retrieve correctly dimensioned values)
-            let arbitrary_timestamp = 100;
-            let usd_per_unit_gas = TryInto::<UnpackedDoubleU224>::try_into(PackedPrice {
-                execution_gas_price: Usd18Decimals(U256::new(921441088750)),
-                // L1 dest chain so there's no DA price by default
-                data_availability_gas_price: Usd18Decimals(U256::new(0)),
-            })
-            .unwrap()
-            .pack(arbitrary_timestamp);
+            let usd_per_unit_gas = TimestampedPackedU224 {
+                // value encodes execution_gas_price of Usd18Decimals(U256::new(921441088750)) and data_availability_gas_price of 0
+                value: as_u8_28(U256::new(921441088750)),
+                timestamp: 100, // arbitrary value
+            };
 
             DestChain {
                 version: 1,

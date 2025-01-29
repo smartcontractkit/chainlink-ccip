@@ -15,48 +15,9 @@ use super::price_math::get_validated_token_price;
 use crate::seed;
 use crate::{
     AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
-    DestChainConfig, ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader,
+    DestChainConfig, ExtraArgsInput, Nonce, PerChainPerTokenConfig, RampMessageHeader,
     SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
 };
-
-pub fn get_fee<'info>(
-    ctx: Context<'_, '_, 'info, 'info, GetFee>,
-    dest_chain_selector: u64,
-    message: SVM2AnyMessage,
-) -> Result<u64> {
-    let remaining_accounts = &ctx.remaining_accounts;
-    let message = &message;
-    require_eq!(
-        remaining_accounts.len(),
-        2 * message.token_amounts.len(),
-        CcipRouterError::InvalidInputsTokenAccounts
-    );
-
-    let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
-        remaining_accounts.split_at(message.token_amounts.len());
-
-    let token_billing_config_accounts = token_billing_config_accounts
-        .iter()
-        .zip(message.token_amounts.iter())
-        .map(|(a, SVMTokenAmount { token, .. })| validated_try_to::billing_token_config(a, *token))
-        .collect::<Result<Vec<_>>>()?;
-    let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
-        .iter()
-        .zip(message.token_amounts.iter())
-        .map(|(a, SVMTokenAmount { token, .. })| {
-            validated_try_to::per_chain_per_token_config(a, *token, dest_chain_selector)
-        })
-        .collect::<Result<Vec<_>>>()?;
-
-    Ok(fee_for_msg(
-        message,
-        &ctx.accounts.dest_chain_state,
-        &ctx.accounts.billing_token_config.config,
-        &token_billing_config_accounts,
-        &per_chain_per_token_config_accounts,
-    )?
-    .amount)
-}
 
 pub fn ccip_send<'info>(
     ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
@@ -466,9 +427,29 @@ mod validated_try_to {
 mod tests {
     use ethnum::U256;
 
-    use super::super::{
-        fee_quoter::tests::sample_additional_token, messages::ramps::tests::sample_dest_chain,
-    };
+    use crate::state::TokenBilling;
+
+    use super::super::messages::ramps::tests::{sample_billing_config, sample_dest_chain};
+
+    pub fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
+        let mint = Pubkey::new_unique();
+        (
+            sample_billing_config(),
+            PerChainPerTokenConfig {
+                version: 1,
+                chain_selector: 0,
+                mint,
+                billing: TokenBilling {
+                    min_fee_usdcents: 50,
+                    max_fee_usdcents: 4294967295,
+                    deci_bps: 0,
+                    dest_gas_overhead: 180000,
+                    dest_bytes_overhead: 640,
+                    is_enabled: true,
+                },
+            },
+        )
+    }
 
     use super::*;
 

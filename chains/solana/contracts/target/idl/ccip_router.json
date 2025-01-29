@@ -1051,63 +1051,6 @@
       "args": []
     },
     {
-      "name": "getFee",
-      "docs": [
-        "Calculates the fee for sending a message to the destination chain.",
-        "",
-        "# Arguments",
-        "",
-        "* `_ctx` - The context containing the accounts required for the fee calculation.",
-        "* `dest_chain_selector` - The chain selector for the destination chain.",
-        "* `message` - The message to be sent.",
-        "",
-        "# Additional accounts",
-        "",
-        "In addition to the fixed amount of accounts defined in the `GetFee` context,",
-        "the following accounts must be provided:",
-        "",
-        "* First, the billing token config accounts for each token sent with the message, sequentially.",
-        "For each token with no billing config account (i.e. tokens that cannot be possibly used as fee",
-        "tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.",
-        "* Then, the per chain / per token config of every token sent with the message, sequentially",
-        "in the same order.",
-        "",
-        "# Returns",
-        "",
-        "The fee amount in u64."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "destChainState",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "billingTokenConfig",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "destChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "message",
-          "type": {
-            "defined": "SVM2AnyMessage"
-          }
-        }
-      ],
-      "returns": "u64"
-    },
-    {
       "name": "withdrawBilledFunds",
       "docs": [
         "Transfers the accumulated billed fees in a particular token to an arbitrary token account.",

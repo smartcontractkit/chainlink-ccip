@@ -2,8 +2,6 @@ use std::convert::Into;
 
 use anchor_lang::prelude::*;
 
-pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
-
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic header for OnRamp & OffRamp messages.
 // The messageId is not expected to match hash(message), since it may originate from another ramp family

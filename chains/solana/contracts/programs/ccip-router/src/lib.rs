@@ -447,36 +447,6 @@ pub mod ccip_router {
         v1::admin::remove_billing_token_config(ctx)
     }
 
-    /// Calculates the fee for sending a message to the destination chain.
-    ///
-    /// # Arguments
-    ///
-    /// * `_ctx` - The context containing the accounts required for the fee calculation.
-    /// * `dest_chain_selector` - The chain selector for the destination chain.
-    /// * `message` - The message to be sent.
-    ///
-    /// # Additional accounts
-    ///
-    /// In addition to the fixed amount of accounts defined in the `GetFee` context,
-    /// the following accounts must be provided:
-    ///
-    /// * First, the billing token config accounts for each token sent with the message, sequentially.
-    ///   For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
-    ///   tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
-    /// * Then, the per chain / per token config of every token sent with the message, sequentially
-    ///   in the same order.
-    ///
-    /// # Returns
-    ///
-    /// The fee amount in u64.
-    pub fn get_fee<'info>(
-        ctx: Context<'_, '_, 'info, 'info, GetFee>,
-        dest_chain_selector: u64,
-        message: SVM2AnyMessage,
-    ) -> Result<u64> {
-        v1::onramp::get_fee(ctx, dest_chain_selector, message)
-    }
-
     /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
     /// Only the CCIP Admin can withdraw billed funds.
     ///
