@@ -181,7 +181,7 @@ pub mod ramps {
 
     fn validate_svm_dest_address(address: &[u8]) -> Result<()> {
         require_eq!(address.len(), 32, CcipRouterError::InvalidSVMAddress);
-        Pubkey::try_from_slice(&address)
+        Pubkey::try_from_slice(address)
             .map(|_| ())
             .map_err(|_| CcipRouterError::InvalidSVMAddress.into())
     }

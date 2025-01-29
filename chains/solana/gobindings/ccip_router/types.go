@@ -1670,6 +1670,7 @@ const (
 	InvalidExtraArgsTag_CcipRouterError
 	InvalidChainFamilySelector_CcipRouterError
 	InvalidTokenReceiver_CcipRouterError
+	InvalidSVMAddress_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1764,6 +1765,8 @@ func (value CcipRouterError) String() string {
 		return "InvalidChainFamilySelector"
 	case InvalidTokenReceiver_CcipRouterError:
 		return "InvalidTokenReceiver"
+	case InvalidSVMAddress_CcipRouterError:
+		return "InvalidSVMAddress"
 	default:
 		return ""
 	}
