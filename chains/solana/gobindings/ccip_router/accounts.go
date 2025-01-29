@@ -20,6 +20,7 @@ type Config struct {
 	EnableManualExecutionAfter      int64
 	Padding2                        [8]uint8
 	Ocr3                            [2]Ocr3Config
+	FeeQuoter                       ag_solanago.PublicKey
 	MaxFeeJuelsPerMsg               ag_binary.Uint128
 	LinkTokenMint                   ag_solanago.PublicKey
 	FeeAggregator                   ag_solanago.PublicKey
@@ -85,6 +86,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Ocr3` param:
 	err = encoder.Encode(obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeQuoter` param:
+	err = encoder.Encode(obj.FeeQuoter)
 	if err != nil {
 		return err
 	}
@@ -172,6 +178,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Ocr3`:
 	err = decoder.Decode(&obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeQuoter`:
+	err = decoder.Decode(&obj.FeeQuoter)
 	if err != nil {
 		return err
 	}

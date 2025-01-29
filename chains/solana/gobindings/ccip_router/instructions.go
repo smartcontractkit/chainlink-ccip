@@ -276,30 +276,6 @@ var (
 	// * `ctx` - The context containing the accounts required for removing the billing token configuration.
 	Instruction_RemoveBillingTokenConfig = ag_binary.TypeID([8]byte{0, 194, 92, 161, 29, 8, 10, 91})
 
-	// Calculates the fee for sending a message to the destination chain.
-	//
-	// # Arguments
-	//
-	// * `_ctx` - The context containing the accounts required for the fee calculation.
-	// * `dest_chain_selector` - The chain selector for the destination chain.
-	// * `message` - The message to be sent.
-	//
-	// # Additional accounts
-	//
-	// In addition to the fixed amount of accounts defined in the `GetFee` context,
-	// the following accounts must be provided:
-	//
-	// * First, the billing token config accounts for each token sent with the message, sequentially.
-	// For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
-	// tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
-	// * Then, the per chain / per token config of every token sent with the message, sequentially
-	// in the same order.
-	//
-	// # Returns
-	//
-	// The fee amount in u64.
-	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
-
 	// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
 	// Only the CCIP Admin can withdraw billed funds.
 	//
@@ -437,8 +413,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateBillingTokenConfig"
 	case Instruction_RemoveBillingTokenConfig:
 		return "RemoveBillingTokenConfig"
-	case Instruction_GetFee:
-		return "GetFee"
 	case Instruction_WithdrawBilledFunds:
 		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
@@ -537,9 +511,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"remove_billing_token_config", (*RemoveBillingTokenConfig)(nil),
-		},
-		{
-			"get_fee", (*GetFee)(nil),
 		},
 		{
 			"withdraw_billed_funds", (*WithdrawBilledFunds)(nil),

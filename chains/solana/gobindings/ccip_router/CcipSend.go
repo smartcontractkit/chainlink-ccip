@@ -54,7 +54,17 @@ type CcipSend struct {
 	//
 	// [11] = [] feeBillingSigner
 	//
-	// [12] = [WRITE] tokenPoolsSigner
+	// [12] = [] feeQuoter
+	//
+	// [13] = [] feeQuoterConfig
+	//
+	// [14] = [] feeQuoterDestChain
+	//
+	// [15] = [] feeQuoterBillingTokenConfig
+	//
+	// [16] = [] feeQuoterLinkTokenConfig
+	//
+	// [17] = [WRITE] tokenPoolsSigner
 	// ··········· CPI signers, optional if no tokens are being transferred.
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
@@ -62,7 +72,7 @@ type CcipSend struct {
 // NewCcipSendInstructionBuilder creates a new `CcipSend` instruction builder.
 func NewCcipSendInstructionBuilder() *CcipSend {
 	nd := &CcipSend{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 13),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 18),
 	}
 	return nd
 }
@@ -219,17 +229,72 @@ func (inst *CcipSend) GetFeeBillingSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[11]
 }
 
+// SetFeeQuoterAccount sets the "feeQuoter" account.
+func (inst *CcipSend) SetFeeQuoterAccount(feeQuoter ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[12] = ag_solanago.Meta(feeQuoter)
+	return inst
+}
+
+// GetFeeQuoterAccount gets the "feeQuoter" account.
+func (inst *CcipSend) GetFeeQuoterAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[12]
+}
+
+// SetFeeQuoterConfigAccount sets the "feeQuoterConfig" account.
+func (inst *CcipSend) SetFeeQuoterConfigAccount(feeQuoterConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[13] = ag_solanago.Meta(feeQuoterConfig)
+	return inst
+}
+
+// GetFeeQuoterConfigAccount gets the "feeQuoterConfig" account.
+func (inst *CcipSend) GetFeeQuoterConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[13]
+}
+
+// SetFeeQuoterDestChainAccount sets the "feeQuoterDestChain" account.
+func (inst *CcipSend) SetFeeQuoterDestChainAccount(feeQuoterDestChain ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[14] = ag_solanago.Meta(feeQuoterDestChain)
+	return inst
+}
+
+// GetFeeQuoterDestChainAccount gets the "feeQuoterDestChain" account.
+func (inst *CcipSend) GetFeeQuoterDestChainAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[14]
+}
+
+// SetFeeQuoterBillingTokenConfigAccount sets the "feeQuoterBillingTokenConfig" account.
+func (inst *CcipSend) SetFeeQuoterBillingTokenConfigAccount(feeQuoterBillingTokenConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[15] = ag_solanago.Meta(feeQuoterBillingTokenConfig)
+	return inst
+}
+
+// GetFeeQuoterBillingTokenConfigAccount gets the "feeQuoterBillingTokenConfig" account.
+func (inst *CcipSend) GetFeeQuoterBillingTokenConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[15]
+}
+
+// SetFeeQuoterLinkTokenConfigAccount sets the "feeQuoterLinkTokenConfig" account.
+func (inst *CcipSend) SetFeeQuoterLinkTokenConfigAccount(feeQuoterLinkTokenConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[16] = ag_solanago.Meta(feeQuoterLinkTokenConfig)
+	return inst
+}
+
+// GetFeeQuoterLinkTokenConfigAccount gets the "feeQuoterLinkTokenConfig" account.
+func (inst *CcipSend) GetFeeQuoterLinkTokenConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[16]
+}
+
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 // CPI signers, optional if no tokens are being transferred.
 func (inst *CcipSend) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[12] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
+	inst.AccountMetaSlice[17] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 // CPI signers, optional if no tokens are being transferred.
 func (inst *CcipSend) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[12]
+	return inst.AccountMetaSlice[17]
 }
 
 func (inst CcipSend) Build() *Instruction {
@@ -302,6 +367,21 @@ func (inst *CcipSend) Validate() error {
 			return errors.New("accounts.FeeBillingSigner is not set")
 		}
 		if inst.AccountMetaSlice[12] == nil {
+			return errors.New("accounts.FeeQuoter is not set")
+		}
+		if inst.AccountMetaSlice[13] == nil {
+			return errors.New("accounts.FeeQuoterConfig is not set")
+		}
+		if inst.AccountMetaSlice[14] == nil {
+			return errors.New("accounts.FeeQuoterDestChain is not set")
+		}
+		if inst.AccountMetaSlice[15] == nil {
+			return errors.New("accounts.FeeQuoterBillingTokenConfig is not set")
+		}
+		if inst.AccountMetaSlice[16] == nil {
+			return errors.New("accounts.FeeQuoterLinkTokenConfig is not set")
+		}
+		if inst.AccountMetaSlice[17] == nil {
 			return errors.New("accounts.TokenPoolsSigner is not set")
 		}
 	}
@@ -324,20 +404,25 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=13]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        destChainState", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("                 nonce", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("       feeTokenProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("          feeTokenMint", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("        feeTokenConfig", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("       linkTokenConfig", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("feeTokenUserAssociated", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("      feeTokenReceiver", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("      feeBillingSigner", inst.AccountMetaSlice[11]))
-						accountsBranch.Child(ag_format.Meta("      tokenPoolsSigner", inst.AccountMetaSlice[12]))
+					instructionBranch.Child("Accounts[len=18]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("                     config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("             destChainState", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("                      nonce", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("                  authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("            feeTokenProgram", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("               feeTokenMint", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("             feeTokenConfig", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("            linkTokenConfig", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("     feeTokenUserAssociated", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("           feeTokenReceiver", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("           feeBillingSigner", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("                  feeQuoter", inst.AccountMetaSlice[12]))
+						accountsBranch.Child(ag_format.Meta("            feeQuoterConfig", inst.AccountMetaSlice[13]))
+						accountsBranch.Child(ag_format.Meta("         feeQuoterDestChain", inst.AccountMetaSlice[14]))
+						accountsBranch.Child(ag_format.Meta("feeQuoterBillingTokenConfig", inst.AccountMetaSlice[15]))
+						accountsBranch.Child(ag_format.Meta("   feeQuoterLinkTokenConfig", inst.AccountMetaSlice[16]))
+						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[17]))
 					})
 				})
 		})
@@ -399,6 +484,11 @@ func NewCcipSendInstruction(
 	feeTokenUserAssociatedAccount ag_solanago.PublicKey,
 	feeTokenReceiver ag_solanago.PublicKey,
 	feeBillingSigner ag_solanago.PublicKey,
+	feeQuoter ag_solanago.PublicKey,
+	feeQuoterConfig ag_solanago.PublicKey,
+	feeQuoterDestChain ag_solanago.PublicKey,
+	feeQuoterBillingTokenConfig ag_solanago.PublicKey,
+	feeQuoterLinkTokenConfig ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
 	return NewCcipSendInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
@@ -416,5 +506,10 @@ func NewCcipSendInstruction(
 		SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssociatedAccount).
 		SetFeeTokenReceiverAccount(feeTokenReceiver).
 		SetFeeBillingSignerAccount(feeBillingSigner).
+		SetFeeQuoterAccount(feeQuoter).
+		SetFeeQuoterConfigAccount(feeQuoterConfig).
+		SetFeeQuoterDestChainAccount(feeQuoterDestChain).
+		SetFeeQuoterBillingTokenConfigAccount(feeQuoterBillingTokenConfig).
+		SetFeeQuoterLinkTokenConfigAccount(feeQuoterLinkTokenConfig).
 		SetTokenPoolsSignerAccount(tokenPoolsSigner)
 }
