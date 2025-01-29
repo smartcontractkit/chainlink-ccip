@@ -144,9 +144,12 @@ func getPendingExecutedReports(
 			continue
 		}
 
+		lggr.Debugw("grouped reports", "selector", selector, "reports", reports, "count", len(reports))
 		sort.Slice(reports, func(i, j int) bool {
 			return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
 		})
+		// todo: remove this logs after investigating whether the sorting above can be safely removed
+		lggr.Debugw("sorted reports", "selector", selector, "reports", reports, "count", len(reports))
 
 		ranges, err := computeRanges(reports)
 		if err != nil {
