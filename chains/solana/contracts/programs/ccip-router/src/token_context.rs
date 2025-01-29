@@ -37,7 +37,6 @@ pub struct RegisterTokenAdminRegistryViaGetCCIPAdmin<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
-        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
@@ -59,7 +58,6 @@ pub struct RegisterTokenAdminRegistryViaOwner<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
-        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     #[account(mut)]
