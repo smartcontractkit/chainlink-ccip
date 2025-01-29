@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -43,6 +42,7 @@ type ccipChainReader struct {
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
 	extraDataCodec  cciptypes.ExtraDataCodec
+	caches          map[cciptypes.ChainSelector]*configCache
 }
 
 func newCCIPChainReaderInternal(
@@ -66,6 +66,11 @@ func newCCIPChainReaderInternal(
 		destChain:       destChain,
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
 		extraDataCodec:  extraDataCodec,
+	}
+
+	// Initialize caches for each chain selector
+	for chainSelector := range contractReaders {
+		reader.caches[chainSelector] = newConfigCache(reader)
 	}
 
 	contracts := ContractAddresses{
@@ -662,59 +667,30 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	return feeUpdates
 }
 
-func (r *ccipChainReader) GetRMNRemoteConfig(
-	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector,
-) (rmntypes.RemoteConfig, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
+func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context, destChainSelector cciptypes.ChainSelector) (rmntypes.RemoteConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
 		return rmntypes.RemoteConfig{}, err
 	}
 
-	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
-	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
-	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, destChainSelector)
-	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
+	cache, ok := r.caches[destChainSelector]
+	if !ok {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("cache not found for chain %d", destChainSelector)
 	}
 
-	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, lggr, destChainSelector, proxyContractAddress)
+	rmnRemoteAddress, err := cache.GetRMNRemoteAddress(ctx)
 	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
-	}
-	lggr.Debugw("got RMNRemote address", "address", rmnRemoteAddress)
-
-	// TODO: make the calls in parallel using errgroup
-	var vc versionedConfig
-	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameRMNRemote,
-		consts.MethodNameGetVersionedConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		&vc,
-	)
-	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote config: %w", err)
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMN remote address: %w", err)
 	}
 
-	type ret struct {
-		DigestHeader cciptypes.Bytes32
-	}
-	var header ret
-
-	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameRMNRemote,
-		consts.MethodNameGetReportDigestHeader,
-		primitives.Unconfirmed,
-		map[string]any{},
-		&header,
-	)
+	vc, err := cache.GetRMNVersionedConfig(ctx)
 	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote report digest header: %w", err)
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMN versioned config: %w", err)
 	}
-	lggr.Infow("got RMNRemote report digest header", "digest", header.DigestHeader)
+
+	header, err := cache.GetRMNDigestHeader(ctx)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMN digest header: %w", err)
+	}
 
 	signers := make([]rmntypes.RemoteSignerInfo, 0, len(vc.Config.Signers))
 	for _, signer := range vc.Config.Signers {
@@ -725,7 +701,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}
 
 	return rmntypes.RemoteConfig{
-		ContractAddress:  rmnRemoteAddress,
+		ContractAddress:  cciptypes.UnknownAddress(rmnRemoteAddress),
 		ConfigDigest:     vc.Config.RMNHomeContractConfigDigest,
 		Signers:          signers,
 		FSign:            vc.Config.F,
@@ -813,21 +789,24 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
-	// build up resp as we go.
+	cache, ok := r.caches[chain]
+	if !ok {
+		return nil, fmt.Errorf("cache not found for chain selector %d", chain)
+	}
+
 	var resp ContractAddresses
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
-		sourceConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, lggr, chain)
+		selectorsAndConfigs, err := cache.GetOffRampAllChains(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
 
 		// Iterate results in sourceChain selector order so that the router config is deterministic.
-		keys := maps.Keys(sourceConfigs)
-		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-		for _, sourceChain := range keys {
-			cfg := sourceConfigs[sourceChain]
+		for i := range selectorsAndConfigs.Selectors {
+			sourceChain := cciptypes.ChainSelector(selectorsAndConfigs.Selectors[i])
+			cfg := selectorsAndConfigs.SourceChainConfigs[i]
 			resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
 			// The local router is located in each source sourceChain config. Add it once.
 			if len(resp[consts.ContractNameRouter][chain]) == 0 {
@@ -839,14 +818,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// NonceManager and RMNRemote are in the offramp static config.
 	{
-		var staticConfig offRampStaticChainConfig
-		err := r.getDestinationData(
-			ctx,
-			chain,
-			consts.ContractNameOffRamp,
-			consts.MethodNameOffRampGetStaticConfig,
-			&staticConfig,
-		)
+		staticConfig, err := cache.GetOffRampStaticConfig(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to lookup nonce manager and rmn proxy remote (offramp static config): %w", err)
 		}
@@ -857,14 +829,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// FeeQuoter from the offRamp dynamic config.
 	{
-		var dynamicConfig offRampDynamicChainConfig
-		err := r.getDestinationData(
-			ctx,
-			chain,
-			consts.ContractNameOffRamp,
-			consts.MethodNameOffRampGetDynamicConfig,
-			&dynamicConfig,
-		)
+		dynamicConfig, err := cache.GetOffRampDynamicConfig(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to lookup fee quoter (offramp dynamic config): %w", err)
 		}
@@ -1005,20 +970,13 @@ type feeQuoterStaticConfig struct {
 
 // getDestFeeQuoterStaticConfig returns the destination chain's Fee Quoter's StaticConfig
 func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (feeQuoterStaticConfig, error) {
-	var staticConfig feeQuoterStaticConfig
-	err := r.getDestinationData(
-		ctx,
-		r.destChain,
-		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetStaticConfig,
-		&staticConfig,
-	)
+	cache, ok := r.caches[r.destChain]
 
-	if err != nil {
-		return feeQuoterStaticConfig{}, fmt.Errorf("unable to lookup fee quoter (offramp static config): %w", err)
+	if !ok {
+		return feeQuoterStaticConfig{}, fmt.Errorf("cache not found for chain %d", r.destChain)
 	}
 
-	return staticConfig, nil
+	return cache.GetFeeQuoterConfig(ctx)
 }
 
 // getFeeQuoterTokenPriceUSD gets the token price in USD of the given token address from the FeeQuoter contract on the
@@ -1157,24 +1115,14 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	lggr logger.Logger,
 	chain cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
-		return nil, fmt.Errorf("validate extended reader existence: %w", err)
+	cache, ok := r.caches[chain]
+	if !ok {
+		return nil, fmt.Errorf("cache not found for chain selector %d", chain)
 	}
 
-	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
-
-	var resp selectorsAndConfigs
-	err := r.contractReaders[chain].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
-		&resp,
-	)
+	resp, err := cache.GetOffRampAllChains(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs for source chain %d: %w",
-			chain, err)
+		return nil, fmt.Errorf("failed to get source chain configs from cache for chain %d: %w", chain, err)
 	}
 
 	if len(resp.SourceChainConfigs) != len(resp.Selectors) {
@@ -1183,7 +1131,9 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 
 	lggr.Debugw("got source chain configs", "configs", resp)
 
-	// Populate the map.
+	enabledConfigs := make(map[cciptypes.ChainSelector]sourceChainConfig)
+
+	// Populate the map and filter out disabled chains
 	for i := range resp.Selectors {
 		chainSel := cciptypes.ChainSelector(resp.Selectors[i])
 		cfg := resp.SourceChainConfigs[i]
@@ -1198,10 +1148,10 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 			continue
 		}
 
-		configs[chainSel] = cfg
+		enabledConfigs[chainSel] = cfg
 	}
 
-	return configs, nil
+	return enabledConfigs, nil
 }
 
 // offRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
@@ -1272,53 +1222,35 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 ) map[cciptypes.ChainSelector]getOnRampDynamicConfigResponse {
 	result := make(map[cciptypes.ChainSelector]getOnRampDynamicConfigResponse)
 
-	mu := new(sync.Mutex)
-	wg := new(sync.WaitGroup)
 	for _, chainSel := range srcChains {
 		// no onramp for the destination chain
 		if chainSel == r.destChain {
 			continue
 		}
-		if r.contractReaders[chainSel] == nil {
-			r.lggr.Errorw("contract reader not found", "chain", chainSel)
+
+		cache, ok := r.caches[chainSel]
+		if !ok {
+			lggr.Errorw("cache not found for chain selector", "chain", chainSel)
 			continue
 		}
 
-		wg.Add(1)
-		go func(chainSel cciptypes.ChainSelector) {
-			defer wg.Done()
-			// read onramp dynamic config
-			resp := getOnRampDynamicConfigResponse{}
-			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
-				ctx,
-				consts.ContractNameOnRamp,
-				consts.MethodNameOnRampGetDynamicConfig,
-				primitives.Unconfirmed,
-				map[string]any{},
-				&resp,
-			)
-			lggr.Debugw("got onramp dynamic config",
-				"chain", chainSel,
-				"resp", resp)
-			if err != nil {
-				if errors.Is(err, contractreader.ErrNoBindings) {
-					// ErrNoBindings is an allowable error during initialization
-					lggr.Infow(
-						"unable to lookup source fee quoters (onRamp dynamic config), "+
-							"this is expected during initialization", "err", err)
-				} else {
-					lggr.Errorw("unable to lookup source fee quoters (onRamp dynamic config)",
-						"chain", chainSel, "err", err)
-				}
-				return
+		resp, err := cache.GetOnRampDynamicConfig(ctx)
+		if err != nil {
+			if errors.Is(err, contractreader.ErrNoBindings) {
+				// ErrNoBindings is an allowable error during initialization
+				lggr.Infow(
+					"unable to lookup source fee quoters (onRamp dynamic config), "+
+						"this is expected during initialization", "err", err)
+			} else {
+				lggr.Errorw("unable to lookup source fee quoters (onRamp dynamic config)",
+					"chain", chainSel, "err", err)
 			}
-			mu.Lock()
-			result[chainSel] = resp
-			mu.Unlock()
-		}(chainSel)
-	}
+			continue
+		}
 
-	wg.Wait()
+		lggr.Debugw("got onramp dynamic config", "chain", chainSel, "resp", resp)
+		result[chainSel] = resp
+	}
 
 	return result
 }
@@ -1406,36 +1338,6 @@ type config struct {
 type versionedConfig struct {
 	Version uint32 `json:"version"`
 	Config  config `json:"config"`
-}
-
-// getARM gets the RMN remote address from the RMN proxy address.
-// See: https://github.com/smartcontractkit/chainlink/blob/3c7817c566c5d0aa14519c679fa85b227ac97cc5/contracts/src/v0.8/ccip/rmn/ARMProxy.sol#L40-L44
-//
-//nolint:lll
-func (r *ccipChainReader) getRMNRemoteAddress(
-	ctx context.Context,
-	lggr logger.Logger,
-	chain cciptypes.ChainSelector,
-	rmnRemoteProxyAddress []byte) ([]byte, error) {
-	_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
-	if err != nil {
-		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
-	}
-
-	// get the RMN remote address from the proxy
-	var rmnRemoteAddress []byte
-	err = r.getDestinationData(
-		ctx,
-		chain,
-		consts.ContractNameRMNProxy,
-		consts.MethodNameGetARM,
-		&rmnRemoteAddress,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
-	}
-
-	return rmnRemoteAddress, nil
 }
 
 // Get the DestChainConfig from the FeeQuoter contract on the given chain.
@@ -1533,39 +1435,12 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
-	type ConfigInfo struct {
-		ConfigDigest                   [32]byte
-		F                              uint8
-		N                              uint8
-		IsSignatureVerificationEnabled bool
+	cache, ok := r.caches[r.destChain]
+	if !ok {
+		return [32]byte{}, fmt.Errorf("cache not found for chain %d", r.destChain)
 	}
 
-	type OCRConfig struct {
-		ConfigInfo   ConfigInfo
-		Signers      [][]byte
-		Transmitters [][]byte
-	}
-
-	type OCRConfigResponse struct {
-		OCRConfig OCRConfig
-	}
-
-	var resp OCRConfigResponse
-	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampLatestConfigDetails,
-		primitives.Unconfirmed,
-		map[string]any{
-			"ocrPluginType": pluginType,
-		},
-		&resp,
-	)
-	if err != nil {
-		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
-	}
-
-	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
+	return cache.GetOffRampConfigDigest(ctx, pluginType)
 }
 
 // Interface compliance check
