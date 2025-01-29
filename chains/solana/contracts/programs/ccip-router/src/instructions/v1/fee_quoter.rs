@@ -11,6 +11,7 @@ use crate::{
 };
 
 use super::messages::ramps::validate_svm2any;
+use super::onramp::ProcessedExtraArgs;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 use super::price_math::get_validated_token_price;
 use super::price_math::{Exponential, Usd18Decimals};
@@ -32,13 +33,14 @@ pub const SVM_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 /// uint32 destGasAmount takes 1 slot.
 pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
 
+// fee_for_msg returns the required fee for ccipSend and validated extraArgs parameters for the destination chain family
 pub fn fee_for_msg(
     message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     fee_token_config: &BillingTokenConfig,
     additional_token_configs: &[Option<BillingTokenConfig>],
     additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
-) -> Result<(SVMTokenAmount, Vec<u8>, bool)> {
+) -> Result<(SVMTokenAmount, ProcessedExtraArgs)> {
     let fee_token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
     } else {
@@ -52,8 +54,7 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         CcipRouterError::InvalidInputsMissingTokenConfig
     );
-    let (extra_args, gas_limit, allow_out_of_order) =
-        validate_svm2any(message, dest_chain, fee_token_config)?;
+    let processed_extra_args = validate_svm2any(message, dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
@@ -68,7 +69,7 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain,
     )?;
 
-    let gas_limit = U256::new(gas_limit);
+    let gas_limit = U256::new(processed_extra_args.gas_limit);
 
     // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
     // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
@@ -128,8 +129,7 @@ pub fn fee_for_msg(
             token: fee_token,
             amount: fee_token_amount,
         },
-        extra_args,
-        allow_out_of_order,
+        processed_extra_args,
     ))
 }
 

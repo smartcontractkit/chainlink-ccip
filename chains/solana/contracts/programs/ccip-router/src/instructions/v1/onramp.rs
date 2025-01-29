@@ -107,7 +107,7 @@ pub fn ccip_send<'info>(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let (fee, extra_args, allow_out_of_order) = fee_for_msg(
+    let (fee, processed_extra_args) = fee_for_msg(
         &message,
         dest_chain,
         &ctx.accounts.fee_token_config.config,
@@ -167,7 +167,11 @@ pub fn ccip_send<'info>(
     let receiver = message.receiver.clone();
     let source_chain_selector = config.svm_chain_selector;
     let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
-    let final_nonce = bump_nonce(nonce_counter_account, allow_out_of_order).unwrap();
+    let final_nonce = bump_nonce(
+        nonce_counter_account,
+        processed_extra_args.allow_out_of_order_execution,
+    )
+    .unwrap();
 
     let token_count = message.token_amounts.len();
     require!(
@@ -186,7 +190,7 @@ pub fn ccip_send<'info>(
             sequence_number: dest_chain.state.sequence_number,
             nonce: final_nonce,
         },
-        extra_args,
+        extra_args: processed_extra_args.bytes,
         fee_token: message.fee_token,
         fee_token_amount: fee.amount.into(),
         fee_value_juels: link_fee.amount.into(),
@@ -306,13 +310,21 @@ fn token_transfer(
 // Helpers //
 /////////////
 
+// ProcessedExtraArgs contains serialized extra args and unpacks commonly used parameters
+#[derive(Debug)]
+pub struct ProcessedExtraArgs {
+    pub bytes: Vec<u8>,
+    pub gas_limit: u128,
+    pub allow_out_of_order_execution: bool,
+}
+
 // process_extra_args returns serialized extraArgs, gas_limit, allow_out_of_order_execution
 // it calls the chain-specific extra args validation logic
 pub fn process_extra_args(
     dest_config: &DestChainConfig,
     extra_args: &[u8],
     message_contains_tokens: bool,
-) -> Result<(Vec<u8>, u128, bool)> {
+) -> Result<ProcessedExtraArgs> {
     require_gte!(extra_args.len(), 4, CcipRouterError::InvalidInputs);
 
     let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
@@ -332,7 +344,7 @@ fn parse_and_validate_evm_extra_args(
     cfg: &DestChainConfig,
     tag: [u8; 4],
     data: &mut &[u8],
-) -> Result<(Vec<u8>, u128, bool)> {
+) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(tag) {
         EVM_EXTRA_ARGS_V2_TAG => {
             let args = if data.is_empty() {
@@ -340,11 +352,11 @@ fn parse_and_validate_evm_extra_args(
             } else {
                 EVMExtraArgsV2::deserialize(data)?
             };
-            Ok((
-                args.serialize_with_tag(),
-                args.gas_limit,
-                args.allow_out_of_order_execution,
-            ))
+            Ok(ProcessedExtraArgs {
+                bytes: args.serialize_with_tag(),
+                gas_limit: args.gas_limit,
+                allow_out_of_order_execution: args.allow_out_of_order_execution,
+            })
         }
         _ => Err(CcipRouterError::InvalidExtraArgsTag.into()),
     }
@@ -355,7 +367,7 @@ fn parse_and_validate_svm_extra_args(
     tag: [u8; 4],
     data: &mut &[u8],
     message_contains_tokens: bool,
-) -> Result<(Vec<u8>, u128, bool)> {
+) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(tag) {
         SVM_EXTRA_ARGS_V1_TAG => {
             let args = if data.is_empty() {
@@ -372,11 +384,11 @@ fn parse_and_validate_svm_extra_args(
                 CcipRouterError::InvalidTokenReceiver
             );
 
-            Ok((
-                args.serialize_with_tag(),
-                args.compute_units as u128,
-                args.allow_out_of_order_execution,
-            ))
+            Ok(ProcessedExtraArgs {
+                bytes: args.serialize_with_tag(),
+                gas_limit: args.compute_units as u128,
+                allow_out_of_order_execution: args.allow_out_of_order_execution,
+            })
         }
         _ => Err(CcipRouterError::InvalidExtraArgsTag.into()),
     }
@@ -698,17 +710,17 @@ mod tests {
         );
 
         // evm - default case
-        let (extra_args, gas_limit, ooo) =
+        let extra_args =
             process_extra_args(&evm_dest_chain.config, &evm_extra_args, false).unwrap();
-        assert_eq!(extra_args[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
         assert_eq!(
-            gas_limit,
+            extra_args.gas_limit,
             evm_dest_chain.config.default_tx_gas_limit as u128
         );
-        assert_eq!(ooo, false);
+        assert_eq!(extra_args.allow_out_of_order_execution, false);
 
         // evm - passed in data
-        let (extra_args, gas_limit, ooo) = process_extra_args(
+        let extra_args = process_extra_args(
             &evm_dest_chain.config,
             &EVMExtraArgsV2 {
                 gas_limit: 100,
@@ -718,9 +730,9 @@ mod tests {
             false,
         )
         .unwrap();
-        assert_eq!(extra_args[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
-        assert_eq!(gas_limit, 100);
-        assert_eq!(ooo, true);
+        assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(extra_args.gas_limit, 100);
+        assert_eq!(extra_args.allow_out_of_order_execution, true);
 
         // evm - fail to match
         assert_eq!(
@@ -729,14 +741,14 @@ mod tests {
         );
 
         // svm - default case
-        let (extra_args, gas_limit, ooo) =
+        let extra_args =
             process_extra_args(&svm_dest_chain.config, &svm_extra_args, false).unwrap();
-        assert_eq!(extra_args[..4], SVM_EXTRA_ARGS_V1_TAG.to_be_bytes());
+        assert_eq!(extra_args.bytes[..4], SVM_EXTRA_ARGS_V1_TAG.to_be_bytes());
         assert_eq!(
-            gas_limit,
+            extra_args.gas_limit,
             svm_dest_chain.config.default_tx_gas_limit as u128
         );
-        assert_eq!(ooo, false);
+        assert_eq!(extra_args.allow_out_of_order_execution, false);
 
         // svm - contains tokens but no receiver address
         assert_eq!(
@@ -761,11 +773,11 @@ mod tests {
                     .to_bytes(),
             ],
         };
-        let (extra_args, gas_limit, ooo) =
+        let extra_args =
             process_extra_args(&svm_dest_chain.config, &args.serialize_with_tag(), true).unwrap();
-        assert_eq!(extra_args, args.serialize_with_tag());
-        assert_eq!(gas_limit, 100);
-        assert_eq!(ooo, true);
+        assert_eq!(extra_args.bytes, args.serialize_with_tag());
+        assert_eq!(extra_args.gas_limit, 100);
+        assert_eq!(extra_args.allow_out_of_order_execution, true);
 
         // svm - fail to match
         assert_eq!(

@@ -66,9 +66,9 @@ pub mod ramps {
     use ethnum::U256;
 
     use crate::{
-        v1::onramp::process_extra_args, BillingTokenConfig, CcipRouterError, DestChain,
-        SVM2AnyMessage, SVMTokenAmount, CCIP_RECEIVE_DISCRIMINATOR, CHAIN_FAMILY_SELECTOR_EVM,
-        CHAIN_FAMILY_SELECTOR_SVM,
+        v1::onramp::{process_extra_args, ProcessedExtraArgs},
+        BillingTokenConfig, CcipRouterError, DestChain, SVM2AnyMessage, SVMTokenAmount,
+        CCIP_RECEIVE_DISCRIMINATOR, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
     };
 
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
@@ -101,7 +101,7 @@ pub mod ramps {
         msg: &SVM2AnyMessage,
         dest_chain: &DestChain,
         token_config: &BillingTokenConfig,
-    ) -> Result<(Vec<u8>, u128, bool)> {
+    ) -> Result<ProcessedExtraArgs> {
         require!(
             dest_chain.config.is_enabled,
             CcipRouterError::DestinationChainDisabled
@@ -121,7 +121,7 @@ pub mod ramps {
             CcipRouterError::UnsupportedNumberOfTokens
         );
 
-        let (extra_args, gas_limit, allow_out_of_order_execution) = process_extra_args(
+        let processed_extra_args = process_extra_args(
             &dest_chain.config,
             &msg.extra_args,
             !msg.token_amounts.is_empty(),
@@ -129,18 +129,19 @@ pub mod ramps {
 
         require_gte!(
             dest_chain.config.max_per_msg_gas_limit as u128,
-            gas_limit,
+            processed_extra_args.gas_limit,
             CcipRouterError::MessageGasLimitTooHigh,
         );
 
         require!(
-            !dest_chain.config.enforce_out_of_order || allow_out_of_order_execution,
+            !dest_chain.config.enforce_out_of_order
+                || processed_extra_args.allow_out_of_order_execution,
             CcipRouterError::ExtraArgOutOfOrderExecutionMustBeTrue,
         );
 
         validate_dest_family_address(msg, dest_chain.config.chain_family_selector)?;
 
-        Ok((extra_args, gas_limit, allow_out_of_order_execution))
+        Ok(processed_extra_args)
     }
 
     fn validate_dest_family_address(
