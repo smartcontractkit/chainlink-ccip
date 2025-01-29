@@ -235,7 +235,6 @@ pub struct AddChainSelector<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + SourceChain::INIT_SPACE,
-        constraint = uninitialized(source_chain_state.version) @ CcipRouterError::InvalidInputs,
     )]
     pub source_chain_state: Account<'info, SourceChain>,
 
@@ -245,7 +244,6 @@ pub struct AddChainSelector<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE,
-        constraint = uninitialized(dest_chain_state.version) @ CcipRouterError::InvalidInputs, // validate uninitialized
     )]
     pub dest_chain_state: Account<'info, DestChain>,
 
@@ -654,7 +652,6 @@ pub struct CommitReportContext<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + CommitReport::INIT_SPACE,
-        constraint = uninitialized(commit_report.version) @ CcipRouterError::InvalidInputs, // validate uninitialized
     )]
     pub commit_report: Account<'info, CommitReport>,
 
