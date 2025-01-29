@@ -114,6 +114,25 @@ pub struct DestChainConfig {
     pub gas_price_staleness_threshold: u32, // The amount of time a gas price can be stale before it is considered invalid (0 means disabled)
     pub enforce_out_of_order: bool, // Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
     pub chain_family_selector: [u8; 4], // Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+
+    // list of senders authorized to send messages to this destination chain.
+    // Note: The attribute name `max_len` is slightly misleading: it is not in any
+    // way limiting the actual length of the vector during initialization; it just
+    // helps the InitSpace derive macro work out the initial space. We can leave it at
+    // zero and calculate the actual length in the instruction context.
+    #[max_len(0)]
+    pub allowed_senders: Vec<Pubkey>,
+    pub allow_list_enabled: bool,
+}
+
+impl DestChainConfig {
+    pub fn space(&self) -> usize {
+        Self::INIT_SPACE + self.dynamic_space()
+    }
+
+    pub fn dynamic_space(&self) -> usize {
+        self.allowed_senders.len() * std::mem::size_of::<Pubkey>()
+    }
 }
 
 #[account]

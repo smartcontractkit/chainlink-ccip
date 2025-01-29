@@ -400,6 +400,11 @@
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -2486,6 +2491,16 @@
                 4
               ]
             }
+          },
+          {
+            "name": "allowedSenders",
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "allowListEnabled",
+            "type": "bool"
           }
         ]
       }
@@ -2773,6 +2788,9 @@
           },
           {
             "name": "InvalidSVMAddress"
+          },
+          {
+            "name": "SenderNotAllowed"
           }
         ]
       }
