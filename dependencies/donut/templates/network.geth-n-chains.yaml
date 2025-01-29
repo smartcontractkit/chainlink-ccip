@@ -9,16 +9,17 @@ in: |
               v2Config:
                 {{- if gt (conv.ToInt .Env.ADDITIONAL_CHAINS_COUNT) 0 }}
                 {{- range $i := seq 1 .Env.ADDITIONAL_CHAINS_COUNT }}
-                01-network-geth-chain-9000000{{ $i }}.toml: |
+                {{- $networkId := add 90000000 $i}}
+                01-network-geth-chain-{{ $networkId }}.toml: |
                   [[EVM]]
-                  ChainID = "9000000{{ $i }}"
+                  ChainID = {{ $networkId }}
                   MinContractPayment = '0'
                   AutoCreateKey = true
                   FinalityDepth = 50
 
                   [[EVM.Nodes]]
-                  Name = 'node-9000000{{ $i }}'
-                  HTTPURL = "http://geth-9000000{{ $i }}:8544"
-                  WSURL = "ws://geth-9000000{{ $i }}:8546"
+                  Name = 'node-{{ $networkId }}'
+                  HTTPURL = "http://geth-{{ $networkId }}:8544"
+                  WSURL = "ws://geth-{{ $networkId }}:8546"
                 {{- end }}
                 {{- end }}
