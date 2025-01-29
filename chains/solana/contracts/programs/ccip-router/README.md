@@ -17,10 +17,9 @@ Collapsed Router + OnRamp + OffRamp Contracts Implementation for CCIP in SVM.
 
 ### Update Config
 
-`add_chain_selector`, `remove_chain_selector`, `update_svm_chain_selector`, `update_default_gas_limit` & `update_default_allow_out_of_order_execution`
+`add_chain_selector`, `remove_chain_selector`, `update_svm_chain_selector`
 
 1. Update the Config PDA with the SVM Chain Selector.
-1. Update the Config PDA with the Default Extra Args.
 1. Init/Close the Chain State PDA with the Supported Destination Chain Selectors (add/remove).
 
 #### Update Config Accounts
