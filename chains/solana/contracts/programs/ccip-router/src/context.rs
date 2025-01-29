@@ -528,20 +528,6 @@ pub struct CcipSend<'info> {
     )]
     pub fee_token_mint: InterfaceAccount<'info, Mint>, // pass pre-2022 wSOL if using native SOL
 
-    #[account(
-        // `message.fee_token` would ideally be named `message.fee_mint` in SVM,
-        // but using the `token` nomenclature is more compatible with EVM
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()],
-        bump,
-    )]
-    pub fee_token_config: Account<'info, BillingTokenConfigWrapper>, // pass pre-2022 wSOL config if using native SOL
-
-    #[account(
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, config.load()?.link_token_mint.key().as_ref()],
-        bump,
-    )]
-    pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
-
     /// CHECK: This is the associated token account for the user paying the fee.
     /// If paying with native SOL, this must be the zero address.
     #[account(

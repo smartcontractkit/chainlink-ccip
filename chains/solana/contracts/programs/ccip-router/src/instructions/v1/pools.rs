@@ -115,7 +115,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
 
         let (expected_fee_token_config, _) = Pubkey::find_program_address(
             &[seed::FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()],
-            &router,
+            &router, // TODO this might need to be fee_quoter instead of router
         );
         require_eq!(
             fee_token_config.key(),
@@ -157,7 +157,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
                 chain_selector.to_le_bytes().as_ref(),
                 mint.key().as_ref(),
             ],
-            &router,
+            &router, // TODO this might need to be fee_quoter instead of router
         );
         let (expected_pool_chain_config, _) = Pubkey::find_program_address(
             &[
