@@ -405,8 +405,6 @@ fn internal_execute<'info>(
         return Ok(());
     }
 
-    let hashed_leaf = verify_merkle_root(&execution_report)?;
-
     // send tokens any -> SOL
     require!(
         token_indexes.len() == execution_report.message.token_amounts.len()
@@ -482,22 +480,17 @@ fn internal_execute<'info>(
     let message = Any2SVMMessage {
         message_id: execution_report.message.header.message_id,
         source_chain_selector: execution_report.source_chain_selector,
-        sender: execution_report.message.sender,
-        data: execution_report.message.data,
+        sender: execution_report.message.sender.clone(),
+        data: execution_report.message.data.clone(),
         token_amounts,
     };
 
-    // handle CPI call if there are extra accounts
+    // handle CPI call if there are message accounts in the remaining_accounts
     // case: no tokens, but there are remaining_accounts passed in
-    // case: tokens, but the first token has a non-zero index (indicating extra accounts before token accounts)
-    if should_execute_messaging(
-        &execution_report.message.logic_receiver,
-        ctx.remaining_accounts.is_empty(),
-    ) {
+    // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
+    let hashed_leaf = if should_execute_messaging(ctx.remaining_accounts, token_indexes) {
         let (msg_program, msg_accounts) = parse_messaging_accounts(
             token_indexes,
-            execution_report.message.logic_receiver,
-            &execution_report.message.extra_args.accounts,
             &execution_report.message.extra_args.is_writable_bitmap,
             ctx.remaining_accounts,
         )?;
@@ -536,7 +529,13 @@ fn internal_execute<'info>(
         let signer = &[&seeds[..]];
 
         invoke_signed(&instruction, &acc_infos, signer)?;
-    }
+        let recv_and_msg_account_keys = Some(*msg_program.key)
+            .into_iter()
+            .chain(msg_accounts.iter().map(|a| *a.key));
+        verify_merkle_root(&execution_report, recv_and_msg_account_keys)?
+    } else {
+        verify_merkle_root(&execution_report, None.into_iter())?
+    };
 
     let new_state = MessageExecutionState::Success;
     execution_state::set(
@@ -576,11 +575,14 @@ fn get_token_accounts_for<'a>(
     Ok(accs)
 }
 
-// should_execute_messaging checks if:
-// 1. There is at least one account used for messaging (the first subset of accounts). This is because the first account is the program id to do the CPI
-// 2. AND the logic_receiver has a value different than zeros
-fn should_execute_messaging(logic_receiver: &Pubkey, remaining_accounts_empty: bool) -> bool {
-    !remaining_accounts_empty && *logic_receiver != Pubkey::default()
+// There is at least one account used for messaging (the first subset of accounts). This is because the first account is the program id to do the CPI
+fn should_execute_messaging<'a>(
+    remaining_accounts: &'a [AccountInfo<'a>],
+    token_indices: &[u8],
+) -> bool {
+    // The first entry in the accounts corresponds to a token, which means there is no logic receiver
+    let only_tokens = token_indices.first().map(|i| *i == 0).unwrap_or_default();
+    !remaining_accounts.is_empty() && !only_tokens
 }
 
 /// parse_message_accounts returns all the accounts needed to execute the CPI instruction
@@ -589,13 +591,13 @@ fn should_execute_messaging(logic_receiver: &Pubkey, remaining_accounts_empty: b
 ///
 /// # Arguments
 /// * `token_indexes` - start indexes of token pool accounts, used to determine ending index for arbitrary messaging accounts
-/// * `logic_receiver` - receiver address from x-chain message, used to validate `remaining_accounts`
-/// * `extra_args_accounts` - arbitrary messaging accounts from the x-chain message, used to validate `accounts`.
-/// * `remaining_accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [program, receiver, ...additional message accounts]
+/// * `remaining_accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [logic_receiver, ...additional message accounts]
+///
+/// # Return values
+//  * `logic_receiver` is the Program ID of the user's program that will execute the message.
+//  * `msg_accounts` the remaining list of accounts used for the arbitrary execution
 fn parse_messaging_accounts<'info>(
     token_indexes: &[u8],
-    logic_receiver: Pubkey,
-    extra_args_accounts: &[Pubkey],
     source_bitmap: &u64,
     remaining_accounts: &'info [AccountInfo<'info>],
 ) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
@@ -610,35 +612,27 @@ fn parse_messaging_accounts<'info>(
         CcipRouterError::InvalidInputs
     ); // there could be other remaining accounts used for tokens
 
-    let msg_program = &remaining_accounts[0];
+    let logic_receiver = &remaining_accounts[0];
     let msg_accounts = &remaining_accounts[1..end_index];
 
-    require!(
-        logic_receiver == msg_program.key(),
-        CcipRouterError::InvalidInputs,
-    );
-    require!(
-        msg_accounts.len() == extra_args_accounts.len(), // assert same number of accounts passed from message and transaction
-        CcipRouterError::InvalidInputs
-    );
-
-    // Validate the addresses of all the accounts match the ones in source chain
-    if msg_accounts.len() > 1 {
-        for (i, acc) in extra_args_accounts.iter().enumerate() {
-            let current_acc = &msg_accounts[i];
-            require!(*acc == current_acc.key(), CcipRouterError::InvalidInputs);
-            require!(
-                is_writable(source_bitmap, (i) as u8) == current_acc.is_writable,
-                CcipRouterError::InvalidInputs
-            );
-        }
+    // Validate that the bitmap corresponds to the individual writable flags
+    for (i, acc) in msg_accounts.iter().enumerate().skip(1) {
+        require!(
+            is_writable(source_bitmap, i as u8) == acc.is_writable,
+            CcipRouterError::InvalidWritabilityBitmap
+        );
     }
 
-    Ok((msg_program, msg_accounts))
+    Ok((logic_receiver, msg_accounts))
 }
 
-pub fn verify_merkle_root(execution_report: &ExecutionReportSingleChain) -> Result<[u8; 32]> {
-    let hashed_leaf = hash(&execution_report.message);
+pub fn verify_merkle_root(
+    execution_report: &ExecutionReportSingleChain,
+    // logic receiver followed by all other message account keys, when they were
+    // provided (i.e. when the message isn't a token transfer exclusively)
+    recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+) -> Result<[u8; 32]> {
+    let hashed_leaf = hash(&execution_report.message, recv_and_msg_account_keys);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
         calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
     require!(
@@ -687,7 +681,10 @@ pub fn validate_execution_report<'info>(
     Ok(())
 }
 
-fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
+fn hash(
+    msg: &Any2SVMRampMessage,
+    recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+) -> [u8; 32] {
     use anchor_lang::solana_program::keccak;
 
     // Calculate vectors size to ensure that the hash is unique
@@ -701,6 +698,10 @@ fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
+    let remaining_account_bytes: Vec<u8> = recv_and_msg_account_keys
+        .flat_map(|k| k.try_to_vec().unwrap())
+        .collect();
+
     // As similar as https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L111
     let result = keccak::hashv(&[
         LEAF_DOMAIN_SEPARATOR.as_slice(),
@@ -713,7 +714,6 @@ fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
         // message header
         &msg.header.message_id,
         &msg.token_receiver.to_bytes(),
-        &msg.logic_receiver.to_bytes(),
         &header_sequence_number,
         msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialized
         &header_nonce,
@@ -724,6 +724,8 @@ fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
         &msg.data,
         // token transfers
         msg.token_amounts.try_to_vec().unwrap().as_ref(), // borsh serialized
+        // Remaining accounts (passed outside `Any2SVMRampMessage`)
+        &remaining_account_bytes,
     ]);
 
     result.to_bytes()
@@ -867,8 +869,6 @@ mod tests {
             .to_vec(),
             token_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
                 .unwrap(),
-            logic_receiver: Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8")
-                .unwrap(),
             data: vec![4, 5, 6],
             header: RampMessageHeader {
                 message_id: [
@@ -894,16 +894,19 @@ mod tests {
             extra_args: SVMExtraArgs {
                 compute_units: 1000,
                 is_writable_bitmap: 1,
-                accounts: vec![
-                    Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
-                ],
             },
             on_ramp_address: on_ramp_address.clone(),
         };
-        let hash_result = hash(&message);
+        let remaining_account_keys = [
+            Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8").unwrap(),
+            Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
+        ]
+        .into_iter();
+
+        let hash_result = hash(&message, remaining_account_keys);
 
         assert_eq!(
-            "4db316059ebdabdb76b8b090d4df866c00de34c4f1ab959fc3ad142c8bde3bfa",
+            "8ceebcae8acd670231be9eb13203797bf6cb09e7a4851dd57600af3ed3945eb0",
             hex::encode(hash_result)
         );
     }

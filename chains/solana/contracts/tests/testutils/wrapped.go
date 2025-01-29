@@ -83,8 +83,8 @@ func AssertClosedAccount(ctx context.Context, t *testing.T, solanaGoClient *rpc.
 	require.True(t, isClosed)
 }
 
-func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, t *testing.T) (ccip_router.Any2SVMRampMessage, [32]byte) {
-	msg, hash, err := ccip.CreateNextMessage(ctx, solanaGoClient)
+func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, t *testing.T, remainingAccounts []solana.PublicKey) (ccip_router.Any2SVMRampMessage, [32]byte) {
+	msg, hash, err := ccip.CreateNextMessage(ctx, solanaGoClient, remainingAccounts)
 	require.NoError(t, err)
 	return msg, hash
 }
@@ -95,8 +95,8 @@ func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceC
 	return num
 }
 
-func MakeAnyToSVMMessage(t *testing.T, tokenReceiver solana.PublicKey, logicReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SVMRampMessage, [32]byte) {
-	msg, hash, err := ccip.MakeAnyToSVMMessage(tokenReceiver, logicReceiver, evmChainSelector, solanaChainSelector, data)
+func MakeAnyToSVMMessage(t *testing.T, tokenReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte, msgAccounts []solana.PublicKey) (ccip_router.Any2SVMRampMessage, [32]byte) {
+	msg, hash, err := ccip.MakeAnyToSVMMessage(tokenReceiver, evmChainSelector, solanaChainSelector, data, msgAccounts)
 	require.NoError(t, err)
 	return msg, hash
 }
