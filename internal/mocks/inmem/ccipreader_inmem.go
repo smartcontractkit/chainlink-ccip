@@ -3,7 +3,10 @@ package inmem
 import (
 	"context"
 	"math/big"
+	"sort"
 	"time"
+
+	mapset "github.com/deckarep/golang-set/v2"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -57,9 +60,9 @@ func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 	return results, nil
 }
 
-func (r InMemoryCCIPReader) ExecutedMessageRanges(
+func (r InMemoryCCIPReader) ExecutedMessages(
 	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
-) ([]cciptypes.SeqNumRange, error) {
+) ([]cciptypes.SeqNum, error) {
 	msgs, ok := r.Messages[source]
 	// no messages for chain
 	if !ok {
@@ -88,7 +91,15 @@ func (r InMemoryCCIPReader) ExecutedMessageRanges(
 	if currentRange != nil {
 		ranges = append(ranges, *currentRange)
 	}
-	return ranges, nil
+
+	seqNums := make([]cciptypes.SeqNum, 0, len(ranges))
+	for _, r := range ranges {
+		seqNums = append(seqNums, r.ToSlice()...)
+	}
+
+	unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
+	sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
+	return unqSeqNums, nil
 }
 
 func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
