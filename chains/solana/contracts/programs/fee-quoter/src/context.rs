@@ -42,7 +42,6 @@ pub struct Initialize<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
-        constraint = uninitialized(config.version) @ FeeQuoterError::InvalidInputs,
     )]
     pub config: Account<'info, Config>,
 
