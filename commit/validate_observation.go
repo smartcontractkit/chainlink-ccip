@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -63,6 +64,17 @@ func (p *Plugin) ValidateObservation(
 	err = p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery, gasObs)
 	if err != nil {
 		return fmt.Errorf("validate chain fee observation: %w", err)
+	}
+
+	if p.discoveryProcessor != nil {
+		discoveryObs := plugincommon.AttributedObservation[dt.Observation]{
+			OracleID:    ao.Observer,
+			Observation: obs.DiscoveryObs,
+		}
+		err = p.discoveryProcessor.ValidateObservation(dt.Outcome{}, dt.Query{}, discoveryObs)
+		if err != nil {
+			return fmt.Errorf("validate discovery observation: %w", err)
+		}
 	}
 
 	return nil
