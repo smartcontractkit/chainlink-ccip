@@ -1187,6 +1187,11 @@ func (scc sourceChainConfig) check() (bool /* enabled */, error) {
 			scc.OnRamp,
 		)
 	}
+
+	if len(scc.Router) == 0 {
+		return false, fmt.Errorf("router is empty: %v", scc.Router)
+	}
+
 	return scc.IsEnabled, nil
 }
 
@@ -1783,10 +1788,6 @@ func validateSendRequestedEvent(
 
 	if ev.Message.Header.MessageID.IsEmpty() {
 		return fmt.Errorf("message ID is zero")
-	}
-
-	if len(ev.Message.Header.OnRamp) == 0 {
-		return fmt.Errorf("empty onramp address")
 	}
 
 	if len(ev.Message.Receiver) == 0 {
