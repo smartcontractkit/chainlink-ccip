@@ -39,6 +39,7 @@ in: |
       helm:
         chart:
           name: oci://registry-1.docker.io/bitnamicharts/postgresql
+          version: 16.x
         valuesFiles:
           - ${LOCAL_VALUES_DIR}/postgresql/type.dev.yaml
           {{- if ne $.Env.PROVIDER "kind" }}
@@ -56,6 +57,7 @@ in: |
       helm:
         chart:
           name: oci://registry-1.docker.io/bitnamicharts/postgresql
+          version: 16.x
         valuesFiles:
           - ${LOCAL_VALUES_DIR}/postgresql/type.dev.yaml
           {{- if ne $.Env.PROVIDER "kind" }}

@@ -287,6 +287,13 @@ profiles:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+  - name: ccip-load-testing-aws-staging
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip-load-tests.yaml
+      )
   - name: git-charts
     merge:
       deployments:

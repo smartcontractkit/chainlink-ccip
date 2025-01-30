@@ -81,6 +81,12 @@ pipelines:
       # Deploy CCIP enabled fully configured DON
       run_dependency_pipelines ccip-don --set-flag infraOnly="true"
       run_pipelines ingress-check
+  # Pipeline without any steps that would break --render flag
+  ccip-v2-infra-only-render:
+    run: |-
+      run_pipelines maybe-kind
+      run_dependency_pipelines geth
+      run_dependency_pipelines ccip-don --set-flag infraOnly="true"
   geth:
     run: |-
       if [ "$PROVIDER" == "kind" ]; then
@@ -184,15 +190,23 @@ profiles:
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
-              - ccip-v2-load-tests
+              - ccip
+              - additional-chains
+              # Use ccip-v2-load-tests to customize blocktime parameter for individual geth network
+              # - ccip-v2-load-tests
           ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - version-from-env
-              - network-generated
+              - network-geth-chain-1337
+              - network-geth-chain-2337
+              - network-additional-geth-chains
               - monitoring-service-monitor
+              - ccip-load-testing-aws-staging
+              # Use network-generated to customize parameters for individual geth network
+              # - network-generated
 commands:
   ccip-v2:
     command: devspace run-pipeline ccip-v2 -p default
@@ -206,12 +220,16 @@ commands:
     command: devspace run-pipeline ccip-v2-infra-only -p default
     description: Run the ccip v2 pipeline without onchain deployment, just infra.
     appendArgs: true
+  ccip-v2-infra-render:
+    command: devspace run-pipeline ccip-v2-infra-only-render --render
+    description: Render infra components, pass desired profile via -p flag
+    appendArgs: true
   deploy-dashboard:
     command: crib dashboard deploy --product=ccip
     description: Deploy Grafana Dashboards
     appendArgs: true
   geth:
-    command: devspace run-pipeline geth -p ccip-v2
+    command: devspace run-pipeline geth -p default
     description: Run the ccip v2 pipeline.
     appendArgs: true
   debug-gap:
