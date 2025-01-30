@@ -111,7 +111,7 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
 	}
 
-	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, p.chainSupport.DestChain(), allSourceChains)
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
@@ -159,7 +159,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, lggr)
+	groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, fetchFrom, lggr)
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
@@ -334,7 +334,7 @@ func (p *Plugin) getFilterObservation(
 	for srcChain, addrSet := range nonceRequestArgs {
 		// TODO: check if srcSelector is supported.
 		addrs := maps.Keys(addrSet)
-		nonces, err := p.ccipReader.Nonces(ctx, srcChain, p.destChain, addrs)
+		nonces, err := p.ccipReader.Nonces(ctx, srcChain, addrs)
 		if err != nil {
 			lggr.Errorw("unable to get nonces", "err", err)
 			continue

@@ -5,23 +5,18 @@ use anchor_lang::prelude::*;
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct Config {
     pub version: u8,
-    pub default_allow_out_of_order_execution: u8, // bytemuck::Pod compliant required for zero_copy
-    _padding0: [u8; 6],
+    _padding0: [u8; 7],
     pub svm_chain_selector: u64,
-    pub default_gas_limit: u128,
+    pub enable_manual_execution_after: i64, // Expressed as Unix time (i.e. seconds since the Unix epoch).
     _padding1: [u8; 8],
+    pub max_fee_juels_per_msg: u128,
 
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
 
-    pub enable_manual_execution_after: i64, // Expressed as Unix time (i.e. seconds since the Unix epoch).
     _padding2: [u8; 8],
-
     pub ocr3: [Ocr3Config; 2],
-    // TODO: token pool global config
 
-    // TODO: billing global configs'
-    pub max_fee_juels_per_msg: u128,
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }

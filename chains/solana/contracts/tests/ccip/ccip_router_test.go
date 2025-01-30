@@ -58,7 +58,6 @@ func TestCCIPRouter(t *testing.T) {
 	require.NoError(t, gerr)
 
 	var nonceEvmPDA solana.PublicKey
-	var nonceSvmPDA solana.PublicKey
 
 	// billing
 	type AccountsPerToken struct {
@@ -145,6 +144,7 @@ func TestCCIPRouter(t *testing.T) {
 	// Small enough to fit in u160, big enough to not fall in the precompile space.
 	validReceiverAddress := [32]byte{}
 	validReceiverAddress[12] = 1
+	emptyEVMExtraArgsV2 := testutils.MustSerializeExtraArgs(t, struct{}{}, ccip.EVMExtraArgsV2Tag)
 
 	var commitLookupTable map[solana.PublicKey]solana.PublicKeySlice
 
@@ -363,9 +363,7 @@ func TestCCIPRouter(t *testing.T) {
 	t.Run("Config", func(t *testing.T) {
 		t.Run("Is initialized", func(t *testing.T) {
 			invalidSVMChainSelector := uint64(17)
-			defaultGasLimit := bin.Uint128{Lo: 3000, Hi: 0, Endianness: nil}
 			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
-			allowOutOfOrderExecution := true
 
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CcipRouterProgram, &rpc.GetAccountInfoOpts{
@@ -382,8 +380,6 @@ func TestCCIPRouter(t *testing.T) {
 
 			instruction, err := ccip_router.NewInitializeInstruction(
 				invalidSVMChainSelector,
-				defaultGasLimit,
-				allowOutOfOrderExecution,
 				config.EnableExecutionAfter,
 				// fee aggregator address, will be changed in later test
 				anotherUser.PublicKey(),
@@ -413,53 +409,9 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 			}
 			require.Equal(t, uint64(17), configAccount.SvmChainSelector)
-			require.Equal(t, defaultGasLimit, configAccount.DefaultGasLimit)
-			require.Equal(t, uint8(1), configAccount.DefaultAllowOutOfOrderExecution)
 
 			nonceEvmPDA, err = state.FindNoncePDA(config.EvmChainSelector, user.PublicKey(), config.CcipRouterProgram)
 			require.NoError(t, err)
-			nonceSvmPDA, err = state.FindNoncePDA(config.SVMChainSelector, user.PublicKey(), config.CcipRouterProgram)
-			require.NoError(t, err)
-		})
-
-		t.Run("When admin updates the default gas limit it's updated", func(t *testing.T) {
-			newGasLimit := bin.Uint128{Lo: 5000, Hi: 0}
-
-			instruction, err := ccip_router.NewUpdateDefaultGasLimitInstruction(
-				newGasLimit,
-				config.RouterConfigPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
-			require.NotNil(t, result)
-
-			var configAccount ccip_router.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(17), configAccount.SvmChainSelector)
-			require.Equal(t, newGasLimit, configAccount.DefaultGasLimit)
-			require.Equal(t, uint8(1), configAccount.DefaultAllowOutOfOrderExecution)
-		})
-
-		t.Run("When admin updates the default allow out of order execution it's updated", func(t *testing.T) {
-			instruction, err := ccip_router.NewUpdateDefaultAllowOutOfOrderExecutionInstruction(
-				false,
-				config.RouterConfigPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
-			require.NotNil(t, result)
-
-			var configAccount ccip_router.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(17), configAccount.SvmChainSelector)
-			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, configAccount.DefaultGasLimit)
-			require.Equal(t, uint8(0), configAccount.DefaultAllowOutOfOrderExecution)
 		})
 
 		t.Run("When admin updates the solana chain selector it's updated", func(t *testing.T) {
@@ -477,8 +429,6 @@ func TestCCIPRouter(t *testing.T) {
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, config.SVMChainSelector, configAccount.SvmChainSelector)
-			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, configAccount.DefaultGasLimit)
-			require.Equal(t, uint8(0), configAccount.DefaultAllowOutOfOrderExecution)
 		})
 
 		type InvalidChainBillingInputTest struct {
@@ -2024,8 +1974,9 @@ func TestCCIPRouter(t *testing.T) {
 	t.Run("getFee", func(t *testing.T) {
 		t.Run("Fee is retrieved for a correctly formatted message", func(t *testing.T) {
 			message := ccip_router.SVM2AnyMessage{
-				Receiver: validReceiverAddress[:],
-				FeeToken: wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				FeeToken:  wsol.mint,
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.RouterConfigPDA, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
@@ -2043,6 +1994,7 @@ func TestCCIPRouter(t *testing.T) {
 				Receiver:     validReceiverAddress[:],
 				FeeToken:     wsol.mint,
 				TokenAmounts: []ccip_router.SVMTokenAmount{{Token: token0.Mint.PublicKey(), Amount: 1}},
+				ExtraArgs:    emptyEVMExtraArgsV2,
 			}
 
 			// Set some fees that will result in some appreciable change in the message fee
@@ -2083,8 +2035,9 @@ func TestCCIPRouter(t *testing.T) {
 
 			for _, address := range [][32]byte{tooBigAddress, tooSmallAddress} {
 				message := ccip_router.SVM2AnyMessage{
-					Receiver: address[:],
-					FeeToken: wsol.mint,
+					Receiver:  address[:],
+					FeeToken:  wsol.mint,
+					ExtraArgs: emptyEVMExtraArgsV2,
 				}
 
 				raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.RouterConfigPDA, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
@@ -2107,9 +2060,10 @@ func TestCCIPRouter(t *testing.T) {
 			destinationChainStatePDA, err := state.FindDestChainStatePDA(destinationChainSelector, config.CcipRouterProgram)
 			require.NoError(t, err)
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: wsol.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2142,9 +2096,10 @@ func TestCCIPRouter(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: wsol.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2190,8 +2145,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, ccipMessageSentEvent.Message.ExtraArgs.GasLimit) // default gas limit
-			require.Equal(t, false, ccipMessageSentEvent.Message.ExtraArgs.AllowOutOfOrderExecution)        // default OOO Execution
+			require.Equal(t, bin.Uint128{Lo: uint64(validDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // default gas limit
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)                                                  // default OOO Execution
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2209,10 +2164,10 @@ func TestCCIPRouter(t *testing.T) {
 				FeeToken: wsol.mint,
 				Receiver: validReceiverAddress[:],
 				Data:     []byte{4, 5, 6},
-				ExtraArgs: ccip_router.ExtraArgsInput{
-					GasLimit:                 &bin.Uint128{Lo: 99, Hi: 0},
-					AllowOutOfOrderExecution: &trueValue,
-				},
+				ExtraArgs: testutils.MustSerializeExtraArgs(t, ccip_router.EVMExtraArgsV2{
+					GasLimit:                 bin.Uint128{Lo: 99, Hi: 0},
+					AllowOutOfOrderExecution: trueValue,
+				}, ccip.EVMExtraArgsV2Tag),
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2258,8 +2213,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 99, Hi: 0}, ccipMessageSentEvent.Message.ExtraArgs.GasLimit) // check it's overwritten
-			require.Equal(t, true, ccipMessageSentEvent.Message.ExtraArgs.AllowOutOfOrderExecution)       // check it's overwritten
+			require.Equal(t, bin.Uint128{Lo: 99, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // check it's overwritten
+			require.Equal(t, true, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)       // check it's overwritten
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(2), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2273,9 +2228,9 @@ func TestCCIPRouter(t *testing.T) {
 				FeeToken: wsol.mint,
 				Receiver: validReceiverAddress[:],
 				Data:     []byte{4, 5, 6},
-				ExtraArgs: ccip_router.ExtraArgsInput{
-					GasLimit: &bin.Uint128{Lo: 99, Hi: 0},
-				},
+				ExtraArgs: testutils.MustSerializeExtraArgs(t, ccip_router.EVMExtraArgsV2{
+					GasLimit: bin.Uint128{Lo: 99, Hi: 0},
+				}, ccip.EVMExtraArgsV2Tag),
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2321,8 +2276,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 99, Hi: 0}, ccipMessageSentEvent.Message.ExtraArgs.GasLimit) // check it's overwritten
-			require.Equal(t, false, ccipMessageSentEvent.Message.ExtraArgs.AllowOutOfOrderExecution)      // check it's default value
+			require.Equal(t, bin.Uint128{Lo: 99, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // check it's overwritten
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)      // check it's default value
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(3), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2332,14 +2287,14 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("When sending a CCIP Message with allow out of order ExtraArgs overrides Emits CCIPMessageSent", func(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
-			trueValue := true
 			message := ccip_router.SVM2AnyMessage{
 				FeeToken: wsol.mint,
 				Receiver: validReceiverAddress[:],
 				Data:     []byte{4, 5, 6},
-				ExtraArgs: ccip_router.ExtraArgsInput{
-					AllowOutOfOrderExecution: &trueValue,
-				},
+				ExtraArgs: testutils.MustSerializeExtraArgs(t, ccip_router.EVMExtraArgsV2{
+					AllowOutOfOrderExecution: true,
+					GasLimit:                 bin.Uint128{Lo: 5000, Hi: 0},
+				}, ccip.EVMExtraArgsV2Tag),
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2385,8 +2340,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, ccipMessageSentEvent.Message.ExtraArgs.GasLimit) // default gas limit
-			require.Equal(t, true, ccipMessageSentEvent.Message.ExtraArgs.AllowOutOfOrderExecution)         // check it's overwritten
+			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // default gas limit
+			require.Equal(t, true, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)         // check it's overwritten
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(4), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2400,9 +2355,9 @@ func TestCCIPRouter(t *testing.T) {
 				FeeToken: token2022.mint,
 				Receiver: validReceiverAddress[:],
 				Data:     []byte{4, 5, 6},
-				ExtraArgs: ccip_router.ExtraArgsInput{
-					GasLimit: &bin.Uint128{Lo: 0, Hi: 0},
-				},
+				ExtraArgs: testutils.MustSerializeExtraArgs(t, ccip_router.EVMExtraArgsV2{
+					GasLimit: bin.Uint128{Lo: 0, Hi: 0},
+				}, ccip.EVMExtraArgsV2Tag),
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2448,93 +2403,22 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 0, Hi: 0}, ccipMessageSentEvent.Message.ExtraArgs.GasLimit)
-			require.Equal(t, false, ccipMessageSentEvent.Message.ExtraArgs.AllowOutOfOrderExecution)
+			require.Equal(t, bin.Uint128{Lo: 0, Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit)
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(5), ccipMessageSentEvent.Message.Header.SequenceNumber)
 			require.Equal(t, uint64(3), ccipMessageSentEvent.Message.Header.Nonce)
 		})
 
-		t.Run("When gasLimit is too high, it fails", func(t *testing.T) {
-			destinationChainSelector := config.EvmChainSelector
-			destinationChainStatePDA := config.EvmDestChainStatePDA
-			message := ccip_router.SVM2AnyMessage{
-				FeeToken: token2022.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
-				ExtraArgs: ccip_router.ExtraArgsInput{
-					GasLimit: &bin.Uint128{Lo: 0, Hi: 1_000_000_000},
-				},
-			}
-
-			raw := ccip_router.NewCcipSendInstruction(
-				destinationChainSelector,
-				message,
-				[]byte{},
-				config.RouterConfigPDA,
-				destinationChainStatePDA,
-				nonceEvmPDA,
-				user.PublicKey(),
-				solana.SystemProgramID,
-				token2022.program,
-				token2022.mint,
-				token2022.billingConfigPDA,
-				token2022.billingConfigPDA,
-				token2022.userATA,
-				token2022.billingATA,
-				config.BillingSignerPDA,
-				config.ExternalTokenPoolsSignerPDA,
-			)
-			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			instruction, err := raw.ValidateAndBuild()
-			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.MessageGasLimitTooHigh_CcipRouterError.String()})
-		})
-
-		t.Run("When out of order execution is enforced, it fails when not enabled", func(t *testing.T) {
-			destinationChainSelector := config.SVMChainSelector // SVM dest chain requires out of order execution
-			destinationChainStatePDA := config.SVMDestChainStatePDA
-			falseVal := false
-			message := ccip_router.SVM2AnyMessage{
-				FeeToken: token2022.mint,
-				Receiver: validReceiverAddress[:],
-				ExtraArgs: ccip_router.ExtraArgsInput{
-					AllowOutOfOrderExecution: &falseVal,
-				},
-			}
-
-			raw := ccip_router.NewCcipSendInstruction(
-				destinationChainSelector,
-				message,
-				[]byte{},
-				config.RouterConfigPDA,
-				destinationChainStatePDA,
-				nonceSvmPDA,
-				user.PublicKey(),
-				solana.SystemProgramID,
-				token2022.program,
-				token2022.mint,
-				token2022.billingConfigPDA,
-				token2022.billingConfigPDA,
-				token2022.userATA,
-				token2022.billingATA,
-				config.BillingSignerPDA,
-				config.ExternalTokenPoolsSignerPDA,
-			)
-			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			instruction, err := raw.ValidateAndBuild()
-			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError.String()})
-		})
-
 		t.Run("When sending a message with an invalid nonce account, it fails", func(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: wsol.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2567,9 +2451,10 @@ func TestCCIPRouter(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: wsol.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2601,9 +2486,10 @@ func TestCCIPRouter(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: wsol.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -2655,9 +2541,10 @@ func TestCCIPRouter(t *testing.T) {
 										raw := ccip_router.NewCcipSendInstruction(
 											destinationChainSelector,
 											ccip_router.SVM2AnyMessage{
-												FeeToken: messageMint,
-												Receiver: validReceiverAddress[:],
-												Data:     []byte{4, 5, 6},
+												FeeToken:  messageMint,
+												Receiver:  validReceiverAddress[:],
+												Data:      []byte{4, 5, 6},
+												ExtraArgs: emptyEVMExtraArgsV2,
 											},
 											[]byte{},
 											config.RouterConfigPDA,
@@ -2693,9 +2580,10 @@ func TestCCIPRouter(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: token2022.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  token2022.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 			anotherUserNonceEVMPDA, err := state.FindNoncePDA(config.EvmChainSelector, anotherUser.PublicKey(), config.CcipRouterProgram)
 			require.NoError(t, err)
@@ -2728,9 +2616,10 @@ func TestCCIPRouter(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: token2022.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  token2022.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 			anotherUserNonceEVMPDA, err := state.FindNoncePDA(config.EvmChainSelector, anotherUser.PublicKey(), config.CcipRouterProgram)
 			require.NoError(t, err)
@@ -2778,8 +2667,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, ccipMessageSentEvent.Message.ExtraArgs.GasLimit)
-			require.Equal(t, false, ccipMessageSentEvent.Message.ExtraArgs.AllowOutOfOrderExecution)
+			require.Equal(t, bin.Uint128{Lo: uint64(validDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit)
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &ccip_router.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(6), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -2805,6 +2694,7 @@ func TestCCIPRouter(t *testing.T) {
 							Amount: 1,
 						},
 					},
+					ExtraArgs: emptyEVMExtraArgsV2,
 				}
 
 				userTokenAccount, ok := token0.User[user.PublicKey()]
@@ -2904,6 +2794,7 @@ func TestCCIPRouter(t *testing.T) {
 							Amount: 2,
 						},
 					},
+					ExtraArgs: emptyEVMExtraArgsV2,
 				}
 
 				userTokenAccount0, ok := token0.User[user.PublicKey()]
@@ -2975,6 +2866,7 @@ func TestCCIPRouter(t *testing.T) {
 						Amount: 1,
 					},
 				},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			userTokenAccount, ok := token0.User[user.PublicKey()]
@@ -3113,9 +3005,10 @@ func TestCCIPRouter(t *testing.T) {
 			for _, token := range billingTokens {
 				t.Run("using "+token.name, func(t *testing.T) {
 					message := ccip_router.SVM2AnyMessage{
-						FeeToken: token.mint,
-						Receiver: validReceiverAddress[:],
-						Data:     []byte{4, 5, 6},
+						FeeToken:  token.mint,
+						Receiver:  validReceiverAddress[:],
+						Data:      []byte{4, 5, 6},
+						ExtraArgs: emptyEVMExtraArgsV2,
 					}
 					rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.RouterConfigPDA, config.EvmDestChainStatePDA, token.billingConfigPDA)
 					ix, err := rawGetFeeIx.ValidateAndBuild()
@@ -3163,9 +3056,10 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("When sending a Valid CCIP Message but the user does not have enough funds of the fee token, it fails", func(t *testing.T) {
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: token2022.mint,
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  token2022.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			noncePDA, err := state.FindNoncePDA(config.EvmChainSelector, tokenlessUser.PublicKey(), config.CcipRouterProgram)
@@ -3206,9 +3100,10 @@ func TestCCIPRouter(t *testing.T) {
 			zeroPubkey := solana.PublicKeyFromBytes(make([]byte, 32))
 
 			message := ccip_router.SVM2AnyMessage{
-				FeeToken: zeroPubkey, // will pay with native SOL
-				Receiver: validReceiverAddress[:],
-				Data:     []byte{4, 5, 6},
+				FeeToken:  zeroPubkey, // will pay with native SOL
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			// getFee
@@ -5265,7 +5160,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 					event := ccip.EventCommitReportAccepted{}
 					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
 
@@ -5333,7 +5228,7 @@ func TestCCIPRouter(t *testing.T) {
 					sourceChainSelector := config.EvmChainSelector
 					msgAccounts := []solana.PublicKey{}
 					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
-					message.ExtraArgs = ccip_router.SVMExtraArgs{}
+					message.ExtraArgs = ccip_router.Any2SVMRampExtraArgs{}
 					message.Data = []byte{}
 					message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
 					message.TokenAmounts = []ccip_router.Any2SVMTokenTransfer{{
