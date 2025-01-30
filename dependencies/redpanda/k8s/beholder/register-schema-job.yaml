@@ -14,22 +14,22 @@ spec:
           args:
             - |
               SCHEMA_CONTENT=$(cat /schemas/example.proto) && \
-              curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages___pb.TestCustomMessage/versions \
+              curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages-pb.TestCustomMessage/versions \
                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \
                    -d "{\"schema\": $SCHEMA_CONTENT, \"schemaType\": \"PROTOBUF\"}"
-              curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages___pb.TestCustomMessageA/versions \
+              curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages-pb.TestCustomMessageA/versions \
                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \
                    -d "{\"schema\": $SCHEMA_CONTENT, \"schemaType\": \"PROTOBUF\"}"
-              curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages___pb.TestCustomMessageB/versions \
+              curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages-pb.TestCustomMessageB/versions \
                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \
                    -d "{\"schema\": $SCHEMA_CONTENT, \"schemaType\": \"PROTOBUF\"}"
-              curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages___pb.TestCustomMessageC/versions \
+              curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages-pb.TestCustomMessageC/versions \
                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \
                    -d "{\"schema\": $SCHEMA_CONTENT, \"schemaType\": \"PROTOBUF\"}"
-              curl -X POST http://redpanda:8081/subjects/beholder__test_domain__messages___pb.test_entity/versions \
+              curl -X POST http://redpanda:8081/subjects/beholder__test_domain__messages-pb.test_entity/versions \
                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \
                    -d "{\"schema\": $SCHEMA_CONTENT, \"schemaType\": \"PROTOBUF\"}"
-              curl -X POST http://redpanda:8081/subjects/beholder__load_test__messages___pb.load_test/versions \
+              curl -X POST http://redpanda:8081/subjects/beholder__load_test__messages-pb.load_test/versions \
                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \
                    -d "{\"schema\": $SCHEMA_CONTENT, \"schemaType\": \"PROTOBUF\"}"
 
