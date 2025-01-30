@@ -129,13 +129,19 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
 
+// getPendingExecutedReports is used to find commit reports which need to be executed.
+// It considers all commit reports as of the given timestamp. Of the reports found, the
+// provided canExecute function is used to filter out reports which the caller knows to
+// be ineligible (i.e. already executed, or snoozed for some reason). The final step
+// is to check their execution state to see if the messages for each report are already
+// executed. Any fully executed reports are returned separately for the caller to remember.
 func getPendingExecutedReports(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
 	canExecute CanExecuteHandle,
 	ts time.Time,
 	lggr logger.Logger,
-) (exectypes.CommitObservations /* fully executed roots */, []exectypes.CommitData, error) {
+) (exectypes.CommitObservations, []exectypes.CommitData /* fully executed roots */, error) {
 	var fullyExecuted []exectypes.CommitData
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
 	if err != nil {
@@ -199,7 +205,7 @@ func getPendingExecutedReports(
 		// Remove fully executed reports.
 		// Populate executed messages on the reports.
 		var executedCommits []exectypes.CommitData
-		groupedCommits[selector], executedCommits = filterOutExecutedMessages(reports, executedMessages)
+		groupedCommits[selector], executedCommits = combineReportsAndMessages(reports, executedMessages)
 		fullyExecuted = append(fullyExecuted, executedCommits...)
 	}
 

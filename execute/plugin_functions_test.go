@@ -454,7 +454,7 @@ func Test_groupByChainSelector(t *testing.T) {
 	}
 }
 
-func Test_filterOutFullyExecutedMessages(t *testing.T) {
+func Test_combineReportsAndMessages(t *testing.T) {
 	type args struct {
 		reports          []exectypes.CommitData
 		executedMessages []cciptypes.SeqNum
@@ -619,7 +619,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got2 := filterOutExecutedMessages(tt.args.reports, tt.args.executedMessages)
+			got, got2 := combineReportsAndMessages(tt.args.reports, tt.args.executedMessages)
 			assert.Equal(t, tt.wantPending, got)
 			assert.Equal(t, tt.wantExecuted, got2)
 		})

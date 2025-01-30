@@ -279,11 +279,10 @@ func groupByChainSelector(
 	return commitReportCache
 }
 
-// filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
+// combineReportsAndMessages returns a new reports slice with fully executed messages removed.
 // Reports that have all of their messages executed are not included in the result.
 // The provided reports must be sorted by sequence number range starting sequence number.
-// TODO: rename to filterMessages or combineReportsAndMessages?
-func filterOutExecutedMessages(
+func combineReportsAndMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum,
 ) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData) {
 	if len(executedMessages) == 0 {
