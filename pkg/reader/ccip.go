@@ -230,10 +230,58 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	lggr.Debugw("decoded commit reports", "reports", reports)
 
-	if len(reports) < limit {
-		return reports, nil
+	return r.populateDisabledChainsInfo(ctx, reports, limit)
+}
+
+// populateDisabledChainsInfo will populate the DisabledSourceChains field of the reports.
+// If all the chains of a report are disabled, the whole report will be skipped.
+func (r *ccipChainReader) populateDisabledChainsInfo(
+	ctx context.Context,
+	reports []plugintypes2.CommitPluginReportWithMeta,
+	limit int,
+) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+	sourceChainConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, r.lggr, r.destChain)
+	if err != nil {
+		return nil, fmt.Errorf("get all offRamp source chains config: %w", err)
 	}
-	return reports[:limit], nil
+
+	disabledSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
+	for chain, cfg := range sourceChainConfigs {
+		if !cfg.IsEnabled {
+			disabledSourceChains.Add(chain)
+		}
+	}
+	r.lggr.Debugw("disabled source chains", "chains", disabledSourceChains)
+
+	reportsAfterRemovingDisabled := make([]plugintypes2.CommitPluginReportWithMeta, 0)
+	for _, rep := range reports {
+		chainsOfReport := mapset.NewSet[cciptypes.ChainSelector]()
+		for _, mr := range rep.Report.MerkleRoots {
+			chainsOfReport.Add(mr.ChainSel)
+		}
+
+		disabledChainsOfReportSet := chainsOfReport.Intersect(disabledSourceChains)
+		disabledChainsOfReportSlice := disabledChainsOfReportSet.ToSlice()
+		sort.Slice(disabledChainsOfReportSlice, func(i, j int) bool {
+			return disabledChainsOfReportSlice[i] < disabledChainsOfReportSlice[j]
+		})
+
+		r.lggr.Debugw("disabled source chains of report",
+			"report", rep, "chains", disabledChainsOfReportSlice)
+
+		if chainsOfReport.Cardinality() == disabledChainsOfReportSet.Cardinality() {
+			r.lggr.Warnw("all source chains of report are disabled, skipping report",
+				"report", rep)
+		} else {
+			rep.DisabledSourceChains = disabledChainsOfReportSlice
+			reportsAfterRemovingDisabled = append(reportsAfterRemovingDisabled, rep)
+		}
+	}
+
+	if len(reportsAfterRemovingDisabled) < limit {
+		return reportsAfterRemovingDisabled, nil
+	}
+	return reportsAfterRemovingDisabled[:limit], nil
 }
 
 type ExecutionStateChangedEvent struct {
@@ -458,6 +506,11 @@ func (r *ccipChainReader) NextSeqNum(
 		cfg, exists := cfgs[chain]
 		if !exists {
 			lggr.Warnf("source chain config not found for chain %d, chain is skipped.", chain)
+			continue
+		}
+
+		if !cfg.IsEnabled {
+			lggr.Infof("source chain %d is disabled, chain is skipped.", chain)
 			continue
 		}
 

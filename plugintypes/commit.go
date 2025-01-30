@@ -13,4 +13,6 @@ type CommitPluginReportWithMeta struct {
 	Report    cciptypes.CommitPluginReport `json:"report"`
 	Timestamp time.Time                    `json:"timestamp"`
 	BlockNum  uint64                       `json:"blockNum"`
+	// DisabledSourceChains is a list of source chains that are disabled for the merkleRoots of this report.
+	DisabledSourceChains []cciptypes.ChainSelector `json:"disabledSourceChains"`
 }
