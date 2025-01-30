@@ -40,6 +40,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+type ContractDiscoveryInterface plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
+
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
 	donID        plugintypes.DonID
@@ -52,7 +54,7 @@ type Plugin struct {
 	reportCodec  cciptypes.ExecutePluginCodec
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
-	discovery    plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
+	discovery    ContractDiscoveryInterface
 	chainSupport plugincommon.ChainSupport
 	observer     metrics.Reporter
 

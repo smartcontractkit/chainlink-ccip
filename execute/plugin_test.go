@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
-
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -334,7 +332,8 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
 	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
-	inmemoryDiscovery := discovery.NewInMemoryDiscoveryProcessor(logger.Test(t))
+	mockDiscoveryProcessor := plugincommon_mock.NewMockPluginProcessor[dt.Query, dt.Observation, dt.Outcome](t)
+	mockDiscoveryProcessor.EXPECT().ValidateObservation(dt.Outcome{}, dt.Query{}, mock.Anything).Return(nil)
 
 	p := &Plugin{
 		lggr:      lggr,
@@ -342,7 +341,7 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
 			0: {},
 		},
-		discovery: inmemoryDiscovery,
+		discovery: mockDiscoveryProcessor,
 	}
 
 	// Reports with duplicate roots.
@@ -361,7 +360,6 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 		Observation: encoded,
 	})
 	require.NoError(t, err)
-	require.True(t, inmemoryDiscovery.ValidateObservationCalled())
 }
 
 func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
