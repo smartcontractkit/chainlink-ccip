@@ -106,13 +106,19 @@ func TestTransactionSizing(t *testing.T) {
 			mustRandomPubkey(), // user nonce PDA
 			auth.PublicKey(),   // sender/authority
 			routerTable["systemProgram"],
-			routerTable["billingTokenProgram"],
-			routerTable["billingTokenMint"],
-			routerTable["billingTokenConfig"],
-			mustRandomPubkey(), // link billing config
-			mustRandomPubkey(), // user billing token ATA
-			routerTable["routerBillingTokenATA"],
-			routerTable["routerBillingSigner"],
+			// feeTokenProgram solana.PublicKey, feeTokenMint solana.PublicKey, feeTokenConfig solana.PublicKey, linkTokenConfig solana.PublicKey, feeTokenUserAssociatedAccount solana.PublicKey, feeTokenReceiver solana.PublicKey, feeBillingSigner solana.PublicKey, feeQuoter solana.PublicKey, feeQuoterConfig solana.PublicKey, feeQuoterDestChain solana.PublicKey, feeQuoterBillingTokenConfig solana.PublicKey, feeQuoterLinkTokenConfig solana.PublicKey, tokenPoolsSigner solana.PublicKey
+			mustRandomPubkey(), // fee token program
+			mustRandomPubkey(), // fee token mint
+			mustRandomPubkey(), // fee token config
+			mustRandomPubkey(), // link token config
+			mustRandomPubkey(), // fee token user ATA
+			mustRandomPubkey(), // fee token receiver
+			mustRandomPubkey(), // fee billing signer
+			mustRandomPubkey(), // fee quoter
+			mustRandomPubkey(), // fee quoter config
+			mustRandomPubkey(), // fee quoter dest chain
+			mustRandomPubkey(), // fee quoter billing token config
+			mustRandomPubkey(), // fee quoter link token config
 			routerTable["routerTokenPoolSigner"],
 		)
 
