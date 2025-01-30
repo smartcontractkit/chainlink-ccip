@@ -71,8 +71,8 @@ func newCCIPChainReaderInternal(
 	}
 
 	// Initialize caches for each chain selector
-	for chainSelector := range contractReaders {
-		reader.caches[chainSelector] = configcache.NewConfigCache(crs[chainSelector])
+	for chainSelector, cr := range crs {
+		reader.caches[chainSelector] = configcache.NewConfigCache(cr)
 	}
 
 	contracts := ContractAddresses{
@@ -91,6 +91,7 @@ func newCCIPChainReaderInternal(
 func (r *ccipChainReader) WithExtendedContractReader(
 	ch cciptypes.ChainSelector, cr contractreader.Extended) *ccipChainReader {
 	r.contractReaders[ch] = cr
+	r.caches[ch] = configcache.NewConfigCache(cr)
 	return r
 }
 
