@@ -164,7 +164,11 @@ func getPendingExecutedReports(
 				}
 				filtered = append(filtered, commitReport)
 			}
-			lggr.Infow("skipping reports marked as executed or snoozed", "selector", selector, "skippedCommitRoots", skippedCommitRoots)
+			lggr.Infow(
+				"skipping reports marked as executed or snoozed",
+				"selector", selector,
+				"skippedCommitRoots", skippedCommitRoots,
+			)
 		}
 		reports = filtered
 
