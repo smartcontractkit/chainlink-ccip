@@ -108,8 +108,11 @@ pub fn set_pool(
             &pool_program,
         );
         let (fee_billing_config, _) = Pubkey::find_program_address(
-            &[seed::FEE_BILLING_TOKEN_CONFIG, mint.as_ref()],
-            ctx.program_id,
+            &[
+                fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+                mint.as_ref(),
+            ],
+            &fee_quoter::ID,
         );
 
         let min_accounts = [

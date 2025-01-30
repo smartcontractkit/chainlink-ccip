@@ -370,25 +370,6 @@ pub mod ccip_router {
         v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
     }
 
-    /// Sets the token billing configuration.
-    ///
-    /// Only CCIP Admin can set the token billing configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-    /// * `chain_selector` - The chain selector.
-    /// * `mint` - The public key of the token mint.
-    /// * `cfg` - The token billing configuration.
-    pub fn set_token_billing(
-        ctx: Context<SetTokenBillingConfig>,
-        chain_selector: u64,
-        mint: Pubkey,
-        cfg: TokenBilling,
-    ) -> Result<()> {
-        v1::admin::set_token_billing(ctx, chain_selector, mint, cfg)
-    }
-
     /// Sets the OCR configuration.
     /// Only CCIP Admin can set the OCR configuration.
     ///
@@ -407,44 +388,6 @@ pub mod ccip_router {
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
         v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
-    }
-
-    /// Adds a billing token configuration.
-    /// Only CCIP Admin can add a billing token configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for adding the billing token configuration.
-    /// * `config` - The billing token configuration to be added.
-    pub fn add_billing_token_config(
-        ctx: Context<AddBillingTokenConfig>,
-        config: BillingTokenConfig,
-    ) -> Result<()> {
-        v1::admin::add_billing_token_config(ctx, config)
-    }
-
-    /// Updates the billing token configuration.
-    /// Only CCIP Admin can update a billing token configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for updating the billing token configuration.
-    /// * `config` - The new billing token configuration.
-    pub fn update_billing_token_config(
-        ctx: Context<UpdateBillingTokenConfig>,
-        config: BillingTokenConfig,
-    ) -> Result<()> {
-        v1::admin::update_billing_token_config(ctx, config)
-    }
-
-    /// Removes the billing token configuration.
-    /// Only CCIP Admin can remove a billing token configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for removing the billing token configuration.
-    pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
-        v1::admin::remove_billing_token_config(ctx)
     }
 
     /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.

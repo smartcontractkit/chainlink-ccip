@@ -261,7 +261,7 @@ fn apply_token_price_update<'info>(
 ) -> Result<()> {
     let (expected, _) = Pubkey::find_program_address(
         &[
-            seed::FEE_BILLING_TOKEN_CONFIG,
+            fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
             token_update.source_token.as_ref(),
         ],
         &crate::ID,

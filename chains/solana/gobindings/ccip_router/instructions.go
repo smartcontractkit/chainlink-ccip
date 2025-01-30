@@ -226,18 +226,6 @@ var (
 	// * `mint` - The public key of the token mint.
 	Instruction_AcceptAdminRoleTokenAdminRegistry = ag_binary.TypeID([8]byte{106, 240, 16, 173, 137, 213, 163, 246})
 
-	// Sets the token billing configuration.
-	//
-	// Only CCIP Admin can set the token billing configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-	// * `chain_selector` - The chain selector.
-	// * `mint` - The public key of the token mint.
-	// * `cfg` - The token billing configuration.
-	Instruction_SetTokenBilling = ag_binary.TypeID([8]byte{225, 230, 37, 71, 131, 209, 54, 230})
-
 	// Sets the OCR configuration.
 	// Only CCIP Admin can set the OCR configuration.
 	//
@@ -249,32 +237,6 @@ var (
 	// * `signers` - The list of signers.
 	// * `transmitters` - The list of transmitters.
 	Instruction_SetOcrConfig = ag_binary.TypeID([8]byte{4, 131, 107, 110, 250, 158, 244, 200})
-
-	// Adds a billing token configuration.
-	// Only CCIP Admin can add a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for adding the billing token configuration.
-	// * `config` - The billing token configuration to be added.
-	Instruction_AddBillingTokenConfig = ag_binary.TypeID([8]byte{63, 156, 254, 216, 227, 53, 0, 69})
-
-	// Updates the billing token configuration.
-	// Only CCIP Admin can update a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the billing token configuration.
-	// * `config` - The new billing token configuration.
-	Instruction_UpdateBillingTokenConfig = ag_binary.TypeID([8]byte{140, 184, 124, 146, 204, 62, 244, 79})
-
-	// Removes the billing token configuration.
-	// Only CCIP Admin can remove a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for removing the billing token configuration.
-	Instruction_RemoveBillingTokenConfig = ag_binary.TypeID([8]byte{0, 194, 92, 161, 29, 8, 10, 91})
 
 	// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
 	// Only the CCIP Admin can withdraw billed funds.
@@ -403,16 +365,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferAdminRoleTokenAdminRegistry"
 	case Instruction_AcceptAdminRoleTokenAdminRegistry:
 		return "AcceptAdminRoleTokenAdminRegistry"
-	case Instruction_SetTokenBilling:
-		return "SetTokenBilling"
 	case Instruction_SetOcrConfig:
 		return "SetOcrConfig"
-	case Instruction_AddBillingTokenConfig:
-		return "AddBillingTokenConfig"
-	case Instruction_UpdateBillingTokenConfig:
-		return "UpdateBillingTokenConfig"
-	case Instruction_RemoveBillingTokenConfig:
-		return "RemoveBillingTokenConfig"
 	case Instruction_WithdrawBilledFunds:
 		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
@@ -498,19 +452,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"accept_admin_role_token_admin_registry", (*AcceptAdminRoleTokenAdminRegistry)(nil),
 		},
 		{
-			"set_token_billing", (*SetTokenBilling)(nil),
-		},
-		{
 			"set_ocr_config", (*SetOcrConfig)(nil),
-		},
-		{
-			"add_billing_token_config", (*AddBillingTokenConfig)(nil),
-		},
-		{
-			"update_billing_token_config", (*UpdateBillingTokenConfig)(nil),
-		},
-		{
-			"remove_billing_token_config", (*RemoveBillingTokenConfig)(nil),
 		},
 		{
 			"withdraw_billed_funds", (*WithdrawBilledFunds)(nil),

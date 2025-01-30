@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::{get_associated_token_address_with_program_id, AssociatedToken};
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use solana_program::sysvar::instructions;
@@ -7,8 +7,8 @@ use solana_program::sysvar::instructions;
 use crate::program::CcipRouter;
 use crate::state::{CommitReport, Config, Nonce};
 use crate::{
-    BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
-    ExecutionReportSingleChain, ExternalExecutionConfig, GlobalState, SVM2AnyMessage, SourceChain,
+    CcipRouterError, DestChain, ExecutionReportSingleChain, ExternalExecutionConfig, GlobalState,
+    SVM2AnyMessage, SourceChain,
 };
 
 /// Static space allocated to any account: must always be added to space calculations.
@@ -37,14 +37,13 @@ pub mod seed {
     pub const NONCE: &[u8] = b"nonce";
     pub const CONFIG: &[u8] = b"config";
     pub const STATE: &[u8] = b"state";
-    pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
 
     // arbitrary messaging signer
-    pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
+    pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
     // token pool interaction signer
-    pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
+    pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
     // signer for billing fee token transfer
-    pub const FEE_BILLING_TOKEN_CONFIG: &[u8] = b"fee_billing_token_config";
+    pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
 
     // token specific
     pub const TOKEN_ADMIN_REGISTRY: &[u8] = b"token_admin_registry";
@@ -319,21 +318,6 @@ pub struct UpdateConfigCCIPRouter<'info> {
 }
 
 #[derive(Accounts)]
-pub struct UpdateSupportedChainsConfigCCIPRouter<'info> {
-    #[account(
-        mut,
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 pub struct SetOcrConfig<'info> {
     #[account(
         mut,
@@ -352,134 +336,6 @@ pub struct SetOcrConfig<'info> {
 
     #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-#[instruction(token_config: BillingTokenConfig)]
-pub struct AddBillingTokenConfig<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(
-        init,
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + BillingTokenConfigWrapper::INIT_SPACE,
-    )]
-    pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
-
-    pub token_program: Interface<'info, TokenInterface>,
-
-    #[account(
-        owner = token_program.key() @ CcipRouterError::InvalidInputs,
-        constraint = token_config.mint == fee_token_mint.key() @ CcipRouterError::InvalidInputs,
-    )]
-    pub fee_token_mint: InterfaceAccount<'info, Mint>,
-
-    #[account(
-        init,
-        payer = authority,
-        associated_token::mint = fee_token_mint,
-        associated_token::authority = fee_billing_signer,
-        associated_token::token_program = token_program,
-    )]
-    pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        address = config.load()?.owner @ CcipRouterError::Unauthorized
-    )]
-    pub authority: Signer<'info>,
-
-    /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
-    #[account(
-        seeds = [seed::FEE_BILLING_SIGNER],
-        bump
-    )]
-    pub fee_billing_signer: UncheckedAccount<'info>,
-
-    pub associated_token_program: Program<'info, AssociatedToken>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(token_config: BillingTokenConfig)]
-pub struct UpdateBillingTokenConfig<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(
-        mut,
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
-        bump,
-    )]
-    pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
-
-    #[account(
-        address = config.load()?.owner @ CcipRouterError::Unauthorized
-    )]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct RemoveBillingTokenConfig<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(
-        mut,
-        close = authority,
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()],
-        bump,
-    )]
-    pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
-
-    pub token_program: Interface<'info, TokenInterface>,
-
-    #[account(
-        owner = token_program.key() @ CcipRouterError::InvalidInputs,
-    )]
-    pub fee_token_mint: InterfaceAccount<'info, Mint>,
-
-    #[account(
-        mut,
-        associated_token::mint = fee_token_mint,
-        associated_token::authority = fee_billing_signer, // use the signer account as the authority
-        associated_token::token_program = token_program,
-        constraint = fee_token_receiver.amount == 0 @ CcipRouterError::InvalidInputs, // ensure the account is empty // TODO improve error
-    )]
-    pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
-
-    /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
-
-    #[account(
-        mut,
-        seeds = [seed::FEE_BILLING_SIGNER],
-        bump
-    )]
-    pub fee_billing_signer: UncheckedAccount<'info>,
-
-    #[account(
-        mut,
-        address = config.load()?.owner @ CcipRouterError::Unauthorized
-    )]
-    pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
