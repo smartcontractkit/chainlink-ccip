@@ -66,21 +66,21 @@ pipelines:
       run_pipelines maybe-kind
 
       run_dependency_pipelines geth
-      run_pipelines ingress-check
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
       # Deploy CCIP enabled fully configured DON
       run_dependency_pipelines ccip-don
-      run_pipelines ingress-check
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
   ccip-v2-infra-only:
     run: |-
       run_pipelines maybe-kind
 
       run_dependency_pipelines geth
-      run_pipelines ingress-check
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
       # Deploy CCIP enabled fully configured DON
       run_dependency_pipelines ccip-don --set-flag infraOnly="true"
-      run_pipelines ingress-check
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
   # Pipeline without any steps that would break --render flag
   ccip-v2-infra-only-render:
     run: |-

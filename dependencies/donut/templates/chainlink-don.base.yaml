@@ -39,11 +39,14 @@ in: |
       helm:
         chart:
           name: oci://registry-1.docker.io/bitnamicharts/postgresql
-          version: 16.x
+          version: 16.4.5
         valuesFiles:
           - ${LOCAL_VALUES_DIR}/postgresql/type.dev.yaml
           {{- if ne $.Env.PROVIDER "kind" }}
           - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
+          {{- end }}
+          {{- if eq $.Env.PROVIDER "aws" }}
+          - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
           {{- end }}
         values:
           fullnameOverride: ${DON_TYPE}-db-bt-{{ $i }}
@@ -57,7 +60,7 @@ in: |
       helm:
         chart:
           name: oci://registry-1.docker.io/bitnamicharts/postgresql
-          version: 16.x
+          version: 16.4.5
         valuesFiles:
           - ${LOCAL_VALUES_DIR}/postgresql/type.dev.yaml
           {{- if ne $.Env.PROVIDER "kind" }}
