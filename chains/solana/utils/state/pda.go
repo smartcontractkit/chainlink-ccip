@@ -30,10 +30,6 @@ func FindTokenAdminRegistryPDA(mint solana.PublicKey, ccipRouterProgram solana.P
 	return solana.FindProgramAddress([][]byte{[]byte("token_admin_registry"), mint.Bytes()}, ccipRouterProgram)
 }
 
-func FindFeeBillingTokenConfigPDA(mint solana.PublicKey, ccipRouterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), mint.Bytes()}, ccipRouterProgram)
-}
-
 func FindSourceChainStatePDA(chainSelector uint64, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, ccipRouterProgram)

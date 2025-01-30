@@ -24,15 +24,13 @@ type TransferOwnership struct {
 	// [0] = [WRITE] config
 	//
 	// [1] = [SIGNER] authority
-	//
-	// [2] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewTransferOwnershipInstructionBuilder creates a new `TransferOwnership` instruction builder.
 func NewTransferOwnershipInstructionBuilder() *TransferOwnership {
 	nd := &TransferOwnership{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
@@ -63,17 +61,6 @@ func (inst *TransferOwnership) SetAuthorityAccount(authority ag_solanago.PublicK
 // GetAuthorityAccount gets the "authority" account.
 func (inst *TransferOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
-}
-
-// SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *TransferOwnership) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *TransferOwnership {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
-	return inst
-}
-
-// GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *TransferOwnership) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
 }
 
 func (inst TransferOwnership) Build() *Instruction {
@@ -109,9 +96,6 @@ func (inst *TransferOwnership) Validate() error {
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
-		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.SystemProgram is not set")
-		}
 	}
 	return nil
 }
@@ -130,10 +114,9 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
@@ -162,11 +145,9 @@ func NewTransferOwnershipInstruction(
 	newOwner ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *TransferOwnership {
+	authority ag_solanago.PublicKey) *TransferOwnership {
 	return NewTransferOwnershipInstructionBuilder().
 		SetNewOwner(newOwner).
 		SetConfigAccount(config).
-		SetAuthorityAccount(authority).
-		SetSystemProgramAccount(systemProgram)
+		SetAuthorityAccount(authority)
 }

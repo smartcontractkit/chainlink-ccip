@@ -441,8 +441,8 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := fee_quoter.NewInitializeInstruction(
 				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
-				config.BillingSignerPDA,
-				config.BillingSignerPDA, // TODO fix offramp address
+				config.CcipRouterProgram,
+				config.CcipRouterProgram, // TODO fix offramp address
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
 				admin.PublicKey(),
@@ -450,6 +450,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.FeeQuoterProgram,
 				programData.Address,
 			).ValidateAndBuild()
+			require.NoError(t, err)
 
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
@@ -462,8 +463,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, defaultMaxFeeJuelsPerMsg, fqConfig.MaxFeeJuelsPerMsg)
 			require.Equal(t, admin.PublicKey(), fqConfig.Owner)
 			require.True(t, fqConfig.ProposedOwner.IsZero())
-			require.Equal(t, config.BillingSignerPDA, fqConfig.Onramp)
-			require.Equal(t, config.BillingSignerPDA, fqConfig.Offramp) // TODO fix this
+			require.Equal(t, config.CcipRouterProgram, fqConfig.Onramp)
+			require.Equal(t, config.CcipRouterProgram, fqConfig.Offramp) // TODO fix this
 		})
 
 		t.Run("When admin updates the default gas limit it's updated", func(t *testing.T) {
@@ -567,73 +568,161 @@ func TestCCIPRouter(t *testing.T) {
 			},
 		}
 
-		t.Run("When and admin adds a chain selector with invalid dest chain config, it fails", func(t *testing.T) {
-			for _, test := range invalidInputTests {
-				t.Run(test.Name, func(t *testing.T) {
-					sourceChainStatePDA, serr := state.FindSourceChainStatePDA(test.Selector, config.CcipRouterProgram)
-					require.NoError(t, serr)
-					destChainStatePDA, derr := state.FindDestChainStatePDA(test.Selector, config.CcipRouterProgram)
-					require.NoError(t, derr)
-					instruction, err := ccip_router.NewAddChainSelectorInstruction(
-						test.Selector,
-						validSourceChainConfig,
-						test.Conf, // here is the invalid dest config data
-						sourceChainStatePDA,
-						destChainStatePDA,
-						config.RouterConfigPDA,
-						admin.PublicKey(),
-						solana.SystemProgramID,
-					).ValidateAndBuild()
-					require.NoError(t, err)
-					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()})
-					require.NotNil(t, result)
-				})
+		// fee quoter and ccip router have very similar DestChainConfig structs,
+		// so just use the same test data but with the right type and cast between them
+		toFqDestChainConfig := func(routerDestChainConfig ccip_router.DestChainConfig) fee_quoter.DestChainConfig {
+			return fee_quoter.DestChainConfig{
+				IsEnabled:                         routerDestChainConfig.IsEnabled,
+				MaxNumberOfTokensPerMsg:           routerDestChainConfig.MaxNumberOfTokensPerMsg,
+				MaxDataBytes:                      routerDestChainConfig.MaxDataBytes,
+				MaxPerMsgGasLimit:                 routerDestChainConfig.MaxPerMsgGasLimit,
+				DestGasOverhead:                   routerDestChainConfig.DestGasOverhead,
+				DestGasPerPayloadByteBase:         routerDestChainConfig.DestGasPerPayloadByteBase,
+				DestGasPerPayloadByteHigh:         routerDestChainConfig.DestGasPerPayloadByteHigh,
+				DestGasPerPayloadByteThreshold:    routerDestChainConfig.DestGasPerPayloadByteThreshold,
+				DestDataAvailabilityOverheadGas:   routerDestChainConfig.DestDataAvailabilityOverheadGas,
+				DestGasPerDataAvailabilityByte:    routerDestChainConfig.DestGasPerDataAvailabilityByte,
+				DestDataAvailabilityMultiplierBps: routerDestChainConfig.DestDataAvailabilityMultiplierBps,
+				DefaultTokenFeeUsdcents:           routerDestChainConfig.DefaultTokenFeeUsdcents,
+				DefaultTokenDestGasOverhead:       routerDestChainConfig.DefaultTokenDestGasOverhead,
+				DefaultTxGasLimit:                 routerDestChainConfig.DefaultTxGasLimit,
+				GasMultiplierWeiPerEth:            routerDestChainConfig.GasMultiplierWeiPerEth,
+				NetworkFeeUsdcents:                routerDestChainConfig.NetworkFeeUsdcents,
+				GasPriceStalenessThreshold:        routerDestChainConfig.GasPriceStalenessThreshold,
+				EnforceOutOfOrder:                 routerDestChainConfig.EnforceOutOfOrder,
+				ChainFamilySelector:               routerDestChainConfig.ChainFamilySelector,
 			}
+		}
+
+		t.Run("When and admin adds a chain selector with invalid dest chain config, it fails", func(t *testing.T) {
+			t.Run("CCIP Router", func(t *testing.T) {
+				for _, test := range invalidInputTests {
+					t.Run(test.Name, func(t *testing.T) {
+						sourceChainStatePDA, serr := state.FindSourceChainStatePDA(test.Selector, config.CcipRouterProgram)
+						require.NoError(t, serr)
+						destChainStatePDA, derr := state.FindDestChainStatePDA(test.Selector, config.CcipRouterProgram)
+						require.NoError(t, derr)
+						instruction, err := ccip_router.NewAddChainSelectorInstruction(
+							test.Selector,
+							validSourceChainConfig,
+							test.Conf, // here is the invalid dest config data
+							sourceChainStatePDA,
+							destChainStatePDA,
+							config.RouterConfigPDA,
+							admin.PublicKey(),
+							solana.SystemProgramID,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+						result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()})
+						require.NotNil(t, result)
+					})
+				}
+			})
+
+			t.Run("Fee Quoter", func(t *testing.T) {
+				for _, test := range invalidInputTests {
+					t.Run(test.Name, func(t *testing.T) {
+						destChainPDA, _, derr := state.FindFqDestChainPDA(test.Selector, config.FeeQuoterProgram)
+						require.NoError(t, derr)
+
+						instruction, err := fee_quoter.NewAddDestChainInstruction(
+							test.Selector,
+							toFqDestChainConfig(test.Conf), // here is the invalid dest config data
+							config.FqConfigPDA,
+							destChainPDA,
+							admin.PublicKey(),
+							solana.SystemProgramID,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+						result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()}) // TODO change error type
+						require.NotNil(t, result)
+					})
+				}
+			})
 		})
 
 		t.Run("When an unauthorized user tries to add a chain selector, it fails", func(t *testing.T) {
-			instruction, err := ccip_router.NewAddChainSelectorInstruction(
-				config.EvmChainSelector,
-				validSourceChainConfig,
-				validDestChainConfig,
-				config.EvmSourceChainStatePDA,
-				config.EvmDestChainStatePDA,
-				config.RouterConfigPDA,
-				user.PublicKey(), // not an admin
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
-			require.NotNil(t, result)
+			t.Run("CCIP Router", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddChainSelectorInstruction(
+					config.EvmChainSelector,
+					validSourceChainConfig,
+					validDestChainConfig,
+					config.EvmSourceChainStatePDA,
+					config.EvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					user.PublicKey(), // not an admin
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+				require.NotNil(t, result)
+			})
+
+			t.Run("Fee Quoter", func(t *testing.T) {
+				instruction, err := fee_quoter.NewAddDestChainInstruction(
+					config.EvmChainSelector,
+					toFqDestChainConfig(validDestChainConfig),
+					config.FqConfigPDA,
+					config.FqEvmDestChainPDA,
+					user.PublicKey(), // not an admin
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()}) // TODO fix error type to fee_quoter
+				require.NotNil(t, result)
+			})
 		})
 
 		t.Run("When admin adds a chain selector it's added on the list", func(t *testing.T) {
-			instruction, err := ccip_router.NewAddChainSelectorInstruction(
-				config.EvmChainSelector,
-				validSourceChainConfig,
-				validDestChainConfig,
-				config.EvmSourceChainStatePDA,
-				config.EvmDestChainStatePDA,
-				config.RouterConfigPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
-			require.NotNil(t, result)
+			t.Run("CCIP Router", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddChainSelectorInstruction(
+					config.EvmChainSelector,
+					validSourceChainConfig,
+					validDestChainConfig,
+					config.EvmSourceChainStatePDA,
+					config.EvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
 
-			var sourceChainStateAccount ccip_router.SourceChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
-			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				var sourceChainStateAccount ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
+				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
+				require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
 
-			var destChainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
-			require.Equal(t, validDestChainConfig, destChainStateAccount.Config)
+				var destChainStateAccount ccip_router.DestChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
+				require.Equal(t, validDestChainConfig, destChainStateAccount.Config)
+			})
+
+			t.Run("Fee Quoter", func(t *testing.T) {
+				conf := toFqDestChainConfig(validDestChainConfig)
+				instruction, err := fee_quoter.NewAddDestChainInstruction(
+					config.EvmChainSelector,
+					conf,
+					config.FqConfigPDA,
+					config.FqEvmDestChainPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				var destChainAccount fee_quoter.DestChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &destChainAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, fee_quoter.TimestampedPackedU224{}, destChainAccount.State.UsdPerUnitGas)
+				require.Equal(t, conf, destChainAccount.Config)
+			})
 		})
 
 		t.Run("When admin adds another chain selector it's also added on the list", func(t *testing.T) {
@@ -952,6 +1041,74 @@ func TestCCIPRouter(t *testing.T) {
 			// Validate proposed set to 0-address
 			var configAccount ccip_router.Config
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			if err != nil {
+				require.NoError(t, err, "failed to get account info")
+			}
+			require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
+		})
+
+		t.Run("Fee Quoter: Can transfer ownership", func(t *testing.T) {
+			// Fail to transfer ownership when not owner
+			instruction, err := fee_quoter.NewTransferOwnershipInstruction(
+				anotherAdmin.PublicKey(),
+				config.FqConfigPDA,
+				user.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			require.NotNil(t, result)
+
+			// successfully transfer ownership
+			instruction, err = fee_quoter.NewTransferOwnershipInstruction(
+				anotherAdmin.PublicKey(),
+				config.FqConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			transferEvent := ccip.OwnershipTransferRequested{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "OwnershipTransferRequested", &transferEvent, config.PrintEvents))
+			require.Equal(t, admin.PublicKey(), transferEvent.From)
+			require.Equal(t, anotherAdmin.PublicKey(), transferEvent.To)
+
+			// Fail to accept ownership when not proposed_owner
+			instruction, err = fee_quoter.NewAcceptOwnershipInstruction(
+				config.FqConfigPDA,
+				user.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			require.NotNil(t, result)
+
+			// Successfully accept ownership
+			// anotherAdmin becomes owner for remaining tests
+			instruction, err = fee_quoter.NewAcceptOwnershipInstruction(
+				config.FqConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+			acceptEvent := ccip.OwnershipTransferred{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "OwnershipTransferred", &acceptEvent, config.PrintEvents))
+			require.Equal(t, admin.PublicKey(), transferEvent.From)
+			require.Equal(t, anotherAdmin.PublicKey(), transferEvent.To)
+
+			// Current owner cannot propose self
+			instruction, err = fee_quoter.NewTransferOwnershipInstruction(
+				anotherAdmin.PublicKey(),
+				config.FqConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()}) // TODO change error type to FQ
+			require.NotNil(t, result)
+
+			// Validate proposed set to 0-address
+			var configAccount fee_quoter.Config
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -6081,7 +6238,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, terr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 
-			configPDA, _, perr := state.FindFeeBillingTokenConfigPDA(mint, ccip_router.ProgramID)
+			configPDA, _, perr := state.FindFqBillingTokenConfigPDA(mint, fee_quoter.ProgramID)
 			require.NoError(t, perr)
 			receiver, _, terr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, mint, config.BillingSignerPDA)
 			require.NoError(t, terr)

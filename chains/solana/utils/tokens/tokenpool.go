@@ -76,7 +76,7 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenConfigPda, _, err := state.FindFeeBillingTokenConfigPDA(mint.PublicKey(), config.CcipRouterProgram)
+	tokenConfigPda, _, err := state.FindFqBillingTokenConfigPDA(mint.PublicKey(), config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}

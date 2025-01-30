@@ -1,3 +1,4 @@
+use anchor_lang::error_code;
 use anchor_lang::prelude::*;
 
 declare_id!("FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw");

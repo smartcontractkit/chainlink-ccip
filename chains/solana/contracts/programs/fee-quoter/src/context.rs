@@ -71,8 +71,6 @@ pub struct UpdateConfig<'info> {
     // validate signer is registered admin
     #[account(address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -88,8 +86,6 @@ pub struct AcceptOwnership<'info> {
     // validate signer is the new admin, accepting ownership of the contract
     #[account(address = config.proposed_owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
