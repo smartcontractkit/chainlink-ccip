@@ -1,7 +1,7 @@
 /// Methods in this module are used to deserialize AccountInfo into the state structs
 use anchor_lang::prelude::*;
 
-use crate::context::seed::{FEE_BILLING_TOKEN_CONFIG, TOKEN_POOL_BILLING};
+use crate::context::seed::{FEE_BILLING_TOKEN_CONFIG, PER_CHAIN_PER_TOKEN_CONFIG};
 use crate::state::{BillingTokenConfig, BillingTokenConfigWrapper, PerChainPerTokenConfig};
 use crate::FeeQuoterError;
 
@@ -12,7 +12,7 @@ pub fn per_chain_per_token_config<'info>(
 ) -> Result<PerChainPerTokenConfig> {
     let (expected, _) = Pubkey::find_program_address(
         &[
-            TOKEN_POOL_BILLING,
+            PER_CHAIN_PER_TOKEN_CONFIG,
             dest_chain_selector.to_le_bytes().as_ref(),
             token.key().as_ref(),
         ],

@@ -18,7 +18,7 @@ pub mod seed {
     pub const DEST_CHAIN: &[u8] = b"dest_chain";
     pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer"; // signer for billing fee token transfer
     pub const FEE_BILLING_TOKEN_CONFIG: &[u8] = b"fee_billing_token_config";
-    pub const TOKEN_POOL_BILLING: &[u8] = b"ccip_tokenpool_billing";
+    pub const PER_CHAIN_PER_TOKEN_CONFIG: &[u8] = b"per_chain_per_token_config";
 }
 
 // valid_version validates that the passed in version is not 0 (uninitialized)
@@ -323,7 +323,7 @@ pub struct SetTokenBillingConfig<'info> {
 
     #[account(
         init_if_needed,
-        seeds = [seed::TOKEN_POOL_BILLING, chain_selector.to_le_bytes().as_ref(), mint.as_ref()],
+        seeds = [seed::PER_CHAIN_PER_TOKEN_CONFIG, chain_selector.to_le_bytes().as_ref(), mint.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + PerChainPerTokenConfig::INIT_SPACE,
