@@ -40,9 +40,17 @@ var (
 	// But none of them could be an init, realloc or close.
 	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
 
-	Instruction_EnableChain = ag_binary.TypeID([8]byte{147, 172, 169, 115, 158, 31, 77, 154})
+	Instruction_EnableList = ag_binary.TypeID([8]byte{121, 229, 134, 138, 144, 138, 19, 248})
 
-	Instruction_DisableChain = ag_binary.TypeID([8]byte{176, 96, 57, 116, 104, 69, 9, 48})
+	Instruction_AddChainTo = ag_binary.TypeID([8]byte{210, 228, 19, 16, 203, 240, 167, 178})
+
+	Instruction_RemoveChainFrom = ag_binary.TypeID([8]byte{49, 195, 5, 223, 99, 40, 40, 91})
+
+	Instruction_UpdateRouter = ag_binary.TypeID([8]byte{32, 109, 12, 153, 101, 129, 64, 70})
+
+	Instruction_ProposeOwner = ag_binary.TypeID([8]byte{90, 57, 141, 110, 196, 241, 172, 39})
+
+	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -52,10 +60,18 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Initialize"
 	case Instruction_CcipReceive:
 		return "CcipReceive"
-	case Instruction_EnableChain:
-		return "EnableChain"
-	case Instruction_DisableChain:
-		return "DisableChain"
+	case Instruction_EnableList:
+		return "EnableList"
+	case Instruction_AddChainTo:
+		return "AddChainTo"
+	case Instruction_RemoveChainFrom:
+		return "RemoveChainFrom"
+	case Instruction_UpdateRouter:
+		return "UpdateRouter"
+	case Instruction_ProposeOwner:
+		return "ProposeOwner"
+	case Instruction_AcceptOwnership:
+		return "AcceptOwnership"
 	default:
 		return ""
 	}
@@ -83,10 +99,22 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"ccip_receive", (*CcipReceive)(nil),
 		},
 		{
-			"enable_chain", (*EnableChain)(nil),
+			"enable_list", (*EnableList)(nil),
 		},
 		{
-			"disable_chain", (*DisableChain)(nil),
+			"add_chain_to", (*AddChainTo)(nil),
+		},
+		{
+			"remove_chain_from", (*RemoveChainFrom)(nil),
+		},
+		{
+			"update_router", (*UpdateRouter)(nil),
+		},
+		{
+			"propose_owner", (*ProposeOwner)(nil),
+		},
+		{
+			"accept_ownership", (*AcceptOwnership)(nil),
 		},
 	},
 )

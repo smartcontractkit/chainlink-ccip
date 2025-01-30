@@ -10,9 +10,9 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// DisableChain is the `disableChain` instruction.
-type DisableChain struct {
-	ChainSelector *uint64
+// ProposeOwner is the `proposeOwner` instruction.
+type ProposeOwner struct {
+	ProposedOwner *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
@@ -20,64 +20,64 @@ type DisableChain struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewDisableChainInstructionBuilder creates a new `DisableChain` instruction builder.
-func NewDisableChainInstructionBuilder() *DisableChain {
-	nd := &DisableChain{
+// NewProposeOwnerInstructionBuilder creates a new `ProposeOwner` instruction builder.
+func NewProposeOwnerInstructionBuilder() *ProposeOwner {
+	nd := &ProposeOwner{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
-// SetChainSelector sets the "chainSelector" parameter.
-func (inst *DisableChain) SetChainSelector(chainSelector uint64) *DisableChain {
-	inst.ChainSelector = &chainSelector
+// SetProposedOwner sets the "proposedOwner" parameter.
+func (inst *ProposeOwner) SetProposedOwner(proposedOwner ag_solanago.PublicKey) *ProposeOwner {
+	inst.ProposedOwner = &proposedOwner
 	return inst
 }
 
 // SetStateAccount sets the "state" account.
-func (inst *DisableChain) SetStateAccount(state ag_solanago.PublicKey) *DisableChain {
+func (inst *ProposeOwner) SetStateAccount(state ag_solanago.PublicKey) *ProposeOwner {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
 // GetStateAccount gets the "state" account.
-func (inst *DisableChain) GetStateAccount() *ag_solanago.AccountMeta {
+func (inst *ProposeOwner) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *DisableChain) SetAuthorityAccount(authority ag_solanago.PublicKey) *DisableChain {
+func (inst *ProposeOwner) SetAuthorityAccount(authority ag_solanago.PublicKey) *ProposeOwner {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *DisableChain) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *ProposeOwner) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-func (inst DisableChain) Build() *Instruction {
+func (inst ProposeOwner) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_DisableChain,
+		TypeID: Instruction_ProposeOwner,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst DisableChain) ValidateAndBuild() (*Instruction, error) {
+func (inst ProposeOwner) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *DisableChain) Validate() error {
+func (inst *ProposeOwner) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.ChainSelector == nil {
-			return errors.New("ChainSelector parameter is not set")
+		if inst.ProposedOwner == nil {
+			return errors.New("ProposedOwner parameter is not set")
 		}
 	}
 
@@ -93,17 +93,17 @@ func (inst *DisableChain) Validate() error {
 	return nil
 }
 
-func (inst *DisableChain) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *ProposeOwner) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("DisableChain")).
+			programBranch.Child(ag_format.Instruction("ProposeOwner")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ChainSelector", *inst.ChainSelector))
+						paramsBranch.Child(ag_format.Param("ProposedOwner", *inst.ProposedOwner))
 					})
 
 					// Accounts of the instruction:
@@ -115,32 +115,32 @@ func (inst *DisableChain) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj DisableChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ChainSelector` param:
-	err = encoder.Encode(obj.ChainSelector)
+func (obj ProposeOwner) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *DisableChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ChainSelector`:
-	err = decoder.Decode(&obj.ChainSelector)
+func (obj *ProposeOwner) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewDisableChainInstruction declares a new DisableChain instruction with the provided parameters and accounts.
-func NewDisableChainInstruction(
+// NewProposeOwnerInstruction declares a new ProposeOwner instruction with the provided parameters and accounts.
+func NewProposeOwnerInstruction(
 	// Parameters:
-	chainSelector uint64,
+	proposedOwner ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *DisableChain {
-	return NewDisableChainInstructionBuilder().
-		SetChainSelector(chainSelector).
+	authority ag_solanago.PublicKey) *ProposeOwner {
+	return NewProposeOwnerInstructionBuilder().
+		SetProposedOwner(proposedOwner).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority)
 }

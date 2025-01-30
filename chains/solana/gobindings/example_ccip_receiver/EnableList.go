@@ -10,9 +10,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// EnableChain is the `enableChain` instruction.
-type EnableChain struct {
-	ChainSelector *uint64
+// EnableList is the `enableList` instruction.
+type EnableList struct {
+	ListType *ListType
+	Enable   *bool
 
 	// [0] = [WRITE] state
 	//
@@ -20,64 +21,73 @@ type EnableChain struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewEnableChainInstructionBuilder creates a new `EnableChain` instruction builder.
-func NewEnableChainInstructionBuilder() *EnableChain {
-	nd := &EnableChain{
+// NewEnableListInstructionBuilder creates a new `EnableList` instruction builder.
+func NewEnableListInstructionBuilder() *EnableList {
+	nd := &EnableList{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
-// SetChainSelector sets the "chainSelector" parameter.
-func (inst *EnableChain) SetChainSelector(chainSelector uint64) *EnableChain {
-	inst.ChainSelector = &chainSelector
+// SetListType sets the "listType" parameter.
+func (inst *EnableList) SetListType(listType ListType) *EnableList {
+	inst.ListType = &listType
+	return inst
+}
+
+// SetEnable sets the "enable" parameter.
+func (inst *EnableList) SetEnable(enable bool) *EnableList {
+	inst.Enable = &enable
 	return inst
 }
 
 // SetStateAccount sets the "state" account.
-func (inst *EnableChain) SetStateAccount(state ag_solanago.PublicKey) *EnableChain {
+func (inst *EnableList) SetStateAccount(state ag_solanago.PublicKey) *EnableList {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
 // GetStateAccount gets the "state" account.
-func (inst *EnableChain) GetStateAccount() *ag_solanago.AccountMeta {
+func (inst *EnableList) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *EnableChain) SetAuthorityAccount(authority ag_solanago.PublicKey) *EnableChain {
+func (inst *EnableList) SetAuthorityAccount(authority ag_solanago.PublicKey) *EnableList {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *EnableChain) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *EnableList) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-func (inst EnableChain) Build() *Instruction {
+func (inst EnableList) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_EnableChain,
+		TypeID: Instruction_EnableList,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst EnableChain) ValidateAndBuild() (*Instruction, error) {
+func (inst EnableList) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *EnableChain) Validate() error {
+func (inst *EnableList) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.ChainSelector == nil {
-			return errors.New("ChainSelector parameter is not set")
+		if inst.ListType == nil {
+			return errors.New("ListType parameter is not set")
+		}
+		if inst.Enable == nil {
+			return errors.New("Enable parameter is not set")
 		}
 	}
 
@@ -93,17 +103,18 @@ func (inst *EnableChain) Validate() error {
 	return nil
 }
 
-func (inst *EnableChain) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *EnableList) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("EnableChain")).
+			programBranch.Child(ag_format.Instruction("EnableList")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ChainSelector", *inst.ChainSelector))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("ListType", *inst.ListType))
+						paramsBranch.Child(ag_format.Param("  Enable", *inst.Enable))
 					})
 
 					// Accounts of the instruction:
@@ -115,32 +126,44 @@ func (inst *EnableChain) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj EnableChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ChainSelector` param:
-	err = encoder.Encode(obj.ChainSelector)
+func (obj EnableList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ListType` param:
+	err = encoder.Encode(obj.ListType)
+	if err != nil {
+		return err
+	}
+	// Serialize `Enable` param:
+	err = encoder.Encode(obj.Enable)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *EnableChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ChainSelector`:
-	err = decoder.Decode(&obj.ChainSelector)
+func (obj *EnableList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ListType`:
+	err = decoder.Decode(&obj.ListType)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Enable`:
+	err = decoder.Decode(&obj.Enable)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewEnableChainInstruction declares a new EnableChain instruction with the provided parameters and accounts.
-func NewEnableChainInstruction(
+// NewEnableListInstruction declares a new EnableList instruction with the provided parameters and accounts.
+func NewEnableListInstruction(
 	// Parameters:
-	chainSelector uint64,
+	listType ListType,
+	enable bool,
 	// Accounts:
 	state ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *EnableChain {
-	return NewEnableChainInstructionBuilder().
-		SetChainSelector(chainSelector).
+	authority ag_solanago.PublicKey) *EnableList {
+	return NewEnableListInstructionBuilder().
+		SetListType(listType).
+		SetEnable(enable).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority)
 }

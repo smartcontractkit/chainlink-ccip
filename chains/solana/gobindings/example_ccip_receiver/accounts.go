@@ -10,8 +10,10 @@ import (
 
 type BaseState struct {
 	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
 	Router        ag_solanago.PublicKey
-	EnabledChains EnabledChains
+	Allow         ChainList
+	Deny          ChainList
 }
 
 var BaseStateDiscriminator = [8]byte{46, 139, 13, 192, 80, 181, 96, 46}
@@ -27,13 +29,23 @@ func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	if err != nil {
 		return err
 	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
 	// Serialize `Router` param:
 	err = encoder.Encode(obj.Router)
 	if err != nil {
 		return err
 	}
-	// Serialize `EnabledChains` param:
-	err = encoder.Encode(obj.EnabledChains)
+	// Serialize `Allow` param:
+	err = encoder.Encode(obj.Allow)
+	if err != nil {
+		return err
+	}
+	// Serialize `Deny` param:
+	err = encoder.Encode(obj.Deny)
 	if err != nil {
 		return err
 	}
@@ -59,13 +71,23 @@ func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	if err != nil {
 		return err
 	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Router`:
 	err = decoder.Decode(&obj.Router)
 	if err != nil {
 		return err
 	}
-	// Deserialize `EnabledChains`:
-	err = decoder.Decode(&obj.EnabledChains)
+	// Deserialize `Allow`:
+	err = decoder.Decode(&obj.Allow)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Deny`:
+	err = decoder.Decode(&obj.Deny)
 	if err != nil {
 		return err
 	}

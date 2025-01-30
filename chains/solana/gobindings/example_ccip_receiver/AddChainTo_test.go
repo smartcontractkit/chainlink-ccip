@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_DisableChain(t *testing.T) {
+func TestEncodeDecode_AddChainTo(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("DisableChain"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("AddChainTo"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(DisableChain)
+				params := new(AddChainTo)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(DisableChain)
+				got := new(AddChainTo)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

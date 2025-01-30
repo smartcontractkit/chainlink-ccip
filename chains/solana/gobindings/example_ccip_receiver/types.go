@@ -7,12 +7,18 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type EnabledChains struct {
-	Xs  [0]uint64
-	Len uint8
+type ChainList struct {
+	IsEnabled bool
+	Xs        [20]uint64
+	Len       uint8
 }
 
-func (obj EnabledChains) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ChainList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `IsEnabled` param:
+	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
 	// Serialize `Xs` param:
 	err = encoder.Encode(obj.Xs)
 	if err != nil {
@@ -26,7 +32,12 @@ func (obj EnabledChains) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	return nil
 }
 
-func (obj *EnabledChains) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ChainList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `IsEnabled`:
+	err = decoder.Decode(&obj.IsEnabled)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Xs`:
 	err = decoder.Decode(&obj.Xs)
 	if err != nil {
@@ -137,4 +148,22 @@ func (obj *SVMTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 		return err
 	}
 	return nil
+}
+
+type ListType ag_binary.BorshEnum
+
+const (
+	Allow_ListType ListType = iota
+	Deny_ListType
+)
+
+func (value ListType) String() string {
+	switch value {
+	case Allow_ListType:
+		return "Allow"
+	case Deny_ListType:
+		return "Deny"
+	default:
+		return ""
+	}
 }
