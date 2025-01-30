@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"sort"
 	"time"
 
@@ -212,6 +213,37 @@ func (p *Plugin) ValidateObservation(
 		}
 	}
 
+	if err = validateCommonStateObservations(p, ao.Observer, decodedObservation, supportedChains); err != nil {
+		return err
+	}
+
+	// check message related validations when states can contain messages
+	if state == exectypes.GetMessages || state == exectypes.Filter {
+		if err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
+			return fmt.Errorf("validate observer reading eligibility: %w", err)
+		}
+
+		err = validateMessagesRelatedObservations(
+			decodedObservation.CommitReports,
+			decodedObservation.Messages,
+			decodedObservation.TokenData,
+			decodedObservation.Hashes,
+			decodedObservation.CostlyMessages,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateCommonStateObservations(
+	p *Plugin,
+	oracleID commontypes.OracleID,
+	decodedObservation exectypes.Observation,
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+) error {
 	if err := plugincommon.ValidateFChain(decodedObservation.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
@@ -225,21 +257,14 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
-	// check message related validations when states can contain messages
-	if state == exectypes.GetMessages || state == exectypes.Filter {
-		if err := validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
-			return fmt.Errorf("validate observer reading eligibility: %w", err)
+	if p.discovery != nil {
+		aos := plugincommon.AttributedObservation[dt.Observation]{
+			OracleID:    oracleID,
+			Observation: decodedObservation.Contracts,
 		}
 
-		err = validateMessagesRelatedObservations(
-			decodedObservation.CommitReports,
-			decodedObservation.Messages,
-			decodedObservation.TokenData,
-			decodedObservation.Hashes,
-			decodedObservation.CostlyMessages,
-		)
-		if err != nil {
-			return err
+		if err := p.discovery.ValidateObservation(dt.Outcome{}, dt.Query{}, aos); err != nil {
+			return fmt.Errorf("process contracts: %w", err)
 		}
 	}
 
