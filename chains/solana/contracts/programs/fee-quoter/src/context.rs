@@ -126,7 +126,10 @@ pub struct GetFee<'info> {
         bump,
     )]
     pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
-    // remaining_accounts
+    //
+    // remaining_accounts:
+    // - First all BillingTokenConfigWrapper accounts (one per token transferred)
+    // - Then all PerChainPerTokenConfig accounts (one per token transferred)
 }
 
 #[derive(Accounts)]

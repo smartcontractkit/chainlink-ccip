@@ -51,7 +51,12 @@ pub fn ccip_send<'info>(
 
     // Fee Quoter validates the message, calculates the fee in both the billing token
     // and LINK, asserts that it doesn't exceed a maximum, and returns it
-    let fee = get_fee_cpi(&ctx, dest_chain_selector, &message)?;
+    let fee = get_fee_cpi(
+        &ctx,
+        dest_chain_selector,
+        &message,
+        &accounts_per_sent_token,
+    )?;
 
     let is_paying_with_native_sol = message.fee_token == Pubkey::default();
     if is_paying_with_native_sol {
@@ -202,6 +207,7 @@ fn get_fee_cpi<'info>(
     ctx: &Context<'_, '_, 'info, 'info, CcipSend<'info>>,
     dest_chain_selector: u64,
     message: &SVM2AnyMessage,
+    accounts_per_token: &[TokenAccounts<'info>],
 ) -> Result<fee_quoter::messages::GetFeeResult> {
     let get_fee_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
 
@@ -219,7 +225,19 @@ fn get_fee_cpi<'info>(
         link_token_config: ctx.accounts.fee_quoter_link_token_config.to_account_info(),
     };
 
-    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, get_fee_signer);
+    let billing_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut accounts_per_token
+        .iter()
+        .map(|a| a.fee_token_config.to_account_info())
+        .collect();
+    let per_chain_per_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut accounts_per_token
+        .iter()
+        .map(|a| a.token_billing_config.to_account_info())
+        .collect();
+    let remaining_accounts = billing_token_config_accs;
+    remaining_accounts.append(per_chain_per_token_config_accs);
+
+    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, get_fee_signer)
+        .with_remaining_accounts(remaining_accounts.to_vec());
 
     let cpi_message = fee_quoter::messages::SVM2AnyMessage {
         receiver: message.receiver.clone(),

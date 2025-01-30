@@ -117,7 +117,7 @@ func TestCCIPRouter(t *testing.T) {
 	}
 
 	getPerChainPerTokenConfigBillingPDA := func(mint solana.PublicKey) solana.PublicKey {
-		tokenBillingPda, _, _ := state.FindCcipTokenpoolBillingPDA(config.EvmChainSelector, mint, config.CcipRouterProgram) // TODO this should be FQ
+		tokenBillingPda, _, _ := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint, config.FeeQuoterProgram)
 		return tokenBillingPda
 	}
 
@@ -1094,14 +1094,14 @@ func TestCCIPRouter(t *testing.T) {
 			}
 		})
 
-		t.Run("Billing Token Config", func(t *testing.T) {
+		t.Run("FeeQuoter: Billing Token Config", func(t *testing.T) {
 			pools := []tokens.TokenPool{token0, token1}
 
 			for i, token := range pools {
 				t.Run(fmt.Sprintf("token%d", i), func(t *testing.T) {
 					t.Run("Pre-condition: Does not support token by default", func(t *testing.T) {
 						tokenBillingPDA := getFqTokenConfigPDA(token.Mint.PublicKey())
-						var tokenConfigAccount ccip_router.BillingTokenConfigWrapper
+						var tokenConfigAccount fee_quoter.BillingTokenConfigWrapper
 						err := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &tokenConfigAccount)
 						require.EqualError(t, err, "not found")
 					})
@@ -1142,7 +1142,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, anotherAdmin, config.DefaultCommitment)
 
-						var tokenConfigAccount ccip_router.BillingTokenConfigWrapper
+						var tokenConfigAccount fee_quoter.BillingTokenConfigWrapper
 						aerr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &tokenConfigAccount)
 						require.NoError(t, aerr)
 
@@ -1162,7 +1162,7 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, cerr)
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, admin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
 
-						var final ccip_router.BillingTokenConfigWrapper
+						var final fee_quoter.BillingTokenConfigWrapper
 						ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &final)
 						require.NoError(t, ferr)
 
