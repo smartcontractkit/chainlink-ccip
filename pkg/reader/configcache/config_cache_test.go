@@ -19,7 +19,7 @@ import (
 )
 
 // createMockBatchResult creates a mock batch read result with the given return value
-func createMockBatchResult(t *testing.T, retVal interface{}) types.BatchReadResult {
+func createMockBatchResult(retVal interface{}) types.BatchReadResult {
 	result := &types.BatchReadResult{}
 	result.SetResult(retVal, nil)
 	return *result
@@ -28,7 +28,7 @@ func createMockBatchResult(t *testing.T, retVal interface{}) types.BatchReadResu
 func setupConfigCacheTest(t *testing.T) (*configCache, *reader_mocks.MockExtended) {
 	mockReader := reader_mocks.NewMockExtended(t)
 
-	cache := NewConfigCache(mockReader)
+	cache := NewConfigCache(mockReader).(*configCache)
 
 	return cache, mockReader
 }
@@ -40,7 +40,7 @@ func TestConfigCache_Refresh(t *testing.T) {
 		// Only return some of the expected results
 		mockBatchResults := types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameRouter}: []types.BatchReadResult{
-				createMockBatchResult(t, &cciptypes.Bytes{1, 2, 3}),
+				createMockBatchResult(&cciptypes.Bytes{1, 2, 3}),
 			},
 			// Intentionally missing other contracts
 		}
@@ -65,7 +65,7 @@ func TestConfigCache_Refresh(t *testing.T) {
 		// Return wrong type in result
 		mockBatchResults := types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameRouter}: []types.BatchReadResult{
-				createMockBatchResult(t, "wrong type"), // String instead of Bytes
+				createMockBatchResult("wrong type"), // String instead of Bytes
 			},
 		}
 
@@ -86,7 +86,7 @@ func TestConfigCache_GetOffRampConfigDigest(t *testing.T) {
 		expectedDigest := [32]byte{1, 2, 3}
 		mockBatchResults := types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameOffRamp}: []types.BatchReadResult{
-				createMockBatchResult(t, &cciptypes.OCRConfigResponse{
+				createMockBatchResult(&cciptypes.OCRConfigResponse{
 					OCRConfig: cciptypes.OCRConfig{
 						ConfigInfo: cciptypes.ConfigInfo{
 							ConfigDigest: expectedDigest,
@@ -112,8 +112,8 @@ func TestConfigCache_GetOffRampConfigDigest(t *testing.T) {
 		expectedDigest := [32]byte{4, 5, 6}
 		mockBatchResults := types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameOffRamp}: []types.BatchReadResult{
-				createMockBatchResult(t, &cciptypes.OCRConfigResponse{}), // commit config
-				createMockBatchResult(t, &cciptypes.OCRConfigResponse{ // execute config
+				createMockBatchResult(&cciptypes.OCRConfigResponse{}), // commit config
+				createMockBatchResult(&cciptypes.OCRConfigResponse{ // execute config
 					OCRConfig: cciptypes.OCRConfig{
 						ConfigInfo: cciptypes.ConfigInfo{
 							ConfigDigest: expectedDigest,
@@ -153,8 +153,8 @@ func TestConfigCache_GetRMNVersionedConfig(t *testing.T) {
 
 	mockBatchResults := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameRMNRemote}: []types.BatchReadResult{
-			createMockBatchResult(t, &cciptypes.RMNDigestHeader{}), // digest header
-			createMockBatchResult(t, &expectedConfig),              // versioned config
+			createMockBatchResult(&cciptypes.RMNDigestHeader{}), // digest header
+			createMockBatchResult(&expectedConfig),              // versioned config
 		},
 	}
 
@@ -181,7 +181,7 @@ func TestConfigCache_GetOnRampDynamicConfig(t *testing.T) {
 
 	mockBatchResults := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOnRamp}: []types.BatchReadResult{
-			createMockBatchResult(t, &expectedConfig),
+			createMockBatchResult(&expectedConfig),
 		},
 	}
 
@@ -216,11 +216,11 @@ func TestConfigCache_GetOffRampAllChains(t *testing.T) {
 
 	mockBatchResults := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: []types.BatchReadResult{
-			createMockBatchResult(t, &cciptypes.OCRConfigResponse{}),         // commit config
-			createMockBatchResult(t, &cciptypes.OCRConfigResponse{}),         // execute config
-			createMockBatchResult(t, &cciptypes.OffRampStaticChainConfig{}),  // static config
-			createMockBatchResult(t, &cciptypes.OffRampDynamicChainConfig{}), // dynamic config
-			createMockBatchResult(t, &expectedConfig),                        // all chains config
+			createMockBatchResult(&cciptypes.OCRConfigResponse{}),         // commit config
+			createMockBatchResult(&cciptypes.OCRConfigResponse{}),         // execute config
+			createMockBatchResult(&cciptypes.OffRampStaticChainConfig{}),  // static config
+			createMockBatchResult(&cciptypes.OffRampDynamicChainConfig{}), // dynamic config
+			createMockBatchResult(&expectedConfig),                        // all chains config
 		},
 	}
 
@@ -240,7 +240,7 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	// Setup mock to always return some data
 	mockBatchResults := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameRouter}: []types.BatchReadResult{
-			createMockBatchResult(t, &cciptypes.Bytes{1, 2, 3}),
+			createMockBatchResult(&cciptypes.Bytes{1, 2, 3}),
 		},
 	}
 
@@ -286,7 +286,7 @@ func TestConfigCache_UpdateFromResults(t *testing.T) {
 
 		results := types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameRouter}: []types.BatchReadResult{
-				createMockBatchResult(t, nil),
+				createMockBatchResult(nil),
 			},
 		}
 
@@ -307,7 +307,7 @@ func TestConfigCache_GetFeeQuoterConfig(t *testing.T) {
 
 		mockBatchResults := types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameFeeQuoter}: []types.BatchReadResult{
-				createMockBatchResult(t, &expectedConfig),
+				createMockBatchResult(&expectedConfig),
 			},
 		}
 
@@ -334,7 +334,7 @@ func TestConfigCache_GetFeeQuoterConfig(t *testing.T) {
 
 		mockBatchResults := types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameFeeQuoter}: []types.BatchReadResult{
-				createMockBatchResult(t, &invalidConfig),
+				createMockBatchResult(&invalidConfig),
 			},
 		}
 
@@ -372,7 +372,7 @@ func TestConfigCache_GetRMNRemoteAddress(t *testing.T) {
 		expectedAddress := cciptypes.Bytes{1, 2, 3, 4}
 		mockBatchResults := types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameRMNProxy}: []types.BatchReadResult{
-				createMockBatchResult(t, &expectedAddress),
+				createMockBatchResult(&expectedAddress),
 			},
 		}
 

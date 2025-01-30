@@ -6,10 +6,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 const (
@@ -62,7 +63,7 @@ type configCache struct {
 }
 
 // NewConfigCache creates a new instance of the configuration cache
-func NewConfigCache(reader contractreader.Extended) *configCache {
+func NewConfigCache(reader contractreader.Extended) ConfigCacher {
 	return &configCache{
 		reader: reader,
 	}
@@ -187,93 +188,137 @@ func (c *configCache) prepareBatchRequests() contractreader.ExtendedBatchGetLate
 // updateFromResults updates the cache with results from the batch request
 func (c *configCache) updateFromResults(batchResult types.BatchGetLatestValuesResult) error {
 	for contract, results := range batchResult {
-		switch contract.Name {
-		case consts.ContractNameRouter:
-			if len(results) > 0 {
-				val, err := results[0].GetResult()
-				if err != nil {
-					return fmt.Errorf("get router result: %w", err)
-				}
-				if typed, ok := val.(*cciptypes.Bytes); ok {
-					c.nativeTokenAddress = *typed
-				}
+		if err := c.handleContractResults(contract, results); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// handleContractResults processes results for a specific contract
+func (c *configCache) handleContractResults(contract types.BoundContract, results []types.BatchReadResult) error {
+	switch contract.Name {
+	case consts.ContractNameRouter:
+		return c.handleRouterResults(results)
+	case consts.ContractNameOnRamp:
+		return c.handleOnRampResults(results)
+	case consts.ContractNameOffRamp:
+		return c.handleOffRampResults(results)
+	case consts.ContractNameRMNRemote:
+		return c.handleRMNRemoteResults(results)
+	case consts.ContractNameRMNProxy:
+		return c.handleRMNProxyResults(results)
+	case consts.ContractNameFeeQuoter:
+		return c.handleFeeQuoterResults(results)
+	}
+	return nil
+}
+
+// handleRouterResults processes router-specific results
+func (c *configCache) handleRouterResults(results []types.BatchReadResult) error {
+	if len(results) > 0 {
+		val, err := results[0].GetResult()
+		if err != nil {
+			return fmt.Errorf("get router result: %w", err)
+		}
+		if typed, ok := val.(*cciptypes.Bytes); ok {
+			c.nativeTokenAddress = *typed
+		}
+	}
+	return nil
+}
+
+// handleOnRampResults processes onramp-specific results
+func (c *configCache) handleOnRampResults(results []types.BatchReadResult) error {
+	if len(results) > 0 {
+		val, err := results[0].GetResult()
+		if err != nil {
+			return fmt.Errorf("get onramp result: %w", err)
+		}
+		if typed, ok := val.(*cciptypes.GetOnRampDynamicConfigResponse); ok {
+			c.onrampDynamicConfig = *typed
+		}
+	}
+	return nil
+}
+
+// handleOffRampResults processes offramp-specific results
+func (c *configCache) handleOffRampResults(results []types.BatchReadResult) error {
+	for i, result := range results {
+		val, err := result.GetResult()
+		if err != nil {
+			return fmt.Errorf("get offramp result %d: %w", i, err)
+		}
+		switch i {
+		case 0:
+			if typed, ok := val.(*cciptypes.OCRConfigResponse); ok {
+				c.commitLatestOCRConfig = *typed
 			}
-		case consts.ContractNameOnRamp:
-			if len(results) > 0 {
-				val, err := results[0].GetResult()
-				if err != nil {
-					return fmt.Errorf("get onramp result: %w", err)
-				}
-				if typed, ok := val.(*cciptypes.GetOnRampDynamicConfigResponse); ok {
-					c.onrampDynamicConfig = *typed
-				}
+		case 1:
+			if typed, ok := val.(*cciptypes.OCRConfigResponse); ok {
+				c.execLatestOCRConfig = *typed
 			}
-		case consts.ContractNameOffRamp:
-			for i, result := range results {
-				val, err := result.GetResult()
-				if err != nil {
-					return fmt.Errorf("get offramp result %d: %w", i, err)
-				}
-				switch i {
-				case 0:
-					if typed, ok := val.(*cciptypes.OCRConfigResponse); ok {
-						c.commitLatestOCRConfig = *typed
-					}
-				case 1:
-					if typed, ok := val.(*cciptypes.OCRConfigResponse); ok {
-						c.execLatestOCRConfig = *typed
-					}
-				case 2:
-					if typed, ok := val.(*cciptypes.OffRampStaticChainConfig); ok {
-						c.offrampStaticConfig = *typed
-					}
-				case 3:
-					if typed, ok := val.(*cciptypes.OffRampDynamicChainConfig); ok {
-						c.offrampDynamicConfig = *typed
-					}
-				case 4:
-					if typed, ok := val.(*cciptypes.SelectorsAndConfigs); ok {
-						c.offrampAllChains = *typed
-					}
-				}
+		case 2:
+			if typed, ok := val.(*cciptypes.OffRampStaticChainConfig); ok {
+				c.offrampStaticConfig = *typed
 			}
-		case consts.ContractNameRMNRemote:
-			for i, result := range results {
-				val, err := result.GetResult()
-				if err != nil {
-					return fmt.Errorf("get rmn remote result %d: %w", i, err)
-				}
-				switch i {
-				case 0:
-					if typed, ok := val.(*cciptypes.RMNDigestHeader); ok {
-						c.rmnDigestHeader = *typed
-					}
-				case 1:
-					if typed, ok := val.(*cciptypes.VersionedConfigRemote); ok {
-						c.rmnVersionedConfig = *typed
-					}
-				}
+		case 3:
+			if typed, ok := val.(*cciptypes.OffRampDynamicChainConfig); ok {
+				c.offrampDynamicConfig = *typed
 			}
-		case consts.ContractNameRMNProxy:
-			if len(results) > 0 {
-				val, err := results[0].GetResult()
-				if err != nil {
-					return fmt.Errorf("get rmn proxy result: %w", err)
-				}
-				if typed, ok := val.(*cciptypes.Bytes); ok {
-					c.rmnRemoteAddress = *typed
-				}
+		case 4:
+			if typed, ok := val.(*cciptypes.SelectorsAndConfigs); ok {
+				c.offrampAllChains = *typed
 			}
-		case consts.ContractNameFeeQuoter:
-			if len(results) > 0 {
-				val, err := results[0].GetResult()
-				if err != nil {
-					return fmt.Errorf("get fee quoter result: %w", err)
-				}
-				if typed, ok := val.(*cciptypes.FeeQuoterStaticConfig); ok {
-					c.feeQuoterConfig = *typed
-				}
+		}
+	}
+	return nil
+}
+
+// handleRMNRemoteResults processes RMN remote-specific results
+func (c *configCache) handleRMNRemoteResults(results []types.BatchReadResult) error {
+	for i, result := range results {
+		val, err := result.GetResult()
+		if err != nil {
+			return fmt.Errorf("get rmn remote result %d: %w", i, err)
+		}
+		switch i {
+		case 0:
+			if typed, ok := val.(*cciptypes.RMNDigestHeader); ok {
+				c.rmnDigestHeader = *typed
 			}
+		case 1:
+			if typed, ok := val.(*cciptypes.VersionedConfigRemote); ok {
+				c.rmnVersionedConfig = *typed
+			}
+		}
+	}
+	return nil
+}
+
+// handleRMNProxyResults processes RMN proxy-specific results
+func (c *configCache) handleRMNProxyResults(results []types.BatchReadResult) error {
+	if len(results) > 0 {
+		val, err := results[0].GetResult()
+		if err != nil {
+			return fmt.Errorf("get rmn proxy result: %w", err)
+		}
+		if typed, ok := val.(*cciptypes.Bytes); ok {
+			c.rmnRemoteAddress = *typed
+		}
+	}
+	return nil
+}
+
+// handleFeeQuoterResults processes fee quoter-specific results
+func (c *configCache) handleFeeQuoterResults(results []types.BatchReadResult) error {
+	if len(results) > 0 {
+		val, err := results[0].GetResult()
+		if err != nil {
+			return fmt.Errorf("get fee quoter result: %w", err)
+		}
+		if typed, ok := val.(*cciptypes.FeeQuoterStaticConfig); ok {
+			c.feeQuoterConfig = *typed
 		}
 	}
 	return nil

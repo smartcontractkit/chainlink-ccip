@@ -86,12 +86,13 @@ type GetOnRampDynamicConfigResponse struct {
 	DynamicConfig OnRampDynamicConfig
 }
 
+// See DynamicChainConfig in OnRamp.sol
 type OnRampDynamicConfig struct {
-	FeeQuoter              []byte
-	ReentrancyGuardEntered bool
-	MessageInterceptor     []byte
-	FeeAggregator          []byte
-	AllowListAdmin         []byte
+	FeeQuoter              []byte `json:"feeQuoter"`
+	ReentrancyGuardEntered bool   `json:"reentrancyGuardEntered"`
+	MessageInterceptor     []byte `json:"messageInterceptor"`
+	FeeAggregator          []byte `json:"feeAggregator"`
+	AllowListAdmin         []byte `json:"allowListAdmin"`
 }
 
 // VersionedConfigRemote is used to parse the response from the RMNRemote contract's getVersionedConfig method.

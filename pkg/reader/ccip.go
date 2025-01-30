@@ -1026,7 +1026,8 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 // getOffRampSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source
 // chain. If some chain is disabled it is not included in the response.
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
-	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
+	ctx context.Context,
+	chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
@@ -1081,51 +1082,6 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	return res, nil
 }
 
-// getAllOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for the provided chain.
-func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
-	ctx context.Context,
-	lggr logger.Logger,
-	chain cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]cciptypes.SourceChainConfig, error) {
-	cache, ok := r.caches[chain]
-	if !ok {
-		return nil, fmt.Errorf("cache not found for chain selector %d", chain)
-	}
-
-	resp, err := cache.GetOffRampAllChains(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs from cache for chain %d: %w", chain, err)
-	}
-
-	if len(resp.SourceChainConfigs) != len(resp.Selectors) {
-		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
-	}
-
-	lggr.Debugw("got source chain configs", "configs", resp)
-
-	enabledConfigs := make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig)
-
-	// Populate the map and filter out disabled chains
-	for i := range resp.Selectors {
-		chainSel := cciptypes.ChainSelector(resp.Selectors[i])
-		cfg := resp.SourceChainConfigs[i]
-
-		enabled, err := cfg.Check()
-		if err != nil {
-			return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
-		}
-		if !enabled {
-			// We don't want to process disabled chains prematurely.
-			lggr.Debugw("source chain is disabled", "chain", chainSel)
-			continue
-		}
-
-		enabledConfigs[chainSel] = cfg
-	}
-
-	return enabledConfigs, nil
-}
-
 // OffRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
 // See: <chainlink repo>/contracts/src/v0.8/ccip/offRamp/OffRamp.sol:StaticConfig
 type OffRampStaticChainConfig struct {
@@ -1142,41 +1098,6 @@ type OffRampDynamicChainConfig struct {
 	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
 	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
 	MessageInterceptor                      []byte `json:"messageInterceptor"`
-}
-
-// getData returns data for a single reader.
-func (r *ccipChainReader) getDestinationData(
-	ctx context.Context,
-	destChain cciptypes.ChainSelector,
-	contract string,
-	method string,
-	returnVal any,
-) error {
-	if err := validateExtendedReaderExistence(r.contractReaders, destChain); err != nil {
-		return err
-	}
-
-	if destChain != r.destChain {
-		return fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChain)
-	}
-
-	return r.contractReaders[destChain].ExtendedGetLatestValue(
-		ctx,
-		contract,
-		method,
-		primitives.Unconfirmed,
-		map[string]any{},
-		returnVal,
-	)
-}
-
-// See DynamicChainConfig in OnRamp.sol
-type onRampDynamicConfig struct {
-	FeeQuoter              []byte `json:"feeQuoter"`
-	ReentrancyGuardEntered bool   `json:"reentrancyGuardEntered"`
-	MessageInterceptor     []byte `json:"messageInterceptor"`
-	FeeAggregator          []byte `json:"feeAggregator"`
-	AllowListAdmin         []byte `json:"allowListAdmin"`
 }
 
 func (r *ccipChainReader) getOnRampDynamicConfigs(
