@@ -89,7 +89,7 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 		Header: ccip_router.RampMessageHeader{
 			MessageId:           messageID,
 			SourceChainSelector: sourceChainSelector,
-			DestChainSelector:   config.SVMChainSelector,
+			DestChainSelector:   config.SvmChainSelector,
 			SequenceNumber:      sequenceNumber,
 			Nonce:               0,
 		},

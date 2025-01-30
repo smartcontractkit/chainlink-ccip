@@ -136,7 +136,7 @@ pub fn ccip_send<'info>(
         fee_token: message.fee_token,
         fee_token_amount: fee.amount.into(),
         fee_value_juels: fee.juels.into(),
-        token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count],
+        token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count], // this will be set later
     };
 
     let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
@@ -497,7 +497,7 @@ mod tests {
         let dest_chain = sample_dest_chain();
         let (token_billing_config, mut per_chain_per_token_config) = sample_additional_token();
         let token_amount = &SVMTokenAmount {
-            token: token_billing_config.mint,
+            token: Pubkey::new_unique(),
             amount: 100,
         };
 

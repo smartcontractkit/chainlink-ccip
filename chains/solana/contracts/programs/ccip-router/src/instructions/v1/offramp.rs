@@ -14,12 +14,11 @@ use super::pools::{
 
 use crate::v1::ocr3base::Signatures;
 use crate::{
-    seed, Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput,
-    CommitReport, CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
-    ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
-    MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
-    SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
-    UsdPerTokenUpdated, UsdPerUnitGasUpdated,
+    seed, Any2SVMRampMessage, CcipRouterError, CommitInput, CommitReport, CommitReportAccepted,
+    CommitReportContext, DestChain, ExecuteReportContext, ExecutionReportSingleChain,
+    ExecutionStateChanged, GasPriceUpdate, GlobalState, MessageExecutionState, OcrPluginType,
+    RampMessageHeader, SVMTokenAmount, SkippedAlreadyExecutedMessage, SourceChain,
+    TimestampedPackedU224, TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated,
 };
 
 pub fn commit<'info>(
@@ -277,7 +276,7 @@ fn apply_token_price_update<'info>(
         CcipRouterError::InvalidInputs
     );
 
-    let token_config_account: &mut Account<BillingTokenConfigWrapper> =
+    let token_config_account: &mut Account<fee_quoter::state::BillingTokenConfigWrapper> =
         &mut Account::try_from(token_config_account_info)?;
 
     require!(
@@ -285,7 +284,7 @@ fn apply_token_price_update<'info>(
         CcipRouterError::InvalidInputs
     );
 
-    token_config_account.config.usd_per_token = TimestampedPackedU224 {
+    token_config_account.config.usd_per_token = fee_quoter::state::TimestampedPackedU224 {
         value: token_update.usd_per_token,
         timestamp: Clock::get()?.unix_timestamp,
     };

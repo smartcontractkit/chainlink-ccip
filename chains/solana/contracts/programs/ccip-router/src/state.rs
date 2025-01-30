@@ -197,13 +197,6 @@ pub struct BillingTokenConfig {
     pub premium_multiplier_wei_per_eth: u64,
 }
 
-#[account]
-#[derive(InitSpace, Debug)]
-pub struct BillingTokenConfigWrapper {
-    pub version: u8,
-    pub config: BillingTokenConfig,
-}
-
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],

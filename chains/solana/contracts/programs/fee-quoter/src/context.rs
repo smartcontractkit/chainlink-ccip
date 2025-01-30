@@ -126,6 +126,7 @@ pub struct GetFee<'info> {
         bump,
     )]
     pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
+    // remaining_accounts
 }
 
 #[derive(Accounts)]

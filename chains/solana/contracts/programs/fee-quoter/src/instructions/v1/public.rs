@@ -89,7 +89,7 @@ pub fn get_fee<'info>(
 }
 
 // Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
-pub fn convert(
+fn convert(
     source_token_amount: &SVMTokenAmount,
     source_config: &BillingTokenConfig,
     target_config: &BillingTokenConfig,
