@@ -1,4 +1,4 @@
-package reader
+package configcache
 
 import (
 	"context"
@@ -16,9 +16,34 @@ const (
 	configCacheRefreshInterval = 30 * time.Second
 )
 
+// configCacher defines the interface for accessing cached config values
+type ConfigCacher interface {
+	// OCR Config related methods
+	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
+
+	// Token related methods
+	GetNativeTokenAddress(ctx context.Context) (cciptypes.Bytes, error)
+
+	// OnRamp related methods
+	GetOnRampDynamicConfig(ctx context.Context) (cciptypes.GetOnRampDynamicConfigResponse, error)
+
+	// OffRamp related methods
+	GetOffRampStaticConfig(ctx context.Context) (cciptypes.OffRampStaticChainConfig, error)
+	GetOffRampDynamicConfig(ctx context.Context) (cciptypes.OffRampDynamicChainConfig, error)
+	GetOffRampAllChains(ctx context.Context) (cciptypes.SelectorsAndConfigs, error)
+
+	// RMN related methods
+	GetRMNDigestHeader(ctx context.Context) (cciptypes.RMNDigestHeader, error)
+	GetRMNVersionedConfig(ctx context.Context) (cciptypes.VersionedConfigRemote, error)
+	GetRMNRemoteAddress(ctx context.Context) (cciptypes.Bytes, error)
+
+	// FeeQuoter related methods
+	GetFeeQuoterConfig(ctx context.Context) (cciptypes.FeeQuoterStaticConfig, error)
+}
+
 // configCache handles caching of contract configurations with automatic refresh
 type configCache struct {
-	reader       *ccipChainReader
+	reader       contractreader.Extended
 	cacheMu      sync.RWMutex
 	lastUpdateAt time.Time
 
@@ -26,18 +51,18 @@ type configCache struct {
 	nativeTokenAddress    cciptypes.Bytes
 	commitLatestOCRConfig cciptypes.OCRConfigResponse
 	execLatestOCRConfig   cciptypes.OCRConfigResponse
-	offrampStaticConfig   offRampStaticChainConfig
-	offrampDynamicConfig  offRampDynamicChainConfig
-	offrampAllChains      selectorsAndConfigs
-	onrampDynamicConfig   getOnRampDynamicConfigResponse
+	offrampStaticConfig   cciptypes.OffRampStaticChainConfig
+	offrampDynamicConfig  cciptypes.OffRampDynamicChainConfig
+	offrampAllChains      cciptypes.SelectorsAndConfigs
+	onrampDynamicConfig   cciptypes.GetOnRampDynamicConfigResponse
 	rmnDigestHeader       cciptypes.RMNDigestHeader
-	rmnVersionedConfig    versionedConfig
+	rmnVersionedConfig    cciptypes.VersionedConfigRemote
 	rmnRemoteAddress      cciptypes.Bytes
-	feeQuoterConfig       feeQuoterStaticConfig
+	feeQuoterConfig       cciptypes.FeeQuoterStaticConfig
 }
 
-// newConfigCache creates a new instance of the configuration cache
-func newConfigCache(reader *ccipChainReader) *configCache {
+// NewConfigCache creates a new instance of the configuration cache
+func NewConfigCache(reader contractreader.Extended) *configCache {
 	return &configCache{
 		reader: reader,
 	}
@@ -64,7 +89,7 @@ func (c *configCache) refreshIfNeeded(ctx context.Context) error {
 func (c *configCache) refresh(ctx context.Context) error {
 	requests := c.prepareBatchRequests()
 
-	batchResult, err := c.reader.contractReaders[c.reader.destChain].ExtendedBatchGetLatestValues(ctx, requests)
+	batchResult, err := c.reader.ExtendedBatchGetLatestValues(ctx, requests)
 	if err != nil {
 		return fmt.Errorf("batch get configs: %w", err)
 	}
@@ -80,16 +105,16 @@ func (c *configCache) refresh(ctx context.Context) error {
 func (c *configCache) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
 	var (
 		nativeTokenAddress    cciptypes.Bytes
-		onrampDynamicConfig   getOnRampDynamicConfigResponse
+		onrampDynamicConfig   cciptypes.GetOnRampDynamicConfigResponse
 		commitLatestOCRConfig cciptypes.OCRConfigResponse
 		execLatestOCRConfig   cciptypes.OCRConfigResponse
-		staticConfig          offRampStaticChainConfig
-		dynamicConfig         offRampDynamicChainConfig
-		selectorsAndConf      selectorsAndConfigs
+		staticConfig          cciptypes.OffRampStaticChainConfig
+		dynamicConfig         cciptypes.OffRampDynamicChainConfig
+		selectorsAndConf      cciptypes.SelectorsAndConfigs
 		rmnDigestHeader       cciptypes.RMNDigestHeader
-		rmnVersionConfig      versionedConfig
+		rmnVersionConfig      cciptypes.VersionedConfigRemote
 		rmnRemoteAddress      []byte
-		feeQuoterConfig       feeQuoterStaticConfig
+		feeQuoterConfig       cciptypes.FeeQuoterStaticConfig
 	)
 
 	return contractreader.ExtendedBatchGetLatestValuesRequest{
@@ -179,7 +204,7 @@ func (c *configCache) updateFromResults(batchResult types.BatchGetLatestValuesRe
 				if err != nil {
 					return fmt.Errorf("get onramp result: %w", err)
 				}
-				if typed, ok := val.(*getOnRampDynamicConfigResponse); ok {
+				if typed, ok := val.(*cciptypes.GetOnRampDynamicConfigResponse); ok {
 					c.onrampDynamicConfig = *typed
 				}
 			}
@@ -199,15 +224,15 @@ func (c *configCache) updateFromResults(batchResult types.BatchGetLatestValuesRe
 						c.execLatestOCRConfig = *typed
 					}
 				case 2:
-					if typed, ok := val.(*offRampStaticChainConfig); ok {
+					if typed, ok := val.(*cciptypes.OffRampStaticChainConfig); ok {
 						c.offrampStaticConfig = *typed
 					}
 				case 3:
-					if typed, ok := val.(*offRampDynamicChainConfig); ok {
+					if typed, ok := val.(*cciptypes.OffRampDynamicChainConfig); ok {
 						c.offrampDynamicConfig = *typed
 					}
 				case 4:
-					if typed, ok := val.(*selectorsAndConfigs); ok {
+					if typed, ok := val.(*cciptypes.SelectorsAndConfigs); ok {
 						c.offrampAllChains = *typed
 					}
 				}
@@ -224,7 +249,7 @@ func (c *configCache) updateFromResults(batchResult types.BatchGetLatestValuesRe
 						c.rmnDigestHeader = *typed
 					}
 				case 1:
-					if typed, ok := val.(*versionedConfig); ok {
+					if typed, ok := val.(*cciptypes.VersionedConfigRemote); ok {
 						c.rmnVersionedConfig = *typed
 					}
 				}
@@ -245,7 +270,7 @@ func (c *configCache) updateFromResults(batchResult types.BatchGetLatestValuesRe
 				if err != nil {
 					return fmt.Errorf("get fee quoter result: %w", err)
 				}
-				if typed, ok := val.(*feeQuoterStaticConfig); ok {
+				if typed, ok := val.(*cciptypes.FeeQuoterStaticConfig); ok {
 					c.feeQuoterConfig = *typed
 				}
 			}
@@ -280,9 +305,9 @@ func (c *configCache) GetNativeTokenAddress(ctx context.Context) (cciptypes.Byte
 }
 
 // GetOnRampDynamicConfig returns the cached onramp dynamic config
-func (c *configCache) GetOnRampDynamicConfig(ctx context.Context) (getOnRampDynamicConfigResponse, error) {
+func (c *configCache) GetOnRampDynamicConfig(ctx context.Context) (cciptypes.GetOnRampDynamicConfigResponse, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
-		return getOnRampDynamicConfigResponse{}, fmt.Errorf("refresh cache: %w", err)
+		return cciptypes.GetOnRampDynamicConfigResponse{}, fmt.Errorf("refresh cache: %w", err)
 	}
 
 	c.cacheMu.RLock()
@@ -291,9 +316,9 @@ func (c *configCache) GetOnRampDynamicConfig(ctx context.Context) (getOnRampDyna
 }
 
 // GetOffRampStaticConfig returns the cached offramp static config
-func (c *configCache) GetOffRampStaticConfig(ctx context.Context) (offRampStaticChainConfig, error) {
+func (c *configCache) GetOffRampStaticConfig(ctx context.Context) (cciptypes.OffRampStaticChainConfig, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
-		return offRampStaticChainConfig{}, fmt.Errorf("refresh cache: %w", err)
+		return cciptypes.OffRampStaticChainConfig{}, fmt.Errorf("refresh cache: %w", err)
 	}
 
 	c.cacheMu.RLock()
@@ -302,9 +327,9 @@ func (c *configCache) GetOffRampStaticConfig(ctx context.Context) (offRampStatic
 }
 
 // GetOffRampDynamicConfig returns the cached offramp dynamic config
-func (c *configCache) GetOffRampDynamicConfig(ctx context.Context) (offRampDynamicChainConfig, error) {
+func (c *configCache) GetOffRampDynamicConfig(ctx context.Context) (cciptypes.OffRampDynamicChainConfig, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
-		return offRampDynamicChainConfig{}, fmt.Errorf("refresh cache: %w", err)
+		return cciptypes.OffRampDynamicChainConfig{}, fmt.Errorf("refresh cache: %w", err)
 	}
 
 	c.cacheMu.RLock()
@@ -313,9 +338,9 @@ func (c *configCache) GetOffRampDynamicConfig(ctx context.Context) (offRampDynam
 }
 
 // GetOffRampAllChains returns the cached offramp all chains config
-func (c *configCache) GetOffRampAllChains(ctx context.Context) (selectorsAndConfigs, error) {
+func (c *configCache) GetOffRampAllChains(ctx context.Context) (cciptypes.SelectorsAndConfigs, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
-		return selectorsAndConfigs{}, fmt.Errorf("refresh cache: %w", err)
+		return cciptypes.SelectorsAndConfigs{}, fmt.Errorf("refresh cache: %w", err)
 	}
 
 	c.cacheMu.RLock()
@@ -335,9 +360,9 @@ func (c *configCache) GetRMNDigestHeader(ctx context.Context) (cciptypes.RMNDige
 }
 
 // GetRMNVersionedConfig returns the cached RMN versioned config
-func (c *configCache) GetRMNVersionedConfig(ctx context.Context) (versionedConfig, error) {
+func (c *configCache) GetRMNVersionedConfig(ctx context.Context) (cciptypes.VersionedConfigRemote, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
-		return versionedConfig{}, fmt.Errorf("refresh cache: %w", err)
+		return cciptypes.VersionedConfigRemote{}, fmt.Errorf("refresh cache: %w", err)
 	}
 
 	c.cacheMu.RLock()
@@ -346,9 +371,9 @@ func (c *configCache) GetRMNVersionedConfig(ctx context.Context) (versionedConfi
 }
 
 // GetFeeQuoterConfig returns the cached fee quoter config
-func (c *configCache) GetFeeQuoterConfig(ctx context.Context) (feeQuoterStaticConfig, error) {
+func (c *configCache) GetFeeQuoterConfig(ctx context.Context) (cciptypes.FeeQuoterStaticConfig, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
-		return feeQuoterStaticConfig{}, fmt.Errorf("refresh cache: %w", err)
+		return cciptypes.FeeQuoterStaticConfig{}, fmt.Errorf("refresh cache: %w", err)
 	}
 
 	c.cacheMu.RLock()
@@ -366,3 +391,5 @@ func (c *configCache) GetRMNRemoteAddress(ctx context.Context) (cciptypes.Bytes,
 	defer c.cacheMu.RUnlock()
 	return c.rmnRemoteAddress, nil
 }
+
+var _ ConfigCacher = (*configCache)(nil)
