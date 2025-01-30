@@ -153,14 +153,18 @@ func getPendingExecutedReports(
 			continue
 		}
 
-		// Filter out reports that cannot be executed (snoozed).
-		// TODO: filter func instead of 'canExecute'?
+		// Filter out reports that cannot be executed (executed or snoozed).
 		var filtered []exectypes.CommitData
-		for _, commitReport := range reports {
-			if !canExecute(commitReport.SourceChain, commitReport.MerkleRoot) {
-				continue
+		{
+			var skippedCommitRoots []string
+			for _, commitReport := range reports {
+				if !canExecute(commitReport.SourceChain, commitReport.MerkleRoot) {
+					skippedCommitRoots = append(skippedCommitRoots, commitReport.MerkleRoot.String())
+					continue
+				}
+				filtered = append(filtered, commitReport)
 			}
-			filtered = append(filtered, commitReport)
+			lggr.Infow("skipping reports marked as executed or snoozed", "selector", selector, "skippedCommitRoots", skippedCommitRoots)
 		}
 		reports = filtered
 
