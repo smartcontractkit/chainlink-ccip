@@ -106,6 +106,13 @@ profiles:
         job-distributor:
           helm:
             values:
+              nodeSelector:
+                node-role: crib
+              tolerations:
+                - key: "node-role"
+                  operator: "Equal"
+                  value: "crib"
+                  effect: "NoSchedule"
               noderpc:
                 annotations:
                   external-dns.alpha.kubernetes.io/hostname: ${DEVSPACE_NAMESPACE}-job-distributor-node-rpc.${DEVSPACE_INGRESS_BASE_DOMAIN}
