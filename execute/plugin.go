@@ -180,9 +180,8 @@ func getPendingExecutedReports(
 	return groupedCommits, nil
 }
 
-//nolint:gocyclo
 func (p *Plugin) ValidateObservation(
-	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
+	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
 	decodedObservation, err := exectypes.DecodeObservation(ao.Observation)
 	if err != nil {
