@@ -121,22 +121,6 @@ type CommitReportAcceptedEvent struct {
 
 // ---------------------------------------------------
 
-func (r *ccipChainReader) getDisabledSourceChainsSet(ctx context.Context) (mapset.Set[cciptypes.ChainSelector], error) {
-	sourceChainConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, r.lggr, r.destChain)
-	if err != nil {
-		return nil, fmt.Errorf("get all offRamp source chains config: %w", err)
-	}
-
-	disabledSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for chain, cfg := range sourceChainConfigs {
-		if !cfg.IsEnabled {
-			disabledSourceChains.Add(chain)
-		}
-	}
-
-	return disabledSourceChains, nil
-}
-
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, ts time.Time, limit int,
 ) ([]plugintypes2.CommitPluginReportWithMeta, error) {
@@ -147,11 +131,6 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	}
 
 	ev := CommitReportAcceptedEvent{}
-
-	disabledSourceChains, err := r.getDisabledSourceChainsSet(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get disabled source chains set: %w", err)
-	}
 
 	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
@@ -197,11 +176,6 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			)
 			if err != nil {
 				r.lggr.Errorw("get onRamp address for selector %d: %w", mr.SourceChainSelector, err)
-				continue
-			}
-			if disabledSourceChains.Contains(cciptypes.ChainSelector(mr.SourceChainSelector)) {
-				r.lggr.Debugw("source chain is disabled, merkle root skipped",
-					"sourceChain", mr.SourceChainSelector)
 				continue
 			}
 
