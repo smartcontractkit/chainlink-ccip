@@ -639,13 +639,13 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 //nolint:lll
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist", "err", err)
+		return nil
+	}
+
 	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
 	for _, chain := range selectors {
-		if _, ok := r.contractReaders[r.destChain]; !ok {
-			lggr.Errorw("contract reader not found for GetChainFeePriceUpdate", "chain", chain)
-			continue
-		}
-
 		update := plugintypes.TimestampedUnixBig{}
 		// Read from dest chain
 		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
