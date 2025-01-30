@@ -18,6 +18,16 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+const (
+	// ExecNoDeviationThresholdUSD is the lower bound no deviation threshold for exec gas. If the exec gas price is
+	// less than this value, we should never trigger a deviation. This is set to 10 gwei in USD terms.
+	ExecNoDeviationThresholdUSD = 10e9
+
+	// DataAvNoDeviationThresholdUSD is the lower bound no deviation threshold for DA gas. If the DA gas price is less
+	// than this value, we should never trigger a deviation. This is set to 20 gwei in USD terms.
+	DataAvNoDeviationThresholdUSD = 20e9
+)
+
 func (p *processor) Outcome(
 	ctx context.Context,
 	_ Outcome,
@@ -249,15 +259,17 @@ func (p *processor) getGasPricesToUpdate(
 			continue
 		}
 
-		executionFeeDeviates := mathslib.Deviates(
+		executionFeeDeviates := mathslib.DeviatesOnCurve(
 			currentChainFee.ExecutionFeePriceUSD,
 			lastUpdate.ChainFee.ExecutionFeePriceUSD,
+			big.NewInt(ExecNoDeviationThresholdUSD),
 			ci.ExecDeviationPPB.Int64(),
 		)
 
-		dataAvFeeDeviates := mathslib.Deviates(
+		dataAvFeeDeviates := mathslib.DeviatesOnCurve(
 			currentChainFee.DataAvFeePriceUSD,
 			lastUpdate.ChainFee.DataAvFeePriceUSD,
+			big.NewInt(DataAvNoDeviationThresholdUSD),
 			ci.DataAvailabilityDeviationPPB.Int64(),
 		)
 
