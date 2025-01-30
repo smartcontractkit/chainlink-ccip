@@ -202,13 +202,13 @@ impl BaseState {
         if self.allow.is_enabled && self.deny.is_enabled {
             // must be within allow list and not in deny list
             self.allow.binary_search(&chain_selector).is_ok()
-                && !self.deny.binary_search(&chain_selector).is_ok()
+                && self.deny.binary_search(&chain_selector).is_err()
         } else if self.allow.is_enabled && !self.deny.is_enabled {
             // check allow list only
             self.allow.binary_search(&chain_selector).is_ok()
         } else if !self.allow.is_enabled && self.deny.is_enabled {
             // check deny list only, if present = not valid
-            !self.deny.binary_search(&chain_selector).is_ok()
+            self.deny.binary_search(&chain_selector).is_err()
         } else {
             // neither list is enabled, allow everything
             true

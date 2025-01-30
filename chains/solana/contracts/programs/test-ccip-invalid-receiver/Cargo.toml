@@ -17,3 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = "0.29.0"
+example_ccip_receiver = { version = "0.1.0-dev", path = "../example-ccip-receiver", features = ["no-entrypoint"] }

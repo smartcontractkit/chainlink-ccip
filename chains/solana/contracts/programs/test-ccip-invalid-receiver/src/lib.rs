@@ -3,6 +3,7 @@
  * Used to test CCIP Router execute and check that it fails
  */
 use anchor_lang::prelude::*;
+use example_ccip_receiver::Any2SVMMessage;
 
 declare_id!("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8");
 
@@ -44,19 +45,4 @@ pub struct Initialize<'info> {
 #[derive(InitSpace, Debug)]
 pub struct Counter {
     pub value: u8,
-}
-
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SVMMessage {
-    pub message_id: [u8; 32],
-    pub source_chain_selector: u64,
-    pub sender: Vec<u8>,
-    pub data: Vec<u8>,
-    pub token_amounts: Vec<SVMTokenAmount>,
-}
-
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct SVMTokenAmount {
-    pub token: Pubkey,
-    pub amount: u64, // TODO: EVM uses u256
 }

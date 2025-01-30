@@ -1,14 +1,17 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{token_interface::Mint, token_interface::TokenAccount};
+use example_ccip_receiver::{
+    Any2SVMMessage, BaseState, CcipReceiverError, EXTERNAL_EXECUTION_CONFIG_SEED,
+};
 use solana_program::pubkey;
 declare_id!("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH");
-
-pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
 #[program]
 pub mod test_ccip_receiver {
+    const CCIP_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
+
     use solana_program::{instruction::Instruction, program::invoke_signed};
 
     use super::*;
@@ -17,7 +20,10 @@ pub mod test_ccip_receiver {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         msg!("Called `initialize` {:?}", ctx);
         ctx.accounts.counter.value = 0;
-        Ok(())
+        ctx.accounts
+            .counter
+            .state
+            .init(ctx.accounts.authority.key(), CCIP_ROUTER)
     }
 
     /// This function is called by the CCIP Router to execute the CCIP message.
@@ -111,9 +117,13 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts, Debug)]
+#[instruction(message: Any2SVMMessage)]
 pub struct SetData<'info> {
     // router CPI signer must be first
-    #[account(owner = CCIP_ROUTER)]
+    #[account(
+        constraint = counter.state.is_router(authority.key()) @ CcipReceiverError::OnlyRouter,
+        constraint = counter.state.is_valid_chain(message.source_chain_selector) @CcipReceiverError::InvalidChain,
+    )]
     pub authority: Signer<'info>,
     // ccip router expects "receiver" to be second
     /// CHECK: Using this to sign
@@ -146,31 +156,12 @@ pub struct TokenPool<'info> {
 #[derive(InitSpace, Debug)]
 pub struct Counter {
     pub value: u8,
+    pub state: BaseState,
 }
 
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct ExternalExecutionConfig {}
-
-// TODO: Import types and constants from CCIP Router, it should be an imported crate
-// But for now, we are copying the structs here as the final design of the messages is not done.
-
-const CCIP_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
-
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SVMMessage {
-    pub message_id: [u8; 32],
-    pub source_chain_selector: u64,
-    pub sender: Vec<u8>,
-    pub data: Vec<u8>,
-    pub token_amounts: Vec<SVMTokenAmount>,
-}
-
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct SVMTokenAmount {
-    pub token: Pubkey,
-    pub amount: u64, // solana local token amount
-}
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct LockOrBurnInV1 {
