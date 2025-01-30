@@ -2,9 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use solana_program::{program::invoke_signed, system_instruction};
 
-use crate::{seed::FEE_BILLING_SIGNER, CcipRouterError, SVMTokenAmount};
+use crate::seed::FEE_BILLING_SIGNER;
+use crate::{CcipRouterError, SVMTokenAmount};
 
-pub fn wrap_native_sol<'info>(
+pub fn transfer_and_wrap_native_sol<'info>(
     token_program: &AccountInfo<'info>,
     from: &mut Signer<'info>,
     to: &mut InterfaceAccount<'info, token_interface::TokenAccount>,

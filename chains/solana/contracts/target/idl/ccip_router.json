@@ -1544,24 +1544,6 @@
       }
     },
     {
-      "name": "BillingTokenConfigWrapper",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "config",
-            "type": {
-              "defined": "BillingTokenConfig"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "TokenAdminRegistry",
       "type": {
         "kind": "struct",

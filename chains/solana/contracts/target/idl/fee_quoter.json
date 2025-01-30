@@ -806,6 +806,22 @@
       }
     },
     {
+      "name": "TokenTransferAdditionalData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destBytesOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "destGasOverhead",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
       "name": "GetFeeResult",
       "type": {
         "kind": "struct",
@@ -821,6 +837,14 @@
           {
             "name": "juels",
             "type": "u64"
+          },
+          {
+            "name": "tokenTransferAdditionalData",
+            "type": {
+              "vec": {
+                "defined": "TokenTransferAdditionalData"
+              }
+            }
           }
         ]
       }

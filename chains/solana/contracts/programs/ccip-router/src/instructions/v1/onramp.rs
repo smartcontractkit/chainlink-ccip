@@ -2,8 +2,9 @@ use std::cell::Ref;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
+use fee_quoter::messages::TokenTransferAdditionalData;
 
-use super::fee_quoter::{transfer_fee, wrap_native_sol};
+use super::fee_quoter::{transfer_and_wrap_native_sol, transfer_fee};
 use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
@@ -13,9 +14,8 @@ use super::pools::{
 
 use crate::seed;
 use crate::{
-    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, DestChainConfig,
-    ExtraArgsInput, Nonce, PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage,
-    SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
+    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, ExtraArgsInput, Nonce,
+    RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
 };
 
 pub fn ccip_send<'info>(
@@ -49,24 +49,13 @@ pub fn ccip_send<'info>(
         accounts_per_sent_token.push(current_token_accounts);
     }
 
-    let per_chain_per_token_config_accounts = accounts_per_sent_token
-        .iter()
-        .map(|accs| {
-            validated_try_to::per_chain_per_token_config(
-                accs.token_billing_config,
-                accs.mint.key(),
-                dest_chain_selector,
-            )
-        })
-        .collect::<Result<Vec<_>>>()?;
-
     // Fee Quoter validates the message, calculates the fee in both the billing token
     // and LINK, asserts that it doesn't exceed a maximum, and returns it
     let fee = get_fee_cpi(&ctx, dest_chain_selector, &message)?;
 
     let is_paying_with_native_sol = message.fee_token == Pubkey::default();
     if is_paying_with_native_sol {
-        wrap_native_sol(
+        transfer_and_wrap_native_sol(
             &ctx.accounts.fee_token_program.to_account_info(),
             &mut ctx.accounts.authority,
             &mut ctx.accounts.fee_token_receiver,
@@ -192,8 +181,7 @@ pub fn ccip_send<'info>(
                 lock_or_burn_out_data,
                 current_token_accounts.pool_config.key(),
                 token_amount,
-                &dest_chain.config,
-                &per_chain_per_token_config_accounts[i],
+                &fee.token_transfer_additional_data[i],
             )?;
         }
     }
@@ -260,21 +248,16 @@ fn token_transfer(
     lock_or_burn_out_data: LockOrBurnOutV1,
     source_pool_address: Pubkey,
     token_amount: &SVMTokenAmount,
-    dest_chain_config: &DestChainConfig,
-    token_config: &PerChainPerTokenConfig,
+    additional_data: &TokenTransferAdditionalData,
 ) -> Result<SVM2AnyTokenTransfer> {
-    let dest_gas_amount = if token_config.billing.is_enabled {
-        token_config.billing.dest_gas_overhead
-    } else {
-        dest_chain_config.default_token_dest_gas_overhead
-    };
+    let dest_gas_amount = additional_data.dest_gas_overhead;
 
     let extra_data = lock_or_burn_out_data.dest_pool_data;
     let extra_data_length = extra_data.len() as u32;
 
     require!(
         extra_data_length <= CCIP_LOCK_OR_BURN_V1_RET_BYTES
-            || extra_data_length <= token_config.billing.dest_bytes_overhead, // TODO is this ok here?
+            || extra_data_length <= additional_data.dest_bytes_overhead, // TODO is this ok here?
         CcipRouterError::SourceTokenDataTooLarge
     );
 
@@ -377,66 +360,9 @@ fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
     result.to_bytes()
 }
 
-/// Methods in this module are used to deserialize AccountInfo into the state structs
-mod validated_try_to {
-    use anchor_lang::prelude::*;
-
-    use crate::{
-        seed::{self},
-        CcipRouterError, PerChainPerTokenConfig,
-    };
-
-    pub fn per_chain_per_token_config<'info>(
-        account: &'info AccountInfo<'info>,
-        token: Pubkey,
-        dest_chain_selector: u64,
-    ) -> Result<PerChainPerTokenConfig> {
-        let (expected, _) = Pubkey::find_program_address(
-            &[
-                seed::TOKEN_POOL_BILLING,
-                dest_chain_selector.to_le_bytes().as_ref(),
-                token.key().as_ref(),
-            ],
-            &crate::ID,
-        );
-        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
-        let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
-        require_eq!(
-            account.version,
-            1, // the v1 version of the onramp will always be tied to version 1 of the state
-            CcipRouterError::InvalidInputs
-        );
-        Ok(account.into_inner())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use ethnum::U256;
-
-    use crate::state::{BillingTokenConfig, TokenBilling};
-
-    use super::super::messages::ramps::tests::{sample_billing_config, sample_dest_chain};
-
-    pub fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
-        let mint = Pubkey::new_unique();
-        (
-            sample_billing_config(),
-            PerChainPerTokenConfig {
-                version: 1,
-                chain_selector: 0,
-                mint,
-                billing: TokenBilling {
-                    min_fee_usdcents: 50,
-                    max_fee_usdcents: 4294967295,
-                    deci_bps: 0,
-                    dest_gas_overhead: 180000,
-                    dest_bytes_overhead: 640,
-                    is_enabled: true,
-                },
-            },
-        )
-    }
 
     use super::*;
 
@@ -494,8 +420,10 @@ mod tests {
             dest_pool_data: vec![],
         };
 
-        let dest_chain = sample_dest_chain();
-        let (token_billing_config, mut per_chain_per_token_config) = sample_additional_token();
+        let additional_token_transfer_data = TokenTransferAdditionalData {
+            dest_bytes_overhead: 640,
+            dest_gas_overhead: 180000,
+        };
         let token_amount = &SVMTokenAmount {
             token: Pubkey::new_unique(),
             amount: 100,
@@ -505,42 +433,26 @@ mod tests {
             lock_or_burn_out_data.clone(),
             source_pool_address,
             token_amount,
-            &dest_chain.config,
-            &per_chain_per_token_config,
+            &additional_token_transfer_data,
         )
         .unwrap();
 
         let expected_exec_data =
-            ethnum::U256::new(per_chain_per_token_config.billing.dest_gas_overhead.into())
+            ethnum::U256::new(additional_token_transfer_data.dest_gas_overhead.into())
                 .to_be_bytes();
 
-        assert!(transfer.extra_data.is_empty());
-        assert_eq!(transfer.dest_exec_data, expected_exec_data);
-
-        // If we now disable billing overrides, the gas overhead will change
-        per_chain_per_token_config.billing.is_enabled = false;
-        let expected_exec_data =
-            ethnum::U256::new(dest_chain.config.default_token_dest_gas_overhead.into())
-                .to_be_bytes();
-
-        let transfer = token_transfer(
-            lock_or_burn_out_data,
-            source_pool_address,
-            token_amount,
-            &dest_chain.config,
-            &per_chain_per_token_config,
-        )
-        .unwrap();
         assert!(transfer.extra_data.is_empty());
         assert_eq!(transfer.dest_exec_data, expected_exec_data);
     }
 
     #[test]
     fn token_transfer_validates_data_length() {
-        let dest_chain = sample_dest_chain();
-        let (token_billing_config, per_chain_per_token_config) = sample_additional_token();
+        let additional_token_transfer_data = TokenTransferAdditionalData {
+            dest_bytes_overhead: 640,
+            dest_gas_overhead: 180000,
+        };
         let token_amount = &SVMTokenAmount {
-            token: token_billing_config.mint,
+            token: Pubkey::new_unique(),
             amount: 100,
         };
 
@@ -555,13 +467,12 @@ mod tests {
             lock_or_burn_out_data,
             source_pool_address,
             token_amount,
-            &dest_chain.config,
-            &per_chain_per_token_config,
+            &additional_token_transfer_data,
         )
         .unwrap();
 
         let unreasonable_size = (CCIP_LOCK_OR_BURN_V1_RET_BYTES
-            .max(per_chain_per_token_config.billing.dest_gas_overhead)
+            .max(additional_token_transfer_data.dest_gas_overhead)
             + 1) as usize;
         let lock_or_burn_out_data = LockOrBurnOutV1 {
             dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
@@ -573,8 +484,7 @@ mod tests {
                 lock_or_burn_out_data,
                 source_pool_address,
                 token_amount,
-                &dest_chain.config,
-                &per_chain_per_token_config,
+                &additional_token_transfer_data,
             )
             .unwrap_err(),
             CcipRouterError::SourceTokenDataTooLarge.into()

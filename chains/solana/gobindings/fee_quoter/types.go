@@ -247,10 +247,44 @@ func (obj *ExtraArgsInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
+type TokenTransferAdditionalData struct {
+	DestBytesOverhead uint32
+	DestGasOverhead   uint32
+}
+
+func (obj TokenTransferAdditionalData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `DestBytesOverhead` param:
+	err = encoder.Encode(obj.DestBytesOverhead)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasOverhead` param:
+	err = encoder.Encode(obj.DestGasOverhead)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TokenTransferAdditionalData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `DestBytesOverhead`:
+	err = decoder.Decode(&obj.DestBytesOverhead)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasOverhead`:
+	err = decoder.Decode(&obj.DestGasOverhead)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type GetFeeResult struct {
-	Token  ag_solanago.PublicKey
-	Amount uint64
-	Juels  uint64
+	Token                       ag_solanago.PublicKey
+	Amount                      uint64
+	Juels                       uint64
+	TokenTransferAdditionalData []TokenTransferAdditionalData
 }
 
 func (obj GetFeeResult) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -266,6 +300,11 @@ func (obj GetFeeResult) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	}
 	// Serialize `Juels` param:
 	err = encoder.Encode(obj.Juels)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenTransferAdditionalData` param:
+	err = encoder.Encode(obj.TokenTransferAdditionalData)
 	if err != nil {
 		return err
 	}
@@ -285,6 +324,11 @@ func (obj *GetFeeResult) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	}
 	// Deserialize `Juels`:
 	err = decoder.Decode(&obj.Juels)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenTransferAdditionalData`:
+	err = decoder.Decode(&obj.TokenTransferAdditionalData)
 	if err != nil {
 		return err
 	}

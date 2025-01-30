@@ -5,7 +5,7 @@ use std::ops::AddAssign;
 
 use crate::context::GetFee;
 use crate::instructions::v1::safe_deserialize;
-use crate::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount};
+use crate::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount, TokenTransferAdditionalData};
 use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
 use crate::FeeQuoterError;
 
@@ -71,7 +71,7 @@ pub fn get_fee<'info>(
     let juels = convert(
         &fee,
         &ctx.accounts.billing_token_config.config,
-        &ctx.accounts.link_token_config.config, // TODO this should be LINK
+        &ctx.accounts.link_token_config.config,
     )?
     .amount;
 
@@ -81,10 +81,29 @@ pub fn get_fee<'info>(
         FeeQuoterError::MessageFeeTooHigh
     );
 
+    let default_token_dest_gas_overhead = ctx
+        .accounts
+        .dest_chain
+        .config
+        .default_token_dest_gas_overhead;
+
+    let token_transfer_additional_data = per_chain_per_token_config_accounts
+        .iter()
+        .map(|per_chain_per_token_config| TokenTransferAdditionalData {
+            dest_bytes_overhead: per_chain_per_token_config.billing.dest_bytes_overhead,
+            dest_gas_overhead: if per_chain_per_token_config.billing.is_enabled {
+                per_chain_per_token_config.billing.dest_gas_overhead
+            } else {
+                default_token_dest_gas_overhead
+            },
+        })
+        .collect();
+
     Ok(GetFeeResult {
         token: fee.token,
         amount: fee.amount,
         juels,
+        token_transfer_additional_data,
     })
 }
 
@@ -323,7 +342,7 @@ fn default_token_network_fees(dest_chain: &DestChain) -> NetworkFee {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct PackedPrice {
+struct PackedPrice {
     // L1 gas price (encoded in the lower 112 bits)
     pub execution_gas_price: Usd18Decimals,
     // L2 gas price (encoded in the higher 112 bits)
@@ -337,7 +356,7 @@ impl From<&TimestampedPackedU224> for PackedPrice {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct UnpackedDoubleU224 {
+struct UnpackedDoubleU224 {
     pub high: u128,
     pub low: u128,
 }
@@ -396,9 +415,8 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
     Ok(price)
 }
 
-// TODO move unit tests here
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use solana_program::{
         entrypoint::SUCCESS,
         program_stubs::{set_syscall_stubs, SyscallStubs},
