@@ -75,20 +75,19 @@ func NewCCIPReaderWithExtendedContractReaders(
 }
 
 type CCIPReader interface {
-	// CommitReportsGTETimestamp reads the requested chain starting at a given timestamp
+	// CommitReportsGTETimestamp reads the destination chain starting at a given timestamp
 	// and finds all ReportAccepted up to the provided limit.
 	CommitReportsGTETimestamp(
 		ctx context.Context,
-		dest cciptypes.ChainSelector,
 		ts time.Time,
 		limit int,
 	) ([]plugintypes2.CommitPluginReportWithMeta, error)
 
-	// ExecutedMessages reads the destination chain and finds which messages are executed.
+	// ExecutedMessages reads the destination chain and finds which messages are executed from the provided source chain.
 	// A slice of sequence numbers is returned to express which messages are executed.
 	ExecutedMessages(
 		ctx context.Context,
-		source, dest cciptypes.ChainSelector,
+		source cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
 	) ([]cciptypes.SeqNum, error)
 
@@ -101,16 +100,14 @@ type CCIPReader interface {
 		seqNumRange cciptypes.SeqNumRange,
 	) ([]cciptypes.Message, error)
 
-	// GetExpectedNextSequenceNumber returns the next sequence number to be used
-	// in the onramp.
+	// GetExpectedNextSequenceNumber reads the destination and returns the expected next onRamp sequence number.
 	GetExpectedNextSequenceNumber(
 		ctx context.Context,
-		sourceChainSelector, destChainSelector cciptypes.ChainSelector,
+		sourceChainSelector cciptypes.ChainSelector,
 	) (cciptypes.SeqNum, error)
 
 	// NextSeqNum reads the destination chain.
 	// Returns the next expected sequence number for each one of the provided chains.
-	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
 	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (
 		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
@@ -121,7 +118,7 @@ type CCIPReader interface {
 	// it must be encoding according to the source chain requirements with typeconv.AddressBytesToString.
 	Nonces(
 		ctx context.Context,
-		source, dest cciptypes.ChainSelector,
+		source cciptypes.ChainSelector,
 		addresses []string,
 	) (map[string]uint64, error)
 
@@ -147,18 +144,11 @@ type CCIPReader interface {
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
 
-	GetRMNRemoteConfig(
-		ctx context.Context,
-		destChainSelector cciptypes.ChainSelector,
-	) (rmntypes.RemoteConfig, error)
+	GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error)
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(
-		ctx context.Context,
-		destChainSelector cciptypes.ChainSelector,
-		sourceChainSelectors []cciptypes.ChainSelector,
-	) (*CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error)
 
 	// DiscoverContracts reads from all available contract readers to discover contract addresses.
 	DiscoverContracts(ctx context.Context) (ContractAddresses, error)

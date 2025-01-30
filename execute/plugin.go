@@ -124,11 +124,10 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 func getPendingExecutedReports(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
-	dest cciptypes.ChainSelector,
 	ts time.Time,
 	lggr logger.Logger,
 ) (exectypes.CommitObservations, error) {
-	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000) // todo: configurable limit
+	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +157,7 @@ func getPendingExecutedReports(
 
 		executedMessageSet := mapset.NewSet[cciptypes.SeqNum]()
 		for _, seqRange := range ranges {
-			executedMessagesForRange, err2 := ccipReader.ExecutedMessages(ctx, selector, dest, seqRange)
+			executedMessagesForRange, err2 := ccipReader.ExecutedMessages(ctx, selector, seqRange)
 			if err2 != nil {
 				return nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err2)
 			}
