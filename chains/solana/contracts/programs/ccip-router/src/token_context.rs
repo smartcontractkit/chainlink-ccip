@@ -26,18 +26,17 @@ pub struct TokenAdminRegistry {
 #[instruction(mint: Pubkey)]
 pub struct RegisterTokenAdminRegistryViaGetCCIPAdmin<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
         init,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
-        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
@@ -48,18 +47,17 @@ pub struct RegisterTokenAdminRegistryViaGetCCIPAdmin<'info> {
 #[derive(Accounts)]
 pub struct RegisterTokenAdminRegistryViaOwner<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
         init,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.key().as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
-        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     #[account(mut)]
@@ -76,14 +74,14 @@ pub struct RegisterTokenAdminRegistryViaOwner<'info> {
 #[instruction(mint: Pubkey)]
 pub struct ModifyTokenAdminRegistry<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
@@ -96,14 +94,14 @@ pub struct ModifyTokenAdminRegistry<'info> {
 #[instruction(mint: Pubkey)]
 pub struct SetPoolTokenAdminRegistry<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
@@ -118,14 +116,14 @@ pub struct SetPoolTokenAdminRegistry<'info> {
 #[instruction(mint: Pubkey)]
 pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
@@ -138,7 +136,7 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
 #[instruction(chain_selector: u64, mint: Pubkey)]
 pub struct SetTokenBillingConfig<'info> {
     #[account(
-        seeds = [CONFIG_SEED],
+        seeds = [seed::CONFIG],
         bump,
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
@@ -146,7 +144,7 @@ pub struct SetTokenBillingConfig<'info> {
 
     #[account(
         init_if_needed,
-        seeds = [TOKEN_POOL_BILLING_SEED, chain_selector.to_le_bytes().as_ref(), mint.as_ref()],
+        seeds = [seed::TOKEN_POOL_BILLING, chain_selector.to_le_bytes().as_ref(), mint.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + PerChainPerTokenConfig::INIT_SPACE,

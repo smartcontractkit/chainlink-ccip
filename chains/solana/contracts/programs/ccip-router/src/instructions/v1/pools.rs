@@ -8,11 +8,7 @@ use solana_program::{
 };
 use solana_program::{program::get_return_data, program_pack::Pack};
 
-use crate::{
-    CcipRouterError, ExternalExecutionConfig, TokenAdminRegistry, CCIP_TOKENPOOL_CONFIG,
-    CCIP_TOKENPOOL_SIGNER, FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
-    TOKEN_POOL_BILLING_SEED, TOKEN_POOL_CONFIG_SEED,
-};
+use crate::{seed, CcipRouterError, ExternalExecutionConfig, TokenAdminRegistry};
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
@@ -83,7 +79,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     {
         // Check Token Admin Registry
         let (expected_token_admin_registry, _) = Pubkey::find_program_address(
-            &[TOKEN_ADMIN_REGISTRY_SEED, mint.key().as_ref()],
+            &[seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
             &router,
         );
         require_eq!(
@@ -94,11 +90,11 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
 
         // check pool program + pool config + pool signer
         let (expected_pool_config, _) = Pubkey::find_program_address(
-            &[CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
+            &[seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
             &pool_program.key(),
         );
         let (expected_pool_signer, _) = Pubkey::find_program_address(
-            &[CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
+            &[seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
             &pool_program.key(),
         );
         require_eq!(
@@ -117,8 +113,10 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             CcipRouterError::InvalidInputsPoolAccounts
         );
 
-        let (expected_fee_token_config, _) =
-            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()], &router);
+        let (expected_fee_token_config, _) = Pubkey::find_program_address(
+            &[seed::FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()],
+            &router,
+        );
         require_eq!(
             fee_token_config.key(),
             expected_fee_token_config,
@@ -155,7 +153,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         // chain config: configured via pool
         let (expected_billing_config, _) = Pubkey::find_program_address(
             &[
-                TOKEN_POOL_BILLING_SEED,
+                seed::TOKEN_POOL_BILLING,
                 chain_selector.to_le_bytes().as_ref(),
                 mint.key().as_ref(),
             ],
@@ -163,7 +161,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         );
         let (expected_pool_chain_config, _) = Pubkey::find_program_address(
             &[
-                TOKEN_POOL_CONFIG_SEED,
+                seed::TOKEN_POOL_CONFIG,
                 chain_selector.to_le_bytes().as_ref(),
                 mint.key().as_ref(),
             ],
