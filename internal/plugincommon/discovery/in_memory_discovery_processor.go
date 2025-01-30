@@ -32,12 +32,20 @@ func (p *InMemoryDiscoveryProcessor) Query(_ context.Context, _ dt.Outcome) (dt.
 }
 
 // Observation returns an empty observation.
-func (p *InMemoryDiscoveryProcessor) Observation(_ context.Context, _ dt.Outcome, _ dt.Query) (dt.Observation, error) {
+func (p *InMemoryDiscoveryProcessor) Observation(
+	_ context.Context,
+	_ dt.Outcome,
+	_ dt.Query,
+) (dt.Observation, error) {
 	return dt.Observation{}, nil
 }
 
 // ValidateObservation returns the count of how many times the function was called.
-func (p *InMemoryDiscoveryProcessor) ValidateObservation(_ dt.Outcome, _ dt.Query, _ plugincommon.AttributedObservation[dt.Observation]) error {
+func (p *InMemoryDiscoveryProcessor) ValidateObservation(
+	_ dt.Outcome,
+	_ dt.Query,
+	_ plugincommon.AttributedObservation[dt.Observation],
+) error {
 	p.validateMutex.Lock()
 	defer p.validateMutex.Unlock()
 	p.validateCount++
@@ -45,7 +53,12 @@ func (p *InMemoryDiscoveryProcessor) ValidateObservation(_ dt.Outcome, _ dt.Quer
 }
 
 // Outcome returns an empty outcome.
-func (p *InMemoryDiscoveryProcessor) Outcome(_ context.Context, _ dt.Outcome, _ dt.Query, _ []plugincommon.AttributedObservation[dt.Observation]) (dt.Outcome, error) {
+func (p *InMemoryDiscoveryProcessor) Outcome(
+	_ context.Context,
+	_ dt.Outcome,
+	_ dt.Query,
+	_ []plugincommon.AttributedObservation[dt.Observation],
+) (dt.Outcome, error) {
 	return dt.Outcome{}, nil
 }
 
