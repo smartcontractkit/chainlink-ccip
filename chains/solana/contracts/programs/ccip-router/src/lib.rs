@@ -63,6 +63,7 @@ pub mod ccip_router {
         default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
         fee_aggregator: Pubkey,
+        fee_quoter: Pubkey,
         link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
     ) -> Result<()> {
@@ -78,6 +79,8 @@ pub mod ccip_router {
         if default_allow_out_of_order_execution {
             config.default_allow_out_of_order_execution = 1;
         }
+
+        config.fee_quoter = fee_quoter;
 
         config.owner = ctx.accounts.authority.key();
 

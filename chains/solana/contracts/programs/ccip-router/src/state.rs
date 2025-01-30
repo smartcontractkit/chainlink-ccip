@@ -98,6 +98,7 @@ pub struct DestChainState {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainConfig {
+    // TODO remove configs here that moved over to FeeQuoter
     pub is_enabled: bool, // Whether this destination chain is enabled
 
     pub max_number_of_tokens_per_msg: u16, // Maximum number of distinct ERC20 token transferred per message

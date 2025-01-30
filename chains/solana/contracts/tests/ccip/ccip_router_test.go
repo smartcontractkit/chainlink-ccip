@@ -263,7 +263,7 @@ func TestCCIPRouter(t *testing.T) {
 			// WSOL //
 			//////////
 
-			wsolPDA, _, aerr := state.FindFqBillingTokenConfigPDA(solana.SolMint, fee_quoter.ProgramID)
+			wsolPDA, _, aerr := state.FindFqBillingTokenConfigPDA(solana.SolMint, config.FeeQuoterProgram)
 			require.NoError(t, aerr)
 			wsolReceiver, _, rerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, config.BillingSignerPDA)
 			require.NoError(t, rerr)
@@ -302,7 +302,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, terr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, admin, config.DefaultCommitment, common.AddSigners(mintPrivK))
 
-			link22PDA, _, aerr := state.FindFqBillingTokenConfigPDA(mintPubK, fee_quoter.ProgramID)
+			link22PDA, _, aerr := state.FindFqBillingTokenConfigPDA(mintPubK, config.FeeQuoterProgram)
 			require.NoError(t, aerr)
 			link22EvmConfigPDA, _, puerr := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mintPubK, config.FeeQuoterProgram)
 			require.NoError(t, puerr)
@@ -393,6 +393,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.EnableExecutionAfter,
 				// fee aggregator address, will be changed in later test
 				anotherUser.PublicKey(),
+				config.FeeQuoterProgram,
 				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
 				config.RouterConfigPDA,
@@ -418,6 +419,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, uint64(17), configAccount.SvmChainSelector)
 			require.Equal(t, defaultGasLimit, configAccount.DefaultGasLimit)
 			require.Equal(t, uint8(1), configAccount.DefaultAllowOutOfOrderExecution)
+			require.Equal(t, config.FeeQuoterProgram, configAccount.FeeQuoter)
 
 			nonceEvmPDA, err = state.FindNoncePDA(config.EvmChainSelector, user.PublicKey(), config.CcipRouterProgram)
 			require.NoError(t, err)
@@ -732,47 +734,75 @@ func TestCCIPRouter(t *testing.T) {
 			// the router is the SVM onramp
 			var paddedCcipRouterProgram [64]byte
 			copy(paddedCcipRouterProgram[:], config.CcipRouterProgram[:])
-
 			onRampConfig := [2][64]byte{paddedCcipRouterProgram, emptyAddress}
 
-			instruction, err := ccip_router.NewAddChainSelectorInstruction(
-				config.SvmChainSelector,
-				ccip_router.SourceChainConfig{
-					OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
-					IsEnabled: true,
-				},
-				ccip_router.DestChainConfig{
-					IsEnabled: true,
-					// minimal valid config
-					DefaultTxGasLimit:   1,
-					MaxPerMsgGasLimit:   100,
-					ChainFamilySelector: [4]uint8{3, 2, 1, 0},
-					EnforceOutOfOrder:   true,
-				},
-				config.SvmSourceChainStatePDA,
-				config.SvmDestChainStatePDA,
-				config.RouterConfigPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
-			require.NotNil(t, result)
+			t.Run("CCIP Router", func(t *testing.T) {
+				instruction, err := ccip_router.NewAddChainSelectorInstruction(
+					config.SvmChainSelector,
+					ccip_router.SourceChainConfig{
+						OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
+						IsEnabled: true,
+					},
+					ccip_router.DestChainConfig{
+						IsEnabled: true,
+						// minimal valid config
+						DefaultTxGasLimit:   1,
+						MaxPerMsgGasLimit:   100,
+						ChainFamilySelector: [4]uint8{3, 2, 1, 0},
+						EnforceOutOfOrder:   true,
+					},
+					config.SvmSourceChainStatePDA,
+					config.SvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
 
-			var sourceChainStateAccount ccip_router.SourceChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
-			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				var sourceChainStateAccount ccip_router.SourceChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmSourceChainStatePDA, config.DefaultCommitment, &sourceChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
+				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
+				require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
 
-			var destChainStateAccount ccip_router.DestChain
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
+				var destChainStateAccount ccip_router.DestChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
+			})
+
+			t.Run("Fee Quoter", func(t *testing.T) {
+				instruction, err := fee_quoter.NewAddDestChainInstruction(
+					config.SvmChainSelector,
+					fee_quoter.DestChainConfig{
+						IsEnabled: true,
+						// minimal valid config
+						DefaultTxGasLimit:   1,
+						MaxPerMsgGasLimit:   100,
+						ChainFamilySelector: [4]uint8{3, 2, 1, 0},
+						EnforceOutOfOrder:   true,
+					},
+					config.FqConfigPDA,
+					config.FqSvmDestChainPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				var destChainStateAccount fee_quoter.DestChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &destChainStateAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, fee_quoter.TimestampedPackedU224{}, destChainStateAccount.State.UsdPerUnitGas)
+			})
 		})
 
 		t.Run("When a non-admin tries to disable the chain selector, it fails", func(t *testing.T) {
+			// TODO move these tests to use FQ
 			t.Run("Source", func(t *testing.T) {
 				ix, err := ccip_router.NewDisableSourceChainSelectorInstruction(
 					config.EvmChainSelector,
@@ -2306,6 +2336,7 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("When sending to an invalid destination chain selector it fails", func(t *testing.T) {
 			destinationChainSelector := uint64(189)
 			destinationChainStatePDA, err := state.FindDestChainStatePDA(destinationChainSelector, config.CcipRouterProgram)
+			require.NoError(t, err)
 			fqDestChainPDA, _, err := state.FindFqDestChainPDA(destinationChainSelector, config.FeeQuoterProgram)
 			require.NoError(t, err)
 			message := ccip_router.SVM2AnyMessage{
@@ -2328,7 +2359,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				fqDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -2366,7 +2397,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -2437,7 +2468,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -2503,7 +2534,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -2570,7 +2601,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -2636,7 +2667,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.userATA,
 				link22.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
@@ -2702,7 +2733,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.userATA,
 				link22.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
@@ -2741,9 +2772,9 @@ func TestCCIPRouter(t *testing.T) {
 				link22.userATA,
 				link22.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
-				config.FqEvmDestChainPDA,
+				config.FqSvmDestChainPDA,
 				link22.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
@@ -2777,7 +2808,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -2815,7 +2846,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -2852,7 +2883,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -2905,7 +2936,7 @@ func TestCCIPRouter(t *testing.T) {
 											userATA,
 											billingATA,
 											config.BillingSignerPDA,
-											fee_quoter.ProgramID,
+											config.FeeQuoterProgram,
 											config.FqConfigPDA,
 											config.FqEvmDestChainPDA,
 											billingConfigPDA,
@@ -2952,7 +2983,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.userATA, // token account of a different user
 				link22.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
@@ -2990,7 +3021,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.anotherUserATA,
 				link22.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
@@ -3068,7 +3099,7 @@ func TestCCIPRouter(t *testing.T) {
 					wsol.userATA,
 					wsol.billingATA,
 					config.BillingSignerPDA,
-					fee_quoter.ProgramID,
+					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 					config.FqEvmDestChainPDA,
 					wsol.fqBillingConfigPDA,
@@ -3172,7 +3203,7 @@ func TestCCIPRouter(t *testing.T) {
 					wsol.userATA,
 					wsol.billingATA,
 					config.BillingSignerPDA,
-					fee_quoter.ProgramID,
+					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 					config.FqEvmDestChainPDA,
 					wsol.fqBillingConfigPDA,
@@ -3329,7 +3360,7 @@ func TestCCIPRouter(t *testing.T) {
 						wsol.userATA,
 						wsol.billingATA,
 						config.BillingSignerPDA,
-						fee_quoter.ProgramID,
+						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 						config.FqEvmDestChainPDA,
 						wsol.fqBillingConfigPDA,
@@ -3401,7 +3432,7 @@ func TestCCIPRouter(t *testing.T) {
 						token.userATA,
 						token.billingATA,
 						config.BillingSignerPDA,
-						fee_quoter.ProgramID,
+						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 						config.FqEvmDestChainPDA,
 						token.fqBillingConfigPDA,
@@ -3447,7 +3478,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.tokenlessUserATA,
 				link22.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
@@ -3509,7 +3540,7 @@ func TestCCIPRouter(t *testing.T) {
 				zeroPubkey, // no user token account, because paying with native SOL
 				wsol.billingATA,
 				config.BillingSignerPDA,
-				fee_quoter.ProgramID,
+				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
@@ -6238,7 +6269,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, terr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 
-			configPDA, _, perr := state.FindFqBillingTokenConfigPDA(mint, fee_quoter.ProgramID)
+			configPDA, _, perr := state.FindFqBillingTokenConfigPDA(mint, config.FeeQuoterProgram)
 			require.NoError(t, perr)
 			receiver, _, terr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, mint, config.BillingSignerPDA)
 			require.NoError(t, terr)
