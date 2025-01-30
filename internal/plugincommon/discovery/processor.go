@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 

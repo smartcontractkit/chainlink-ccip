@@ -5,9 +5,10 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"sort"
 	"time"
+
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 

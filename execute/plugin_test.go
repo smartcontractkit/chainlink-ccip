@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"

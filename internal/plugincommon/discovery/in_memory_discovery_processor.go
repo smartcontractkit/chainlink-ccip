@@ -3,10 +3,12 @@ package discovery
 import (
 	"context"
 
+	"sync"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"sync"
 )
 
 // InMemoryDiscoveryProcessor is an in-memory implementation of PluginProcessor.
