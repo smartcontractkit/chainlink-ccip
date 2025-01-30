@@ -51,7 +51,7 @@ type Plugin struct {
 	reportCodec  cciptypes.ExecutePluginCodec
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
-	discovery    *discovery.ContractDiscoveryProcessor
+	discovery    plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
 	chainSupport plugincommon.ChainSupport
 	observer     metrics.Reporter
 
