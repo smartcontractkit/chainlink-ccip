@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
-	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -67,9 +66,6 @@ type Plugin struct {
 	contractsInitialized bool
 	// this cache remembers commit root details to optimize DB lookups.
 	commitRootsCache cache.CommitsRootsCache
-
-	// TODO: remove this, it can be transient. Also its logger is never initialized.
-	observationOptimizer optimizers.ObservationOptimizer
 }
 
 func NewPlugin(
@@ -119,8 +115,7 @@ func NewPlugin(
 			reportingCfg.OracleID,
 			destChain,
 		),
-		observer:             metricsReporter,
-		observationOptimizer: optimizers.NewObservationOptimizer(maxObservationLength),
+		observer: metricsReporter,
 		commitRootsCache: cache.NewCommitRootsCache(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
