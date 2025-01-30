@@ -264,19 +264,16 @@ func groupByChainSelector(
 	reports []plugintypes2.CommitPluginReportWithMeta) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for _, report := range reports {
-		disabledSourceChains := mapset.NewSet(report.DisabledSourceChains...)
 		for _, singleReport := range report.Report.MerkleRoots {
-			if !disabledSourceChains.Contains(singleReport.ChainSel) {
-				commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
-					exectypes.CommitData{
-						SourceChain:         singleReport.ChainSel,
-						OnRampAddress:       singleReport.OnRampAddress,
-						Timestamp:           report.Timestamp,
-						BlockNum:            report.BlockNum,
-						MerkleRoot:          singleReport.MerkleRoot,
-						SequenceNumberRange: singleReport.SeqNumsRange,
-					})
-			}
+			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
+				exectypes.CommitData{
+					SourceChain:         singleReport.ChainSel,
+					OnRampAddress:       singleReport.OnRampAddress,
+					Timestamp:           report.Timestamp,
+					BlockNum:            report.BlockNum,
+					MerkleRoot:          singleReport.MerkleRoot,
+					SequenceNumberRange: singleReport.SeqNumsRange,
+				})
 		}
 	}
 	return commitReportCache

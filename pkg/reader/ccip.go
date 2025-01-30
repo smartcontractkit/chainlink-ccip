@@ -121,6 +121,22 @@ type CommitReportAcceptedEvent struct {
 
 // ---------------------------------------------------
 
+func (r *ccipChainReader) getDisabledSourceChainsSet(ctx context.Context) (mapset.Set[cciptypes.ChainSelector], error) {
+	sourceChainConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, r.lggr, r.destChain)
+	if err != nil {
+		return nil, fmt.Errorf("get all offRamp source chains config: %w", err)
+	}
+
+	disabledSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
+	for chain, cfg := range sourceChainConfigs {
+		if !cfg.IsEnabled {
+			disabledSourceChains.Add(chain)
+		}
+	}
+
+	return disabledSourceChains, nil
+}
+
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, ts time.Time, limit int,
 ) ([]plugintypes2.CommitPluginReportWithMeta, error) {
@@ -131,6 +147,11 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	}
 
 	ev := CommitReportAcceptedEvent{}
+
+	disabledSourceChains, err := r.getDisabledSourceChainsSet(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get disabled source chains set: %w", err)
+	}
 
 	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
@@ -160,12 +181,8 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		ev, is := (item.Data).(*CommitReportAcceptedEvent)
-		if !is {
-			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
-		}
-
-		if err := validateCommitReportAcceptedEvent(*ev, item, ts); err != nil {
+		ev, err := validateCommitReportAcceptedEvent(item, ts)
+		if err != nil {
 			lggr.Errorw("validate commit report accepted event", "err", err, "ev", ev)
 			continue
 		}
@@ -182,6 +199,12 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				r.lggr.Errorw("get onRamp address for selector %d: %w", mr.SourceChainSelector, err)
 				continue
 			}
+			if disabledSourceChains.Contains(cciptypes.ChainSelector(mr.SourceChainSelector)) {
+				r.lggr.Debugw("source chain is disabled, merkle root skipped",
+					"sourceChain", mr.SourceChainSelector)
+				continue
+			}
+
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
 				OnRampAddress: onRampAddress,
@@ -230,58 +253,10 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	lggr.Debugw("decoded commit reports", "reports", reports)
 
-	return r.populateDisabledChainsInfo(ctx, reports, limit)
-}
-
-// populateDisabledChainsInfo will populate the DisabledSourceChains field of the reports.
-// If all the chains of a report are disabled, the whole report will be skipped.
-func (r *ccipChainReader) populateDisabledChainsInfo(
-	ctx context.Context,
-	reports []plugintypes2.CommitPluginReportWithMeta,
-	limit int,
-) ([]plugintypes2.CommitPluginReportWithMeta, error) {
-	sourceChainConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, r.lggr, r.destChain)
-	if err != nil {
-		return nil, fmt.Errorf("get all offRamp source chains config: %w", err)
+	if len(reports) < limit {
+		return reports, nil
 	}
-
-	disabledSourceChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for chain, cfg := range sourceChainConfigs {
-		if !cfg.IsEnabled {
-			disabledSourceChains.Add(chain)
-		}
-	}
-	r.lggr.Debugw("disabled source chains", "chains", disabledSourceChains)
-
-	reportsAfterRemovingDisabled := make([]plugintypes2.CommitPluginReportWithMeta, 0)
-	for _, rep := range reports {
-		chainsOfReport := mapset.NewSet[cciptypes.ChainSelector]()
-		for _, mr := range rep.Report.MerkleRoots {
-			chainsOfReport.Add(mr.ChainSel)
-		}
-
-		disabledChainsOfReportSet := chainsOfReport.Intersect(disabledSourceChains)
-		disabledChainsOfReportSlice := disabledChainsOfReportSet.ToSlice()
-		sort.Slice(disabledChainsOfReportSlice, func(i, j int) bool {
-			return disabledChainsOfReportSlice[i] < disabledChainsOfReportSlice[j]
-		})
-
-		r.lggr.Debugw("disabled source chains of report",
-			"report", rep, "chains", disabledChainsOfReportSlice)
-
-		if chainsOfReport.Cardinality() == disabledChainsOfReportSet.Cardinality() {
-			r.lggr.Warnw("all source chains of report are disabled, skipping report",
-				"report", rep)
-		} else {
-			rep.DisabledSourceChains = disabledChainsOfReportSlice
-			reportsAfterRemovingDisabled = append(reportsAfterRemovingDisabled, rep)
-		}
-	}
-
-	if len(reportsAfterRemovingDisabled) < limit {
-		return reportsAfterRemovingDisabled, nil
-	}
-	return reportsAfterRemovingDisabled[:limit], nil
+	return reports[:limit], nil
 }
 
 type ExecutionStateChangedEvent struct {
@@ -1682,36 +1657,40 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
 }
 
-func validateCommitReportAcceptedEvent(
-	ev CommitReportAcceptedEvent, seq types.Sequence, gteTimestamp time.Time) error {
+func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
+	ev, is := (seq.Data).(*CommitReportAcceptedEvent)
+	if !is {
+		return nil, fmt.Errorf("unexpected type %T while expecting a commit report", seq)
+	}
+
 	if seq.Timestamp < uint64(gteTimestamp.Unix()) {
-		return fmt.Errorf("commit report accepted event timestamp is less than the minimum timestamp %v<%v",
+		return nil, fmt.Errorf("commit report accepted event timestamp is less than the minimum timestamp %v<%v",
 			seq.Timestamp, gteTimestamp.Unix())
 	}
 
 	if err := validateMerkleRoots(ev.MerkleRoots); err != nil {
-		return fmt.Errorf("merkle roots: %w", err)
+		return nil, fmt.Errorf("merkle roots: %w", err)
 	}
 
 	for _, tpus := range ev.PriceUpdates.TokenPriceUpdates {
 		if len(tpus.SourceToken) == 0 {
-			return fmt.Errorf("empty source token")
+			return nil, fmt.Errorf("empty source token")
 		}
 		if tpus.UsdPerToken == nil {
-			return fmt.Errorf("nil usd per token")
+			return nil, fmt.Errorf("nil usd per token")
 		}
 	}
 
 	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
 		if gpus.DestChainSelector == 0 {
-			return fmt.Errorf("dest chain is zero")
+			return nil, fmt.Errorf("dest chain is zero")
 		}
 		if gpus.UsdPerUnitGas == nil {
-			return fmt.Errorf("nil usd per unit gas")
+			return nil, fmt.Errorf("nil usd per unit gas")
 		}
 	}
 
-	return nil
+	return ev, nil
 }
 
 func validateMerkleRoots(merkleRoots []MerkleRoot) error {
