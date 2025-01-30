@@ -639,6 +639,11 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 //nolint:lll
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist", "err", err)
+		return nil
+	}
+
 	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
 	for _, chain := range selectors {
 		update := plugintypes.TimestampedUnixBig{}
@@ -818,7 +823,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	}
 
 	// build up resp as we go.
-	var resp ContractAddresses
+	resp := make(ContractAddresses)
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
@@ -881,7 +886,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddresses, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	var resp ContractAddresses
+	resp := make(ContractAddresses)
 
 	// Discover destination contracts if the dest chain is supported.
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err == nil {
