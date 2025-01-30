@@ -44,12 +44,12 @@ func (r InMemoryCCIPReader) GetContractAddress(contractName string, chain ccipty
 // GetExpectedNextSequenceNumber implements reader.CCIP.
 func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
-	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	sourceChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	panic("unimplemented")
 }
 
 func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
-	_ context.Context, _ cciptypes.ChainSelector, ts time.Time, limit int,
+	_ context.Context, ts time.Time, limit int,
 ) ([]plugintypes.CommitPluginReportWithMeta, error) {
 	results := slicelib.Filter(r.Reports, func(report plugintypes.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
@@ -61,7 +61,7 @@ func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 }
 
 func (r InMemoryCCIPReader) ExecutedMessages(
-	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
+	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.SeqNum, error) {
 	msgs, ok := r.Messages[source]
 	// no messages for chain
@@ -69,7 +69,7 @@ func (r InMemoryCCIPReader) ExecutedMessages(
 		return nil, nil
 	}
 	filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
-		return seqNumRange.Contains(msg.Header.SequenceNumber) && msg.Destination == dest && msg.Executed
+		return seqNumRange.Contains(msg.Header.SequenceNumber) && msg.Destination == r.Dest && msg.Executed
 	})
 
 	// Build executed ranges
@@ -127,7 +127,7 @@ func (r InMemoryCCIPReader) NextSeqNum(
 
 func (r InMemoryCCIPReader) Nonces(
 	ctx context.Context,
-	source, dest cciptypes.ChainSelector,
+	source cciptypes.ChainSelector,
 	addresses []string,
 ) (map[string]uint64, error) {
 	return nil, nil
@@ -166,17 +166,12 @@ func (r InMemoryCCIPReader) DiscoverContracts(ctx context.Context) (reader.Contr
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) GetRMNRemoteConfig(
-	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector,
-) (rmntypes.RemoteConfig, error) {
+func (r InMemoryCCIPReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
 	return rmntypes.RemoteConfig{}, nil
 }
 
 func (r InMemoryCCIPReader) GetRmnCurseInfo(
-	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector,
-	sourceChainSelectors []cciptypes.ChainSelector,
+	ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector,
 ) (*reader.CurseInfo, error) {
 	return &reader.CurseInfo{
 		CursedSourceChains: map[cciptypes.ChainSelector]bool{},
