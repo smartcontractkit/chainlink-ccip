@@ -91,9 +91,9 @@ type CCIPReader interface {
 		seqNumRange cciptypes.SeqNumRange,
 	) ([]cciptypes.SeqNum, error)
 
-	// MsgsBetweenSeqNums reads the provided chains.
-	// Finds and returns ccip messages submitted between the provided sequence numbers.
-	// Messages are sorted ascending based on their timestamp and limited up to the provided limit.
+	// MsgsBetweenSeqNums reads the provided chains, finds and returns ccip messages
+	// submitted between the provided sequence numbers. Messages are sorted ascending based on
+	// their timestamp and limited up to the provided limit.
 	MsgsBetweenSeqNums(
 		ctx context.Context,
 		chain cciptypes.ChainSelector,
