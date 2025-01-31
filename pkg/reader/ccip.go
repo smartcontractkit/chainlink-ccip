@@ -96,11 +96,11 @@ func (r *ccipChainReader) WithExtendedContractReader(
 }
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
-	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
+	ctx context.Context, ts time.Time, limit int,
 ) ([]plugintypes2.CommitPluginReportWithMeta, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	if err := validateExtendedReaderExistence(r.contractReaders, dest); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -139,7 +139,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	ev := CommitReportAcceptedEvent{}
 
-	iter, err := r.contractReaders[dest].ExtendedQueryKey(
+	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
 		query.KeyFilter{
@@ -161,7 +161,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
 	lggr.Debugw("queried commit reports", "numReports", len(iter),
-		"destChain", dest,
+		"destChain", r.destChain,
 		"ts", ts,
 		"limit", limit*2)
 
@@ -239,9 +239,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 }
 
 func (r *ccipChainReader) ExecutedMessages(
-	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
+	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.SeqNum, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, dest); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -257,7 +257,7 @@ func (r *ccipChainReader) ExecutedMessages(
 
 	dataTyp := ExecutionStateChangedEvent{}
 
-	iter, err := r.contractReaders[dest].ExtendedQueryKey(
+	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
 		query.KeyFilter{
@@ -404,13 +404,8 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 // GetExpectedNextSequenceNumber implements CCIP.
 func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
-	sourceChainSelector,
-	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
-	if destChainSelector != r.destChain {
-		return 0, fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChainSelector)
-	}
-
 	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return 0, err
 	}
@@ -422,13 +417,13 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 		consts.MethodNameGetExpectedNextSequenceNumber,
 		primitives.Unconfirmed,
 		map[string]any{
-			"destChainSelector": destChainSelector,
+			"destChainSelector": r.destChain,
 		},
 		&expectedNextSequenceNumber,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get expected next sequence number from onramp, source chain: %d, dest chain: %d: %w",
-			sourceChainSelector, destChainSelector, err)
+			sourceChainSelector, r.destChain, err)
 	}
 
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
@@ -464,11 +459,11 @@ func (r *ccipChainReader) NextSeqNum(
 
 func (r *ccipChainReader) Nonces(
 	ctx context.Context,
-	sourceChainSelector, destChainSelector cciptypes.ChainSelector,
+	sourceChainSelector cciptypes.ChainSelector,
 	addresses []string,
 ) (map[string]uint64, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -505,7 +500,7 @@ func (r *ccipChainReader) Nonces(
 		consts.ContractNameNonceManager: contractBatch,
 	}
 
-	batchResult, err := r.contractReaders[destChainSelector].ExtendedBatchGetLatestValues(
+	batchResult, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(
 		ctx,
 		request,
 	)
@@ -652,6 +647,11 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 //nolint:lll
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist", "err", err)
+		return nil
+	}
+
 	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
 	for _, chain := range selectors {
 		update := plugintypes.TimestampedUnixBig{}
@@ -683,16 +683,24 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 
 func (r *ccipChainReader) GetRMNRemoteConfig(
 	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector) (rmntypes.RemoteConfig, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
+) (rmntypes.RemoteConfig, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return rmntypes.RemoteConfig{}, err
 	}
 
-	cache, ok := r.caches[destChainSelector]
-	if !ok {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("cache not found for chain %d", destChainSelector)
+	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
+	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
+	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, r.destChain)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
 
+	cache, ok := r.caches[r.destChain]
+	if !ok {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("cache not found for chain %d", r.destChain)
+	}
+	// rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, lggr, r.destChain, proxyContractAddress)
 	rmnRemoteAddress, err := cache.GetRMNRemoteAddress(ctx)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMN remote address: %w", err)
@@ -703,7 +711,19 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMN versioned config: %w", err)
 	}
 
-	header, err := cache.GetRMNDigestHeader(ctx)
+	type ret struct {
+		DigestHeader cciptypes.Bytes32
+	}
+	var header ret
+
+	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameRMNRemote,
+		consts.MethodNameGetReportDigestHeader,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&header,
+	)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMN digest header: %w", err)
 	}
@@ -730,7 +750,6 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 // from the destination chain RMN remote contract.
 func (r *ccipChainReader) GetRmnCurseInfo(
 	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector,
 	sourceChainSelectors []cciptypes.ChainSelector,
 ) (*CurseInfo, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
@@ -760,7 +779,7 @@ func (r *ccipChainReader) GetRmnCurseInfo(
 	return getCurseInfoFromCursedSubjects(
 		lggr,
 		mapset.NewSet(cursedSubjects.CursedSubjects...),
-		destChainSelector,
+		r.destChain,
 		sourceChainSelectors,
 	), nil
 }
@@ -810,7 +829,8 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		return nil, fmt.Errorf("cache not found for chain selector %d", chain)
 	}
 
-	var resp ContractAddresses
+	// build up resp as we go.
+	resp := make(ContractAddresses)
 
 	// OnRamps are in the offRamp sourceChainConfig.
 	{
@@ -858,7 +878,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddresses, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	var resp ContractAddresses
+	resp := make(ContractAddresses)
 
 	// Discover destination contracts if the dest chain is supported.
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err == nil {

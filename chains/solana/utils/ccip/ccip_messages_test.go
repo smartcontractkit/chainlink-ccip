@@ -36,7 +36,7 @@ func TestMessageHashing(t *testing.T) {
 				SequenceNumber:      89,
 				Nonce:               90,
 			},
-			ExtraArgs: ccip_router.SVMExtraArgs{
+			ExtraArgs: ccip_router.Any2SVMRampExtraArgs{
 				ComputeUnits:     1000,
 				IsWritableBitmap: GenerateBitMapForIndexes([]int{0}),
 			},
@@ -62,6 +62,12 @@ func TestMessageHashing(t *testing.T) {
 	t.Run("SVMToAny", func(t *testing.T) {
 		t.Parallel()
 
+		extraArgs, err := SerializeExtraArgs(ccip_router.EVMExtraArgsV2{
+			GasLimit:                 bin.Uint128{Lo: 1},
+			AllowOutOfOrderExecution: true,
+		}, EVMExtraArgsV2Tag)
+		require.NoError(t, err)
+
 		h, err := HashSVMToAnyMessage(ccip_router.SVM2AnyRampMessage{
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{},
@@ -70,13 +76,10 @@ func TestMessageHashing(t *testing.T) {
 				SequenceNumber:      30,
 				Nonce:               40,
 			},
-			Sender:   solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa"),
-			Data:     []byte{4, 5, 6},
-			Receiver: sender,
-			ExtraArgs: ccip_router.AnyExtraArgs{
-				GasLimit:                 bin.Uint128{Lo: 1},
-				AllowOutOfOrderExecution: true,
-			},
+			Sender:         solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa"),
+			Data:           []byte{4, 5, 6},
+			Receiver:       sender,
+			ExtraArgs:      extraArgs,
 			FeeToken:       solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			FeeTokenAmount: ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(50)},
 			FeeValueJuels:  ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(500)},
@@ -91,6 +94,6 @@ func TestMessageHashing(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "009bc51872fe41ea096bd881bf52e3daf07c80e112ffeeba6aa503d8281b6bfd", hex.EncodeToString(h))
+		require.Equal(t, "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7", hex.EncodeToString(h))
 	})
 }

@@ -106,3 +106,14 @@ func MustMarshalBorsh(t *testing.T, v interface{}) []byte {
 	require.NoError(t, err)
 	return bz
 }
+
+func MustSerializeExtraArgs(t *testing.T, data interface{}, tag string) []byte {
+	b, err := ccip.SerializeExtraArgs(data, tag)
+	require.NoError(t, err)
+	return b
+}
+
+func MustDeserializeExtraArgs[A any](t *testing.T, obj A, data []byte, tag string) A {
+	require.NoError(t, ccip.DeserializeExtraArgs(obj, data, tag))
+	return obj
+}

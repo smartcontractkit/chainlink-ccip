@@ -32,8 +32,6 @@
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
         "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `default_gas_limit` - The default gas limit for other destination chains.",
-        "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
         "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
       ],
       "accounts": [
@@ -82,14 +80,6 @@
         {
           "name": "svmChainSelector",
           "type": "u64"
-        },
-        {
-          "name": "defaultGasLimit",
-          "type": "u128"
-        },
-        {
-          "name": "defaultAllowOutOfOrderExecution",
-          "type": "bool"
         },
         {
           "name": "enableExecutionAfter",
@@ -458,78 +448,6 @@
         {
           "name": "newChainSelector",
           "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "updateDefaultGasLimit",
-      "docs": [
-        "Updates the default gas limit in the router configuration.",
-        "",
-        "This change affects the default value for gas limit on every other destination chain.",
-        "The Admin is the only one able to update the default gas limit.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `new_gas_limit` - The new default gas limit."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "newGasLimit",
-          "type": "u128"
-        }
-      ]
-    },
-    {
-      "name": "updateDefaultAllowOutOfOrderExecution",
-      "docs": [
-        "Updates the default setting for allowing out-of-order execution for other destination chains.",
-        "The Admin is the only one able to update this config.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `new_allow_out_of_order_execution` - The new setting for allowing out-of-order execution."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "newAllowOutOfOrderExecution",
-          "type": "bool"
         }
       ]
     },
@@ -1558,15 +1476,11 @@
             "type": "u8"
           },
           {
-            "name": "defaultAllowOutOfOrderExecution",
-            "type": "u8"
-          },
-          {
             "name": "padding0",
             "type": {
               "array": [
                 "u8",
-                6
+                7
               ]
             }
           },
@@ -1575,8 +1489,8 @@
             "type": "u64"
           },
           {
-            "name": "defaultGasLimit",
-            "type": "u128"
+            "name": "enableManualExecutionAfter",
+            "type": "i64"
           },
           {
             "name": "padding1",
@@ -1588,16 +1502,16 @@
             }
           },
           {
+            "name": "maxFeeJuelsPerMsg",
+            "type": "u128"
+          },
+          {
             "name": "owner",
             "type": "publicKey"
           },
           {
             "name": "proposedOwner",
             "type": "publicKey"
-          },
-          {
-            "name": "enableManualExecutionAfter",
-            "type": "i64"
           },
           {
             "name": "padding2",
@@ -1618,10 +1532,6 @@
                 2
               ]
             }
-          },
-          {
-            "name": "maxFeeJuelsPerMsg",
-            "type": "u128"
           },
           {
             "name": "linkTokenMint",
@@ -1986,6 +1896,62 @@
       }
     },
     {
+      "name": "EVMExtraArgsV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "gasLimit",
+            "type": "u128"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMExtraArgsV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "computeUnits",
+            "type": "u32"
+          },
+          {
+            "name": "accountIsWritableBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "RampMessageHeader",
       "type": {
         "kind": "struct",
@@ -2066,7 +2032,7 @@
       }
     },
     {
-      "name": "SVMExtraArgs",
+      "name": "Any2SVMRampExtraArgs",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2077,22 +2043,6 @@
           {
             "name": "isWritableBitmap",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AnyExtraArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": "u128"
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": "bool"
           }
         ]
       }
@@ -2131,7 +2081,7 @@
           {
             "name": "extraArgs",
             "type": {
-              "defined": "SVMExtraArgs"
+              "defined": "Any2SVMRampExtraArgs"
             }
           },
           {
@@ -2166,9 +2116,7 @@
           },
           {
             "name": "extraArgs",
-            "type": {
-              "defined": "AnyExtraArgs"
-            }
+            "type": "bytes"
           },
           {
             "name": "feeToken",
@@ -2284,9 +2232,7 @@
           },
           {
             "name": "extraArgs",
-            "type": {
-              "defined": "ExtraArgsInput"
-            }
+            "type": "bytes"
           }
         ]
       }
@@ -2303,26 +2249,6 @@
           {
             "name": "amount",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExtraArgsInput",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": {
-              "option": "u128"
-            }
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": {
-              "option": "bool"
-            }
           }
         ]
       }
@@ -2835,6 +2761,18 @@
           },
           {
             "name": "InvalidWritabilityBitmap"
+          },
+          {
+            "name": "InvalidExtraArgsTag"
+          },
+          {
+            "name": "InvalidChainFamilySelector"
+          },
+          {
+            "name": "InvalidTokenReceiver"
+          },
+          {
+            "name": "InvalidSVMAddress"
           }
         ]
       }

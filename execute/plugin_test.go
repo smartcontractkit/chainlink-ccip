@@ -155,7 +155,6 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			got, err := getPendingExecutedReports(
 				context.Background(),
 				mockReader,
-				123,
 				time.Now(),
 				logger.Test(t),
 			)
@@ -325,6 +324,42 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "validate observed sequence numbers: duplicate merkle root")
+}
+
+func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+
+	mockHomeChain := reader_mock.NewMockHomeChain(t)
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	mockDiscoveryProcessor := plugincommon_mock.NewMockPluginProcessor[dt.Query, dt.Observation, dt.Outcome](t)
+	mockDiscoveryProcessor.EXPECT().ValidateObservation(dt.Outcome{}, dt.Query{}, mock.Anything).Return(nil)
+
+	p := &Plugin{
+		lggr:      lggr,
+		homeChain: mockHomeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+		discovery: mockDiscoveryProcessor,
+	}
+
+	// Reports with duplicate roots.
+	root := cciptypes.Bytes32{}
+	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2), SourceChain: 1},
+		},
+	}
+	observation := exectypes.NewObservation(
+		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+	)
+	encoded, err := observation.Encode()
+	require.NoError(t, err)
+	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+		Observation: encoded,
+	})
+	require.NoError(t, err)
 }
 
 func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
@@ -590,7 +625,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{
 						CursedSourceChains: map[cciptypes.ChainSelector]bool{
 							1: false,
@@ -612,7 +647,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{}, fmt.Errorf("test error"))
 
 				homeChain := basicHomeChain()
@@ -632,7 +667,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{GlobalCurse: true}, nil)
 
 				homeChain := basicHomeChain()
@@ -652,7 +687,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{CursedDestination: true}, nil)
 
 				homeChain := basicHomeChain()
@@ -672,7 +707,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{1: true}}, nil)
 
 				homeChain := basicHomeChain()
