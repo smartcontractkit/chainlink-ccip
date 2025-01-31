@@ -849,6 +849,8 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
 
+		lggr.Debugw("got source chain configs", "configs", selectorsAndConfigs)
+
 		// Iterate results in sourceChain selector order so that the router config is deterministic.
 		for i := range selectorsAndConfigs.Selectors {
 			sourceChain := cciptypes.ChainSelector(selectorsAndConfigs.Selectors[i])
