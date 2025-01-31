@@ -93,8 +93,8 @@ type CommitPluginFactoryParams struct {
 	RmnCrypto         cciptypes.RMNCrypto
 }
 
-// NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by the
-// factory. It is safe to assume that a factory instance will create exactly one plugin instance.
+// NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by
+// the factory. It is safe to assume that a factory instance will create exactly one plugin instance.
 func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 	return &PluginFactory{
 		baseLggr:          params.Lggr,
