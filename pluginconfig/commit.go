@@ -82,6 +82,8 @@ type CommitOffchainConfig struct {
 	//TODO: Rename to something with ChainFee
 	RemoteGasPriceBatchWriteFrequency commonconfig.Duration `json:"remoteGasPriceBatchWriteFrequency"`
 
+	DisableChainFeeDeviationCheck bool `json:"disableChainFeeDeviationCheck"`
+
 	FeeInfo map[cciptypes.ChainSelector]FeeInfo `json:"feeInfo"`
 
 	// TokenPriceBatchWriteFrequency is the frequency at which the commit plugin should
