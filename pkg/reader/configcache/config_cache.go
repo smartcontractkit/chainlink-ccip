@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	configCacheRefreshInterval = 30 * time.Second
+	configCacheRefreshInterval = 0 * time.Second
 )
 
 // configCacher defines the interface for accessing cached config values
