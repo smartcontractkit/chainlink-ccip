@@ -75,12 +75,15 @@ func NewConfigCache(reader contractreader.Extended, lggr logger.Logger) ConfigCa
 
 // refreshIfNeeded refreshes the cache if the refresh interval has elapsed
 func (c *configCache) refreshIfNeeded(ctx context.Context) error {
+	c.lggr.Infow("In refreshIfNeeded")
 	c.cacheMu.Lock()
 	defer c.cacheMu.Unlock()
 
 	if time.Since(c.lastUpdateAt) < configCacheRefreshInterval {
 		return nil
 	}
+
+	c.lggr.Debugw("Refreshing cache")
 
 	if err := c.refresh(ctx); err != nil {
 		return fmt.Errorf("refresh cache: %w", err)
@@ -105,6 +108,8 @@ func (c *configCache) refresh(ctx context.Context) error {
 		c.lggr.Infow("some contracts were skipped due to no bindings: %v", batchResult.SkippedNoBinds)
 		c.clearSkippedContractValues(batchResult.SkippedNoBinds)
 	}
+
+	c.lggr.Infow("batchResult is", "batchResult", batchResult)
 
 	if err := c.updateFromResults(batchResult.Results); err != nil {
 		return fmt.Errorf("update cache from results: %w", err)
@@ -420,9 +425,12 @@ func (c *configCache) GetOffRampDynamicConfig(ctx context.Context) (cciptypes.Of
 
 // GetOffRampAllChains returns the cached offramp all chains config
 func (c *configCache) GetOffRampAllChains(ctx context.Context) (cciptypes.SelectorsAndConfigs, error) {
+	c.lggr.Infow("In GetOffRampAllChains")
 	if err := c.refreshIfNeeded(ctx); err != nil {
 		return cciptypes.SelectorsAndConfigs{}, fmt.Errorf("refresh cache: %w", err)
 	}
+	c.lggr.Infow("After refreshIfNeeded")
+	c.lggr.Infow("The offrampAllChains is", "offrampAllChains", c.offrampAllChains)
 
 	c.cacheMu.RLock()
 	defer c.cacheMu.RUnlock()
