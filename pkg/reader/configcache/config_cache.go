@@ -119,7 +119,7 @@ func (c *configCache) refresh(ctx context.Context) error {
 	// Log skipped contracts if any for debugging
 	// Clear skipped contract values from cache
 	if len(batchResult.SkippedNoBinds) > 0 {
-		c.lggr.Infow("some contracts were skipped due to no bindings: %v", batchResult.SkippedNoBinds)
+		c.lggr.Infow("some contracts were skipped due to no bindings", "contracts", batchResult.SkippedNoBinds)
 		// c.clearSkippedContractValues(batchResult.SkippedNoBinds)
 	}
 
