@@ -8,6 +8,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -45,6 +47,7 @@ type ConfigCacher interface {
 // configCache handles caching of contract configurations with automatic refresh
 type configCache struct {
 	reader       contractreader.Extended
+	lggr         logger.Logger
 	cacheMu      sync.RWMutex
 	lastUpdateAt time.Time
 
@@ -63,9 +66,10 @@ type configCache struct {
 }
 
 // NewConfigCache creates a new instance of the configuration cache
-func NewConfigCache(reader contractreader.Extended) ConfigCacher {
+func NewConfigCache(reader contractreader.Extended, lggr logger.Logger) ConfigCacher {
 	return &configCache{
 		reader: reader,
+		lggr:   lggr,
 	}
 }
 
@@ -90,12 +94,19 @@ func (c *configCache) refreshIfNeeded(ctx context.Context) error {
 func (c *configCache) refresh(ctx context.Context) error {
 	requests := c.prepareBatchRequests()
 
-	batchResult, err := c.reader.ExtendedBatchGetLatestValues(ctx, requests)
+	batchResult, err := c.reader.ExtendedBatchGetLatestValuesGraceful(ctx, requests)
 	if err != nil {
 		return fmt.Errorf("batch get configs: %w", err)
 	}
 
-	if err := c.updateFromResults(batchResult); err != nil {
+	// Log skipped contracts if any for debugging
+	// Clear skipped contract values from cache
+	if len(batchResult.SkippedNoBinds) > 0 {
+		c.lggr.Infow("some contracts were skipped due to no bindings: %v", batchResult.SkippedNoBinds)
+		c.clearSkippedContractValues(batchResult.SkippedNoBinds)
+	}
+
+	if err := c.updateFromResults(batchResult.Results); err != nil {
 		return fmt.Errorf("update cache from results: %w", err)
 	}
 
@@ -322,6 +333,31 @@ func (c *configCache) handleFeeQuoterResults(results []types.BatchReadResult) er
 		}
 	}
 	return nil
+}
+
+// clearSkippedContractValues resets cache values for contracts that had no bindings
+func (c *configCache) clearSkippedContractValues(skippedContracts []string) {
+	for _, contractName := range skippedContracts {
+		switch contractName {
+		case consts.ContractNameRouter:
+			c.nativeTokenAddress = cciptypes.Bytes{}
+		case consts.ContractNameOnRamp:
+			c.onrampDynamicConfig = cciptypes.GetOnRampDynamicConfigResponse{}
+		case consts.ContractNameOffRamp:
+			c.commitLatestOCRConfig = cciptypes.OCRConfigResponse{}
+			c.execLatestOCRConfig = cciptypes.OCRConfigResponse{}
+			c.offrampStaticConfig = cciptypes.OffRampStaticChainConfig{}
+			c.offrampDynamicConfig = cciptypes.OffRampDynamicChainConfig{}
+			c.offrampAllChains = cciptypes.SelectorsAndConfigs{}
+		case consts.ContractNameRMNRemote:
+			c.rmnDigestHeader = cciptypes.RMNDigestHeader{}
+			c.rmnVersionedConfig = cciptypes.VersionedConfigRemote{}
+		case consts.ContractNameRMNProxy:
+			c.rmnRemoteAddress = cciptypes.Bytes{}
+		case consts.ContractNameFeeQuoter:
+			c.feeQuoterConfig = cciptypes.FeeQuoterStaticConfig{}
+		}
+	}
 }
 
 func (c *configCache) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
