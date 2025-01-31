@@ -74,6 +74,8 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w, seqNr: %d", err, seqNr)
 	}
 
+	cdp.lggr.Infow("Discovered contracts", "contracts", contracts, "seqNr", seqNr)
+
 	return dt.Observation{
 		FChain:    fChain,
 		Addresses: contracts,
@@ -318,6 +320,8 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		lggr.Warnw("No consensus on router, routerConsensus map is empty")
 	}
 	contracts[consts.ContractNameRouter] = routerConsensus
+
+	cdp.lggr.Infow("Contracts to be synced", "contracts", contracts)
 
 	// call Sync to bind contracts.
 	if err := (*cdp.reader).Sync(ctx, contracts); err != nil {

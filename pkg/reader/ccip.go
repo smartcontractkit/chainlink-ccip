@@ -907,6 +907,8 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddres
 
 	myChains := maps.Keys(r.contractReaders)
 
+	r.lggr.Infow("discovering contracts", "chains", myChains, "destChain", r.destChain, "resp", resp)
+
 	// Read onRamps for FeeQuoter in DynamicConfig.
 	dynamicConfigs := r.getOnRampDynamicConfigs(ctx, lggr, myChains)
 	for chain, cfg := range dynamicConfigs {
