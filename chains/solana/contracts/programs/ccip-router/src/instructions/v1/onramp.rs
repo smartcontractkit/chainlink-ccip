@@ -1,6 +1,5 @@
-use std::cell::Ref;
-
 use crate::events::on_ramp as events;
+use crate::extra_args::{EVMExtraArgsV2, SVMExtraArgsV1};
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
@@ -15,10 +14,9 @@ use super::price_math::get_validated_token_price;
 
 use crate::{seed, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 use crate::{
-    AnyExtraArgs, BillingTokenConfig, CcipRouterError, CcipSend, Config, DestChainConfig,
-    ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage,
-    SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
-    EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
+    BillingTokenConfig, CcipRouterError, CcipSend, DestChainConfig, GetFee, Nonce,
+    PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
+    SVM2AnyTokenTransfer, SVMTokenAmount, EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
 };
 
 pub fn get_fee<'info>(

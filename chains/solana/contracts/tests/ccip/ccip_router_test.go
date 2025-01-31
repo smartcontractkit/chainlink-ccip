@@ -58,7 +58,6 @@ func TestCCIPRouter(t *testing.T) {
 	require.NoError(t, gerr)
 
 	var nonceEvmPDA solana.PublicKey
-	var nonceSvmPDA solana.PublicKey
 
 	// billing
 	type AccountsPerToken struct {
@@ -424,48 +423,6 @@ func TestCCIPRouter(t *testing.T) {
 
 			nonceEvmPDA, err = state.FindNoncePDA(config.EvmChainSelector, user.PublicKey(), config.CcipRouterProgram)
 			require.NoError(t, err)
-			nonceSvmPDA, err = state.FindNoncePDA(config.SVMChainSelector, user.PublicKey(), config.CcipRouterProgram)
-			require.NoError(t, err)
-		})
-
-		t.Run("When admin updates the default gas limit it's updated", func(t *testing.T) {
-			newGasLimit := bin.Uint128{Lo: 5000, Hi: 0}
-
-			instruction, err := ccip_router.NewUpdateDefaultGasLimitInstruction(
-				newGasLimit,
-				config.RouterConfigPDA,
-				legacyAdmin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
-			require.NotNil(t, result)
-
-			var configAccount ccip_router.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(17), configAccount.SvmChainSelector)
-			require.Equal(t, newGasLimit, configAccount.DefaultGasLimit)
-			require.Equal(t, uint8(1), configAccount.DefaultAllowOutOfOrderExecution)
-		})
-
-		t.Run("When admin updates the default allow out of order execution it's updated", func(t *testing.T) {
-			instruction, err := ccip_router.NewUpdateDefaultAllowOutOfOrderExecutionInstruction(
-				false,
-				config.RouterConfigPDA,
-				legacyAdmin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
-			require.NotNil(t, result)
-
-			var configAccount ccip_router.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, uint64(17), configAccount.SvmChainSelector)
-			require.Equal(t, bin.Uint128{Lo: 5000, Hi: 0}, configAccount.DefaultGasLimit)
-			require.Equal(t, uint8(0), configAccount.DefaultAllowOutOfOrderExecution)
 		})
 
 		t.Run("When admin updates the solana chain selector it's updated", func(t *testing.T) {
