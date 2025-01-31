@@ -101,15 +101,15 @@ func (c *configCache) refresh(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("batch get configs: %w", err)
 	}
-
+	c.lggr.Infow("batchResult result len is", "batchResult", len(batchResult.Results))
+	c.lggr.Infow("batchResult is", "batchResult", batchResult.Results)
+	c.lggr.Infow("batchResult.SkippedNoBinds is", "batchResult.SkippedNoBinds", batchResult.SkippedNoBinds)
 	// Log skipped contracts if any for debugging
 	// Clear skipped contract values from cache
 	if len(batchResult.SkippedNoBinds) > 0 {
 		c.lggr.Infow("some contracts were skipped due to no bindings: %v", batchResult.SkippedNoBinds)
 		c.clearSkippedContractValues(batchResult.SkippedNoBinds)
 	}
-
-	c.lggr.Infow("batchResult is", "batchResult", batchResult)
 
 	if err := c.updateFromResults(batchResult.Results); err != nil {
 		return fmt.Errorf("update cache from results: %w", err)
