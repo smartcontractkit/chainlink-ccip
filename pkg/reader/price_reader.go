@@ -195,6 +195,11 @@ func (pr *priceReader) GetFeedPricesUSD(
 			continue
 		}
 
+		if latestRoundData.Answer == nil || latestRoundData.Answer.Cmp(big.NewInt(0)) <= 0 {
+			lggr.Errorw("latestRoundData.Answer is nil or non positive", "contract", boundContract.Address)
+			continue
+		}
+
 		// Normalize price for this contract
 		normalizedContractPrice := pr.normalizePrice(latestRoundData.Answer, *decimals)
 

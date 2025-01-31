@@ -19,17 +19,13 @@ import (
 //
 // * `ctx` - The context containing the accounts required for initialization.
 // * `svm_chain_selector` - The chain selector for SVM.
-// * `default_gas_limit` - The default gas limit for other destination chains.
-// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
 // * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
 type Initialize struct {
-	SvmChainSelector                *uint64
-	DefaultGasLimit                 *ag_binary.Uint128
-	DefaultAllowOutOfOrderExecution *bool
-	EnableExecutionAfter            *int64
-	FeeAggregator                   *ag_solanago.PublicKey
-	LinkTokenMint                   *ag_solanago.PublicKey
-	MaxFeeJuelsPerMsg               *ag_binary.Uint128
+	SvmChainSelector     *uint64
+	EnableExecutionAfter *int64
+	FeeAggregator        *ag_solanago.PublicKey
+	LinkTokenMint        *ag_solanago.PublicKey
+	MaxFeeJuelsPerMsg    *ag_binary.Uint128
 
 	// [0] = [WRITE] config
 	//
@@ -60,18 +56,6 @@ func NewInitializeInstructionBuilder() *Initialize {
 // SetSvmChainSelector sets the "svmChainSelector" parameter.
 func (inst *Initialize) SetSvmChainSelector(svmChainSelector uint64) *Initialize {
 	inst.SvmChainSelector = &svmChainSelector
-	return inst
-}
-
-// SetDefaultGasLimit sets the "defaultGasLimit" parameter.
-func (inst *Initialize) SetDefaultGasLimit(defaultGasLimit ag_binary.Uint128) *Initialize {
-	inst.DefaultGasLimit = &defaultGasLimit
-	return inst
-}
-
-// SetDefaultAllowOutOfOrderExecution sets the "defaultAllowOutOfOrderExecution" parameter.
-func (inst *Initialize) SetDefaultAllowOutOfOrderExecution(defaultAllowOutOfOrderExecution bool) *Initialize {
-	inst.DefaultAllowOutOfOrderExecution = &defaultAllowOutOfOrderExecution
 	return inst
 }
 
@@ -210,12 +194,6 @@ func (inst *Initialize) Validate() error {
 		if inst.SvmChainSelector == nil {
 			return errors.New("SvmChainSelector parameter is not set")
 		}
-		if inst.DefaultGasLimit == nil {
-			return errors.New("DefaultGasLimit parameter is not set")
-		}
-		if inst.DefaultAllowOutOfOrderExecution == nil {
-			return errors.New("DefaultAllowOutOfOrderExecution parameter is not set")
-		}
 		if inst.EnableExecutionAfter == nil {
 			return errors.New("EnableExecutionAfter parameter is not set")
 		}
@@ -269,14 +247,12 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=7]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("               SvmChainSelector", *inst.SvmChainSelector))
-						paramsBranch.Child(ag_format.Param("                DefaultGasLimit", *inst.DefaultGasLimit))
-						paramsBranch.Child(ag_format.Param("DefaultAllowOutOfOrderExecution", *inst.DefaultAllowOutOfOrderExecution))
-						paramsBranch.Child(ag_format.Param("           EnableExecutionAfter", *inst.EnableExecutionAfter))
-						paramsBranch.Child(ag_format.Param("                  FeeAggregator", *inst.FeeAggregator))
-						paramsBranch.Child(ag_format.Param("                  LinkTokenMint", *inst.LinkTokenMint))
-						paramsBranch.Child(ag_format.Param("              MaxFeeJuelsPerMsg", *inst.MaxFeeJuelsPerMsg))
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("    SvmChainSelector", *inst.SvmChainSelector))
+						paramsBranch.Child(ag_format.Param("EnableExecutionAfter", *inst.EnableExecutionAfter))
+						paramsBranch.Child(ag_format.Param("       FeeAggregator", *inst.FeeAggregator))
+						paramsBranch.Child(ag_format.Param("       LinkTokenMint", *inst.LinkTokenMint))
+						paramsBranch.Child(ag_format.Param("   MaxFeeJuelsPerMsg", *inst.MaxFeeJuelsPerMsg))
 					})
 
 					// Accounts of the instruction:
@@ -297,16 +273,6 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `SvmChainSelector` param:
 	err = encoder.Encode(obj.SvmChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `DefaultGasLimit` param:
-	err = encoder.Encode(obj.DefaultGasLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `DefaultAllowOutOfOrderExecution` param:
-	err = encoder.Encode(obj.DefaultAllowOutOfOrderExecution)
 	if err != nil {
 		return err
 	}
@@ -338,16 +304,6 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `DefaultGasLimit`:
-	err = decoder.Decode(&obj.DefaultGasLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DefaultAllowOutOfOrderExecution`:
-	err = decoder.Decode(&obj.DefaultAllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
 	// Deserialize `EnableExecutionAfter`:
 	err = decoder.Decode(&obj.EnableExecutionAfter)
 	if err != nil {
@@ -375,8 +331,6 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 func NewInitializeInstruction(
 	// Parameters:
 	svmChainSelector uint64,
-	defaultGasLimit ag_binary.Uint128,
-	defaultAllowOutOfOrderExecution bool,
 	enableExecutionAfter int64,
 	feeAggregator ag_solanago.PublicKey,
 	linkTokenMint ag_solanago.PublicKey,
@@ -392,8 +346,6 @@ func NewInitializeInstruction(
 	tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetSvmChainSelector(svmChainSelector).
-		SetDefaultGasLimit(defaultGasLimit).
-		SetDefaultAllowOutOfOrderExecution(defaultAllowOutOfOrderExecution).
 		SetEnableExecutionAfter(enableExecutionAfter).
 		SetFeeAggregator(feeAggregator).
 		SetLinkTokenMint(linkTokenMint).

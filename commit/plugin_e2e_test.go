@@ -724,7 +724,7 @@ func prepareCcipReaderMock(
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
-	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 		Return(&reader2.CurseInfo{}, nil).Maybe()
 
 	if mockEmptySeqNrs {
@@ -866,11 +866,11 @@ func setupNode(params SetupNodeParams) nodeSetup {
 
 	for _, ch := range sourceChains {
 		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
-			mock.Anything, ch, destChain).Return(params.offRampNextSeqNum[ch]+1, nil).Maybe()
+			mock.Anything, ch).Return(params.offRampNextSeqNum[ch]+1, nil).Maybe()
 	}
 
 	ccipReader.EXPECT().
-		GetRMNRemoteConfig(mock.Anything, mock.Anything).
+		GetRMNRemoteConfig(mock.Anything).
 		Return(params.rmnReportCfg, nil).Maybe()
 
 	ccipReader.EXPECT().

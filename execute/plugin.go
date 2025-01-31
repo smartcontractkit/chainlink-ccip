@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
+
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 
@@ -37,6 +40,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+type ContractDiscoveryInterface plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
+
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
 	donID        plugintypes.DonID
@@ -49,7 +54,7 @@ type Plugin struct {
 	reportCodec  cciptypes.ExecutePluginCodec
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
-	discovery    *discovery.ContractDiscoveryProcessor
+	discovery    ContractDiscoveryInterface
 	chainSupport plugincommon.ChainSupport
 	observer     metrics.Reporter
 
@@ -123,23 +128,14 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 func getPendingExecutedReports(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
-	dest cciptypes.ChainSelector,
 	ts time.Time,
 	lggr logger.Logger,
 ) (exectypes.CommitObservations, error) {
-	latestReportTS := time.Time{}
-	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
+	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
 	if err != nil {
 		return nil, err
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
-
-	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
-	for _, report := range commitReports {
-		if report.Timestamp.After(latestReportTS) {
-			latestReportTS = report.Timestamp
-		}
-	}
 
 	groupedCommits := groupByChainSelector(commitReports)
 	lggr.Debugw("grouped commits before removing fully executed reports",
@@ -151,25 +147,33 @@ func getPendingExecutedReports(
 			continue
 		}
 
+		lggr.Debugw("grouped reports", "selector", selector, "reports", reports, "count", len(reports))
+		sort.Slice(reports, func(i, j int) bool {
+			return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
+		})
+		// todo: remove this logs after investigating whether the sorting above can be safely removed
+		lggr.Debugw("sorted reports", "selector", selector, "reports", reports, "count", len(reports))
+
 		ranges, err := computeRanges(reports)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("compute report ranges: %w", err)
 		}
 
-		var executedMessages []cciptypes.SeqNumRange
+		executedMessageSet := mapset.NewSet[cciptypes.SeqNum]()
 		for _, seqRange := range ranges {
-			executedMessagesForRange, err2 := ccipReader.ExecutedMessageRanges(ctx, selector, dest, seqRange)
+			executedMessagesForRange, err2 := ccipReader.ExecutedMessages(ctx, selector, seqRange)
 			if err2 != nil {
-				return nil, err2
+				return nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err2)
 			}
-			executedMessages = append(executedMessages, executedMessagesForRange...)
+			executedMessageSet = executedMessageSet.Union(mapset.NewSet(executedMessagesForRange...))
 		}
+
+		executedMessages := executedMessageSet.ToSlice()
+		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
 
 		// Remove fully executed reports.
-		groupedCommits[selector], err = filterOutExecutedMessages(reports, executedMessages)
-		if err != nil {
-			return nil, err
-		}
+		// Populate executed messages on the reports.
+		groupedCommits[selector] = filterOutExecutedMessages(reports, executedMessages)
 	}
 
 	lggr.Debugw("grouped commits after removing fully executed reports",
@@ -178,9 +182,8 @@ func getPendingExecutedReports(
 	return groupedCommits, nil
 }
 
-//nolint:gocyclo
 func (p *Plugin) ValidateObservation(
-	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
+	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
 	decodedObservation, err := exectypes.DecodeObservation(ao.Observation)
 	if err != nil {
@@ -212,6 +215,37 @@ func (p *Plugin) ValidateObservation(
 		}
 	}
 
+	if err = validateCommonStateObservations(p, ao.Observer, decodedObservation, supportedChains); err != nil {
+		return err
+	}
+
+	// check message related validations when states can contain messages
+	if state == exectypes.GetMessages || state == exectypes.Filter {
+		if err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
+			return fmt.Errorf("validate observer reading eligibility: %w", err)
+		}
+
+		err = validateMessagesRelatedObservations(
+			decodedObservation.CommitReports,
+			decodedObservation.Messages,
+			decodedObservation.TokenData,
+			decodedObservation.Hashes,
+			decodedObservation.CostlyMessages,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateCommonStateObservations(
+	p *Plugin,
+	oracleID commontypes.OracleID,
+	decodedObservation exectypes.Observation,
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+) error {
 	if err := plugincommon.ValidateFChain(decodedObservation.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
@@ -225,21 +259,14 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
-	// check message related validations when states can contain messages
-	if state == exectypes.GetMessages || state == exectypes.Filter {
-		if err := validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
-			return fmt.Errorf("validate observer reading eligibility: %w", err)
+	if p.discovery != nil {
+		aos := plugincommon.AttributedObservation[dt.Observation]{
+			OracleID:    oracleID,
+			Observation: decodedObservation.Contracts,
 		}
 
-		err = validateMessagesRelatedObservations(
-			decodedObservation.CommitReports,
-			decodedObservation.Messages,
-			decodedObservation.TokenData,
-			decodedObservation.Hashes,
-			decodedObservation.CostlyMessages,
-		)
-		if err != nil {
-			return err
+		if err := p.discovery.ValidateObservation(dt.Outcome{}, dt.Query{}, aos); err != nil {
+			return fmt.Errorf("process contracts: %w", err)
 		}
 	}
 
