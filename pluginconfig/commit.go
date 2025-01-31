@@ -32,8 +32,9 @@ const (
 )
 
 type FeeInfo struct {
-	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
-	DataAvailabilityDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
+	ExecDeviationPPB              cciptypes.BigInt `json:"execDeviationPPB"`
+	DataAvailabilityDeviationPPB  cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
+	DisableChainFeeDeviationCheck bool             `json:"disableChainFeeDeviationCheck"`
 }
 
 type TokenInfo struct {

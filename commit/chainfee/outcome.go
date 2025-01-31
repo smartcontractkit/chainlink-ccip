@@ -253,9 +253,15 @@ func (p *processor) getGasPricesToUpdate(
 		if feeInfo == nil {
 			continue
 		}
+
 		ci, ok := feeInfo[chain]
 		if !ok {
 			lggr.Warnf("could not find fee info for chain %d", chain)
+			continue
+		}
+
+		if ci.DisableChainFeeDeviationCheck {
+			lggr.Debugf("chain fee deviation check disabled, skipping deviation check for chain %d", chain)
 			continue
 		}
 
