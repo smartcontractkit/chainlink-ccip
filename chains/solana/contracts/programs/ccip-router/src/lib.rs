@@ -21,6 +21,9 @@ use crate::messages::*;
 mod instructions;
 use crate::instructions::*;
 
+mod extra_args;
+use crate::extra_args::*;
+
 // Anchor discriminators for CPI calls
 const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
@@ -52,15 +55,11 @@ pub mod ccip_router {
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
     /// * `svm_chain_selector` - The chain selector for SVM.
-    /// * `default_gas_limit` - The default gas limit for other destination chains.
-    /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<InitializeCCIPRouter>,
         svm_chain_selector: u64,
-        default_gas_limit: u128,
-        default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
         fee_aggregator: Pubkey,
         link_token_mint: Pubkey,
@@ -70,14 +69,9 @@ pub mod ccip_router {
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
         config.version = 1;
         config.svm_chain_selector = svm_chain_selector;
-        config.default_gas_limit = default_gas_limit;
         config.enable_manual_execution_after = enable_execution_after;
         config.link_token_mint = link_token_mint;
         config.max_fee_juels_per_msg = max_fee_juels_per_msg;
-
-        if default_allow_out_of_order_execution {
-            config.default_allow_out_of_order_execution = 1;
-        }
 
         config.owner = ctx.accounts.authority.key();
 
@@ -237,39 +231,6 @@ pub mod ccip_router {
         new_chain_selector: u64,
     ) -> Result<()> {
         v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
-    }
-
-    /// Updates the default gas limit in the router configuration.
-    ///
-    /// This change affects the default value for gas limit on every other destination chain.
-    /// The Admin is the only one able to update the default gas limit.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for updating the configuration.
-    /// * `new_gas_limit` - The new default gas limit.
-    pub fn update_default_gas_limit(
-        ctx: Context<UpdateConfigCCIPRouter>,
-        new_gas_limit: u128,
-    ) -> Result<()> {
-        v1::admin::update_default_gas_limit(ctx, new_gas_limit)
-    }
-
-    /// Updates the default setting for allowing out-of-order execution for other destination chains.
-    /// The Admin is the only one able to update this config.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for updating the configuration.
-    /// * `new_allow_out_of_order_execution` - The new setting for allowing out-of-order execution.
-    pub fn update_default_allow_out_of_order_execution(
-        ctx: Context<UpdateConfigCCIPRouter>,
-        new_allow_out_of_order_execution: bool,
-    ) -> Result<()> {
-        v1::admin::update_default_allow_out_of_order_execution(
-            ctx,
-            new_allow_out_of_order_execution,
-        )
     }
 
     /// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
@@ -691,4 +652,12 @@ pub enum CcipRouterError {
     ExtraArgOutOfOrderExecutionMustBeTrue,
     #[msg("Invalid writability bitmap")]
     InvalidWritabilityBitmap,
+    #[msg("Invalid extra args tag")]
+    InvalidExtraArgsTag,
+    #[msg("Invalid chain family selector")]
+    InvalidChainFamilySelector,
+    #[msg("Invalid token receiver")]
+    InvalidTokenReceiver,
+    #[msg("Invalid SVM address")]
+    InvalidSVMAddress,
 }
