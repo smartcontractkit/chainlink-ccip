@@ -300,7 +300,7 @@ func TestCCIPRouter(t *testing.T) {
 			// Token2022 //
 			///////////////
 
-			// Create Token2022 token, managed by "admin" (not "anotherAdmin" who manages CCIP).
+			// Create Token2022 token, managed by "admin" (not "ccipAdmin" who manages CCIP).
 			// Random-generated key, but fixing it adds determinism to tests to make it easier to debug.
 			mintPrivK := solana.MustPrivateKeyFromBase58("32YVeJArcWWWV96fztfkRQhohyFz5Hwno93AeGVrN4g2LuFyvwznrNd9A6tbvaTU6BuyBsynwJEMLre8vSy3CrVU")
 
@@ -846,7 +846,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			// Successfully accept ownership
-			// anotherAdmin becomes owner for remaining tests
+			// ccipAdmin becomes owner for remaining tests
 			instruction, err = ccip_router.NewAcceptOwnershipInstruction(
 				config.RouterConfigPDA,
 				ccipAdmin.PublicKey(),
@@ -2231,11 +2231,11 @@ func TestCCIPRouter(t *testing.T) {
 				modifiedDestChain.Config,
 				config.EvmDestChainStatePDA,
 				config.RouterConfigPDA,
-				anotherAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, anotherAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			destinationChainSelector := config.EvmChainSelector
@@ -2277,11 +2277,11 @@ func TestCCIPRouter(t *testing.T) {
 				initialDestChain.Config,
 				config.EvmDestChainStatePDA,
 				config.RouterConfigPDA,
-				anotherAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, anotherAdmin, config.DefaultCommitment)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 		})
 
@@ -3060,11 +3060,11 @@ func TestCCIPRouter(t *testing.T) {
 				modifiedDestChain.Config,
 				config.EvmDestChainStatePDA,
 				config.RouterConfigPDA,
-				anotherAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, anotherAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var parsedDestChain ccip_router.DestChain
@@ -3113,11 +3113,11 @@ func TestCCIPRouter(t *testing.T) {
 				initialDestChain.Config,
 				config.EvmDestChainStatePDA,
 				config.RouterConfigPDA,
-				anotherAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, anotherAdmin, config.DefaultCommitment)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 		})
 
