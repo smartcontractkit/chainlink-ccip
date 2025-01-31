@@ -1,16 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
+use crate::context::RemoveBillingTokenConfig;
+use crate::events::admin as events;
 use crate::{seed, DisableDestChainSelectorConfig};
 use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
-    DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
-    FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved, Ocr3ConfigInfo, OcrPluginType,
-    OwnershipTransferRequested, OwnershipTransferred, RemoveBillingTokenConfig, SetOcrConfig,
-    SetTokenBillingConfig, SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated,
-    SourceChainState, TimestampedPackedU224, TokenBilling, TransferOwnership,
-    UpdateBillingTokenConfig, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
-    UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
+    DestChainConfig, DestChainState, Ocr3ConfigInfo, OcrPluginType, SetOcrConfig,
+    SetTokenBillingConfig, SourceChainConfig, SourceChainState, TimestampedPackedU224,
+    TokenBilling, TransferOwnership, UpdateBillingTokenConfig, UpdateConfigCCIPRouter,
+    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -22,7 +21,7 @@ pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubke
         proposed_owner != config.owner,
         CcipRouterError::InvalidInputs
     );
-    emit!(OwnershipTransferRequested {
+    emit!(events::OwnershipTransferRequested {
         from: config.owner,
         to: proposed_owner,
     });
@@ -32,7 +31,7 @@ pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubke
 
 pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
-    emit!(OwnershipTransferred {
+    emit!(events::OwnershipTransferred {
         from: config.owner,
         to: config.proposed_owner,
     });
@@ -78,11 +77,11 @@ pub fn add_chain_selector(
         },
     };
 
-    emit!(SourceChainAdded {
+    emit!(events::SourceChainAdded {
         source_chain_selector: new_chain_selector,
         source_chain_config,
     });
-    emit!(DestChainAdded {
+    emit!(events::DestChainAdded {
         dest_chain_selector: new_chain_selector,
         dest_chain_config,
     });
@@ -98,7 +97,7 @@ pub fn disable_source_chain_selector(
 
     chain_state.config.is_enabled = false;
 
-    emit!(SourceChainConfigUpdated {
+    emit!(events::SourceChainConfigUpdated {
         source_chain_selector,
         source_chain_config: chain_state.config.clone(),
     });
@@ -114,7 +113,7 @@ pub fn disable_dest_chain_selector(
 
     chain_state.config.is_enabled = false;
 
-    emit!(DestChainConfigUpdated {
+    emit!(events::DestChainConfigUpdated {
         dest_chain_selector,
         dest_chain_config: chain_state.config.clone(),
     });
@@ -131,7 +130,7 @@ pub fn update_source_chain_config(
 
     ctx.accounts.source_chain_state.config = source_chain_config.clone();
 
-    emit!(SourceChainConfigUpdated {
+    emit!(events::SourceChainConfigUpdated {
         source_chain_selector,
         source_chain_config,
     });
@@ -147,7 +146,7 @@ pub fn update_dest_chain_config(
 
     ctx.accounts.dest_chain_state.config = dest_chain_config.clone();
 
-    emit!(DestChainConfigUpdated {
+    emit!(events::DestChainConfigUpdated {
         dest_chain_selector,
         dest_chain_config,
     });
@@ -228,7 +227,7 @@ pub fn add_billing_token_config(
     ctx: Context<AddBillingTokenConfig>,
     config: BillingTokenConfig,
 ) -> Result<()> {
-    emit!(FeeTokenAdded {
+    emit!(events::FeeTokenAdded {
         fee_token: config.mint,
         enabled: config.enabled
     });
@@ -244,10 +243,10 @@ pub fn update_billing_token_config(
     if config.enabled != ctx.accounts.billing_token_config.config.enabled {
         // enabled/disabled status has changed
         match config.enabled {
-            true => emit!(FeeTokenEnabled {
+            true => emit!(events::FeeTokenEnabled {
                 fee_token: config.mint
             }),
-            false => emit!(FeeTokenDisabled {
+            false => emit!(events::FeeTokenDisabled {
                 fee_token: config.mint
             }),
         }
@@ -274,7 +273,7 @@ pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Re
 
     token_interface::close_account(cpi_ctx)?;
 
-    emit!(FeeTokenRemoved {
+    emit!(events::FeeTokenRemoved {
         fee_token: ctx.accounts.fee_token_mint.key()
     });
     Ok(())

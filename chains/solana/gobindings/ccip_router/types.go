@@ -1688,6 +1688,8 @@ const (
 	SourceTokenDataTooLarge_CcipRouterError
 	MessageGasLimitTooHigh_CcipRouterError
 	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
+	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
+	InvalidTokenAdminRegistryProposedAdmin_CcipRouterError
 	InvalidWritabilityBitmap_CcipRouterError
 	InvalidExtraArgsTag_CcipRouterError
 	InvalidChainFamilySelector_CcipRouterError
@@ -1780,6 +1782,10 @@ func (value CcipRouterError) String() string {
 		return "MessageGasLimitTooHigh"
 	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError:
 		return "ExtraArgOutOfOrderExecutionMustBeTrue"
+	case InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError:
+		return "InvalidTokenAdminRegistryInputsZeroAddress"
+	case InvalidTokenAdminRegistryProposedAdmin_CcipRouterError:
+		return "InvalidTokenAdminRegistryProposedAdmin"
 	case InvalidWritabilityBitmap_CcipRouterError:
 		return "InvalidWritabilityBitmap"
 	case InvalidExtraArgsTag_CcipRouterError:

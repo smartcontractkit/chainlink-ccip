@@ -24,6 +24,7 @@
     {
       "name": "initialize",
       "docs": [
+        "Initialization Flow //",
         "Initializes the CCIP Router.",
         "",
         "The initialization of the Router is responsibility of Admin, nothing more than calling this method should be done first.",
@@ -159,6 +160,7 @@
     {
       "name": "updateFeeAggregator",
       "docs": [
+        "Config //",
         "Updates the fee aggregator in the router configuration.",
         "The Admin is the only one able to update the fee aggregator.",
         "",
@@ -494,267 +496,6 @@
       ]
     },
     {
-      "name": "registerTokenAdminRegistryViaGetCcipAdmin",
-      "docs": [
-        "Registers the Token Admin Registry via the CCIP Admin",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for registration.",
-        "* `mint` - The public key of the token mint.",
-        "* `token_admin_registry_admin` - The public key of the token admin registry admin."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenAdminRegistry",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "tokenAdminRegistryAdmin",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "registerTokenAdminRegistryViaOwner",
-      "docs": [
-        "Registers the Token Admin Registry via the token owner.",
-        "",
-        "The Authority of the Mint Token can claim the registry of the token.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for registration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenAdminRegistry",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "setPool",
-      "docs": [
-        "Sets the pool lookup table for a given token mint.",
-        "",
-        "The administrator of the token admin registry can set the pool lookup table for a given token mint.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for setting the pool.",
-        "* `mint` - The public key of the token mint.",
-        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.",
-        "* `is_writable` - index of account in lookup table that is writable"
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenAdminRegistry",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolLookuptable",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "writableIndexes",
-          "type": "bytes"
-        }
-      ]
-    },
-    {
-      "name": "transferAdminRoleTokenAdminRegistry",
-      "docs": [
-        "Transfers the admin role of the token admin registry to a new admin.",
-        "",
-        "Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for the transfer.",
-        "* `mint` - The public key of the token mint.",
-        "* `new_admin` - The public key of the new admin."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenAdminRegistry",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "newAdmin",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "acceptAdminRoleTokenAdminRegistry",
-      "docs": [
-        "Accepts the admin role of the token admin registry.",
-        "",
-        "The Pending Admin must call this function to accept the admin role of the Token Admin Registry.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for accepting the admin role.",
-        "* `mint` - The public key of the token mint."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenAdminRegistry",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "setTokenBilling",
-      "docs": [
-        "Sets the token billing configuration.",
-        "",
-        "Only CCIP Admin can set the token billing configuration.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
-        "* `chain_selector` - The chain selector.",
-        "* `mint` - The public key of the token mint.",
-        "* `cfg` - The token billing configuration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "perChainPerTokenConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "chainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "TokenBilling"
-          }
-        }
-      ]
-    },
-    {
       "name": "setOcrConfig",
       "docs": [
         "Sets the OCR configuration.",
@@ -811,6 +552,365 @@
           "name": "transmitters",
           "type": {
             "vec": "publicKey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ccipAdminProposeAdministrator",
+      "docs": [
+        "Token Admin Registry //",
+        "Registers the Token Admin Registry via the CCIP Admin",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenAdminRegistryAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "ccipAdminOverridePendingAdministrator",
+      "docs": [
+        "Overrides the pending admin of the Token Admin Registry",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenAdminRegistryAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "ownerProposeAdministrator",
+      "docs": [
+        "Registers the Token Admin Registry by the token owner.",
+        "",
+        "The Authority of the Mint Token can claim the registry of the token.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenAdminRegistryAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "ownerOverridePendingAdministrator",
+      "docs": [
+        "Overrides the pending admin of the Token Admin Registry by the token owner",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenAdminRegistryAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "acceptAdminRoleTokenAdminRegistry",
+      "docs": [
+        "Accepts the admin role of the token admin registry.",
+        "",
+        "The Pending Admin must call this function to accept the admin role of the Token Admin Registry.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for accepting the admin role.",
+        "* `mint` - The public key of the token mint."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transferAdminRoleTokenAdminRegistry",
+      "docs": [
+        "Transfers the admin role of the token admin registry to a new admin.",
+        "",
+        "Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer.",
+        "* `mint` - The public key of the token mint.",
+        "* `new_admin` - The public key of the new admin."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newAdmin",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setPool",
+      "docs": [
+        "Sets the pool lookup table for a given token mint.",
+        "",
+        "The administrator of the token admin registry can set the pool lookup table for a given token mint.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the pool.",
+        "* `mint` - The public key of the token mint.",
+        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.",
+        "* `is_writable` - index of account in lookup table that is writable"
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAdminRegistry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolLookuptable",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "writableIndexes",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "setTokenBilling",
+      "docs": [
+        "Billing //",
+        "Sets the token billing configuration.",
+        "",
+        "Only CCIP Admin can set the token billing configuration.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
+        "* `chain_selector` - The chain selector.",
+        "* `mint` - The public key of the token mint.",
+        "* `cfg` - The token billing configuration."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perChainPerTokenConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "chainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": "TokenBilling"
           }
         }
       ]
@@ -1093,14 +1193,14 @@
     {
       "name": "ccipSend",
       "docs": [
-        "ON RAMP FLOW",
+        "On Ramp Flow //",
         "Sends a message to the destination chain.",
         "",
         "Request a message to be sent to the destination chain.",
         "The method name needs to be ccip_send with Anchor encoding.",
         "This function is called by the CCIP Sender Contract (or final user) to send a message to the CCIP Router.",
         "The message will be sent to the receiver on the destination chain selector.",
-        "This message emits the event CCIPSendRequested with all the necessary data to be retrieved by the OffChain Code",
+        "This message emits the event CCIPMessageSent with all the necessary data to be retrieved by the OffChain Code",
         "",
         "# Arguments",
         "",
@@ -1201,7 +1301,7 @@
     {
       "name": "commit",
       "docs": [
-        "OFF RAMP FLOW",
+        "Off Ramp Flow //",
         "Commits a report to the router.",
         "",
         "The method name needs to be commit with Anchor encoding.",
@@ -1313,7 +1413,6 @@
     {
       "name": "execute",
       "docs": [
-        "OFF RAMP FLOW",
         "Executes a message on the destination chain.",
         "",
         "The method name needs to be execute with Anchor encoding.",
@@ -1754,6 +1853,10 @@
                 2
               ]
             }
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
           }
         ]
       }
@@ -2775,6 +2878,12 @@
             "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
           },
           {
+            "name": "InvalidTokenAdminRegistryInputsZeroAddress"
+          },
+          {
+            "name": "InvalidTokenAdminRegistryProposedAdmin"
+          },
+          {
             "name": "InvalidWritabilityBitmap"
           },
           {
@@ -2797,174 +2906,6 @@
     }
   ],
   "events": [
-    {
-      "name": "CCIPMessageSent",
-      "fields": [
-        {
-          "name": "destChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "sequenceNumber",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "message",
-          "type": {
-            "defined": "SVM2AnyRampMessage"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "CommitReportAccepted",
-      "fields": [
-        {
-          "name": "merkleRoot",
-          "type": {
-            "defined": "MerkleRoot"
-          },
-          "index": false
-        },
-        {
-          "name": "priceUpdates",
-          "type": {
-            "defined": "PriceUpdates"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "SkippedAlreadyExecutedMessage",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "sequenceNumber",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "AlreadyAttempted",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "sequenceNumber",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ExecutionStateChanged",
-      "fields": [
-        {
-          "name": "sourceChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "sequenceNumber",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "messageId",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "messageHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "state",
-          "type": {
-            "defined": "MessageExecutionState"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "PoolSet",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "previousPoolLookupTable",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newPoolLookupTable",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "AdministratorTransferRequested",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "currentAdmin",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newAdmin",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "AdministratorTransferred",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newAdmin",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
     {
       "name": "FeeTokenAdded",
       "fields": [
@@ -3006,93 +2947,6 @@
         {
           "name": "feeToken",
           "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "UsdPerUnitGasUpdated",
-      "fields": [
-        {
-          "name": "destChain",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "value",
-          "type": {
-            "array": [
-              "u8",
-              28
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "timestamp",
-          "type": "i64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "UsdPerTokenUpdated",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "value",
-          "type": {
-            "array": [
-              "u8",
-              28
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "timestamp",
-          "type": "i64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "TokenTransferFeeConfigUpdated",
-      "fields": [
-        {
-          "name": "destChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "tokenTransferFeeConfig",
-          "type": {
-            "defined": "TokenBilling"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "PremiumMultiplierWeiPerEthUpdated",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "premiumMultiplierWeiPerEth",
-          "type": "u64",
           "index": false
         }
       ]
@@ -3166,21 +3020,6 @@
       ]
     },
     {
-      "name": "AdministratorRegistered",
-      "fields": [
-        {
-          "name": "tokenMint",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "administrator",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
       "name": "OwnershipTransferRequested",
       "fields": [
         {
@@ -3206,6 +3045,246 @@
         {
           "name": "to",
           "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CommitReportAccepted",
+      "fields": [
+        {
+          "name": "merkleRoot",
+          "type": {
+            "defined": "MerkleRoot"
+          },
+          "index": false
+        },
+        {
+          "name": "priceUpdates",
+          "type": {
+            "defined": "PriceUpdates"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "SkippedAlreadyExecutedMessage",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sequenceNumber",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ExecutionStateChanged",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sequenceNumber",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "messageId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "messageHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "state",
+          "type": {
+            "defined": "MessageExecutionState"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UsdPerUnitGasUpdated",
+      "fields": [
+        {
+          "name": "destChain",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UsdPerTokenUpdated",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CCIPMessageSent",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sequenceNumber",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "message",
+          "type": {
+            "defined": "SVM2AnyRampMessage"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PoolSet",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "previousPoolLookupTable",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newPoolLookupTable",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "AdministratorTransferRequested",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "currentAdmin",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "AdministratorTransferred",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newAdmin",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenTransferFeeConfigUpdated",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenTransferFeeConfig",
+          "type": {
+            "defined": "TokenBilling"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PremiumMultiplierWeiPerEthUpdated",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "premiumMultiplierWeiPerEth",
+          "type": "u64",
           "index": false
         }
       ]
