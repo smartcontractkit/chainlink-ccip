@@ -858,8 +858,6 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", configs)
 		}
 
-		lggr.Debugw("got source chain configs", "configs", configs)
-
 		// Populate the map.
 		for i := range selectorsAndConfigs.Selectors {
 			chainSel := cciptypes.ChainSelector(selectorsAndConfigs.Selectors[i])
@@ -1171,35 +1169,53 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 ) map[cciptypes.ChainSelector]cciptypes.GetOnRampDynamicConfigResponse {
 	result := make(map[cciptypes.ChainSelector]cciptypes.GetOnRampDynamicConfigResponse)
 
+	mu := new(sync.Mutex)
+	wg := new(sync.WaitGroup)
 	for _, chainSel := range srcChains {
 		// no onramp for the destination chain
 		if chainSel == r.destChain {
 			continue
 		}
-
-		cache, ok := r.caches[chainSel]
-		if !ok {
-			lggr.Errorw("cache not found for chain selector", "chain", chainSel)
+		if r.contractReaders[chainSel] == nil {
+			r.lggr.Errorw("contract reader not found", "chain", chainSel)
 			continue
 		}
 
-		resp, err := cache.GetOnRampDynamicConfig(ctx)
-		if err != nil {
-			if errors.Is(err, contractreader.ErrNoBindings) {
-				// ErrNoBindings is an allowable error during initialization
-				lggr.Infow(
-					"unable to lookup source fee quoters (onRamp dynamic config), "+
-						"this is expected during initialization", "err", err)
-			} else {
-				lggr.Errorw("unable to lookup source fee quoters (onRamp dynamic config)",
-					"chain", chainSel, "err", err)
+		wg.Add(1)
+		go func(chainSel cciptypes.ChainSelector) {
+			defer wg.Done()
+			// read onramp dynamic config
+			resp := cciptypes.GetOnRampDynamicConfigResponse{}
+			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
+				ctx,
+				consts.ContractNameOnRamp,
+				consts.MethodNameOnRampGetDynamicConfig,
+				primitives.Unconfirmed,
+				map[string]any{},
+				&resp,
+			)
+			lggr.Debugw("got onramp dynamic config",
+				"chain", chainSel,
+				"resp", resp)
+			if err != nil {
+				if errors.Is(err, contractreader.ErrNoBindings) {
+					// ErrNoBindings is an allowable error during initialization
+					lggr.Infow(
+						"unable to lookup source fee quoters (onRamp dynamic config), "+
+							"this is expected during initialization", "err", err)
+				} else {
+					lggr.Errorw("unable to lookup source fee quoters (onRamp dynamic config)",
+						"chain", chainSel, "err", err)
+				}
+				return
 			}
-			continue
-		}
-
-		lggr.Debugw("got onramp dynamic config", "chain", chainSel, "resp", resp)
-		result[chainSel] = resp
+			mu.Lock()
+			result[chainSel] = resp
+			mu.Unlock()
+		}(chainSel)
 	}
+
+	wg.Wait()
 
 	return result
 }

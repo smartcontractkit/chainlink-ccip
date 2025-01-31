@@ -27,9 +27,6 @@ type ConfigCacher interface {
 	// Token related methods
 	GetNativeTokenAddress(ctx context.Context) (cciptypes.Bytes, error)
 
-	// OnRamp related methods
-	GetOnRampDynamicConfig(ctx context.Context) (cciptypes.GetOnRampDynamicConfigResponse, error)
-
 	// OffRamp related methods
 	GetOffRampStaticConfig(ctx context.Context) (cciptypes.OffRampStaticChainConfig, error)
 	GetOffRampDynamicConfig(ctx context.Context) (cciptypes.OffRampDynamicChainConfig, error)
@@ -58,7 +55,6 @@ type configCache struct {
 	offrampStaticConfig   cciptypes.OffRampStaticChainConfig
 	offrampDynamicConfig  cciptypes.OffRampDynamicChainConfig
 	offrampAllChains      cciptypes.SelectorsAndConfigs
-	onrampDynamicConfig   cciptypes.GetOnRampDynamicConfigResponse
 	rmnDigestHeader       cciptypes.RMNDigestHeader
 	rmnVersionedConfig    cciptypes.VersionedConfigRemote
 	rmnRemoteAddress      cciptypes.Bytes
@@ -135,7 +131,6 @@ func (c *configCache) refresh(ctx context.Context) error {
 func (c *configCache) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
 	var (
 		nativeTokenAddress    cciptypes.Bytes
-		onrampDynamicConfig   cciptypes.GetOnRampDynamicConfigResponse
 		commitLatestOCRConfig cciptypes.OCRConfigResponse
 		execLatestOCRConfig   cciptypes.OCRConfigResponse
 		staticConfig          cciptypes.OffRampStaticChainConfig
@@ -152,11 +147,6 @@ func (c *configCache) prepareBatchRequests() contractreader.ExtendedBatchGetLate
 			ReadName:  consts.MethodNameRouterGetWrappedNative,
 			Params:    map[string]any{},
 			ReturnVal: &nativeTokenAddress,
-		}},
-		consts.ContractNameOnRamp: {{
-			ReadName:  consts.MethodNameOnRampGetDynamicConfig,
-			Params:    map[string]any{},
-			ReturnVal: &onrampDynamicConfig,
 		}},
 		consts.ContractNameOffRamp: {
 			{
@@ -229,8 +219,6 @@ func (c *configCache) handleContractResults(contract types.BoundContract, result
 	switch contract.Name {
 	case consts.ContractNameRouter:
 		return c.handleRouterResults(results)
-	case consts.ContractNameOnRamp:
-		return c.handleOnRampResults(results)
 	case consts.ContractNameOffRamp:
 		c.lggr.Infow("In handleContractResults")
 		return c.handleOffRampResults(results)
@@ -253,20 +241,6 @@ func (c *configCache) handleRouterResults(results []types.BatchReadResult) error
 		}
 		if typed, ok := val.(*cciptypes.Bytes); ok {
 			c.nativeTokenAddress = *typed
-		}
-	}
-	return nil
-}
-
-// handleOnRampResults processes onramp-specific results
-func (c *configCache) handleOnRampResults(results []types.BatchReadResult) error {
-	if len(results) > 0 {
-		val, err := results[0].GetResult()
-		if err != nil {
-			return fmt.Errorf("get onramp result: %w", err)
-		}
-		if typed, ok := val.(*cciptypes.GetOnRampDynamicConfigResponse); ok {
-			c.onrampDynamicConfig = *typed
 		}
 	}
 	return nil
@@ -408,17 +382,6 @@ func (c *configCache) GetNativeTokenAddress(ctx context.Context) (cciptypes.Byte
 	c.cacheMu.RLock()
 	defer c.cacheMu.RUnlock()
 	return c.nativeTokenAddress, nil
-}
-
-// GetOnRampDynamicConfig returns the cached onramp dynamic config
-func (c *configCache) GetOnRampDynamicConfig(ctx context.Context) (cciptypes.GetOnRampDynamicConfigResponse, error) {
-	if err := c.refreshIfNeeded(ctx); err != nil {
-		return cciptypes.GetOnRampDynamicConfigResponse{}, fmt.Errorf("refresh cache: %w", err)
-	}
-
-	c.cacheMu.RLock()
-	defer c.cacheMu.RUnlock()
-	return c.onrampDynamicConfig, nil
 }
 
 // GetOffRampStaticConfig returns the cached offramp static config

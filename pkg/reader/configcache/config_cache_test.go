@@ -49,17 +49,6 @@ func TestConfigCache_Refresh_BasicScenario(t *testing.T) {
 			types.BoundContract{Name: consts.ContractNameRouter}: []types.BatchReadResult{
 				createMockBatchResult(&cciptypes.Bytes{1, 2, 3}), // native token address
 			},
-			types.BoundContract{Name: consts.ContractNameOnRamp}: []types.BatchReadResult{
-				createMockBatchResult(&cciptypes.GetOnRampDynamicConfigResponse{
-					DynamicConfig: cciptypes.OnRampDynamicConfig{
-						FeeQuoter:              []byte{4, 5, 6},
-						ReentrancyGuardEntered: false,
-						MessageInterceptor:     []byte{7, 8, 9},
-						FeeAggregator:          []byte{10, 11, 12},
-						AllowListAdmin:         []byte{13, 14, 15},
-					},
-				}),
-			},
 			types.BoundContract{Name: consts.ContractNameOffRamp}: []types.BatchReadResult{
 				createMockBatchResult(&cciptypes.OCRConfigResponse{ // commit config
 					OCRConfig: cciptypes.OCRConfig{
@@ -160,15 +149,6 @@ func TestConfigCache_Refresh_BasicScenario(t *testing.T) {
 	addr, err := cache.GetNativeTokenAddress(tests.Context(t))
 	require.NoError(t, err)
 	assert.Equal(t, cciptypes.Bytes{1, 2, 3}, addr)
-
-	// Verify OnRamp values
-	onRampConfig, err := cache.GetOnRampDynamicConfig(tests.Context(t))
-	require.NoError(t, err)
-	assert.Equal(t, []byte{4, 5, 6}, onRampConfig.DynamicConfig.FeeQuoter)
-	assert.Equal(t, []byte{7, 8, 9}, onRampConfig.DynamicConfig.MessageInterceptor)
-	assert.Equal(t, []byte{10, 11, 12}, onRampConfig.DynamicConfig.FeeAggregator)
-	assert.Equal(t, []byte{13, 14, 15}, onRampConfig.DynamicConfig.AllowListAdmin)
-	assert.False(t, onRampConfig.DynamicConfig.ReentrancyGuardEntered)
 
 	// Verify OffRamp values
 	commitDigest, err := cache.GetOffRampConfigDigest(tests.Context(t), consts.PluginTypeCommit)
@@ -283,14 +263,6 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 			addr, err := cache.GetNativeTokenAddress(tests.Context(t))
 			require.NoError(t, err)
 			assert.Equal(t, cciptypes.Bytes{1, 2, 3}, addr)
-		}()
-
-		go func() {
-			defer wg.Done()
-			<-start // Wait for start signal
-			config, err := cache.GetOnRampDynamicConfig(tests.Context(t))
-			require.NoError(t, err)
-			assert.Equal(t, []byte{4, 5, 6}, config.DynamicConfig.FeeQuoter)
 		}()
 
 		go func() {
