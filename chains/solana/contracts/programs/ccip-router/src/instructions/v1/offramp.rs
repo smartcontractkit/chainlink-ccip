@@ -465,11 +465,13 @@ fn internal_execute<'info>(
             CcipRouterError::OfframpInvalidDataLength
         );
 
+        // parse pool return data into SVMTokenAmount
         token_amounts[i] = SVMTokenAmount {
             token: accs.mint.key(),
             amount: ReleaseOrMintOutV1::try_from_slice(&return_data)?.destination_amount,
         };
 
+        // validate user recieved tokens according to the amount returned by the token pool
         let post_bal = get_balance(accs.user_token_account)?;
         require!(
             post_bal >= init_bal && post_bal - init_bal == token_amounts[i].amount,

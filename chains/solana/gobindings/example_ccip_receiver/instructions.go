@@ -48,7 +48,7 @@ var (
 
 	Instruction_UpdateRouter = ag_binary.TypeID([8]byte{32, 109, 12, 153, 101, 129, 64, 70})
 
-	Instruction_ProposeOwner = ag_binary.TypeID([8]byte{90, 57, 141, 110, 196, 241, 172, 39})
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 )
@@ -68,8 +68,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "RemoveChainFrom"
 	case Instruction_UpdateRouter:
 		return "UpdateRouter"
-	case Instruction_ProposeOwner:
-		return "ProposeOwner"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
 	default:
@@ -111,7 +111,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"update_router", (*UpdateRouter)(nil),
 		},
 		{
-			"propose_owner", (*ProposeOwner)(nil),
+			"transfer_ownership", (*TransferOwnership)(nil),
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),

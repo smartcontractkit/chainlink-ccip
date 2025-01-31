@@ -941,7 +941,6 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "arrayvec 1.0.0",
  "solana-program",
 ]
 

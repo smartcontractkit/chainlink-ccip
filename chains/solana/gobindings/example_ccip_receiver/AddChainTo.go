@@ -17,14 +17,16 @@ type AddChainTo struct {
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [SIGNER] authority
+	// [1] = [WRITE, SIGNER] authority
+	//
+	// [2] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewAddChainToInstructionBuilder creates a new `AddChainTo` instruction builder.
 func NewAddChainToInstructionBuilder() *AddChainTo {
 	nd := &AddChainTo{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -54,13 +56,24 @@ func (inst *AddChainTo) GetStateAccount() *ag_solanago.AccountMeta {
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *AddChainTo) SetAuthorityAccount(authority ag_solanago.PublicKey) *AddChainTo {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AddChainTo) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
+}
+
+// SetSystemProgramAccount sets the "systemProgram" account.
+func (inst *AddChainTo) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AddChainTo {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	return inst
+}
+
+// GetSystemProgramAccount gets the "systemProgram" account.
+func (inst *AddChainTo) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst AddChainTo) Build() *Instruction {
@@ -99,6 +112,9 @@ func (inst *AddChainTo) Validate() error {
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
+		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.SystemProgram is not set")
+		}
 	}
 	return nil
 }
@@ -118,9 +134,10 @@ func (inst *AddChainTo) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -160,10 +177,12 @@ func NewAddChainToInstruction(
 	chainSelector uint64,
 	// Accounts:
 	state ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *AddChainTo {
+	authority ag_solanago.PublicKey,
+	systemProgram ag_solanago.PublicKey) *AddChainTo {
 	return NewAddChainToInstructionBuilder().
 		SetListType(listType).
 		SetChainSelector(chainSelector).
 		SetStateAccount(state).
-		SetAuthorityAccount(authority)
+		SetAuthorityAccount(authority).
+		SetSystemProgramAccount(systemProgram)
 }

@@ -102,8 +102,13 @@
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -168,7 +173,7 @@
       ]
     },
     {
-      "name": "proposeOwner",
+      "name": "transferOwnership",
       "accounts": [
         {
           "name": "state",
@@ -250,17 +255,10 @@
             "type": "bool"
           },
           {
-            "name": "xs",
+            "name": "chains",
             "type": {
-              "array": [
-                "u64",
-                20
-              ]
+              "vec": "u64"
             }
-          },
-          {
-            "name": "len",
-            "type": "u8"
           }
         ]
       }
@@ -375,11 +373,6 @@
       "code": 6004,
       "name": "OnlyProposedOwner",
       "msg": "Address is not proposed_owner"
-    },
-    {
-      "code": 6005,
-      "name": "Full",
-      "msg": "List is full"
     }
   ]
 }

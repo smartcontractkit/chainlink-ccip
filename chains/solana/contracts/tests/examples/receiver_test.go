@@ -50,9 +50,9 @@ func TestCcipReceiver(t *testing.T) {
 	})
 
 	t.Run("enable/disable chains", func(t *testing.T) {
-		ixAllow, err := ccip_receiver.NewAddChainToInstruction(ccip_receiver.Allow_ListType, config.EvmChainSelector, receiverState, owner.PublicKey()).ValidateAndBuild()
+		ixAllow, err := ccip_receiver.NewAddChainToInstruction(ccip_receiver.Allow_ListType, config.EvmChainSelector, receiverState, owner.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 		require.NoError(t, err)
-		ixDeny, err := ccip_receiver.NewAddChainToInstruction(ccip_receiver.Deny_ListType, config.SVMChainSelector, receiverState, owner.PublicKey()).ValidateAndBuild()
+		ixDeny, err := ccip_receiver.NewAddChainToInstruction(ccip_receiver.Deny_ListType, config.SVMChainSelector, receiverState, owner.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 		require.NoError(t, err)
 		ixEnableAllow, err := ccip_receiver.NewEnableListInstruction(ccip_receiver.Allow_ListType, true, receiverState, owner.PublicKey()).ValidateAndBuild()
 		require.NoError(t, err)

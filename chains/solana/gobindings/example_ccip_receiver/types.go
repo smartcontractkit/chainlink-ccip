@@ -9,8 +9,7 @@ import (
 
 type ChainList struct {
 	IsEnabled bool
-	Xs        [20]uint64
-	Len       uint8
+	Chains    []uint64
 }
 
 func (obj ChainList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -19,13 +18,8 @@ func (obj ChainList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Serialize `Xs` param:
-	err = encoder.Encode(obj.Xs)
-	if err != nil {
-		return err
-	}
-	// Serialize `Len` param:
-	err = encoder.Encode(obj.Len)
+	// Serialize `Chains` param:
+	err = encoder.Encode(obj.Chains)
 	if err != nil {
 		return err
 	}
@@ -38,13 +32,8 @@ func (obj *ChainList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	if err != nil {
 		return err
 	}
-	// Deserialize `Xs`:
-	err = decoder.Decode(&obj.Xs)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Len`:
-	err = decoder.Decode(&obj.Len)
+	// Deserialize `Chains`:
+	err = decoder.Decode(&obj.Chains)
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use arrayvec::arrayvec;
 declare_id!("CcipReceiver1111111111111111111111111111111");
 
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
@@ -45,7 +44,7 @@ pub mod example_ccip_receiver {
     }
 
     pub fn add_chain_to(
-        ctx: Context<UpdateConfig>,
+        ctx: Context<AddChainTo>,
         list_type: ListType,
         chain_selector: u64,
     ) -> Result<()> {
@@ -70,10 +69,10 @@ pub mod example_ccip_receiver {
             .update_router(ctx.accounts.authority.key(), new_router)
     }
 
-    pub fn propose_owner(ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
+    pub fn transfer_ownership(ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
         ctx.accounts
             .state
-            .propose_owner(ctx.accounts.authority.key(), proposed_owner)
+            .transfer_ownership(ctx.accounts.authority.key(), proposed_owner)
     }
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
@@ -127,6 +126,25 @@ pub struct UpdateConfig<'info> {
 }
 
 #[derive(Accounts, Debug)]
+pub struct AddChainTo<'info> {
+    #[account(
+        mut,
+        seeds = [b"state"],
+        bump,
+        realloc = state.space_with_new_chain(), // allows sizing up and down the state (if chains were removed, this allows some recovery of account size)
+        realloc::payer = authority,
+        realloc::zero = false,
+    )]
+    pub state: Account<'info, BaseState>,
+    #[account(
+        mut,
+        address = state.owner @ CcipReceiverError::OnlyOwner,
+    )]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts, Debug)]
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
@@ -158,10 +176,9 @@ pub struct BaseState {
 #[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
 pub struct ChainList {
     pub is_enabled: bool,
-    pub xs: [u64; 20],
-    len: u8,
+    #[max_len(0)]
+    pub chains: Vec<u64>,
 }
-arrayvec!(ChainList, u64, u8);
 
 impl BaseState {
     pub fn init(&mut self, owner: Pubkey, router: Pubkey) -> Result<()> {
@@ -170,7 +187,7 @@ impl BaseState {
         self.update_router(owner, router)
     }
 
-    pub fn propose_owner(&mut self, owner: Pubkey, proposed_owner: Pubkey) -> Result<()> {
+    pub fn transfer_ownership(&mut self, owner: Pubkey, proposed_owner: Pubkey) -> Result<()> {
         require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
         self.proposed_owner = proposed_owner;
         Ok(())
@@ -198,17 +215,22 @@ impl BaseState {
         Ok(())
     }
 
+    // is_valid_chain checks that chain is allowed based on the list
+    // both enabled: chain must be on allow list and not on deny list
+    // allow enabled: chain must be on allow list
+    // deny enabled: chain must not be on deny list
+    // both disabled: all chains allowed
     pub fn is_valid_chain(&self, chain_selector: u64) -> bool {
         if self.allow.is_enabled && self.deny.is_enabled {
             // must be within allow list and not in deny list
-            self.allow.binary_search(&chain_selector).is_ok()
-                && self.deny.binary_search(&chain_selector).is_err()
+            self.allow.chains.binary_search(&chain_selector).is_ok()
+                && self.deny.chains.binary_search(&chain_selector).is_err()
         } else if self.allow.is_enabled && !self.deny.is_enabled {
             // check allow list only
-            self.allow.binary_search(&chain_selector).is_ok()
+            self.allow.chains.binary_search(&chain_selector).is_ok()
         } else if !self.allow.is_enabled && self.deny.is_enabled {
             // check deny list only, if present = not valid
-            self.deny.binary_search(&chain_selector).is_err()
+            self.deny.chains.binary_search(&chain_selector).is_err()
         } else {
             // neither list is enabled, allow everything
             true
@@ -231,11 +253,10 @@ impl BaseState {
         require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
 
         let list = self.get_list(list_type);
-        require!(list.remaining_capacity() > 0, CcipReceiverError::Full);
-        match list.binary_search(&chain_selector) {
+        match list.chains.binary_search(&chain_selector) {
             // already present
             Ok(_) => (),
-            Err(i) => list.insert(i, chain_selector),
+            Err(i) => list.chains.insert(i, chain_selector),
         }
 
         Ok(())
@@ -249,11 +270,18 @@ impl BaseState {
     ) -> Result<()> {
         require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
         let list = self.get_list(list_type);
-        let index = list.binary_search(&chain_selector);
+        let index = list.chains.binary_search(&chain_selector);
         if let Ok(index) = index {
-            list.remove(index);
+            list.chains.remove(index);
         }
         Ok(())
+    }
+
+    // calculates the necessary space for adding the new chain to the allow/deny list
+    pub fn space_with_new_chain(&self) -> usize {
+        8  // discriminator
+        + Self::INIT_SPACE // base space for ChainList
+        + (self.allow.chains.len() + self.deny.chains.len() + 1) * 8 // (existing chains + 1) * u64::byte_size
     }
 
     fn get_list(&mut self, list_type: ListType) -> &mut ChainList {
@@ -298,8 +326,6 @@ pub enum CcipReceiverError {
     OnlyOwner,
     #[msg("Address is not proposed_owner")]
     OnlyProposedOwner,
-    #[msg("List is full")]
-    Full,
 }
 
 #[event]
@@ -326,11 +352,11 @@ mod tests {
         // only owner can propose
         assert_eq!(
             state
-                .propose_owner(Pubkey::new_unique(), Pubkey::new_unique())
+                .transfer_ownership(Pubkey::new_unique(), Pubkey::new_unique())
                 .unwrap_err(),
             CcipReceiverError::OnlyOwner.into()
         );
-        state.propose_owner(state.owner, next_owner).unwrap();
+        state.transfer_ownership(state.owner, next_owner).unwrap();
 
         // only proposed_owner can accept
         assert_eq!(
@@ -384,50 +410,50 @@ mod tests {
             CcipReceiverError::OnlyOwner.into(),
         );
 
-        assert!(state.allow.is_empty());
-        assert!(state.deny.is_empty());
+        assert!(state.allow.chains.is_empty());
+        assert!(state.deny.chains.is_empty());
 
         // add 2 chain selector to allow
         state
             .add_chain_to(state.owner, 10, ListType::Allow)
             .unwrap();
-        assert_eq!(state.allow.len(), 1);
-        assert_eq!(state.allow.xs[0], 10);
+        assert_eq!(state.allow.chains.len(), 1);
+        assert_eq!(state.allow.chains[0], 10);
         state
             .add_chain_to(state.owner, 40, ListType::Allow)
             .unwrap();
-        assert_eq!(state.allow.len(), 2);
-        assert_eq!(state.allow.xs[0], 10);
-        assert_eq!(state.allow.xs[1], 40);
+        assert_eq!(state.allow.chains.len(), 2);
+        assert_eq!(state.allow.chains[0], 10);
+        assert_eq!(state.allow.chains[1], 40);
 
         // add 3 chain selectors to deny
         state.add_chain_to(state.owner, 20, ListType::Deny).unwrap();
-        assert_eq!(state.deny.len(), 1);
-        assert_eq!(state.deny.xs[0], 20);
+        assert_eq!(state.deny.chains.len(), 1);
+        assert_eq!(state.deny.chains[0], 20);
         state.add_chain_to(state.owner, 40, ListType::Deny).unwrap();
-        assert_eq!(state.deny.len(), 2);
-        assert_eq!(state.deny.xs[0], 20);
-        assert_eq!(state.deny.xs[1], 40);
+        assert_eq!(state.deny.chains.len(), 2);
+        assert_eq!(state.deny.chains[0], 20);
+        assert_eq!(state.deny.chains[1], 40);
         state.add_chain_to(state.owner, 21, ListType::Deny).unwrap();
-        assert_eq!(state.deny.len(), 3);
-        assert_eq!(state.deny.xs[0], 20);
-        assert_eq!(state.deny.xs[1], 21);
-        assert_eq!(state.deny.xs[2], 40);
+        assert_eq!(state.deny.chains.len(), 3);
+        assert_eq!(state.deny.chains[0], 20);
+        assert_eq!(state.deny.chains[1], 21);
+        assert_eq!(state.deny.chains[2], 40);
 
         // remove chain selector from deny
         state
             .remove_chain_from(state.owner, 21, ListType::Deny)
             .unwrap();
-        assert_eq!(state.deny.len(), 2);
-        assert_eq!(state.deny.xs[0], 20);
-        assert_eq!(state.deny.xs[1], 40);
+        assert_eq!(state.deny.chains.len(), 2);
+        assert_eq!(state.deny.chains[0], 20);
+        assert_eq!(state.deny.chains[1], 40);
         // remove same chain selector from deny
         state
             .remove_chain_from(state.owner, 21, ListType::Deny)
             .unwrap();
-        assert_eq!(state.deny.len(), 2);
-        assert_eq!(state.deny.xs[0], 20);
-        assert_eq!(state.deny.xs[1], 40);
+        assert_eq!(state.deny.chains.len(), 2);
+        assert_eq!(state.deny.chains[0], 20);
+        assert_eq!(state.deny.chains[1], 40);
 
         // no lists enabled
         assert!(state.is_valid_chain(10)); // in allow list
