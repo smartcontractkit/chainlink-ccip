@@ -44,8 +44,6 @@ var (
 	//
 	// * `ctx` - The context containing the accounts required for initialization.
 	// * `svm_chain_selector` - The chain selector for SVM.
-	// * `default_gas_limit` - The default gas limit for other destination chains.
-	// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
 	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
@@ -143,26 +141,6 @@ var (
 	// * `ctx` - The context containing the accounts required for updating the configuration.
 	// * `new_chain_selector` - The new chain selector for SVM.
 	Instruction_UpdateSvmChainSelector = ag_binary.TypeID([8]byte{164, 212, 71, 101, 166, 113, 26, 93})
-
-	// Updates the default gas limit in the router configuration.
-	//
-	// This change affects the default value for gas limit on every other destination chain.
-	// The Admin is the only one able to update the default gas limit.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `new_gas_limit` - The new default gas limit.
-	Instruction_UpdateDefaultGasLimit = ag_binary.TypeID([8]byte{201, 34, 231, 229, 247, 252, 77, 210})
-
-	// Updates the default setting for allowing out-of-order execution for other destination chains.
-	// The Admin is the only one able to update this config.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `new_allow_out_of_order_execution` - The new setting for allowing out-of-order execution.
-	Instruction_UpdateDefaultAllowOutOfOrderExecution = ag_binary.TypeID([8]byte{44, 54, 136, 71, 177, 17, 18, 241})
 
 	// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
 	//
@@ -411,10 +389,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateDestChainConfig"
 	case Instruction_UpdateSvmChainSelector:
 		return "UpdateSvmChainSelector"
-	case Instruction_UpdateDefaultGasLimit:
-		return "UpdateDefaultGasLimit"
-	case Instruction_UpdateDefaultAllowOutOfOrderExecution:
-		return "UpdateDefaultAllowOutOfOrderExecution"
 	case Instruction_UpdateEnableManualExecutionAfter:
 		return "UpdateEnableManualExecutionAfter"
 	case Instruction_RegisterTokenAdminRegistryViaGetCcipAdmin:
@@ -498,12 +472,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"update_svm_chain_selector", (*UpdateSvmChainSelector)(nil),
-		},
-		{
-			"update_default_gas_limit", (*UpdateDefaultGasLimit)(nil),
-		},
-		{
-			"update_default_allow_out_of_order_execution", (*UpdateDefaultAllowOutOfOrderExecution)(nil),
 		},
 		{
 			"update_enable_manual_execution_after", (*UpdateEnableManualExecutionAfter)(nil),
