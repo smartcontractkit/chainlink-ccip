@@ -91,6 +91,7 @@ func (c *configCache) refreshIfNeeded(ctx context.Context) error {
 	}
 
 	c.lastUpdateAt = time.Now()
+	c.lggr.Infow("Cache refreshed", "lastUpdateAt", c.lastUpdateAt)
 	return nil
 }
 
