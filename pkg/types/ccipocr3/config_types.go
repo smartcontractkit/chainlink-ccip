@@ -30,15 +30,15 @@ type RMNDigestHeader struct {
 //
 //nolint:lll // It's a URL.
 type FeeQuoterStaticConfig struct {
-	MaxFeeJuelsPerMsg  BigInt
-	LinkToken          []byte
-	StalenessThreshold uint32
+	MaxFeeJuelsPerMsg  BigInt `json:"maxFeeJuelsPerMsg"`
+	LinkToken          []byte `json:"linkToken"`
+	StalenessThreshold uint32 `json:"stalenessThreshold"`
 }
 
 // selectorsAndConfigs wraps the return values from getAllsourceChainConfigs.
 type SelectorsAndConfigs struct {
-	Selectors          []uint64
-	SourceChainConfigs []SourceChainConfig
+	Selectors          []uint64            `mapstructure:"F0"`
+	SourceChainConfigs []SourceChainConfig `mapstructure:"F1"`
 }
 
 // sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
@@ -68,22 +68,30 @@ func (scc SourceChainConfig) Check() (bool /* enabled */, error) {
 	return scc.IsEnabled, nil
 }
 
+// OffRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
+// See: <chainlink repo>/contracts/src/v0.8/ccip/offRamp/OffRamp.sol:StaticConfig
 type OffRampStaticChainConfig struct {
-	ChainSelector        ChainSelector
-	GasForCallExactCheck uint16
-	RmnRemote            []byte
-	TokenAdminRegistry   []byte
-	NonceManager         []byte
+	ChainSelector        ChainSelector `json:"chainSelector"`
+	GasForCallExactCheck uint16        `json:"gasForCallExactCheck"`
+	RmnRemote            []byte        `json:"rmnRemote"`
+	TokenAdminRegistry   []byte        `json:"tokenAdminRegistry"`
+	NonceManager         []byte        `json:"nonceManager"`
 }
 
+// OffRampDynamicChainConfig maps to DynamicConfig in OffRamp.sol
 type OffRampDynamicChainConfig struct {
-	FeeQuoter                               []byte
-	PermissionLessExecutionThresholdSeconds uint32
-	IsRMNVerificationDisabled               bool
-	MessageInterceptor                      []byte
+	FeeQuoter                               []byte `json:"feeQuoter"`
+	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
+	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
+	MessageInterceptor                      []byte `json:"messageInterceptor"`
 }
+
+// We're wrapping the onRampDynamicConfig this way to map to on-chain return type which is a named struct
+// https://github.com/smartcontractkit/chainlink/blob/12af1de88238e0e918177d6b5622070417f48adf/contracts/src/v0.8/ccip/onRamp/OnRamp.sol#L328
+//
+//nolint:lll
 type GetOnRampDynamicConfigResponse struct {
-	DynamicConfig OnRampDynamicConfig
+	DynamicConfig OnRampDynamicConfig `json:"dynamicConfig"`
 }
 
 // See DynamicChainConfig in OnRamp.sol
@@ -98,11 +106,11 @@ type OnRampDynamicConfig struct {
 // VersionedConfigRemote is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L167-L169
 type VersionedConfigRemote struct {
-	Version uint32
-	Config  Config
+	Version uint32 `json:"version"`
+	Config  Config `json:"config"`
 }
 
-// config is used to parse the response from the RMNRemote contract's getVersionedConfig method.
+// Config is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L49-L53
 type Config struct {
 	RMNHomeContractConfigDigest Bytes32  `json:"rmnHomeContractConfigDigest"`
