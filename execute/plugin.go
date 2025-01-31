@@ -137,7 +137,7 @@ func getPendingExecutedReports(
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
-	// Remove fully executed reports and reports from disabled source chains.
+	// Remove fully executed reports.
 	for selector, reports := range groupedCommits {
 		if len(reports) == 0 {
 			continue

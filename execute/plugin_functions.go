@@ -259,7 +259,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 	return ranges, nil
 }
 
-// groupByChainSelector groups the reports by their chain selector and remove disabled chains from the result.
+// groupByChainSelector groups the reports by their chain selector.
 func groupByChainSelector(
 	reports []plugintypes2.CommitPluginReportWithMeta) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)

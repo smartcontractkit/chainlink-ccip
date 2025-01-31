@@ -578,12 +578,12 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 			continue
 		}
 
-		if feeComponent.ExecutionFee == nil {
-			lggr.Errorw("execution fee is nil", "chain", chain)
+		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
+			lggr.Errorw("execution fee is nil or non positive", "chain", chain)
 			continue
 		}
-		if feeComponent.DataAvailabilityFee == nil {
-			lggr.Errorw("data availability fee is nil", "chain", chain)
+		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
+			lggr.Errorw("data availability fee is nil or negative", "chain", chain)
 			continue
 		}
 
@@ -662,8 +662,8 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			lggr.Warnw("no native token price available", "chain", chain)
 			continue
 		}
-		if update.Value == nil {
-			lggr.Errorw("native token price is nil", "chain", chain)
+		if update.Value == nil || update.Value.Cmp(big.NewInt(0)) <= 0 {
+			lggr.Errorw("native token price is nil or non-positive", "chain", chain)
 			continue
 		}
 		prices[chain] = cciptypes.NewBigInt(update.Value)
@@ -1650,8 +1650,8 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 		if len(tpus.SourceToken) == 0 {
 			return nil, fmt.Errorf("empty source token")
 		}
-		if tpus.UsdPerToken == nil {
-			return nil, fmt.Errorf("nil usd per token")
+		if tpus.UsdPerToken == nil || tpus.UsdPerToken.Cmp(big.NewInt(0)) <= 0 {
+			return nil, fmt.Errorf("nil or non-positive usd per token")
 		}
 	}
 
@@ -1659,8 +1659,8 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 		if gpus.DestChainSelector == 0 {
 			return nil, fmt.Errorf("dest chain is zero")
 		}
-		if gpus.UsdPerUnitGas == nil {
-			return nil, fmt.Errorf("nil usd per unit gas")
+		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
+			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
 		}
 	}
 
@@ -1749,10 +1749,6 @@ func validateSendRequestedEvent(
 
 	if len(ev.Message.Sender) == 0 {
 		return fmt.Errorf("empty sender address")
-	}
-
-	if len(ev.Message.FeeToken) == 0 {
-		return fmt.Errorf("empty fee token")
 	}
 
 	if ev.Message.FeeTokenAmount.IsEmpty() {
