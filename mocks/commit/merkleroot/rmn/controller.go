@@ -13,7 +13,7 @@ import (
 
 	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 
-	rmnpb "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	types "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
