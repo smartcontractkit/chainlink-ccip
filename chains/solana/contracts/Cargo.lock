@@ -201,7 +201,6 @@ dependencies = [
  "anchor-derive-accounts",
  "anchor-derive-serde",
  "anchor-derive-space",
- "anchor-syn",
  "arrayref",
  "base64 0.13.1",
  "bincode",
@@ -938,6 +937,15 @@ checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 
 [[package]]
 name = "example_ccip_receiver"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-program",
+]
+
+[[package]]
+name = "example_ccip_sender"
 version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",

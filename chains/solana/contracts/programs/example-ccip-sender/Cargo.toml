@@ -1,12 +1,12 @@
 [package]
-name = "example_ccip_receiver"
+name = "example_ccip_sender"
 version = "0.1.0-dev"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "example_ccip_receiver"
+name = "example_ccip_sender"
 
 [features]
 no-entrypoint = []
