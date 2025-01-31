@@ -182,12 +182,22 @@ func TestDeviatesOnCurve(t *testing.T) {
 		// Deviates = abs(diff) > thresholdPPB
 		{
 			name: "xNew is just below deviation threshold and does deviate",
-			args: args{xNew: big.NewInt(3e13), xOld: big.NewInt(2.519478222838e12), noDev: big.NewInt(1), ppb: CurveBasedDeviationPPB},
+			args: args{
+				xNew:  big.NewInt(3e13),
+				xOld:  big.NewInt(2.519478222838e12),
+				noDev: big.NewInt(1),
+				ppb:   CurveBasedDeviationPPB,
+			},
 			want: false,
 		},
 		{
 			name: "xNew is just above deviation threshold and does deviate",
-			args: args{xNew: big.NewInt(3e13), xOld: big.NewInt(2.519478222838e12 - 30), noDev: big.NewInt(1), ppb: CurveBasedDeviationPPB},
+			args: args{
+				xNew:  big.NewInt(3e13),
+				xOld:  big.NewInt(2.519478222838e12 - 30),
+				noDev: big.NewInt(1),
+				ppb:   CurveBasedDeviationPPB,
+			},
 			want: true,
 		},
 	}
