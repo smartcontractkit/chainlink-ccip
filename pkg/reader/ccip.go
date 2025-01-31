@@ -883,6 +883,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			for _, sourceChain := range keys {
 				cfg := configs[sourceChain]
 				resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
+				lggr.Infow("appending onramp contract address", "address", cfg.OnRamp)
 				// The local router is located in each source sourceChain config. Add it once.
 				if len(resp[consts.ContractNameRouter][chain]) == 0 {
 					resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
