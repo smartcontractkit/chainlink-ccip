@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -851,15 +852,42 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 		lggr.Infow("got source chain configs", "configs", selectorsAndConfigs)
 
-		// Iterate results in sourceChain selector order so that the router config is deterministic.
+		configs := make(map[cciptypes.ChainSelector]cciptypes.SourceChainConfig)
+
+		if len(selectorsAndConfigs.SourceChainConfigs) != len(selectorsAndConfigs.Selectors) {
+			return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", configs)
+		}
+
+		lggr.Debugw("got source chain configs", "configs", configs)
+
+		// Populate the map.
 		for i := range selectorsAndConfigs.Selectors {
-			sourceChain := cciptypes.ChainSelector(selectorsAndConfigs.Selectors[i])
+			chainSel := cciptypes.ChainSelector(selectorsAndConfigs.Selectors[i])
 			cfg := selectorsAndConfigs.SourceChainConfigs[i]
-			resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
-			// The local router is located in each source sourceChain config. Add it once.
-			if len(resp[consts.ContractNameRouter][chain]) == 0 {
-				resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
-				lggr.Infow("appending router contract address", "address", cfg.Router)
+
+			enabled, err := cfg.Check()
+			if err != nil {
+				return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
+			}
+			if !enabled {
+				// We don't want to process disabled chains prematurely.
+				lggr.Debugw("source chain is disabled", "chain", chainSel)
+				continue
+			}
+
+			configs[chainSel] = cfg
+
+			// Iterate results in sourceChain selector order so that the router config is deterministic.
+			keys := maps.Keys(configs)
+			sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+			for _, sourceChain := range keys {
+				cfg := configs[sourceChain]
+				resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
+				// The local router is located in each source sourceChain config. Add it once.
+				if len(resp[consts.ContractNameRouter][chain]) == 0 {
+					resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
+					lggr.Infow("appending router contract address", "address", cfg.Router)
+				}
 			}
 		}
 	}
