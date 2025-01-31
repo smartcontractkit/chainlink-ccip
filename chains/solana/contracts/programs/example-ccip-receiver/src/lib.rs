@@ -1,12 +1,19 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{Mint, TokenAccount};
+
 declare_id!("CcipReceiver1111111111111111111111111111111");
 
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
+pub const APPROVED_SENDER_SEED: &[u8] = b"approved_ccip_sender";
+pub const TOKEN_ADMIN_SEED: &[u8] = b"receiver_token_admin";
 
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
 #[program]
 pub mod example_ccip_receiver {
+    use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
+    use solana_program::program::invoke_signed;
+
     use super::*;
 
     /// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
@@ -33,40 +40,27 @@ pub mod example_ccip_receiver {
         Ok(())
     }
 
-    pub fn enable_list(
-        ctx: Context<UpdateConfig>,
-        list_type: ListType,
-        enable: bool,
-    ) -> Result<()> {
-        ctx.accounts
-            .state
-            .enable_list(ctx.accounts.authority.key(), list_type, enable)
-    }
-
-    pub fn add_chain_to(
-        ctx: Context<AddChainTo>,
-        list_type: ListType,
-        chain_selector: u64,
-    ) -> Result<()> {
-        ctx.accounts
-            .state
-            .add_chain_to(ctx.accounts.authority.key(), chain_selector, list_type)
-    }
-
-    pub fn remove_chain_from(
-        ctx: Context<UpdateConfig>,
-        list_type: ListType,
-        chain_selector: u64,
-    ) -> Result<()> {
-        ctx.accounts
-            .state
-            .add_chain_to(ctx.accounts.authority.key(), chain_selector, list_type)
-    }
-
     pub fn update_router(ctx: Context<UpdateConfig>, new_router: Pubkey) -> Result<()> {
         ctx.accounts
             .state
             .update_router(ctx.accounts.authority.key(), new_router)
+    }
+
+    // approve_sender creates a PDA to approve the specific source chain + remote address
+    pub fn approve_sender(
+        _ctx: Context<ApproveSender>,
+        _chain_selector: u64,
+        _remote_address: Vec<u8>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn unapprove_sender(
+        _ctx: Context<UnapproveSender>,
+        _chain_selector: u64,
+        _remote_address: Vec<u8>,
+    ) -> Result<()> {
+        Ok(())
     }
 
     pub fn transfer_ownership(ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
@@ -79,6 +73,33 @@ pub mod example_ccip_receiver {
         ctx.accounts
             .state
             .accept_ownership(ctx.accounts.authority.key())
+    }
+
+    pub fn withdraw_tokens(ctx: Context<WithdrawTokens>, amount: u64, decimals: u8) -> Result<()> {
+        let mut ix = transfer_checked(
+            &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
+            &ctx.accounts.program_token_account.key(),
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.to_token_account.key(),
+            &ctx.accounts.token_admin.key(),
+            &[],
+            amount,
+            decimals,
+        )?;
+        ix.program_id = ctx.accounts.token_program.key(); // set to user specified program
+
+        let seeds = &[TOKEN_ADMIN_SEED, &[ctx.bumps.token_admin]];
+        invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.program_token_account.to_account_info(),
+                ctx.accounts.mint.to_account_info(),
+                ctx.accounts.to_token_account.to_account_info(),
+                ctx.accounts.token_admin.to_account_info(),
+            ],
+            &[&seeds[..]],
+        )?;
+        Ok(())
     }
 }
 
@@ -94,6 +115,15 @@ pub struct Initialize<'info> {
         space = ANCHOR_DISCRIMINATOR + BaseState::INIT_SPACE,
     )]
     pub state: Account<'info, BaseState>,
+    #[account(
+        init,
+        seeds = [TOKEN_ADMIN_SEED],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR,
+    )]
+    /// CHECK: CPI signer for tokens
+    pub token_admin: UncheckedAccount<'info>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -104,10 +134,19 @@ pub struct Initialize<'info> {
 pub struct CcipReceive<'info> {
     // router CPI signer must be first
     #[account(
-        constraint = state.is_valid_chain(message.source_chain_selector) @ CcipReceiverError::InvalidChain,
         constraint = state.is_router(authority.key()) @ CcipReceiverError::OnlyRouter,
     )]
     pub authority: Signer<'info>,
+    #[account(
+        seeds = [
+            APPROVED_SENDER_SEED,
+            message.source_chain_selector.to_le_bytes().as_ref(),
+            &[message.sender.len() as u8],
+            &message.sender,
+        ],
+        bump,
+    )]
+    pub approved_sender: Account<'info, ApprovedSender>, // if PDA does not exist, the message sender and/or source chain are not approved
     pub state: Account<'info, BaseState>,
 }
 
@@ -126,25 +165,6 @@ pub struct UpdateConfig<'info> {
 }
 
 #[derive(Accounts, Debug)]
-pub struct AddChainTo<'info> {
-    #[account(
-        mut,
-        seeds = [b"state"],
-        bump,
-        realloc = state.space_with_new_chain(), // allows sizing up and down the state (if chains were removed, this allows some recovery of account size)
-        realloc::payer = authority,
-        realloc::zero = false,
-    )]
-    pub state: Account<'info, BaseState>,
-    #[account(
-        mut,
-        address = state.owner @ CcipReceiverError::OnlyOwner,
-    )]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts, Debug)]
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
@@ -154,6 +174,102 @@ pub struct AcceptOwnership<'info> {
     pub state: Account<'info, BaseState>,
     #[account(
         address = state.proposed_owner @ CcipReceiverError::OnlyProposedOwner,
+    )]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts, Debug)]
+#[instruction(chain_selector: u64, remote_sender: Vec<u8>)]
+pub struct ApproveSender<'info> {
+    #[account(
+        mut,
+        seeds = [b"state"],
+        bump,
+    )]
+    pub state: Account<'info, BaseState>,
+    #[account(
+        init,
+        seeds = [
+            APPROVED_SENDER_SEED,
+            chain_selector.to_le_bytes().as_ref(),
+            &[remote_sender.len() as u8],
+            &remote_sender,
+        ],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + ApprovedSender::INIT_SPACE,
+    )]
+    pub approved_sender: Account<'info, ApprovedSender>,
+    #[account(
+        mut,
+        address = state.owner @ CcipReceiverError::OnlyOwner,
+    )]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts, Debug)]
+#[instruction(chain_selector: u64, remote_sender: Vec<u8>)]
+pub struct UnapproveSender<'info> {
+    #[account(
+        mut,
+        seeds = [b"state"],
+        bump,
+    )]
+    pub state: Account<'info, BaseState>,
+    #[account(
+        mut,
+        seeds = [
+            APPROVED_SENDER_SEED,
+            chain_selector.to_le_bytes().as_ref(),
+            &[remote_sender.len() as u8],
+            &remote_sender,
+        ],
+        bump,
+        close = authority,
+    )]
+    pub approved_sender: Account<'info, ApprovedSender>,
+    #[account(
+        mut,
+        address = state.owner @ CcipReceiverError::OnlyOwner,
+    )]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts, Debug)]
+pub struct WithdrawTokens<'info> {
+    #[account(
+        mut,
+        seeds = [b"state"],
+        bump,
+    )]
+    pub state: Account<'info, BaseState>,
+    #[account(
+        mut,
+        token::mint = mint,
+        token::authority = token_admin,
+        token::token_program = token_program,
+    )]
+    pub program_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::mint = mint,
+        token::token_program = token_program,
+    )]
+    pub to_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(address = *mint.to_account_info().owner)]
+    /// CHECK: CPI to token program
+    pub token_program: AccountInfo<'info>,
+    #[account(
+        seeds = [TOKEN_ADMIN_SEED],
+        bump,
+    )]
+    /// CHECK: CPI signer for tokens
+    pub token_admin: UncheckedAccount<'info>,
+    #[account(
+        address = state.owner @ CcipReceiverError::OnlyOwner,
     )]
     pub authority: Signer<'info>,
 }
@@ -168,16 +284,8 @@ pub struct AcceptOwnership<'info> {
 pub struct BaseState {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-    pub router: Pubkey,
-    pub allow: ChainList,
-    pub deny: ChainList,
-}
 
-#[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct ChainList {
-    pub is_enabled: bool,
-    #[max_len(0)]
-    pub chains: Vec<u64>,
+    pub router: Pubkey,
 }
 
 impl BaseState {
@@ -214,83 +322,11 @@ impl BaseState {
         self.router = router;
         Ok(())
     }
-
-    // is_valid_chain checks that chain is allowed based on the list
-    // both enabled: chain must be on allow list and not on deny list
-    // allow enabled: chain must be on allow list
-    // deny enabled: chain must not be on deny list
-    // both disabled: all chains allowed
-    pub fn is_valid_chain(&self, chain_selector: u64) -> bool {
-        if self.allow.is_enabled && self.deny.is_enabled {
-            // must be within allow list and not in deny list
-            self.allow.chains.binary_search(&chain_selector).is_ok()
-                && self.deny.chains.binary_search(&chain_selector).is_err()
-        } else if self.allow.is_enabled && !self.deny.is_enabled {
-            // check allow list only
-            self.allow.chains.binary_search(&chain_selector).is_ok()
-        } else if !self.allow.is_enabled && self.deny.is_enabled {
-            // check deny list only, if present = not valid
-            self.deny.chains.binary_search(&chain_selector).is_err()
-        } else {
-            // neither list is enabled, allow everything
-            true
-        }
-    }
-
-    pub fn enable_list(&mut self, owner: Pubkey, list_type: ListType, enable: bool) -> Result<()> {
-        require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
-        let list = self.get_list(list_type);
-        list.is_enabled = enable;
-        Ok(())
-    }
-
-    pub fn add_chain_to(
-        &mut self,
-        owner: Pubkey,
-        chain_selector: u64,
-        list_type: ListType,
-    ) -> Result<()> {
-        require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
-
-        let list = self.get_list(list_type);
-        match list.chains.binary_search(&chain_selector) {
-            // already present
-            Ok(_) => (),
-            Err(i) => list.chains.insert(i, chain_selector),
-        }
-
-        Ok(())
-    }
-
-    pub fn remove_chain_from(
-        &mut self,
-        owner: Pubkey,
-        chain_selector: u64,
-        list_type: ListType,
-    ) -> Result<()> {
-        require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
-        let list = self.get_list(list_type);
-        let index = list.chains.binary_search(&chain_selector);
-        if let Ok(index) = index {
-            list.chains.remove(index);
-        }
-        Ok(())
-    }
-
-    // calculates the necessary space for adding the new chain to the allow/deny list
-    pub fn space_with_new_chain(&self) -> usize {
-        8  // discriminator
-        + Self::INIT_SPACE // base space for ChainList
-        + (self.allow.chains.len() + self.deny.chains.len() + 1) * 8 // (existing chains + 1) * u64::byte_size
-    }
-
-    fn get_list(&mut self, list_type: ListType) -> &mut ChainList {
-        match list_type {
-            ListType::Allow => &mut self.allow,
-            ListType::Deny => &mut self.deny,
-        }
-    }
 }
+
+#[account]
+#[derive(InitSpace, Default, Debug)]
+pub struct ApprovedSender {}
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct Any2SVMMessage {
@@ -307,21 +343,14 @@ pub struct SVMTokenAmount {
     pub amount: u64, // solana local token amount
 }
 
-#[repr(u8)]
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub enum ListType {
-    Allow,
-    Deny,
-}
-
 #[error_code]
 pub enum CcipReceiverError {
     #[msg("Address is not router external execution PDA")]
     OnlyRouter,
     #[msg("Invalid router address")]
     InvalidRouter,
-    #[msg("Invalid chain")]
-    InvalidChain,
+    #[msg("Invalid combination of chain and sender")]
+    InvalidChainAndSender,
     #[msg("Address is not owner")]
     OnlyOwner,
     #[msg("Address is not proposed_owner")]
@@ -385,107 +414,5 @@ mod tests {
         state
             .update_router(state.owner, Pubkey::new_unique())
             .unwrap();
-    }
-
-    #[test]
-    fn chains() {
-        let mut state = create_state();
-
-        assert_eq!(
-            state
-                .enable_list(Pubkey::new_unique(), ListType::Allow, true)
-                .unwrap_err(),
-            CcipReceiverError::OnlyOwner.into(),
-        );
-        assert_eq!(
-            state
-                .add_chain_to(Pubkey::new_unique(), 1, ListType::Deny)
-                .unwrap_err(),
-            CcipReceiverError::OnlyOwner.into(),
-        );
-        assert_eq!(
-            state
-                .remove_chain_from(Pubkey::new_unique(), 1, ListType::Deny)
-                .unwrap_err(),
-            CcipReceiverError::OnlyOwner.into(),
-        );
-
-        assert!(state.allow.chains.is_empty());
-        assert!(state.deny.chains.is_empty());
-
-        // add 2 chain selector to allow
-        state
-            .add_chain_to(state.owner, 10, ListType::Allow)
-            .unwrap();
-        assert_eq!(state.allow.chains.len(), 1);
-        assert_eq!(state.allow.chains[0], 10);
-        state
-            .add_chain_to(state.owner, 40, ListType::Allow)
-            .unwrap();
-        assert_eq!(state.allow.chains.len(), 2);
-        assert_eq!(state.allow.chains[0], 10);
-        assert_eq!(state.allow.chains[1], 40);
-
-        // add 3 chain selectors to deny
-        state.add_chain_to(state.owner, 20, ListType::Deny).unwrap();
-        assert_eq!(state.deny.chains.len(), 1);
-        assert_eq!(state.deny.chains[0], 20);
-        state.add_chain_to(state.owner, 40, ListType::Deny).unwrap();
-        assert_eq!(state.deny.chains.len(), 2);
-        assert_eq!(state.deny.chains[0], 20);
-        assert_eq!(state.deny.chains[1], 40);
-        state.add_chain_to(state.owner, 21, ListType::Deny).unwrap();
-        assert_eq!(state.deny.chains.len(), 3);
-        assert_eq!(state.deny.chains[0], 20);
-        assert_eq!(state.deny.chains[1], 21);
-        assert_eq!(state.deny.chains[2], 40);
-
-        // remove chain selector from deny
-        state
-            .remove_chain_from(state.owner, 21, ListType::Deny)
-            .unwrap();
-        assert_eq!(state.deny.chains.len(), 2);
-        assert_eq!(state.deny.chains[0], 20);
-        assert_eq!(state.deny.chains[1], 40);
-        // remove same chain selector from deny
-        state
-            .remove_chain_from(state.owner, 21, ListType::Deny)
-            .unwrap();
-        assert_eq!(state.deny.chains.len(), 2);
-        assert_eq!(state.deny.chains[0], 20);
-        assert_eq!(state.deny.chains[1], 40);
-
-        // no lists enabled
-        assert!(state.is_valid_chain(10)); // in allow list
-        assert!(state.is_valid_chain(20)); // in deny list
-        assert!(state.is_valid_chain(30)); // in neither list
-        assert!(state.is_valid_chain(40)); // in both lists
-
-        // only allow list enabled
-        state
-            .enable_list(state.owner, ListType::Allow, true)
-            .unwrap();
-        assert!(state.is_valid_chain(10)); // in allow list
-        assert!(!state.is_valid_chain(20)); // in deny list
-        assert!(!state.is_valid_chain(30)); // in neither list
-        assert!(state.is_valid_chain(40)); // in both lists
-
-        // both lists enabled
-        state
-            .enable_list(state.owner, ListType::Deny, true)
-            .unwrap();
-        assert!(state.is_valid_chain(10)); // in allow list
-        assert!(!state.is_valid_chain(20)); // in deny list
-        assert!(!state.is_valid_chain(30)); // in neither list
-        assert!(!state.is_valid_chain(40)); // in both lists
-
-        // only deny list enabled
-        state
-            .enable_list(state.owner, ListType::Allow, false)
-            .unwrap();
-        assert!(state.is_valid_chain(10)); // in allow list
-        assert!(!state.is_valid_chain(20)); // in deny list
-        assert!(state.is_valid_chain(30)); // in neither list
-        assert!(!state.is_valid_chain(40)); // in both lists
     }
 }

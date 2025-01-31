@@ -40,17 +40,17 @@ var (
 	// But none of them could be an init, realloc or close.
 	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
 
-	Instruction_EnableList = ag_binary.TypeID([8]byte{121, 229, 134, 138, 144, 138, 19, 248})
-
-	Instruction_AddChainTo = ag_binary.TypeID([8]byte{210, 228, 19, 16, 203, 240, 167, 178})
-
-	Instruction_RemoveChainFrom = ag_binary.TypeID([8]byte{49, 195, 5, 223, 99, 40, 40, 91})
-
 	Instruction_UpdateRouter = ag_binary.TypeID([8]byte{32, 109, 12, 153, 101, 129, 64, 70})
+
+	Instruction_ApproveSender = ag_binary.TypeID([8]byte{110, 115, 180, 233, 200, 99, 131, 255})
+
+	Instruction_UnapproveSender = ag_binary.TypeID([8]byte{156, 35, 66, 182, 129, 232, 105, 176})
 
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
+
+	Instruction_WithdrawTokens = ag_binary.TypeID([8]byte{2, 4, 225, 61, 19, 182, 106, 170})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -60,18 +60,18 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Initialize"
 	case Instruction_CcipReceive:
 		return "CcipReceive"
-	case Instruction_EnableList:
-		return "EnableList"
-	case Instruction_AddChainTo:
-		return "AddChainTo"
-	case Instruction_RemoveChainFrom:
-		return "RemoveChainFrom"
 	case Instruction_UpdateRouter:
 		return "UpdateRouter"
+	case Instruction_ApproveSender:
+		return "ApproveSender"
+	case Instruction_UnapproveSender:
+		return "UnapproveSender"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_WithdrawTokens:
+		return "WithdrawTokens"
 	default:
 		return ""
 	}
@@ -99,22 +99,22 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"ccip_receive", (*CcipReceive)(nil),
 		},
 		{
-			"enable_list", (*EnableList)(nil),
-		},
-		{
-			"add_chain_to", (*AddChainTo)(nil),
-		},
-		{
-			"remove_chain_from", (*RemoveChainFrom)(nil),
-		},
-		{
 			"update_router", (*UpdateRouter)(nil),
+		},
+		{
+			"approve_sender", (*ApproveSender)(nil),
+		},
+		{
+			"unapprove_sender", (*UnapproveSender)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),
+		},
+		{
+			"withdraw_tokens", (*WithdrawTokens)(nil),
 		},
 	},
 )

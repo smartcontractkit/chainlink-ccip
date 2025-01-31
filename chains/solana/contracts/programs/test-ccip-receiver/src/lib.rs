@@ -122,7 +122,6 @@ pub struct SetData<'info> {
     // router CPI signer must be first
     #[account(
         constraint = counter.state.is_router(authority.key()) @ CcipReceiverError::OnlyRouter,
-        constraint = counter.state.is_valid_chain(message.source_chain_selector) @CcipReceiverError::InvalidChain,
     )]
     pub authority: Signer<'info>,
     // ccip router expects "receiver" to be second

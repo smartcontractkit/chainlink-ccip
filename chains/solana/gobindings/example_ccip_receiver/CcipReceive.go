@@ -20,14 +20,16 @@ type CcipReceive struct {
 
 	// [0] = [SIGNER] authority
 	//
-	// [1] = [] state
+	// [1] = [] approvedSender
+	//
+	// [2] = [] state
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCcipReceiveInstructionBuilder creates a new `CcipReceive` instruction builder.
 func NewCcipReceiveInstructionBuilder() *CcipReceive {
 	nd := &CcipReceive{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -49,15 +51,26 @@ func (inst *CcipReceive) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetApprovedSenderAccount sets the "approvedSender" account.
+func (inst *CcipReceive) SetApprovedSenderAccount(approvedSender ag_solanago.PublicKey) *CcipReceive {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(approvedSender)
+	return inst
+}
+
+// GetApprovedSenderAccount gets the "approvedSender" account.
+func (inst *CcipReceive) GetApprovedSenderAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetStateAccount sets the "state" account.
 func (inst *CcipReceive) SetStateAccount(state ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(state)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(state)
 	return inst
 }
 
 // GetStateAccount gets the "state" account.
 func (inst *CcipReceive) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst CcipReceive) Build() *Instruction {
@@ -91,6 +104,9 @@ func (inst *CcipReceive) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.ApprovedSender is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.State is not set")
 		}
 	}
@@ -111,9 +127,10 @@ func (inst *CcipReceive) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[1]))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("approvedSender", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -142,9 +159,11 @@ func NewCcipReceiveInstruction(
 	message Any2SVMMessage,
 	// Accounts:
 	authority ag_solanago.PublicKey,
+	approvedSender ag_solanago.PublicKey,
 	state ag_solanago.PublicKey) *CcipReceive {
 	return NewCcipReceiveInstructionBuilder().
 		SetMessage(message).
 		SetAuthorityAccount(authority).
+		SetApprovedSenderAccount(approvedSender).
 		SetStateAccount(state)
 }

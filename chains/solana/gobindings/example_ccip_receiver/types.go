@@ -7,39 +7,6 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type ChainList struct {
-	IsEnabled bool
-	Chains    []uint64
-}
-
-func (obj ChainList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `IsEnabled` param:
-	err = encoder.Encode(obj.IsEnabled)
-	if err != nil {
-		return err
-	}
-	// Serialize `Chains` param:
-	err = encoder.Encode(obj.Chains)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ChainList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `IsEnabled`:
-	err = decoder.Decode(&obj.IsEnabled)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Chains`:
-	err = decoder.Decode(&obj.Chains)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type Any2SVMMessage struct {
 	MessageId           [32]uint8
 	SourceChainSelector uint64
@@ -137,22 +104,4 @@ func (obj *SVMTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 		return err
 	}
 	return nil
-}
-
-type ListType ag_binary.BorshEnum
-
-const (
-	Allow_ListType ListType = iota
-	Deny_ListType
-)
-
-func (value ListType) String() string {
-	switch value {
-	case Allow_ListType:
-		return "Allow"
-	case Deny_ListType:
-		return "Deny"
-	default:
-		return ""
-	}
 }

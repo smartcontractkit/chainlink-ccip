@@ -12,8 +12,6 @@ type BaseState struct {
 	Owner         ag_solanago.PublicKey
 	ProposedOwner ag_solanago.PublicKey
 	Router        ag_solanago.PublicKey
-	Allow         ChainList
-	Deny          ChainList
 }
 
 var BaseStateDiscriminator = [8]byte{46, 139, 13, 192, 80, 181, 96, 46}
@@ -36,16 +34,6 @@ func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	}
 	// Serialize `Router` param:
 	err = encoder.Encode(obj.Router)
-	if err != nil {
-		return err
-	}
-	// Serialize `Allow` param:
-	err = encoder.Encode(obj.Allow)
-	if err != nil {
-		return err
-	}
-	// Serialize `Deny` param:
-	err = encoder.Encode(obj.Deny)
 	if err != nil {
 		return err
 	}
@@ -81,15 +69,35 @@ func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	if err != nil {
 		return err
 	}
-	// Deserialize `Allow`:
-	err = decoder.Decode(&obj.Allow)
+	return nil
+}
+
+type ApprovedSender struct{}
+
+var ApprovedSenderDiscriminator = [8]byte{141, 66, 47, 213, 85, 194, 71, 166}
+
+func (obj ApprovedSender) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ApprovedSenderDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Deny`:
-	err = decoder.Decode(&obj.Deny)
-	if err != nil {
-		return err
+	return nil
+}
+
+func (obj *ApprovedSender) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ApprovedSenderDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[141 66 47 213 85 194 71 166]",
+				fmt.Sprint(discriminator[:]))
+		}
 	}
 	return nil
 }

@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_RemoveChainFrom(t *testing.T) {
+func TestEncodeDecode_UnapproveSender(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("RemoveChainFrom"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("UnapproveSender"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(RemoveChainFrom)
+				params := new(UnapproveSender)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(RemoveChainFrom)
+				got := new(UnapproveSender)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

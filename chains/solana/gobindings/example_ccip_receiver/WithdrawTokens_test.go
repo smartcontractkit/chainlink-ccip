@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_EnableList(t *testing.T) {
+func TestEncodeDecode_WithdrawTokens(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("EnableList"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("WithdrawTokens"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(EnableList)
+				params := new(WithdrawTokens)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(EnableList)
+				got := new(WithdrawTokens)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)
