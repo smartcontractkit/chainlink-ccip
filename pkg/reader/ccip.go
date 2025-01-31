@@ -696,11 +696,21 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
 
+	_, err = bindExtendedReaderContract(
+		ctx,
+		lggr,
+		r.contractReaders,
+		r.destChain,
+		consts.ContractNameRMNProxy,
+		proxyContractAddress)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("bind RMN proxy contract: %w", err)
+	}
+
 	cache, ok := r.caches[r.destChain]
 	if !ok {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("cache not found for chain %d", r.destChain)
 	}
-	// rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, lggr, r.destChain, proxyContractAddress)
 	rmnRemoteAddress, err := cache.GetRMNRemoteAddress(ctx)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMN remote address: %w", err)
@@ -716,7 +726,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}
 	var header ret
 
-	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
+	err = r.contractReaders[r.destChain].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameRMNRemote,
 		consts.MethodNameGetReportDigestHeader,
