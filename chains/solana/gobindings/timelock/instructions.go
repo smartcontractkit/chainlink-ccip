@@ -36,6 +36,10 @@ var (
 
 	Instruction_AppendInstructions = ag_binary.TypeID([8]byte{58, 58, 137, 122, 115, 51, 144, 134})
 
+	Instruction_InitializeInstruction = ag_binary.TypeID([8]byte{195, 230, 213, 135, 144, 148, 142, 85})
+
+	Instruction_AppendInstructionData = ag_binary.TypeID([8]byte{76, 77, 102, 131, 136, 12, 45, 5})
+
 	Instruction_FinalizeOperation = ag_binary.TypeID([8]byte{63, 208, 32, 98, 85, 182, 236, 140})
 
 	Instruction_ClearOperation = ag_binary.TypeID([8]byte{111, 217, 62, 240, 224, 75, 60, 58})
@@ -78,6 +82,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "InitializeOperation"
 	case Instruction_AppendInstructions:
 		return "AppendInstructions"
+	case Instruction_InitializeInstruction:
+		return "InitializeInstruction"
+	case Instruction_AppendInstructionData:
+		return "AppendInstructionData"
 	case Instruction_FinalizeOperation:
 		return "FinalizeOperation"
 	case Instruction_ClearOperation:
@@ -139,6 +147,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"append_instructions", (*AppendInstructions)(nil),
+		},
+		{
+			"initialize_instruction", (*InitializeInstruction)(nil),
+		},
+		{
+			"append_instruction_data", (*AppendInstructionData)(nil),
 		},
 		{
 			"finalize_operation", (*FinalizeOperation)(nil),

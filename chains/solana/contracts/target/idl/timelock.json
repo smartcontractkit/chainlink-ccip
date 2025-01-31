@@ -245,6 +245,126 @@
       ]
     },
     {
+      "name": "initializeInstruction",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "programId",
+          "type": "publicKey"
+        },
+        {
+          "name": "accounts",
+          "type": {
+            "vec": {
+              "defined": "InstructionAccount"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "appendInstructionData",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "ixIndex",
+          "type": "u32"
+        },
+        {
+          "name": "ixDataChunk",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
       "name": "finalizeOperation",
       "accounts": [
         {
