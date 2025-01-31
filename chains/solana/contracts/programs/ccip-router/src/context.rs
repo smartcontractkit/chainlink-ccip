@@ -320,6 +320,9 @@ pub struct UpdateDestChainSelectorConfig<'info> {
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
         realloc = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE + dest_chain_config.dynamic_space(),
         realloc::payer = authority,
+        // `realloc::zero = true` is only necessary in cases where an instruction is capable of reallocating
+        // *down* and then *up*, during a single execution. In any other cases (such as this), it's not
+        // necessary as the memory will be zero'd automatically on instruction entry.
         realloc::zero = false
     )]
     pub dest_chain_state: Account<'info, DestChain>,
