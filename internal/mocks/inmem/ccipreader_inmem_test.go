@@ -89,7 +89,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 			t.Parallel()
 			r := InMemoryCCIPReader{
 				Reports: tt.fields.Reports}
-			got, err := r.CommitReportsGTETimestamp(context.Background(), 1, tt.args.ts, tt.args.limit)
+			got, err := r.CommitReportsGTETimestamp(context.Background(), tt.args.ts, tt.args.limit)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CommitReportsGTETimestamp() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -119,7 +119,7 @@ func makeMsg(seqNum cciptypes.SeqNum, dest cciptypes.ChainSelector, executed boo
 	}
 }
 
-func TestInMemoryCCIPReader_ExecutedMessageRanges(t *testing.T) {
+func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 	type fields struct {
 		MessagesWithExecuted map[cciptypes.ChainSelector][]MessagesWithMetadata
 		Dest                 cciptypes.ChainSelector
@@ -133,7 +133,7 @@ func TestInMemoryCCIPReader_ExecutedMessageRanges(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []cciptypes.SeqNumRange
+		want    []cciptypes.SeqNum
 		wantErr bool
 	}{
 		{
@@ -158,9 +158,7 @@ func TestInMemoryCCIPReader_ExecutedMessageRanges(t *testing.T) {
 				},
 				Dest: 2,
 			},
-			want: []cciptypes.SeqNumRange{
-				cciptypes.NewSeqNumRange(51, 51),
-			},
+			want:    cciptypes.NewSeqNumRange(51, 51).ToSlice(),
 			wantErr: false,
 		},
 		{
@@ -180,10 +178,7 @@ func TestInMemoryCCIPReader_ExecutedMessageRanges(t *testing.T) {
 				},
 				Dest: 2,
 			},
-			want: []cciptypes.SeqNumRange{
-				cciptypes.NewSeqNumRange(50, 50),
-				cciptypes.NewSeqNumRange(52, 52),
-			},
+			want:    []cciptypes.SeqNum{50, 52},
 			wantErr: false,
 		},
 		{
@@ -203,9 +198,7 @@ func TestInMemoryCCIPReader_ExecutedMessageRanges(t *testing.T) {
 				},
 				Dest: 2,
 			},
-			want: []cciptypes.SeqNumRange{
-				cciptypes.NewSeqNumRange(50, 52),
-			},
+			want:    cciptypes.NewSeqNumRange(50, 52).ToSlice(),
 			wantErr: false,
 		},
 	}
@@ -216,13 +209,13 @@ func TestInMemoryCCIPReader_ExecutedMessageRanges(t *testing.T) {
 				Messages: tt.fields.MessagesWithExecuted,
 				Dest:     tt.fields.Dest,
 			}
-			got, err := r.ExecutedMessageRanges(context.Background(), tt.args.source, tt.args.dest, tt.args.seqNumRange)
+			got, err := r.ExecutedMessages(context.Background(), tt.args.source, tt.args.seqNumRange)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ExecutedMessageRanges() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ExecutedMessages() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ExecutedMessageRanges() got = %v, want %v", got, tt.want)
+				t.Errorf("ExecutedMessages() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -114,13 +114,13 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			want:        cciptypes.TokenPriceMap{ArbAddr: cciptypes.NewBigInt(ArbPrice)},
 		},
 		{
-			name: "Zero price should succeed",
+			name: "Zero price should be discarded",
 			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
 				ArbAddr: ArbInfo,
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: big.NewInt(0)},
-			want:        cciptypes.TokenPriceMap{ArbAddr: cciptypes.NewBigInt(big.NewInt(0))},
+			want:        cciptypes.TokenPriceMap{},
 		},
 		{
 			name: "Multiple error accounts",

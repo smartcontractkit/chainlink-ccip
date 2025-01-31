@@ -147,12 +147,19 @@ type EventMintRelease struct {
 }
 
 type EventChainConfigured struct {
-	Discriminator       [8]byte
-	ChainSelector       uint64
-	Token               []byte
-	PreviousToken       []byte
-	PoolAddress         []byte
-	PreviousPoolAddress []byte
+	Discriminator         [8]byte
+	ChainSelector         uint64
+	Token                 token_pool.RemoteAddress
+	PreviousToken         token_pool.RemoteAddress
+	PoolAddresses         []token_pool.RemoteAddress
+	PreviousPoolAddresses []token_pool.RemoteAddress
+}
+
+type EventRemotePoolsAppended struct {
+	Discriminator         [8]byte
+	ChainSelector         uint64
+	PoolAddresses         []token_pool.RemoteAddress
+	PreviousPoolAddresses []token_pool.RemoteAddress
 }
 
 type EventRateLimitConfigured struct {

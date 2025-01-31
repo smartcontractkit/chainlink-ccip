@@ -160,7 +160,11 @@ func TestPluginReports(t *testing.T) {
 						SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
 						MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
 					},
-				}},
+				},
+				TokenPrices: []ccipocr3.TokenPrice{
+					{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+				},
+			},
 		},
 	}
 

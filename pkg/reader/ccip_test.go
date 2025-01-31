@@ -1320,7 +1320,6 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 	nonces, err := ccipReader.Nonces(
 		context.Background(),
 		chainA,
-		chainB,
 		[]string{addr1, addr2},
 	)
 

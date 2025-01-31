@@ -10,8 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetChainRemoteConfig is the `setChainRemoteConfig` instruction.
-type SetChainRemoteConfig struct {
+// InitChainRemoteConfig is the `initChainRemoteConfig` instruction.
+type InitChainRemoteConfig struct {
 	RemoteChainSelector *uint64
 	Mint                *ag_solanago.PublicKey
 	Cfg                 *RemoteConfig
@@ -26,94 +26,94 @@ type SetChainRemoteConfig struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewSetChainRemoteConfigInstructionBuilder creates a new `SetChainRemoteConfig` instruction builder.
-func NewSetChainRemoteConfigInstructionBuilder() *SetChainRemoteConfig {
-	nd := &SetChainRemoteConfig{
+// NewInitChainRemoteConfigInstructionBuilder creates a new `InitChainRemoteConfig` instruction builder.
+func NewInitChainRemoteConfigInstructionBuilder() *InitChainRemoteConfig {
+	nd := &InitChainRemoteConfig{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
 
 // SetRemoteChainSelector sets the "remoteChainSelector" parameter.
-func (inst *SetChainRemoteConfig) SetRemoteChainSelector(remoteChainSelector uint64) *SetChainRemoteConfig {
+func (inst *InitChainRemoteConfig) SetRemoteChainSelector(remoteChainSelector uint64) *InitChainRemoteConfig {
 	inst.RemoteChainSelector = &remoteChainSelector
 	return inst
 }
 
 // SetMint sets the "mint" parameter.
-func (inst *SetChainRemoteConfig) SetMint(mint ag_solanago.PublicKey) *SetChainRemoteConfig {
+func (inst *InitChainRemoteConfig) SetMint(mint ag_solanago.PublicKey) *InitChainRemoteConfig {
 	inst.Mint = &mint
 	return inst
 }
 
 // SetCfg sets the "cfg" parameter.
-func (inst *SetChainRemoteConfig) SetCfg(cfg RemoteConfig) *SetChainRemoteConfig {
+func (inst *InitChainRemoteConfig) SetCfg(cfg RemoteConfig) *InitChainRemoteConfig {
 	inst.Cfg = &cfg
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *SetChainRemoteConfig) SetConfigAccount(config ag_solanago.PublicKey) *SetChainRemoteConfig {
+func (inst *InitChainRemoteConfig) SetConfigAccount(config ag_solanago.PublicKey) *InitChainRemoteConfig {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *SetChainRemoteConfig) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *InitChainRemoteConfig) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetChainConfigAccount sets the "chainConfig" account.
-func (inst *SetChainRemoteConfig) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *SetChainRemoteConfig {
+func (inst *InitChainRemoteConfig) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *InitChainRemoteConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
 // GetChainConfigAccount gets the "chainConfig" account.
-func (inst *SetChainRemoteConfig) GetChainConfigAccount() *ag_solanago.AccountMeta {
+func (inst *InitChainRemoteConfig) GetChainConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *SetChainRemoteConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetChainRemoteConfig {
+func (inst *InitChainRemoteConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *InitChainRemoteConfig {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *SetChainRemoteConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *InitChainRemoteConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *SetChainRemoteConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetChainRemoteConfig {
+func (inst *InitChainRemoteConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitChainRemoteConfig {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *SetChainRemoteConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *InitChainRemoteConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
-func (inst SetChainRemoteConfig) Build() *Instruction {
+func (inst InitChainRemoteConfig) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_SetChainRemoteConfig,
+		TypeID: Instruction_InitChainRemoteConfig,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst SetChainRemoteConfig) ValidateAndBuild() (*Instruction, error) {
+func (inst InitChainRemoteConfig) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *SetChainRemoteConfig) Validate() error {
+func (inst *InitChainRemoteConfig) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.RemoteChainSelector == nil {
@@ -145,11 +145,11 @@ func (inst *SetChainRemoteConfig) Validate() error {
 	return nil
 }
 
-func (inst *SetChainRemoteConfig) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *InitChainRemoteConfig) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("SetChainRemoteConfig")).
+			programBranch.Child(ag_format.Instruction("InitChainRemoteConfig")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -171,7 +171,7 @@ func (inst *SetChainRemoteConfig) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj SetChainRemoteConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj InitChainRemoteConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `RemoteChainSelector` param:
 	err = encoder.Encode(obj.RemoteChainSelector)
 	if err != nil {
@@ -189,7 +189,7 @@ func (obj SetChainRemoteConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (
 	}
 	return nil
 }
-func (obj *SetChainRemoteConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *InitChainRemoteConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `RemoteChainSelector`:
 	err = decoder.Decode(&obj.RemoteChainSelector)
 	if err != nil {
@@ -208,8 +208,8 @@ func (obj *SetChainRemoteConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder
 	return nil
 }
 
-// NewSetChainRemoteConfigInstruction declares a new SetChainRemoteConfig instruction with the provided parameters and accounts.
-func NewSetChainRemoteConfigInstruction(
+// NewInitChainRemoteConfigInstruction declares a new InitChainRemoteConfig instruction with the provided parameters and accounts.
+func NewInitChainRemoteConfigInstruction(
 	// Parameters:
 	remoteChainSelector uint64,
 	mint ag_solanago.PublicKey,
@@ -218,8 +218,8 @@ func NewSetChainRemoteConfigInstruction(
 	config ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *SetChainRemoteConfig {
-	return NewSetChainRemoteConfigInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *InitChainRemoteConfig {
+	return NewInitChainRemoteConfigInstructionBuilder().
 		SetRemoteChainSelector(remoteChainSelector).
 		SetMint(mint).
 		SetCfg(cfg).

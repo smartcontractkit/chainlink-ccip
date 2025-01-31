@@ -28,7 +28,7 @@ func IsReportCursed(
 		return false, nil
 	}
 
-	curseInfo, err := ccipReader.GetRmnCurseInfo(ctx, destChain, reportSourceChains)
+	curseInfo, err := ccipReader.GetRmnCurseInfo(ctx, reportSourceChains)
 	if err != nil {
 		return false, fmt.Errorf("error while fetching curse info: %w", err)
 	}

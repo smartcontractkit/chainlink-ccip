@@ -4,7 +4,7 @@ pub const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
 const MAX_NUM_HASHES: usize = 128; // TODO: Change this to 256 when supporting commit reports with 256 messages
 
 #[derive(Debug)]
-pub enum MerkleError {
+pub(super) enum MerkleError {
     InvalidProof,
 }
 
@@ -16,7 +16,7 @@ fn hash_pair(hash1: &[u8; 32], hash2: &[u8; 32]) -> [u8; 32] {
     }
 }
 
-pub fn calculate_merkle_root(
+pub(super) fn calculate_merkle_root(
     hashed_leaf: [u8; 32],
     proofs: Vec<[u8; 32]>,
 ) -> Result<[u8; 32], MerkleError> {

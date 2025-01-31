@@ -48,7 +48,6 @@ type CcipSend struct {
 	// [8] = [] linkTokenConfig
 	//
 	// [9] = [] feeTokenUserAssociatedAccount
-	// ··········· CHECK this is the associated token account for the user paying the fee.
 	// ··········· If paying with native SOL, this must be the zero address.
 	//
 	// [10] = [WRITE] feeTokenReceiver
@@ -56,6 +55,7 @@ type CcipSend struct {
 	// [11] = [] feeBillingSigner
 	//
 	// [12] = [WRITE] tokenPoolsSigner
+	// ··········· CPI signers, optional if no tokens are being transferred.
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
@@ -185,7 +185,6 @@ func (inst *CcipSend) GetLinkTokenConfigAccount() *ag_solanago.AccountMeta {
 }
 
 // SetFeeTokenUserAssociatedAccountAccount sets the "feeTokenUserAssociatedAccount" account.
-// CHECK this is the associated token account for the user paying the fee.
 // If paying with native SOL, this must be the zero address.
 func (inst *CcipSend) SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssociatedAccount ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[9] = ag_solanago.Meta(feeTokenUserAssociatedAccount)
@@ -193,7 +192,6 @@ func (inst *CcipSend) SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssoci
 }
 
 // GetFeeTokenUserAssociatedAccountAccount gets the "feeTokenUserAssociatedAccount" account.
-// CHECK this is the associated token account for the user paying the fee.
 // If paying with native SOL, this must be the zero address.
 func (inst *CcipSend) GetFeeTokenUserAssociatedAccountAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[9]
@@ -222,12 +220,14 @@ func (inst *CcipSend) GetFeeBillingSignerAccount() *ag_solanago.AccountMeta {
 }
 
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
+// CPI signers, optional if no tokens are being transferred.
 func (inst *CcipSend) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[12] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
+// CPI signers, optional if no tokens are being transferred.
 func (inst *CcipSend) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[12]
 }

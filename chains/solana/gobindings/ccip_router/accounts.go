@@ -9,20 +9,18 @@ import (
 )
 
 type Config struct {
-	Version                         uint8
-	DefaultAllowOutOfOrderExecution uint8
-	Padding0                        [6]uint8
-	SvmChainSelector                uint64
-	DefaultGasLimit                 ag_binary.Uint128
-	Padding1                        [8]uint8
-	Owner                           ag_solanago.PublicKey
-	ProposedOwner                   ag_solanago.PublicKey
-	EnableManualExecutionAfter      int64
-	Padding2                        [8]uint8
-	Ocr3                            [2]Ocr3Config
-	MaxFeeJuelsPerMsg               ag_binary.Uint128
-	LinkTokenMint                   ag_solanago.PublicKey
-	FeeAggregator                   ag_solanago.PublicKey
+	Version                    uint8
+	Padding0                   [7]uint8
+	SvmChainSelector           uint64
+	EnableManualExecutionAfter int64
+	Padding1                   [8]uint8
+	MaxFeeJuelsPerMsg          ag_binary.Uint128
+	Owner                      ag_solanago.PublicKey
+	ProposedOwner              ag_solanago.PublicKey
+	Padding2                   [8]uint8
+	Ocr3                       [2]Ocr3Config
+	LinkTokenMint              ag_solanago.PublicKey
+	FeeAggregator              ag_solanago.PublicKey
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -38,11 +36,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `DefaultAllowOutOfOrderExecution` param:
-	err = encoder.Encode(obj.DefaultAllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
 	// Serialize `Padding0` param:
 	err = encoder.Encode(obj.Padding0)
 	if err != nil {
@@ -53,13 +46,18 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `DefaultGasLimit` param:
-	err = encoder.Encode(obj.DefaultGasLimit)
+	// Serialize `EnableManualExecutionAfter` param:
+	err = encoder.Encode(obj.EnableManualExecutionAfter)
 	if err != nil {
 		return err
 	}
 	// Serialize `Padding1` param:
 	err = encoder.Encode(obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxFeeJuelsPerMsg` param:
+	err = encoder.Encode(obj.MaxFeeJuelsPerMsg)
 	if err != nil {
 		return err
 	}
@@ -73,11 +71,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `EnableManualExecutionAfter` param:
-	err = encoder.Encode(obj.EnableManualExecutionAfter)
-	if err != nil {
-		return err
-	}
 	// Serialize `Padding2` param:
 	err = encoder.Encode(obj.Padding2)
 	if err != nil {
@@ -85,11 +78,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Ocr3` param:
 	err = encoder.Encode(obj.Ocr3)
-	if err != nil {
-		return err
-	}
-	// Serialize `MaxFeeJuelsPerMsg` param:
-	err = encoder.Encode(obj.MaxFeeJuelsPerMsg)
 	if err != nil {
 		return err
 	}
@@ -125,11 +113,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `DefaultAllowOutOfOrderExecution`:
-	err = decoder.Decode(&obj.DefaultAllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
 	// Deserialize `Padding0`:
 	err = decoder.Decode(&obj.Padding0)
 	if err != nil {
@@ -140,13 +123,18 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `DefaultGasLimit`:
-	err = decoder.Decode(&obj.DefaultGasLimit)
+	// Deserialize `EnableManualExecutionAfter`:
+	err = decoder.Decode(&obj.EnableManualExecutionAfter)
 	if err != nil {
 		return err
 	}
 	// Deserialize `Padding1`:
 	err = decoder.Decode(&obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxFeeJuelsPerMsg`:
+	err = decoder.Decode(&obj.MaxFeeJuelsPerMsg)
 	if err != nil {
 		return err
 	}
@@ -160,11 +148,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `EnableManualExecutionAfter`:
-	err = decoder.Decode(&obj.EnableManualExecutionAfter)
-	if err != nil {
-		return err
-	}
 	// Deserialize `Padding2`:
 	err = decoder.Decode(&obj.Padding2)
 	if err != nil {
@@ -172,11 +155,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Ocr3`:
 	err = decoder.Decode(&obj.Ocr3)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MaxFeeJuelsPerMsg`:
-	err = decoder.Decode(&obj.MaxFeeJuelsPerMsg)
 	if err != nil {
 		return err
 	}

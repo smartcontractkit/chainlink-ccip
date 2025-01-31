@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
+use crate::seed;
 use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
     DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
@@ -9,7 +10,7 @@ use crate::{
     SetTokenBillingConfig, SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated,
     SourceChainState, TimestampedPackedU224, TokenBilling, TransferOwnership,
     UpdateBillingTokenConfig, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
-    UpdateSourceChainSelectorConfig, WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
+    UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -164,32 +165,6 @@ pub fn update_svm_chain_selector(
     Ok(())
 }
 
-pub fn update_default_gas_limit(
-    ctx: Context<UpdateConfigCCIPRouter>,
-    new_gas_limit: u128,
-) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
-
-    config.default_gas_limit = new_gas_limit;
-
-    Ok(())
-}
-
-pub fn update_default_allow_out_of_order_execution(
-    ctx: Context<UpdateConfigCCIPRouter>,
-    new_allow_out_of_order_execution: bool,
-) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
-
-    let mut v = 0_u8;
-    if new_allow_out_of_order_execution {
-        v = 1;
-    }
-    config.default_allow_out_of_order_execution = v;
-
-    Ok(())
-}
-
 pub fn update_enable_manual_execution_after(
     ctx: Context<UpdateConfigCCIPRouter>,
     new_enable_manual_execution_after: i64,
@@ -293,7 +268,7 @@ pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Re
         authority: ctx.accounts.fee_billing_signer.to_account_info(),
     };
     let cpi_program = ctx.accounts.token_program.to_account_info();
-    let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[ctx.bumps.fee_billing_signer]];
+    let seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
     let signer_seeds = &[&seeds[..]];
     let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
 

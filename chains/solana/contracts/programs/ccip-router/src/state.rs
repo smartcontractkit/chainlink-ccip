@@ -5,23 +5,18 @@ use anchor_lang::prelude::*;
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct Config {
     pub version: u8,
-    pub default_allow_out_of_order_execution: u8, // bytemuck::Pod compliant required for zero_copy
-    _padding0: [u8; 6],
+    _padding0: [u8; 7],
     pub svm_chain_selector: u64,
-    pub default_gas_limit: u128,
+    pub enable_manual_execution_after: i64, // Expressed as Unix time (i.e. seconds since the Unix epoch).
     _padding1: [u8; 8],
+    pub max_fee_juels_per_msg: u128,
 
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
 
-    pub enable_manual_execution_after: i64, // Expressed as Unix time (i.e. seconds since the Unix epoch).
     _padding2: [u8; 8],
-
     pub ocr3: [Ocr3Config; 2],
-    // TODO: token pool global config
 
-    // TODO: billing global configs'
-    pub max_fee_juels_per_msg: u128,
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
@@ -103,7 +98,9 @@ pub struct DestChainConfig {
     pub max_data_bytes: u32,               // Maximum payload data size in bytes
     pub max_per_msg_gas_limit: u32,        // Maximum gas limit for messages targeting EVMs
     pub dest_gas_overhead: u32, //  Gas charged on top of the gasLimit to cover destination chain costs
-    pub dest_gas_per_payload_byte: u16, // Destination chain gas charged for passing each byte of `data` payload to receiver
+    pub dest_gas_per_payload_byte_base: u32, // Base gas cost per byte up to threshold
+    pub dest_gas_per_payload_byte_high: u32, // Higher gas cost per byte after threshold
+    pub dest_gas_per_payload_byte_threshold: u32, // Threshold in bytes for higher gas cost
     pub dest_data_availability_overhead_gas: u32, // Extra data availability gas charged on top of the message, e.g. for OCR
     pub dest_gas_per_data_availability_byte: u16, // Amount of gas to charge per byte of message data that needs availability
     pub dest_data_availability_multiplier_bps: u16, // Multiplier for data availability gas, multiples of bps, or 0.0001

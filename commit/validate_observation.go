@@ -9,6 +9,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 )
 
 // ValidateObservation validates an observation to ensure it is well-formed
@@ -63,6 +65,17 @@ func (p *Plugin) ValidateObservation(
 	err = p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery, gasObs)
 	if err != nil {
 		return fmt.Errorf("validate chain fee observation: %w", err)
+	}
+
+	if p.discoveryProcessor != nil {
+		discoveryObs := plugincommon.AttributedObservation[dt.Observation]{
+			OracleID:    ao.Observer,
+			Observation: obs.DiscoveryObs,
+		}
+		err = p.discoveryProcessor.ValidateObservation(dt.Outcome{}, dt.Query{}, discoveryObs)
+		if err != nil {
+			return fmt.Errorf("validate discovery observation: %w", err)
+		}
 	}
 
 	return nil

@@ -19,66 +19,79 @@ import (
 // * `ctx` - The context containing the accounts required for registration.
 type RegisterTokenAdminRegistryViaOwner struct {
 
-	// [0] = [WRITE] tokenAdminRegistry
+	// [0] = [] config
 	//
-	// [1] = [WRITE] mint
+	// [1] = [WRITE] tokenAdminRegistry
 	//
-	// [2] = [WRITE, SIGNER] authority
+	// [2] = [WRITE] mint
 	//
-	// [3] = [] systemProgram
+	// [3] = [WRITE, SIGNER] authority
+	//
+	// [4] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewRegisterTokenAdminRegistryViaOwnerInstructionBuilder creates a new `RegisterTokenAdminRegistryViaOwner` instruction builder.
 func NewRegisterTokenAdminRegistryViaOwnerInstructionBuilder() *RegisterTokenAdminRegistryViaOwner {
 	nd := &RegisterTokenAdminRegistryViaOwner{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
 
+// SetConfigAccount sets the "config" account.
+func (inst *RegisterTokenAdminRegistryViaOwner) SetConfigAccount(config ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaOwner {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *RegisterTokenAdminRegistryViaOwner) GetConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
 // SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
 func (inst *RegisterTokenAdminRegistryViaOwner) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaOwner {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
 	return inst
 }
 
 // GetTokenAdminRegistryAccount gets the "tokenAdminRegistry" account.
 func (inst *RegisterTokenAdminRegistryViaOwner) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice[1]
 }
 
 // SetMintAccount sets the "mint" account.
 func (inst *RegisterTokenAdminRegistryViaOwner) SetMintAccount(mint ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaOwner {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(mint).WRITE()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint).WRITE()
 	return inst
 }
 
 // GetMintAccount gets the "mint" account.
 func (inst *RegisterTokenAdminRegistryViaOwner) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *RegisterTokenAdminRegistryViaOwner) SetAuthorityAccount(authority ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaOwner {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *RegisterTokenAdminRegistryViaOwner) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *RegisterTokenAdminRegistryViaOwner) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaOwner {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *RegisterTokenAdminRegistryViaOwner) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst RegisterTokenAdminRegistryViaOwner) Build() *Instruction {
@@ -102,15 +115,18 @@ func (inst *RegisterTokenAdminRegistryViaOwner) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.TokenAdminRegistry is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Mint is not set")
+			return errors.New("accounts.TokenAdminRegistry is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.Mint is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.Authority is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -129,11 +145,12 @@ func (inst *RegisterTokenAdminRegistryViaOwner) EncodeToTree(parent ag_treeout.B
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("              mint", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("              mint", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -149,11 +166,13 @@ func (obj *RegisterTokenAdminRegistryViaOwner) UnmarshalWithDecoder(decoder *ag_
 // NewRegisterTokenAdminRegistryViaOwnerInstruction declares a new RegisterTokenAdminRegistryViaOwner instruction with the provided parameters and accounts.
 func NewRegisterTokenAdminRegistryViaOwnerInstruction(
 	// Accounts:
+	config ag_solanago.PublicKey,
 	tokenAdminRegistry ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *RegisterTokenAdminRegistryViaOwner {
 	return NewRegisterTokenAdminRegistryViaOwnerInstructionBuilder().
+		SetConfigAccount(config).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
 		SetMintAccount(mint).
 		SetAuthorityAccount(authority).

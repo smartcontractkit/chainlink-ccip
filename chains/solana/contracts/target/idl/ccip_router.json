@@ -32,8 +32,6 @@
         "",
         "* `ctx` - The context containing the accounts required for initialization.",
         "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `default_gas_limit` - The default gas limit for other destination chains.",
-        "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
         "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
       ],
       "accounts": [
@@ -82,14 +80,6 @@
         {
           "name": "svmChainSelector",
           "type": "u64"
-        },
-        {
-          "name": "defaultGasLimit",
-          "type": "u128"
-        },
-        {
-          "name": "defaultAllowOutOfOrderExecution",
-          "type": "bool"
         },
         {
           "name": "enableExecutionAfter",
@@ -221,7 +211,11 @@
         {
           "name": "sourceChainState",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Adding a chain selector implies initializing the state for a new chain,",
+            "hence the need to initialize two accounts."
+          ]
         },
         {
           "name": "destChainState",
@@ -458,78 +452,6 @@
       ]
     },
     {
-      "name": "updateDefaultGasLimit",
-      "docs": [
-        "Updates the default gas limit in the router configuration.",
-        "",
-        "This change affects the default value for gas limit on every other destination chain.",
-        "The Admin is the only one able to update the default gas limit.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `new_gas_limit` - The new default gas limit."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "newGasLimit",
-          "type": "u128"
-        }
-      ]
-    },
-    {
-      "name": "updateDefaultAllowOutOfOrderExecution",
-      "docs": [
-        "Updates the default setting for allowing out-of-order execution for other destination chains.",
-        "The Admin is the only one able to update this config.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `new_allow_out_of_order_execution` - The new setting for allowing out-of-order execution."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "newAllowOutOfOrderExecution",
-          "type": "bool"
-        }
-      ]
-    },
-    {
       "name": "updateEnableManualExecutionAfter",
       "docs": [
         "Updates the minimum amount of time required between a message being committed and when it can be manually executed.",
@@ -623,6 +545,11 @@
       ],
       "accounts": [
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAdminRegistry",
           "isMut": true,
           "isSigner": false
@@ -660,6 +587,11 @@
         "* `is_writable` - index of account in lookup table that is writable"
       ],
       "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
@@ -702,6 +634,11 @@
       ],
       "accounts": [
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAdminRegistry",
           "isMut": true,
           "isSigner": false
@@ -736,6 +673,11 @@
         "* `mint` - The public key of the token mint."
       ],
       "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
@@ -1054,6 +996,11 @@
       ],
       "accounts": [
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "destChainState",
           "isMut": false,
           "isSigner": false
@@ -1207,7 +1154,6 @@
           "isMut": false,
           "isSigner": false,
           "docs": [
-            "CHECK this is the associated token account for the user paying the fee.",
             "If paying with native SOL, this must be the zero address."
           ]
         },
@@ -1224,7 +1170,10 @@
         {
           "name": "tokenPoolsSigner",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "CPI signers, optional if no tokens are being transferred."
+          ]
         }
       ],
       "args": [
@@ -1267,9 +1216,10 @@
         "* `report_context_byte_words` - consists of:",
         "* report_context_byte_words[0]: ConfigDigest",
         "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number",
-        "* report_context_byte_words[2]: ExtraHash",
-        "* `report` - The commit input report, single merkle root with RMN signatures and price updates",
-        "* `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH"
+        "* `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates",
+        "* `rs` - slice of R components of signatures",
+        "* `ss` - slice of S components of signatures",
+        "* `raw_vs` - array of V components of signatures"
       ],
       "accounts": [
         {
@@ -1314,25 +1264,43 @@
                   32
                 ]
               },
-              3
+              2
             ]
           }
         },
         {
-          "name": "report",
-          "type": {
-            "defined": "CommitInput"
-          }
+          "name": "rawReport",
+          "type": "bytes"
         },
         {
-          "name": "signatures",
+          "name": "rs",
           "type": {
             "vec": {
               "array": [
                 "u8",
-                65
+                32
               ]
             }
+          }
+        },
+        {
+          "name": "ss",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "rawVs",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
           }
         }
       ]
@@ -1356,12 +1324,11 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for the execute.",
-        "* `execution_report` - the execution report containing only one message and proofs",
+        "* `raw_execution_report` - the serialized execution report containing only one message and proofs",
         "* `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)",
         "*  consists of:",
         "* report_context_byte_words[0]: ConfigDigest",
-        "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number",
-        "* report_context_byte_words[2]: ExtraHash"
+        "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number"
       ],
       "accounts": [
         {
@@ -1407,10 +1374,8 @@
       ],
       "args": [
         {
-          "name": "executionReport",
-          "type": {
-            "defined": "ExecutionReportSingleChain"
-          }
+          "name": "rawExecutionReport",
+          "type": "bytes"
         },
         {
           "name": "reportContextByteWords",
@@ -1422,7 +1387,7 @@
                   32
                 ]
               },
-              3
+              2
             ]
           }
         },
@@ -1444,7 +1409,7 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for the execution.",
-        "* `execution_report` - The execution report containing the message and proofs."
+        "* `raw_execution_report` - The serialized execution report containing the message and proofs."
       ],
       "accounts": [
         {
@@ -1490,10 +1455,8 @@
       ],
       "args": [
         {
-          "name": "executionReport",
-          "type": {
-            "defined": "ExecutionReportSingleChain"
-          }
+          "name": "rawExecutionReport",
+          "type": "bytes"
         },
         {
           "name": "tokenIndexes",
@@ -1513,15 +1476,11 @@
             "type": "u8"
           },
           {
-            "name": "defaultAllowOutOfOrderExecution",
-            "type": "u8"
-          },
-          {
             "name": "padding0",
             "type": {
               "array": [
                 "u8",
-                6
+                7
               ]
             }
           },
@@ -1530,8 +1489,8 @@
             "type": "u64"
           },
           {
-            "name": "defaultGasLimit",
-            "type": "u128"
+            "name": "enableManualExecutionAfter",
+            "type": "i64"
           },
           {
             "name": "padding1",
@@ -1543,16 +1502,16 @@
             }
           },
           {
+            "name": "maxFeeJuelsPerMsg",
+            "type": "u128"
+          },
+          {
             "name": "owner",
             "type": "publicKey"
           },
           {
             "name": "proposedOwner",
             "type": "publicKey"
-          },
-          {
-            "name": "enableManualExecutionAfter",
-            "type": "i64"
           },
           {
             "name": "padding2",
@@ -1573,10 +1532,6 @@
                 2
               ]
             }
-          },
-          {
-            "name": "maxFeeJuelsPerMsg",
-            "type": "u128"
           },
           {
             "name": "linkTokenMint",
@@ -1802,6 +1757,10 @@
   "types": [
     {
       "name": "CommitInput",
+      "docs": [
+        "Input from an offchain node, containing the Merkle root and interval for",
+        "the source chain, and optionally some price updates alongside it."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1878,6 +1837,9 @@
     },
     {
       "name": "GasPriceUpdate",
+      "docs": [
+        "Gas price for a given chain in USD; its value may contain tightly packed fields."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1899,6 +1861,9 @@
     },
     {
       "name": "MerkleRoot",
+      "docs": [
+        "Struct to hold a merkle root and an interval for a source chain"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1925,6 +1890,62 @@
                 "u8",
                 32
               ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "EVMExtraArgsV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "gasLimit",
+            "type": "u128"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMExtraArgsV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "computeUnits",
+            "type": "u32"
+          },
+          {
+            "name": "accountIsWritableBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
             }
           }
         ]
@@ -2011,7 +2032,7 @@
       }
     },
     {
-      "name": "SVMExtraArgs",
+      "name": "Any2SVMRampExtraArgs",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2022,28 +2043,6 @@
           {
             "name": "isWritableBitmap",
             "type": "u64"
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": "publicKey"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "AnyExtraArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": "u128"
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": "bool"
           }
         ]
       }
@@ -2068,10 +2067,6 @@
             "type": "bytes"
           },
           {
-            "name": "logicReceiver",
-            "type": "publicKey"
-          },
-          {
             "name": "tokenReceiver",
             "type": "publicKey"
           },
@@ -2086,7 +2081,7 @@
           {
             "name": "extraArgs",
             "type": {
-              "defined": "SVMExtraArgs"
+              "defined": "Any2SVMRampExtraArgs"
             }
           },
           {
@@ -2121,9 +2116,7 @@
           },
           {
             "name": "extraArgs",
-            "type": {
-              "defined": "AnyExtraArgs"
-            }
+            "type": "bytes"
           },
           {
             "name": "feeToken",
@@ -2239,9 +2232,7 @@
           },
           {
             "name": "extraArgs",
-            "type": {
-              "defined": "ExtraArgsInput"
-            }
+            "type": "bytes"
           }
         ]
       }
@@ -2258,26 +2249,6 @@
           {
             "name": "amount",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExtraArgsInput",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": {
-              "option": "u128"
-            }
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": {
-              "option": "bool"
-            }
           }
         ]
       }
@@ -2456,8 +2427,16 @@
             "type": "u32"
           },
           {
-            "name": "destGasPerPayloadByte",
-            "type": "u16"
+            "name": "destGasPerPayloadByteBase",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteHigh",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteThreshold",
+            "type": "u32"
           },
           {
             "name": "destDataAvailabilityOverheadGas",
@@ -2633,17 +2612,6 @@
       }
     },
     {
-      "name": "MerkleError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "InvalidProof"
-          }
-        ]
-      }
-    },
-    {
       "name": "MessageExecutionState",
       "type": {
         "kind": "enum",
@@ -2790,6 +2758,21 @@
           },
           {
             "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
+          },
+          {
+            "name": "InvalidWritabilityBitmap"
+          },
+          {
+            "name": "InvalidExtraArgsTag"
+          },
+          {
+            "name": "InvalidChainFamilySelector"
+          },
+          {
+            "name": "InvalidTokenReceiver"
+          },
+          {
+            "name": "InvalidSVMAddress"
           }
         ]
       }
@@ -3354,6 +3337,11 @@
       "code": 6014,
       "name": "InvalidSignature",
       "msg": "Invalid signature"
+    },
+    {
+      "code": 6015,
+      "name": "SignaturesOutOfRegistration",
+      "msg": "Signatures out of registration"
     }
   ]
 }

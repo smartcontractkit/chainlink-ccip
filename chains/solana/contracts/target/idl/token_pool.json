@@ -103,7 +103,7 @@
       ]
     },
     {
-      "name": "setChainRemoteConfig",
+      "name": "initChainRemoteConfig",
       "accounts": [
         {
           "name": "config",
@@ -139,6 +139,90 @@
           "name": "cfg",
           "type": {
             "defined": "RemoteConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "editChainRemoteConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": "RemoteConfig"
+          }
+        }
+      ]
+    },
+    {
+      "name": "appendRemotePoolAddresses",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "remoteChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "mint",
+          "type": "publicKey"
+        },
+        {
+          "name": "addresses",
+          "type": {
+            "vec": {
+              "defined": "RemoteAddress"
+            }
           }
         }
       ]
@@ -496,11 +580,15 @@
         "fields": [
           {
             "name": "destTokenAddress",
-            "type": "bytes"
+            "type": {
+              "defined": "RemoteAddress"
+            }
           },
           {
             "name": "destPoolData",
-            "type": "bytes"
+            "type": {
+              "defined": "RemoteAddress"
+            }
           }
         ]
       }
@@ -512,7 +600,9 @@
         "fields": [
           {
             "name": "originalSender",
-            "type": "bytes"
+            "type": {
+              "defined": "RemoteAddress"
+            }
           },
           {
             "name": "remoteChainSelector",
@@ -541,18 +631,24 @@
               "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
               "expected pool address for the given remoteChainSelector."
             ],
-            "type": "bytes"
+            "type": {
+              "defined": "RemoteAddress"
+            }
           },
           {
             "name": "sourcePoolData",
-            "type": "bytes"
+            "type": {
+              "defined": "RemoteAddress"
+            }
           },
           {
             "name": "offchainTokenData",
             "docs": [
               "@dev WARNING: offchainTokenData is untrusted data."
             ],
-            "type": "bytes"
+            "type": {
+              "defined": "RemoteAddress"
+            }
           }
         ]
       }
@@ -575,16 +671,34 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "poolAddress",
-            "type": "bytes"
+            "name": "poolAddresses",
+            "type": {
+              "vec": {
+                "defined": "RemoteAddress"
+              }
+            }
           },
           {
             "name": "tokenAddress",
-            "type": "bytes"
+            "type": {
+              "defined": "RemoteAddress"
+            }
           },
           {
             "name": "decimals",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "bytes"
           }
         ]
       }
@@ -688,22 +802,34 @@
         },
         {
           "name": "token",
-          "type": "bytes",
+          "type": {
+            "defined": "RemoteAddress"
+          },
           "index": false
         },
         {
           "name": "previousToken",
-          "type": "bytes",
+          "type": {
+            "defined": "RemoteAddress"
+          },
           "index": false
         },
         {
-          "name": "poolAddress",
-          "type": "bytes",
+          "name": "poolAddresses",
+          "type": {
+            "vec": {
+              "defined": "RemoteAddress"
+            }
+          },
           "index": false
         },
         {
-          "name": "previousPoolAddress",
-          "type": "bytes",
+          "name": "previousPoolAddresses",
+          "type": {
+            "vec": {
+              "defined": "RemoteAddress"
+            }
+          },
           "index": false
         }
       ]
@@ -727,6 +853,34 @@
           "name": "inboundRateLimit",
           "type": {
             "defined": "RateLimitConfig"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "RemotePoolsAppended",
+      "fields": [
+        {
+          "name": "chainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "poolAddresses",
+          "type": {
+            "vec": {
+              "defined": "RemoteAddress"
+            }
+          },
+          "index": false
+        },
+        {
+          "name": "previousPoolAddresses",
+          "type": {
+            "vec": {
+              "defined": "RemoteAddress"
+            }
           },
           "index": false
         }

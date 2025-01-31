@@ -162,8 +162,8 @@ func (obj *LockOrBurnInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 }
 
 type LockOrBurnOutV1 struct {
-	DestTokenAddress []byte
-	DestPoolData     []byte
+	DestTokenAddress RemoteAddress
+	DestPoolData     RemoteAddress
 }
 
 func (obj LockOrBurnOutV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -195,7 +195,7 @@ func (obj *LockOrBurnOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 }
 
 type ReleaseOrMintInV1 struct {
-	OriginalSender      []byte
+	OriginalSender      RemoteAddress
 	RemoteChainSelector uint64
 	Receiver            ag_solanago.PublicKey
 	Amount              [32]uint8
@@ -203,11 +203,11 @@ type ReleaseOrMintInV1 struct {
 
 	// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
 	// expected pool address for the given remoteChainSelector.
-	SourcePoolAddress []byte
-	SourcePoolData    []byte
+	SourcePoolAddress RemoteAddress
+	SourcePoolData    RemoteAddress
 
 	// @dev WARNING: offchainTokenData is untrusted data.
-	OffchainTokenData []byte
+	OffchainTokenData RemoteAddress
 }
 
 func (obj ReleaseOrMintInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -321,14 +321,14 @@ func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 }
 
 type RemoteConfig struct {
-	PoolAddress  []byte
-	TokenAddress []byte
-	Decimals     uint8
+	PoolAddresses []RemoteAddress
+	TokenAddress  RemoteAddress
+	Decimals      uint8
 }
 
 func (obj RemoteConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `PoolAddress` param:
-	err = encoder.Encode(obj.PoolAddress)
+	// Serialize `PoolAddresses` param:
+	err = encoder.Encode(obj.PoolAddresses)
 	if err != nil {
 		return err
 	}
@@ -346,8 +346,8 @@ func (obj RemoteConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 }
 
 func (obj *RemoteConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `PoolAddress`:
-	err = decoder.Decode(&obj.PoolAddress)
+	// Deserialize `PoolAddresses`:
+	err = decoder.Decode(&obj.PoolAddresses)
 	if err != nil {
 		return err
 	}
@@ -358,6 +358,28 @@ func (obj *RemoteConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	}
 	// Deserialize `Decimals`:
 	err = decoder.Decode(&obj.Decimals)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type RemoteAddress struct {
+	Address []byte
+}
+
+func (obj RemoteAddress) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Address` param:
+	err = encoder.Encode(obj.Address)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RemoteAddress) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Address`:
+	err = decoder.Decode(&obj.Address)
 	if err != nil {
 		return err
 	}

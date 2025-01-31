@@ -175,6 +175,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 
 	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: skipPreflight, PreflightCommitment: rpc.CommitmentProcessed})
 	if err != nil {
+		fmt.Println(tx) // debugging if tx errors
 		return nil, err
 	}
 
