@@ -245,6 +245,26 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/overrides.yaml
+  - name: ccip-v2-scripts
+    activation:
+      - vars:
+          CCIP_TOOLING_VERSION: "v2"
+    merge:
+      dependencies:
+        ccip-v2-scripts-deploy-home-chain:
+          path: ${DEPENDENCIES_DIR}/ccip-v2-scripts/devspace.yaml
+          overwriteVars: true
+          pipeline: deploy-home-chain-contracts
+          namespace: ${DEVSPACE_NAMESPACE}
+        ccip-v2-scripts-deploy-ccip:
+          path: ${DEPENDENCIES_DIR}/ccip-v2-scripts/devspace.yaml
+          overwriteVars: true
+          pipeline: deploy-ccip
+          namespace: ${DEVSPACE_NAMESPACE}
+        job-distributor:
+          path: ${DEPENDENCIES_DIR}/job-distributor
+          overwriteVars: true
+          namespace: ${DEVSPACE_NAMESPACE}
   - name: crib-staging
     activation:
       - vars:
@@ -255,6 +275,13 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging.yaml
       )
+  - name: ccip-load-testing-aws-staging
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip-load-tests.yaml
+      )
   - name: crib-kind
     activation:
       - vars:
@@ -264,35 +291,6 @@ profiles:
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-kind.yaml
-      )
-  - name: ccip-v2-scripts
-    activation:
-      - vars:
-          CCIP_TOOLING_VERSION: "v2"
-    patches:
-      - op: add
-        path: dependencies
-        value:
-          ccip-v2-scripts-deploy-home-chain:
-            path: ${DEPENDENCIES_DIR}/ccip-v2-scripts/devspace.yaml
-            overwriteVars: true
-            pipeline: deploy-home-chain-contracts
-            namespace: ${DEVSPACE_NAMESPACE}
-          ccip-v2-scripts-deploy-ccip:
-            path: ${DEPENDENCIES_DIR}/ccip-v2-scripts/devspace.yaml
-            overwriteVars: true
-            pipeline: deploy-ccip
-            namespace: ${DEVSPACE_NAMESPACE}
-          job-distributor:
-            path: ${DEPENDENCIES_DIR}/job-distributor
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-  - name: ccip-load-testing-aws-staging
-    merge: |-
-      $(
-        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
-        gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip-load-tests.yaml
       )
   - name: git-charts
     merge:

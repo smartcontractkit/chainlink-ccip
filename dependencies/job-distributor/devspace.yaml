@@ -127,6 +127,12 @@ profiles:
                 className: nginx-internal
                 annotations:
                   nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+  - name: size-medium
+    merge:
+      dependencies:
+        postgres:
+          profiles:
+            - job-distributor-size-medium
   - name: kind
     activation:
       - vars:

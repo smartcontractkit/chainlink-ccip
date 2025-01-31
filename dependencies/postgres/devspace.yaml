@@ -11,6 +11,7 @@ deployments:
     helm:
       chart:
         name: oci://registry-1.docker.io/bitnamicharts/postgresql
+        version: 16.4.5
       values:
         architecture: standalone
         fullnameOverride: postgres
@@ -32,7 +33,7 @@ deployments:
           persistence:
             enabled: false
             size: 5Gi
-            storageClass: gp2
+            storageClass: gp3
         networkPolicy:
           enabled: false
         volumePermissions:
@@ -51,6 +52,23 @@ hooks:
     events: ["after:deploy:postgres"]
 
 profiles:
+  - name: job-distributor-size-medium
+    merge:
+      deployments:
+        postgres:
+          helm:
+            values:
+              primary:
+                resources:
+                  requests:
+                    cpu: 500m
+                    memory: 256Mi
+                    ephemeral-storage: 50Mi
+                  limits:
+                    cpu: 2000m
+                    memory: 512Mi
+                    ephemeral-storage: 2Gi
+
   - name: aws
     activation:
       - vars:
