@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use crate::{
-    seed, AuthorizedOfframpsModified, DecommissionAuthorizedOfframps, RegisterAuthorizedOfframps,
+    seed, AuthorizedOfframpsModified, DecommissionAuthorizedOfframps, InitAuthorizedOfframps,
+    RegisterAuthorizedOfframps,
 };
 use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
@@ -317,6 +318,10 @@ pub fn withdraw_billed_funds(
         ctx.accounts.fee_token_mint.decimals,
         ctx.bumps.fee_billing_signer,
     )
+}
+
+pub fn init_authorized_offramps(_ctx: Context<InitAuthorizedOfframps>) -> Result<()> {
+    Ok(())
 }
 
 pub fn register_authorized_offramps(

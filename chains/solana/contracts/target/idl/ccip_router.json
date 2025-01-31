@@ -46,11 +46,6 @@
           "isSigner": false
         },
         {
-          "name": "authorizedOfframps",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -958,6 +953,40 @@
         {
           "name": "feeBillingSigner",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initAuthorizedOfframps",
+      "docs": [
+        "Initializes the authorized offramp list. Must be done separately",
+        "from router initialization to circumvent stack size limitations.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the acounts required for the operation."
+      ],
+      "accounts": [
+        {
+          "name": "authorizedOfframps",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {

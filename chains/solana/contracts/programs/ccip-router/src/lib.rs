@@ -408,6 +408,16 @@ pub mod ccip_router {
         v1::admin::remove_billing_token_config(ctx)
     }
 
+    /// Initializes the authorized offramp list. Must be done separately
+    /// from router initialization to circumvent stack size limitations.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the acounts required for the operation.
+    pub fn init_authorized_offramps(ctx: Context<InitAuthorizedOfframps>) -> Result<()> {
+        v1::admin::init_authorized_offramps(ctx)
+    }
+
     /// Adds a number of new authorized offramps, which may call
     /// `ccip_receive` methods on user contracts.
     ///

@@ -7,7 +7,8 @@ use solana_program::sysvar::instructions;
 use crate::program::CcipRouter;
 use crate::state::{CommitReport, Config, Nonce};
 use crate::{
-    AuthorizedOfframps, BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain, ExecutionReportSingleChain, ExternalExecutionConfig, GlobalState, SVM2AnyMessage, SourceChain
+    AuthorizedOfframps, BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
+    ExecutionReportSingleChain, ExternalExecutionConfig, GlobalState, SVM2AnyMessage, SourceChain,
 };
 
 /// Static space allocated to any account: must always be added to space calculations.
@@ -195,17 +196,6 @@ pub struct InitializeCCIPRouter<'info> {
     )]
     pub state: Account<'info, GlobalState>,
 
-    // We initialize the authorized offramps empty not to complicate
-    // the initialization API. Authorized offramps can be registered later.
-    #[account(
-        init,
-        seeds = [seed::AUTHORIZED_OFFRAMPS],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + AuthorizedOfframps::INIT_SPACE, 
-    )]
-    pub authorized_offramps: Account<'info, AuthorizedOfframps>,
-
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -237,18 +227,14 @@ pub struct InitializeCCIPRouter<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_offramps: Vec<Pubkey>)]
-pub struct RegisterAuthorizedOfframps<'info> {
+pub struct InitAuthorizedOfframps<'info> {
     #[account(
-        mut,
+        init,
         seeds = [seed::AUTHORIZED_OFFRAMPS],
         bump,
-        realloc = ANCHOR_DISCRIMINATOR
-            + ExternalExecutionConfig::INIT_SPACE
-            + authorized_offramps.dynamic_space()
-            + new_offramps.len() * std::mem::size_of::<Pubkey>(),
-        realloc::payer = authority,
-        realloc::zero = false,
+        space = ANCHOR_DISCRIMINATOR
+            + AuthorizedOfframps::INIT_SPACE,
+        payer = authority,
     )]
     pub authorized_offramps: Account<'info, AuthorizedOfframps>,
 
@@ -258,7 +244,35 @@ pub struct RegisterAuthorizedOfframps<'info> {
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
-        
+
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(new_offramps: Vec<Pubkey>)]
+pub struct RegisterAuthorizedOfframps<'info> {
+    #[account(
+        mut,
+        seeds = [seed::AUTHORIZED_OFFRAMPS],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR
+            + AuthorizedOfframps::INIT_SPACE
+            + authorized_offramps.dynamic_space()
+            + new_offramps.len() * std::mem::size_of::<Pubkey>(),
+        realloc::payer = authority,
+        realloc::zero = false
+    )]
+    pub authorized_offramps: Account<'info, AuthorizedOfframps>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -272,7 +286,7 @@ pub struct DecommissionAuthorizedOfframps<'info> {
         seeds = [seed::AUTHORIZED_OFFRAMPS],
         bump,
         realloc = ANCHOR_DISCRIMINATOR
-            + ExternalExecutionConfig::INIT_SPACE
+            + AuthorizedOfframps::INIT_SPACE
             + authorized_offramps.dynamic_space()
             - offramps_to_decommission.len() * std::mem::size_of::<Pubkey>(),
         realloc::payer = authority,
@@ -286,7 +300,7 @@ pub struct DecommissionAuthorizedOfframps<'info> {
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
-        
+
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,

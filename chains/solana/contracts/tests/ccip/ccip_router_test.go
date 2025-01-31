@@ -378,7 +378,7 @@ func TestCCIPRouter(t *testing.T) {
 			}
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-			instruction, err := ccip_router.NewInitializeInstruction(
+			initializeIx, err := ccip_router.NewInitializeInstruction(
 				invalidSVMChainSelector,
 				config.EnableExecutionAfter,
 				// fee aggregator address, will be changed in later test
@@ -390,7 +390,6 @@ func TestCCIPRouter(t *testing.T) {
 				defaultMaxFeeJuelsPerMsg,
 				config.RouterConfigPDA,
 				config.RouterStatePDA,
-				config.RouterAuthorizedOfframpsPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
 				config.CcipRouterProgram,
@@ -400,7 +399,15 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+			offrampsIx, err := ccip_router.NewInitAuthorizedOfframpsInstruction(
+				config.RouterAuthorizedOfframpsPDA,
+				config.RouterConfigPDA,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initializeIx, offrampsIx}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			// Fetch account data

@@ -254,6 +254,14 @@ var (
 	// * `ctx` - The context containing the accounts required for removing the billing token configuration.
 	Instruction_RemoveBillingTokenConfig = ag_binary.TypeID([8]byte{0, 194, 92, 161, 29, 8, 10, 91})
 
+	// Initializes the authorized offramp list. Must be done separately
+	// from router initialization to circumvent stack size limitations.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the acounts required for the operation.
+	Instruction_InitAuthorizedOfframps = ag_binary.TypeID([8]byte{81, 197, 209, 65, 46, 143, 128, 159})
+
 	// Adds a number of new authorized offramps, which may call
 	// `ccip_receive` methods on user contracts.
 	//
@@ -431,6 +439,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateBillingTokenConfig"
 	case Instruction_RemoveBillingTokenConfig:
 		return "RemoveBillingTokenConfig"
+	case Instruction_InitAuthorizedOfframps:
+		return "InitAuthorizedOfframps"
 	case Instruction_RegisterAuthorizedOfframps:
 		return "RegisterAuthorizedOfframps"
 	case Instruction_DecommissionAuthorizedOfframps:
@@ -529,6 +539,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"remove_billing_token_config", (*RemoveBillingTokenConfig)(nil),
+		},
+		{
+			"init_authorized_offramps", (*InitAuthorizedOfframps)(nil),
 		},
 		{
 			"register_authorized_offramps", (*RegisterAuthorizedOfframps)(nil),
