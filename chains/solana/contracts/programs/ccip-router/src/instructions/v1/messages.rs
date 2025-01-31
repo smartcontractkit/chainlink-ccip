@@ -429,6 +429,8 @@ pub mod ramps {
                     gas_price_staleness_threshold: 90000,
                     enforce_out_of_order: false,
                     chain_family_selector: CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes(),
+                    allowed_senders: vec![],
+                    allow_list_enabled: false,
                 },
             }
         }

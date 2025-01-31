@@ -68,7 +68,14 @@ pub fn ccip_send<'info>(
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
 
+    let sender = ctx.accounts.authority.key.to_owned();
     let dest_chain = &mut ctx.accounts.dest_chain_state;
+
+    require!(
+        !dest_chain.config.allow_list_enabled
+            || dest_chain.config.allowed_senders.contains(&sender),
+        CcipRouterError::SenderNotAllowed
+    );
 
     let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
 
@@ -164,7 +171,6 @@ pub fn ccip_send<'info>(
     );
     dest_chain.state.sequence_number = overflow_add.unwrap();
 
-    let sender = ctx.accounts.authority.key.to_owned();
     let receiver = message.receiver.clone();
     let source_chain_selector = config.svm_chain_selector;
     let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;

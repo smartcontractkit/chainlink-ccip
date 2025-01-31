@@ -3,7 +3,7 @@ use anchor_spl::token_interface;
 
 use crate::context::RemoveBillingTokenConfig;
 use crate::events::admin as events;
-use crate::seed;
+use crate::{seed, DisableDestChainSelectorConfig};
 use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
     DestChainConfig, DestChainState, Ocr3ConfigInfo, OcrPluginType, SetOcrConfig,
@@ -106,7 +106,7 @@ pub fn disable_source_chain_selector(
 }
 
 pub fn disable_dest_chain_selector(
-    ctx: Context<UpdateDestChainSelectorConfig>,
+    ctx: Context<DisableDestChainSelectorConfig>,
     dest_chain_selector: u64,
 ) -> Result<()> {
     let chain_state = &mut ctx.accounts.dest_chain_state;

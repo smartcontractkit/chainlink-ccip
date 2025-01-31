@@ -186,7 +186,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for disabling the chain selector.
     /// * `dest_chain_selector` - The destination chain selector to be disabled.
     pub fn disable_dest_chain_selector(
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<DisableDestChainSelectorConfig>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         v1::admin::disable_dest_chain_selector(ctx, dest_chain_selector)
@@ -710,4 +710,6 @@ pub enum CcipRouterError {
     InvalidTokenReceiver,
     #[msg("Invalid SVM address")]
     InvalidSVMAddress,
+    #[msg("Sender not allowed for that destination chain")]
+    SenderNotAllowed,
 }
