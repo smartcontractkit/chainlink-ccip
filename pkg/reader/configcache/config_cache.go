@@ -101,14 +101,6 @@ func (c *configCache) refresh(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("batch get configs: %w", err)
 	}
-	// 	type BatchGetLatestValuesResult map[BoundContract]ContractBatchResults
-	// type ContractBatchResults []BatchReadResult
-	// type BatchReadResult struct {
-	// 	ReadName    string
-	// 	returnValue any
-	// 	err         error
-	// }
-
 	// print the batchResult
 	for contract, results := range batchResult.Results {
 		c.lggr.Infow("contract is", "contract", contract)
@@ -238,6 +230,7 @@ func (c *configCache) handleContractResults(contract types.BoundContract, result
 	case consts.ContractNameOnRamp:
 		return c.handleOnRampResults(results)
 	case consts.ContractNameOffRamp:
+		c.lggr.Infow("In handleContractResults")
 		return c.handleOffRampResults(results)
 	case consts.ContractNameRMNRemote:
 		return c.handleRMNRemoteResults(results)
@@ -284,25 +277,31 @@ func (c *configCache) handleOffRampResults(results []types.BatchReadResult) erro
 		if err != nil {
 			return fmt.Errorf("get offramp result %d: %w", i, err)
 		}
+		c.lggr.Infow("val is", "val", val)
 		switch i {
 		case 0:
 			if typed, ok := val.(*cciptypes.OCRConfigResponse); ok {
+				c.lggr.Infow("typed is", "typed", typed)
 				c.commitLatestOCRConfig = *typed
 			}
 		case 1:
 			if typed, ok := val.(*cciptypes.OCRConfigResponse); ok {
+				c.lggr.Infow("typed is", "typed", typed)
 				c.execLatestOCRConfig = *typed
 			}
 		case 2:
 			if typed, ok := val.(*cciptypes.OffRampStaticChainConfig); ok {
+				c.lggr.Infow("typed is", "typed", typed)
 				c.offrampStaticConfig = *typed
 			}
 		case 3:
 			if typed, ok := val.(*cciptypes.OffRampDynamicChainConfig); ok {
+				c.lggr.Infow("typed is", "typed", typed)
 				c.offrampDynamicConfig = *typed
 			}
 		case 4:
 			if typed, ok := val.(*cciptypes.SelectorsAndConfigs); ok {
+				c.lggr.Infow("typed is", "typed", typed)
 				c.offrampAllChains = *typed
 			}
 		}
