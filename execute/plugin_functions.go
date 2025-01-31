@@ -622,10 +622,6 @@ func getConsensusObservation(
 	F int,
 	destChain cciptypes.ChainSelector,
 ) (exectypes.Observation, error) {
-	if len(aos) < F {
-		return exectypes.Observation{}, fmt.Errorf("below F threshold")
-	}
-
 	observedFChains := make(map[cciptypes.ChainSelector][]int)
 	for _, ao := range aos {
 		obs := ao.Observation

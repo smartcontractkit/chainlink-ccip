@@ -748,7 +748,6 @@ func Test_getConsensusObservation(t *testing.T) {
 		want    exectypes.Observation
 		wantErr assert.ErrorAssertionFunc
 	}{
-
 		{
 			name: "empty",
 			args: args{
@@ -780,6 +779,50 @@ func Test_getConsensusObservation(t *testing.T) {
 					},
 				},
 			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "consensus when exactly f+1",
+			args: args{
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+				},
+			},
+			want: exectypes.Observation{
+				Nonces: exectypes.NonceObservations{
+					1: {
+						"0x1": 1,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "no consensus when less than f+1",
+			args: args{
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+				},
+			},
+			want:    exectypes.Observation{},
 			wantErr: assert.NoError,
 		},
 		{
