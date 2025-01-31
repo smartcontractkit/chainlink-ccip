@@ -254,6 +254,26 @@ var (
 	// * `ctx` - The context containing the accounts required for removing the billing token configuration.
 	Instruction_RemoveBillingTokenConfig = ag_binary.TypeID([8]byte{0, 194, 92, 161, 29, 8, 10, 91})
 
+	// Adds a number of new authorized offramps, which may call
+	// `ccip_receive` methods on user contracts.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the acounts required for the operation.
+	// * `new_offramps` - Vector of unique offramp contract addresses. None of them
+	// may already be registered as authorized offramps.
+	Instruction_RegisterAuthorizedOfframps = ag_binary.TypeID([8]byte{46, 163, 65, 10, 163, 91, 229, 72})
+
+	// Removes a number of new authorized offramps, which may call
+	// `ccip_receive` methods on user contracts.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the acounts required for the operation.
+	// * `offramps_to_decommission` - Vector of offramp contract addresses. They
+	// must all be registered as authorized offramps.
+	Instruction_DecommissionAuthorizedOfframps = ag_binary.TypeID([8]byte{53, 207, 12, 152, 229, 198, 43, 95})
+
 	// Calculates the fee for sending a message to the destination chain.
 	//
 	// # Arguments
@@ -411,6 +431,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateBillingTokenConfig"
 	case Instruction_RemoveBillingTokenConfig:
 		return "RemoveBillingTokenConfig"
+	case Instruction_RegisterAuthorizedOfframps:
+		return "RegisterAuthorizedOfframps"
+	case Instruction_DecommissionAuthorizedOfframps:
+		return "DecommissionAuthorizedOfframps"
 	case Instruction_GetFee:
 		return "GetFee"
 	case Instruction_WithdrawBilledFunds:
@@ -505,6 +529,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"remove_billing_token_config", (*RemoveBillingTokenConfig)(nil),
+		},
+		{
+			"register_authorized_offramps", (*RegisterAuthorizedOfframps)(nil),
+		},
+		{
+			"decommission_authorized_offramps", (*DecommissionAuthorizedOfframps)(nil),
 		},
 		{
 			"get_fee", (*GetFee)(nil),

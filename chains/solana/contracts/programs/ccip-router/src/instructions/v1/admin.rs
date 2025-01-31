@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
-use crate::seed;
+use crate::{
+    seed, AuthorizedOfframpsModified, DecommissionAuthorizedOfframps, RegisterAuthorizedOfframps,
+};
 use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
     DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
@@ -58,7 +60,7 @@ pub fn add_chain_selector(
 ) -> Result<()> {
     // Set source chain config & state
     let source_chain_state = &mut ctx.accounts.source_chain_state;
-    validate_source_chain_config(new_chain_selector, &source_chain_config)?;
+    helpers::validate_source_chain_config(new_chain_selector, &source_chain_config)?;
     source_chain_state.version = 1;
     source_chain_state.chain_selector = new_chain_selector;
     source_chain_state.config = source_chain_config.clone();
@@ -66,7 +68,7 @@ pub fn add_chain_selector(
 
     // Set dest chain config & state
     let dest_chain_state = &mut ctx.accounts.dest_chain_state;
-    validate_dest_chain_config(new_chain_selector, &dest_chain_config)?;
+    helpers::validate_dest_chain_config(new_chain_selector, &dest_chain_config)?;
     dest_chain_state.version = 1;
     dest_chain_state.chain_selector = new_chain_selector;
     dest_chain_state.config = dest_chain_config.clone();
@@ -127,7 +129,7 @@ pub fn update_source_chain_config(
     source_chain_selector: u64,
     source_chain_config: SourceChainConfig,
 ) -> Result<()> {
-    validate_source_chain_config(source_chain_selector, &source_chain_config)?;
+    helpers::validate_source_chain_config(source_chain_selector, &source_chain_config)?;
 
     ctx.accounts.source_chain_state.config = source_chain_config.clone();
 
@@ -143,7 +145,7 @@ pub fn update_dest_chain_config(
     dest_chain_selector: u64,
     dest_chain_config: DestChainConfig,
 ) -> Result<()> {
-    validate_dest_chain_config(dest_chain_selector, &dest_chain_config)?;
+    helpers::validate_dest_chain_config(dest_chain_selector, &dest_chain_config)?;
 
     ctx.accounts.dest_chain_state.config = dest_chain_config.clone();
 
@@ -317,33 +319,84 @@ pub fn withdraw_billed_funds(
     )
 }
 
-/////////////
-// Helpers //
-/////////////
-
-fn validate_source_chain_config(
-    _source_chain_selector: u64,
-    _config: &SourceChainConfig,
+pub fn register_authorized_offramps(
+    ctx: Context<RegisterAuthorizedOfframps>,
+    mut new_offramps: Vec<Pubkey>,
 ) -> Result<()> {
-    // As of now, the config has very few properties and there is nothing to validate yet.
-    // This is a placeholder to add validations as that config object grows.
+    // Remove duplicates to ensure there aren't redundant entries in the list
+    new_offramps.sort();
+    new_offramps.dedup();
+
+    let authorized_offramps = &mut ctx.accounts.authorized_offramps.offramps;
+    require!(
+        !new_offramps.iter().any(|o| authorized_offramps.contains(o)),
+        CcipRouterError::OfframpAlreadyRegistered
+    );
+
+    let old_offramps = authorized_offramps.clone();
+    authorized_offramps.extend_from_slice(&new_offramps);
+
+    emit!(AuthorizedOfframpsModified {
+        old_offramps,
+        new_offramps: authorized_offramps.clone()
+    });
+
     Ok(())
 }
 
-fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig) -> Result<()> {
-    // TODO improve errors
-    require!(dest_chain_selector != 0, CcipRouterError::InvalidInputs);
+pub fn decommission_authorized_offramps(
+    ctx: Context<DecommissionAuthorizedOfframps>,
+    offramps_to_decommission: Vec<Pubkey>,
+) -> Result<()> {
+    let authorized_offramps = &mut ctx.accounts.authorized_offramps.offramps;
     require!(
-        config.default_tx_gas_limit != 0,
-        CcipRouterError::InvalidInputs
+        offramps_to_decommission
+            .iter()
+            .all(|o| authorized_offramps.contains(o)),
+        CcipRouterError::OfframpWasNotRegistered
     );
-    require!(
-        config.default_tx_gas_limit <= config.max_per_msg_gas_limit,
-        CcipRouterError::InvalidInputs
-    );
-    require!(
-        config.chain_family_selector != [0; 4],
-        CcipRouterError::InvalidInputs
-    );
+
+    let old_offramps = authorized_offramps.clone();
+    authorized_offramps.retain(|o| !offramps_to_decommission.contains(o));
+
+    emit!(AuthorizedOfframpsModified {
+        old_offramps,
+        new_offramps: authorized_offramps.clone()
+    });
+
     Ok(())
+}
+
+mod helpers {
+    use super::*;
+
+    pub fn validate_source_chain_config(
+        _source_chain_selector: u64,
+        _config: &SourceChainConfig,
+    ) -> Result<()> {
+        // As of now, the config has very few properties and there is nothing to validate yet.
+        // This is a placeholder to add validations as that config object grows.
+        Ok(())
+    }
+
+    pub fn validate_dest_chain_config(
+        dest_chain_selector: u64,
+        config: &DestChainConfig,
+    ) -> Result<()> {
+        // TODO improve errors
+        require!(dest_chain_selector != 0, CcipRouterError::InvalidInputs);
+        require!(
+            config.default_tx_gas_limit != 0,
+            CcipRouterError::InvalidInputs
+        );
+        require!(
+            config.default_tx_gas_limit <= config.max_per_msg_gas_limit,
+            CcipRouterError::InvalidInputs
+        );
+        require!(
+            config.chain_family_selector != [0; 4],
+            CcipRouterError::InvalidInputs
+        );
+        Ok(())
+    }
 }

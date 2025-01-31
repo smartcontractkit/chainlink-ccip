@@ -390,6 +390,7 @@ func TestCCIPRouter(t *testing.T) {
 				defaultMaxFeeJuelsPerMsg,
 				config.RouterConfigPDA,
 				config.RouterStatePDA,
+				config.RouterAuthorizedOfframpsPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
 				config.CcipRouterProgram,

@@ -9,7 +9,9 @@ import (
 func FindConfigPDA(ccipRouterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
 	return solana.FindProgramAddress([][]byte{[]byte("config")}, ccipRouterProgram)
 }
-
+func FindAuthorizedOfframpsPDA(ccipRouterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("authorized_offramps")}, ccipRouterProgram)
+}
 func FindStatePDA(ccipRouterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
 	return solana.FindProgramAddress([][]byte{[]byte("state")}, ccipRouterProgram)
 }

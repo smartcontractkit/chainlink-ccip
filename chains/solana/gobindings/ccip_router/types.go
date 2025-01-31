@@ -1671,6 +1671,8 @@ const (
 	InvalidChainFamilySelector_CcipRouterError
 	InvalidTokenReceiver_CcipRouterError
 	InvalidSVMAddress_CcipRouterError
+	OfframpAlreadyRegistered_CcipRouterError
+	OfframpWasNotRegistered_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1767,6 +1769,10 @@ func (value CcipRouterError) String() string {
 		return "InvalidTokenReceiver"
 	case InvalidSVMAddress_CcipRouterError:
 		return "InvalidSVMAddress"
+	case OfframpAlreadyRegistered_CcipRouterError:
+		return "OfframpAlreadyRegistered"
+	case OfframpWasNotRegistered_CcipRouterError:
+		return "OfframpWasNotRegistered"
 	default:
 		return ""
 	}

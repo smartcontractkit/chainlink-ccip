@@ -21,6 +21,7 @@ var (
 
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	RouterStatePDA, _, _                     = state.FindStatePDA(CcipRouterProgram)
+	RouterAuthorizedOfframpsPDA, _, _        = state.FindAuthorizedOfframpsPDA(CcipRouterProgram)
 	ExternalExecutionConfigPDA, _, _         = state.FindExternalExecutionConfigPDA(CcipRouterProgram)
 	ExternalTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipRouterProgram)
 	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipLogicReceiver)

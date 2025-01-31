@@ -171,6 +171,48 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	return nil
 }
 
+type AuthorizedOfframps struct {
+	Offramps []ag_solanago.PublicKey
+}
+
+var AuthorizedOfframpsDiscriminator = [8]byte{111, 248, 162, 2, 17, 147, 190, 179}
+
+func (obj AuthorizedOfframps) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(AuthorizedOfframpsDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Offramps` param:
+	err = encoder.Encode(obj.Offramps)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AuthorizedOfframps) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(AuthorizedOfframpsDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[111 248 162 2 17 147 190 179]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Offramps`:
+	err = decoder.Decode(&obj.Offramps)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type GlobalState struct {
 	LatestPriceSequenceNumber uint64
 }

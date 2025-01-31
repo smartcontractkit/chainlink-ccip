@@ -81,6 +81,12 @@ pub struct FeeTokenRemoved {
 }
 
 #[event]
+pub struct AuthorizedOfframpsModified {
+    pub old_offramps: Vec<Pubkey>,
+    pub new_offramps: Vec<Pubkey>,
+}
+
+#[event]
 pub struct UsdPerUnitGasUpdated {
     pub dest_chain: u64,
     pub value: [u8; 28], // EVM uses u256 here

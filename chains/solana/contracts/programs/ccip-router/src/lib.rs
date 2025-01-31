@@ -408,6 +408,36 @@ pub mod ccip_router {
         v1::admin::remove_billing_token_config(ctx)
     }
 
+    /// Adds a number of new authorized offramps, which may call
+    /// `ccip_receive` methods on user contracts.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the acounts required for the operation.
+    /// * `new_offramps` - Vector of unique offramp contract addresses. None of them
+    ///    may already be registered as authorized offramps.
+    pub fn register_authorized_offramps(
+        ctx: Context<RegisterAuthorizedOfframps>,
+        new_offramps: Vec<Pubkey>,
+    ) -> Result<()> {
+        v1::admin::register_authorized_offramps(ctx, new_offramps)
+    }
+
+    /// Removes a number of new authorized offramps, which may call
+    /// `ccip_receive` methods on user contracts.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the acounts required for the operation.
+    /// * `offramps_to_decommission` - Vector of offramp contract addresses. They
+    ///    must all be registered as authorized offramps.
+    pub fn decommission_authorized_offramps(
+        ctx: Context<DecommissionAuthorizedOfframps>,
+        offramps_to_decommission: Vec<Pubkey>,
+    ) -> Result<()> {
+        v1::admin::decommission_authorized_offramps(ctx, offramps_to_decommission)
+    }
+
     /// Calculates the fee for sending a message to the destination chain.
     ///
     /// # Arguments
@@ -660,4 +690,8 @@ pub enum CcipRouterError {
     InvalidTokenReceiver,
     #[msg("Invalid SVM address")]
     InvalidSVMAddress,
+    #[msg("Offramp was already registered")]
+    OfframpAlreadyRegistered,
+    #[msg("Offramp was not registered")]
+    OfframpWasNotRegistered,
 }

@@ -21,6 +21,19 @@ pub struct Config {
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
 
+#[account]
+#[derive(InitSpace, Default)]
+pub struct AuthorizedOfframps {
+    #[max_len(0)]
+    pub offramps: Vec<Pubkey>,
+}
+
+impl AuthorizedOfframps {
+    pub fn dynamic_space(&self) -> usize {
+        self.offramps.len() * std::mem::size_of::<Pubkey>()
+    }
+}
+
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
 pub struct Ocr3ConfigInfo {
