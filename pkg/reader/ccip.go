@@ -87,6 +87,40 @@ func (r *ccipChainReader) WithExtendedContractReader(
 	return r
 }
 
+// ---------------------------------------------------
+// The following types are used to decode the events
+// but should be replaced by chain-reader modifiers and use the base cciptypes.CommitReport type.
+
+type MerkleRoot struct {
+	SourceChainSelector uint64
+	OnRampAddress       cciptypes.UnknownAddress
+	MinSeqNr            uint64
+	MaxSeqNr            uint64
+	MerkleRoot          cciptypes.Bytes32
+}
+
+type TokenPriceUpdate struct {
+	SourceToken cciptypes.UnknownAddress
+	UsdPerToken *big.Int
+}
+
+type GasPriceUpdate struct {
+	DestChainSelector uint64
+	UsdPerUnitGas     *big.Int
+}
+
+type PriceUpdates struct {
+	TokenPriceUpdates []TokenPriceUpdate
+	GasPriceUpdates   []GasPriceUpdate
+}
+
+type CommitReportAcceptedEvent struct {
+	MerkleRoots  []MerkleRoot
+	PriceUpdates PriceUpdates
+}
+
+// ---------------------------------------------------
+
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, ts time.Time, limit int,
 ) ([]plugintypes2.CommitPluginReportWithMeta, error) {
@@ -95,39 +129,6 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
-
-	// ---------------------------------------------------
-	// The following types are used to decode the events
-	// but should be replaced by chain-reader modifiers and use the base cciptypes.CommitReport type.
-
-	type MerkleRoot struct {
-		SourceChainSelector uint64
-		OnRampAddress       cciptypes.UnknownAddress
-		MinSeqNr            uint64
-		MaxSeqNr            uint64
-		MerkleRoot          cciptypes.Bytes32
-	}
-
-	type TokenPriceUpdate struct {
-		SourceToken cciptypes.UnknownAddress
-		UsdPerToken *big.Int
-	}
-
-	type GasPriceUpdate struct {
-		DestChainSelector uint64
-		UsdPerUnitGas     *big.Int
-	}
-
-	type PriceUpdates struct {
-		TokenPriceUpdates []TokenPriceUpdate
-		GasPriceUpdates   []GasPriceUpdate
-	}
-
-	type CommitReportAcceptedEvent struct {
-		MerkleRoots  []MerkleRoot
-		PriceUpdates PriceUpdates
-	}
-	// ---------------------------------------------------
 
 	ev := CommitReportAcceptedEvent{}
 
@@ -159,9 +160,10 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		ev, is := (item.Data).(*CommitReportAcceptedEvent)
-		if !is {
-			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
+		ev, err := validateCommitReportAcceptedEvent(item, ts)
+		if err != nil {
+			lggr.Errorw("validate commit report accepted event", "err", err, "ev", ev)
+			continue
 		}
 
 		lggr.Debugw("processing commit report", "report", ev, "item", item)
@@ -176,6 +178,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				r.lggr.Errorw("get onRamp address for selector %d: %w", mr.SourceChainSelector, err)
 				continue
 			}
+
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
 				OnRampAddress: onRampAddress,
@@ -230,21 +233,21 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	return reports[:limit], nil
 }
 
+type ExecutionStateChangedEvent struct {
+	SourceChainSelector cciptypes.ChainSelector
+	SequenceNumber      cciptypes.SeqNum
+	MessageID           cciptypes.Bytes32
+	MessageHash         cciptypes.Bytes32
+	State               uint8
+	ReturnData          cciptypes.Bytes
+	GasUsed             big.Int
+}
+
 func (r *ccipChainReader) ExecutedMessages(
 	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.SeqNum, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
-	}
-
-	type ExecutionStateChangedEvent struct {
-		SourceChainSelector cciptypes.ChainSelector
-		SequenceNumber      cciptypes.SeqNum
-		MessageID           cciptypes.Bytes32
-		MessageHash         cciptypes.Bytes32
-		State               uint8
-		ReturnData          cciptypes.Bytes
-		GasUsed             big.Int
 	}
 
 	dataTyp := ExecutionStateChangedEvent{}
@@ -291,10 +294,23 @@ func (r *ccipChainReader) ExecutedMessages(
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
 		}
+
+		if err := validateExecutionStateChangedEvent(stateChange, seqNumRange, source); err != nil {
+			r.lggr.Errorw("validate execution state changed event",
+				"err", err, "stateChange", stateChange)
+			continue
+		}
+
 		executed = append(executed, stateChange.SequenceNumber)
 	}
 
 	return executed, nil
+}
+
+type SendRequestedEvent struct {
+	DestChainSelector cciptypes.ChainSelector
+	SequenceNumber    cciptypes.SeqNum
+	Message           cciptypes.Message
 }
 
 func (r *ccipChainReader) MsgsBetweenSeqNums(
@@ -308,12 +324,6 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, sourceChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address: %w", err)
-	}
-
-	type SendRequestedEvent struct {
-		DestChainSelector cciptypes.ChainSelector
-		SequenceNumber    cciptypes.SeqNum
-		Message           cciptypes.Message
 	}
 
 	seq, err := r.contractReaders[sourceChainSelector].ExtendedQueryKey(
@@ -367,6 +377,11 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
+		if err := validateSendRequestedEvent(msg, sourceChainSelector, r.destChain, seqNumRange); err != nil {
+			lggr.Errorw("validate send requested event", "err", err, "msg", msg)
+			continue
+		}
+
 		msg.Message.ExtraArgsDecoded, err = r.extraDataCodec.DecodeExtraArgs(msg.Message.ExtraArgs, sourceChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode the ExtraArgs: %w", err)
@@ -418,6 +433,11 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 			sourceChainSelector, r.destChain, err)
 	}
 
+	if expectedNextSequenceNumber == 0 {
+		return 0, fmt.Errorf("the returned expected next sequence num is 0, source chain: %d, dest chain: %d",
+			sourceChainSelector, r.destChain)
+	}
+
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
@@ -435,6 +455,11 @@ func (r *ccipChainReader) NextSeqNum(
 		cfg, exists := cfgs[chain]
 		if !exists {
 			lggr.Warnf("source chain config not found for chain %d, chain is skipped.", chain)
+			continue
+		}
+
+		if !cfg.IsEnabled {
+			lggr.Infof("source chain %d is disabled, chain is skipped.", chain)
 			continue
 		}
 
@@ -552,6 +577,16 @@ func (r *ccipChainReader) GetChainsFeeComponents(
 			lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
 			continue
 		}
+
+		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
+			lggr.Errorw("execution fee is nil or non positive", "chain", chain)
+			continue
+		}
+		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
+			lggr.Errorw("data availability fee is nil or negative", "chain", chain)
+			continue
+		}
+
 		feeComponents[chain] = *feeComponent
 	}
 	return feeComponents
@@ -625,6 +660,10 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 		if update == nil || update.Timestamp == 0 {
 			lggr.Warnw("no native token price available", "chain", chain)
+			continue
+		}
+		if update.Value == nil || update.Value.Cmp(big.NewInt(0)) <= 0 {
+			lggr.Errorw("native token price is nil or non-positive", "chain", chain)
 			continue
 		}
 		prices[chain] = cciptypes.NewBigInt(update.Value)
@@ -1027,6 +1066,10 @@ func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (fee
 		return feeQuoterStaticConfig{}, fmt.Errorf("unable to lookup fee quoter (offramp static config): %w", err)
 	}
 
+	if len(staticConfig.LinkToken) == 0 {
+		return feeQuoterStaticConfig{}, fmt.Errorf("link token address is empty")
+	}
+
 	return staticConfig, nil
 }
 
@@ -1093,6 +1136,11 @@ func (scc sourceChainConfig) check() (bool /* enabled */, error) {
 			scc.OnRamp,
 		)
 	}
+
+	if len(scc.Router) == 0 {
+		return false, fmt.Errorf("router is empty: %v", scc.Router)
+	}
+
 	return scc.IsEnabled, nil
 }
 
@@ -1385,6 +1433,12 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				}
 				return
 			}
+
+			if len(resp.Router) == 0 {
+				r.lggr.Errorw("router address is empty", "chain", chainSel)
+				return
+			}
+
 			mu.Lock()
 			result[chainSel] = resp
 			mu.Unlock()
@@ -1575,6 +1629,137 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 	}
 
 	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
+}
+
+func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
+	ev, is := (seq.Data).(*CommitReportAcceptedEvent)
+	if !is {
+		return nil, fmt.Errorf("unexpected type %T while expecting a commit report", seq)
+	}
+
+	if seq.Timestamp < uint64(gteTimestamp.Unix()) {
+		return nil, fmt.Errorf("commit report accepted event timestamp is less than the minimum timestamp %v<%v",
+			seq.Timestamp, gteTimestamp.Unix())
+	}
+
+	if err := validateMerkleRoots(ev.MerkleRoots); err != nil {
+		return nil, fmt.Errorf("merkle roots: %w", err)
+	}
+
+	for _, tpus := range ev.PriceUpdates.TokenPriceUpdates {
+		if len(tpus.SourceToken) == 0 {
+			return nil, fmt.Errorf("empty source token")
+		}
+		if tpus.UsdPerToken == nil || tpus.UsdPerToken.Cmp(big.NewInt(0)) <= 0 {
+			return nil, fmt.Errorf("nil or non-positive usd per token")
+		}
+	}
+
+	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
+		if gpus.DestChainSelector == 0 {
+			return nil, fmt.Errorf("dest chain is zero")
+		}
+		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
+			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
+		}
+	}
+
+	return ev, nil
+}
+
+func validateMerkleRoots(merkleRoots []MerkleRoot) error {
+	for _, mr := range merkleRoots {
+		if mr.SourceChainSelector == 0 {
+			return fmt.Errorf("source chain is zero")
+		}
+		if mr.MinSeqNr == 0 {
+			return fmt.Errorf("minSeqNr is zero")
+		}
+		if mr.MaxSeqNr == 0 {
+			return fmt.Errorf("maxSeqNr is zero")
+		}
+		if mr.MinSeqNr > mr.MaxSeqNr {
+			return fmt.Errorf("minSeqNr is greater than maxSeqNr")
+		}
+		if mr.MerkleRoot.IsEmpty() {
+			return fmt.Errorf("empty merkle root")
+		}
+		if len(mr.OnRampAddress) == 0 {
+			return fmt.Errorf("empty onramp address")
+		}
+	}
+
+	return nil
+}
+
+func validateExecutionStateChangedEvent(
+	ev *ExecutionStateChangedEvent, expRange cciptypes.SeqNumRange, sourceChain cciptypes.ChainSelector) error {
+	if ev == nil {
+		return fmt.Errorf("execution state changed event is nil")
+	}
+
+	if ev.SequenceNumber < expRange.Start() || ev.SequenceNumber > expRange.End() {
+		return fmt.Errorf("execution state changed event sequence number is not in the expected range")
+	}
+
+	if ev.SourceChainSelector != sourceChain {
+		return fmt.Errorf("source chain is not the expected queried one")
+	}
+
+	if ev.MessageHash.IsEmpty() {
+		return fmt.Errorf("nil message hash")
+	}
+
+	if ev.MessageID.IsEmpty() {
+		return fmt.Errorf("message ID is zero")
+	}
+
+	if ev.State == 0 {
+		return fmt.Errorf("state is zero")
+	}
+
+	return nil
+}
+
+func validateSendRequestedEvent(
+	ev *SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) error {
+	if ev == nil {
+		return fmt.Errorf("send requested event is nil")
+	}
+
+	if ev.DestChainSelector != dest {
+		return fmt.Errorf("dest chain is not the expected queried one")
+	}
+
+	if ev.Message.Header.SourceChainSelector != source {
+		return fmt.Errorf("source chain is not the expected queried one")
+	}
+
+	if ev.SequenceNumber < seqNumRange.Start() || ev.SequenceNumber > seqNumRange.End() {
+		return fmt.Errorf("send requested event sequence number is not in the expected range")
+	}
+
+	if ev.Message.Header.MessageID.IsEmpty() {
+		return fmt.Errorf("message ID is zero")
+	}
+
+	if len(ev.Message.Receiver) == 0 {
+		return fmt.Errorf("empty receiver address")
+	}
+
+	if len(ev.Message.Sender) == 0 {
+		return fmt.Errorf("empty sender address")
+	}
+
+	if ev.Message.FeeTokenAmount.IsEmpty() {
+		return fmt.Errorf("fee token amount is zero")
+	}
+
+	if len(ev.Message.FeeToken) == 0 {
+		return fmt.Errorf("empty fee token")
+	}
+
+	return nil
 }
 
 // Interface compliance check
