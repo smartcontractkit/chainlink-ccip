@@ -2940,6 +2940,9 @@
             "name": "InvalidTokenAdminRegistryInputsZeroAddress"
           },
           {
+            "name": "InvalidTokenAdminRegistryProposedAdmin"
+          },
+          {
             "name": "InvalidWritabilityBitmap"
           }
         ]

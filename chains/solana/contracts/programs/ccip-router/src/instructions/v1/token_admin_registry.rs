@@ -38,6 +38,13 @@ pub fn ccip_admin_override_pending_administrator(
     token_admin_registry_admin: Pubkey,
 ) -> Result<()> {
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+    require_eq!(
+        token_admin_registry.administrator,
+        Pubkey::new_from_array([0; 32]),
+        CcipRouterError::InvalidTokenAdminRegistryProposedAdmin
+    );
+
     token_admin_registry.pending_administrator = token_admin_registry_admin;
 
     Ok(())
@@ -62,6 +69,13 @@ pub fn owner_override_pending_administrator(
     token_admin_registry_admin: Pubkey,
 ) -> Result<()> {
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+    require_eq!(
+        token_admin_registry.administrator,
+        Pubkey::new_from_array([0; 32]),
+        CcipRouterError::InvalidTokenAdminRegistryProposedAdmin
+    );
+
     token_admin_registry.pending_administrator = token_admin_registry_admin;
 
     Ok(())

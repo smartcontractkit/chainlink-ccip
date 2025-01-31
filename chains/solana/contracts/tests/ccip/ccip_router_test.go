@@ -1574,6 +1574,20 @@ func TestCCIPRouter(t *testing.T) {
 				})
 			})
 
+			t.Run("when admin is set, proposing a new one fails", func(t *testing.T) {
+				instruction, err := ccip_router.NewCcipAdminOverridePendingAdministratorInstruction(
+					token0PoolAdmin.PublicKey(),
+					config.RouterConfigPDA,
+					token0.AdminRegistryPDA,
+					token0.Mint.PublicKey(),
+					ccipAdmin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.InvalidTokenAdminRegistryProposedAdmin_CcipRouterError.String()})
+			})
+
 			t.Run("set pool", func(t *testing.T) {
 				t.Run("When any user wants to set up the pool, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
@@ -1920,6 +1934,20 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
 				})
+			})
+
+			t.Run("when admin is set, proposing a new one fails", func(t *testing.T) {
+				instruction, err := ccip_router.NewOwnerOverridePendingAdministratorInstruction(
+					token1PoolAdmin.PublicKey(),
+					config.RouterConfigPDA,
+					token1.AdminRegistryPDA,
+					token1.Mint.PublicKey(),
+					token1PoolAdmin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment, []string{ccip_router.InvalidTokenAdminRegistryProposedAdmin_CcipRouterError.String()})
 			})
 
 			t.Run("set pool", func(t *testing.T) {

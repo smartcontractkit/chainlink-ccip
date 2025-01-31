@@ -737,6 +737,8 @@ pub enum CcipRouterError {
     ExtraArgOutOfOrderExecutionMustBeTrue,
     #[msg("New Admin can not be zero address")]
     InvalidTokenAdminRegistryInputsZeroAddress,
+    #[msg("An already owned registry can not be proposed")]
+    InvalidTokenAdminRegistryProposedAdmin,
     #[msg("Invalid writability bitmap")]
     InvalidWritabilityBitmap,
 }

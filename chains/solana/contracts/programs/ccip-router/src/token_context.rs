@@ -109,7 +109,6 @@ pub struct OverridePendingTokenAdminRegistryByOwner<'info> {
     #[account(
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
