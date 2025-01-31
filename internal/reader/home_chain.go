@@ -143,6 +143,11 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
 		}
 
+		validCfgInfos := getValidChainConfigInfos(r.lggr, chainConfigInfos)
+
+		if len(validCfgInfos) == 0 {
+			continue
+		}
 		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
 
 		if uint64(len(chainConfigInfos)) < defaultConfigPageSize {
@@ -332,6 +337,37 @@ func convertOnChainConfigToHomeChainConfig(
 		}
 	}
 	return chainConfigs
+}
+
+func validateChainConfigInfos(chainConfigInfo ChainConfigInfo) error {
+	if chainConfigInfo.ChainSelector == 0 {
+		return errors.New("chain selector is 0")
+	}
+	if chainConfigInfo.ChainConfig.FChain == 0 {
+		return errors.New("fChain is 0")
+	}
+
+	if len(chainConfigInfo.ChainConfig.Readers) == 0 {
+		return errors.New("readers is empty")
+	}
+
+	if len(chainConfigInfo.ChainConfig.Config) == 0 {
+		return errors.New("config is empty")
+	}
+
+	return nil
+}
+
+func getValidChainConfigInfos(lggr logger.Logger, chainConfigInfos []ChainConfigInfo) []ChainConfigInfo {
+	validChainConfigInfos := make([]ChainConfigInfo, 0)
+	for _, chainConfigInfo := range chainConfigInfos {
+		if err := validateChainConfigInfos(chainConfigInfo); err != nil {
+			lggr.Warnw("invalid chain config info", "err", err)
+			continue
+		}
+		validChainConfigInfos = append(validChainConfigInfos, chainConfigInfo)
+	}
+	return validChainConfigInfos
 }
 
 // HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make
