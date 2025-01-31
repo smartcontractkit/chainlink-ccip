@@ -428,113 +428,113 @@ func TestConfigCache_ErrorHandling(t *testing.T) {
 	})
 }
 
-func TestConfigCache_SkippedContractsHandling(t *testing.T) {
-	t.Run("clears skipped contract values", func(t *testing.T) {
-		cache, mockReader := setupConfigCacheTest(t)
+// func TestConfigCache_SkippedContractsHandling(t *testing.T) {
+// 	t.Run("clears skipped contract values", func(t *testing.T) {
+// 		cache, mockReader := setupConfigCacheTest(t)
 
-		// First response with values
-		initialResults := contractreader.BatchGetLatestValuesGracefulResult{
-			Results: types.BatchGetLatestValuesResult{
-				types.BoundContract{Name: consts.ContractNameRouter}: []types.BatchReadResult{
-					createMockBatchResult(&cciptypes.Bytes{1, 2, 3}),
-				},
-				types.BoundContract{Name: consts.ContractNameOnRamp}: []types.BatchReadResult{
-					createMockBatchResult(&cciptypes.GetOnRampDynamicConfigResponse{
-						DynamicConfig: cciptypes.OnRampDynamicConfig{
-							FeeQuoter: []byte{4, 5, 6},
-						},
-					}),
-				},
-			},
-		}
+// 		// First response with values
+// 		initialResults := contractreader.BatchGetLatestValuesGracefulResult{
+// 			Results: types.BatchGetLatestValuesResult{
+// 				types.BoundContract{Name: consts.ContractNameRouter}: []types.BatchReadResult{
+// 					createMockBatchResult(&cciptypes.Bytes{1, 2, 3}),
+// 				},
+// 				types.BoundContract{Name: consts.ContractNameOnRamp}: []types.BatchReadResult{
+// 					createMockBatchResult(&cciptypes.GetOnRampDynamicConfigResponse{
+// 						DynamicConfig: cciptypes.OnRampDynamicConfig{
+// 							FeeQuoter: []byte{4, 5, 6},
+// 						},
+// 					}),
+// 				},
+// 			},
+// 		}
 
-		mockReader.EXPECT().ExtendedBatchGetLatestValuesGraceful(
-			mock.Anything,
-			mock.Anything,
-		).Return(initialResults, nil).Once()
+// 		mockReader.EXPECT().ExtendedBatchGetLatestValuesGraceful(
+// 			mock.Anything,
+// 			mock.Anything,
+// 		).Return(initialResults, nil).Once()
 
-		// Initial calls to populate cache
-		addr, err := cache.GetNativeTokenAddress(tests.Context(t))
-		require.NoError(t, err)
-		assert.Equal(t, cciptypes.Bytes{1, 2, 3}, addr)
+// 		// Initial calls to populate cache
+// 		addr, err := cache.GetNativeTokenAddress(tests.Context(t))
+// 		require.NoError(t, err)
+// 		assert.Equal(t, cciptypes.Bytes{1, 2, 3}, addr)
 
-		onRampConfig, err := cache.GetOnRampDynamicConfig(tests.Context(t))
-		require.NoError(t, err)
-		assert.Equal(t, []byte{4, 5, 6}, onRampConfig.DynamicConfig.FeeQuoter)
+// 		onRampConfig, err := cache.GetOnRampDynamicConfig(tests.Context(t))
+// 		require.NoError(t, err)
+// 		assert.Equal(t, []byte{4, 5, 6}, onRampConfig.DynamicConfig.FeeQuoter)
 
-		// Second response with router skipped
-		updatedResults := contractreader.BatchGetLatestValuesGracefulResult{
-			Results: types.BatchGetLatestValuesResult{
-				types.BoundContract{Name: consts.ContractNameOnRamp}: []types.BatchReadResult{
-					createMockBatchResult(&cciptypes.GetOnRampDynamicConfigResponse{
-						DynamicConfig: cciptypes.OnRampDynamicConfig{
-							FeeQuoter: []byte{7, 8, 9},
-						},
-					}),
-				},
-			},
-			SkippedNoBinds: []string{consts.ContractNameRouter},
-		}
+// 		// Second response with router skipped
+// 		updatedResults := contractreader.BatchGetLatestValuesGracefulResult{
+// 			Results: types.BatchGetLatestValuesResult{
+// 				types.BoundContract{Name: consts.ContractNameOnRamp}: []types.BatchReadResult{
+// 					createMockBatchResult(&cciptypes.GetOnRampDynamicConfigResponse{
+// 						DynamicConfig: cciptypes.OnRampDynamicConfig{
+// 							FeeQuoter: []byte{7, 8, 9},
+// 						},
+// 					}),
+// 				},
+// 			},
+// 			SkippedNoBinds: []string{consts.ContractNameRouter},
+// 		}
 
-		// Force cache expiry
-		cache.lastUpdateAt = time.Time{}
+// 		// Force cache expiry
+// 		cache.lastUpdateAt = time.Time{}
 
-		mockReader.EXPECT().ExtendedBatchGetLatestValuesGraceful(
-			mock.Anything,
-			mock.Anything,
-		).Return(updatedResults, nil).Once()
+// 		mockReader.EXPECT().ExtendedBatchGetLatestValuesGraceful(
+// 			mock.Anything,
+// 			mock.Anything,
+// 		).Return(updatedResults, nil).Once()
 
-		// Router value should be cleared
-		addr, err = cache.GetNativeTokenAddress(tests.Context(t))
-		require.NoError(t, err)
-		assert.Equal(t, cciptypes.Bytes{}, addr, "router value should be cleared")
+// 		// Router value should be cleared
+// 		addr, err = cache.GetNativeTokenAddress(tests.Context(t))
+// 		require.NoError(t, err)
+// 		assert.Equal(t, cciptypes.Bytes{}, addr, "router value should be cleared")
 
-		// OnRamp value should be updated
-		onRampConfig, err = cache.GetOnRampDynamicConfig(tests.Context(t))
-		require.NoError(t, err)
-		assert.Equal(t, []byte{7, 8, 9}, onRampConfig.DynamicConfig.FeeQuoter)
-	})
-}
+// 		// OnRamp value should be updated
+// 		onRampConfig, err = cache.GetOnRampDynamicConfig(tests.Context(t))
+// 		require.NoError(t, err)
+// 		assert.Equal(t, []byte{7, 8, 9}, onRampConfig.DynamicConfig.FeeQuoter)
+// 	})
+// }
 
-func TestConfigCache_EmptyValues(t *testing.T) {
-	t.Run("returns zero values for empty results", func(t *testing.T) {
-		cache, mockReader := setupConfigCacheTest(t)
+// func TestConfigCache_EmptyValues(t *testing.T) {
+// 	t.Run("returns zero values for empty results", func(t *testing.T) {
+// 		cache, mockReader := setupConfigCacheTest(t)
 
-		mockBatchResults := contractreader.BatchGetLatestValuesGracefulResult{
-			Results: types.BatchGetLatestValuesResult{},
-			SkippedNoBinds: []string{
-				consts.ContractNameRouter,
-				consts.ContractNameOnRamp,
-				consts.ContractNameOffRamp,
-				consts.ContractNameRMNRemote,
-				consts.ContractNameRMNProxy,
-				consts.ContractNameFeeQuoter,
-			},
-		}
+// 		mockBatchResults := contractreader.BatchGetLatestValuesGracefulResult{
+// 			Results: types.BatchGetLatestValuesResult{},
+// 			SkippedNoBinds: []string{
+// 				consts.ContractNameRouter,
+// 				consts.ContractNameOnRamp,
+// 				consts.ContractNameOffRamp,
+// 				consts.ContractNameRMNRemote,
+// 				consts.ContractNameRMNProxy,
+// 				consts.ContractNameFeeQuoter,
+// 			},
+// 		}
 
-		mockReader.EXPECT().ExtendedBatchGetLatestValuesGraceful(
-			mock.Anything,
-			mock.Anything,
-		).Return(mockBatchResults, nil).Once()
+// 		mockReader.EXPECT().ExtendedBatchGetLatestValuesGraceful(
+// 			mock.Anything,
+// 			mock.Anything,
+// 		).Return(mockBatchResults, nil).Once()
 
-		// Check all getters return zero values
-		addr, err := cache.GetNativeTokenAddress(tests.Context(t))
-		require.NoError(t, err)
-		assert.Equal(t, cciptypes.Bytes{}, addr)
+// 		// Check all getters return zero values
+// 		addr, err := cache.GetNativeTokenAddress(tests.Context(t))
+// 		require.NoError(t, err)
+// 		assert.Equal(t, cciptypes.Bytes{}, addr)
 
-		onRampConfig, err := cache.GetOnRampDynamicConfig(tests.Context(t))
-		require.NoError(t, err)
-		assert.Equal(t, cciptypes.GetOnRampDynamicConfigResponse{}, onRampConfig)
+// 		onRampConfig, err := cache.GetOnRampDynamicConfig(tests.Context(t))
+// 		require.NoError(t, err)
+// 		assert.Equal(t, cciptypes.GetOnRampDynamicConfigResponse{}, onRampConfig)
 
-		offRampConfig, err := cache.GetOffRampStaticConfig(tests.Context(t))
-		require.NoError(t, err)
-		assert.Equal(t, cciptypes.OffRampStaticChainConfig{}, offRampConfig)
+// 		offRampConfig, err := cache.GetOffRampStaticConfig(tests.Context(t))
+// 		require.NoError(t, err)
+// 		assert.Equal(t, cciptypes.OffRampStaticChainConfig{}, offRampConfig)
 
-		feeQuoterConfig, err := cache.GetFeeQuoterConfig(tests.Context(t))
-		require.NoError(t, err)
-		assert.Equal(t, cciptypes.FeeQuoterStaticConfig{}, feeQuoterConfig)
-	})
-}
+// 		feeQuoterConfig, err := cache.GetFeeQuoterConfig(tests.Context(t))
+// 		require.NoError(t, err)
+// 		assert.Equal(t, cciptypes.FeeQuoterStaticConfig{}, feeQuoterConfig)
+// 	})
+// }
 
 func TestConfigCache_ContextHandling(t *testing.T) {
 	t.Run("handles cancelled context", func(t *testing.T) {

@@ -80,6 +80,7 @@ func (c *configCache) refreshIfNeeded(ctx context.Context) error {
 	defer c.cacheMu.Unlock()
 
 	if time.Since(c.lastUpdateAt) < configCacheRefreshInterval {
+		c.lggr.Infow("Not refreshing cache")
 		return nil
 	}
 
@@ -119,7 +120,7 @@ func (c *configCache) refresh(ctx context.Context) error {
 	// Clear skipped contract values from cache
 	if len(batchResult.SkippedNoBinds) > 0 {
 		c.lggr.Infow("some contracts were skipped due to no bindings: %v", batchResult.SkippedNoBinds)
-		c.clearSkippedContractValues(batchResult.SkippedNoBinds)
+		// c.clearSkippedContractValues(batchResult.SkippedNoBinds)
 	}
 
 	if err := c.updateFromResults(batchResult.Results); err != nil {
@@ -359,29 +360,29 @@ func (c *configCache) handleFeeQuoterResults(results []types.BatchReadResult) er
 }
 
 // clearSkippedContractValues resets cache values for contracts that had no bindings
-func (c *configCache) clearSkippedContractValues(skippedContracts []string) {
-	for _, contractName := range skippedContracts {
-		switch contractName {
-		case consts.ContractNameRouter:
-			c.nativeTokenAddress = cciptypes.Bytes{}
-		case consts.ContractNameOnRamp:
-			c.onrampDynamicConfig = cciptypes.GetOnRampDynamicConfigResponse{}
-		case consts.ContractNameOffRamp:
-			c.commitLatestOCRConfig = cciptypes.OCRConfigResponse{}
-			c.execLatestOCRConfig = cciptypes.OCRConfigResponse{}
-			c.offrampStaticConfig = cciptypes.OffRampStaticChainConfig{}
-			c.offrampDynamicConfig = cciptypes.OffRampDynamicChainConfig{}
-			c.offrampAllChains = cciptypes.SelectorsAndConfigs{}
-		case consts.ContractNameRMNRemote:
-			c.rmnDigestHeader = cciptypes.RMNDigestHeader{}
-			c.rmnVersionedConfig = cciptypes.VersionedConfigRemote{}
-		case consts.ContractNameRMNProxy:
-			c.rmnRemoteAddress = cciptypes.Bytes{}
-		case consts.ContractNameFeeQuoter:
-			c.feeQuoterConfig = cciptypes.FeeQuoterStaticConfig{}
-		}
-	}
-}
+// func (c *configCache) clearSkippedContractValues(skippedContracts []string) {
+// 	for _, contractName := range skippedContracts {
+// 		switch contractName {
+// 		case consts.ContractNameRouter:
+// 			c.nativeTokenAddress = cciptypes.Bytes{}
+// 		case consts.ContractNameOnRamp:
+// 			c.onrampDynamicConfig = cciptypes.GetOnRampDynamicConfigResponse{}
+// 		case consts.ContractNameOffRamp:
+// 			c.commitLatestOCRConfig = cciptypes.OCRConfigResponse{}
+// 			c.execLatestOCRConfig = cciptypes.OCRConfigResponse{}
+// 			c.offrampStaticConfig = cciptypes.OffRampStaticChainConfig{}
+// 			c.offrampDynamicConfig = cciptypes.OffRampDynamicChainConfig{}
+// 			c.offrampAllChains = cciptypes.SelectorsAndConfigs{}
+// 		case consts.ContractNameRMNRemote:
+// 			c.rmnDigestHeader = cciptypes.RMNDigestHeader{}
+// 			c.rmnVersionedConfig = cciptypes.VersionedConfigRemote{}
+// 		case consts.ContractNameRMNProxy:
+// 			c.rmnRemoteAddress = cciptypes.Bytes{}
+// 		case consts.ContractNameFeeQuoter:
+// 			c.feeQuoterConfig = cciptypes.FeeQuoterStaticConfig{}
+// 		}
+// 	}
+// }
 
 func (c *configCache) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
