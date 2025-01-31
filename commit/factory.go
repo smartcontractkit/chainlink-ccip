@@ -88,7 +88,7 @@ type CommitPluginFactoryParams struct {
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
 	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
-	ChainWriters      map[cciptypes.ChainSelector]types.ContractWriter
+	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
 	RmnPeerClient     rmn.PeerClient
 	RmnCrypto         cciptypes.RMNCrypto
 }
@@ -106,7 +106,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
 		contractReaders:   params.ContractReaders,
-		chainWriters:      params.ChainWriters,
+		chainWriters:      params.ContractWriters,
 		rmnPeerClient:     params.RmnPeerClient,
 		rmnCrypto:         params.RmnCrypto,
 	}

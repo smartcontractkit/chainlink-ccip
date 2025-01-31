@@ -87,7 +87,7 @@ type PluginFactoryParams struct {
 	TokenDataEncoder cciptypes.TokenDataEncoder
 	EstimateProvider cciptypes.EstimateProvider
 	ContractReaders  map[cciptypes.ChainSelector]types.ContractReader
-	ChainWriters     map[cciptypes.ChainSelector]types.ContractWriter
+	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
 }
 
 // NewExecutePluginFactory creates a new PluginFactory instance. For execute plugin, oracle instances are not managed by
@@ -104,7 +104,7 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
 		contractReaders:  params.ContractReaders,
-		chainWriters:     params.ChainWriters,
+		chainWriters:     params.ContractWriters,
 	}
 }
 
