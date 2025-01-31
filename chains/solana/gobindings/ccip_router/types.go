@@ -216,6 +216,105 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
+type EVMExtraArgsV2 struct {
+	GasLimit                 ag_binary.Uint128
+	AllowOutOfOrderExecution bool
+}
+
+func (obj EVMExtraArgsV2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `GasLimit` param:
+	err = encoder.Encode(obj.GasLimit)
+	if err != nil {
+		return err
+	}
+	// Serialize `AllowOutOfOrderExecution` param:
+	err = encoder.Encode(obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *EVMExtraArgsV2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `GasLimit`:
+	err = decoder.Decode(&obj.GasLimit)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AllowOutOfOrderExecution`:
+	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SVMExtraArgsV1 struct {
+	ComputeUnits             uint32
+	AccountIsWritableBitmap  uint64
+	AllowOutOfOrderExecution bool
+	TokenReceiver            [32]uint8
+	Accounts                 [][32]uint8
+}
+
+func (obj SVMExtraArgsV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ComputeUnits` param:
+	err = encoder.Encode(obj.ComputeUnits)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountIsWritableBitmap` param:
+	err = encoder.Encode(obj.AccountIsWritableBitmap)
+	if err != nil {
+		return err
+	}
+	// Serialize `AllowOutOfOrderExecution` param:
+	err = encoder.Encode(obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenReceiver` param:
+	err = encoder.Encode(obj.TokenReceiver)
+	if err != nil {
+		return err
+	}
+	// Serialize `Accounts` param:
+	err = encoder.Encode(obj.Accounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SVMExtraArgsV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ComputeUnits`:
+	err = decoder.Decode(&obj.ComputeUnits)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountIsWritableBitmap`:
+	err = decoder.Decode(&obj.AccountIsWritableBitmap)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AllowOutOfOrderExecution`:
+	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Accounts`:
+	err = decoder.Decode(&obj.Accounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type RampMessageHeader struct {
 	MessageId           [32]uint8
 	SourceChainSelector uint64
@@ -348,12 +447,12 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 	return nil
 }
 
-type SVMExtraArgs struct {
+type Any2SVMRampExtraArgs struct {
 	ComputeUnits     uint32
 	IsWritableBitmap uint64
 }
 
-func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Any2SVMRampExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ComputeUnits` param:
 	err = encoder.Encode(obj.ComputeUnits)
 	if err != nil {
@@ -367,7 +466,7 @@ func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 
-func (obj *SVMExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Any2SVMRampExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ComputeUnits`:
 	err = decoder.Decode(&obj.ComputeUnits)
 	if err != nil {
@@ -381,46 +480,13 @@ func (obj *SVMExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	return nil
 }
 
-type AnyExtraArgs struct {
-	GasLimit                 ag_binary.Uint128
-	AllowOutOfOrderExecution bool
-}
-
-func (obj AnyExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `GasLimit` param:
-	err = encoder.Encode(obj.GasLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `AllowOutOfOrderExecution` param:
-	err = encoder.Encode(obj.AllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *AnyExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `GasLimit`:
-	err = decoder.Decode(&obj.GasLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `AllowOutOfOrderExecution`:
-	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type Any2SVMRampMessage struct {
 	Header        RampMessageHeader
 	Sender        []byte
 	Data          []byte
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
-	ExtraArgs     SVMExtraArgs
+	ExtraArgs     Any2SVMRampExtraArgs
 	OnRampAddress []byte
 }
 
@@ -507,7 +573,7 @@ type SVM2AnyRampMessage struct {
 	Sender         ag_solanago.PublicKey
 	Data           []byte
 	Receiver       []byte
-	ExtraArgs      AnyExtraArgs
+	ExtraArgs      []byte
 	FeeToken       ag_solanago.PublicKey
 	TokenAmounts   []SVM2AnyTokenTransfer
 	FeeTokenAmount CrossChainAmount
@@ -749,7 +815,7 @@ type SVM2AnyMessage struct {
 	Data         []byte
 	TokenAmounts []SVMTokenAmount
 	FeeToken     ag_solanago.PublicKey
-	ExtraArgs    ExtraArgsInput
+	ExtraArgs    []byte
 }
 
 func (obj SVM2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -839,81 +905,6 @@ func (obj *SVMTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	err = decoder.Decode(&obj.Amount)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-type ExtraArgsInput struct {
-	GasLimit                 *ag_binary.Uint128 `bin:"optional"`
-	AllowOutOfOrderExecution *bool              `bin:"optional"`
-}
-
-func (obj ExtraArgsInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `GasLimit` param (optional):
-	{
-		if obj.GasLimit == nil {
-			err = encoder.WriteBool(false)
-			if err != nil {
-				return err
-			}
-		} else {
-			err = encoder.WriteBool(true)
-			if err != nil {
-				return err
-			}
-			err = encoder.Encode(obj.GasLimit)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// Serialize `AllowOutOfOrderExecution` param (optional):
-	{
-		if obj.AllowOutOfOrderExecution == nil {
-			err = encoder.WriteBool(false)
-			if err != nil {
-				return err
-			}
-		} else {
-			err = encoder.WriteBool(true)
-			if err != nil {
-				return err
-			}
-			err = encoder.Encode(obj.AllowOutOfOrderExecution)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (obj *ExtraArgsInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `GasLimit` (optional):
-	{
-		ok, err := decoder.ReadBool()
-		if err != nil {
-			return err
-		}
-		if ok {
-			err = decoder.Decode(&obj.GasLimit)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// Deserialize `AllowOutOfOrderExecution` (optional):
-	{
-		ok, err := decoder.ReadBool()
-		if err != nil {
-			return err
-		}
-		if ok {
-			err = decoder.Decode(&obj.AllowOutOfOrderExecution)
-			if err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }
@@ -1676,6 +1667,10 @@ const (
 	MessageGasLimitTooHigh_CcipRouterError
 	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
 	InvalidWritabilityBitmap_CcipRouterError
+	InvalidExtraArgsTag_CcipRouterError
+	InvalidChainFamilySelector_CcipRouterError
+	InvalidTokenReceiver_CcipRouterError
+	InvalidSVMAddress_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1764,6 +1759,14 @@ func (value CcipRouterError) String() string {
 		return "ExtraArgOutOfOrderExecutionMustBeTrue"
 	case InvalidWritabilityBitmap_CcipRouterError:
 		return "InvalidWritabilityBitmap"
+	case InvalidExtraArgsTag_CcipRouterError:
+		return "InvalidExtraArgsTag"
+	case InvalidChainFamilySelector_CcipRouterError:
+		return "InvalidChainFamilySelector"
+	case InvalidTokenReceiver_CcipRouterError:
+		return "InvalidTokenReceiver"
+	case InvalidSVMAddress_CcipRouterError:
+		return "InvalidSVMAddress"
 	default:
 		return ""
 	}
