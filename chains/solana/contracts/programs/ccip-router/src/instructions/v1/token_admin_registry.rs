@@ -19,7 +19,7 @@ use crate::{
 
 const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;
 
-// Proposes an administrator for the given token as pending administrator
+/// Proposes an administrator for the given token as pending administrator
 pub fn ccip_admin_propose_administrator(
     ctx: Context<RegisterTokenAdminRegistryByCCIPAdmin>,
     token_admin_registry_admin: Pubkey,
@@ -32,7 +32,7 @@ pub fn ccip_admin_propose_administrator(
     Ok(())
 }
 
-// Overrides the pending administrator for the given token
+/// Overrides the pending administrator for the given token
 pub fn ccip_admin_override_pending_administrator(
     ctx: Context<OverridePendingTokenAdminRegistryByCCIPAdmin>,
     token_admin_registry_admin: Pubkey,
@@ -50,7 +50,7 @@ pub fn ccip_admin_override_pending_administrator(
     Ok(())
 }
 
-// Proposes an administrator for the given token as pending administrator
+/// Proposes an administrator for the given token as pending administrator
 pub fn owner_propose_administrator(
     ctx: Context<RegisterTokenAdminRegistryByOwner>,
     token_admin_registry_admin: Pubkey,
@@ -63,7 +63,7 @@ pub fn owner_propose_administrator(
     Ok(())
 }
 
-// Overrides the pending administrator for the given token
+/// Overrides the pending administrator for the given token
 pub fn owner_override_pending_administrator(
     ctx: Context<OverridePendingTokenAdminRegistryByOwner>,
     token_admin_registry_admin: Pubkey,
@@ -107,7 +107,7 @@ fn init_with_pending_administrator(
     Ok(())
 }
 
-// Transfers the administrator role for a token to a new address with a 2-step process
+/// Transfers the administrator role for a token to a new address with a 2-step process
 pub fn transfer_admin_role_token_admin_registry(
     ctx: Context<ModifyTokenAdminRegistry>,
     new_admin: Pubkey,
@@ -126,7 +126,7 @@ pub fn transfer_admin_role_token_admin_registry(
     Ok(())
 }
 
-// Accepts the admin role for a token
+/// Accepts the admin role for a token
 pub fn accept_admin_role_token_admin_registry(
     ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
 ) -> Result<()> {
@@ -145,10 +145,10 @@ pub fn accept_admin_role_token_admin_registry(
     Ok(())
 }
 
-// Sets the lookup table for pool for a token.
-// TODO: Add a test with look up table as 0 address
-// Setting the lookup table to address(0) effectively delists the token from CCIP.
-// Setting the lookup table to any other address enables the token on CCIP.
+/// Sets the lookup table for pool for a token.
+/// TODO: Add a test with look up table as 0 address
+/// Setting the lookup table to address(0) effectively delists the token from CCIP.
+/// Setting the lookup table to any other address enables the token on CCIP.
 pub fn set_pool(ctx: Context<SetPoolTokenAdminRegistry>, writable_indexes: Vec<u8>) -> Result<()> {
     let token_mint = ctx.accounts.mint.key().to_owned();
 
