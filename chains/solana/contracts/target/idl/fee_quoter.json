@@ -58,7 +58,7 @@
           "type": "publicKey"
         },
         {
-          "name": "offramp",
+          "name": "offrampSigner",
           "type": "publicKey"
         }
       ]
@@ -600,7 +600,7 @@
             "type": "publicKey"
           },
           {
-            "name": "offramp",
+            "name": "offrampSigner",
             "type": "publicKey"
           }
         ]

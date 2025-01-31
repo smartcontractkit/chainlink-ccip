@@ -162,6 +162,7 @@ pub struct AddBillingTokenConfig<'info> {
         associated_token::authority = fee_billing_signer,
         associated_token::token_program = token_program,
     )]
+    // TODO figure out how to set the close authority to FQ
     pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
@@ -243,7 +244,8 @@ pub struct RemoveBillingTokenConfig<'info> {
     #[account(
         mut,
         seeds = [seed::FEE_BILLING_SIGNER],
-        bump
+        bump,
+        seeds::program = config.onramp,
     )]
     pub fee_billing_signer: UncheckedAccount<'info>,
 
@@ -348,7 +350,7 @@ pub struct UpdatePrices<'info> {
     pub config: Account<'info, Config>,
 
     // Only the offramp can update prices
-    #[account(address = config.offramp @ FeeQuoterError::Unauthorized)]
+    #[account(address = config.offramp_signer @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 

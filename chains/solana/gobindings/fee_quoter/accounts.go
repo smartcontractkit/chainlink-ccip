@@ -15,7 +15,7 @@ type Config struct {
 	MaxFeeJuelsPerMsg ag_binary.Uint128
 	LinkTokenMint     ag_solanago.PublicKey
 	Onramp            ag_solanago.PublicKey
-	Offramp           ag_solanago.PublicKey
+	OfframpSigner     ag_solanago.PublicKey
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -56,8 +56,8 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `Offramp` param:
-	err = encoder.Encode(obj.Offramp)
+	// Serialize `OfframpSigner` param:
+	err = encoder.Encode(obj.OfframpSigner)
 	if err != nil {
 		return err
 	}
@@ -108,8 +108,8 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Offramp`:
-	err = decoder.Decode(&obj.Offramp)
+	// Deserialize `OfframpSigner`:
+	err = decoder.Decode(&obj.OfframpSigner)
 	if err != nil {
 		return err
 	}

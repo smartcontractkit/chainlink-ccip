@@ -517,6 +517,27 @@ pub struct CommitReportContext<'info> {
     /// CHECK: This is the sysvar instructions account
     #[account(address = instructions::ID @ CcipRouterError::InvalidInputs)]
     pub sysvar_instructions: UncheckedAccount<'info>,
+
+    /// CHECK: This is the signer for the billing CPIs, used here to invoke fee quoter with price updates
+    #[account(
+        seeds = [seed::FEE_BILLING_SIGNER],
+        bump
+    )]
+    pub fee_billing_signer: UncheckedAccount<'info>,
+
+    /// CHECK: fee quoter program account, used to invoke fee quoter with price updates
+    #[account(
+        address = config.load()?.fee_quoter @ CcipRouterError::InvalidInputs,
+    )]
+    pub fee_quoter: UncheckedAccount<'info>,
+
+    /// CHECK: fee quoter config account, used to invoke fee quoter with price updates
+    #[account(
+        seeds = [fee_quoter::context::seed::CONFIG],
+        bump,
+        seeds::program = config.load()?.fee_quoter,
+    )]
+    pub fee_quoter_config: UncheckedAccount<'info>,
     // remaining accounts
     // global state account (to update the price sequence number)
     // [...billingTokenConfig accounts]

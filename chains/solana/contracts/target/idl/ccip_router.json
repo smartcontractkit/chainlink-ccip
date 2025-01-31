@@ -1084,6 +1084,21 @@
           "name": "sysvarInstructions",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [

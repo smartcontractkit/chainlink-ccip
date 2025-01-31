@@ -71,8 +71,8 @@ pub fn commit<'info>(
         // - the accounts to update DestChain for gas prices
         // They must be in order:
         // 1. state_account
-        // 2. token_accounts[]
-        // 3. gas_accounts[]
+        // 2. fee quoter token_accounts[]
+        // 3. fee quoter gas_accounts[]
         // matching the order of the price updates in the CommitInput.
         // They must also all be writable so they can be updated.
         let minimum_remaining_accounts = 1
@@ -105,19 +105,51 @@ pub fn commit<'info>(
             global_state.latest_price_sequence_number = ocr_sequence_number;
             global_state.exit(&crate::ID)?; // as it is manually loaded, it also has to be manually written back
 
-            // For each token price update, unpack the corresponding remaining_account and update the price.
-            // Keep in mind that the remaining_accounts are sorted in the same order as tokens and gas price updates in the report.
-            for (i, update) in report.price_updates.token_price_updates.iter().enumerate() {
-                apply_token_price_update(update, &ctx.remaining_accounts[i + 1])?;
-            }
+            let cpi_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
+            let cpi_signer = &[&cpi_seeds[..]];
+            let cpi_program = ctx.accounts.fee_quoter.to_account_info();
+            let cpi_accounts = fee_quoter::cpi::accounts::UpdatePrices {
+                config: ctx.accounts.fee_quoter_config.to_account_info(),
+                authority: ctx.accounts.fee_billing_signer.to_account_info(),
+            };
+            let cpi_remaining_accounts = ctx.remaining_accounts[1..].to_vec();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, cpi_signer)
+                .with_remaining_accounts(cpi_remaining_accounts);
 
-            // Skip the first state account and the ones for token updates
-            let offset = report.price_updates.token_price_updates.len() + 1;
+            let token_price_updates = report
+                .price_updates
+                .token_price_updates
+                .iter()
+                .map(|u| fee_quoter::context::TokenPriceUpdate {
+                    source_token: u.source_token,
+                    usd_per_token: u.usd_per_token,
+                })
+                .collect();
+            let gas_price_update = report
+                .price_updates
+                .gas_price_updates
+                .iter()
+                .map(|u| fee_quoter::context::GasPriceUpdate {
+                    dest_chain_selector: u.dest_chain_selector,
+                    usd_per_unit_gas: u.usd_per_unit_gas,
+                })
+                .collect();
 
-            // Do the same for gas price updates
-            for (i, update) in report.price_updates.gas_price_updates.iter().enumerate() {
-                apply_gas_price_update(update, &ctx.remaining_accounts[i + offset])?;
-            }
+            fee_quoter::cpi::update_prices(cpi_ctx, token_price_updates, gas_price_update)?;
+
+            // // For each token price update, unpack the corresponding remaining_account and update the price.
+            // // Keep in mind that the remaining_accounts are sorted in the same order as tokens and gas price updates in the report.
+            // for (i, update) in report.price_updates.token_price_updates.iter().enumerate() {
+            //     apply_token_price_update(update, &ctx.remaining_accounts[i + 1])?;
+            // }
+
+            // // Skip the first state account and the ones for token updates
+            // let offset = report.price_updates.token_price_updates.len() + 1;
+
+            // // Do the same for gas price updates
+            // for (i, update) in report.price_updates.gas_price_updates.iter().enumerate() {
+            //     apply_gas_price_update(update, &ctx.remaining_accounts[i + offset])?;
+            // }
         } else {
             // TODO check if this is really necessary. EVM has this validation checking that the
             // array of merkle roots in the report is not empty. But here, considering we only have 1 root per report,

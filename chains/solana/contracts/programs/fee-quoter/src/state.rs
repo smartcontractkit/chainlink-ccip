@@ -14,7 +14,7 @@ pub struct Config {
     // TODO The following field is unused until the day we integrate with feeds to fetch fresh values
     // pub token_price_staleness_threshold: u32,
     pub onramp: Pubkey,
-    pub offramp: Pubkey, // TODO see if this has to become a list of offramps
+    pub offramp_signer: Pubkey, // TODO see if this has to become a list of offramps
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]

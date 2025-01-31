@@ -12,7 +12,7 @@ use messages::*;
 pub mod state;
 use state::*;
 
-mod event;
+pub mod event;
 
 mod instructions;
 use instructions::v1;
@@ -38,7 +38,7 @@ pub mod fee_quoter {
         link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
-        offramp: Pubkey,
+        offramp_signer: Pubkey,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             version: 1,
@@ -47,7 +47,7 @@ pub mod fee_quoter {
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
-            offramp,
+            offramp_signer,
         });
 
         // ctx.accounts.state.latest_price_sequence_number = 0; // TODO each offramp has its own price seq_nr?
