@@ -7,7 +7,7 @@ use crate::constants::{
     ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED, TIMELOCK_OPERATION_SEED,
 };
 use crate::error::TimelockError;
-use crate::state::{Config, InstructionData, Operation};
+use crate::state::{Config, InstructionData, InstructionAccount, Operation};
 use crate::TIMELOCK_BYPASSER_OPERATION_SEED;
 
 /// Operation management for timelock system, handling both standard (timelock-enforced)
@@ -47,7 +47,10 @@ pub fn initialize_operation<'info>(
 
     Ok(())
 }
+// todo: idea for chunk instruction upload to support large instruction data(nearly 1232 bytes(-tx overhead) per instruction)
+// todo: adjust the account space calculation for InstructionData struct.
 
+// todo: remove this after tooling compatibility check / testing
 pub fn append_instructions<'info>(
     ctx: Context<'_, '_, '_, 'info, AppendInstructions<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
@@ -57,6 +60,47 @@ pub fn append_instructions<'info>(
     let op = &mut ctx.accounts.operation;
     op.instructions.extend(instructions_batch);
 
+    Ok(())
+}
+
+pub fn initialize_instruction<'info>(
+    ctx: Context<'_, '_, '_, 'info, InitializeInstruction<'info>>,
+    _timelock_id: [u8; 32],
+    _id: [u8; 32],
+    program_id: Pubkey,
+    accounts: Vec<InstructionAccount>,
+) -> Result<()> {
+    // todo: initialize intermediate instruction field with program id and accounts
+    let op = &mut ctx.accounts.operation;
+
+    // create a new InstructionData with an empty `data`
+    let new_ix = InstructionData {
+        program_id,
+        data: Vec::new(),
+        accounts,
+    };
+
+    // push it into op.instructions
+    op.instructions.push(new_ix);
+    Ok(())
+}
+
+pub fn append_instruction_data<'info>(
+    ctx: Context<'_, '_, '_, 'info, AppendInstructionData<'info>>,
+    _timelock_id: [u8; 32],
+    _id: [u8; 32],
+    ix_index: u32,
+    ix_data_chunk: Vec<u8>,
+) -> Result<()> {
+    // todo: append instruction data with desired index and instruction data
+    let op = &mut ctx.accounts.operation;
+
+    let target_ix = &mut op.instructions[ix_index as usize];
+
+    // extend the data
+    target_ix.data.extend_from_slice(&ix_data_chunk);
+
+    // NOTE: no need to finalize instruction, verify_id will check the finalization
     Ok(())
 }
 
@@ -203,6 +247,86 @@ pub struct AppendInstructions<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(
+    timelock_id: [u8; 32],
+    id: [u8; 32],
+    program_id: Pubkey,
+    accounts: Vec<InstructionAccount>,
+)]
+pub struct InitializeInstruction<'info> {
+    #[account(
+        mut,
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE
+            + operation.instructions.iter().map(|ix| 
+                // program_id + 4 + data.len + 4 + accounts.len*34
+                32 + 4 + ix.data.len() + 4 + ix.accounts.len() * 34
+            ).sum::<usize>()
+            // program_id (32) + data Vec overhead (4) + accounts vec overhead (4) plus each account is (32 + 1 + 1) = 34
+            + 32 + 4 + 4 + (accounts.len() * 34),
+        realloc::payer = authority,
+        realloc::zero = false,
+        constraint = !operation.is_finalized @ TimelockError::OperationAlreadyFinalized,
+        constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled,
+        constraint = operation.instructions.len() < operation.total_instructions as usize @ TimelockError::TooManyInstructions,
+    )]
+    pub operation: Account<'info, Operation>,
+
+    #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
+    pub config: Account<'info, Config>,
+
+    // NOTE: access controller check and access happens in require_role_or_admin macro
+    pub role_access_controller: AccountLoader<'info, AccessController>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(
+    timelock_id: [u8; 32],
+    id: [u8; 32],
+    ix_index: u32,
+    ix_data_chunk: Vec<u8>,
+)]
+pub struct AppendInstructionData<'info> {
+    #[account(
+        mut,
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE
+            + operation.instructions.iter().enumerate().map(|(i,ix)| {
+                if i == ix_index as usize {
+                    // old size + ix_data_chunk
+                    ix.data.len() + ix_data_chunk.len() +  (32 + 4 + 4 + ix.accounts.len()*34)
+                } else {
+                    // program_id + 4 + data.len + 4 + accounts.len*34
+                    32 + 4 + ix.data.len() + 4 + ix.accounts.len() * 34
+                }
+            }).sum::<usize>(),
+        realloc::payer = authority,
+        realloc::zero = false,
+
+        constraint = !operation.is_finalized @ TimelockError::OperationAlreadyFinalized,
+        constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled,
+        constraint = (ix_index as usize) < operation.instructions.len() @ TimelockError::InvalidInput
+    )]
+    pub operation: Account<'info, Operation>,
+
+    #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
+    pub config: Account<'info, Config>,
+
+    // NOTE: access controller check and access happens in require_role_or_admin macro
+    pub role_access_controller: AccountLoader<'info, AccessController>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct FinalizeOperation<'info> {
     #[account(
@@ -233,8 +357,8 @@ pub struct ClearOperation<'info> {
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        close = authority,
         constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled, // restrict clearing of scheduled operation
+        close = authority,
     )]
     pub operation: Account<'info, Operation>,
 

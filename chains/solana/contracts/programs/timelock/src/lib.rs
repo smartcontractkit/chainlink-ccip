@@ -66,6 +66,28 @@ pub mod timelock {
     }
 
     #[access_control(require_role_or_admin!(ctx, Role::Proposer))]
+    pub fn initialize_instruction<'info>(
+        ctx: Context<'_, '_, '_, 'info, InitializeInstruction<'info>>,
+        timelock_id: [u8; 32],
+        id: [u8; 32],
+        program_id: Pubkey,
+        accounts: Vec<InstructionAccount>,
+    ) -> Result<()> {
+        operation::initialize_instruction(ctx, timelock_id, id, program_id, accounts)
+    }
+
+    #[access_control(require_role_or_admin!(ctx, Role::Proposer))]
+    pub fn append_instruction_data<'info>(
+        ctx: Context<'_, '_, '_, 'info, AppendInstructionData<'info>>,
+        timelock_id: [u8; 32],
+        id: [u8; 32],
+        ix_index: u32,
+        ix_data_chunk: Vec<u8>,
+    ) -> Result<()> {
+        operation::append_instruction_data(ctx, timelock_id, id, ix_index, ix_data_chunk)
+    }
+
+    #[access_control(require_role_or_admin!(ctx, Role::Proposer))]
     pub fn finalize_operation<'info>(
         ctx: Context<'_, '_, '_, 'info, FinalizeOperation<'info>>,
         timelock_id: [u8; TIMELOCK_ID_PADDED],
