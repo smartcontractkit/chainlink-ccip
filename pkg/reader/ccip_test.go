@@ -69,6 +69,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		require.NoError(t, err)
 		v.OnRamp = cciptypes.UnknownAddress(fromString)
 		v.IsEnabled = true
+		v.Router = cciptypes.UnknownAddress(fromString)
 	}).Return(nil)
 
 	offrampAddress := []byte{0x3}
