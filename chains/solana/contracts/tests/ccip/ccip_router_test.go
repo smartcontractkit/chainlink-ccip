@@ -673,6 +673,7 @@ func TestCCIPRouter(t *testing.T) {
 						destChainStatePDA,
 						config.RouterConfigPDA,
 						admin.PublicKey(),
+						solana.SystemProgramID,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()})
@@ -702,6 +703,7 @@ func TestCCIPRouter(t *testing.T) {
 					config.EvmDestChainStatePDA,
 					config.RouterConfigPDA,
 					user.PublicKey(), // unauthorized
+					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
@@ -751,6 +753,7 @@ func TestCCIPRouter(t *testing.T) {
 					config.EvmDestChainStatePDA,
 					config.RouterConfigPDA,
 					admin.PublicKey(),
+					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
@@ -2092,6 +2095,72 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 		})
 
+		t.Run("When sending with an empty but enabled allowlist, it fails", func(t *testing.T) {
+			var initialDestChain ccip_router.DestChain
+			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDestChain)
+			require.NoError(t, err, "failed to get account info")
+			modifiedDestChain := initialDestChain
+			modifiedDestChain.Config.AllowListEnabled = true
+
+			updateDestChainIx, err := ccip_router.NewUpdateDestChainConfigInstruction(
+				config.EvmChainSelector,
+				modifiedDestChain.Config,
+				config.EvmDestChainStatePDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, anotherAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			destinationChainSelector := config.EvmChainSelector
+			destinationChainStatePDA := config.EvmDestChainStatePDA
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
+			}
+
+			raw := ccip_router.NewCcipSendInstruction(
+				destinationChainSelector,
+				message,
+				[]byte{},
+				config.RouterConfigPDA,
+				destinationChainStatePDA,
+				nonceEvmPDA,
+				user.PublicKey(),
+				solana.SystemProgramID,
+				wsol.program,
+				wsol.mint,
+				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
+				wsol.userATA,
+				wsol.billingATA,
+				config.BillingSignerPDA,
+				config.ExternalTokenPoolsSignerPDA,
+			)
+			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: SenderNotAllowed"})
+			require.NotNil(t, result)
+
+			// We now restore the config to keep the test state-neutral
+			updateDestChainIx, err = ccip_router.NewUpdateDestChainConfigInstruction(
+				config.EvmChainSelector,
+				initialDestChain.Config,
+				config.EvmDestChainStatePDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, anotherAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+		})
+
 		t.Run("When sending a Valid CCIP Message Emits CCIPMessageSent", func(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
@@ -2849,6 +2918,83 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 2, initBal1-currBal1) // burned amount
 			})
+		})
+
+		t.Run("When sending with an enabled allowlist including the sender, it succeeds", func(t *testing.T) {
+			var initialDestChain ccip_router.DestChain
+			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDestChain)
+			require.NoError(t, err, "failed to get account info")
+			modifiedDestChain := initialDestChain
+			modifiedDestChain.Config.AllowListEnabled = true
+			modifiedDestChain.Config.AllowedSenders = []solana.PublicKey{
+				user.PublicKey(),
+				anotherUser.PublicKey(),
+			}
+
+			updateDestChainIx, err := ccip_router.NewUpdateDestChainConfigInstruction(
+				config.EvmChainSelector,
+				modifiedDestChain.Config,
+				config.EvmDestChainStatePDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, anotherAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			var parsedDestChain ccip_router.DestChain
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &parsedDestChain)
+			require.NoError(t, err, "failed to get account info")
+
+			// This proves we're able to update the config with a dynamically sized element
+			require.Equal(t, parsedDestChain.Config.AllowedSenders, modifiedDestChain.Config.AllowedSenders)
+
+			destinationChainSelector := config.EvmChainSelector
+			destinationChainStatePDA := config.EvmDestChainStatePDA
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
+			}
+
+			raw := ccip_router.NewCcipSendInstruction(
+				destinationChainSelector,
+				message,
+				[]byte{},
+				config.RouterConfigPDA,
+				destinationChainStatePDA,
+				nonceEvmPDA,
+				user.PublicKey(),
+				solana.SystemProgramID,
+				wsol.program,
+				wsol.mint,
+				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
+				wsol.userATA,
+				wsol.billingATA,
+				config.BillingSignerPDA,
+				config.ExternalTokenPoolsSignerPDA,
+			)
+			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			// We now restore the config to keep the test state-neutral
+			updateDestChainIx, err = ccip_router.NewUpdateDestChainConfigInstruction(
+				config.EvmChainSelector,
+				initialDestChain.Config,
+				config.EvmDestChainStatePDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{updateDestChainIx}, anotherAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
 		})
 
 		t.Run("token pool accounts: validation", func(t *testing.T) {

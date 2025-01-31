@@ -306,7 +306,12 @@ func convertOnChainConfigToRMNHomeChainConfig(
 		return map[cciptypes.Bytes32]rmntypes.HomeConfig{}
 	}
 
-	versionedConfigWithDigests := []VersionedConfig{primaryConfig}
+	versionedConfigWithDigests := make([]VersionedConfig, 0, 2)
+
+	if !primaryConfig.ConfigDigest.IsEmpty() {
+		versionedConfigWithDigests = append(versionedConfigWithDigests, primaryConfig)
+	}
+
 	if !secondaryConfig.ConfigDigest.IsEmpty() {
 		versionedConfigWithDigests = append(versionedConfigWithDigests, secondaryConfig)
 	}

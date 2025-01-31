@@ -28,13 +28,15 @@ type UpdateDestChainConfig struct {
 	// [1] = [] config
 	//
 	// [2] = [WRITE, SIGNER] authority
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewUpdateDestChainConfigInstructionBuilder creates a new `UpdateDestChainConfig` instruction builder.
 func NewUpdateDestChainConfigInstructionBuilder() *UpdateDestChainConfig {
 	nd := &UpdateDestChainConfig{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -84,6 +86,17 @@ func (inst *UpdateDestChainConfig) GetAuthorityAccount() *ag_solanago.AccountMet
 	return inst.AccountMetaSlice[2]
 }
 
+// SetSystemProgramAccount sets the "systemProgram" account.
+func (inst *UpdateDestChainConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateDestChainConfig {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	return inst
+}
+
+// GetSystemProgramAccount gets the "systemProgram" account.
+func (inst *UpdateDestChainConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
 func (inst UpdateDestChainConfig) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -123,6 +136,9 @@ func (inst *UpdateDestChainConfig) Validate() error {
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.SystemProgram is not set")
+		}
 	}
 	return nil
 }
@@ -142,10 +158,11 @@ func (inst *UpdateDestChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("destChainState", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta(" systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -186,11 +203,13 @@ func NewUpdateDestChainConfigInstruction(
 	// Accounts:
 	destChainState ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *UpdateDestChainConfig {
+	authority ag_solanago.PublicKey,
+	systemProgram ag_solanago.PublicKey) *UpdateDestChainConfig {
 	return NewUpdateDestChainConfigInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
 		SetDestChainConfig(destChainConfig).
 		SetDestChainStateAccount(destChainState).
 		SetConfigAccount(config).
-		SetAuthorityAccount(authority)
+		SetAuthorityAccount(authority).
+		SetSystemProgramAccount(systemProgram)
 }
