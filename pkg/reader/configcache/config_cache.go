@@ -101,8 +101,27 @@ func (c *configCache) refresh(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("batch get configs: %w", err)
 	}
-	c.lggr.Infow("batchResult result len is", "batchResult", len(batchResult.Results))
-	c.lggr.Infow("batchResult is", "batchResult", batchResult.Results)
+	// 	type BatchGetLatestValuesResult map[BoundContract]ContractBatchResults
+	// type ContractBatchResults []BatchReadResult
+	// type BatchReadResult struct {
+	// 	ReadName    string
+	// 	returnValue any
+	// 	err         error
+	// }
+
+	// print the batchResult
+	for contract, results := range batchResult.Results {
+		c.lggr.Infow("contract is", "contract", contract)
+		for i, result := range results {
+			c.lggr.Infow("result is", "result", result)
+			val, err := result.GetResult()
+			if err != nil {
+				c.lggr.Errorw("get offramp result %d: %w", i, err)
+			}
+			c.lggr.Infow("val is", "val", val)
+		}
+	}
+
 	c.lggr.Infow("batchResult.SkippedNoBinds is", "batchResult.SkippedNoBinds", batchResult.SkippedNoBinds)
 	// Log skipped contracts if any for debugging
 	// Clear skipped contract values from cache
