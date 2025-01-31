@@ -917,64 +917,6 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	return resp, nil
 }
 
-func (r *ccipChainReader) getOnRampDynamicConfigs(
-	ctx context.Context,
-	lggr logger.Logger,
-	srcChains []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]cciptypes.GetOnRampDynamicConfigResponse {
-	result := make(map[cciptypes.ChainSelector]cciptypes.GetOnRampDynamicConfigResponse)
-
-	mu := new(sync.Mutex)
-	wg := new(sync.WaitGroup)
-	for _, chainSel := range srcChains {
-		// no onramp for the destination chain
-		if chainSel == r.destChain {
-			continue
-		}
-		if r.contractReaders[chainSel] == nil {
-			r.lggr.Errorw("contract reader not found", "chain", chainSel)
-			continue
-		}
-
-		wg.Add(1)
-		go func(chainSel cciptypes.ChainSelector) {
-			defer wg.Done()
-			// read onramp dynamic config
-			resp := cciptypes.GetOnRampDynamicConfigResponse{}
-			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
-				ctx,
-				consts.ContractNameOnRamp,
-				consts.MethodNameOnRampGetDynamicConfig,
-				primitives.Unconfirmed,
-				map[string]any{},
-				&resp,
-			)
-			lggr.Debugw("got onramp dynamic config",
-				"chain", chainSel,
-				"resp", resp)
-			if err != nil {
-				if errors.Is(err, contractreader.ErrNoBindings) {
-					// ErrNoBindings is an allowable error during initialization
-					lggr.Infow(
-						"unable to lookup source fee quoters (onRamp dynamic config), "+
-							"this is expected during initialization", "err", err)
-				} else {
-					lggr.Errorw("unable to lookup source fee quoters (onRamp dynamic config)",
-						"chain", chainSel, "err", err)
-				}
-				return
-			}
-			mu.Lock()
-			result[chainSel] = resp
-			mu.Unlock()
-		}(chainSel)
-	}
-
-	wg.Wait()
-
-	return result
-}
-
 func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddresses, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	resp := make(ContractAddresses)
