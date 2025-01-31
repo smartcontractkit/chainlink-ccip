@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
+	ag_binary "github.com/gagliardetto/binary"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_receiver"
@@ -150,6 +152,7 @@ func TestCCIPRouter(t *testing.T) {
 	validReceiverAddress := [32]byte{}
 	validReceiverAddress[12] = 1
 
+	var ccipSendLookupTable map[solana.PublicKey]solana.PublicKeySlice
 	var commitLookupTable map[solana.PublicKey]solana.PublicKeySlice
 
 	t.Run("setup", func(t *testing.T) {
@@ -327,6 +330,43 @@ func TestCCIPRouter(t *testing.T) {
 			link22.billingATA = link22Receiver
 			link22.feeAggregatorATA = link22FeeAggregatorATA
 			link22.fqEvmConfigPDA = link22EvmConfigPDA
+		})
+
+		t.Run("Ccip Send address lookup table", func(t *testing.T) {
+			// Create single Address Lookup Table, to be used in all ccip send tests.
+			// Create it early in the test suite (a "setup" step) to let it warm up with more than enough time,
+			// as otherwise it can slow down tests  for ~20 seconds.
+			// It includes most accounts that are used, though not all of them are used at the same time (some are either/or).
+			lookupEntries := []solana.PublicKey{
+				config.RouterConfigPDA,
+				nonceEvmPDA,
+				nonceSvmPDA,
+				config.EvmDestChainStatePDA,
+				config.SvmDestChainStatePDA,
+				solana.SystemProgramID,
+				solana.TokenProgramID,
+				solana.Token2022ProgramID,
+				config.FeeQuoterProgram,
+				config.FqConfigPDA,
+				config.FqEvmDestChainPDA,
+				config.FqSvmDestChainPDA,
+				wsol.fqBillingConfigPDA,
+				wsol.mint,
+				wsol.userATA,
+				wsol.billingATA,
+				wsol.anotherUserATA,
+				link22.fqBillingConfigPDA,
+				link22.mint,
+				link22.userATA,
+				link22.billingATA,
+				config.ExternalTokenPoolsSignerPDA,
+			}
+			lookupTableAddr, err := common.SetupLookupTable(ctx, solanaGoClient, admin, lookupEntries)
+			require.NoError(t, err)
+
+			ccipSendLookupTable = map[solana.PublicKey]solana.PublicKeySlice{
+				lookupTableAddr: lookupEntries,
+			}
 		})
 
 		t.Run("Commit price updates address lookup table", func(t *testing.T) {
@@ -3219,6 +3259,9 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
 				addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
+				for k, v := range ccipSendLookupTable {
+					addressTables[k] = v
+				}
 
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
@@ -3390,6 +3433,16 @@ func TestCCIPRouter(t *testing.T) {
 			}
 		})
 
+		decodeGetFeeResult := func(t *testing.T) func([]byte) fee_quoter.GetFeeResult {
+			return func(bytes []byte) fee_quoter.GetFeeResult {
+				result := fee_quoter.GetFeeResult{}
+				decoder := ag_binary.NewBinDecoder(bytes)
+				err := result.UnmarshalWithDecoder(decoder)
+				require.NoError(t, err)
+				return result
+			}
+		}
+
 		t.Run("When sending a Valid CCIP Message it bills the amount that getFee previously returned", func(t *testing.T) {
 			destinationChainSelector := config.EvmChainSelector
 			destinationChainStatePDA := config.EvmDestChainStatePDA
@@ -3406,14 +3459,15 @@ func TestCCIPRouter(t *testing.T) {
 						Receiver: message.Receiver,
 						Data:     message.Data,
 					}
-					rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.RouterConfigPDA, config.EvmDestChainStatePDA, token.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+					rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, token.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 					ix, err := rawGetFeeIx.ValidateAndBuild()
 					require.NoError(t, err)
 
 					feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
 					require.NotNil(t, feeResult)
-					fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
-					require.Greater(t, fee, uint64(0))
+					fmt.Println(feeResult.Meta.LogMessages)
+					fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.FeeQuoterProgram.String(), decodeGetFeeResult(t))
+					require.Greater(t, fee.Amount, uint64(0))
 
 					initialBalance := getBalance(token.billingATA)
 
@@ -3448,7 +3502,7 @@ func TestCCIPRouter(t *testing.T) {
 					finalBalance := getBalance(token.billingATA)
 
 					// Check that the billing receiver account balance has increased by the fee amount
-					require.Equal(t, fee, finalBalance-initialBalance)
+					require.Equal(t, fee.Amount, finalBalance-initialBalance)
 				})
 			}
 		})
@@ -3512,15 +3566,16 @@ func TestCCIPRouter(t *testing.T) {
 			}
 
 			// getFee
-			rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.RouterConfigPDA, config.EvmDestChainStatePDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+			rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 			ix, err := rawGetFeeIx.ValidateAndBuild()
 			require.NoError(t, err)
 
 			feeResult := testutils.SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{ix}, user)
 			require.NotNil(t, feeResult)
-			fee, err := common.ExtractTypedReturnValue(ctx, feeResult.Value.Logs, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
+			var fee fee_quoter.GetFeeResult
+			fee, err = common.ExtractTypedReturnValue(ctx, feeResult.Value.Logs, config.FeeQuoterProgram.String(), decodeGetFeeResult(t))
 			require.NoError(t, err)
-			require.Greater(t, fee, uint64(0))
+			require.Greater(t, fee.Amount, uint64(0))
 
 			initialBalance := getBalance(wsol.billingATA)
 			initialLamports := getLamports(user.PublicKey())
@@ -3557,10 +3612,10 @@ func TestCCIPRouter(t *testing.T) {
 			finalLamports := getLamports(user.PublicKey())
 
 			// Check that the billing receiver account balance has increased by the fee amount
-			require.Equal(t, fee, finalBalance-initialBalance)
+			require.Equal(t, fee.Amount, finalBalance-initialBalance)
 
 			// Check that the user has paid for the tx cost and the ccip fee from their SOL
-			require.Equal(t, fee+result.Meta.Fee, initialLamports-finalLamports)
+			require.Equal(t, fee.Amount+result.Meta.Fee, initialLamports-finalLamports)
 		})
 
 		////////////////////
@@ -3900,14 +3955,14 @@ func TestCCIPRouter(t *testing.T) {
 							tokenUpdates, err := common.ParseMultipleEvents[ccip.UsdPerTokenUpdated](tx.Meta.LogMessages, "UsdPerTokenUpdated", config.PrintEvents)
 							require.NoError(t, err)
 							require.Len(t, tokenUpdates, 2)
-							var eventWsol, eventlink22 bool
+							var eventWsol, eventLink22 bool
 							for _, tokenUpdate := range tokenUpdates {
 								switch tokenUpdate.Token {
 								case wsol.mint:
 									eventWsol = true
 									require.Equal(t, common.To28BytesBE(3), tokenUpdate.Value)
 								case link22.mint:
-									eventlink22 = true
+									eventLink22 = true
 									require.Equal(t, common.To28BytesBE(4), tokenUpdate.Value)
 								default:
 									t.Fatalf("unexpected token update: %v", tokenUpdate)
@@ -3915,7 +3970,7 @@ func TestCCIPRouter(t *testing.T) {
 								require.Greater(t, tokenUpdate.Timestamp, int64(0)) // timestamp is set
 							}
 							require.True(t, eventWsol, "missing wsol update event")
-							require.True(t, eventlink22, "missing link22 update event")
+							require.True(t, eventLink22, "missing link22 update event")
 
 							// yes gas update
 							gasUpdates, err := common.ParseMultipleEvents[ccip.UsdPerUnitGasUpdated](tx.Meta.LogMessages, "UsdPerUnitGasUpdated", config.PrintEvents)
