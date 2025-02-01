@@ -23,6 +23,18 @@ func mustRandomPubkey() solana.PublicKey {
 	return k.PublicKey()
 }
 
+const MAX_SOLANA_TX_SIZE = 1232
+
+type failOnExcessTxSize func(tables map[solana.PublicKey]solana.PublicKeySlice) bool
+
+func failOnExcessAlways(tables map[solana.PublicKey]solana.PublicKeySlice) bool {
+	return true
+}
+
+func failOnExcessOnlyWithTables(tables map[solana.PublicKey]solana.PublicKeySlice) bool {
+	return len(tables) > 0
+}
+
 // NOTE: this test does not execute or validate transaction inputs, it simply builds transactions to calculate the size of each transaction with signers
 func TestTransactionSizing(t *testing.T) {
 	ccip_router.SetProgramID(config.CcipRouterProgram)
@@ -45,6 +57,10 @@ func TestTransactionSizing(t *testing.T) {
 		"sysVarInstruction":     solana.SysVarInstructionsPubkey,
 		"originChainConfig":     mustRandomPubkey(),
 		"arbMessagingSigner":    mustRandomPubkey(),
+		"fqBillingSinger":       mustRandomPubkey(),
+		"feeQuoterProgram":      mustRandomPubkey(),
+		"fqConfigPDA":           mustRandomPubkey(),
+		"fqLinkConfig":          mustRandomPubkey(),
 	}
 
 	tokenTable := map[string]solana.PublicKey{
@@ -58,7 +74,7 @@ func TestTransactionSizing(t *testing.T) {
 		"mint":                  mustRandomPubkey(),
 	}
 
-	run := func(name string, ix solana.Instruction, tables map[solana.PublicKey]solana.PublicKeySlice, opts ...common.TxModifier) string {
+	run := func(name string, failOnExcessPredicate failOnExcessTxSize, ix solana.Instruction, tables map[solana.PublicKey]solana.PublicKeySlice, opts ...common.TxModifier) string {
 		tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{1}, solana.TransactionAddressTables(tables))
 		require.NoError(t, err)
 
@@ -74,8 +90,15 @@ func TestTransactionSizing(t *testing.T) {
 		bz, err := tx.MarshalBinary()
 		require.NoError(t, err)
 		l := len(bz)
-		require.LessOrEqual(t, l, 1250)
-		return fmt.Sprintf("%-55s: %-4d - remaining: %d", name, l, 1232-l)
+		if failOnExcessPredicate(tables) {
+			require.LessOrEqual(t, l, MAX_SOLANA_TX_SIZE)
+		}
+		remaining := MAX_SOLANA_TX_SIZE - l
+		var warning string
+		if remaining < 0 {
+			warning = "<<< WARNING!!"
+		}
+		return fmt.Sprintf("%-55s: %-4d - remaining: %d %s", name, l, remaining, warning)
 	}
 
 	// ccipSend test messages + instruction ---------------------------------
@@ -106,16 +129,16 @@ func TestTransactionSizing(t *testing.T) {
 			mustRandomPubkey(), // user nonce PDA
 			auth.PublicKey(),   // sender/authority
 			routerTable["systemProgram"],
-			mustRandomPubkey(), // fee token program
-			mustRandomPubkey(), // fee token mint
-			mustRandomPubkey(), // fee token user ATA
-			mustRandomPubkey(), // fee token receiver
-			mustRandomPubkey(), // fee billing signer
-			mustRandomPubkey(), // fee quoter
-			mustRandomPubkey(), // fee quoter config
-			mustRandomPubkey(), // fee quoter dest chain
-			mustRandomPubkey(), // fee quoter billing token config
-			mustRandomPubkey(), // fee quoter link token config
+			routerTable["billingTokenProgram"], // fee token program
+			routerTable["billingTokenProgram"], // fee token mint
+			mustRandomPubkey(),                 // fee token user ATA
+			mustRandomPubkey(),                 // fee token receiver
+			routerTable["routerBillingSigner"], // fee billing signer
+			routerTable["feeQuoterProgram"],    // fee quoter
+			routerTable["fqConfigPDA"],         // fee quoter config
+			mustRandomPubkey(),                 // fee quoter dest chain
+			mustRandomPubkey(),                 // fee quoter billing token config
+			routerTable["fqLinkConfig"],        // fee quoter link token config
 			routerTable["routerTokenPoolSigner"],
 		)
 
@@ -163,6 +186,9 @@ func TestTransactionSizing(t *testing.T) {
 			auth.PublicKey(),
 			routerTable["systemProgram"],
 			routerTable["sysVarInstruction"],
+			routerTable["fqBillingSinger"],
+			routerTable["feeQuoterProgram"],
+			routerTable["fqConfigPDA"],
 		)
 
 		for _, v := range addAccounts {
@@ -252,9 +278,10 @@ func TestTransactionSizing(t *testing.T) {
 
 	// runner ---------------------------------------------------------
 	params := []struct {
-		name   string
-		ix     solana.Instruction
-		tables map[solana.PublicKey]solana.PublicKeySlice
+		name           string
+		ix             solana.Instruction
+		tables         map[solana.PublicKey]solana.PublicKeySlice
+		allowPredicate failOnExcessTxSize
 	}{
 		{
 			"ccipSend:noToken",
@@ -262,6 +289,7 @@ func TestTransactionSizing(t *testing.T) {
 			map[solana.PublicKey]solana.PublicKeySlice{
 				mustRandomPubkey(): maps.Values(routerTable),
 			},
+			failOnExcessAlways,
 		},
 		{
 			"ccipSend:singleToken",
@@ -274,6 +302,7 @@ func TestTransactionSizing(t *testing.T) {
 				mustRandomPubkey():            maps.Values(routerTable),
 				tokenTable["poolLookupTable"]: maps.Values(tokenTable),
 			},
+			failOnExcessAlways,
 		},
 		{
 			"commit:noPrices",
@@ -281,6 +310,7 @@ func TestTransactionSizing(t *testing.T) {
 			map[solana.PublicKey]solana.PublicKeySlice{
 				mustRandomPubkey(): maps.Values(routerTable),
 			},
+			failOnExcessAlways,
 		},
 		{
 			"commit:withPrices",
@@ -291,6 +321,7 @@ func TestTransactionSizing(t *testing.T) {
 			map[solana.PublicKey]solana.PublicKeySlice{
 				mustRandomPubkey(): maps.Values(routerTable),
 			},
+			failOnExcessOnlyWithTables, // without lookup tables, we already know it exceeds the max tx size
 		},
 		{
 			"execute:noToken",
@@ -298,6 +329,7 @@ func TestTransactionSizing(t *testing.T) {
 			map[solana.PublicKey]solana.PublicKeySlice{
 				mustRandomPubkey(): maps.Values(routerTable),
 			},
+			failOnExcessAlways,
 		},
 		{
 			"execute:singleToken",
@@ -310,6 +342,7 @@ func TestTransactionSizing(t *testing.T) {
 				mustRandomPubkey():            maps.Values(routerTable),
 				tokenTable["poolLookupTable"]: maps.Values(tokenTable),
 			},
+			failOnExcessAlways,
 		},
 	}
 
@@ -323,10 +356,10 @@ func TestTransactionSizing(t *testing.T) {
 			}
 
 			outputs = append(outputs,
-				run(p.name+l, p.ix, tables),
-				run(p.name+l+" +cuLimit", p.ix, tables, common.AddComputeUnitLimit(0)),
-				run(p.name+l+" +cuPrice", p.ix, tables, common.AddComputeUnitPrice(0)),
-				run(p.name+l+" +cuPrice +cuLimit", p.ix, tables, common.AddComputeUnitLimit(0), common.AddComputeUnitPrice(0)),
+				run(p.name+l, p.allowPredicate, p.ix, tables),
+				run(p.name+l+" +cuLimit", p.allowPredicate, p.ix, tables, common.AddComputeUnitLimit(0)),
+				run(p.name+l+" +cuPrice", p.allowPredicate, p.ix, tables, common.AddComputeUnitPrice(0)),
+				run(p.name+l+" +cuPrice +cuLimit", p.allowPredicate, p.ix, tables, common.AddComputeUnitLimit(0), common.AddComputeUnitPrice(0)),
 				divider,
 			)
 		}
