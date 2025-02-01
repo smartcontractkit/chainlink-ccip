@@ -225,60 +225,6 @@
       ]
     },
     {
-      "name": "removeBillingTokenConfig",
-      "docs": [
-        "Removes the billing token configuration.",
-        "Only CCIP Admin can remove a billing token configuration.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for removing the billing token configuration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "billingTokenConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenReceiver",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "feeBillingSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "addDestChain",
       "docs": [
         "Adds a new destination chain selector to the fee quoter.",

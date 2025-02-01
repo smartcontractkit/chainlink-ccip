@@ -3355,7 +3355,7 @@ func TestCCIPRouter(t *testing.T) {
 				ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, userTokenAccount1, token1.Mint.PublicKey(), config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
-				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
+				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
 				require.NotNil(t, result)
 
 				// check balances
@@ -3793,35 +3793,6 @@ func TestCCIPRouter(t *testing.T) {
 
 			// Check that the user has paid for the tx cost and the ccip fee from their SOL
 			require.Equal(t, fee.Amount+result.Meta.Fee, initialLamports-finalLamports)
-		})
-
-		////////////////////
-		// Billing config //
-		////////////////////
-		// These tests are run at the end as they require previous successful ccip_send executions
-		// (so that there's a billed balance)
-		t.Run("FeeQuoter: Remove billing token after successful onramp calls", func(t *testing.T) {
-			t.Run("When trying to remove a billing token for which there is still a held balance, it fails", func(t *testing.T) {
-				for _, token := range billingTokens {
-					t.Run(token.name, func(t *testing.T) {
-						balance := getBalance(token.billingATA)
-						require.Greater(t, balance, uint64(0))
-
-						ix, err := fee_quoter.NewRemoveBillingTokenConfigInstruction(
-							config.FqConfigPDA,
-							token.fqBillingConfigPDA,
-							token.program,
-							token.mint,
-							token.billingATA,
-							config.BillingSignerPDA,
-							ccipAdmin.PublicKey(),
-							solana.SystemProgramID,
-						).ValidateAndBuild()
-						require.NoError(t, err)
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.InvalidInputs_CcipRouterError.String()})
-					})
-				}
-			})
 		})
 	})
 
@@ -6536,105 +6507,6 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 1, finalBal-initBal)
 			})
-		})
-	})
-
-	//////////////////////////
-	//     Cleanup tests    //
-	//////////////////////////
-
-	t.Run("FeeQuoter Cleanup", func(t *testing.T) {
-		t.Run("Can remove token config", func(t *testing.T) {
-			token0BillingPDA := getFqTokenConfigPDA(token0.Mint.PublicKey())
-
-			var initial fee_quoter.BillingTokenConfigWrapper
-			ierr := common.GetAccountDataBorshInto(ctx, solanaGoClient, token0BillingPDA, config.DefaultCommitment, &initial)
-			require.NoError(t, ierr) // it exists, initially
-
-			receiver, _, aerr := tokens.FindAssociatedTokenAddress(token0.Program, token0.Mint.PublicKey(), config.BillingSignerPDA)
-			require.NoError(t, aerr)
-
-			ixConfig, cerr := fee_quoter.NewRemoveBillingTokenConfigInstruction(
-				config.FqConfigPDA,
-				token0BillingPDA,
-				token0.Program,
-				token0.Mint.PublicKey(),
-				receiver,
-				config.FqBillingSignerPDA,
-				ccipAdmin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, cerr)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, ccipAdmin, config.DefaultCommitment)
-
-			var final fee_quoter.BillingTokenConfigWrapper
-			ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, token0BillingPDA, rpc.CommitmentProcessed, &final)
-			require.EqualError(t, ferr, "not found") // it no longer exists
-		})
-
-		t.Run("Can remove a pre-2022 token too", func(t *testing.T) {
-			mintPriv, kerr := solana.NewRandomPrivateKey()
-			require.NoError(t, kerr)
-			mint := mintPriv.PublicKey()
-
-			// use old (pre-2022) token program
-			ixToken, terr := tokens.CreateToken(ctx, solana.TokenProgramID, mint, legacyAdmin.PublicKey(), 9, solanaGoClient, config.DefaultCommitment)
-			require.NoError(t, terr)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, legacyAdmin, config.DefaultCommitment, common.AddSigners(mintPriv))
-
-			configPDA, _, perr := state.FindFqBillingTokenConfigPDA(mint, config.FeeQuoterProgram)
-			require.NoError(t, perr)
-			receiver, _, terr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, mint, config.BillingSignerPDA)
-			require.NoError(t, terr)
-
-			tokenConfig := fee_quoter.BillingTokenConfig{
-				Enabled:                    true,
-				Mint:                       mint,
-				UsdPerToken:                fee_quoter.TimestampedPackedU224{},
-				PremiumMultiplierWeiPerEth: 0,
-			}
-
-			// add it first
-			ixConfig, cerr := fee_quoter.NewAddBillingTokenConfigInstruction(
-				tokenConfig,
-				config.FqConfigPDA,
-				configPDA,
-				solana.TokenProgramID,
-				mint,
-				receiver,
-				ccipAdmin.PublicKey(),
-				config.FqBillingSignerPDA,
-				tokens.AssociatedTokenProgramID,
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, cerr)
-
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, ccipAdmin, config.DefaultCommitment)
-
-			var tokenConfigAccount fee_quoter.BillingTokenConfigWrapper
-			aerr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configPDA, config.DefaultCommitment, &tokenConfigAccount)
-			require.NoError(t, aerr)
-
-			require.Equal(t, tokenConfig, tokenConfigAccount.Config)
-
-			// now, remove the added pre-2022 token, which has a balance of 0 in the receiver
-			ixConfig, cerr = fee_quoter.NewRemoveBillingTokenConfigInstruction(
-				config.RouterConfigPDA,
-				configPDA,
-				solana.TokenProgramID,
-				mint,
-				receiver,
-				config.FqBillingSignerPDA,
-				ccipAdmin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, cerr)
-
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, ccipAdmin, config.DefaultCommitment)
-
-			var final fee_quoter.BillingTokenConfigWrapper
-			ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configPDA, rpc.CommitmentProcessed, &final)
-			require.EqualError(t, ferr, "not found") // it no longer exists
 		})
 	})
 }

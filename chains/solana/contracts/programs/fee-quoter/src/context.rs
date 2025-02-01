@@ -208,58 +208,6 @@ pub struct UpdateBillingTokenConfig<'info> {
 }
 
 #[derive(Accounts)]
-pub struct RemoveBillingTokenConfig<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
-    )]
-    pub config: Account<'info, Config>,
-
-    #[account(
-        mut,
-        close = authority,
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, fee_token_mint.key().as_ref()],
-        bump,
-    )]
-    pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
-
-    pub token_program: Interface<'info, TokenInterface>,
-
-    #[account(
-        owner = token_program.key() @ FeeQuoterError::InvalidInputs,
-    )]
-    pub fee_token_mint: InterfaceAccount<'info, Mint>,
-
-    #[account(
-        mut,
-        associated_token::mint = fee_token_mint,
-        associated_token::authority = fee_billing_signer, // use the signer account as the authority
-        associated_token::token_program = token_program,
-        constraint = fee_token_receiver.amount == 0 @ FeeQuoterError::InvalidInputs, // ensure the account is empty // TODO improve error
-    )]
-    pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
-
-    /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
-    #[account(
-        mut,
-        seeds = [seed::FEE_BILLING_SIGNER],
-        bump,
-        seeds::program = config.onramp,
-    )]
-    pub fee_billing_signer: UncheckedAccount<'info>,
-
-    #[account(
-        mut,
-        // Only the registered admin can remove a billing token config
-        address = config.owner @ FeeQuoterError::Unauthorized
-    )]
-    pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 #[instruction(dest_chain_selector: u64)]
 pub struct AddDestChain<'info> {
     #[account(

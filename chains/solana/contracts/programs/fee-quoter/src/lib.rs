@@ -109,16 +109,6 @@ pub mod fee_quoter {
         v1::admin::update_billing_token_config(ctx, config)
     }
 
-    /// Removes the billing token configuration.
-    /// Only CCIP Admin can remove a billing token configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for removing the billing token configuration.
-    pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
-        v1::admin::remove_billing_token_config(ctx)
-    }
-
     /// Adds a new destination chain selector to the fee quoter.
     ///
     /// The Admin needs to add any new chain supported.

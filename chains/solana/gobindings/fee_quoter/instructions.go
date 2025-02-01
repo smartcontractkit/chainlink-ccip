@@ -79,14 +79,6 @@ var (
 	// * `config` - The new billing token configuration.
 	Instruction_UpdateBillingTokenConfig = ag_binary.TypeID([8]byte{140, 184, 124, 146, 204, 62, 244, 79})
 
-	// Removes the billing token configuration.
-	// Only CCIP Admin can remove a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for removing the billing token configuration.
-	Instruction_RemoveBillingTokenConfig = ag_binary.TypeID([8]byte{0, 194, 92, 161, 29, 8, 10, 91})
-
 	// Adds a new destination chain selector to the fee quoter.
 	//
 	// The Admin needs to add any new chain supported.
@@ -174,8 +166,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AddBillingTokenConfig"
 	case Instruction_UpdateBillingTokenConfig:
 		return "UpdateBillingTokenConfig"
-	case Instruction_RemoveBillingTokenConfig:
-		return "RemoveBillingTokenConfig"
 	case Instruction_AddDestChain:
 		return "AddDestChain"
 	case Instruction_DisableDestChain:
@@ -222,9 +212,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"update_billing_token_config", (*UpdateBillingTokenConfig)(nil),
-		},
-		{
-			"remove_billing_token_config", (*RemoveBillingTokenConfig)(nil),
 		},
 		{
 			"add_dest_chain", (*AddDestChain)(nil),
