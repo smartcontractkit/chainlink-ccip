@@ -135,20 +135,6 @@ pub fn commit<'info>(
                 .collect();
 
             fee_quoter::cpi::update_prices(cpi_ctx, token_price_updates, gas_price_update)?;
-
-            // // For each token price update, unpack the corresponding remaining_account and update the price.
-            // // Keep in mind that the remaining_accounts are sorted in the same order as tokens and gas price updates in the report.
-            // for (i, update) in report.price_updates.token_price_updates.iter().enumerate() {
-            //     apply_token_price_update(update, &ctx.remaining_accounts[i + 1])?;
-            // }
-
-            // // Skip the first state account and the ones for token updates
-            // let offset = report.price_updates.token_price_updates.len() + 1;
-
-            // // Do the same for gas price updates
-            // for (i, update) in report.price_updates.gas_price_updates.iter().enumerate() {
-            //     apply_gas_price_update(update, &ctx.remaining_accounts[i + offset])?;
-            // }
         } else {
             // TODO check if this is really necessary. EVM has this validation checking that the
             // array of merkle roots in the report is not empty. But here, considering we only have 1 root per report,
