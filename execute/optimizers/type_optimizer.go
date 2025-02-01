@@ -3,13 +3,13 @@ package optimizers
 import (
 	"sort"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
-
-	"golang.org/x/exp/maps"
-
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -19,8 +19,9 @@ type ObservationOptimizer struct {
 	lggr              logger.Logger
 }
 
-func NewObservationOptimizer(maxEncodedSize int) ObservationOptimizer {
+func NewObservationOptimizer(lggr logger.Logger, maxEncodedSize int) ObservationOptimizer {
 	return ObservationOptimizer{
+		lggr:              logutil.WithComponent(lggr, "ObservationOptimizer"),
 		maxEncodedSize:    maxEncodedSize,
 		emptyEncodedSizes: NewEmptyEncodeSizes(),
 	}

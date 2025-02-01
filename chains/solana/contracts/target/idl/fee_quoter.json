@@ -726,6 +726,62 @@
       }
     },
     {
+      "name": "EVMExtraArgsV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "gasLimit",
+            "type": "u128"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMExtraArgsV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "computeUnits",
+            "type": "u32"
+          },
+          {
+            "name": "accountIsWritableBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
+          },
+          {
+            "name": "tokenReceiver",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "SVM2AnyMessage",
       "type": {
         "kind": "struct",
@@ -752,9 +808,7 @@
           },
           {
             "name": "extraArgs",
-            "type": {
-              "defined": "ExtraArgsInput"
-            }
+            "type": "bytes"
           }
         ]
       }
@@ -771,26 +825,6 @@
           {
             "name": "amount",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ExtraArgsInput",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": {
-              "option": "u128"
-            }
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": {
-              "option": "bool"
-            }
           }
         ]
       }
@@ -835,6 +869,32 @@
                 "defined": "TokenTransferAdditionalData"
               }
             }
+          },
+          {
+            "name": "processedExtraArgs",
+            "type": {
+              "defined": "ProcessedExtraArgs"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProcessedExtraArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": "bytes"
+          },
+          {
+            "name": "gasLimit",
+            "type": "u128"
+          },
+          {
+            "name": "allowOutOfOrderExecution",
+            "type": "bool"
           }
         ]
       }
@@ -1410,6 +1470,26 @@
       "code": 6040,
       "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
       "msg": "Extra arg out of order execution must be true"
+    },
+    {
+      "code": 6041,
+      "name": "InvalidExtraArgsTag",
+      "msg": "Invalid extra args tag"
+    },
+    {
+      "code": 6042,
+      "name": "InvalidChainFamilySelector",
+      "msg": "Invalid chain family selector"
+    },
+    {
+      "code": 6043,
+      "name": "InvalidTokenReceiver",
+      "msg": "Invalid token receiver"
+    },
+    {
+      "code": 6044,
+      "name": "InvalidSVMAddress",
+      "msg": "Invalid SVM address"
     }
   ]
 }

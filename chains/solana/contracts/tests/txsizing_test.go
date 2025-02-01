@@ -84,7 +84,7 @@ func TestTransactionSizing(t *testing.T) {
 		Data:         []byte{},
 		TokenAmounts: []ccip_router.SVMTokenAmount{}, // no tokens
 		FeeToken:     [32]byte{},                     // solana fee token
-		ExtraArgs:    ccip_router.ExtraArgsInput{},   // default options
+		ExtraArgs:    []byte{},                       // default options
 	}
 	sendSingleMinimalToken := ccip_router.SVM2AnyMessage{
 		Receiver: make([]byte, 20),
@@ -94,7 +94,7 @@ func TestTransactionSizing(t *testing.T) {
 			Amount: 0,
 		}}, // one token
 		FeeToken:  [32]byte{},
-		ExtraArgs: ccip_router.ExtraArgsInput{}, // default options
+		ExtraArgs: []byte{}, // default options
 	}
 	ixCcipSend := func(msg ccip_router.SVM2AnyMessage, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewCcipSendInstruction(
@@ -188,7 +188,7 @@ func TestTransactionSizing(t *testing.T) {
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
 			TokenAmounts:  []ccip_router.Any2SVMTokenTransfer{},
-			ExtraArgs: ccip_router.SVMExtraArgs{
+			ExtraArgs: ccip_router.Any2SVMRampExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
 			},
@@ -217,7 +217,7 @@ func TestTransactionSizing(t *testing.T) {
 				ExtraData:         []byte{},
 				Amount:            ccip_router.CrossChainAmount{LeBytes: [32]uint8{}},
 			}},
-			ExtraArgs: ccip_router.SVMExtraArgs{
+			ExtraArgs: ccip_router.Any2SVMRampExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
 			},

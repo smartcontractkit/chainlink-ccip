@@ -1,3 +1,4 @@
+use crate::events::on_ramp as events;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use fee_quoter::messages::TokenTransferAdditionalData;
@@ -12,8 +13,8 @@ use super::pools::{
 
 use crate::seed;
 use crate::{
-    CCIPMessageSent, CcipRouterError, CcipSend, Nonce, RampMessageHeader, SVM2AnyMessage,
-    SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
+    CcipRouterError, CcipSend, Nonce, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
+    SVM2AnyTokenTransfer, SVMTokenAmount,
 };
 
 pub fn ccip_send<'info>(
@@ -24,6 +25,15 @@ pub fn ccip_send<'info>(
 ) -> Result<()> {
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
+
+    let sender = ctx.accounts.authority.key.to_owned();
+    let dest_chain = &mut ctx.accounts.dest_chain_state;
+
+    require!(
+        !dest_chain.config.allow_list_enabled
+            || dest_chain.config.allowed_senders.contains(&sender),
+        CcipRouterError::SenderNotAllowed
+    );
 
     let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
 
@@ -99,7 +109,6 @@ pub fn ccip_send<'info>(
     );
     dest_chain.state.sequence_number = overflow_add.unwrap();
 
-    let sender = ctx.accounts.authority.key.to_owned();
     let receiver = message.receiver.clone();
     let source_chain_selector = config.svm_chain_selector;
 
@@ -197,7 +206,7 @@ pub fn ccip_send<'info>(
     let message_id = &hash(&new_message);
     new_message.header.message_id.clone_from(message_id);
 
-    emit!(CCIPMessageSent {
+    emit!(events::CCIPMessageSent {
         dest_chain_selector,
         sequence_number: new_message.header.sequence_number,
         message: new_message,
@@ -412,7 +421,7 @@ mod tests {
         let hash_result = hash(&message);
 
         assert_eq!(
-            "009bc51872fe41ea096bd881bf52e3daf07c80e112ffeeba6aa503d8281b6bfd",
+            "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7",
             hex::encode(hash_result)
         );
     }

@@ -10,14 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ON RAMP FLOW
+// On Ramp Flow //
 // Sends a message to the destination chain.
 //
 // Request a message to be sent to the destination chain.
 // The method name needs to be ccip_send with Anchor encoding.
 // This function is called by the CCIP Sender Contract (or final user) to send a message to the CCIP Router.
 // The message will be sent to the receiver on the destination chain selector.
-// This message emits the event CCIPSendRequested with all the necessary data to be retrieved by the OffChain Code
+// This message emits the event CCIPMessageSent with all the necessary data to be retrieved by the OffChain Code
 //
 // # Arguments
 //

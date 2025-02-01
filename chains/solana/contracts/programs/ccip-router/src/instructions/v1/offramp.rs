@@ -1,3 +1,4 @@
+use crate::events::off_ramp as events;
 use anchor_lang::prelude::*;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
@@ -14,11 +15,9 @@ use super::pools::{
 
 use crate::v1::ocr3base::Signatures;
 use crate::{
-    seed, Any2SVMRampMessage, CcipRouterError, CommitInput, CommitReport, CommitReportAccepted,
-    CommitReportContext, DestChain, ExecuteReportContext, ExecutionReportSingleChain,
-    ExecutionStateChanged, GasPriceUpdate, GlobalState, MessageExecutionState, OcrPluginType,
-    RampMessageHeader, SVMTokenAmount, SkippedAlreadyExecutedMessage, SourceChain,
-    TimestampedPackedU224, TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated,
+    seed, Any2SVMRampMessage, CcipRouterError, CommitInput, CommitReport, CommitReportContext,
+    ExecuteReportContext, ExecutionReportSingleChain, GlobalState, MessageExecutionState,
+    OcrPluginType, RampMessageHeader, SVMTokenAmount, SourceChain,
 };
 
 pub fn commit<'info>(
@@ -209,7 +208,7 @@ pub fn commit<'info>(
     commit_report.min_msg_nr = root.min_seq_nr;
     commit_report.max_msg_nr = root.max_seq_nr;
 
-    emit!(CommitReportAccepted {
+    emit!(events::CommitReportAccepted {
         merkle_root: root.clone(),
         price_updates: report.price_updates.clone(),
     });
@@ -286,107 +285,6 @@ pub fn manually_execute<'info>(
 // Helpers //
 /////////////
 
-fn apply_token_price_update<'info>(
-    token_update: &TokenPriceUpdate,
-    token_config_account_info: &'info AccountInfo<'info>,
-) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(
-        &[
-            fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
-            token_update.source_token.as_ref(),
-        ],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        token_config_account_info.key(),
-        expected,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        token_config_account_info.is_writable,
-        CcipRouterError::InvalidInputs
-    );
-
-    let token_config_account: &mut Account<fee_quoter::state::BillingTokenConfigWrapper> =
-        &mut Account::try_from(token_config_account_info)?;
-
-    require!(
-        token_config_account.version == 1,
-        CcipRouterError::InvalidInputs
-    );
-
-    token_config_account.config.usd_per_token = fee_quoter::state::TimestampedPackedU224 {
-        value: token_update.usd_per_token,
-        timestamp: Clock::get()?.unix_timestamp,
-    };
-
-    emit!(UsdPerTokenUpdated {
-        token: token_config_account.config.mint,
-        value: token_config_account.config.usd_per_token.value,
-        timestamp: token_config_account.config.usd_per_token.timestamp,
-    });
-
-    // As the account is manually loaded from the AccountInfo, it also needs to be manually
-    // written back to so the changes are persisted.
-    token_config_account.exit(&crate::ID)
-}
-
-fn apply_gas_price_update<'info>(
-    gas_update: &GasPriceUpdate,
-    dest_chain_state_account_info: &'info AccountInfo<'info>,
-) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(
-        &[
-            seed::DEST_CHAIN_STATE,
-            gas_update.dest_chain_selector.to_le_bytes().as_ref(),
-        ],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        dest_chain_state_account_info.key(),
-        expected,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        dest_chain_state_account_info.is_writable,
-        CcipRouterError::InvalidInputs
-    );
-
-    // The passed-in chain_state account may refer to the same chain but it only corresponds to source.
-    // To update the price that values correspond to the destination, which is a different account.
-    // As the account is sent as additional accounts, then Anchor won't automatically (de)serialize the account
-    // as it is not the one in the context, so we have to do it manually load it and write it back
-    let dest_chain_state_account = &mut Account::try_from(dest_chain_state_account_info)?;
-    update_chain_state_gas_price(dest_chain_state_account, gas_update)?;
-    dest_chain_state_account.exit(&crate::ID)?;
-    Ok(())
-}
-
-fn update_chain_state_gas_price(
-    chain_state_account: &mut Account<DestChain>,
-    gas_update: &GasPriceUpdate,
-) -> Result<()> {
-    require!(
-        chain_state_account.version == 1,
-        CcipRouterError::InvalidInputs
-    );
-
-    chain_state_account.state.usd_per_unit_gas = TimestampedPackedU224 {
-        value: gas_update.usd_per_unit_gas,
-        timestamp: Clock::get()?.unix_timestamp,
-    };
-
-    emit!(UsdPerUnitGasUpdated {
-        dest_chain: gas_update.dest_chain_selector,
-        value: chain_state_account.state.usd_per_unit_gas.value,
-        timestamp: chain_state_account.state.usd_per_unit_gas.timestamp,
-    });
-
-    Ok(())
-}
-
 // internal_execute is the base execution logic without any additional validation
 fn internal_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
@@ -429,7 +327,7 @@ fn internal_execute<'info>(
     let original_state = execution_state::get(commit_report, message_header.sequence_number);
 
     if original_state == MessageExecutionState::Success {
-        emit!(SkippedAlreadyExecutedMessage {
+        emit!(events::SkippedAlreadyExecutedMessage {
             source_chain_selector: message_header.source_chain_selector,
             sequence_number: message_header.sequence_number,
         });
@@ -575,7 +473,7 @@ fn internal_execute<'info>(
         new_state.to_owned(),
     );
 
-    emit!(ExecutionStateChanged {
+    emit!(events::ExecutionStateChanged {
         source_chain_selector: message_header.source_chain_selector,
         sequence_number: message_header.sequence_number,
         message_id: message_header.message_id, // Unique identifier for the message, generated with the source chain's encoding scheme

@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::extra_args::{EVMExtraArgsV2, SVMExtraArgsV1};
+use crate::extra_args::{
+    EVMExtraArgsV2, SVMExtraArgsV1, EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
+};
 use crate::messages::{
     ProcessedExtraArgs, SVM2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
 };

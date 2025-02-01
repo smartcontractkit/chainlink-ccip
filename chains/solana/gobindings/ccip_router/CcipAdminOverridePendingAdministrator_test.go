@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_UpdateDefaultAllowOutOfOrderExecution(t *testing.T) {
+func TestEncodeDecode_CcipAdminOverridePendingAdministrator(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("UpdateDefaultAllowOutOfOrderExecution"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("CcipAdminOverridePendingAdministrator"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(UpdateDefaultAllowOutOfOrderExecution)
+				params := new(CcipAdminOverridePendingAdministrator)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(UpdateDefaultAllowOutOfOrderExecution)
+				got := new(CcipAdminOverridePendingAdministrator)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

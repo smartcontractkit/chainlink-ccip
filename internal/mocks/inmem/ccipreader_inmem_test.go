@@ -89,7 +89,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 			t.Parallel()
 			r := InMemoryCCIPReader{
 				Reports: tt.fields.Reports}
-			got, err := r.CommitReportsGTETimestamp(context.Background(), 1, tt.args.ts, tt.args.limit)
+			got, err := r.CommitReportsGTETimestamp(context.Background(), tt.args.ts, tt.args.limit)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CommitReportsGTETimestamp() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -209,7 +209,7 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 				Messages: tt.fields.MessagesWithExecuted,
 				Dest:     tt.fields.Dest,
 			}
-			got, err := r.ExecutedMessages(context.Background(), tt.args.source, tt.args.dest, tt.args.seqNumRange)
+			got, err := r.ExecutedMessages(context.Background(), tt.args.source, tt.args.seqNumRange)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ExecutedMessages() error = %v, wantErr %v", err, tt.wantErr)
 				return

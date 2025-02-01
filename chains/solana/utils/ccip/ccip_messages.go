@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -15,6 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
+
+const EVMExtraArgsV2Tag = "181dcf10"
+const SVMExtraArgsV1Tag = "1f3b3aba"
 
 var leafDomainSeparator = [32]byte{}
 
@@ -95,7 +99,7 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 		},
 		Sender: []byte{1, 2, 3},
 		Data:   []byte{4, 5, 6},
-		ExtraArgs: ccip_router.SVMExtraArgs{
+		ExtraArgs: ccip_router.Any2SVMRampExtraArgs{
 			ComputeUnits:     1000,
 			IsWritableBitmap: GenerateBitMapForIndexes([]int{0, 1}),
 		},
@@ -280,7 +284,6 @@ func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
 }
 
 // GenerateBitMapForIndexes generates a bitmap for the given indexes.
-
 func GenerateBitMapForIndexes(indexes []int) uint64 {
 	var bitmap uint64
 
@@ -289,4 +292,27 @@ func GenerateBitMapForIndexes(indexes []int) uint64 {
 	}
 
 	return bitmap
+}
+
+func SerializeExtraArgs(data interface{}, tag string) ([]byte, error) {
+	tagBytes, err := hex.DecodeString(tag)
+	if err != nil {
+		return nil, err
+	}
+	v, err := bin.MarshalBorsh(data)
+	return append(tagBytes, v...), err
+}
+
+func DeserializeExtraArgs(obj interface{}, data []byte, tag string) error {
+	tagBytes, err := hex.DecodeString(tag)
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(data[:4], tagBytes) {
+		return fmt.Errorf("Mismatched tag: %s != %s", hex.EncodeToString(data[:4]), tag)
+	}
+
+	err = bin.UnmarshalBorsh(obj, data[4:])
+	return err
 }

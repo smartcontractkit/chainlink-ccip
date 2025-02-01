@@ -39,18 +39,24 @@ import (
 )
 
 func Test_getPendingExecutedReports(t *testing.T) {
+	canExecute := func(ret bool) CanExecuteHandle {
+		return func(cciptypes.ChainSelector, cciptypes.Bytes32) bool { return ret }
+	}
+
 	tests := []struct {
-		name    string
-		reports []plugintypes2.CommitPluginReportWithMeta
-		ranges  map[cciptypes.ChainSelector][]cciptypes.SeqNum
-		want    exectypes.CommitObservations
-		wantErr assert.ErrorAssertionFunc
+		name         string
+		reports      []plugintypes2.CommitPluginReportWithMeta
+		ranges       map[cciptypes.ChainSelector][]cciptypes.SeqNum
+		canExec      CanExecuteHandle
+		wantObs      exectypes.CommitObservations
+		wantExecuted []exectypes.CommitData
+		wantErr      assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
 			reports: nil,
 			ranges:  nil,
-			want:    exectypes.CommitObservations{},
+			wantObs: exectypes.CommitObservations{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -72,7 +78,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: nil,
 			},
-			want: exectypes.CommitObservations{
+			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
 						SourceChain:         1,
@@ -103,7 +109,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: {1, 2, 3, 7, 8},
 			},
-			want: exectypes.CommitObservations{
+			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
 						SourceChain:         1,
@@ -131,14 +137,73 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				},
 			},
 			ranges:  map[cciptypes.ChainSelector][]cciptypes.SeqNum{},
-			want:    exectypes.CommitObservations{},
+			wantObs: exectypes.CommitObservations{},
 			wantErr: assert.NoError,
+		},
+		{
+			name: "single fully-executed report",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						MerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: cciptypes.NewSeqNumRange(1, 10).ToSlice(),
+			},
+			wantObs: exectypes.CommitObservations{
+				1: nil,
+			},
+			wantExecuted: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+					Timestamp:           time.UnixMilli(10101010101),
+					BlockNum:            999,
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "single known-executed report",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						MerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			canExec: canExecute(false),
+			ranges:  nil,
+			wantObs: exectypes.CommitObservations{
+				1: nil,
+			},
+			wantExecuted: nil, // the executed message is not returned.
+			wantErr:      assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			if tt.canExec == nil {
+				tt.canExec = canExecute(true)
+			}
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			mockReader.On(
 				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
@@ -152,17 +217,18 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
 			// for each chain selector:
 			//      ExecutedMessages(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNum, error)
-			got, err := getPendingExecutedReports(
+			got, got2, err := getPendingExecutedReports(
 				context.Background(),
 				mockReader,
-				123,
+				tt.canExec,
 				time.Now(),
 				logger.Test(t),
 			)
 			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
 				return
 			}
-			assert.Equalf(t, tt.want, got, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantObs, got, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantExecuted, got2, "getPendingExecutedReports(...)")
 		})
 	}
 }
@@ -325,6 +391,42 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "validate observed sequence numbers: duplicate merkle root")
+}
+
+func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+
+	mockHomeChain := reader_mock.NewMockHomeChain(t)
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	mockDiscoveryProcessor := plugincommon_mock.NewMockPluginProcessor[dt.Query, dt.Observation, dt.Outcome](t)
+	mockDiscoveryProcessor.EXPECT().ValidateObservation(dt.Outcome{}, dt.Query{}, mock.Anything).Return(nil)
+
+	p := &Plugin{
+		lggr:      lggr,
+		homeChain: mockHomeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+		discovery: mockDiscoveryProcessor,
+	}
+
+	// Reports with duplicate roots.
+	root := cciptypes.Bytes32{}
+	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2), SourceChain: 1},
+		},
+	}
+	observation := exectypes.NewObservation(
+		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+	)
+	encoded, err := observation.Encode()
+	require.NoError(t, err)
+	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+		Observation: encoded,
+	})
+	require.NoError(t, err)
 }
 
 func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
@@ -590,7 +692,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{
 						CursedSourceChains: map[cciptypes.ChainSelector]bool{
 							1: false,
@@ -612,7 +714,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{}, fmt.Errorf("test error"))
 
 				homeChain := basicHomeChain()
@@ -632,7 +734,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{GlobalCurse: true}, nil)
 
 				homeChain := basicHomeChain()
@@ -652,7 +754,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{CursedDestination: true}, nil)
 
 				homeChain := basicHomeChain()
@@ -672,7 +774,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{1: true}}, nil)
 
 				homeChain := basicHomeChain()

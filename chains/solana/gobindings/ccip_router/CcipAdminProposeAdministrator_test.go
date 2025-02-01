@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_UpdateDefaultGasLimit(t *testing.T) {
+func TestEncodeDecode_CcipAdminProposeAdministrator(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("UpdateDefaultGasLimit"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("CcipAdminProposeAdministrator"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(UpdateDefaultGasLimit)
+				params := new(CcipAdminProposeAdministrator)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(UpdateDefaultGasLimit)
+				got := new(CcipAdminProposeAdministrator)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

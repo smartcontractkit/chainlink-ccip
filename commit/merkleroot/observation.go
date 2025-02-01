@@ -364,7 +364,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, o.chainSupport.DestChain(), allSourceChains)
+	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
@@ -427,7 +427,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 
 	for _, sourceChain := range sourceChains {
 		eg.Go(func() error {
-			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain, destChain)
+			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain)
 			if err != nil {
 				lggr.Errorf("failed to get expected next seq num for source chain %d: %s", sourceChain, err)
 				return nil
@@ -604,7 +604,7 @@ func (o observerImpl) ObserveRMNRemoteCfg(
 	dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
-	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx, dstChain)
+	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
 		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
 			// destination chain not supported

@@ -7,8 +7,8 @@ use solana_program::sysvar::instructions;
 use crate::program::CcipRouter;
 use crate::state::{CommitReport, Config, Nonce};
 use crate::{
-    CcipRouterError, DestChain, ExecutionReportSingleChain, ExternalExecutionConfig, GlobalState,
-    SVM2AnyMessage, SourceChain,
+    CcipRouterError, DestChain, DestChainConfig, ExecutionReportSingleChain,
+    ExternalExecutionConfig, GlobalState, SVM2AnyMessage, SourceChain,
 };
 
 /// Static space allocated to any account: must always be added to space calculations.
@@ -222,11 +222,10 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64)]
+#[instruction(new_chain_selector: u64, dest_chain_config: DestChainConfig)]
 pub struct AddChainSelector<'info> {
     /// Adding a chain selector implies initializing the state for a new chain,
     /// hence the need to initialize two accounts.
-
     #[account(
         init,
         seeds = [seed::SOURCE_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
@@ -241,7 +240,7 @@ pub struct AddChainSelector<'info> {
         seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
         bump,
         payer = authority,
-        space = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE,
+        space = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE + dest_chain_config.dynamic_space(),
     )]
     pub dest_chain_state: Account<'info, DestChain>,
 
@@ -280,8 +279,37 @@ pub struct UpdateSourceChainSelectorConfig<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64)]
+#[instruction(new_chain_selector: u64, dest_chain_config: DestChainConfig)]
 pub struct UpdateDestChainSelectorConfig<'info> {
+    #[account(
+        mut,
+        seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
+        realloc = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE + dest_chain_config.dynamic_space(),
+        realloc::payer = authority,
+        // `realloc::zero = true` is only necessary in cases where an instruction is capable of reallocating
+        // *down* and then *up*, during a single execution. In any other cases (such as this), it's not
+        // necessary as the memory will be zero'd automatically on instruction entry.
+        realloc::zero = false
+    )]
+    pub dest_chain_state: Account<'info, DestChain>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(new_chain_selector: u64)]
+pub struct DisableDestChainSelectorConfig<'info> {
     #[account(
         mut,
         seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],

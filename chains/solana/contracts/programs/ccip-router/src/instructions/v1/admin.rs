@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
+use crate::events::admin as events;
+use crate::DisableDestChainSelectorConfig;
 use crate::{
-    AcceptOwnership, AddChainSelector, CcipRouterError, DestChainAdded, DestChainConfig,
-    DestChainConfigUpdated, DestChainState, Ocr3ConfigInfo, OcrPluginType,
-    OwnershipTransferRequested, OwnershipTransferred, SetOcrConfig, SourceChainAdded,
-    SourceChainConfig, SourceChainConfigUpdated, SourceChainState, TimestampedPackedU224,
-    TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
-    UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
+    AcceptOwnership, AddChainSelector, CcipRouterError, DestChainConfig, DestChainState,
+    Ocr3ConfigInfo, OcrPluginType, SetOcrConfig, SourceChainConfig, SourceChainState,
+    TimestampedPackedU224, TransferOwnership, UpdateConfigCCIPRouter,
+    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -19,7 +19,7 @@ pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubke
         proposed_owner != config.owner,
         CcipRouterError::InvalidInputs
     );
-    emit!(OwnershipTransferRequested {
+    emit!(events::OwnershipTransferRequested {
         from: config.owner,
         to: proposed_owner,
     });
@@ -29,7 +29,7 @@ pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubke
 
 pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
-    emit!(OwnershipTransferred {
+    emit!(events::OwnershipTransferred {
         from: config.owner,
         to: config.proposed_owner,
     });
@@ -75,11 +75,11 @@ pub fn add_chain_selector(
         },
     };
 
-    emit!(SourceChainAdded {
+    emit!(events::SourceChainAdded {
         source_chain_selector: new_chain_selector,
         source_chain_config,
     });
-    emit!(DestChainAdded {
+    emit!(events::DestChainAdded {
         dest_chain_selector: new_chain_selector,
         dest_chain_config,
     });
@@ -95,7 +95,7 @@ pub fn disable_source_chain_selector(
 
     chain_state.config.is_enabled = false;
 
-    emit!(SourceChainConfigUpdated {
+    emit!(events::SourceChainConfigUpdated {
         source_chain_selector,
         source_chain_config: chain_state.config.clone(),
     });
@@ -104,14 +104,14 @@ pub fn disable_source_chain_selector(
 }
 
 pub fn disable_dest_chain_selector(
-    ctx: Context<UpdateDestChainSelectorConfig>,
+    ctx: Context<DisableDestChainSelectorConfig>,
     dest_chain_selector: u64,
 ) -> Result<()> {
     let chain_state = &mut ctx.accounts.dest_chain_state;
 
     chain_state.config.is_enabled = false;
 
-    emit!(DestChainConfigUpdated {
+    emit!(events::DestChainConfigUpdated {
         dest_chain_selector,
         dest_chain_config: chain_state.config.clone(),
     });
@@ -128,7 +128,7 @@ pub fn update_source_chain_config(
 
     ctx.accounts.source_chain_state.config = source_chain_config.clone();
 
-    emit!(SourceChainConfigUpdated {
+    emit!(events::SourceChainConfigUpdated {
         source_chain_selector,
         source_chain_config,
     });
@@ -144,7 +144,7 @@ pub fn update_dest_chain_config(
 
     ctx.accounts.dest_chain_state.config = dest_chain_config.clone();
 
-    emit!(DestChainConfigUpdated {
+    emit!(events::DestChainConfigUpdated {
         dest_chain_selector,
         dest_chain_config,
     });
