@@ -23,7 +23,7 @@ func mustRandomPubkey() solana.PublicKey {
 	return k.PublicKey()
 }
 
-const MAX_SOLANA_TX_SIZE = 1232
+const MaxSolanaTxSize = 1232
 
 type failOnExcessTxSize func(tables map[solana.PublicKey]solana.PublicKeySlice) bool
 
@@ -91,9 +91,9 @@ func TestTransactionSizing(t *testing.T) {
 		require.NoError(t, err)
 		l := len(bz)
 		if failOnExcessPredicate(tables) {
-			require.LessOrEqual(t, l, MAX_SOLANA_TX_SIZE)
+			require.LessOrEqual(t, l, MaxSolanaTxSize)
 		}
-		remaining := MAX_SOLANA_TX_SIZE - l
+		remaining := MaxSolanaTxSize - l
 		var warning string
 		if remaining < 0 {
 			warning = "<<< WARNING!!"
