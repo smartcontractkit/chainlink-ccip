@@ -5,7 +5,9 @@ use std::ops::AddAssign;
 
 use crate::context::GetFee;
 use crate::instructions::v1::safe_deserialize;
-use crate::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount, TokenTransferAdditionalData};
+use crate::messages::{
+    GetFeeResult, ProcessedExtraArgs, SVM2AnyMessage, SVMTokenAmount, TokenTransferAdditionalData,
+};
 use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
 use crate::FeeQuoterError;
 
@@ -60,7 +62,7 @@ pub fn get_fee<'info>(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let fee = fee_for_msg(
+    let (fee, processed_extra_args) = fee_for_msg(
         message,
         &ctx.accounts.dest_chain,
         &ctx.accounts.billing_token_config.config,
@@ -104,6 +106,7 @@ pub fn get_fee<'info>(
         amount: fee.amount,
         juels,
         token_transfer_additional_data,
+        processed_extra_args,
     })
 }
 
@@ -131,7 +134,7 @@ fn fee_for_msg(
     fee_token_config: &BillingTokenConfig,
     additional_token_configs: &[Option<BillingTokenConfig>],
     additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
-) -> Result<SVMTokenAmount> {
+) -> Result<(SVMTokenAmount, ProcessedExtraArgs)> {
     let fee_token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
     } else {
@@ -145,7 +148,7 @@ fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         FeeQuoterError::InvalidInputsMissingTokenConfig
     );
-    validate_svm2any(message, dest_chain, fee_token_config)?;
+    let processed_extra_args = validate_svm2any(message, dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
@@ -160,12 +163,7 @@ fn fee_for_msg(
         additional_token_configs_for_dest_chain,
     )?;
 
-    let gas_limit = U256::new(
-        message
-            .extra_args
-            .gas_limit
-            .unwrap_or_else(|| dest_chain.config.default_tx_gas_limit.into()),
-    );
+    let gas_limit = U256::new(processed_extra_args.gas_limit);
 
     // Calculate calldata gas cost while accounting for EIP-7623 variable calldata gas pricing
     // This logic works for EVMs post Pectra upgrade, while being backwards compatible with pre-Pectra EVMs.
@@ -214,10 +212,13 @@ fn fee_for_msg(
         .try_into()
         .map_err(|_| FeeQuoterError::InvalidTokenPrice)?;
 
-    Ok(SVMTokenAmount {
-        token: fee_token,
-        amount: fee_token_amount,
-    })
+    Ok((
+        SVMTokenAmount {
+            token: fee_token,
+            amount: fee_token_amount,
+        },
+        processed_extra_args,
+    ))
 }
 
 fn data_availability_cost(
@@ -422,7 +423,7 @@ mod tests {
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
-    use crate::messages::{ExtraArgsInput, CHAIN_FAMILY_SELECTOR_EVM};
+    use super::super::messages::tests::{sample_billing_config, sample_dest_chain, sample_message};
     use crate::TokenBilling;
 
     use super::*;
@@ -446,89 +447,6 @@ mod tests {
         }
     }
 
-    fn as_u8_28(single: U256) -> [u8; 28] {
-        single.to_be_bytes()[4..32].try_into().unwrap()
-    }
-
-    pub fn sample_message() -> SVM2AnyMessage {
-        let mut receiver = vec![0u8; 32];
-
-        // Arbitrary value that pushes the address to the right EVM range
-        // (above precompile space, under u160::max)
-        receiver[20] = 0xA;
-
-        SVM2AnyMessage {
-            receiver,
-            data: vec![],
-            token_amounts: vec![],
-            fee_token: native_mint::ID,
-            extra_args: ExtraArgsInput {
-                gas_limit: None,
-                allow_out_of_order_execution: None,
-            },
-        }
-    }
-
-    pub fn sample_billing_config() -> BillingTokenConfig {
-        // All values are derived from inspecting the Ethereum Mainnet -> Avalanche lane as of Jan 9 2025,
-        // using USDC as transfer token and LINK as fee token wherever applicable (these are not important,
-        // they were used to retrieve correctly dimensioned values)
-
-        let arbitrary_timestamp = 100;
-        let usd_per_token = TimestampedPackedU224 {
-            timestamp: arbitrary_timestamp,
-            value: as_u8_28(U256::new(19816680000000000000)),
-        };
-
-        BillingTokenConfig {
-            enabled: true,
-            mint: native_mint::ID,
-            usd_per_token,
-            premium_multiplier_wei_per_eth: 900000000000000000,
-        }
-    }
-
-    pub fn sample_dest_chain() -> DestChain {
-        // All values are derived from inspecting the Ethereum Mainnet -> Avalanche lane as of Jan 9 2025,
-        // using USDC as transfer token and LINK as fee token wherever applicable (these are not important,
-        // they were used to retrieve correctly dimensioned values)
-        let arbitrary_timestamp = 100;
-        let usd_per_unit_gas = TryInto::<UnpackedDoubleU224>::try_into(PackedPrice {
-            execution_gas_price: Usd18Decimals(U256::new(921441088750)),
-            // L1 dest chain so there's no DA price by default
-            data_availability_gas_price: Usd18Decimals(U256::new(0)),
-        })
-        .unwrap()
-        .pack(arbitrary_timestamp);
-
-        DestChain {
-            version: 1,
-            chain_selector: 1,
-            state: crate::DestChainState { usd_per_unit_gas },
-            config: crate::DestChainConfig {
-                is_enabled: true,
-                max_number_of_tokens_per_msg: 1,
-                max_data_bytes: 30000,
-                max_per_msg_gas_limit: 3000000,
-                dest_gas_overhead: 300000,
-                dest_gas_per_payload_byte_base: 16,
-                dest_gas_per_payload_byte_high: 40,
-                dest_gas_per_payload_byte_threshold: 3000,
-                dest_data_availability_overhead_gas: 0,
-                dest_gas_per_data_availability_byte: 16,
-                dest_data_availability_multiplier_bps: 0,
-                default_token_fee_usdcents: 50,
-                default_token_dest_gas_overhead: 90000,
-                default_tx_gas_limit: 200000,
-                gas_multiplier_wei_per_eth: 1100000000000000000,
-                network_fee_usdcents: 50,
-                gas_price_staleness_threshold: 90000,
-                enforce_out_of_order: false,
-                chain_family_selector: CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes(),
-            },
-        }
-    }
-
     #[test]
     // NOTE: This test is unique in that the return value of `fee_for_msg` has been
     // directly validated against a `getFee` query in the Ethereum mainnet -> Avalanche Fuji
@@ -546,7 +464,8 @@ mod tests {
                 &[],
                 &[]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 48282184443231661
@@ -567,7 +486,8 @@ mod tests {
                 &[],
                 &[]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the network fee component of the sum
@@ -627,7 +547,8 @@ mod tests {
                 &[Some(token_config)],
                 &[per_chain_per_token]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 52911699750913573,
@@ -661,7 +582,8 @@ mod tests {
                 &[Some(another_token_config)],
                 &[another_per_chain_per_token_config]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the min_fee
@@ -698,7 +620,8 @@ mod tests {
                 &[Some(another_token_config.clone())],
                 &[another_per_chain_per_token_config.clone()]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 36654452956230811
@@ -716,7 +639,8 @@ mod tests {
                 &[Some(another_token_config)],
                 &[another_per_chain_per_token_config]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Slight increase in price
@@ -751,7 +675,8 @@ mod tests {
                 &[None],
                 &[another_per_chain_per_token_config.clone()]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 35758615812975735
@@ -769,7 +694,8 @@ mod tests {
                 &[None],
                 &[another_per_chain_per_token_config.clone()]
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 35758615812975735
@@ -805,7 +731,8 @@ mod tests {
                 &tokens,
                 &per_chains
             )
-            .unwrap(),
+            .unwrap()
+            .0,
             SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens

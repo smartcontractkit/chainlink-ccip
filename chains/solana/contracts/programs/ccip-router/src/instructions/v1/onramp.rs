@@ -1,5 +1,3 @@
-use std::cell::Ref;
-
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use fee_quoter::messages::TokenTransferAdditionalData;
@@ -14,8 +12,8 @@ use super::pools::{
 
 use crate::seed;
 use crate::{
-    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, ExtraArgsInput, Nonce,
-    RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
+    CCIPMessageSent, CcipRouterError, CcipSend, Nonce, RampMessageHeader, SVM2AnyMessage,
+    SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
 };
 
 pub fn ccip_send<'info>(
@@ -51,7 +49,7 @@ pub fn ccip_send<'info>(
 
     // Fee Quoter validates the message, calculates the fee in both the billing token
     // and LINK, asserts that it doesn't exceed a maximum, and returns it
-    let fee = get_fee_cpi(
+    let get_fee_result = get_fee_cpi(
         &ctx,
         dest_chain_selector,
         &message,
@@ -64,7 +62,7 @@ pub fn ccip_send<'info>(
             &ctx.accounts.fee_token_program.to_account_info(),
             &mut ctx.accounts.authority,
             &mut ctx.accounts.fee_token_receiver,
-            fee.amount,
+            get_fee_result.amount,
             ctx.bumps.fee_billing_signer,
         )?;
     } else {
@@ -79,8 +77,8 @@ pub fn ccip_send<'info>(
         };
 
         let transferable_fee = SVMTokenAmount {
-            token: fee.token,
-            amount: fee.amount,
+            token: get_fee_result.token,
+            amount: get_fee_result.amount,
         };
 
         transfer_fee(
@@ -104,10 +102,15 @@ pub fn ccip_send<'info>(
     let sender = ctx.accounts.authority.key.to_owned();
     let receiver = message.receiver.clone();
     let source_chain_selector = config.svm_chain_selector;
-    let extra_args = extra_args_or_default(config, message.extra_args);
 
     let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
-    let final_nonce = bump_nonce(nonce_counter_account, extra_args).unwrap();
+    let final_nonce = bump_nonce(
+        nonce_counter_account,
+        get_fee_result
+            .processed_extra_args
+            .allow_out_of_order_execution,
+    )
+    .unwrap();
 
     let token_count = message.token_amounts.len();
     require!(
@@ -126,10 +129,10 @@ pub fn ccip_send<'info>(
             sequence_number: dest_chain.state.sequence_number,
             nonce: final_nonce,
         },
-        extra_args,
+        extra_args: get_fee_result.processed_extra_args.bytes,
         fee_token: message.fee_token,
-        fee_token_amount: fee.amount.into(),
-        fee_value_juels: fee.juels.into(),
+        fee_token_amount: get_fee_result.amount.into(),
+        fee_value_juels: get_fee_result.juels.into(),
         token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count], // this will be set later
     };
 
@@ -186,7 +189,7 @@ pub fn ccip_send<'info>(
                 lock_or_burn_out_data,
                 current_token_accounts.pool_config.key(),
                 token_amount,
-                &fee.token_transfer_additional_data[i],
+                &get_fee_result.token_transfer_additional_data[i],
             )?;
         }
     }
@@ -251,10 +254,7 @@ fn get_fee_cpi<'info>(
             })
             .collect(),
         fee_token: message.fee_token.clone(),
-        extra_args: fee_quoter::messages::ExtraArgsInput {
-            gas_limit: message.extra_args.gas_limit,
-            allow_out_of_order_execution: message.extra_args.allow_out_of_order_execution,
-        },
+        extra_args: message.extra_args.clone(),
     };
 
     let fee = fee_quoter::cpi::get_fee(cpi_ctx, dest_chain_selector, cpi_message)?.get();
@@ -298,24 +298,10 @@ fn token_transfer(
 /////////////
 // Helpers //
 /////////////
-fn extra_args_or_default(default_config: Ref<Config>, extra_args: ExtraArgsInput) -> AnyExtraArgs {
-    let mut result_args = AnyExtraArgs {
-        gas_limit: default_config.default_gas_limit.to_owned(),
-        allow_out_of_order_execution: default_config.default_allow_out_of_order_execution != 0,
-    };
-
-    if let Some(gas_limit) = extra_args.gas_limit {
-        gas_limit.clone_into(&mut result_args.gas_limit)
-    }
-
-    if let Some(allow_out_of_order_execution) = extra_args.allow_out_of_order_execution {
-        allow_out_of_order_execution.clone_into(&mut result_args.allow_out_of_order_execution)
-    }
-
-    result_args
-}
-
-fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraArgs) -> Result<u64> {
+fn bump_nonce(
+    nonce_counter_account: &mut Account<Nonce>,
+    allow_out_of_order_execution: bool,
+) -> Result<u64> {
     // Avoid Re-initialization attack as the account is init_if_needed
     // https://solana.com/developers/courses/program-security/reinitialization-attacks#add-is-initialized-check
     if nonce_counter_account.version == 0 {
@@ -325,9 +311,9 @@ fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraAr
         nonce_counter_account.counter = 0;
     }
 
-    // TODO: Require config.enforce_out_of_order => extra_args.allow_out_of_order_execution
+    // config.enforce_out_of_order checked in `validate_svm2any`
     let mut final_nonce = 0;
-    if !extra_args.allow_out_of_order_execution {
+    if !allow_out_of_order_execution {
         nonce_counter_account.counter = nonce_counter_account.counter.checked_add(1).unwrap();
         final_nonce = nonce_counter_account.counter;
     }
@@ -402,10 +388,11 @@ mod tests {
                 0, 0, 0, 0,
             ]
             .to_vec(),
-            extra_args: AnyExtraArgs {
+            extra_args: fee_quoter::extra_args::EVMExtraArgsV2 {
                 gas_limit: 1,
                 allow_out_of_order_execution: true,
-            },
+            }
+            .serialize_with_tag(),
             fee_token: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
             fee_token_amount: 50u32.into(),
             token_amounts: [SVM2AnyTokenTransfer {

@@ -14,6 +14,8 @@ use state::*;
 
 pub mod event;
 
+pub mod extra_args;
+
 mod instructions;
 use instructions::v1;
 
@@ -312,4 +314,12 @@ pub enum FeeQuoterError {
     MessageGasLimitTooHigh,
     #[msg("Extra arg out of order execution must be true")]
     ExtraArgOutOfOrderExecutionMustBeTrue,
+    #[msg("Invalid extra args tag")]
+    InvalidExtraArgsTag,
+    #[msg("Invalid chain family selector")]
+    InvalidChainFamilySelector,
+    #[msg("Invalid token receiver")]
+    InvalidTokenReceiver,
+    #[msg("Invalid SVM address")]
+    InvalidSVMAddress,
 }

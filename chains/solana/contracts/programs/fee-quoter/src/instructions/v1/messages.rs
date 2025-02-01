@@ -1,8 +1,11 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::messages::{SVM2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM};
-use crate::state::{BillingTokenConfig, DestChain};
+use crate::extra_args::{EVMExtraArgsV2, SVMExtraArgsV1};
+use crate::messages::{
+    ProcessedExtraArgs, SVM2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
+};
+use crate::state::{BillingTokenConfig, DestChain, DestChainConfig};
 use crate::FeeQuoterError;
 
 const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
@@ -11,7 +14,7 @@ pub fn validate_svm2any(
     msg: &SVM2AnyMessage,
     dest_chain: &DestChain,
     token_config: &BillingTokenConfig,
-) -> Result<()> {
+) -> Result<ProcessedExtraArgs> {
     require!(
         dest_chain.config.is_enabled,
         FeeQuoterError::DestinationChainDisabled
@@ -31,48 +34,52 @@ pub fn validate_svm2any(
         FeeQuoterError::UnsupportedNumberOfTokens
     );
 
+    let processed_extra_args = process_extra_args(
+        &dest_chain.config,
+        &msg.extra_args,
+        !msg.token_amounts.is_empty(),
+    )?;
+
     require_gte!(
         dest_chain.config.max_per_msg_gas_limit as u128,
-        msg.extra_args
-            .gas_limit
-            .unwrap_or(dest_chain.config.default_tx_gas_limit as u128),
+        processed_extra_args.gas_limit,
         FeeQuoterError::MessageGasLimitTooHigh,
     );
 
     require!(
         !dest_chain.config.enforce_out_of_order
-            || msg.extra_args.allow_out_of_order_execution.unwrap_or(false),
+            || processed_extra_args.allow_out_of_order_execution,
         FeeQuoterError::ExtraArgOutOfOrderExecutionMustBeTrue,
     );
 
-    validate_dest_family_address(msg, dest_chain.config.chain_family_selector)
+    validate_dest_family_address(msg, dest_chain.config.chain_family_selector)?;
+
+    Ok(processed_extra_args)
 }
 
 fn validate_dest_family_address(
     msg: &SVM2AnyMessage,
     chain_family_selector: [u8; 4],
 ) -> Result<()> {
+    let selector = u32::from_be_bytes(chain_family_selector);
+    match selector {
+        CHAIN_FAMILY_SELECTOR_EVM => validate_evm_dest_address(&msg.receiver),
+        CHAIN_FAMILY_SELECTOR_SVM => validate_svm_dest_address(&msg.receiver),
+        _ => Err(FeeQuoterError::UnsupportedChainFamilySelector.into()),
+    }
+}
+
+fn validate_evm_dest_address(address: &[u8]) -> Result<()> {
     const PRECOMPILE_SPACE: u32 = 1024;
 
-    let selector = u32::from_be_bytes(chain_family_selector);
-    // Only EVM is supported as a destination family.
-    require_eq!(
-        selector,
-        CHAIN_FAMILY_SELECTOR_EVM,
-        FeeQuoterError::UnsupportedChainFamilySelector
-    );
-
-    require_eq!(msg.receiver.len(), 32, FeeQuoterError::InvalidEVMAddress);
+    require_eq!(address.len(), 32, FeeQuoterError::InvalidEVMAddress);
 
     let address: U256 = U256::from_be_bytes(
-        msg.receiver
-            .clone()
+        address
             .try_into()
             .map_err(|_| FeeQuoterError::InvalidEncoding)?,
     );
-
     require!(address <= U160_MAX, FeeQuoterError::InvalidEVMAddress);
-
     if let Ok(small_address) = TryInto::<u32>::try_into(address) {
         require_gte!(
             small_address,
@@ -80,20 +87,100 @@ fn validate_dest_family_address(
             FeeQuoterError::InvalidEVMAddress
         )
     };
-
     Ok(())
+}
+
+fn validate_svm_dest_address(address: &[u8]) -> Result<()> {
+    require_eq!(address.len(), 32, FeeQuoterError::InvalidSVMAddress);
+    Pubkey::try_from_slice(address)
+        .map(|_| ())
+        .map_err(|_| FeeQuoterError::InvalidSVMAddress.into())
+}
+
+// process_extra_args returns serialized extraArgs, gas_limit, allow_out_of_order_execution
+// it calls the chain-specific extra args validation logic
+// TODO move to public?
+pub fn process_extra_args(
+    dest_config: &DestChainConfig,
+    extra_args: &[u8],
+    message_contains_tokens: bool,
+) -> Result<ProcessedExtraArgs> {
+    require_gte!(extra_args.len(), 4, FeeQuoterError::InvalidInputs);
+
+    let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
+    let mut data = &extra_args[4..];
+
+    match u32::from_be_bytes(dest_config.chain_family_selector) {
+        CHAIN_FAMILY_SELECTOR_EVM => parse_and_validate_evm_extra_args(dest_config, tag, &mut data),
+        CHAIN_FAMILY_SELECTOR_SVM => {
+            parse_and_validate_svm_extra_args(dest_config, tag, &mut data, message_contains_tokens)
+        }
+
+        _ => Err(FeeQuoterError::InvalidChainFamilySelector.into()),
+    }
+}
+
+fn parse_and_validate_evm_extra_args(
+    cfg: &DestChainConfig,
+    tag: [u8; 4],
+    data: &mut &[u8],
+) -> Result<ProcessedExtraArgs> {
+    match u32::from_be_bytes(tag) {
+        EVM_EXTRA_ARGS_V2_TAG => {
+            let args = if data.is_empty() {
+                EVMExtraArgsV2::default_config(cfg)
+            } else {
+                EVMExtraArgsV2::deserialize(data)?
+            };
+            Ok(ProcessedExtraArgs {
+                bytes: args.serialize_with_tag(),
+                gas_limit: args.gas_limit,
+                allow_out_of_order_execution: args.allow_out_of_order_execution,
+            })
+        }
+        _ => Err(FeeQuoterError::InvalidExtraArgsTag.into()),
+    }
+}
+
+fn parse_and_validate_svm_extra_args(
+    cfg: &DestChainConfig,
+    tag: [u8; 4],
+    data: &mut &[u8],
+    message_contains_tokens: bool,
+) -> Result<ProcessedExtraArgs> {
+    match u32::from_be_bytes(tag) {
+        SVM_EXTRA_ARGS_V1_TAG => {
+            let args = if data.is_empty() {
+                SVMExtraArgsV1::default_config(cfg)
+            } else {
+                SVMExtraArgsV1::deserialize(data)?
+            };
+
+            // token_receiver != 0 when tokens are present
+            // token_receiver == 0 when tokens are not present
+            let receiver_is_zero_address = args.token_receiver == [0; 32];
+            require!(
+                message_contains_tokens != receiver_is_zero_address,
+                FeeQuoterError::InvalidTokenReceiver
+            );
+
+            Ok(ProcessedExtraArgs {
+                bytes: args.serialize_with_tag(),
+                gas_limit: args.compute_units as u128,
+                allow_out_of_order_execution: args.allow_out_of_order_execution,
+            })
+        }
+        _ => Err(FeeQuoterError::InvalidExtraArgsTag.into()),
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{ExtraArgsInput, SVMTokenAmount, TimestampedPackedU224};
+    use crate::extra_args::{EVMExtraArgsV2, EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG};
+    use crate::{SVMTokenAmount, TimestampedPackedU224};
     use anchor_lang::solana_program::pubkey::Pubkey;
     use anchor_spl::token::spl_token::native_mint;
-
-    fn as_u8_28(single: U256) -> [u8; 28] {
-        single.to_be_bytes()[4..32].try_into().unwrap()
-    }
 
     #[test]
     fn message_not_validated_for_disabled_destination_chain() {
@@ -170,6 +257,170 @@ pub mod tests {
         );
     }
 
+    #[test]
+    fn message_exceeds_gas_limit_fails_to_validate() {
+        let mut message = sample_message();
+        message.extra_args = EVMExtraArgsV2 {
+            gas_limit: 1_000_000_000,
+            allow_out_of_order_execution: false,
+        }
+        .serialize_with_tag();
+        assert_eq!(
+            validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config()).unwrap_err(),
+            FeeQuoterError::MessageGasLimitTooHigh.into()
+        );
+    }
+
+    #[test]
+    fn validate_out_of_order_execution() {
+        let mut dest_chain_enforce = sample_dest_chain();
+        dest_chain_enforce.config.enforce_out_of_order = true;
+        let mut dest_chain_not_enforce = sample_dest_chain();
+        dest_chain_not_enforce.config.enforce_out_of_order = false;
+
+        let mut message_ooo = sample_message();
+        message_ooo.extra_args = EVMExtraArgsV2 {
+            gas_limit: 1_000,
+            allow_out_of_order_execution: true,
+        }
+        .serialize_with_tag();
+        let mut message_not_ooo = sample_message();
+        message_not_ooo.extra_args = EVMExtraArgsV2 {
+            gas_limit: 1_000,
+            allow_out_of_order_execution: false,
+        }
+        .serialize_with_tag();
+
+        // allowed cases
+        validate_svm2any(&message_ooo, &dest_chain_enforce, &sample_billing_config()).unwrap();
+        validate_svm2any(
+            &message_ooo,
+            &dest_chain_not_enforce,
+            &sample_billing_config(),
+        )
+        .unwrap();
+        validate_svm2any(
+            &message_not_ooo,
+            &dest_chain_not_enforce,
+            &sample_billing_config(),
+        )
+        .unwrap();
+
+        // not allowed cases
+        assert_eq!(
+            validate_svm2any(
+                &message_not_ooo,
+                &dest_chain_enforce,
+                &sample_billing_config()
+            )
+            .unwrap_err(),
+            FeeQuoterError::ExtraArgOutOfOrderExecutionMustBeTrue.into()
+        );
+    }
+
+    #[test]
+    fn process_extra_args_matches_family() {
+        let evm_dest_chain = sample_dest_chain();
+        let mut svm_dest_chain = sample_dest_chain();
+        svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
+        let evm_extra_args = EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
+        let svm_extra_args = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+        let mut none_dest_chain = sample_dest_chain();
+        none_dest_chain.config.chain_family_selector = [0; 4];
+
+        // match family
+        process_extra_args(&evm_dest_chain.config, &evm_extra_args, false).unwrap();
+        process_extra_args(&svm_dest_chain.config, &svm_extra_args, false).unwrap();
+        assert_eq!(
+            process_extra_args(&none_dest_chain.config, &evm_extra_args, false).unwrap_err(),
+            FeeQuoterError::InvalidChainFamilySelector.into()
+        );
+        assert_eq!(
+            process_extra_args(&none_dest_chain.config, &[0; 0], false).unwrap_err(),
+            FeeQuoterError::InvalidInputs.into()
+        );
+
+        // evm - default case
+        let extra_args =
+            process_extra_args(&evm_dest_chain.config, &evm_extra_args, false).unwrap();
+        assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(
+            extra_args.gas_limit,
+            evm_dest_chain.config.default_tx_gas_limit as u128
+        );
+        assert_eq!(extra_args.allow_out_of_order_execution, false);
+
+        // evm - passed in data
+        let extra_args = process_extra_args(
+            &evm_dest_chain.config,
+            &EVMExtraArgsV2 {
+                gas_limit: 100,
+                allow_out_of_order_execution: true,
+            }
+            .serialize_with_tag(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(extra_args.gas_limit, 100);
+        assert_eq!(extra_args.allow_out_of_order_execution, true);
+
+        // evm - fail to match
+        assert_eq!(
+            process_extra_args(&evm_dest_chain.config, &svm_extra_args, false).unwrap_err(),
+            FeeQuoterError::InvalidExtraArgsTag.into()
+        );
+
+        // svm - default case
+        let extra_args =
+            process_extra_args(&svm_dest_chain.config, &svm_extra_args, false).unwrap();
+        assert_eq!(extra_args.bytes[..4], SVM_EXTRA_ARGS_V1_TAG.to_be_bytes());
+        assert_eq!(
+            extra_args.gas_limit,
+            svm_dest_chain.config.default_tx_gas_limit as u128
+        );
+        assert_eq!(extra_args.allow_out_of_order_execution, false);
+
+        // svm - contains tokens but no receiver address
+        assert_eq!(
+            process_extra_args(&svm_dest_chain.config, &svm_extra_args, true).unwrap_err(),
+            FeeQuoterError::InvalidTokenReceiver.into(),
+        );
+
+        // svm - passed in data
+        let args = SVMExtraArgsV1 {
+            compute_units: 100,
+            account_is_writable_bitmap: 3,
+            allow_out_of_order_execution: true,
+            token_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
+                .unwrap()
+                .to_bytes(),
+            accounts: vec![
+                Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
+                    .unwrap()
+                    .to_bytes(),
+                Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa")
+                    .unwrap()
+                    .to_bytes(),
+            ],
+        };
+        let extra_args =
+            process_extra_args(&svm_dest_chain.config, &args.serialize_with_tag(), true).unwrap();
+        assert_eq!(extra_args.bytes, args.serialize_with_tag());
+        assert_eq!(extra_args.gas_limit, 100);
+        assert_eq!(extra_args.allow_out_of_order_execution, true);
+
+        // svm - fail to match
+        assert_eq!(
+            process_extra_args(&svm_dest_chain.config, &evm_extra_args, false).unwrap_err(),
+            FeeQuoterError::InvalidExtraArgsTag.into()
+        );
+    }
+
+    pub fn as_u8_28(single: U256) -> [u8; 28] {
+        single.to_be_bytes()[4..32].try_into().unwrap()
+    }
+
     pub fn sample_message() -> SVM2AnyMessage {
         let mut receiver = vec![0u8; 32];
 
@@ -182,10 +433,7 @@ pub mod tests {
             data: vec![],
             token_amounts: vec![],
             fee_token: native_mint::ID,
-            extra_args: ExtraArgsInput {
-                gas_limit: None,
-                allow_out_of_order_execution: None,
-            },
+            extra_args: EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec(), // empty extraArgs, use defaults
         }
     }
 

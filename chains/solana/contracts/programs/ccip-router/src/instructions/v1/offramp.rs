@@ -885,7 +885,7 @@ mod tests {
     use ethnum::U256;
 
     use super::*;
-    use crate::{Any2SVMRampMessage, Any2SVMTokenTransfer, SVMExtraArgs};
+    use crate::{Any2SVMRampExtraArgs, Any2SVMRampMessage, Any2SVMTokenTransfer};
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
@@ -922,7 +922,7 @@ mod tests {
                 amount: U256::from_le_bytes([1; 32]).into(),
             }]
             .to_vec(),
-            extra_args: SVMExtraArgs {
+            extra_args: Any2SVMRampExtraArgs {
                 compute_units: 1000,
                 is_writable_bitmap: 1,
             },

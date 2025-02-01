@@ -162,32 +162,6 @@ pub fn update_svm_chain_selector(
     Ok(())
 }
 
-pub fn update_default_gas_limit(
-    ctx: Context<UpdateConfigCCIPRouter>,
-    new_gas_limit: u128,
-) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
-
-    config.default_gas_limit = new_gas_limit;
-
-    Ok(())
-}
-
-pub fn update_default_allow_out_of_order_execution(
-    ctx: Context<UpdateConfigCCIPRouter>,
-    new_allow_out_of_order_execution: bool,
-) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
-
-    let mut v = 0_u8;
-    if new_allow_out_of_order_execution {
-        v = 1;
-    }
-    config.default_allow_out_of_order_execution = v;
-
-    Ok(())
-}
-
 pub fn update_enable_manual_execution_after(
     ctx: Context<UpdateConfigCCIPRouter>,
     new_enable_manual_execution_after: i64,
