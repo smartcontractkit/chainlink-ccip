@@ -258,11 +258,11 @@ fn get_fee_cpi<'info>(
             .token_amounts
             .iter()
             .map(|x| fee_quoter::messages::SVMTokenAmount {
-                token: x.token.clone(),
+                token: x.token,
                 amount: x.amount,
             })
             .collect(),
-        fee_token: message.fee_token.clone(),
+        fee_token: message.fee_token,
         extra_args: message.extra_args.clone(),
     };
 
@@ -284,7 +284,7 @@ fn token_transfer(
 
     require!(
         extra_data_length <= CCIP_LOCK_OR_BURN_V1_RET_BYTES
-            || extra_data_length <= additional_data.dest_bytes_overhead, // TODO is this ok here?
+            || extra_data_length <= additional_data.dest_bytes_overhead,
         CcipRouterError::SourceTokenDataTooLarge
     );
 

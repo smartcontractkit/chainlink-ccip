@@ -16,7 +16,7 @@ pub struct Config {
 
     _padding2: [u8; 8],
     pub ocr3: [Ocr3Config; 2],
-    pub fee_quoter: Pubkey, // TODO configure this
+    pub fee_quoter: Pubkey,
 
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
@@ -198,19 +198,6 @@ pub struct RateLimitTokenBucket {
     pub is_enabled: bool,  // Indication whether the rate limiting is enabled or not
     pub capacity: u128,    // Maximum number of tokens that can be in the bucket.
     pub rate: u128,        // Number of tokens per second that the bucket is refilled.
-}
-
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
-// TODO remove?
-pub struct BillingTokenConfig {
-    // NOTE: when modifying this struct, make sure to update the version in the wrapper
-    pub enabled: bool,
-    pub mint: Pubkey,
-
-    // price tracking
-    pub usd_per_token: TimestampedPackedU224,
-    // billing configs
-    pub premium_multiplier_wei_per_eth: u64,
 }
 
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]

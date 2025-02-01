@@ -49,7 +49,7 @@ pub(super) struct TokenAccounts<'a> {
     pub pool_signer: &'a AccountInfo<'a>,
     pub token_program: &'a AccountInfo<'a>,
     pub mint: &'a AccountInfo<'a>,
-    pub fee_token_config: &'a AccountInfo<'a>, // TODO review this...
+    pub fee_token_config: &'a AccountInfo<'a>,
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
