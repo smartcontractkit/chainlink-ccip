@@ -935,6 +935,8 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddres
 		}
 	}
 
+	r.lggr.Infow("discovered contracts", "contracts", resp)
+
 	// The following calls are on dynamically configured chains which may not
 	// be available when this function is called. Eventually they will be
 	// configured through consensus when the Sync function is called, but until
