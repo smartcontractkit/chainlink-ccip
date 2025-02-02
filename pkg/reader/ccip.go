@@ -1230,25 +1230,19 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 
 	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
 
-	var resp selectorsAndConfigs
-	err := r.contractReaders[chain].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
-		&resp,
-	)
+	call, err := r.refresh(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source chain configs for source chain %d: %w",
 			chain, err)
 	}
 
+	resp := call.SelectorsAndConf
+
 	if len(resp.SourceChainConfigs) != len(resp.Selectors) {
 		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
 	}
 
-	lggr.Infow("got source chain configs", "configs", resp)
+	lggr.Infow("got source chain configs", "configs", resp, "chain", chain)
 
 	// Populate the map.
 	for i := range resp.Selectors {
@@ -1774,3 +1768,165 @@ func validateSendRequestedEvent(
 
 // Interface compliance check
 var _ CCIPReader = (*ccipChainReader)(nil)
+
+// refresh fetches all configurations and updates the cache
+func (r *ccipChainReader) refresh(ctx context.Context) (NogoResponse, error) {
+	requests := r.prepareBatchRequests()
+
+	batchResult, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValuesGraceful(ctx, requests)
+	if err != nil {
+		return NogoResponse{}, fmt.Errorf("batch get latest values: %w", err)
+	}
+	// print the batchResult
+	for contract, results := range batchResult.Results {
+		r.lggr.Infow("contract is", "contract", contract)
+		for i, result := range results {
+			r.lggr.Infow("result is", "result", result)
+			val, err := result.GetResult()
+			if err != nil {
+				r.lggr.Errorw("get offramp result %d: %w", i, err)
+			}
+			r.lggr.Infow("val is", "val", val)
+		}
+	}
+
+	r.lggr.Infow("batchResult.SkippedNoBinds is", "batchResult.SkippedNoBinds", batchResult.SkippedNoBinds)
+	// Log skipped contracts if any for debugging
+	// Clear skipped contract values from cache
+	if len(batchResult.SkippedNoBinds) > 0 {
+		r.lggr.Infow("some contracts were skipped due to no bindings", "contracts", batchResult.SkippedNoBinds)
+		// c.clearSkippedContractValues(batchResult.SkippedNoBinds)
+	}
+
+	return r.updateFromResults(batchResult.Results)
+}
+
+// prepareBatchRequests creates the batch request for all configurations
+func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
+	var (
+		commitLatestOCRConfig OCRConfigResponse
+		execLatestOCRConfig   OCRConfigResponse
+		staticConfig          offRampStaticChainConfig
+		dynamicConfig         offRampDynamicChainConfig
+		selectorsAndConf      selectorsAndConfigs
+	)
+
+	return contractreader.ExtendedBatchGetLatestValuesRequest{
+		consts.ContractNameOffRamp: {
+			{
+				ReadName: consts.MethodNameOffRampLatestConfigDetails,
+				Params: map[string]any{
+					"ocrPluginType": consts.PluginTypeCommit,
+				},
+				ReturnVal: &commitLatestOCRConfig,
+			},
+			{
+				ReadName: consts.MethodNameOffRampLatestConfigDetails,
+				Params: map[string]any{
+					"ocrPluginType": consts.PluginTypeExecute,
+				},
+				ReturnVal: &execLatestOCRConfig,
+			},
+			{
+				ReadName:  consts.MethodNameOffRampGetStaticConfig,
+				Params:    map[string]any{},
+				ReturnVal: &staticConfig,
+			},
+			{
+				ReadName:  consts.MethodNameOffRampGetDynamicConfig,
+				Params:    map[string]any{},
+				ReturnVal: &dynamicConfig,
+			},
+			{
+				ReadName:  consts.MethodNameOffRampGetAllSourceChainConfigs,
+				Params:    map[string]any{},
+				ReturnVal: &selectorsAndConf,
+			},
+		},
+	}
+}
+
+// updateFromResults updates the cache with results from the batch request
+func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValuesResult) (NogoResponse, error) {
+	for contract, results := range batchResult {
+		return r.handleContractResults(contract, results)
+	}
+	return NogoResponse{}, nil
+}
+
+// handleContractResults processes results for a specific contract
+func (r *ccipChainReader) handleContractResults(contract types.BoundContract, results []types.BatchReadResult) (NogoResponse, error) {
+	switch contract.Name {
+	case consts.ContractNameOffRamp:
+		r.lggr.Infow("In handleContractResults")
+		return r.handleOffRampResults(results)
+	}
+	return NogoResponse{}, fmt.Errorf("unexpected contract name %s", contract.Name)
+}
+
+type NogoResponse struct {
+	CommitLatestOCRConfig OCRConfigResponse
+	ExecLatestOCRConfig   OCRConfigResponse
+	StaticConfig          offRampStaticChainConfig
+	DynamicConfig         offRampDynamicChainConfig
+	SelectorsAndConf      selectorsAndConfigs
+}
+
+// handleOffRampResults processes offramp-specific results
+func (r *ccipChainReader) handleOffRampResults(results []types.BatchReadResult) (NogoResponse, error) {
+	response := NogoResponse{}
+
+	for i, result := range results {
+		val, err := result.GetResult()
+		if err != nil {
+			return NogoResponse{}, fmt.Errorf("get offramp result %d: %w", i, err)
+		}
+		r.lggr.Infow("val is", "val", val)
+
+		switch i {
+		case 0:
+			if typed, ok := val.(*OCRConfigResponse); ok {
+				r.lggr.Infow("typed is", "typed", typed)
+				response.CommitLatestOCRConfig = *typed
+			}
+		case 1:
+			if typed, ok := val.(*OCRConfigResponse); ok {
+				r.lggr.Infow("typed is", "typed", typed)
+				response.ExecLatestOCRConfig = *typed
+			}
+		case 2:
+			if typed, ok := val.(*offRampStaticChainConfig); ok {
+				r.lggr.Infow("typed is", "typed", typed)
+				response.StaticConfig = *typed
+			}
+		case 3:
+			if typed, ok := val.(*offRampDynamicChainConfig); ok {
+				r.lggr.Infow("typed is", "typed", typed)
+				response.DynamicConfig = *typed
+			}
+		case 4:
+			if typed, ok := val.(*selectorsAndConfigs); ok {
+				r.lggr.Infow("typed is", "typed", typed)
+				response.SelectorsAndConf = *typed
+			}
+		}
+	}
+	return response, nil
+}
+
+type OCRConfigResponse struct {
+	OCRConfig OCRConfig
+}
+
+type OCRConfig struct {
+	ConfigInfo   ConfigInfo
+	Signers      [][]byte
+	Transmitters [][]byte
+}
+
+type ConfigInfo struct {
+	ConfigDigest                   [32]byte
+	F                              uint8
+	N                              uint8
+	IsSignatureVerificationEnabled bool
+}
