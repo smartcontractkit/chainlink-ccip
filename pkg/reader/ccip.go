@@ -1855,7 +1855,8 @@ func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValu
 }
 
 // handleContractResults processes results for a specific contract
-func (r *ccipChainReader) handleContractResults(contract types.BoundContract, results []types.BatchReadResult) (NogoResponse, error) {
+func (r *ccipChainReader) handleContractResults(
+	contract types.BoundContract, results []types.BatchReadResult) (NogoResponse, error) {
 	switch contract.Name {
 	case consts.ContractNameOffRamp:
 		r.lggr.Infow("In handleContractResults")
