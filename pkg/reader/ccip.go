@@ -1931,7 +1931,7 @@ type OfframpNogoResponse struct {
 }
 
 type RMNProxyNogoResponse struct {
-	RMNRemoteAddress cciptypes.Bytes
+	RMNRemoteAddress []byte
 }
 
 // handleOffRampResults processes offramp-specific results
