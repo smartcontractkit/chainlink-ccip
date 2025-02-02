@@ -1902,11 +1902,11 @@ func (r *ccipChainReader) handleRMNProxyResults(results []types.BatchReadResult)
 
 	if len(results) > 0 {
 		val, err := results[0].GetResult()
-		r.lggr.Infow("handleRMNProxyResults- val is", "val", val)
+		r.lggr.Infow("handleRMNProxyResults - val is", "val", val)
 		if err != nil {
 			return RMNProxyNogoResponse{}, fmt.Errorf("get RMN proxy result: %w", err)
 		}
-		if typed, ok := val.(*cciptypes.Bytes); ok {
+		if typed, ok := val.(*[]byte); ok {
 			r.lggr.Infow("handleRMNProxyResults - typed is", "typed", typed)
 			rmnProxy.RMNRemoteAddress = *typed
 		} else {
