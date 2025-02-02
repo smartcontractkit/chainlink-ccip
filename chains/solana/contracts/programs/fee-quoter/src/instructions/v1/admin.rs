@@ -1,5 +1,5 @@
 use crate::context::{
-    AcceptOwnership, AddBillingTokenConfig, AddDestChain, SetTokenBillingConfig,
+    AcceptOwnership, AddBillingTokenConfig, AddDestChain, SetTokenTransferFeeConfig,
     UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
 };
 use crate::event::{
@@ -8,7 +8,7 @@ use crate::event::{
 };
 use crate::state::{
     BillingTokenConfig, DestChain, DestChainConfig, DestChainState, PerChainPerTokenConfig,
-    TimestampedPackedU224, TokenBilling,
+    TimestampedPackedU224, TokenTransferFeeConfig,
 };
 use crate::FeeQuoterError;
 use anchor_lang::prelude::*;
@@ -132,11 +132,11 @@ pub fn update_dest_chain_config(
     Ok(())
 }
 
-pub fn set_token_billing(
-    ctx: Context<SetTokenBillingConfig>,
+pub fn set_token_transfer_fee_config(
+    ctx: Context<SetTokenTransferFeeConfig>,
     chain_selector: u64,
     mint: Pubkey,
-    cfg: TokenBilling,
+    cfg: TokenTransferFeeConfig,
 ) -> Result<()> {
     ctx.accounts
         .per_chain_per_token_config
@@ -144,7 +144,7 @@ pub fn set_token_billing(
             version: 1, // update this if we change the account struct
             chain_selector,
             mint,
-            billing: cfg.clone(),
+            token_transfer_config: cfg.clone(),
         });
     emit!(TokenTransferFeeConfigUpdated {
         dest_chain_selector: chain_selector,

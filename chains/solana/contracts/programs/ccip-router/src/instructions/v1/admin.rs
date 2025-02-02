@@ -6,8 +6,8 @@ use crate::DisableDestChainSelectorConfig;
 use crate::{
     AcceptOwnership, AddChainSelector, CcipRouterError, DestChainConfig, DestChainState,
     Ocr3ConfigInfo, OcrPluginType, SetOcrConfig, SourceChainConfig, SourceChainState,
-    TimestampedPackedU224, TransferOwnership, UpdateConfigCCIPRouter,
-    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
+    TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
+    UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -67,13 +67,7 @@ pub fn add_chain_selector(
     dest_chain_state.version = 1;
     dest_chain_state.chain_selector = new_chain_selector;
     dest_chain_state.config = dest_chain_config.clone();
-    dest_chain_state.state = DestChainState {
-        sequence_number: 0,
-        usd_per_unit_gas: TimestampedPackedU224 {
-            value: [0; 28],
-            timestamp: 0,
-        },
-    };
+    dest_chain_state.state = DestChainState { sequence_number: 0 };
 
     emit!(events::SourceChainAdded {
         source_chain_selector: new_chain_selector,

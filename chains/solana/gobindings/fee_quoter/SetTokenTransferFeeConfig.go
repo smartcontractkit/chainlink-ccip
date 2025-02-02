@@ -10,22 +10,22 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Sets the token billing configuration.
-// It is an upsert, initializing the token billing config account if it doesn't exist
+// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
+// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
 // and overwriting it if it does.
 //
-// Only the Admin can set the token billing configuration.
+// Only the Admin can perform this operation.
 //
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for setting the token billing configuration.
 // * `chain_selector` - The chain selector.
 // * `mint` - The public key of the token mint.
-// * `cfg` - The token billing configuration.
-type SetTokenBilling struct {
+// * `cfg` - The token transfer fee configuration.
+type SetTokenTransferFeeConfig struct {
 	ChainSelector *uint64
 	Mint          *ag_solanago.PublicKey
-	Cfg           *TokenBilling
+	Cfg           *TokenTransferFeeConfig
 
 	// [0] = [] config
 	//
@@ -37,94 +37,94 @@ type SetTokenBilling struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewSetTokenBillingInstructionBuilder creates a new `SetTokenBilling` instruction builder.
-func NewSetTokenBillingInstructionBuilder() *SetTokenBilling {
-	nd := &SetTokenBilling{
+// NewSetTokenTransferFeeConfigInstructionBuilder creates a new `SetTokenTransferFeeConfig` instruction builder.
+func NewSetTokenTransferFeeConfigInstructionBuilder() *SetTokenTransferFeeConfig {
+	nd := &SetTokenTransferFeeConfig{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
 
 // SetChainSelector sets the "chainSelector" parameter.
-func (inst *SetTokenBilling) SetChainSelector(chainSelector uint64) *SetTokenBilling {
+func (inst *SetTokenTransferFeeConfig) SetChainSelector(chainSelector uint64) *SetTokenTransferFeeConfig {
 	inst.ChainSelector = &chainSelector
 	return inst
 }
 
 // SetMint sets the "mint" parameter.
-func (inst *SetTokenBilling) SetMint(mint ag_solanago.PublicKey) *SetTokenBilling {
+func (inst *SetTokenTransferFeeConfig) SetMint(mint ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
 	inst.Mint = &mint
 	return inst
 }
 
 // SetCfg sets the "cfg" parameter.
-func (inst *SetTokenBilling) SetCfg(cfg TokenBilling) *SetTokenBilling {
+func (inst *SetTokenTransferFeeConfig) SetCfg(cfg TokenTransferFeeConfig) *SetTokenTransferFeeConfig {
 	inst.Cfg = &cfg
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *SetTokenBilling) SetConfigAccount(config ag_solanago.PublicKey) *SetTokenBilling {
+func (inst *SetTokenTransferFeeConfig) SetConfigAccount(config ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *SetTokenBilling) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *SetTokenTransferFeeConfig) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetPerChainPerTokenConfigAccount sets the "perChainPerTokenConfig" account.
-func (inst *SetTokenBilling) SetPerChainPerTokenConfigAccount(perChainPerTokenConfig ag_solanago.PublicKey) *SetTokenBilling {
+func (inst *SetTokenTransferFeeConfig) SetPerChainPerTokenConfigAccount(perChainPerTokenConfig ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(perChainPerTokenConfig).WRITE()
 	return inst
 }
 
 // GetPerChainPerTokenConfigAccount gets the "perChainPerTokenConfig" account.
-func (inst *SetTokenBilling) GetPerChainPerTokenConfigAccount() *ag_solanago.AccountMeta {
+func (inst *SetTokenTransferFeeConfig) GetPerChainPerTokenConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *SetTokenBilling) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetTokenBilling {
+func (inst *SetTokenTransferFeeConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *SetTokenBilling) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *SetTokenTransferFeeConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *SetTokenBilling) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetTokenBilling {
+func (inst *SetTokenTransferFeeConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *SetTokenBilling) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *SetTokenTransferFeeConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
-func (inst SetTokenBilling) Build() *Instruction {
+func (inst SetTokenTransferFeeConfig) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_SetTokenBilling,
+		TypeID: Instruction_SetTokenTransferFeeConfig,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst SetTokenBilling) ValidateAndBuild() (*Instruction, error) {
+func (inst SetTokenTransferFeeConfig) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *SetTokenBilling) Validate() error {
+func (inst *SetTokenTransferFeeConfig) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.ChainSelector == nil {
@@ -156,11 +156,11 @@ func (inst *SetTokenBilling) Validate() error {
 	return nil
 }
 
-func (inst *SetTokenBilling) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *SetTokenTransferFeeConfig) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("SetTokenBilling")).
+			programBranch.Child(ag_format.Instruction("SetTokenTransferFeeConfig")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -182,7 +182,7 @@ func (inst *SetTokenBilling) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj SetTokenBilling) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SetTokenTransferFeeConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ChainSelector` param:
 	err = encoder.Encode(obj.ChainSelector)
 	if err != nil {
@@ -200,7 +200,7 @@ func (obj SetTokenBilling) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	}
 	return nil
 }
-func (obj *SetTokenBilling) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SetTokenTransferFeeConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ChainSelector`:
 	err = decoder.Decode(&obj.ChainSelector)
 	if err != nil {
@@ -219,18 +219,18 @@ func (obj *SetTokenBilling) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	return nil
 }
 
-// NewSetTokenBillingInstruction declares a new SetTokenBilling instruction with the provided parameters and accounts.
-func NewSetTokenBillingInstruction(
+// NewSetTokenTransferFeeConfigInstruction declares a new SetTokenTransferFeeConfig instruction with the provided parameters and accounts.
+func NewSetTokenTransferFeeConfigInstruction(
 	// Parameters:
 	chainSelector uint64,
 	mint ag_solanago.PublicKey,
-	cfg TokenBilling,
+	cfg TokenTransferFeeConfig,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	perChainPerTokenConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *SetTokenBilling {
-	return NewSetTokenBillingInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
+	return NewSetTokenTransferFeeConfigInstructionBuilder().
 		SetChainSelector(chainSelector).
 		SetMint(mint).
 		SetCfg(cfg).

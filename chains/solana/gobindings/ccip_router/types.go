@@ -999,17 +999,11 @@ func (obj *SourceChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 
 type DestChainState struct {
 	SequenceNumber uint64
-	UsdPerUnitGas  TimestampedPackedU224
 }
 
 func (obj DestChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `SequenceNumber` param:
 	err = encoder.Encode(obj.SequenceNumber)
-	if err != nil {
-		return err
-	}
-	// Serialize `UsdPerUnitGas` param:
-	err = encoder.Encode(obj.UsdPerUnitGas)
 	if err != nil {
 		return err
 	}
@@ -1019,11 +1013,6 @@ func (obj DestChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 func (obj *DestChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `SequenceNumber`:
 	err = decoder.Decode(&obj.SequenceNumber)
-	if err != nil {
-		return err
-	}
-	// Deserialize `UsdPerUnitGas`:
-	err = decoder.Decode(&obj.UsdPerUnitGas)
 	if err != nil {
 		return err
 	}
@@ -1266,83 +1255,6 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	}
 	// Deserialize `AllowListEnabled`:
 	err = decoder.Decode(&obj.AllowListEnabled)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type TokenBilling struct {
-	MinFeeUsdcents    uint32
-	MaxFeeUsdcents    uint32
-	DeciBps           uint16
-	DestGasOverhead   uint32
-	DestBytesOverhead uint32
-	IsEnabled         bool
-}
-
-func (obj TokenBilling) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MinFeeUsdcents` param:
-	err = encoder.Encode(obj.MinFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Serialize `MaxFeeUsdcents` param:
-	err = encoder.Encode(obj.MaxFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Serialize `DeciBps` param:
-	err = encoder.Encode(obj.DeciBps)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestGasOverhead` param:
-	err = encoder.Encode(obj.DestGasOverhead)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestBytesOverhead` param:
-	err = encoder.Encode(obj.DestBytesOverhead)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsEnabled` param:
-	err = encoder.Encode(obj.IsEnabled)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *TokenBilling) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MinFeeUsdcents`:
-	err = decoder.Decode(&obj.MinFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MaxFeeUsdcents`:
-	err = decoder.Decode(&obj.MaxFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DeciBps`:
-	err = decoder.Decode(&obj.DeciBps)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestGasOverhead`:
-	err = decoder.Decode(&obj.DestGasOverhead)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestBytesOverhead`:
-	err = decoder.Decode(&obj.DestBytesOverhead)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsEnabled`:
-	err = decoder.Decode(&obj.IsEnabled)
 	if err != nil {
 		return err
 	}

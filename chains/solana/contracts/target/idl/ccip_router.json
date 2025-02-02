@@ -1551,32 +1551,6 @@
       }
     },
     {
-      "name": "PerChainPerTokenConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "billing",
-            "type": {
-              "defined": "TokenBilling"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "TokenAdminRegistry",
       "type": {
         "kind": "struct",
@@ -2195,12 +2169,6 @@
           {
             "name": "sequenceNumber",
             "type": "u64"
-          },
-          {
-            "name": "usdPerUnitGas",
-            "type": {
-              "defined": "TimestampedPackedU224"
-            }
           }
         ]
       }
@@ -2299,38 +2267,6 @@
           },
           {
             "name": "allowListEnabled",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenBilling",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "minFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "maxFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "deciBps",
-            "type": "u16"
-          },
-          {
-            "name": "destGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "destBytesOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "isEnabled",
             "type": "bool"
           }
         ]
@@ -2918,28 +2854,6 @@
         {
           "name": "newAdmin",
           "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "TokenTransferFeeConfigUpdated",
-      "fields": [
-        {
-          "name": "destChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "tokenTransferFeeConfig",
-          "type": {
-            "defined": "TokenBilling"
-          },
           "index": false
         }
       ]

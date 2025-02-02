@@ -363,20 +363,20 @@
       ]
     },
     {
-      "name": "setTokenBilling",
+      "name": "setTokenTransferFeeConfig",
       "docs": [
-        "Sets the token billing configuration.",
-        "It is an upsert, initializing the token billing config account if it doesn't exist",
+        "Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.",
+        "It is an upsert, initializing the per-chain-per-token config account if it doesn't exist",
         "and overwriting it if it does.",
         "",
-        "Only the Admin can set the token billing configuration.",
+        "Only the Admin can perform this operation.",
         "",
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
         "* `chain_selector` - The chain selector.",
         "* `mint` - The public key of the token mint.",
-        "* `cfg` - The token billing configuration."
+        "* `cfg` - The token transfer fee configuration."
       ],
       "accounts": [
         {
@@ -412,7 +412,7 @@
         {
           "name": "cfg",
           "type": {
-            "defined": "TokenBilling"
+            "defined": "TokenTransferFeeConfig"
           }
         }
       ]
@@ -616,9 +616,9 @@
             "type": "publicKey"
           },
           {
-            "name": "billing",
+            "name": "tokenTransferConfig",
             "type": {
-              "defined": "TokenBilling"
+              "defined": "TokenTransferFeeConfig"
             }
           }
         ]
@@ -996,7 +996,7 @@
       }
     },
     {
-      "name": "TokenBilling",
+      "name": "TokenTransferFeeConfig",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1204,7 +1204,7 @@
         {
           "name": "tokenTransferFeeConfig",
           "type": {
-            "defined": "TokenBilling"
+            "defined": "TokenTransferFeeConfig"
           },
           "index": false
         }

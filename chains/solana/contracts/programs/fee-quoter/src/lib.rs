@@ -159,25 +159,25 @@ pub mod fee_quoter {
         v1::admin::update_dest_chain_config(ctx, chain_selector, dest_chain_config)
     }
 
-    /// Sets the token billing configuration.
-    /// It is an upsert, initializing the token billing config account if it doesn't exist
+    /// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
+    /// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
     /// and overwriting it if it does.
     ///
-    /// Only the Admin can set the token billing configuration.
+    /// Only the Admin can perform this operation.
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for setting the token billing configuration.
     /// * `chain_selector` - The chain selector.
     /// * `mint` - The public key of the token mint.
-    /// * `cfg` - The token billing configuration.
-    pub fn set_token_billing(
-        ctx: Context<SetTokenBillingConfig>,
+    /// * `cfg` - The token transfer fee configuration.
+    pub fn set_token_transfer_fee_config(
+        ctx: Context<SetTokenTransferFeeConfig>,
         chain_selector: u64,
         mint: Pubkey,
-        cfg: TokenBilling,
+        cfg: TokenTransferFeeConfig,
     ) -> Result<()> {
-        v1::admin::set_token_billing(ctx, chain_selector, mint, cfg)
+        v1::admin::set_token_transfer_fee_config(ctx, chain_selector, mint, cfg)
     }
 
     /// Calculates the fee for sending a message to the destination chain.

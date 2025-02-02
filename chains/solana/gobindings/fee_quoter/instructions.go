@@ -112,19 +112,19 @@ var (
 	// * `dest_chain_config` - The new configuration for the destination chain.
 	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
 
-	// Sets the token billing configuration.
-	// It is an upsert, initializing the token billing config account if it doesn't exist
+	// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
+	// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
 	// and overwriting it if it does.
 	//
-	// Only the Admin can set the token billing configuration.
+	// Only the Admin can perform this operation.
 	//
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
 	// * `chain_selector` - The chain selector.
 	// * `mint` - The public key of the token mint.
-	// * `cfg` - The token billing configuration.
-	Instruction_SetTokenBilling = ag_binary.TypeID([8]byte{225, 230, 37, 71, 131, 209, 54, 230})
+	// * `cfg` - The token transfer fee configuration.
+	Instruction_SetTokenTransferFeeConfig = ag_binary.TypeID([8]byte{76, 243, 16, 214, 126, 11, 254, 77})
 
 	// Calculates the fee for sending a message to the destination chain.
 	//
@@ -172,8 +172,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "DisableDestChain"
 	case Instruction_UpdateDestChainConfig:
 		return "UpdateDestChainConfig"
-	case Instruction_SetTokenBilling:
-		return "SetTokenBilling"
+	case Instruction_SetTokenTransferFeeConfig:
+		return "SetTokenTransferFeeConfig"
 	case Instruction_GetFee:
 		return "GetFee"
 	case Instruction_UpdatePrices:
@@ -223,7 +223,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"update_dest_chain_config", (*UpdateDestChainConfig)(nil),
 		},
 		{
-			"set_token_billing", (*SetTokenBilling)(nil),
+			"set_token_transfer_fee_config", (*SetTokenTransferFeeConfig)(nil),
 		},
 		{
 			"get_fee", (*GetFee)(nil),

@@ -88,7 +88,6 @@ pub struct SourceChain {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainState {
     pub sequence_number: u64, // The last used sequence number
-    pub usd_per_unit_gas: TimestampedPackedU224,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
@@ -168,27 +167,6 @@ pub struct CommitReport {
     pub min_msg_nr: u64,
     pub max_msg_nr: u64, // TODO: Change this to [u128; 2] when supporting commit reports with 256 messages
     pub execution_states: u128,
-}
-
-#[account]
-#[derive(InitSpace, Debug)]
-pub struct PerChainPerTokenConfig {
-    pub version: u8,         // schema version
-    pub chain_selector: u64, // remote chain
-    pub mint: Pubkey,        // token on solana
-
-    pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
-}
-
-#[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct TokenBilling {
-    pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
-    pub max_fee_usdcents: u32, // Maximum fee to charge per token transfer, multiples of 0.01 USD
-    pub deci_bps: u16, // Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
-    pub dest_gas_overhead: u32, // Gas charged to execute the token transfer on the destination chain
-    // Extra data availability bytes that are returned from the source pool and sent
-    pub dest_bytes_overhead: u32, // to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
-    pub is_enabled: bool,         // Whether this token has custom transfer fees
 }
 
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]

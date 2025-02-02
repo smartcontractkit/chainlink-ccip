@@ -245,10 +245,10 @@ func (obj *BillingTokenConfigWrapper) UnmarshalWithDecoder(decoder *ag_binary.De
 }
 
 type PerChainPerTokenConfig struct {
-	Version       uint8
-	ChainSelector uint64
-	Mint          ag_solanago.PublicKey
-	Billing       TokenBilling
+	Version             uint8
+	ChainSelector       uint64
+	Mint                ag_solanago.PublicKey
+	TokenTransferConfig TokenTransferFeeConfig
 }
 
 var PerChainPerTokenConfigDiscriminator = [8]byte{183, 88, 20, 99, 246, 46, 51, 230}
@@ -274,8 +274,8 @@ func (obj PerChainPerTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder)
 	if err != nil {
 		return err
 	}
-	// Serialize `Billing` param:
-	err = encoder.Encode(obj.Billing)
+	// Serialize `TokenTransferConfig` param:
+	err = encoder.Encode(obj.TokenTransferConfig)
 	if err != nil {
 		return err
 	}
@@ -311,8 +311,8 @@ func (obj *PerChainPerTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	if err != nil {
 		return err
 	}
-	// Deserialize `Billing`:
-	err = decoder.Decode(&obj.Billing)
+	// Deserialize `TokenTransferConfig`:
+	err = decoder.Decode(&obj.TokenTransferConfig)
 	if err != nil {
 		return err
 	}

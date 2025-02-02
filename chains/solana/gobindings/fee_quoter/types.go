@@ -744,7 +744,7 @@ func (obj *BillingTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	return nil
 }
 
-type TokenBilling struct {
+type TokenTransferFeeConfig struct {
 	MinFeeUsdcents    uint32
 	MaxFeeUsdcents    uint32
 	DeciBps           uint16
@@ -753,7 +753,7 @@ type TokenBilling struct {
 	IsEnabled         bool
 }
 
-func (obj TokenBilling) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj TokenTransferFeeConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `MinFeeUsdcents` param:
 	err = encoder.Encode(obj.MinFeeUsdcents)
 	if err != nil {
@@ -787,7 +787,7 @@ func (obj TokenBilling) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 
-func (obj *TokenBilling) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *TokenTransferFeeConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `MinFeeUsdcents`:
 	err = decoder.Decode(&obj.MinFeeUsdcents)
 	if err != nil {

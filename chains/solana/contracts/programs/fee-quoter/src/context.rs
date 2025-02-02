@@ -263,7 +263,7 @@ pub struct UpdateDestChainConfig<'info> {
 
 #[derive(Accounts)]
 #[instruction(chain_selector: u64, mint: Pubkey)]
-pub struct SetTokenBillingConfig<'info> {
+pub struct SetTokenTransferFeeConfig<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,

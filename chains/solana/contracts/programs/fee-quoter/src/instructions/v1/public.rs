@@ -92,9 +92,13 @@ pub fn get_fee<'info>(
     let token_transfer_additional_data = per_chain_per_token_config_accounts
         .iter()
         .map(|per_chain_per_token_config| TokenTransferAdditionalData {
-            dest_bytes_overhead: per_chain_per_token_config.billing.dest_bytes_overhead,
-            dest_gas_overhead: if per_chain_per_token_config.billing.is_enabled {
-                per_chain_per_token_config.billing.dest_gas_overhead
+            dest_bytes_overhead: per_chain_per_token_config
+                .token_transfer_config
+                .dest_bytes_overhead,
+            dest_gas_overhead: if per_chain_per_token_config.token_transfer_config.is_enabled {
+                per_chain_per_token_config
+                    .token_transfer_config
+                    .dest_gas_overhead
             } else {
                 default_token_dest_gas_overhead
             },
@@ -283,7 +287,7 @@ fn network_fee(
 
     for (i, token_amount) in message.token_amounts.iter().enumerate() {
         let config_for_dest_chain = &token_configs_for_dest_chain[i];
-        let token_network_fee = if config_for_dest_chain.billing.is_enabled {
+        let token_network_fee = if config_for_dest_chain.token_transfer_config.is_enabled {
             token_network_fees(&token_configs[i], token_amount, config_for_dest_chain)?
         } else {
             // If the token has no specific overrides configured, we use the global defaults.
@@ -302,25 +306,37 @@ fn token_network_fees(
     config_for_dest_chain: &PerChainPerTokenConfig,
 ) -> Result<NetworkFee> {
     let bps_fee = match billing_config {
-        Some(config) if config_for_dest_chain.billing.deci_bps > 0 => {
+        Some(config) if config_for_dest_chain.token_transfer_config.deci_bps > 0 => {
             let token_price = get_validated_token_price(config)?;
             // Calculate token transfer value, then apply fee ratio
             // ratio represents multiples of 0.1bps, or 1e-5
             Usd18Decimals(
                 Usd18Decimals::from_token_amount(token_amount, &token_price).0
-                    * U256::new(config_for_dest_chain.billing.deci_bps.into())
+                    * U256::new(config_for_dest_chain.token_transfer_config.deci_bps.into())
                     / 1u32.e(5),
             )
         }
         _ => Usd18Decimals::ZERO,
     };
 
-    let min_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.min_fee_usdcents);
-    let max_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.max_fee_usdcents);
+    let min_fee =
+        Usd18Decimals::from_usd_cents(config_for_dest_chain.token_transfer_config.min_fee_usdcents);
+    let max_fee =
+        Usd18Decimals::from_usd_cents(config_for_dest_chain.token_transfer_config.max_fee_usdcents);
     let (premium, token_transfer_gas, token_transfer_bytes_overhead) = (
         bps_fee.clamp(min_fee, max_fee),
-        U256::new(config_for_dest_chain.billing.dest_gas_overhead.into()),
-        U256::new(config_for_dest_chain.billing.dest_bytes_overhead.into()),
+        U256::new(
+            config_for_dest_chain
+                .token_transfer_config
+                .dest_gas_overhead
+                .into(),
+        ),
+        U256::new(
+            config_for_dest_chain
+                .token_transfer_config
+                .dest_bytes_overhead
+                .into(),
+        ),
     );
     Ok(NetworkFee {
         premium,
@@ -424,7 +440,7 @@ mod tests {
     };
 
     use super::super::messages::tests::{sample_billing_config, sample_dest_chain, sample_message};
-    use crate::TokenBilling;
+    use crate::TokenTransferFeeConfig;
 
     use super::*;
 
@@ -527,11 +543,11 @@ mod tests {
         let (token_config, mut per_chain_per_token) = sample_additional_token();
 
         // Not enabled == no overrides
-        per_chain_per_token.billing.is_enabled = false;
+        per_chain_per_token.token_transfer_config.is_enabled = false;
 
         // Will have no effect since billing overrides are disabled
-        per_chain_per_token.billing.min_fee_usdcents = 0;
-        per_chain_per_token.billing.max_fee_usdcents = 0;
+        per_chain_per_token.token_transfer_config.min_fee_usdcents = 0;
+        per_chain_per_token.token_transfer_config.max_fee_usdcents = 0;
 
         let mut message = sample_message();
         message.token_amounts = vec![SVMTokenAmount {
@@ -565,8 +581,12 @@ mod tests {
         let (another_token_config, mut another_per_chain_per_token_config) =
             sample_additional_token();
 
-        another_per_chain_per_token_config.billing.min_fee_usdcents = 800;
-        another_per_chain_per_token_config.billing.max_fee_usdcents = 1600;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .min_fee_usdcents = 800;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .max_fee_usdcents = 1600;
 
         let mut message = sample_message();
         message.token_amounts = vec![SVMTokenAmount {
@@ -602,9 +622,15 @@ mod tests {
             sample_additional_token();
 
         // Set some arbitrary values so the bps fee lands between min and max
-        another_per_chain_per_token_config.billing.min_fee_usdcents = 1;
-        another_per_chain_per_token_config.billing.max_fee_usdcents = 1000;
-        another_per_chain_per_token_config.billing.deci_bps = 10000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .min_fee_usdcents = 1;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .max_fee_usdcents = 1000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .deci_bps = 10000;
 
         let mut message = sample_message();
         message.token_amounts = vec![SVMTokenAmount {
@@ -629,7 +655,9 @@ mod tests {
         );
 
         // changing deci_bps affects the outcome.
-        another_per_chain_per_token_config.billing.deci_bps = 20000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .deci_bps = 20000;
 
         assert_eq!(
             fee_for_msg(
@@ -657,9 +685,15 @@ mod tests {
         let (_, mut another_per_chain_per_token_config) = sample_additional_token();
 
         // Will have no effect, as we cannot know the price of the token
-        another_per_chain_per_token_config.billing.min_fee_usdcents = 1;
-        another_per_chain_per_token_config.billing.max_fee_usdcents = 1000;
-        another_per_chain_per_token_config.billing.deci_bps = 10000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .min_fee_usdcents = 1;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .max_fee_usdcents = 1000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .deci_bps = 10000;
 
         let mut message = sample_message();
         message.token_amounts = vec![SVMTokenAmount {
@@ -684,7 +718,9 @@ mod tests {
         );
 
         // Will have no effect, as we cannot know the price of the token
-        another_per_chain_per_token_config.billing.deci_bps = 20000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .deci_bps = 20000;
 
         assert_eq!(
             fee_for_msg(
@@ -749,7 +785,7 @@ mod tests {
                 version: 1,
                 chain_selector: 0,
                 mint,
-                billing: TokenBilling {
+                token_transfer_config: TokenTransferFeeConfig {
                     min_fee_usdcents: 50,
                     max_fee_usdcents: 4294967295,
                     deci_bps: 0,

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::state::{DestChainConfig, TokenBilling};
+use crate::state::{DestChainConfig, TokenTransferFeeConfig};
 
 #[event]
 pub struct FeeTokenAdded {
@@ -65,5 +65,5 @@ pub struct UsdPerTokenUpdated {
 pub struct TokenTransferFeeConfigUpdated {
     pub dest_chain_selector: u64,
     pub token: Pubkey,
-    pub token_transfer_fee_config: TokenBilling,
+    pub token_transfer_fee_config: TokenTransferFeeConfig,
 }

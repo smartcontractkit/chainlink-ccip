@@ -86,17 +86,14 @@ pub struct BillingTokenConfigWrapper {
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct PerChainPerTokenConfig {
-    pub version: u8,         // schema version
-    pub chain_selector: u64, // remote chain
-    pub mint: Pubkey,        // token on solana
-
-    // TODO rename to token_transfer_fee_config
-    pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
+    pub version: u8,                                   // schema version
+    pub chain_selector: u64,                           // remote chain
+    pub mint: Pubkey,                                  // token on solana
+    pub token_transfer_config: TokenTransferFeeConfig, // EVM: configurable in router only by ccip admins
 }
 
 #[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-// TODO rename to TokenTransferFeeConfig
-pub struct TokenBilling {
+pub struct TokenTransferFeeConfig {
     pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
     pub max_fee_usdcents: u32, // Maximum fee to charge per token transfer, multiples of 0.01 USD
     pub deci_bps: u16, // Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
