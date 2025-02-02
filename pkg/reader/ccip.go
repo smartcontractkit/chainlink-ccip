@@ -1877,12 +1877,13 @@ func (r *ccipChainReader) handleContractResults(
 	var err error
 	switch contract.Name {
 	case consts.ContractNameOffRamp:
-		r.lggr.Infow("In handleContractResults")
+		r.lggr.Infow("In handleContractResults ContractNameOffRamp")
 		offramp, err = r.handleOffRampResults(results)
 		if err != nil {
 			return NogoResponse{}, fmt.Errorf("handle offramp results: %w", err)
 		}
 	case consts.ContractNameRMNProxy:
+		r.lggr.Infow("In handleContractResults ContractNameRMNProxy")
 		rmnProxy, err = r.handleRMNProxyResults(results)
 		if err != nil {
 			return NogoResponse{}, fmt.Errorf("handle router results: %w", err)
@@ -1897,12 +1898,16 @@ func (r *ccipChainReader) handleContractResults(
 func (r *ccipChainReader) handleRMNProxyResults(results []types.BatchReadResult) (RMNProxyNogoResponse, error) {
 	rmnProxy := RMNProxyNogoResponse{}
 
+	r.lggr.Infow("results is", "results", results)
+
 	if len(results) > 0 {
 		val, err := results[0].GetResult()
+		r.lggr.Infow("val is", "val", val)
 		if err != nil {
 			return RMNProxyNogoResponse{}, fmt.Errorf("get RMN proxy result: %w", err)
 		}
 		if typed, ok := val.(*cciptypes.Bytes); ok {
+			r.lggr.Infow("typed is", "typed", typed)
 			rmnProxy.RMNRemoteAddress = *typed
 		}
 	}
