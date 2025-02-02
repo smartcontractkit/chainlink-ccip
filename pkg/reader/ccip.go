@@ -1510,7 +1510,7 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
 
-	return rmnRemoteAddressFromNormalCall, nil
+	return rmnRemoteAddressFromBatch, nil
 }
 
 // Get the DestChainConfig from the FeeQuoter contract on the given chain.
