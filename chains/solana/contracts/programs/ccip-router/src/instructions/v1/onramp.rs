@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use fee_quoter::messages::TokenTransferAdditionalData;
 
-use super::fee_quoter::{transfer_and_wrap_native_sol, transfer_fee};
+use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
 use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
@@ -215,61 +215,9 @@ pub fn ccip_send<'info>(
     Ok(())
 }
 
-fn get_fee_cpi<'info>(
-    ctx: &Context<'_, '_, 'info, 'info, CcipSend<'info>>,
-    dest_chain_selector: u64,
-    message: &SVM2AnyMessage,
-    accounts_per_token: &[TokenAccounts<'info>],
-) -> Result<fee_quoter::messages::GetFeeResult> {
-    let get_fee_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
-
-    let get_fee_signer = &[&get_fee_seeds[..]];
-
-    let cpi_program = ctx.accounts.fee_quoter.to_account_info();
-
-    let cpi_accounts = fee_quoter::cpi::accounts::GetFee {
-        config: ctx.accounts.fee_quoter_config.to_account_info(),
-        dest_chain: ctx.accounts.fee_quoter_dest_chain.to_account_info(),
-        billing_token_config: ctx
-            .accounts
-            .fee_quoter_billing_token_config
-            .to_account_info(),
-        link_token_config: ctx.accounts.fee_quoter_link_token_config.to_account_info(),
-    };
-
-    let billing_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut accounts_per_token
-        .iter()
-        .map(|a| a.fee_token_config.to_account_info())
-        .collect();
-    let per_chain_per_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut accounts_per_token
-        .iter()
-        .map(|a| a.token_billing_config.to_account_info())
-        .collect();
-    let remaining_accounts = billing_token_config_accs;
-    remaining_accounts.append(per_chain_per_token_config_accs);
-
-    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, get_fee_signer)
-        .with_remaining_accounts(remaining_accounts.to_vec());
-
-    let cpi_message = fee_quoter::messages::SVM2AnyMessage {
-        receiver: message.receiver.clone(),
-        data: message.data.clone(),
-        token_amounts: message
-            .token_amounts
-            .iter()
-            .map(|x| fee_quoter::messages::SVMTokenAmount {
-                token: x.token,
-                amount: x.amount,
-            })
-            .collect(),
-        fee_token: message.fee_token,
-        extra_args: message.extra_args.clone(),
-    };
-
-    let fee = fee_quoter::cpi::get_fee(cpi_ctx, dest_chain_selector, cpi_message)?.get();
-
-    Ok(fee)
-}
+/////////////
+// Helpers //
+/////////////
 
 fn token_transfer(
     lock_or_burn_out_data: LockOrBurnOutV1,
@@ -304,9 +252,6 @@ fn token_transfer(
     })
 }
 
-/////////////
-// Helpers //
-/////////////
 fn bump_nonce(
     nonce_counter_account: &mut Account<Nonce>,
     allow_out_of_order_execution: bool,

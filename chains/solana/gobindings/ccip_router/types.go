@@ -1327,39 +1327,6 @@ func (obj *RateLimitTokenBucket) UnmarshalWithDecoder(decoder *ag_binary.Decoder
 	return nil
 }
 
-type TimestampedPackedU224 struct {
-	Value     [28]uint8
-	Timestamp int64
-}
-
-func (obj TimestampedPackedU224) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Value` param:
-	err = encoder.Encode(obj.Value)
-	if err != nil {
-		return err
-	}
-	// Serialize `Timestamp` param:
-	err = encoder.Encode(obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *TimestampedPackedU224) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Value`:
-	err = decoder.Decode(&obj.Value)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Timestamp`:
-	err = decoder.Decode(&obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type OcrPluginType ag_binary.BorshEnum
 
 const (

@@ -178,12 +178,6 @@ pub struct RateLimitTokenBucket {
     pub rate: u128,        // Number of tokens per second that the bucket is refilled.
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
-pub struct TimestampedPackedU224 {
-    pub value: [u8; 28],
-    pub timestamp: i64, // maintaining the type that SVM returns for the time (solana_program::clock::UnixTimestamp = i64)
-}
-
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
 // used in the commit report execution_states field
 pub enum MessageExecutionState {

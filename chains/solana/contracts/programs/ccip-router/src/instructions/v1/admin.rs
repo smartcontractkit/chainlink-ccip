@@ -10,7 +10,7 @@ use crate::{
     UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
 };
 
-use super::fee_quoter::do_billing_transfer;
+use super::fees::do_billing_transfer;
 use super::ocr3base::ocr3_set;
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {

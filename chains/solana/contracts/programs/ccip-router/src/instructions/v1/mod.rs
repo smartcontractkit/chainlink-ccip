@@ -10,7 +10,7 @@ pub mod token_admin_registry;
 // Private modules //
 /////////////////////
 mod config;
-mod fee_quoter;
+mod fees;
 mod merkle;
 mod messages;
 mod ocr3base;

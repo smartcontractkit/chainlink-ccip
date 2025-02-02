@@ -2301,27 +2301,6 @@
       }
     },
     {
-      "name": "TimestampedPackedU224",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": {
-              "array": [
-                "u8",
-                28
-              ]
-            }
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
       "name": "OcrPluginType",
       "type": {
         "kind": "enum",
