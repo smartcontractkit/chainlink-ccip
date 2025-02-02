@@ -731,7 +731,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
 	}
-	lggr.Debugw("got RMNRemote address", "address", rmnRemoteAddress)
+	lggr.Infow("got RMNRemote address", "address", rmnRemoteAddress)
 
 	// TODO: make the calls in parallel using errgroup
 	var vc versionedConfig
