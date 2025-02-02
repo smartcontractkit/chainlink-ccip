@@ -1898,19 +1898,22 @@ func (r *ccipChainReader) handleContractResults(
 func (r *ccipChainReader) handleRMNProxyResults(results []types.BatchReadResult) (RMNProxyNogoResponse, error) {
 	rmnProxy := RMNProxyNogoResponse{}
 
-	r.lggr.Infow("results is", "results", results)
+	r.lggr.Infow("handleRMNProxyResults - results is", "results", results)
 
 	if len(results) > 0 {
 		val, err := results[0].GetResult()
-		r.lggr.Infow("val is", "val", val)
+		r.lggr.Infow("handleRMNProxyResults- val is", "val", val)
 		if err != nil {
 			return RMNProxyNogoResponse{}, fmt.Errorf("get RMN proxy result: %w", err)
 		}
 		if typed, ok := val.(*cciptypes.Bytes); ok {
-			r.lggr.Infow("typed is", "typed", typed)
+			r.lggr.Infow("handleRMNProxyResults - typed is", "typed", typed)
 			rmnProxy.RMNRemoteAddress = *typed
+		} else {
+			r.lggr.Infow("handleRMNProxyResults - val is not of type Bytes", "val", val)
 		}
 	}
+	r.lggr.Infow("handleRMNProxyResults - rmnProxy is", "rmnProxy", rmnProxy)
 	return rmnProxy, nil
 }
 
