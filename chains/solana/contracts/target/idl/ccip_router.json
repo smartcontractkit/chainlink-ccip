@@ -2365,32 +2365,6 @@
       }
     },
     {
-      "name": "BillingTokenConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "enabled",
-            "type": "bool"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "usdPerToken",
-            "type": {
-              "defined": "TimestampedPackedU224"
-            }
-          },
-          {
-            "name": "premiumMultiplierWeiPerEth",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "TimestampedPackedU224",
       "type": {
         "kind": "struct",
