@@ -1194,9 +1194,8 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 				map[string]any{},
 				&resp,
 			)
-			lggr.Debugw("got onramp dynamic config",
-				"chain", chainSel,
-				"resp", resp)
+			lggr.Infow("got onramp dynamic config",
+				"chain", chainSel)
 			if err != nil {
 				if errors.Is(err, contractreader.ErrNoBindings) {
 					// ErrNoBindings is an allowable error during initialization
