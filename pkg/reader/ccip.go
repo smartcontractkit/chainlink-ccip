@@ -1236,7 +1236,7 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 			chain, err)
 	}
 
-	resp := call.SelectorsAndConf
+	resp := call.Offramp.SelectorsAndConf
 
 	if len(resp.SourceChainConfigs) != len(resp.Selectors) {
 		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
@@ -1488,16 +1488,8 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	if err != nil {
 		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
 	}
-
-	// get the RMN remote address from the proxy
-	var rmnRemoteAddress []byte
-	err = r.getDestinationData(
-		ctx,
-		chain,
-		consts.ContractNameRMNProxy,
-		consts.MethodNameGetARM,
-		&rmnRemoteAddress,
-	)
+	response, err := r.refresh(ctx)
+	rmnRemoteAddress := response.RMNProxy.RMNRemoteAddress
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
@@ -1809,6 +1801,7 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 		staticConfig          offRampStaticChainConfig
 		dynamicConfig         offRampDynamicChainConfig
 		selectorsAndConf      selectorsAndConfigs
+		rmnRemoteAddress      []byte
 	)
 
 	return contractreader.ExtendedBatchGetLatestValuesRequest{
@@ -1843,6 +1836,11 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 				ReturnVal: &selectorsAndConf,
 			},
 		},
+		consts.ContractNameRMNProxy: {{
+			ReadName:  consts.MethodNameGetARM,
+			Params:    map[string]any{},
+			ReturnVal: &rmnRemoteAddress,
+		}},
 	}
 }
 
@@ -1857,15 +1855,50 @@ func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValu
 // handleContractResults processes results for a specific contract
 func (r *ccipChainReader) handleContractResults(
 	contract types.BoundContract, results []types.BatchReadResult) (NogoResponse, error) {
+	offramp := OfframpNogoResponse{}
+	rmnProxy := RMNProxyNogoResponse{}
+
+	var err error
 	switch contract.Name {
 	case consts.ContractNameOffRamp:
 		r.lggr.Infow("In handleContractResults")
-		return r.handleOffRampResults(results)
+		offramp, err = r.handleOffRampResults(results)
+		if err != nil {
+			return NogoResponse{}, fmt.Errorf("handle offramp results: %w", err)
+		}
+	case consts.ContractNameRMNProxy:
+		rmnProxy, err = r.handleRMNProxyResults(results)
+		if err != nil {
+			return NogoResponse{}, fmt.Errorf("handle router results: %w", err)
+		}
 	}
-	return NogoResponse{}, fmt.Errorf("unexpected contract name %s", contract.Name)
+	return NogoResponse{
+		Offramp:  offramp,
+		RMNProxy: rmnProxy,
+	}, nil
+}
+
+func (r *ccipChainReader) handleRMNProxyResults(results []types.BatchReadResult) (RMNProxyNogoResponse, error) {
+	rmnProxy := RMNProxyNogoResponse{}
+
+	if len(results) > 0 {
+		val, err := results[0].GetResult()
+		if err != nil {
+			return RMNProxyNogoResponse{}, fmt.Errorf("get RMN proxy result: %w", err)
+		}
+		if typed, ok := val.(*cciptypes.Bytes); ok {
+			rmnProxy.RMNRemoteAddress = *typed
+		}
+	}
+	return rmnProxy, nil
 }
 
 type NogoResponse struct {
+	Offramp  OfframpNogoResponse
+	RMNProxy RMNProxyNogoResponse
+}
+
+type OfframpNogoResponse struct {
 	CommitLatestOCRConfig OCRConfigResponse
 	ExecLatestOCRConfig   OCRConfigResponse
 	StaticConfig          offRampStaticChainConfig
@@ -1873,14 +1906,18 @@ type NogoResponse struct {
 	SelectorsAndConf      selectorsAndConfigs
 }
 
+type RMNProxyNogoResponse struct {
+	RMNRemoteAddress cciptypes.Bytes
+}
+
 // handleOffRampResults processes offramp-specific results
-func (r *ccipChainReader) handleOffRampResults(results []types.BatchReadResult) (NogoResponse, error) {
-	response := NogoResponse{}
+func (r *ccipChainReader) handleOffRampResults(results []types.BatchReadResult) (OfframpNogoResponse, error) {
+	response := OfframpNogoResponse{}
 
 	for i, result := range results {
 		val, err := result.GetResult()
 		if err != nil {
-			return NogoResponse{}, fmt.Errorf("get offramp result %d: %w", i, err)
+			return OfframpNogoResponse{}, fmt.Errorf("get offramp result %d: %w", i, err)
 		}
 		r.lggr.Infow("val is", "val", val)
 
