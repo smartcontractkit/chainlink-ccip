@@ -871,6 +871,8 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
 
+		r.lggr.Infow("sourceConfigs", "sourceConfigs", sourceConfigs)
+
 		// Iterate results in sourceChain selector order so that the router config is deterministic.
 		keys := maps.Keys(sourceConfigs)
 		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
@@ -898,6 +900,9 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		if err != nil {
 			return nil, fmt.Errorf("unable to lookup nonce manager and rmn proxy remote (offramp static config): %w", err)
 		}
+
+		lggr.Infow("got offramp static config", "staticConfig", staticConfig)
+
 		resp = resp.Append(consts.ContractNameNonceManager, chain, staticConfig.NonceManager)
 		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfig.RmnRemote)
 		lggr.Infow("appending RMN remote contract address", "address", staticConfig.RmnRemote)
@@ -916,6 +921,9 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		if err != nil {
 			return nil, fmt.Errorf("unable to lookup fee quoter (offramp dynamic config): %w", err)
 		}
+
+		lggr.Infow("got offramp dynamic config", "dynamicConfig", dynamicConfig)
+
 		resp = resp.Append(consts.ContractNameFeeQuoter, chain, dynamicConfig.FeeQuoter)
 		lggr.Infow("appending fee quoter contract address", "address", dynamicConfig.FeeQuoter)
 	}
@@ -1240,7 +1248,7 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
 	}
 
-	lggr.Debugw("got source chain configs", "configs", resp)
+	lggr.Infow("got source chain configs", "configs", resp)
 
 	// Populate the map.
 	for i := range resp.Selectors {
