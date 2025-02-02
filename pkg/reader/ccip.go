@@ -1488,13 +1488,29 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	if err != nil {
 		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
 	}
-	response, err := r.refresh(ctx)
-	rmnRemoteAddress := response.RMNProxy.RMNRemoteAddress
+
+	// get the RMN remote address from the proxy
+	var rmnRemoteAddressFromNormalCall []byte
+	err = r.getDestinationData(
+		ctx,
+		chain,
+		consts.ContractNameRMNProxy,
+		consts.MethodNameGetARM,
+		&rmnRemoteAddressFromNormalCall,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
 
-	return rmnRemoteAddress, nil
+	response, err := r.refresh(ctx)
+	rmnRemoteAddressFromBatch := response.RMNProxy.RMNRemoteAddress
+
+	r.lggr.Infow("got RMN remote address", "rmnRemoteAddressFromNormalCall", rmnRemoteAddressFromNormalCall, "rmnRemoteAddressFromBatch", rmnRemoteAddressFromBatch)
+	if err != nil {
+		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
+	}
+
+	return rmnRemoteAddressFromNormalCall, nil
 }
 
 // Get the DestChainConfig from the FeeQuoter contract on the given chain.
