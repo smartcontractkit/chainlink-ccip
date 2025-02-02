@@ -92,30 +92,6 @@ pub struct DestChainState {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainConfig {
-    // TODO remove configs here that moved over to FeeQuoter
-    pub is_enabled: bool, // Whether this destination chain is enabled
-
-    pub max_number_of_tokens_per_msg: u16, // Maximum number of distinct ERC20 token transferred per message
-    pub max_data_bytes: u32,               // Maximum payload data size in bytes
-    pub max_per_msg_gas_limit: u32,        // Maximum gas limit for messages targeting EVMs
-    pub dest_gas_overhead: u32, //  Gas charged on top of the gasLimit to cover destination chain costs
-    pub dest_gas_per_payload_byte_base: u32, // Base gas cost per byte up to threshold
-    pub dest_gas_per_payload_byte_high: u32, // Higher gas cost per byte after threshold
-    pub dest_gas_per_payload_byte_threshold: u32, // Threshold in bytes for higher gas cost
-    pub dest_data_availability_overhead_gas: u32, // Extra data availability gas charged on top of the message, e.g. for OCR
-    pub dest_gas_per_data_availability_byte: u16, // Amount of gas to charge per byte of message data that needs availability
-    pub dest_data_availability_multiplier_bps: u16, // Multiplier for data availability gas, multiples of bps, or 0.0001
-
-    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
-    pub default_token_fee_usdcents: u16, // Default token fee charged per token transfer
-    pub default_token_dest_gas_overhead: u32, //  Default gas charged to execute the token transfer on the destination chain
-    pub default_tx_gas_limit: u32,            // Default gas limit for a tx
-    pub gas_multiplier_wei_per_eth: u64, // Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
-    pub network_fee_usdcents: u32, // Flat network fee to charge for messages, multiples of 0.01 USD
-    pub gas_price_staleness_threshold: u32, // The amount of time a gas price can be stale before it is considered invalid (0 means disabled)
-    pub enforce_out_of_order: bool, // Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
-    pub chain_family_selector: [u8; 4], // Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
-
     // list of senders authorized to send messages to this destination chain.
     // Note: The attribute name `max_len` is slightly misleading: it is not in any
     // way limiting the actual length of the vector during initialization; it just

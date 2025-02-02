@@ -177,21 +177,6 @@ pub mod ccip_router {
         v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
     }
 
-    /// Disables the destination chain selector.
-    ///
-    /// The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for disabling the chain selector.
-    /// * `dest_chain_selector` - The destination chain selector to be disabled.
-    pub fn disable_dest_chain_selector(
-        ctx: Context<DisableDestChainSelectorConfig>,
-        dest_chain_selector: u64,
-    ) -> Result<()> {
-        v1::admin::disable_dest_chain_selector(ctx, dest_chain_selector)
-    }
-
     /// Updates the configuration of the source chain selector.
     ///
     /// The Admin is the only one able to update the source chain config.

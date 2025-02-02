@@ -5,7 +5,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use solana_program::sysvar::instructions;
 
 use crate::program::CcipRouter;
-use crate::state::{CommitReport, Config, Nonce};
+use crate::state::{CommitReport, Config, Nonce, SourceChainConfig};
 use crate::{
     CcipRouterError, DestChain, DestChainConfig, ExecutionReportSingleChain,
     ExternalExecutionConfig, GlobalState, SVM2AnyMessage, SourceChain,
@@ -222,7 +222,7 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64, dest_chain_config: DestChainConfig)]
+#[instruction(new_chain_selector: u64, _source_chain_config: SourceChainConfig, dest_chain_config: DestChainConfig)]
 pub struct AddChainSelector<'info> {
     /// Adding a chain selector implies initializing the state for a new chain,
     /// hence the need to initialize two accounts.
@@ -305,28 +305,6 @@ pub struct UpdateDestChainSelectorConfig<'info> {
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(new_chain_selector: u64)]
-pub struct DisableDestChainSelectorConfig<'info> {
-    #[account(
-        mut,
-        seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
-        bump,
-        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub dest_chain_state: Account<'info, DestChain>,
-
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]

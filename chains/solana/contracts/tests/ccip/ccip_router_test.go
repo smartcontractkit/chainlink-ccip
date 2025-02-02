@@ -135,7 +135,7 @@ func TestCCIPRouter(t *testing.T) {
 		OnRamp:    [2][64]byte{onRampAddress, emptyAddress},
 		IsEnabled: true,
 	}
-	validDestChainConfig := ccip_router.DestChainConfig{
+	validFqDestChainConfig := fee_quoter.DestChainConfig{
 		IsEnabled: true,
 
 		// minimal valid config
@@ -535,116 +535,64 @@ func TestCCIPRouter(t *testing.T) {
 		type InvalidChainBillingInputTest struct {
 			Name         string
 			Selector     uint64
-			Conf         ccip_router.DestChainConfig
+			Conf         fee_quoter.DestChainConfig
 			SkipOnUpdate bool
 		}
 		invalidInputTests := []InvalidChainBillingInputTest{
 			{
 				Name:     "Zero DefaultTxGasLimit",
 				Selector: config.EvmChainSelector,
-				Conf: ccip_router.DestChainConfig{
+				Conf: fee_quoter.DestChainConfig{
 					DefaultTxGasLimit:   0,
-					MaxPerMsgGasLimit:   validDestChainConfig.MaxPerMsgGasLimit,
-					ChainFamilySelector: validDestChainConfig.ChainFamilySelector,
+					MaxPerMsgGasLimit:   validFqDestChainConfig.MaxPerMsgGasLimit,
+					ChainFamilySelector: validFqDestChainConfig.ChainFamilySelector,
 				},
 			},
 			{
 				Name:         "Zero DestChainSelector",
 				Selector:     0,
-				Conf:         validDestChainConfig,
+				Conf:         validFqDestChainConfig,
 				SkipOnUpdate: true, // as the 0-selector is invalid, the config account can never be initialized
 			},
 			{
 				Name:     "Zero ChainFamilySelector",
 				Selector: config.EvmChainSelector,
-				Conf: ccip_router.DestChainConfig{
-					DefaultTxGasLimit:   validDestChainConfig.DefaultTxGasLimit,
-					MaxPerMsgGasLimit:   validDestChainConfig.MaxPerMsgGasLimit,
+				Conf: fee_quoter.DestChainConfig{
+					DefaultTxGasLimit:   validFqDestChainConfig.DefaultTxGasLimit,
+					MaxPerMsgGasLimit:   validFqDestChainConfig.MaxPerMsgGasLimit,
 					ChainFamilySelector: [4]uint8{0, 0, 0, 0},
 				},
 			},
 			{
 				Name:     "DefaultTxGasLimit > MaxPerMsgGasLimit",
 				Selector: config.EvmChainSelector,
-				Conf: ccip_router.DestChainConfig{
+				Conf: fee_quoter.DestChainConfig{
 					DefaultTxGasLimit:   100,
 					MaxPerMsgGasLimit:   1,
-					ChainFamilySelector: validDestChainConfig.ChainFamilySelector,
+					ChainFamilySelector: validFqDestChainConfig.ChainFamilySelector,
 				},
 			},
 		}
 
-		// fee quoter and ccip router have very similar DestChainConfig structs,
-		// so just use the same test data but with the right type and cast between them
-		toFqDestChainConfig := func(routerDestChainConfig ccip_router.DestChainConfig) fee_quoter.DestChainConfig {
-			return fee_quoter.DestChainConfig{
-				IsEnabled:                         routerDestChainConfig.IsEnabled,
-				MaxNumberOfTokensPerMsg:           routerDestChainConfig.MaxNumberOfTokensPerMsg,
-				MaxDataBytes:                      routerDestChainConfig.MaxDataBytes,
-				MaxPerMsgGasLimit:                 routerDestChainConfig.MaxPerMsgGasLimit,
-				DestGasOverhead:                   routerDestChainConfig.DestGasOverhead,
-				DestGasPerPayloadByteBase:         routerDestChainConfig.DestGasPerPayloadByteBase,
-				DestGasPerPayloadByteHigh:         routerDestChainConfig.DestGasPerPayloadByteHigh,
-				DestGasPerPayloadByteThreshold:    routerDestChainConfig.DestGasPerPayloadByteThreshold,
-				DestDataAvailabilityOverheadGas:   routerDestChainConfig.DestDataAvailabilityOverheadGas,
-				DestGasPerDataAvailabilityByte:    routerDestChainConfig.DestGasPerDataAvailabilityByte,
-				DestDataAvailabilityMultiplierBps: routerDestChainConfig.DestDataAvailabilityMultiplierBps,
-				DefaultTokenFeeUsdcents:           routerDestChainConfig.DefaultTokenFeeUsdcents,
-				DefaultTokenDestGasOverhead:       routerDestChainConfig.DefaultTokenDestGasOverhead,
-				DefaultTxGasLimit:                 routerDestChainConfig.DefaultTxGasLimit,
-				GasMultiplierWeiPerEth:            routerDestChainConfig.GasMultiplierWeiPerEth,
-				NetworkFeeUsdcents:                routerDestChainConfig.NetworkFeeUsdcents,
-				GasPriceStalenessThreshold:        routerDestChainConfig.GasPriceStalenessThreshold,
-				EnforceOutOfOrder:                 routerDestChainConfig.EnforceOutOfOrder,
-				ChainFamilySelector:               routerDestChainConfig.ChainFamilySelector,
+		t.Run("Fee Quoter: When and admin adds a chain selector with invalid dest chain config, it fails", func(t *testing.T) {
+			for _, test := range invalidInputTests {
+				t.Run(test.Name, func(t *testing.T) {
+					destChainPDA, _, derr := state.FindFqDestChainPDA(test.Selector, config.FeeQuoterProgram)
+					require.NoError(t, derr)
+
+					instruction, err := fee_quoter.NewAddDestChainInstruction(
+						test.Selector,
+						test.Conf, // here is the invalid dest config data
+						config.FqConfigPDA,
+						destChainPDA,
+						legacyAdmin.PublicKey(),
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()}) // TODO change error type
+					require.NotNil(t, result)
+				})
 			}
-		}
-
-		t.Run("When and admin adds a chain selector with invalid dest chain config, it fails", func(t *testing.T) {
-			t.Run("CCIP Router", func(t *testing.T) {
-				for _, test := range invalidInputTests {
-					t.Run(test.Name, func(t *testing.T) {
-						sourceChainStatePDA, serr := state.FindSourceChainStatePDA(test.Selector, config.CcipRouterProgram)
-						require.NoError(t, serr)
-						destChainStatePDA, derr := state.FindDestChainStatePDA(test.Selector, config.CcipRouterProgram)
-						require.NoError(t, derr)
-						instruction, err := ccip_router.NewAddChainSelectorInstruction(
-							test.Selector,
-							validSourceChainConfig,
-							test.Conf, // here is the invalid dest config data
-							sourceChainStatePDA,
-							destChainStatePDA,
-							config.RouterConfigPDA,
-							legacyAdmin.PublicKey(),
-							solana.SystemProgramID,
-						).ValidateAndBuild()
-						require.NoError(t, err)
-						result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()})
-						require.NotNil(t, result)
-					})
-				}
-			})
-
-			t.Run("Fee Quoter", func(t *testing.T) {
-				for _, test := range invalidInputTests {
-					t.Run(test.Name, func(t *testing.T) {
-						destChainPDA, _, derr := state.FindFqDestChainPDA(test.Selector, config.FeeQuoterProgram)
-						require.NoError(t, derr)
-
-						instruction, err := fee_quoter.NewAddDestChainInstruction(
-							test.Selector,
-							toFqDestChainConfig(test.Conf), // here is the invalid dest config data
-							config.FqConfigPDA,
-							destChainPDA,
-							legacyAdmin.PublicKey(),
-							solana.SystemProgramID,
-						).ValidateAndBuild()
-						require.NoError(t, err)
-						result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()}) // TODO change error type
-						require.NotNil(t, result)
-					})
-				}
-			})
 		})
 
 		t.Run("When an unauthorized user tries to add a chain selector, it fails", func(t *testing.T) {
@@ -652,7 +600,7 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_router.NewAddChainSelectorInstruction(
 					config.EvmChainSelector,
 					validSourceChainConfig,
-					validDestChainConfig,
+					ccip_router.DestChainConfig{},
 					config.EvmSourceChainStatePDA,
 					config.EvmDestChainStatePDA,
 					config.RouterConfigPDA,
@@ -667,7 +615,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("Fee Quoter", func(t *testing.T) {
 				instruction, err := fee_quoter.NewAddDestChainInstruction(
 					config.EvmChainSelector,
-					toFqDestChainConfig(validDestChainConfig),
+					validFqDestChainConfig,
 					config.FqConfigPDA,
 					config.FqEvmDestChainPDA,
 					user.PublicKey(), // not an admin
@@ -684,7 +632,7 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_router.NewAddChainSelectorInstruction(
 					config.EvmChainSelector,
 					validSourceChainConfig,
-					validDestChainConfig,
+					ccip_router.DestChainConfig{},
 					config.EvmSourceChainStatePDA,
 					config.EvmDestChainStatePDA,
 					config.RouterConfigPDA,
@@ -706,14 +654,13 @@ func TestCCIPRouter(t *testing.T) {
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(0), destChainStateAccount.State.SequenceNumber)
-				require.Equal(t, validDestChainConfig, destChainStateAccount.Config)
+				require.Equal(t, ccip_router.DestChainConfig{}, destChainStateAccount.Config)
 			})
 
 			t.Run("Fee Quoter", func(t *testing.T) {
-				conf := toFqDestChainConfig(validDestChainConfig)
 				instruction, err := fee_quoter.NewAddDestChainInstruction(
 					config.EvmChainSelector,
-					conf,
+					validFqDestChainConfig,
 					config.FqConfigPDA,
 					config.FqEvmDestChainPDA,
 					legacyAdmin.PublicKey(),
@@ -727,7 +674,7 @@ func TestCCIPRouter(t *testing.T) {
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &destChainAccount)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, fee_quoter.TimestampedPackedU224{}, destChainAccount.State.UsdPerUnitGas)
-				require.Equal(t, conf, destChainAccount.Config)
+				require.Equal(t, validFqDestChainConfig, destChainAccount.Config)
 			})
 		})
 
@@ -747,14 +694,7 @@ func TestCCIPRouter(t *testing.T) {
 						OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
 						IsEnabled: true,
 					},
-					ccip_router.DestChainConfig{
-						IsEnabled: true,
-						// minimal valid config
-						DefaultTxGasLimit:   1,
-						MaxPerMsgGasLimit:   100,
-						ChainFamilySelector: [4]uint8{3, 2, 1, 0},
-						EnforceOutOfOrder:   true,
-					},
+					ccip_router.DestChainConfig{},
 					config.SvmSourceChainStatePDA,
 					config.SvmDestChainStatePDA,
 					config.RouterConfigPDA,
@@ -806,7 +746,6 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("When a non-admin tries to disable the chain selector, it fails", func(t *testing.T) {
-			// TODO move these tests to use FQ
 			t.Run("Source", func(t *testing.T) {
 				ix, err := ccip_router.NewDisableSourceChainSelectorInstruction(
 					config.EvmChainSelector,
@@ -819,11 +758,11 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 			})
 
-			t.Run("Dest", func(t *testing.T) {
-				ix, err := ccip_router.NewDisableDestChainSelectorInstruction(
+			t.Run("Fee Quoter: Dest", func(t *testing.T) {
+				ix, err := fee_quoter.NewDisableDestChainInstruction(
 					config.EvmChainSelector,
-					config.EvmDestChainStatePDA,
-					config.RouterConfigPDA,
+					config.FqConfigPDA,
+					config.FqEvmDestChainPDA,
 					user.PublicKey(),
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -854,43 +793,42 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, false, final.Config.IsEnabled)
 			})
 
-			t.Run("Dest", func(t *testing.T) {
-				var initial ccip_router.DestChain
-				err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initial)
+			t.Run("Fee Quoter: Dest", func(t *testing.T) {
+				var initial fee_quoter.DestChain
+				err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &initial)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, true, initial.Config.IsEnabled)
 
-				ix, err := ccip_router.NewDisableDestChainSelectorInstruction(
+				ix, err := fee_quoter.NewDisableDestChainInstruction(
 					config.EvmChainSelector,
-					config.EvmDestChainStatePDA,
-					config.RouterConfigPDA,
+					config.FqConfigPDA,
+					config.FqEvmDestChainPDA,
 					legacyAdmin.PublicKey(),
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
 
-				var final ccip_router.DestChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &final)
+				var final fee_quoter.DestChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &final)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, false, final.Config.IsEnabled)
 			})
 		})
 
-		t.Run("When an admin tries to update the chain state with invalid destination chain config, it fails", func(t *testing.T) {
+		t.Run("Fee Quoter: When an admin tries to update the chain state with invalid destination chain config, it fails", func(t *testing.T) {
 			for _, test := range invalidInputTests {
 				if test.SkipOnUpdate {
 					continue
 				}
 				t.Run(test.Name, func(t *testing.T) {
-					destChainStatePDA, derr := state.FindDestChainStatePDA(test.Selector, config.CcipRouterProgram)
+					destChainPDA, _, derr := state.FindFqDestChainPDA(test.Selector, config.FeeQuoterProgram)
 					require.NoError(t, derr)
-					instruction, err := ccip_router.NewUpdateDestChainConfigInstruction(
+					instruction, err := fee_quoter.NewUpdateDestChainConfigInstruction(
 						test.Selector,
 						test.Conf,
-						destChainStatePDA,
-						config.RouterConfigPDA,
+						config.FqConfigPDA,
+						destChainPDA,
 						legacyAdmin.PublicKey(),
-						solana.SystemProgramID,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()})
@@ -913,14 +851,13 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 			})
 
-			t.Run("Dest", func(t *testing.T) {
-				instruction, err := ccip_router.NewUpdateDestChainConfigInstruction(
+			t.Run("FeeQuoter: Dest", func(t *testing.T) {
+				instruction, err := fee_quoter.NewUpdateDestChainConfigInstruction(
 					config.EvmChainSelector,
-					validDestChainConfig,
-					config.EvmDestChainStatePDA,
-					config.RouterConfigPDA,
+					validFqDestChainConfig,
+					config.FqConfigPDA,
+					config.FqEvmDestChainPDA,
 					user.PublicKey(), // unauthorized
-					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
@@ -955,29 +892,28 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, updated, final.Config)
 			})
 
-			var initialDest ccip_router.DestChain
-			derr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initialDest)
+			var initialDest fee_quoter.DestChain
+			derr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &initialDest)
 			require.NoError(t, derr, "failed to get account info")
 
-			t.Run("Dest", func(t *testing.T) {
+			t.Run("Fee Quoter: Dest", func(t *testing.T) {
 				updated := initialDest.Config
 				updated.IsEnabled = true
 				require.NotEqual(t, initialDest.Config, updated) // at this point, onchain is disabled and we'll re-enable it
 
-				instruction, err := ccip_router.NewUpdateDestChainConfigInstruction(
+				instruction, err := fee_quoter.NewUpdateDestChainConfigInstruction(
 					config.EvmChainSelector,
 					updated,
-					config.EvmDestChainStatePDA,
-					config.RouterConfigPDA,
+					config.FqConfigPDA,
+					config.FqEvmDestChainPDA,
 					legacyAdmin.PublicKey(),
-					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
-				var final ccip_router.DestChain
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &final)
+				var final fee_quoter.DestChain
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &final)
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, updated, final.Config)
 			})
@@ -2623,8 +2559,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: uint64(validDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &fee_quoter.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // default gas limit
-			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &fee_quoter.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)                                                  // default OOO Execution
+			require.Equal(t, bin.Uint128{Lo: uint64(validFqDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &fee_quoter.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit) // default gas limit
+			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &fee_quoter.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)                                                    // default OOO Execution
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.SequenceNumber)
@@ -3175,7 +3111,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, validReceiverAddress[:], ccipMessageSentEvent.Message.Receiver)
 			data := [3]uint8{4, 5, 6}
 			require.Equal(t, data[:], ccipMessageSentEvent.Message.Data)
-			require.Equal(t, bin.Uint128{Lo: uint64(validDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &fee_quoter.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit)
+			require.Equal(t, bin.Uint128{Lo: uint64(validFqDestChainConfig.DefaultTxGasLimit), Hi: 0}, testutils.MustDeserializeExtraArgs(t, &fee_quoter.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).GasLimit)
 			require.Equal(t, false, testutils.MustDeserializeExtraArgs(t, &fee_quoter.EVMExtraArgsV2{}, ccipMessageSentEvent.Message.ExtraArgs, ccip.EVMExtraArgsV2Tag).AllowOutOfOrderExecution)
 			require.Equal(t, uint64(15), ccipMessageSentEvent.Message.Header.SourceChainSelector)
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
@@ -5276,7 +5212,7 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err = ccip_router.NewAddChainSelectorInstruction(
 					unsupportedChainSelector,
 					validSourceChainConfig,
-					validDestChainConfig,
+					ccip_router.DestChainConfig{},
 					unsupportedSourceChainStatePDA,
 					unsupportedDestChainStatePDA,
 					config.RouterConfigPDA,

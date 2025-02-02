@@ -300,42 +300,6 @@
       ]
     },
     {
-      "name": "disableDestChainSelector",
-      "docs": [
-        "Disables the destination chain selector.",
-        "",
-        "The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for disabling the chain selector.",
-        "* `dest_chain_selector` - The destination chain selector to be disabled."
-      ],
-      "accounts": [
-        {
-          "name": "destChainState",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "destChainSelector",
-          "type": "u64"
-        }
-      ]
-    },
-    {
       "name": "updateSourceChainConfig",
       "docs": [
         "Updates the configuration of the source chain selector.",
@@ -2178,87 +2142,6 @@
       "type": {
         "kind": "struct",
         "fields": [
-          {
-            "name": "isEnabled",
-            "type": "bool"
-          },
-          {
-            "name": "maxNumberOfTokensPerMsg",
-            "type": "u16"
-          },
-          {
-            "name": "maxDataBytes",
-            "type": "u32"
-          },
-          {
-            "name": "maxPerMsgGasLimit",
-            "type": "u32"
-          },
-          {
-            "name": "destGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteBase",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteHigh",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteThreshold",
-            "type": "u32"
-          },
-          {
-            "name": "destDataAvailabilityOverheadGas",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerDataAvailabilityByte",
-            "type": "u16"
-          },
-          {
-            "name": "destDataAvailabilityMultiplierBps",
-            "type": "u16"
-          },
-          {
-            "name": "defaultTokenFeeUsdcents",
-            "type": "u16"
-          },
-          {
-            "name": "defaultTokenDestGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "defaultTxGasLimit",
-            "type": "u32"
-          },
-          {
-            "name": "gasMultiplierWeiPerEth",
-            "type": "u64"
-          },
-          {
-            "name": "networkFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "gasPriceStalenessThreshold",
-            "type": "u32"
-          },
-          {
-            "name": "enforceOutOfOrder",
-            "type": "bool"
-          },
-          {
-            "name": "chainFamilySelector",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          },
           {
             "name": "allowedSenders",
             "type": {

@@ -257,8 +257,6 @@ pub struct UpdateDestChainConfig<'info> {
     // Only the registered admin can perform this action
     #[account(mut, address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

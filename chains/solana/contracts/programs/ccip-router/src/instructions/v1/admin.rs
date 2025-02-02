@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use crate::events::admin as events;
-use crate::DisableDestChainSelectorConfig;
 use crate::{
     AcceptOwnership, AddChainSelector, CcipRouterError, DestChainConfig, DestChainState,
     Ocr3ConfigInfo, OcrPluginType, SetOcrConfig, SourceChainConfig, SourceChainState,
@@ -92,22 +91,6 @@ pub fn disable_source_chain_selector(
     emit!(events::SourceChainConfigUpdated {
         source_chain_selector,
         source_chain_config: chain_state.config.clone(),
-    });
-
-    Ok(())
-}
-
-pub fn disable_dest_chain_selector(
-    ctx: Context<DisableDestChainSelectorConfig>,
-    dest_chain_selector: u64,
-) -> Result<()> {
-    let chain_state = &mut ctx.accounts.dest_chain_state;
-
-    chain_state.config.is_enabled = false;
-
-    emit!(events::DestChainConfigUpdated {
-        dest_chain_selector,
-        dest_chain_config: chain_state.config.clone(),
     });
 
     Ok(())
@@ -252,20 +235,10 @@ fn validate_source_chain_config(
     Ok(())
 }
 
-fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig) -> Result<()> {
+fn validate_dest_chain_config(dest_chain_selector: u64, _config: &DestChainConfig) -> Result<()> {
+    // As of now, the config has very few properties and there is very little to validate yet.
+    // This is mainly a placeholder to add validations as that config object grows.
     // TODO improve errors
     require!(dest_chain_selector != 0, CcipRouterError::InvalidInputs);
-    require!(
-        config.default_tx_gas_limit != 0,
-        CcipRouterError::InvalidInputs
-    );
-    require!(
-        config.default_tx_gas_limit <= config.max_per_msg_gas_limit,
-        CcipRouterError::InvalidInputs
-    );
-    require!(
-        config.chain_family_selector != [0; 4],
-        CcipRouterError::InvalidInputs
-    );
     Ok(())
 }

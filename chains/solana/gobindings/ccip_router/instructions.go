@@ -102,16 +102,6 @@ var (
 	// * `source_chain_selector` - The source chain selector to be disabled.
 	Instruction_DisableSourceChainSelector = ag_binary.TypeID([8]byte{58, 101, 54, 252, 248, 31, 226, 121})
 
-	// Disables the destination chain selector.
-	//
-	// The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for disabling the chain selector.
-	// * `dest_chain_selector` - The destination chain selector to be disabled.
-	Instruction_DisableDestChainSelector = ag_binary.TypeID([8]byte{214, 71, 132, 65, 177, 59, 170, 72})
-
 	// Updates the configuration of the source chain selector.
 	//
 	// The Admin is the only one able to update the source chain config.
@@ -338,8 +328,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AddChainSelector"
 	case Instruction_DisableSourceChainSelector:
 		return "DisableSourceChainSelector"
-	case Instruction_DisableDestChainSelector:
-		return "DisableDestChainSelector"
 	case Instruction_UpdateSourceChainConfig:
 		return "UpdateSourceChainConfig"
 	case Instruction_UpdateDestChainConfig:
@@ -411,9 +399,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"disable_source_chain_selector", (*DisableSourceChainSelector)(nil),
-		},
-		{
-			"disable_dest_chain_selector", (*DisableDestChainSelector)(nil),
 		},
 		{
 			"update_source_chain_config", (*UpdateSourceChainConfig)(nil),
