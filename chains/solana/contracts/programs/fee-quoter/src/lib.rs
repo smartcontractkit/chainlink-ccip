@@ -201,7 +201,12 @@ pub mod fee_quoter {
     ///
     /// # Returns
     ///
-    /// The fee amount in u64.
+    /// GetFeeResult struct with:
+    /// - the fee token mint address,
+    /// - the fee amount of said token,
+    /// - the fee value in juels,
+    /// - additional data required when performing the cross-chain transfer of tokens in that message
+    /// - deserialized and processed extra args
     pub fn get_fee<'info>(
         ctx: Context<'_, '_, 'info, 'info, GetFee>,
         dest_chain_selector: u64,

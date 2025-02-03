@@ -147,7 +147,12 @@ var (
 	//
 	// # Returns
 	//
-	// The fee amount in u64.
+	// GetFeeResult struct with:
+	// - the fee token mint address,
+	// - the fee amount of said token,
+	// - the fee value in juels,
+	// - additional data required when performing the cross-chain transfer of tokens in that message
+	// - deserialized and processed extra args
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 
 	Instruction_UpdatePrices = ag_binary.TypeID([8]byte{62, 161, 234, 136, 106, 26, 18, 160})

@@ -17,6 +17,8 @@ use crate::{
     SVM2AnyTokenTransfer, SVMTokenAmount,
 };
 
+use helpers::*;
+
 pub fn ccip_send<'info>(
     ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
     dest_chain_selector: u64,
@@ -57,8 +59,6 @@ pub fn ccip_send<'info>(
         accounts_per_sent_token.push(current_token_accounts);
     }
 
-    // Fee Quoter validates the message, calculates the fee in both the billing token
-    // and LINK, asserts that it doesn't exceed a maximum, and returns it
     let get_fee_result = get_fee_cpi(
         &ctx,
         dest_chain_selector,
@@ -203,7 +203,7 @@ pub fn ccip_send<'info>(
         }
     }
 
-    let message_id = &hash(&new_message);
+    let message_id = &helpers::hash(&new_message);
     new_message.header.message_id.clone_from(message_id);
 
     emit!(events::CCIPMessageSent {
@@ -215,238 +215,239 @@ pub fn ccip_send<'info>(
     Ok(())
 }
 
-/////////////
-// Helpers //
-/////////////
-
-fn token_transfer(
-    lock_or_burn_out_data: LockOrBurnOutV1,
-    source_pool_address: Pubkey,
-    token_amount: &SVMTokenAmount,
-    additional_data: &TokenTransferAdditionalData,
-) -> Result<SVM2AnyTokenTransfer> {
-    let dest_gas_amount = additional_data.dest_gas_overhead;
-
-    let extra_data = lock_or_burn_out_data.dest_pool_data;
-    let extra_data_length = extra_data.len() as u32;
-
-    require!(
-        extra_data_length <= CCIP_LOCK_OR_BURN_V1_RET_BYTES
-            || extra_data_length <= additional_data.dest_bytes_overhead,
-        CcipRouterError::SourceTokenDataTooLarge
-    );
-
-    // TODO: Revisit when/if non-EVM destinations from SVM become supported.
-    // for an EVM destination, exec data it consists of the amount of gas available for the releaseOrMint
-    // and transfer calls made by the offRamp
-    let dest_exec_data = ethnum::U256::new(dest_gas_amount.into()) // TODO remove dependency on ethnum
-        .to_be_bytes()
-        .to_vec();
-
-    Ok(SVM2AnyTokenTransfer {
-        source_pool_address,
-        dest_token_address: lock_or_burn_out_data.dest_token_address,
-        extra_data,
-        amount: token_amount.amount.into(), // pool on receiver chain handles decimals
-        dest_exec_data,
-    })
-}
-
-fn bump_nonce(
-    nonce_counter_account: &mut Account<Nonce>,
-    allow_out_of_order_execution: bool,
-) -> Result<u64> {
-    // Avoid Re-initialization attack as the account is init_if_needed
-    // https://solana.com/developers/courses/program-security/reinitialization-attacks#add-is-initialized-check
-    if nonce_counter_account.version == 0 {
-        // The authority must be the owner of the PDA, as it's their Public Key in the seed
-        // If the account is not initialized, initialize it
-        nonce_counter_account.version = 1;
-        nonce_counter_account.counter = 0;
-    }
-
-    // config.enforce_out_of_order checked in `validate_svm2any`
-    let mut final_nonce = 0;
-    if !allow_out_of_order_execution {
-        nonce_counter_account.counter = nonce_counter_account.counter.checked_add(1).unwrap();
-        final_nonce = nonce_counter_account.counter;
-    }
-    Ok(final_nonce)
-}
-
-fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
-    use anchor_lang::solana_program::keccak;
-
-    // Push Data Size to ensure that the hash is unique
-    let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
-
-    // RampMessageHeader struct
-    let header_source_chain_selector = msg.header.source_chain_selector.to_be_bytes();
-    let header_dest_chain_selector = msg.header.dest_chain_selector.to_be_bytes();
-    let header_sequence_number = msg.header.sequence_number.to_be_bytes();
-    let header_nonce = msg.header.nonce.to_be_bytes();
-
-    // similar to: https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L134
-    let result = keccak::hashv(&[
-        LEAF_DOMAIN_SEPARATOR.as_slice(),
-        // metadata
-        "SVM2AnyMessageHashV1".as_bytes(),
-        &header_source_chain_selector,
-        &header_dest_chain_selector,
-        &crate::ID.to_bytes(), // onramp: ccip_router program
-        // message header
-        &msg.sender.to_bytes(),
-        &header_sequence_number,
-        &header_nonce,
-        &msg.fee_token.to_bytes(),
-        // The cross-chain amounts are encoded in little endian, but
-        // this is irrelevant to the hashing function as long as both
-        // sides agree.
-        &msg.fee_token_amount.to_bytes(),
-        &msg.fee_value_juels.to_bytes(),
-        // messaging
-        &[msg.receiver.len() as u8],
-        &msg.receiver,
-        &data_size.to_be_bytes(),
-        &msg.data,
-        // tokens
-        &msg.token_amounts.try_to_vec().unwrap(),
-        // extra args
-        msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialize
-    ]);
-
-    result.to_bytes()
-}
-
-#[cfg(test)]
-mod tests {
-    use ethnum::U256;
-
+mod helpers {
     use super::*;
 
-    /// Builds a message and hash it, it's compared with a known hash
-    #[test]
-    fn test_hash() {
-        let message = SVM2AnyRampMessage {
-            header: RampMessageHeader {
-                message_id: [0; 32],
-                source_chain_selector: 10,
-                dest_chain_selector: 20,
-                sequence_number: 30,
-                nonce: 40,
-            },
-            sender: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa").unwrap(),
-            data: vec![4, 5, 6],
-            receiver: [
-                1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0,
-            ]
-            .to_vec(),
-            extra_args: fee_quoter::extra_args::EVMExtraArgsV2 {
-                gas_limit: 1,
-                allow_out_of_order_execution: true,
-            }
-            .serialize_with_tag(),
-            fee_token: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
-            fee_token_amount: 50u32.into(),
-            token_amounts: [SVM2AnyTokenTransfer {
-                source_pool_address: Pubkey::try_from(
-                    "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
-                )
-                .unwrap(),
-                dest_token_address: vec![0, 1, 2, 3],
-                extra_data: vec![4, 5, 6],
-                amount: U256::from_le_bytes([1; 32]).into(),
-                dest_exec_data: vec![4, 5, 6],
-            }]
-            .to_vec(),
-            fee_value_juels: 500u32.into(),
-        };
+    pub(super) fn token_transfer(
+        lock_or_burn_out_data: LockOrBurnOutV1,
+        source_pool_address: Pubkey,
+        token_amount: &SVMTokenAmount,
+        additional_data: &TokenTransferAdditionalData,
+    ) -> Result<SVM2AnyTokenTransfer> {
+        let dest_gas_amount = additional_data.dest_gas_overhead;
 
-        let hash_result = hash(&message);
+        let extra_data = lock_or_burn_out_data.dest_pool_data;
+        let extra_data_length = extra_data.len() as u32;
 
-        assert_eq!(
-            "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7",
-            hex::encode(hash_result)
+        require!(
+            extra_data_length <= CCIP_LOCK_OR_BURN_V1_RET_BYTES
+                || extra_data_length <= additional_data.dest_bytes_overhead,
+            CcipRouterError::SourceTokenDataTooLarge
         );
+
+        // TODO: Revisit when/if non-EVM destinations from SVM become supported.
+        // for an EVM destination, exec data it consists of the amount of gas available for the releaseOrMint
+        // and transfer calls made by the offRamp
+        let dest_exec_data = ethnum::U256::new(dest_gas_amount.into()) // TODO remove dependency on ethnum
+            .to_be_bytes()
+            .to_vec();
+
+        Ok(SVM2AnyTokenTransfer {
+            source_pool_address,
+            dest_token_address: lock_or_burn_out_data.dest_token_address,
+            extra_data,
+            amount: token_amount.amount.into(), // pool on receiver chain handles decimals
+            dest_exec_data,
+        })
     }
 
-    #[test]
-    fn token_transfer_with_no_pool_data() {
-        let source_pool_address = Pubkey::new_unique();
-        let lock_or_burn_out_data = LockOrBurnOutV1 {
-            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
-            dest_pool_data: vec![],
-        };
+    pub(super) fn bump_nonce(
+        nonce_counter_account: &mut Account<Nonce>,
+        allow_out_of_order_execution: bool,
+    ) -> Result<u64> {
+        // Avoid Re-initialization attack as the account is init_if_needed
+        // https://solana.com/developers/courses/program-security/reinitialization-attacks#add-is-initialized-check
+        if nonce_counter_account.version == 0 {
+            // The authority must be the owner of the PDA, as it's their Public Key in the seed
+            // If the account is not initialized, initialize it
+            nonce_counter_account.version = 1;
+            nonce_counter_account.counter = 0;
+        }
 
-        let additional_token_transfer_data = TokenTransferAdditionalData {
-            dest_bytes_overhead: 640,
-            dest_gas_overhead: 180000,
-        };
-        let token_amount = &SVMTokenAmount {
-            token: Pubkey::new_unique(),
-            amount: 100,
-        };
-
-        let transfer = token_transfer(
-            lock_or_burn_out_data.clone(),
-            source_pool_address,
-            token_amount,
-            &additional_token_transfer_data,
-        )
-        .unwrap();
-
-        let expected_exec_data =
-            ethnum::U256::new(additional_token_transfer_data.dest_gas_overhead.into())
-                .to_be_bytes();
-
-        assert!(transfer.extra_data.is_empty());
-        assert_eq!(transfer.dest_exec_data, expected_exec_data);
+        // config.enforce_out_of_order checked in `validate_svm2any`
+        let mut final_nonce = 0;
+        if !allow_out_of_order_execution {
+            nonce_counter_account.counter = nonce_counter_account.counter.checked_add(1).unwrap();
+            final_nonce = nonce_counter_account.counter;
+        }
+        Ok(final_nonce)
     }
 
-    #[test]
-    fn token_transfer_validates_data_length() {
-        let additional_token_transfer_data = TokenTransferAdditionalData {
-            dest_bytes_overhead: 640,
-            dest_gas_overhead: 180000,
-        };
-        let token_amount = &SVMTokenAmount {
-            token: Pubkey::new_unique(),
-            amount: 100,
-        };
+    pub(super) fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
+        use anchor_lang::solana_program::keccak;
 
-        let reasonable_size = CCIP_LOCK_OR_BURN_V1_RET_BYTES as usize;
-        let source_pool_address = Pubkey::new_unique();
-        let lock_or_burn_out_data = LockOrBurnOutV1 {
-            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
-            dest_pool_data: vec![b'A'; reasonable_size],
-        };
+        // Push Data Size to ensure that the hash is unique
+        let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
-        token_transfer(
-            lock_or_burn_out_data,
-            source_pool_address,
-            token_amount,
-            &additional_token_transfer_data,
-        )
-        .unwrap();
+        // RampMessageHeader struct
+        let header_source_chain_selector = msg.header.source_chain_selector.to_be_bytes();
+        let header_dest_chain_selector = msg.header.dest_chain_selector.to_be_bytes();
+        let header_sequence_number = msg.header.sequence_number.to_be_bytes();
+        let header_nonce = msg.header.nonce.to_be_bytes();
 
-        let unreasonable_size = (CCIP_LOCK_OR_BURN_V1_RET_BYTES
-            .max(additional_token_transfer_data.dest_gas_overhead)
-            + 1) as usize;
-        let lock_or_burn_out_data = LockOrBurnOutV1 {
-            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
-            dest_pool_data: vec![b'A'; unreasonable_size],
-        };
+        // similar to: https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L134
+        let result = keccak::hashv(&[
+            LEAF_DOMAIN_SEPARATOR.as_slice(),
+            // metadata
+            "SVM2AnyMessageHashV1".as_bytes(),
+            &header_source_chain_selector,
+            &header_dest_chain_selector,
+            &crate::ID.to_bytes(), // onramp: ccip_router program
+            // message header
+            &msg.sender.to_bytes(),
+            &header_sequence_number,
+            &header_nonce,
+            &msg.fee_token.to_bytes(),
+            // The cross-chain amounts are encoded in little endian, but
+            // this is irrelevant to the hashing function as long as both
+            // sides agree.
+            &msg.fee_token_amount.to_bytes(),
+            &msg.fee_value_juels.to_bytes(),
+            // messaging
+            &[msg.receiver.len() as u8],
+            &msg.receiver,
+            &data_size.to_be_bytes(),
+            &msg.data,
+            // tokens
+            &msg.token_amounts.try_to_vec().unwrap(),
+            // extra args
+            msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialize
+        ]);
 
-        assert_eq!(
+        result.to_bytes()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use ethnum::U256;
+
+        use super::*;
+
+        /// Builds a message and hash it, it's compared with a known hash
+        #[test]
+        fn test_hash() {
+            let message = SVM2AnyRampMessage {
+                header: RampMessageHeader {
+                    message_id: [0; 32],
+                    source_chain_selector: 10,
+                    dest_chain_selector: 20,
+                    sequence_number: 30,
+                    nonce: 40,
+                },
+                sender: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa").unwrap(),
+                data: vec![4, 5, 6],
+                receiver: [
+                    1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ]
+                .to_vec(),
+                extra_args: fee_quoter::extra_args::EVMExtraArgsV2 {
+                    gas_limit: 1,
+                    allow_out_of_order_execution: true,
+                }
+                .serialize_with_tag(),
+                fee_token: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
+                    .unwrap(),
+                fee_token_amount: 50u32.into(),
+                token_amounts: [SVM2AnyTokenTransfer {
+                    source_pool_address: Pubkey::try_from(
+                        "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
+                    )
+                    .unwrap(),
+                    dest_token_address: vec![0, 1, 2, 3],
+                    extra_data: vec![4, 5, 6],
+                    amount: U256::from_le_bytes([1; 32]).into(),
+                    dest_exec_data: vec![4, 5, 6],
+                }]
+                .to_vec(),
+                fee_value_juels: 500u32.into(),
+            };
+
+            let hash_result = hash(&message);
+
+            assert_eq!(
+                "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7",
+                hex::encode(hash_result)
+            );
+        }
+
+        #[test]
+        fn token_transfer_with_no_pool_data() {
+            let source_pool_address = Pubkey::new_unique();
+            let lock_or_burn_out_data = LockOrBurnOutV1 {
+                dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+                dest_pool_data: vec![],
+            };
+
+            let additional_token_transfer_data = TokenTransferAdditionalData {
+                dest_bytes_overhead: 640,
+                dest_gas_overhead: 180000,
+            };
+            let token_amount = &SVMTokenAmount {
+                token: Pubkey::new_unique(),
+                amount: 100,
+            };
+
+            let transfer = token_transfer(
+                lock_or_burn_out_data.clone(),
+                source_pool_address,
+                token_amount,
+                &additional_token_transfer_data,
+            )
+            .unwrap();
+
+            let expected_exec_data =
+                ethnum::U256::new(additional_token_transfer_data.dest_gas_overhead.into())
+                    .to_be_bytes();
+
+            assert!(transfer.extra_data.is_empty());
+            assert_eq!(transfer.dest_exec_data, expected_exec_data);
+        }
+
+        #[test]
+        fn token_transfer_validates_data_length() {
+            let additional_token_transfer_data = TokenTransferAdditionalData {
+                dest_bytes_overhead: 640,
+                dest_gas_overhead: 180000,
+            };
+            let token_amount = &SVMTokenAmount {
+                token: Pubkey::new_unique(),
+                amount: 100,
+            };
+
+            let reasonable_size = CCIP_LOCK_OR_BURN_V1_RET_BYTES as usize;
+            let source_pool_address = Pubkey::new_unique();
+            let lock_or_burn_out_data = LockOrBurnOutV1 {
+                dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+                dest_pool_data: vec![b'A'; reasonable_size],
+            };
+
             token_transfer(
                 lock_or_burn_out_data,
                 source_pool_address,
                 token_amount,
                 &additional_token_transfer_data,
             )
-            .unwrap_err(),
-            CcipRouterError::SourceTokenDataTooLarge.into()
-        );
+            .unwrap();
+
+            let unreasonable_size = (CCIP_LOCK_OR_BURN_V1_RET_BYTES
+                .max(additional_token_transfer_data.dest_gas_overhead)
+                + 1) as usize;
+            let lock_or_burn_out_data = LockOrBurnOutV1 {
+                dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+                dest_pool_data: vec![b'A'; unreasonable_size],
+            };
+
+            assert_eq!(
+                token_transfer(
+                    lock_or_burn_out_data,
+                    source_pool_address,
+                    token_amount,
+                    &additional_token_transfer_data,
+                )
+                .unwrap_err(),
+                CcipRouterError::SourceTokenDataTooLarge.into()
+            );
+        }
     }
 }

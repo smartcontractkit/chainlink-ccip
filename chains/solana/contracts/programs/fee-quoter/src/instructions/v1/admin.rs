@@ -38,18 +38,6 @@ pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     Ok(())
 }
 
-// pub fn update_onramp(ctx: Context<UpdateConfig>, onramp: Pubkey) -> Result<()> {
-//     ctx.accounts.config.onramp = onramp;
-//     // TODO emit event
-//     Ok(())
-// }
-
-// pub fn update_offramp(ctx: Context<UpdateConfig>, offramp: Pubkey) -> Result<()> {
-//     ctx.accounts.config.offramp = offramp;
-//     // TODO emit event
-//     Ok(())
-// }
-
 pub fn add_billing_token_config(
     ctx: Context<AddBillingTokenConfig>,
     config: BillingTokenConfig,

@@ -9,6 +9,13 @@ use crate::{CcipRouterError, SVMTokenAmount};
 
 use super::pools::TokenAccounts;
 
+/// Invokes Fee Quoter to:
+/// - validate the message,
+/// - calculate the fee in both the billing token and LINK, and
+/// - assert that it doesn't exceed a maximum
+///
+/// # Returns
+///  GetFeeResult with fee quoter's response
 pub(super) fn get_fee_cpi<'info>(
     ctx: &Context<'_, '_, 'info, 'info, CcipSend<'info>>,
     dest_chain_selector: u64,
