@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -1861,57 +1860,35 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 	}
 }
 
-// ContractHandler defines how to handle different contract results
-type ContractHandler struct {
-	handler    func([]types.BatchReadResult) (interface{}, error)
-	resultType reflect.Type
-}
-
-// updateFromResults updates the cache with results from the batch request
 func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValuesResult) (NogoResponse, error) {
-	handlers := map[string]ContractHandler{
-		consts.ContractNameOffRamp: {
-			handler: func(results []types.BatchReadResult) (interface{}, error) {
-				return r.handleOffRampResults(results)
-			},
-			resultType: reflect.TypeOf(OfframpNogoResponse{}),
-		},
-		consts.ContractNameRMNProxy: {
-			handler: func(results []types.BatchReadResult) (interface{}, error) {
-				return r.handleRMNProxyResults(results)
-			},
-			resultType: reflect.TypeOf(RMNProxyNogoResponse{}),
-		},
-	}
-
 	response := NogoResponse{}
 
 	for contract, results := range batchResult {
 		r.lggr.Infow("Processing contract results", "contract", contract.Name)
 
-		handler, exists := handlers[contract.Name]
-		if !exists {
+		switch contract.Name {
+		case consts.ContractNameOffRamp:
+			offramp, err := r.handleOffRampResults(results)
+			if err != nil {
+				return NogoResponse{}, fmt.Errorf("handle offramp results: %w", err)
+			}
+			r.lggr.Infow("Result is", "result", offramp)
+			response.Offramp = offramp
+
+		case consts.ContractNameRMNProxy:
+			rmnProxy, err := r.handleRMNProxyResults(results)
+			if err != nil {
+				return NogoResponse{}, fmt.Errorf("handle RMN proxy results: %w", err)
+			}
+			r.lggr.Infow("Result is", "result", rmnProxy)
+			response.RMNProxy = rmnProxy
+
+		default:
 			r.lggr.Warnw("No handler found for contract", "contract", contract.Name)
-			continue
-		}
-
-		result, err := handler.handler(results)
-		if err != nil {
-			return NogoResponse{}, fmt.Errorf("handle %s results: %w", contract.Name, err)
-		}
-
-		r.lggr.Infow("Result is", "result", result)
-
-		// Set the result in the appropriate field using reflection
-		responseValue := reflect.ValueOf(&response).Elem()
-		field := responseValue.FieldByName(contract.Name)
-		if field.IsValid() && field.Type() == handler.resultType {
-			field.Set(reflect.ValueOf(result))
 		}
 	}
 
 	r.lggr.Infow("Response is", "response", response)
-
 	return response, nil
 }
 
