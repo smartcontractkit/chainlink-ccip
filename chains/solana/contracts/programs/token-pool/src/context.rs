@@ -6,13 +6,18 @@ use anchor_spl::{
 
 use crate::{
     ChainConfig, Config, ExternalExecutionConfig, LockOrBurnInV1, RateLimitConfig,
-    ReleaseOrMintInV1, RemoteAddress, RemoteConfig,
+    ReleaseOrMintInputV1, RemoteAddress, RemoteConfig,
 };
 
-const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
-const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
-pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
-pub const CCIP_TOKENPOOL_CHAINCONFIG: &[u8] = b"ccip_tokenpool_chainconfig";
+/// Static space allocated to any account: must always be added to space calculations.
+const ANCHOR_DISCRIMINATOR: usize = 8;
+
+/// Fixed seeds for PDA derivation: different context must use different seeds.
+pub mod seed {
+    pub const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
+    pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
+    pub const CCIP_TOKENPOOL_CHAINCONFIG: &[u8] = b"ccip_tokenpool_chainconfig";
+}
 pub const RELEASE_MINT: [u8; 8] = [0x14, 0x94, 0x71, 0xc6, 0xe5, 0xaa, 0x47, 0x30];
 pub const LOCK_BURN: [u8; 8] = [0xc8, 0x0e, 0x32, 0x09, 0x2c, 0x5b, 0x79, 0x25];
 
@@ -20,24 +25,29 @@ pub const LOCK_BURN: [u8; 8] = [0xc8, 0x0e, 0x32, 0x09, 0x2c, 0x5b, 0x79, 0x25];
 pub struct InitializeTokenPool<'info> {
     #[account(
         init,
-        seeds = [CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
     )]
-    pub config: Account<'info, Config>, // config PDA for token pool
-    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+    pub config: Account<'info, Config>,
+
+    /// Underlying token that the pool wraps
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    /// PDA for managing tokens
     #[account(
         init,
-        seeds = [CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ExternalExecutionConfig::INIT_SPACE,
     )]
-    pub pool_signer: Account<'info, ExternalExecutionConfig>, // PDA for managing tokens
+    pub pool_signer: Account<'info, ExternalExecutionConfig>,
+
     #[account(
         mut,
-        address = mint.mint_authority.unwrap() @ CcipTokenPoolError::InvalidInitPoolPermissions, // TODO - what if mint_authority is 0-address (no more minting)
+        address = mint.mint_authority.unwrap() @ CcipTokenPoolError::InvalidInitPoolPermissions,
     )]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -47,10 +57,11 @@ pub struct InitializeTokenPool<'info> {
 pub struct SetConfig<'info> {
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(address = config.owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -59,16 +70,17 @@ pub struct SetConfig<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(address = config.proposed_owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
-#[instruction(release_or_mint: ReleaseOrMintInV1)]
+#[instruction(release_or_mint: ReleaseOrMintInputV1)]
 pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
     #[account(address = config.ramp_authority @ CcipTokenPoolError::InvalidPoolCaller)]
@@ -78,25 +90,30 @@ pub struct TokenOfframp<'info> {
     // consistent set + token pool program
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(address = *mint.to_account_info().owner)]
     /// CHECK: CPI to token program
     pub token_program: AccountInfo<'info>,
+
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
+
     #[account(
-        seeds = [CCIP_TOKENPOOL_SIGNER, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_SIGNER, config.mint.key().as_ref()],
         bump,
     )]
     pub pool_signer: Account<'info, ExternalExecutionConfig>,
+
     #[account(mut, address = get_associated_token_address_with_program_id(&pool_signer.key(), &mint.key(), &token_program.key()))]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, release_or_mint.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CHAINCONFIG, release_or_mint.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
@@ -121,25 +138,30 @@ pub struct TokenOnramp<'info> {
     // consistent set + token pool program
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(address = *mint.to_account_info().owner)]
     /// CHECK: CPI to underlying token program
     pub token_program: AccountInfo<'info>,
+
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
+
     #[account(
-        seeds = [CCIP_TOKENPOOL_SIGNER, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_SIGNER, config.mint.key().as_ref()],
         bump,
     )]
     pub pool_signer: Account<'info, ExternalExecutionConfig>,
+
     #[account(mut, address = get_associated_token_address_with_program_id(&pool_signer.key(), &mint.key(), &token_program.key()))]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CHAINCONFIG, lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
@@ -153,59 +175,67 @@ pub struct TokenOnramp<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct InitializeChainConfig<'info> {
     #[account(
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(
         init,
-        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
     )]
     pub chain_config: Account<'info, ChainConfig>,
+
     #[account(mut, address = config.owner)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
+/// Allows modifying the config without changing its size (i.e. not changing the remote pool account list.)
 #[derive(Accounts)]
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct EditChainConfigStaticSize<'info> {
     #[account(
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
+
     #[account(mut, address = config.owner)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
+/// Allows modifying the config changing its size (e.g. changing the remote pool account list.)
 #[derive(Accounts)]
 #[instruction(remote_chain_selector: u64, mint: Pubkey, cfg: RemoteConfig)]
 pub struct EditChainConfigDynamicSize<'info> {
     #[account(
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE + cfg.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>(),
         realloc::payer = authority,
         realloc::zero = false
     )]
     pub chain_config: Account<'info, ChainConfig>,
+
     #[account(mut, address = config.owner)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -215,13 +245,14 @@ pub struct EditChainConfigDynamicSize<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey, addresses: Vec<RemoteAddress>)]
 pub struct AppendRemotePoolAddresses<'info> {
     #[account(
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
             + chain_config.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
@@ -230,6 +261,7 @@ pub struct AppendRemotePoolAddresses<'info> {
         realloc::zero = false
     )]
     pub chain_config: Account<'info, ChainConfig>,
+
     #[account(mut, address = config.owner)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -239,17 +271,19 @@ pub struct AppendRemotePoolAddresses<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct DeleteChainConfig<'info> {
     #[account(
-        seeds = [CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, config.mint.key().as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,
+
     #[account(
         mut,
-        seeds = [CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [seed::CCIP_TOKENPOOL_CHAINCONFIG, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
         close = authority,
     )]
     pub chain_config: Account<'info, ChainConfig>,
+
     #[account(mut, address = config.owner)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -312,13 +346,14 @@ pub struct Released {
 }
 
 // note: configuration events are slightly different than EVM chains because configuration follows different steps
+
 #[event]
 pub struct RemoteChainConfigured {
     pub chain_selector: u64,
     pub token: RemoteAddress,
-    pub previous_token: RemoteAddress,
+    pub previous_token: Option<RemoteAddress>,
     pub pool_addresses: Vec<RemoteAddress>,
-    pub previous_pool_addresses: Vec<RemoteAddress>,
+    pub previous_pool_addresses: Option<Vec<RemoteAddress>>,
 }
 
 #[event]

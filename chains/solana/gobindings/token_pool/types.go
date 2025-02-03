@@ -96,7 +96,7 @@ func (obj *RateLimitConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 }
 
 type LockOrBurnInV1 struct {
-	Receiver            []byte
+	Receiver            RemoteAddress
 	RemoteChainSelector uint64
 	OriginalSender      ag_solanago.PublicKey
 	Amount              uint64
@@ -194,23 +194,28 @@ func (obj *LockOrBurnOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	return nil
 }
 
-type ReleaseOrMintInV1 struct {
+type ReleaseOrMintInputV1 struct {
 	OriginalSender      RemoteAddress
 	RemoteChainSelector uint64
 	Receiver            ag_solanago.PublicKey
-	Amount              [32]uint8
-	LocalToken          ag_solanago.PublicKey
+
+	// Encoded as u256, denominated in the source token's decimals.
+	Amount     [32]uint8
+	LocalToken ag_solanago.PublicKey
 
 	// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
 	// expected pool address for the given remoteChainSelector.
 	SourcePoolAddress RemoteAddress
-	SourcePoolData    RemoteAddress
+
+	// Opaque data received from the source pool to process the release or mint.
+	SourcePoolData RemoteAddress
 
 	// @dev WARNING: offchainTokenData is untrusted data.
+	// Opaque offchain data to process the release or mint
 	OffchainTokenData RemoteAddress
 }
 
-func (obj ReleaseOrMintInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ReleaseOrMintInputV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `OriginalSender` param:
 	err = encoder.Encode(obj.OriginalSender)
 	if err != nil {
@@ -254,7 +259,7 @@ func (obj ReleaseOrMintInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 
-func (obj *ReleaseOrMintInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ReleaseOrMintInputV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `OriginalSender`:
 	err = decoder.Decode(&obj.OriginalSender)
 	if err != nil {
@@ -298,11 +303,14 @@ func (obj *ReleaseOrMintInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-type ReleaseOrMintOutV1 struct {
+type ReleaseOrMintOutputV1 struct {
+	// The number of tokens released or minted on the destination chain, denominated in the local token's decimals.
+	// This value is expected to be equal to the ReleaseOrMintInV1.amount in the case where the source and destination
+	// chain have the same number of decimals.
 	DestinationAmount uint64
 }
 
-func (obj ReleaseOrMintOutV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ReleaseOrMintOutputV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `DestinationAmount` param:
 	err = encoder.Encode(obj.DestinationAmount)
 	if err != nil {
@@ -311,7 +319,7 @@ func (obj ReleaseOrMintOutV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	return nil
 }
 
-func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ReleaseOrMintOutputV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `DestinationAmount`:
 	err = decoder.Decode(&obj.DestinationAmount)
 	if err != nil {
@@ -321,9 +329,13 @@ func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 }
 
 type RemoteConfig struct {
+	// Allowed remote pool addresses. It's stored as an unbounded vector to ensure it's always possible
+	// to upgrade the config with new allowed addresses, without invalidating in-flight messages.
 	PoolAddresses []RemoteAddress
 	TokenAddress  RemoteAddress
-	Decimals      uint8
+
+	// This value (remote decimals) must be tracked to convert amounts properly from remote to local types.
+	Decimals uint8
 }
 
 func (obj RemoteConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {

@@ -10,7 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetRampAuthority is the `setRampAuthority` instruction.
+// `set_ramp_authority` changes the expected signer for mint/release + burn/lock method calls
+// this is used to update the router address
 type SetRampAuthority struct {
 	NewAuthority *ag_solanago.PublicKey
 

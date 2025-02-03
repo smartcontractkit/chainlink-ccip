@@ -13,12 +13,18 @@
         {
           "name": "mint",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Underlying token that the pool wraps"
+          ]
         },
         {
           "name": "poolSigner",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "PDA for managing tokens"
+          ]
         },
         {
           "name": "authority",
@@ -67,6 +73,9 @@
     },
     {
       "name": "acceptOwnership",
+      "docs": [
+        "Must be signed by the proposed owner"
+      ],
       "accounts": [
         {
           "name": "config",
@@ -83,6 +92,10 @@
     },
     {
       "name": "setRampAuthority",
+      "docs": [
+        "`set_ramp_authority` changes the expected signer for mint/release + burn/lock method calls",
+        "this is used to update the router address"
+      ],
       "accounts": [
         {
           "name": "config",
@@ -104,6 +117,10 @@
     },
     {
       "name": "initChainRemoteConfig",
+      "docs": [
+        "Remote pools must be empty as it must be zero sized, but they can be immediately",
+        "added with a call to the `append_remote_pool_addresses` instruction"
+      ],
       "accounts": [
         {
           "name": "config",
@@ -145,6 +162,9 @@
     },
     {
       "name": "editChainRemoteConfig",
+      "docs": [
+        "Remote pools can be modified arbitrarily, the account space will be dynamically reallocated."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -357,12 +377,12 @@
         {
           "name": "releaseOrMint",
           "type": {
-            "defined": "ReleaseOrMintInV1"
+            "defined": "ReleaseOrMintInputV1"
           }
         }
       ],
       "returns": {
-        "defined": "ReleaseOrMintOutV1"
+        "defined": "ReleaseOrMintOutputV1"
       }
     },
     {
@@ -552,7 +572,9 @@
         "fields": [
           {
             "name": "receiver",
-            "type": "bytes"
+            "type": {
+              "defined": "RemoteAddress"
+            }
           },
           {
             "name": "remoteChainSelector",
@@ -594,7 +616,11 @@
       }
     },
     {
-      "name": "ReleaseOrMintInV1",
+      "name": "ReleaseOrMintInputV1",
+      "docs": [
+        "All information necessary to perform a release or mint operation. As it's an input to",
+        "the offramp process, the sender is remote and the receiver local."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -614,6 +640,9 @@
           },
           {
             "name": "amount",
+            "docs": [
+              "Encoded as u256, denominated in the source token's decimals."
+            ],
             "type": {
               "array": [
                 "u8",
@@ -637,6 +666,9 @@
           },
           {
             "name": "sourcePoolData",
+            "docs": [
+              "Opaque data received from the source pool to process the release or mint."
+            ],
             "type": {
               "defined": "RemoteAddress"
             }
@@ -644,7 +676,8 @@
           {
             "name": "offchainTokenData",
             "docs": [
-              "@dev WARNING: offchainTokenData is untrusted data."
+              "@dev WARNING: offchainTokenData is untrusted data.",
+              "Opaque offchain data to process the release or mint"
             ],
             "type": {
               "defined": "RemoteAddress"
@@ -654,12 +687,17 @@
       }
     },
     {
-      "name": "ReleaseOrMintOutV1",
+      "name": "ReleaseOrMintOutputV1",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "destinationAmount",
+            "docs": [
+              "The number of tokens released or minted on the destination chain, denominated in the local token's decimals.",
+              "This value is expected to be equal to the ReleaseOrMintInV1.amount in the case where the source and destination",
+              "chain have the same number of decimals."
+            ],
             "type": "u64"
           }
         ]
@@ -672,6 +710,10 @@
         "fields": [
           {
             "name": "poolAddresses",
+            "docs": [
+              "Allowed remote pool addresses. It's stored as an unbounded vector to ensure it's always possible",
+              "to upgrade the config with new allowed addresses, without invalidating in-flight messages."
+            ],
             "type": {
               "vec": {
                 "defined": "RemoteAddress"
@@ -686,6 +728,9 @@
           },
           {
             "name": "decimals",
+            "docs": [
+              "This value (remote decimals) must be tracked to convert amounts properly from remote to local types."
+            ],
             "type": "u8"
           }
         ]
@@ -693,6 +738,9 @@
     },
     {
       "name": "RemoteAddress",
+      "docs": [
+        "Represents an address from a non-SVM remote chain. In the case of EVM chains, it's ABI encoded."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -810,7 +858,9 @@
         {
           "name": "previousToken",
           "type": {
-            "defined": "RemoteAddress"
+            "option": {
+              "defined": "RemoteAddress"
+            }
           },
           "index": false
         },
@@ -826,8 +876,10 @@
         {
           "name": "previousPoolAddresses",
           "type": {
-            "vec": {
-              "defined": "RemoteAddress"
+            "option": {
+              "vec": {
+                "defined": "RemoteAddress"
+              }
             }
           },
           "index": false

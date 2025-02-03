@@ -32,12 +32,18 @@ var (
 
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
+	// Must be signed by the proposed owner
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
+	// `set_ramp_authority` changes the expected signer for mint/release + burn/lock method calls
+	// this is used to update the router address
 	Instruction_SetRampAuthority = ag_binary.TypeID([8]byte{181, 180, 204, 162, 156, 188, 239, 153})
 
+	// Remote pools must be empty as it must be zero sized, but they can be immediately
+	// added with a call to the `append_remote_pool_addresses` instruction
 	Instruction_InitChainRemoteConfig = ag_binary.TypeID([8]byte{21, 150, 133, 36, 2, 116, 199, 129})
 
+	// Remote pools can be modified arbitrarily, the account space will be dynamically reallocated.
 	Instruction_EditChainRemoteConfig = ag_binary.TypeID([8]byte{149, 112, 186, 72, 116, 217, 159, 175})
 
 	Instruction_AppendRemotePoolAddresses = ag_binary.TypeID([8]byte{172, 57, 83, 55, 70, 112, 26, 197})

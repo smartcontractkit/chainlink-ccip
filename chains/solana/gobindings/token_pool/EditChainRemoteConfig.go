@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// EditChainRemoteConfig is the `editChainRemoteConfig` instruction.
+// Remote pools can be modified arbitrarily, the account space will be dynamically reallocated.
 type EditChainRemoteConfig struct {
 	RemoteChainSelector *uint64
 	Mint                *ag_solanago.PublicKey

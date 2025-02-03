@@ -10,7 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitChainRemoteConfig is the `initChainRemoteConfig` instruction.
+// Remote pools must be empty as it must be zero sized, but they can be immediately
+// added with a call to the `append_remote_pool_addresses` instruction
 type InitChainRemoteConfig struct {
 	RemoteChainSelector *uint64
 	Mint                *ag_solanago.PublicKey
