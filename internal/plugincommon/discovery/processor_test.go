@@ -769,18 +769,22 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 			mockReaderIface := reader.CCIPReader(mockReader)
 
 			// For onRamps we need to return addresses only for already observed onRamps
-			for contractName, addresses := range tc.addresses {
-				if contractName == consts.ContractNameOnRamp {
-					for chain, address := range addresses {
-						mockReader.EXPECT().GetContractAddress(consts.ContractNameOnRamp, chain).Return(address, nil).Maybe()
-					}
-				} else {
-					for chain, _ := range addresses {
-						mockReader.EXPECT().GetContractAddress(consts.ContractNameOnRamp, chain).
-							Return(nil, fmt.Errorf("err")).Maybe()
-					}
-
+			for chain, address := range tc.addresses[consts.ContractNameOnRamp] {
+				mockReader.EXPECT().GetContractAddress(consts.ContractNameOnRamp, chain).Return(address, nil).Maybe()
+			}
+			for chain := range tc.addresses[consts.ContractNameFeeQuoter] {
+				if tc.addresses[consts.ContractNameOnRamp][chain] != nil {
+					continue
 				}
+				mockReader.EXPECT().GetContractAddress(consts.ContractNameOnRamp, chain).
+					Return(nil, fmt.Errorf("err")).Maybe()
+			}
+			for chain := range tc.addresses[consts.ContractNameRouter] {
+				if tc.addresses[consts.ContractNameOnRamp][chain] != nil {
+					continue
+				}
+				mockReader.EXPECT().GetContractAddress(consts.ContractNameOnRamp, chain).
+					Return(nil, fmt.Errorf("err")).Maybe()
 			}
 
 			cdp := NewContractDiscoveryProcessor(
