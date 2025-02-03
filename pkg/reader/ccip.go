@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -1860,43 +1861,54 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 	}
 }
 
-// updateFromResults updates the cache with results from the batch request
-func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValuesResult) (NogoResponse, error) {
-	for contract, results := range batchResult {
-		return r.handleContractResults(contract, results)
-	}
-	return NogoResponse{}, nil
+// ContractHandler defines how to handle different contract results
+type ContractHandler struct {
+	handler    func([]types.BatchReadResult) (interface{}, error)
+	resultType reflect.Type
 }
 
-// handleContractResults processes results for a specific contract
-func (r *ccipChainReader) handleContractResults(
-	contract types.BoundContract, results []types.BatchReadResult) (NogoResponse, error) {
-	offramp := OfframpNogoResponse{}
-	rmnProxy := RMNProxyNogoResponse{}
+// updateFromResults updates the cache with results from the batch request
+func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValuesResult) (NogoResponse, error) {
+	handlers := map[string]ContractHandler{
+		consts.ContractNameOffRamp: {
+			handler: func(results []types.BatchReadResult) (interface{}, error) {
+				return r.handleOffRampResults(results)
+			},
+			resultType: reflect.TypeOf(OfframpNogoResponse{}),
+		},
+		consts.ContractNameRMNProxy: {
+			handler: func(results []types.BatchReadResult) (interface{}, error) {
+				return r.handleRMNProxyResults(results)
+			},
+			resultType: reflect.TypeOf(RMNProxyNogoResponse{}),
+		},
+	}
 
-	r.lggr.Infow("In handleContractResults - contract is", "contract", contract)
+	response := NogoResponse{}
 
-	var err error
-	switch contract.Name {
-	case consts.ContractNameOffRamp:
-		r.lggr.Infow("In handleContractResults ContractNameOffRamp")
-		offramp, err = r.handleOffRampResults(results)
-		if err != nil {
-			return NogoResponse{}, fmt.Errorf("handle offramp results: %w", err)
+	for contract, results := range batchResult {
+		r.lggr.Infow("Processing contract results", "contract", contract.Name)
+
+		handler, exists := handlers[contract.Name]
+		if !exists {
+			r.lggr.Warnw("No handler found for contract", "contract", contract.Name)
+			continue
 		}
-	case consts.ContractNameRMNProxy:
-		r.lggr.Infow("In handleContractResults ContractNameRMNProxy")
-		rmnProxy, err = r.handleRMNProxyResults(results)
+
+		result, err := handler.handler(results)
 		if err != nil {
-			return NogoResponse{}, fmt.Errorf("handle RMN proxy results: %w", err)
+			return NogoResponse{}, fmt.Errorf("handle %s results: %w", contract.Name, err)
+		}
+
+		// Set the result in the appropriate field using reflection
+		responseValue := reflect.ValueOf(&response).Elem()
+		field := responseValue.FieldByName(contract.Name)
+		if field.IsValid() && field.Type() == handler.resultType {
+			field.Set(reflect.ValueOf(result))
 		}
 	}
 
-	r.lggr.Infow("In handleContractResults - offramp is", "rmnProxy", rmnProxy, "offramp", offramp)
-	return NogoResponse{
-		Offramp:  offramp,
-		RMNProxy: rmnProxy,
-	}, nil
+	return response, nil
 }
 
 func (r *ccipChainReader) handleRMNProxyResults(results []types.BatchReadResult) (RMNProxyNogoResponse, error) {
