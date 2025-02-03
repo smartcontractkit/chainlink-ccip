@@ -15,7 +15,6 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 pub const MAX_CONFIG_V: u8 = 1;
 const MAX_CHAINSTATE_V: u8 = 1;
 const MAX_NONCE_V: u8 = 1;
-const MAX_COMMITREPORT_V: u8 = 1;
 
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
     !uninitialized(v) && v <= max_version
@@ -28,11 +27,8 @@ pub const fn uninitialized(v: u8) -> bool {
 /// Fixed seeds for PDA derivation: different context must use different seeds.
 pub mod seed {
     pub const DEST_CHAIN_STATE: &[u8] = b"dest_chain_state";
-    pub const SOURCE_CHAIN_STATE: &[u8] = b"source_chain_state";
-    pub const COMMIT_REPORT: &[u8] = b"commit_report";
     pub const NONCE: &[u8] = b"nonce";
     pub const CONFIG: &[u8] = b"config";
-    pub const STATE: &[u8] = b"state";
 
     // arbitrary messaging signer
     pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
@@ -161,20 +157,9 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(new_chain_selector: u64, _source_chain_config: SourceChainConfig, dest_chain_config: DestChainConfig)]
+#[instruction(new_chain_selector: u64, dest_chain_config: DestChainConfig)]
+// TODO rename to add only dest
 pub struct AddChainSelector<'info> {
-    // TODO rename to add only dest
-    /// Adding a chain selector implies initializing the state for a new chain,
-    /// hence the need to initialize two accounts.
-    #[account(
-        init,
-        seeds = [seed::SOURCE_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + SourceChain::INIT_SPACE,
-    )]
-    pub source_chain_state: Account<'info, SourceChain>,
-
     #[account(
         init,
         seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
@@ -194,28 +179,6 @@ pub struct AddChainSelector<'info> {
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(new_chain_selector: u64)]
-pub struct UpdateSourceChainSelectorConfig<'info> {
-    #[account(
-        mut,
-        seeds = [seed::SOURCE_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
-        bump,
-        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub source_chain_state: Account<'info, SourceChain>,
-
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]

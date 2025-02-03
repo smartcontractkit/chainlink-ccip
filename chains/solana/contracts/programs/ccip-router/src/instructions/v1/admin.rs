@@ -4,13 +4,10 @@ use anchor_spl::token_interface;
 use crate::events::admin as events;
 use crate::{
     AcceptOwnership, AddChainSelector, CcipRouterError, DestChainConfig, DestChainState,
-    Ocr3ConfigInfo, OcrPluginType, SetOcrConfig, SourceChainConfig, SourceChainState,
-    TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
-    UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
+    TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, WithdrawBilledFunds,
 };
 
 use super::fees::do_billing_transfer;
-use super::ocr3base::ocr3_set;
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
@@ -49,17 +46,8 @@ pub fn update_fee_aggregator(
 pub fn add_chain_selector(
     ctx: Context<AddChainSelector>,
     new_chain_selector: u64,
-    source_chain_config: SourceChainConfig,
     dest_chain_config: DestChainConfig,
 ) -> Result<()> {
-    // Set source chain config & state
-    let source_chain_state = &mut ctx.accounts.source_chain_state;
-    validate_source_chain_config(new_chain_selector, &source_chain_config)?;
-    source_chain_state.version = 1;
-    source_chain_state.chain_selector = new_chain_selector;
-    source_chain_state.config = source_chain_config.clone();
-    source_chain_state.state = SourceChainState { min_seq_nr: 1 };
-
     // Set dest chain config & state
     let dest_chain_state = &mut ctx.accounts.dest_chain_state;
     validate_dest_chain_config(new_chain_selector, &dest_chain_config)?;
@@ -68,47 +56,11 @@ pub fn add_chain_selector(
     dest_chain_state.config = dest_chain_config.clone();
     dest_chain_state.state = DestChainState { sequence_number: 0 };
 
-    emit!(events::SourceChainAdded {
-        source_chain_selector: new_chain_selector,
-        source_chain_config,
-    });
     emit!(events::DestChainAdded {
         dest_chain_selector: new_chain_selector,
         dest_chain_config,
     });
 
-    Ok(())
-}
-
-pub fn disable_source_chain_selector(
-    ctx: Context<UpdateSourceChainSelectorConfig>,
-    source_chain_selector: u64,
-) -> Result<()> {
-    let chain_state = &mut ctx.accounts.source_chain_state;
-
-    chain_state.config.is_enabled = false;
-
-    emit!(events::SourceChainConfigUpdated {
-        source_chain_selector,
-        source_chain_config: chain_state.config.clone(),
-    });
-
-    Ok(())
-}
-
-pub fn update_source_chain_config(
-    ctx: Context<UpdateSourceChainSelectorConfig>,
-    source_chain_selector: u64,
-    source_chain_config: SourceChainConfig,
-) -> Result<()> {
-    validate_source_chain_config(source_chain_selector, &source_chain_config)?;
-
-    ctx.accounts.source_chain_state.config = source_chain_config.clone();
-
-    emit!(events::SourceChainConfigUpdated {
-        source_chain_selector,
-        source_chain_config,
-    });
     Ok(())
 }
 
@@ -135,41 +87,6 @@ pub fn update_svm_chain_selector(
     let mut config = ctx.accounts.config.load_mut()?;
 
     config.svm_chain_selector = new_chain_selector;
-
-    Ok(())
-}
-
-pub fn set_ocr_config(
-    ctx: Context<SetOcrConfig>,
-    plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
-    config_info: Ocr3ConfigInfo,
-    signers: Vec<[u8; 20]>,
-    transmitters: Vec<Pubkey>,
-) -> Result<()> {
-    require!(plugin_type < 2, CcipRouterError::InvalidInputs);
-    let mut config = ctx.accounts.config.load_mut()?;
-
-    let is_commit = plugin_type == OcrPluginType::Commit as u8;
-
-    ocr3_set(
-        &mut config.ocr3[plugin_type as usize],
-        plugin_type,
-        Ocr3ConfigInfo {
-            config_digest: config_info.config_digest,
-            f: config_info.f,
-            n: signers.len() as u8,
-            is_signature_verification_enabled: if is_commit { 1 } else { 0 },
-        },
-        signers,
-        transmitters,
-    )?;
-
-    if is_commit {
-        // When the OCR config changes, we reset the sequence number since it is scoped per config digest.
-        // Note that s_minSeqNr/roots do not need to be reset as the roots persist
-        // across reconfigurations and are de-duplicated separately.
-        ctx.accounts.state.latest_price_sequence_number = 0;
-    }
 
     Ok(())
 }

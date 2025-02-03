@@ -135,47 +135,9 @@ pub mod ccip_router {
     pub fn add_chain_selector(
         ctx: Context<AddChainSelector>,
         new_chain_selector: u64,
-        source_chain_config: SourceChainConfig,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::add_chain_selector(
-            ctx,
-            new_chain_selector,
-            source_chain_config,
-            dest_chain_config,
-        )
-    }
-
-    /// Disables the source chain selector.
-    ///
-    /// The Admin is the only one able to disable the chain selector as source. This method is thought of as an emergency kill-switch.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for disabling the chain selector.
-    /// * `source_chain_selector` - The source chain selector to be disabled.
-    pub fn disable_source_chain_selector(
-        ctx: Context<UpdateSourceChainSelectorConfig>,
-        source_chain_selector: u64,
-    ) -> Result<()> {
-        v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
-    }
-
-    /// Updates the configuration of the source chain selector.
-    ///
-    /// The Admin is the only one able to update the source chain config.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for updating the chain selector.
-    /// * `source_chain_selector` - The source chain selector to be updated.
-    /// * `source_chain_config` - The new configuration for the source chain.
-    pub fn update_source_chain_config(
-        ctx: Context<UpdateSourceChainSelectorConfig>,
-        source_chain_selector: u64,
-        source_chain_config: SourceChainConfig,
-    ) -> Result<()> {
-        v1::admin::update_source_chain_config(ctx, source_chain_selector, source_chain_config)
+        v1::admin::add_chain_selector(ctx, new_chain_selector, dest_chain_config)
     }
 
     /// Updates the configuration of the destination chain selector.

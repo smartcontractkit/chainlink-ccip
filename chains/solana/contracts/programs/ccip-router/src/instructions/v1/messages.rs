@@ -1,8 +1,5 @@
 pub mod pools {
-    use crate::{
-        CrossChainAmount, TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR,
-        TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR,
-    };
+    use crate::TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR;
 
     use super::super::pools::ToTxData;
     use anchor_lang::prelude::*;
@@ -35,10 +32,4 @@ pub mod pools {
     pub(in super::super) struct ReleaseOrMintOutV1 {
         pub destination_amount: u64, // TODO: u256 on EVM?
     }
-}
-
-pub mod ramps {
-    use anchor_lang::prelude::*;
-
-    use crate::{CcipRouterError, SVMTokenAmount, CCIP_RECEIVE_DISCRIMINATOR};
 }

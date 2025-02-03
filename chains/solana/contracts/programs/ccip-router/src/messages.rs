@@ -13,16 +13,6 @@ pub struct RampMessageHeader {
     pub nonce: u64, // nonce for this lane for this sender, not unique across senders/lanes
 }
 
-impl RampMessageHeader {
-    pub fn len(&self) -> usize {
-        32 // message_id
-        + 8 // source_chain
-        + 8 // dest_chain
-        + 8 // sequence
-        + 8 // nonce
-    }
-}
-
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic message emitted from the OnRamp
 // Note: hash(Any2SVMRampMessage) != hash(SVM2AnyRampMessage) due to encoding & parameter differences
