@@ -98,7 +98,6 @@ jobs:
           chainlink-team: releng
           chainlink-product: crib
           main-dns-zone: ${{ secrets.MAIN_DNS_ZONE_STAGE_PUBLIC }}
-          enable-proxy-debug: "true"
           websockets-services: "gap-${DEVSPACE_NAMESPACE}-geth-1337-ws,gap-${DEVSPACE_NAMESPACE}-geth-2337-ws"
 
       - name: Destroy CRIB Environment
