@@ -5,25 +5,18 @@ import (
 
 	"github.com/patrickmn/go-cache"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 type InflightMessageCache struct {
-	lggr            logger.Logger
-	flightAllowance time.Duration
-
 	// inflight is a cache of messages that are currently in flight. This cache
 	// is used to prevent duplicate reports from being sent for the same message.
 	inflight *cache.Cache
 }
 
-func NewInflightMessageCache(lggr logger.Logger, flightAllowance time.Duration) *InflightMessageCache {
+func NewInflightMessageCache(cacheExpiry time.Duration) *InflightMessageCache {
 	return &InflightMessageCache{
-		lggr:            lggr,
-		flightAllowance: flightAllowance,
-		inflight:        cache.New(flightAllowance, CleanupInterval),
+		inflight: cache.New(cacheExpiry, CleanupInterval),
 	}
 }
 
