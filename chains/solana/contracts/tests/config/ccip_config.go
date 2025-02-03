@@ -19,6 +19,9 @@ var (
 	CcipTokenPoolProgram       = solana.MustPublicKeyFromBase58("GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH")
 	Token2022Program           = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 
+	// example programs
+	CcipBaseReceiver = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	RouterStatePDA, _, _                     = state.FindStatePDA(CcipRouterProgram)
 	ExternalExecutionConfigPDA, _, _         = state.FindExternalExecutionConfigPDA(CcipRouterProgram)
