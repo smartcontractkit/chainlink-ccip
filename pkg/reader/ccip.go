@@ -1511,7 +1511,7 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 
 	r.lggr.Infow("got RMN remote address", "rmnRemoteAddressFromNormalCall", rmnRemoteAddressFromNormalCall, "rmnRemoteAddressFromBatch", rmnRemoteAddressFromBatch)
 
-	return rmnRemoteAddressFromBatch, nil
+	return rmnRemoteAddressFromNormalCall, nil
 }
 
 // Get the DestChainConfig from the FeeQuoter contract on the given chain.
