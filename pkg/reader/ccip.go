@@ -901,11 +901,18 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			return nil, fmt.Errorf("unable to lookup nonce manager and rmn proxy remote (offramp static config): %w", err)
 		}
 
-		lggr.Infow("got offramp static config", "staticConfig", staticConfig)
+		respBatch, err := r.refresh(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("refresh: %w", err)
+		}
 
-		resp = resp.Append(consts.ContractNameNonceManager, chain, staticConfig.NonceManager)
-		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfig.RmnRemote)
-		lggr.Infow("appending RMN remote contract address", "address", staticConfig.RmnRemote)
+		staticConfigBatch := respBatch.Offramp.StaticConfig
+
+		lggr.Infow("got offramp static config", "staticConfig", staticConfig, "staticConfigBatch", staticConfigBatch)
+
+		resp = resp.Append(consts.ContractNameNonceManager, chain, staticConfigBatch.NonceManager)
+		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfigBatch.RmnRemote)
+		lggr.Infow("appending RMN remote contract address", "address", staticConfigBatch.RmnRemote)
 	}
 
 	// FeeQuoter from the offRamp dynamic config.
@@ -922,10 +929,17 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			return nil, fmt.Errorf("unable to lookup fee quoter (offramp dynamic config): %w", err)
 		}
 
-		lggr.Infow("got offramp dynamic config", "dynamicConfig", dynamicConfig)
+		respBatch, err := r.refresh(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("refresh: %w", err)
+		}
 
-		resp = resp.Append(consts.ContractNameFeeQuoter, chain, dynamicConfig.FeeQuoter)
-		lggr.Infow("appending fee quoter contract address", "address", dynamicConfig.FeeQuoter)
+		dynamicConfigBatch := respBatch.Offramp.DynamicConfig
+
+		lggr.Infow("got offramp dynamic config", "dynamicConfig", dynamicConfig, "dynamicConfigBatch", dynamicConfigBatch)
+
+		resp = resp.Append(consts.ContractNameFeeQuoter, chain, dynamicConfigBatch.FeeQuoter)
+		lggr.Infow("appending fee quoter contract address", "address", dynamicConfigBatch.FeeQuoter)
 	}
 
 	return resp, nil
