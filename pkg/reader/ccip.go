@@ -777,7 +777,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		ContractAddress:  rmnRemoteAddress,
 		ConfigDigest:     vc.Config.RMNHomeContractConfigDigest,
 		Signers:          signers,
-		FSign:            vc.Config.F,
+		FSign:            vc.Config.FSign,
 		ConfigVersion:    vc.Version,
 		RmnReportVersion: header.DigestHeader,
 	}, nil
@@ -1461,7 +1461,7 @@ type signer struct {
 type config struct {
 	RMNHomeContractConfigDigest cciptypes.Bytes32 `json:"rmnHomeContractConfigDigest"`
 	Signers                     []signer          `json:"signers"`
-	F                           uint64            `json:"f"` // previously: MinSigners
+	FSign                       uint64            `json:"fSign"` // previously: MinSigners
 }
 
 // versionedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.
