@@ -65,7 +65,7 @@ jobs:
 
       - name: Deploy and validate crib environment
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@4616ed15e4a00f8b146a73a9abb6b3c9055dcb95 # crib-deploy-environment@unreleased
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@c97cc897814c58837d2f7f7bb1317be3a22a618e # crib-deploy-environment@8.5.0
         id: deploy
         with:
           aws-region: ${{ secrets.AWS_REGION }}
@@ -80,8 +80,9 @@ jobs:
           chainlink-team: dona
           chainlink-product: daas
           crib-repo-ref: ${{ github.ref }}
-          main-dns-zone: ${{ secrets.MAIN_DNS_ZONE_STAGE_PUBLIC }}
           ns-name-prefix: "crib-daas-ci"
+          websockets-services: "gap-${DEVSPACE_NAMESPACE}-geth-1337-ws,gap-${DEVSPACE_NAMESPACE}-geth-2337-ws"
+
 
       - name: Destroy crib environment
         if: always() && steps.deploy.outputs.devspace-namespace != '' && inputs.debug != 'true' && steps.check-prereqs-for-running.outputs.should_run == 'true'
