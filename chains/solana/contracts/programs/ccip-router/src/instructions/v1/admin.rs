@@ -139,17 +139,6 @@ pub fn update_svm_chain_selector(
     Ok(())
 }
 
-pub fn update_enable_manual_execution_after(
-    ctx: Context<UpdateConfigCCIPRouter>,
-    new_enable_manual_execution_after: i64,
-) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
-
-    config.enable_manual_execution_after = new_enable_manual_execution_after;
-
-    Ok(())
-}
-
 pub fn set_ocr_config(
     ctx: Context<SetOcrConfig>,
     plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
@@ -225,15 +214,6 @@ pub fn withdraw_billed_funds(
 /////////////
 // Helpers //
 /////////////
-
-fn validate_source_chain_config(
-    _source_chain_selector: u64,
-    _config: &SourceChainConfig,
-) -> Result<()> {
-    // As of now, the config has very few properties and there is nothing to validate yet.
-    // This is a placeholder to add validations as that config object grows.
-    Ok(())
-}
 
 fn validate_dest_chain_config(dest_chain_selector: u64, _config: &DestChainConfig) -> Result<()> {
     // As of now, the config has very few properties and there is very little to validate yet.
