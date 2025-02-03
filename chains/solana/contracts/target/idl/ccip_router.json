@@ -91,6 +91,10 @@
           "type": "publicKey"
         },
         {
+          "name": "feeQuoter",
+          "type": "publicKey"
+        },
+        {
           "name": "linkTokenMint",
           "type": "publicKey"
         },
@@ -291,42 +295,6 @@
       "args": [
         {
           "name": "sourceChainSelector",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "disableDestChainSelector",
-      "docs": [
-        "Disables the destination chain selector.",
-        "",
-        "The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for disabling the chain selector.",
-        "* `dest_chain_selector` - The destination chain selector to be disabled."
-      ],
-      "accounts": [
-        {
-          "name": "destChainState",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "destChainSelector",
           "type": "u64"
         }
       ]
@@ -862,277 +830,9 @@
       ]
     },
     {
-      "name": "setTokenBilling",
-      "docs": [
-        "Billing //",
-        "Sets the token billing configuration.",
-        "",
-        "Only CCIP Admin can set the token billing configuration.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
-        "* `chain_selector` - The chain selector.",
-        "* `mint` - The public key of the token mint.",
-        "* `cfg` - The token billing configuration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "perChainPerTokenConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "chainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "cfg",
-          "type": {
-            "defined": "TokenBilling"
-          }
-        }
-      ]
-    },
-    {
-      "name": "addBillingTokenConfig",
-      "docs": [
-        "Adds a billing token configuration.",
-        "Only CCIP Admin can add a billing token configuration.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for adding the billing token configuration.",
-        "* `config` - The billing token configuration to be added."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "billingTokenConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenReceiver",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "feeBillingSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "config",
-          "type": {
-            "defined": "BillingTokenConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "updateBillingTokenConfig",
-      "docs": [
-        "Updates the billing token configuration.",
-        "Only CCIP Admin can update a billing token configuration.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the billing token configuration.",
-        "* `config` - The new billing token configuration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "billingTokenConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "config",
-          "type": {
-            "defined": "BillingTokenConfig"
-          }
-        }
-      ]
-    },
-    {
-      "name": "removeBillingTokenConfig",
-      "docs": [
-        "Removes the billing token configuration.",
-        "Only CCIP Admin can remove a billing token configuration.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for removing the billing token configuration."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "billingTokenConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "feeTokenReceiver",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "feeBillingSigner",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "getFee",
-      "docs": [
-        "Calculates the fee for sending a message to the destination chain.",
-        "",
-        "# Arguments",
-        "",
-        "* `_ctx` - The context containing the accounts required for the fee calculation.",
-        "* `dest_chain_selector` - The chain selector for the destination chain.",
-        "* `message` - The message to be sent.",
-        "",
-        "# Additional accounts",
-        "",
-        "In addition to the fixed amount of accounts defined in the `GetFee` context,",
-        "the following accounts must be provided:",
-        "",
-        "* First, the billing token config accounts for each token sent with the message, sequentially.",
-        "For each token with no billing config account (i.e. tokens that cannot be possibly used as fee",
-        "tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.",
-        "* Then, the per chain / per token config of every token sent with the message, sequentially",
-        "in the same order.",
-        "",
-        "# Returns",
-        "",
-        "The fee amount in u64."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "destChainState",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "billingTokenConfig",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "destChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "message",
-          "type": {
-            "defined": "SVM2AnyMessage"
-          }
-        }
-      ],
-      "returns": "u64"
-    },
-    {
       "name": "withdrawBilledFunds",
       "docs": [
+        "Billing //",
         "Transfers the accumulated billed fees in a particular token to an arbitrary token account.",
         "Only the CCIP Admin can withdraw billed funds.",
         "",
@@ -1245,16 +945,6 @@
           "isSigner": false
         },
         {
-          "name": "feeTokenConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "linkTokenConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "feeTokenUserAssociatedAccount",
           "isMut": false,
           "isSigner": false,
@@ -1269,6 +959,31 @@
         },
         {
           "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterDestChain",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterBillingTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterLinkTokenConfig",
           "isMut": false,
           "isSigner": false
         },
@@ -1354,6 +1069,21 @@
         },
         {
           "name": "sysvarInstructions",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterConfig",
           "isMut": false,
           "isSigner": false
         }
@@ -1638,6 +1368,10 @@
             }
           },
           {
+            "name": "feeQuoter",
+            "type": "publicKey"
+          },
+          {
             "name": "linkTokenMint",
             "type": "publicKey"
           },
@@ -1776,50 +1510,6 @@
           {
             "name": "executionStates",
             "type": "u128"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PerChainPerTokenConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "chainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "billing",
-            "type": {
-              "defined": "TokenBilling"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "BillingTokenConfigWrapper",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "config",
-            "type": {
-              "defined": "BillingTokenConfig"
-            }
           }
         ]
       }
@@ -1998,62 +1688,6 @@
                 "u8",
                 32
               ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "EVMExtraArgsV2",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "gasLimit",
-            "type": "u128"
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SVMExtraArgsV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "computeUnits",
-            "type": "u32"
-          },
-          {
-            "name": "accountIsWritableBitmap",
-            "type": "u64"
-          },
-          {
-            "name": "allowOutOfOrderExecution",
-            "type": "bool"
-          },
-          {
-            "name": "tokenReceiver",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "accounts",
-            "type": {
-              "vec": {
-                "array": [
-                  "u8",
-                  32
-                ]
-              }
             }
           }
         ]
@@ -2499,12 +2133,6 @@
           {
             "name": "sequenceNumber",
             "type": "u64"
-          },
-          {
-            "name": "usdPerUnitGas",
-            "type": {
-              "defined": "TimestampedPackedU224"
-            }
           }
         ]
       }
@@ -2515,87 +2143,6 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "isEnabled",
-            "type": "bool"
-          },
-          {
-            "name": "maxNumberOfTokensPerMsg",
-            "type": "u16"
-          },
-          {
-            "name": "maxDataBytes",
-            "type": "u32"
-          },
-          {
-            "name": "maxPerMsgGasLimit",
-            "type": "u32"
-          },
-          {
-            "name": "destGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteBase",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteHigh",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerPayloadByteThreshold",
-            "type": "u32"
-          },
-          {
-            "name": "destDataAvailabilityOverheadGas",
-            "type": "u32"
-          },
-          {
-            "name": "destGasPerDataAvailabilityByte",
-            "type": "u16"
-          },
-          {
-            "name": "destDataAvailabilityMultiplierBps",
-            "type": "u16"
-          },
-          {
-            "name": "defaultTokenFeeUsdcents",
-            "type": "u16"
-          },
-          {
-            "name": "defaultTokenDestGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "defaultTxGasLimit",
-            "type": "u32"
-          },
-          {
-            "name": "gasMultiplierWeiPerEth",
-            "type": "u64"
-          },
-          {
-            "name": "networkFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "gasPriceStalenessThreshold",
-            "type": "u32"
-          },
-          {
-            "name": "enforceOutOfOrder",
-            "type": "bool"
-          },
-          {
-            "name": "chainFamilySelector",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          },
-          {
             "name": "allowedSenders",
             "type": {
               "vec": "publicKey"
@@ -2603,38 +2150,6 @@
           },
           {
             "name": "allowListEnabled",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenBilling",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "minFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "maxFeeUsdcents",
-            "type": "u32"
-          },
-          {
-            "name": "deciBps",
-            "type": "u16"
-          },
-          {
-            "name": "destGasOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "destBytesOverhead",
-            "type": "u32"
-          },
-          {
-            "name": "isEnabled",
             "type": "bool"
           }
         ]
@@ -2664,53 +2179,6 @@
           {
             "name": "rate",
             "type": "u128"
-          }
-        ]
-      }
-    },
-    {
-      "name": "BillingTokenConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "enabled",
-            "type": "bool"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "usdPerToken",
-            "type": {
-              "defined": "TimestampedPackedU224"
-            }
-          },
-          {
-            "name": "premiumMultiplierWeiPerEth",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TimestampedPackedU224",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": {
-              "array": [
-                "u8",
-                28
-              ]
-            }
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
           }
         ]
       }
@@ -3248,28 +2716,6 @@
         {
           "name": "newAdmin",
           "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "TokenTransferFeeConfigUpdated",
-      "fields": [
-        {
-          "name": "destChainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "tokenTransferFeeConfig",
-          "type": {
-            "defined": "TokenBilling"
-          },
           "index": false
         }
       ]

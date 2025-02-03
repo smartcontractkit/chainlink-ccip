@@ -71,11 +71,11 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-	billingPDA, _, err := state.FindCcipTokenpoolBillingPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipRouterProgram)
+	billingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenConfigPda, _, err := state.FindFeeBillingTokenConfigPDA(mint.PublicKey(), config.CcipRouterProgram)
+	tokenConfigPda, _, err := state.FindFqBillingTokenConfigPDA(mint.PublicKey(), config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}

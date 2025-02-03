@@ -196,8 +196,11 @@ pub fn set_pool(ctx: Context<SetPoolTokenAdminRegistry>, writable_indexes: Vec<u
             &pool_program,
         );
         let (fee_billing_config, _) = Pubkey::find_program_address(
-            &[seed::FEE_BILLING_TOKEN_CONFIG, token_mint.as_ref()],
-            ctx.program_id,
+            &[
+                fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+                token_mint.as_ref(),
+            ],
+            &fee_quoter::ID,
         );
 
         let min_accounts = [
