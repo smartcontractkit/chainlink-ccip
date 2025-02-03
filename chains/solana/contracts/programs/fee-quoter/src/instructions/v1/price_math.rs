@@ -3,7 +3,9 @@ use std::ops::{Add, AddAssign, Mul};
 
 use ethnum::U256;
 
-use crate::{BillingTokenConfig, CcipRouterError, SVMTokenAmount, TimestampedPackedU224};
+use crate::messages::SVMTokenAmount;
+use crate::state::{BillingTokenConfig, TimestampedPackedU224};
+use crate::FeeQuoterError;
 
 pub trait Exponential {
     fn e(self, exponent: u8) -> U256;
@@ -30,7 +32,7 @@ pub(super) fn get_validated_token_price(
     // was set at least once.
     require!(
         price.0 != 0 && timestamp != 0,
-        CcipRouterError::InvalidTokenPrice
+        FeeQuoterError::InvalidTokenPrice
     );
 
     Ok(price)

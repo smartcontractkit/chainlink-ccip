@@ -8,7 +8,6 @@ use anchor_spl::token_interface::Mint;
 
 // track state versions
 const MAX_TOKEN_REGISTRY_V: u8 = 1;
-const MAX_TOKEN_AND_CHAIN_CONFIG_V: u8 = 1;
 
 #[account]
 #[derive(InitSpace)]
@@ -181,30 +180,4 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(mut, address = token_admin_registry.pending_administrator @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-#[instruction(chain_selector: u64, mint: Pubkey)]
-pub struct SetTokenBillingConfig<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(
-        init_if_needed,
-        seeds = [seed::TOKEN_POOL_BILLING, chain_selector.to_le_bytes().as_ref(), mint.as_ref()],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + PerChainPerTokenConfig::INIT_SPACE,
-        constraint = uninitialized(per_chain_per_token_config.version) || valid_version(per_chain_per_token_config.version, MAX_TOKEN_AND_CHAIN_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub per_chain_per_token_config: Account<'info, PerChainPerTokenConfig>,
-
-    // validate signer is registered ccip admin
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
 }

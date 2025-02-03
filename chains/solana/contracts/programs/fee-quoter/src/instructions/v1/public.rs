@@ -1,20 +1,18 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::spl_token::native_mint;
+use ethnum::U256;
 use std::ops::AddAssign;
 
-use anchor_lang::prelude::*;
-use anchor_spl::{token::spl_token::native_mint, token_interface};
-use ethnum::U256;
-use solana_program::{program::invoke_signed, system_instruction};
-
-use crate::{
-    seed::FEE_BILLING_SIGNER, BillingTokenConfig, CcipRouterError, DestChain,
-    PerChainPerTokenConfig, SVM2AnyMessage, SVMTokenAmount, TimestampedPackedU224,
+use crate::context::GetFee;
+use crate::instructions::v1::safe_deserialize;
+use crate::messages::{
+    GetFeeResult, ProcessedExtraArgs, SVM2AnyMessage, SVMTokenAmount, TokenTransferAdditionalData,
 };
+use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
+use crate::FeeQuoterError;
 
-use super::messages::ramps::validate_svm2any;
-use super::onramp::ProcessedExtraArgs;
-use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
-use super::price_math::get_validated_token_price;
-use super::price_math::{Exponential, Usd18Decimals};
+use super::messages::validate_svm2any;
+use super::price_math::{get_validated_token_price, Exponential, Usd18Decimals};
 
 /// SVM2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, sender and tokenAmounts).
 /// Each variable array takes 1 more slot to store its length.
@@ -33,8 +31,108 @@ pub const SVM_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 /// uint32 destGasAmount takes 1 slot.
 pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
 
-// fee_for_msg returns the required fee for ccipSend and validated extraArgs parameters for the destination chain family
-pub fn fee_for_msg(
+pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
+
+pub fn get_fee<'info>(
+    ctx: Context<'_, '_, 'info, 'info, GetFee>,
+    dest_chain_selector: u64,
+    message: SVM2AnyMessage,
+) -> Result<GetFeeResult> {
+    let remaining_accounts = &ctx.remaining_accounts;
+    let message = &message;
+    require_eq!(
+        remaining_accounts.len(),
+        2 * message.token_amounts.len(),
+        FeeQuoterError::InvalidInputsTokenAccounts
+    );
+
+    let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
+        remaining_accounts.split_at(message.token_amounts.len());
+
+    let token_billing_config_accounts = token_billing_config_accounts
+        .iter()
+        .zip(message.token_amounts.iter())
+        .map(|(a, SVMTokenAmount { token, .. })| safe_deserialize::billing_token_config(a, *token))
+        .collect::<Result<Vec<_>>>()?;
+    let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
+        .iter()
+        .zip(message.token_amounts.iter())
+        .map(|(a, SVMTokenAmount { token, .. })| {
+            safe_deserialize::per_chain_per_token_config(a, *token, dest_chain_selector)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let (fee, processed_extra_args) = fee_for_msg(
+        message,
+        &ctx.accounts.dest_chain,
+        &ctx.accounts.billing_token_config.config,
+        &token_billing_config_accounts,
+        &per_chain_per_token_config_accounts,
+    )?;
+
+    let juels = convert(
+        &fee,
+        &ctx.accounts.billing_token_config.config,
+        &ctx.accounts.link_token_config.config,
+    )?
+    .amount;
+
+    require_gte!(
+        ctx.accounts.config.max_fee_juels_per_msg,
+        juels as u128,
+        FeeQuoterError::MessageFeeTooHigh
+    );
+
+    let default_token_dest_gas_overhead = ctx
+        .accounts
+        .dest_chain
+        .config
+        .default_token_dest_gas_overhead;
+
+    let token_transfer_additional_data = per_chain_per_token_config_accounts
+        .iter()
+        .map(|per_chain_per_token_config| TokenTransferAdditionalData {
+            dest_bytes_overhead: per_chain_per_token_config
+                .token_transfer_config
+                .dest_bytes_overhead,
+            dest_gas_overhead: if per_chain_per_token_config.token_transfer_config.is_enabled {
+                per_chain_per_token_config
+                    .token_transfer_config
+                    .dest_gas_overhead
+            } else {
+                default_token_dest_gas_overhead
+            },
+        })
+        .collect();
+
+    Ok(GetFeeResult {
+        token: fee.token,
+        amount: fee.amount,
+        juels,
+        token_transfer_additional_data,
+        processed_extra_args,
+    })
+}
+
+// Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
+fn convert(
+    source_token_amount: &SVMTokenAmount,
+    source_config: &BillingTokenConfig,
+    target_config: &BillingTokenConfig,
+) -> Result<SVMTokenAmount> {
+    assert!(source_config.mint == source_token_amount.token);
+    let source_price = get_validated_token_price(source_config)?;
+    let target_price = get_validated_token_price(target_config)?;
+
+    Ok(SVMTokenAmount {
+        token: target_config.mint,
+        amount: ((source_price * source_token_amount.amount).0 / target_price.0)
+            .try_into()
+            .map_err(|_| FeeQuoterError::InvalidTokenPrice)?,
+    })
+}
+
+fn fee_for_msg(
     message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     fee_token_config: &BillingTokenConfig,
@@ -48,11 +146,11 @@ pub fn fee_for_msg(
     };
     require!(
         additional_token_configs.len() == message.token_amounts.len(),
-        CcipRouterError::InvalidInputsMissingTokenConfig
+        FeeQuoterError::InvalidInputsMissingTokenConfig
     );
     require!(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
-        CcipRouterError::InvalidInputsMissingTokenConfig
+        FeeQuoterError::InvalidInputsMissingTokenConfig
     );
     let processed_extra_args = validate_svm2any(message, dest_chain, fee_token_config)?;
 
@@ -78,23 +176,18 @@ pub fn fee_for_msg(
     // It is not included in the calculation below for simplicity.
     let calldata_length =
         U256::new(message.data.len() as u128) + network_fee.transfer_bytes_overhead;
-
     let mut calldata_gas =
         calldata_length * U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128);
-
     let calldata_threshold =
         U256::new(dest_chain.config.dest_gas_per_payload_byte_threshold as u128);
-
     if calldata_length > calldata_threshold {
         let base_calldata_gas = U256::new(dest_chain.config.dest_gas_per_payload_byte_base as u128)
             * calldata_threshold;
-
         let extra_bytes = calldata_length - calldata_threshold;
         let extra_calldata_gas =
             extra_bytes * U256::new(dest_chain.config.dest_gas_per_payload_byte_high as u128);
         calldata_gas = base_calldata_gas + extra_calldata_gas;
     }
-
     let execution_gas = gas_limit
         + U256::new(dest_chain.config.dest_gas_overhead as u128)
         + calldata_gas
@@ -112,7 +205,6 @@ pub fn fee_for_msg(
     );
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
-
     // At this step, every fee component has been raised to 36 decimals
     let fee_token_value =
         (network_fee.premium * premium_multiplier) + execution_cost + data_availability_cost;
@@ -122,7 +214,7 @@ pub fn fee_for_msg(
     // The result is the fee in the fee tokens smallest denominations (e.g. lamport for Sol).
     let fee_token_amount = (fee_token_value.0 / fee_token_price.0)
         .try_into()
-        .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
+        .map_err(|_| FeeQuoterError::InvalidTokenPrice)?;
 
     Ok((
         SVMTokenAmount {
@@ -195,7 +287,7 @@ fn network_fee(
 
     for (i, token_amount) in message.token_amounts.iter().enumerate() {
         let config_for_dest_chain = &token_configs_for_dest_chain[i];
-        let token_network_fee = if config_for_dest_chain.billing.is_enabled {
+        let token_network_fee = if config_for_dest_chain.token_transfer_config.is_enabled {
             token_network_fees(&token_configs[i], token_amount, config_for_dest_chain)?
         } else {
             // If the token has no specific overrides configured, we use the global defaults.
@@ -214,25 +306,37 @@ fn token_network_fees(
     config_for_dest_chain: &PerChainPerTokenConfig,
 ) -> Result<NetworkFee> {
     let bps_fee = match billing_config {
-        Some(config) if config_for_dest_chain.billing.deci_bps > 0 => {
+        Some(config) if config_for_dest_chain.token_transfer_config.deci_bps > 0 => {
             let token_price = get_validated_token_price(config)?;
             // Calculate token transfer value, then apply fee ratio
             // ratio represents multiples of 0.1bps, or 1e-5
             Usd18Decimals(
                 Usd18Decimals::from_token_amount(token_amount, &token_price).0
-                    * U256::new(config_for_dest_chain.billing.deci_bps.into())
+                    * U256::new(config_for_dest_chain.token_transfer_config.deci_bps.into())
                     / 1u32.e(5),
             )
         }
         _ => Usd18Decimals::ZERO,
     };
 
-    let min_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.min_fee_usdcents);
-    let max_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.max_fee_usdcents);
+    let min_fee =
+        Usd18Decimals::from_usd_cents(config_for_dest_chain.token_transfer_config.min_fee_usdcents);
+    let max_fee =
+        Usd18Decimals::from_usd_cents(config_for_dest_chain.token_transfer_config.max_fee_usdcents);
     let (premium, token_transfer_gas, token_transfer_bytes_overhead) = (
         bps_fee.clamp(min_fee, max_fee),
-        U256::new(config_for_dest_chain.billing.dest_gas_overhead.into()),
-        U256::new(config_for_dest_chain.billing.dest_bytes_overhead.into()),
+        U256::new(
+            config_for_dest_chain
+                .token_transfer_config
+                .dest_gas_overhead
+                .into(),
+        ),
+        U256::new(
+            config_for_dest_chain
+                .token_transfer_config
+                .dest_bytes_overhead
+                .into(),
+        ),
     );
     Ok(NetworkFee {
         premium,
@@ -255,7 +359,7 @@ fn default_token_network_fees(dest_chain: &DestChain) -> NetworkFee {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct PackedPrice {
+struct PackedPrice {
     // L1 gas price (encoded in the lower 112 bits)
     pub execution_gas_price: Usd18Decimals,
     // L2 gas price (encoded in the higher 112 bits)
@@ -269,7 +373,7 @@ impl From<&TimestampedPackedU224> for PackedPrice {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct UnpackedDoubleU224 {
+struct UnpackedDoubleU224 {
     pub high: u128,
     pub low: u128,
 }
@@ -304,12 +408,12 @@ impl TryFrom<PackedPrice> for UnpackedDoubleU224 {
                 .data_availability_gas_price
                 .0
                 .try_into()
-                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+                .map_err(|_| FeeQuoterError::InvalidTokenPrice)?,
             low: value
                 .execution_gas_price
                 .0
                 .try_into()
-                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+                .map_err(|_| FeeQuoterError::InvalidTokenPrice)?,
         })
     }
 }
@@ -322,78 +426,22 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
 
     require!(
         threshold == 0 || threshold > elapsed_time,
-        CcipRouterError::StaleGasPrice
+        FeeQuoterError::StaleGasPrice
     );
 
     Ok(price)
 }
 
-pub fn wrap_native_sol<'info>(
-    token_program: &AccountInfo<'info>,
-    from: &mut Signer<'info>,
-    to: &mut InterfaceAccount<'info, token_interface::TokenAccount>,
-    amount: u64,
-    signer_bump: u8,
-) -> Result<()> {
-    require!(
-        // guarantee that if caller is a PDA with data it won't get garbage-collected
-        from.data_is_empty() || from.get_lamports() > amount,
-        CcipRouterError::InsufficientLamports
-    );
-
-    invoke_signed(
-        &system_instruction::transfer(&from.key(), &to.key(), amount),
-        &[from.to_account_info(), to.to_account_info()],
-        &[&[FEE_BILLING_SIGNER, &[signer_bump]]],
-    )?;
-
-    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
-    let signer_seeds = &[&seeds[..]];
-    let account = to.to_account_info();
-    let sync: anchor_spl::token_2022::SyncNative = anchor_spl::token_2022::SyncNative { account };
-    let cpi_ctx = CpiContext::new_with_signer(token_program.to_account_info(), sync, signer_seeds);
-
-    token_interface::sync_native(cpi_ctx)
-}
-
-pub fn transfer_fee<'info>(
-    fee: &SVMTokenAmount,
-    token_program: AccountInfo<'info>,
-    transfer: token_interface::TransferChecked<'info>,
-    decimals: u8,
-    signer_bump: u8,
-) -> Result<()> {
-    require!(
-        fee.token == transfer.mint.key(),
-        CcipRouterError::InvalidInputs
-    ); // TODO use more specific error
-
-    do_billing_transfer(token_program, transfer, fee.amount, decimals, signer_bump)
-}
-
-pub fn do_billing_transfer<'info>(
-    token_program: AccountInfo<'info>,
-    transfer: token_interface::TransferChecked<'info>,
-    amount: u64,
-    decimals: u8,
-    signer_bump: u8,
-) -> Result<()> {
-    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
-    let signer_seeds = &[&seeds[..]];
-    let cpi_ctx = CpiContext::new_with_signer(token_program, transfer, signer_seeds);
-    token_interface::transfer_checked(cpi_ctx, amount, decimals)
-}
-
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use solana_program::{
         entrypoint::SUCCESS,
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
-    use crate::TokenBilling;
+    use super::super::messages::tests::{sample_billing_config, sample_dest_chain, sample_message};
+    use crate::TokenTransferFeeConfig;
 
-    use super::super::messages::ramps::tests::*;
     use super::*;
 
     struct TestStubs;
@@ -403,6 +451,15 @@ pub mod tests {
             // This causes the syscall to return a default-initialized
             // clock when the build target is off-chain. Good enough for tests.
             SUCCESS
+        }
+    }
+
+    impl UnpackedDoubleU224 {
+        pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
+            let mut value = [0u8; 28];
+            value[14..].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+            value[..14].clone_from_slice(&self.high.to_be_bytes()[2..16]);
+            TimestampedPackedU224 { value, timestamp }
         }
     }
 
@@ -472,7 +529,7 @@ pub mod tests {
                 &[]
             )
             .unwrap_err(),
-            CcipRouterError::InvalidInputsMissingTokenConfig.into()
+            FeeQuoterError::InvalidInputsMissingTokenConfig.into()
         );
     }
 
@@ -486,11 +543,11 @@ pub mod tests {
         let (token_config, mut per_chain_per_token) = sample_additional_token();
 
         // Not enabled == no overrides
-        per_chain_per_token.billing.is_enabled = false;
+        per_chain_per_token.token_transfer_config.is_enabled = false;
 
         // Will have no effect since billing overrides are disabled
-        per_chain_per_token.billing.min_fee_usdcents = 0;
-        per_chain_per_token.billing.max_fee_usdcents = 0;
+        per_chain_per_token.token_transfer_config.min_fee_usdcents = 0;
+        per_chain_per_token.token_transfer_config.max_fee_usdcents = 0;
 
         let mut message = sample_message();
         message.token_amounts = vec![SVMTokenAmount {
@@ -524,8 +581,12 @@ pub mod tests {
         let (another_token_config, mut another_per_chain_per_token_config) =
             sample_additional_token();
 
-        another_per_chain_per_token_config.billing.min_fee_usdcents = 800;
-        another_per_chain_per_token_config.billing.max_fee_usdcents = 1600;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .min_fee_usdcents = 800;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .max_fee_usdcents = 1600;
 
         let mut message = sample_message();
         message.token_amounts = vec![SVMTokenAmount {
@@ -561,9 +622,15 @@ pub mod tests {
             sample_additional_token();
 
         // Set some arbitrary values so the bps fee lands between min and max
-        another_per_chain_per_token_config.billing.min_fee_usdcents = 1;
-        another_per_chain_per_token_config.billing.max_fee_usdcents = 1000;
-        another_per_chain_per_token_config.billing.deci_bps = 10000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .min_fee_usdcents = 1;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .max_fee_usdcents = 1000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .deci_bps = 10000;
 
         let mut message = sample_message();
         message.token_amounts = vec![SVMTokenAmount {
@@ -588,7 +655,9 @@ pub mod tests {
         );
 
         // changing deci_bps affects the outcome.
-        another_per_chain_per_token_config.billing.deci_bps = 20000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .deci_bps = 20000;
 
         assert_eq!(
             fee_for_msg(
@@ -616,9 +685,15 @@ pub mod tests {
         let (_, mut another_per_chain_per_token_config) = sample_additional_token();
 
         // Will have no effect, as we cannot know the price of the token
-        another_per_chain_per_token_config.billing.min_fee_usdcents = 1;
-        another_per_chain_per_token_config.billing.max_fee_usdcents = 1000;
-        another_per_chain_per_token_config.billing.deci_bps = 10000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .min_fee_usdcents = 1;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .max_fee_usdcents = 1000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .deci_bps = 10000;
 
         let mut message = sample_message();
         message.token_amounts = vec![SVMTokenAmount {
@@ -643,7 +718,9 @@ pub mod tests {
         );
 
         // Will have no effect, as we cannot know the price of the token
-        another_per_chain_per_token_config.billing.deci_bps = 20000;
+        another_per_chain_per_token_config
+            .token_transfer_config
+            .deci_bps = 20000;
 
         assert_eq!(
             fee_for_msg(
@@ -708,7 +785,7 @@ pub mod tests {
                 version: 1,
                 chain_selector: 0,
                 mint,
-                billing: TokenBilling {
+                token_transfer_config: TokenTransferFeeConfig {
                     min_fee_usdcents: 50,
                     max_fee_usdcents: 4294967295,
                     deci_bps: 0,
@@ -733,7 +810,7 @@ pub mod tests {
                 &[]
             )
             .unwrap_err(),
-            CcipRouterError::InvalidTokenPrice.into()
+            FeeQuoterError::InvalidTokenPrice.into()
         );
     }
 
@@ -750,7 +827,7 @@ pub mod tests {
                 &[]
             )
             .unwrap_err(),
-            CcipRouterError::InvalidTokenPrice.into()
+            FeeQuoterError::InvalidTokenPrice.into()
         );
     }
 
@@ -771,7 +848,7 @@ pub mod tests {
                 &[]
             )
             .unwrap_err(),
-            CcipRouterError::StaleGasPrice.into()
+            FeeQuoterError::StaleGasPrice.into()
         );
     }
 

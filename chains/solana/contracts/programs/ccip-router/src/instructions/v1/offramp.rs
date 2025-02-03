@@ -15,10 +15,9 @@ use super::pools::{
 
 use crate::v1::ocr3base::Signatures;
 use crate::{
-    seed, Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput,
-    CommitReport, CommitReportContext, DestChain, ExecuteReportContext, ExecutionReportSingleChain,
-    GasPriceUpdate, GlobalState, MessageExecutionState, OcrPluginType, RampMessageHeader,
-    SVMTokenAmount, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
+    seed, Any2SVMRampMessage, CcipRouterError, CommitInput, CommitReport, CommitReportContext,
+    ExecuteReportContext, ExecutionReportSingleChain, GlobalState, MessageExecutionState,
+    OcrPluginType, RampMessageHeader, SVMTokenAmount, SourceChain,
 };
 
 pub fn commit<'info>(
@@ -71,8 +70,8 @@ pub fn commit<'info>(
         // - the accounts to update DestChain for gas prices
         // They must be in order:
         // 1. state_account
-        // 2. token_accounts[]
-        // 3. gas_accounts[]
+        // 2. fee quoter token_accounts[]
+        // 3. fee quoter gas_accounts[]
         // matching the order of the price updates in the CommitInput.
         // They must also all be writable so they can be updated.
         let minimum_remaining_accounts = 1
@@ -105,19 +104,37 @@ pub fn commit<'info>(
             global_state.latest_price_sequence_number = ocr_sequence_number;
             global_state.exit(&crate::ID)?; // as it is manually loaded, it also has to be manually written back
 
-            // For each token price update, unpack the corresponding remaining_account and update the price.
-            // Keep in mind that the remaining_accounts are sorted in the same order as tokens and gas price updates in the report.
-            for (i, update) in report.price_updates.token_price_updates.iter().enumerate() {
-                apply_token_price_update(update, &ctx.remaining_accounts[i + 1])?;
-            }
+            let cpi_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
+            let cpi_signer = &[&cpi_seeds[..]];
+            let cpi_program = ctx.accounts.fee_quoter.to_account_info();
+            let cpi_accounts = fee_quoter::cpi::accounts::UpdatePrices {
+                config: ctx.accounts.fee_quoter_config.to_account_info(),
+                authority: ctx.accounts.fee_billing_signer.to_account_info(),
+            };
+            let cpi_remaining_accounts = ctx.remaining_accounts[1..].to_vec();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, cpi_signer)
+                .with_remaining_accounts(cpi_remaining_accounts);
 
-            // Skip the first state account and the ones for token updates
-            let offset = report.price_updates.token_price_updates.len() + 1;
+            let token_price_updates = report
+                .price_updates
+                .token_price_updates
+                .iter()
+                .map(|u| fee_quoter::context::TokenPriceUpdate {
+                    source_token: u.source_token,
+                    usd_per_token: u.usd_per_token,
+                })
+                .collect();
+            let gas_price_update = report
+                .price_updates
+                .gas_price_updates
+                .iter()
+                .map(|u| fee_quoter::context::GasPriceUpdate {
+                    dest_chain_selector: u.dest_chain_selector,
+                    usd_per_unit_gas: u.usd_per_unit_gas,
+                })
+                .collect();
 
-            // Do the same for gas price updates
-            for (i, update) in report.price_updates.gas_price_updates.iter().enumerate() {
-                apply_gas_price_update(update, &ctx.remaining_accounts[i + offset])?;
-            }
+            fee_quoter::cpi::update_prices(cpi_ctx, token_price_updates, gas_price_update)?;
         } else {
             // TODO check if this is really necessary. EVM has this validation checking that the
             // array of merkle roots in the report is not empty. But here, considering we only have 1 root per report,
@@ -253,107 +270,6 @@ pub fn manually_execute<'info>(
 /////////////
 // Helpers //
 /////////////
-
-fn apply_token_price_update<'info>(
-    token_update: &TokenPriceUpdate,
-    token_config_account_info: &'info AccountInfo<'info>,
-) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(
-        &[
-            seed::FEE_BILLING_TOKEN_CONFIG,
-            token_update.source_token.as_ref(),
-        ],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        token_config_account_info.key(),
-        expected,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        token_config_account_info.is_writable,
-        CcipRouterError::InvalidInputs
-    );
-
-    let token_config_account: &mut Account<BillingTokenConfigWrapper> =
-        &mut Account::try_from(token_config_account_info)?;
-
-    require!(
-        token_config_account.version == 1,
-        CcipRouterError::InvalidInputs
-    );
-
-    token_config_account.config.usd_per_token = TimestampedPackedU224 {
-        value: token_update.usd_per_token,
-        timestamp: Clock::get()?.unix_timestamp,
-    };
-
-    emit!(events::UsdPerTokenUpdated {
-        token: token_config_account.config.mint,
-        value: token_config_account.config.usd_per_token.value,
-        timestamp: token_config_account.config.usd_per_token.timestamp,
-    });
-
-    // As the account is manually loaded from the AccountInfo, it also needs to be manually
-    // written back to so the changes are persisted.
-    token_config_account.exit(&crate::ID)
-}
-
-fn apply_gas_price_update<'info>(
-    gas_update: &GasPriceUpdate,
-    dest_chain_state_account_info: &'info AccountInfo<'info>,
-) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(
-        &[
-            seed::DEST_CHAIN_STATE,
-            gas_update.dest_chain_selector.to_le_bytes().as_ref(),
-        ],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        dest_chain_state_account_info.key(),
-        expected,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        dest_chain_state_account_info.is_writable,
-        CcipRouterError::InvalidInputs
-    );
-
-    // The passed-in chain_state account may refer to the same chain but it only corresponds to source.
-    // To update the price that values correspond to the destination, which is a different account.
-    // As the account is sent as additional accounts, then Anchor won't automatically (de)serialize the account
-    // as it is not the one in the context, so we have to do it manually load it and write it back
-    let dest_chain_state_account = &mut Account::try_from(dest_chain_state_account_info)?;
-    update_chain_state_gas_price(dest_chain_state_account, gas_update)?;
-    dest_chain_state_account.exit(&crate::ID)?;
-    Ok(())
-}
-
-fn update_chain_state_gas_price(
-    chain_state_account: &mut Account<DestChain>,
-    gas_update: &GasPriceUpdate,
-) -> Result<()> {
-    require!(
-        chain_state_account.version == 1,
-        CcipRouterError::InvalidInputs
-    );
-
-    chain_state_account.state.usd_per_unit_gas = TimestampedPackedU224 {
-        value: gas_update.usd_per_unit_gas,
-        timestamp: Clock::get()?.unix_timestamp,
-    };
-
-    emit!(events::UsdPerUnitGasUpdated {
-        dest_chain: gas_update.dest_chain_selector,
-        value: chain_state_account.state.usd_per_unit_gas.value,
-        timestamp: chain_state_account.state.usd_per_unit_gas.timestamp,
-    });
-
-    Ok(())
-}
 
 // internal_execute is the base execution logic without any additional validation
 fn internal_execute<'info>(

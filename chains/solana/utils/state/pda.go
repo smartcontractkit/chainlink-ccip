@@ -30,15 +30,6 @@ func FindTokenAdminRegistryPDA(mint solana.PublicKey, ccipRouterProgram solana.P
 	return solana.FindProgramAddress([][]byte{[]byte("token_admin_registry"), mint.Bytes()}, ccipRouterProgram)
 }
 
-func FindFeeBillingTokenConfigPDA(mint solana.PublicKey, ccipRouterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), mint.Bytes()}, ccipRouterProgram)
-}
-
-func FindCcipTokenpoolBillingPDA(chainSelector uint64, mint solana.PublicKey, ccipRouterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
-	chainSelectorLE := common.Uint64ToLE(chainSelector)
-	return solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_billing"), chainSelectorLE, mint.Bytes()}, ccipRouterProgram)
-}
-
 func FindSourceChainStatePDA(chainSelector uint64, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, ccipRouterProgram)
@@ -67,4 +58,30 @@ func FindApprovedSender(chainSelector uint64, sourceSender []byte, receiverProgr
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	p, _, err := solana.FindProgramAddress([][]byte{[]byte("approved_ccip_sender"), chainSelectorLE, []byte{uint8(len(sourceSender))}, sourceSender}, receiverProgram) //nolint:gosec
 	return p, err
+}
+
+/////////////////////
+// Fee Quoter PDAs //
+/////////////////////
+
+func FindFqConfigPDA(feeQuoterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("config")}, feeQuoterProgram)
+}
+
+func FindFqDestChainPDA(chainSelector uint64, feeQuoterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	chainSelectorLE := common.Uint64ToLE(chainSelector)
+	return solana.FindProgramAddress([][]byte{[]byte("dest_chain"), chainSelectorLE}, feeQuoterProgram)
+}
+
+func FindFqBillingTokenConfigPDA(mint solana.PublicKey, feeQuoterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), mint.Bytes()}, feeQuoterProgram)
+}
+
+func FindFqBillingSignerPDA(feeQuoterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("fee_billing_signer")}, feeQuoterProgram)
+}
+
+func FindFqPerChainPerTokenConfigPDA(chainSelector uint64, mint solana.PublicKey, feeQuoterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	chainSelectorLE := common.Uint64ToLE(chainSelector)
+	return solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), chainSelectorLE, mint.Bytes()}, feeQuoterProgram)
 }
