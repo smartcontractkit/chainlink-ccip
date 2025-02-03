@@ -1,6 +1,8 @@
 package ocrtypecodec
 
 import (
+	"encoding/json"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 )
 
@@ -20,17 +22,28 @@ func NewExecCodecJSON() *ExecCodecJSON {
 }
 
 func (*ExecCodecJSON) EncodeObservation(observation exectypes.Observation) ([]byte, error) {
-	return observation.Encode()
+	return json.Marshal(observation)
 }
 
 func (*ExecCodecJSON) DecodeObservation(data []byte) (exectypes.Observation, error) {
-	return exectypes.DecodeObservation(data)
+	if len(data) == 0 {
+		return exectypes.Observation{}, nil
+	}
+	obs := exectypes.Observation{}
+	err := json.Unmarshal(data, &obs)
+	return obs, err
 }
 
 func (*ExecCodecJSON) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
-	return outcome.Encode()
+	// We sort again here in case construction is not via the constructor.
+	return json.Marshal(exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report))
 }
 
 func (*ExecCodecJSON) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
-	return exectypes.DecodeOutcome(data)
+	if len(data) == 0 {
+		return exectypes.Outcome{}, nil
+	}
+	o := exectypes.Outcome{}
+	err := json.Unmarshal(data, &o)
+	return o, err
 }
