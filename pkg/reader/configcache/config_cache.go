@@ -35,7 +35,7 @@ type ConfigCacher interface {
 	// RMN related methods
 	GetRMNDigestHeader(ctx context.Context) (cciptypes.RMNDigestHeader, error)
 	GetRMNVersionedConfig(ctx context.Context) (cciptypes.VersionedConfigRemote, error)
-	GetRMNRemoteAddress(ctx context.Context) (cciptypes.Bytes, error)
+	GetRMNRemoteAddress(ctx context.Context) ([]byte, error)
 
 	// FeeQuoter related methods
 	GetFeeQuoterConfig(ctx context.Context) (cciptypes.FeeQuoterStaticConfig, error)
@@ -57,7 +57,7 @@ type configCache struct {
 	offrampAllChains      cciptypes.SelectorsAndConfigs
 	rmnDigestHeader       cciptypes.RMNDigestHeader
 	rmnVersionedConfig    cciptypes.VersionedConfigRemote
-	rmnRemoteAddress      cciptypes.Bytes
+	rmnRemoteAddress      []byte
 	feeQuoterConfig       cciptypes.FeeQuoterStaticConfig
 }
 
@@ -313,8 +313,10 @@ func (c *configCache) handleRMNProxyResults(results []types.BatchReadResult) err
 		if err != nil {
 			return fmt.Errorf("get rmn proxy result: %w", err)
 		}
-		if typed, ok := val.(*cciptypes.Bytes); ok {
+		if typed, ok := val.(*[]byte); ok {
 			c.rmnRemoteAddress = *typed
+		} else {
+			c.lggr.Infow("handleRMNProxyResults - typed is", "typed", typed)
 		}
 	}
 	return nil
@@ -454,9 +456,9 @@ func (c *configCache) GetFeeQuoterConfig(ctx context.Context) (cciptypes.FeeQuot
 }
 
 // GetRMNRemoteAddress returns the cached RMN remote address
-func (c *configCache) GetRMNRemoteAddress(ctx context.Context) (cciptypes.Bytes, error) {
+func (c *configCache) GetRMNRemoteAddress(ctx context.Context) ([]byte, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
-		return cciptypes.Bytes{}, fmt.Errorf("refresh cache: %w", err)
+		return nil, fmt.Errorf("refresh cache: %w", err)
 	}
 
 	c.cacheMu.RLock()

@@ -364,62 +364,6 @@ func (_c *MockConfigCacher_GetOffRampStaticConfig_Call) RunAndReturn(run func(co
 	return _c
 }
 
-// GetOnRampDynamicConfig provides a mock function with given fields: ctx
-func (_m *MockConfigCacher) GetOnRampDynamicConfig(ctx context.Context) (ccipocr3.GetOnRampDynamicConfigResponse, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetOnRampDynamicConfig")
-	}
-
-	var r0 ccipocr3.GetOnRampDynamicConfigResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.GetOnRampDynamicConfigResponse, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.GetOnRampDynamicConfigResponse); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Get(0).(ccipocr3.GetOnRampDynamicConfigResponse)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockConfigCacher_GetOnRampDynamicConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOnRampDynamicConfig'
-type MockConfigCacher_GetOnRampDynamicConfig_Call struct {
-	*mock.Call
-}
-
-// GetOnRampDynamicConfig is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockConfigCacher_Expecter) GetOnRampDynamicConfig(ctx interface{}) *MockConfigCacher_GetOnRampDynamicConfig_Call {
-	return &MockConfigCacher_GetOnRampDynamicConfig_Call{Call: _e.mock.On("GetOnRampDynamicConfig", ctx)}
-}
-
-func (_c *MockConfigCacher_GetOnRampDynamicConfig_Call) Run(run func(ctx context.Context)) *MockConfigCacher_GetOnRampDynamicConfig_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockConfigCacher_GetOnRampDynamicConfig_Call) Return(_a0 ccipocr3.GetOnRampDynamicConfigResponse, _a1 error) *MockConfigCacher_GetOnRampDynamicConfig_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockConfigCacher_GetOnRampDynamicConfig_Call) RunAndReturn(run func(context.Context) (ccipocr3.GetOnRampDynamicConfigResponse, error)) *MockConfigCacher_GetOnRampDynamicConfig_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetRMNDigestHeader provides a mock function with given fields: ctx
 func (_m *MockConfigCacher) GetRMNDigestHeader(ctx context.Context) (ccipocr3.RMNDigestHeader, error) {
 	ret := _m.Called(ctx)
@@ -477,23 +421,23 @@ func (_c *MockConfigCacher_GetRMNDigestHeader_Call) RunAndReturn(run func(contex
 }
 
 // GetRMNRemoteAddress provides a mock function with given fields: ctx
-func (_m *MockConfigCacher) GetRMNRemoteAddress(ctx context.Context) (ccipocr3.Bytes, error) {
+func (_m *MockConfigCacher) GetRMNRemoteAddress(ctx context.Context) ([]byte, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRMNRemoteAddress")
 	}
 
-	var r0 ccipocr3.Bytes
+	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.Bytes, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ([]byte, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.Bytes); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) []byte); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(ccipocr3.Bytes)
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
@@ -524,12 +468,12 @@ func (_c *MockConfigCacher_GetRMNRemoteAddress_Call) Run(run func(ctx context.Co
 	return _c
 }
 
-func (_c *MockConfigCacher_GetRMNRemoteAddress_Call) Return(_a0 ccipocr3.Bytes, _a1 error) *MockConfigCacher_GetRMNRemoteAddress_Call {
+func (_c *MockConfigCacher_GetRMNRemoteAddress_Call) Return(_a0 []byte, _a1 error) *MockConfigCacher_GetRMNRemoteAddress_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockConfigCacher_GetRMNRemoteAddress_Call) RunAndReturn(run func(context.Context) (ccipocr3.Bytes, error)) *MockConfigCacher_GetRMNRemoteAddress_Call {
+func (_c *MockConfigCacher_GetRMNRemoteAddress_Call) RunAndReturn(run func(context.Context) ([]byte, error)) *MockConfigCacher_GetRMNRemoteAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }
