@@ -950,6 +950,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "fee_quoter",
  "solana-program",
 ]
 
