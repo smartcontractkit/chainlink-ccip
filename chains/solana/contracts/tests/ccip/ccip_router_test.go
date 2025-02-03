@@ -22,9 +22,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -38,7 +38,7 @@ func TestCCIPRouter(t *testing.T) {
 	t.Parallel()
 
 	ccip_router.SetProgramID(config.CcipRouterProgram)
-	ccip_receiver.SetProgramID(config.CcipLogicReceiver)
+	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
 	token_pool.SetProgramID(config.CcipTokenPoolProgram)
 	fee_quoter.SetProgramID(config.FeeQuoterProgram)
 
@@ -175,7 +175,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("receiver", func(t *testing.T) {
-			instruction, ixErr := ccip_receiver.NewInitializeInstruction(
+			instruction, ixErr := test_ccip_receiver.NewInitializeInstruction(
 				config.ReceiverTargetAccountPDA,
 				config.ReceiverExternalExecutionConfigPDA,
 				user.PublicKey(),

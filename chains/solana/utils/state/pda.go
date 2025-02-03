@@ -54,6 +54,12 @@ func FindNoncePDA(chainSelector uint64, user solana.PublicKey, ccipRouterProgram
 	return p, err
 }
 
+func FindApprovedSender(chainSelector uint64, sourceSender []byte, receiverProgram solana.PublicKey) (solana.PublicKey, error) {
+	chainSelectorLE := common.Uint64ToLE(chainSelector)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("approved_ccip_sender"), chainSelectorLE, []byte{uint8(len(sourceSender))}, sourceSender}, receiverProgram) //nolint:gosec
+	return p, err
+}
+
 /////////////////////
 // Fee Quoter PDAs //
 /////////////////////
