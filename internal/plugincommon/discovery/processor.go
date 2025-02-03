@@ -121,7 +121,8 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 					return fmt.Errorf(
 						"oracle %d is not allowed to observe chain %s for %s", ao.OracleID, chain, contract)
 				}
-				if ao.Observation.Addresses[consts.ContractNameOnRamp][chain] == nil {
+				_, err = (*cdp.reader).GetContractAddress(consts.ContractNameOnRamp, chain)
+				if ao.Observation.Addresses[consts.ContractNameOnRamp][chain] == nil && err != nil {
 					return fmt.Errorf(
 						"oracle %d must observe onramp contract on chain %s before observing %s",
 						ao.OracleID, chain, contract)
