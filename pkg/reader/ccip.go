@@ -733,6 +733,11 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}
 	lggr.Infow("got RMNRemote address", "address", rmnRemoteAddress)
 
+	resultBatch, err := r.refresh(ctx)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("refresh: %w", err)
+	}
+
 	// TODO: make the calls in parallel using errgroup
 	var vc versionedConfig
 	err = r.contractReaders[r.destChain].ExtendedGetLatestValue(
@@ -747,10 +752,14 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote config: %w", err)
 	}
 
-	type ret struct {
-		DigestHeader cciptypes.Bytes32
-	}
-	var header ret
+	vcBatch := resultBatch.RMNRemote.RMNRemoteVersionedConfig
+
+	lggr.Infow("got RMNRemote versioned config", "config", vc.Config, "batchConfig", vcBatch)
+
+	// type ret struct {
+	// 	DigestHeader cciptypes.Bytes32
+	// }
+	var header rmnDigestHeader
 
 	err = r.contractReaders[r.destChain].ExtendedGetLatestValue(
 		ctx,
@@ -763,10 +772,12 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote report digest header: %w", err)
 	}
-	lggr.Infow("got RMNRemote report digest header", "digest", header.DigestHeader)
 
-	signers := make([]rmntypes.RemoteSignerInfo, 0, len(vc.Config.Signers))
-	for _, signer := range vc.Config.Signers {
+	digestHeaderBatch := resultBatch.RMNRemote.RMNRemoteDigestHeader.DigestHeader
+	lggr.Infow("got RMNRemote report digest header", "digest", header.DigestHeader, "batchDigest", digestHeaderBatch)
+
+	signers := make([]rmntypes.RemoteSignerInfo, 0, len(vcBatch.Config.Signers))
+	for _, signer := range vcBatch.Config.Signers {
 		signers = append(signers, rmntypes.RemoteSignerInfo{
 			OnchainPublicKey: signer.OnchainPublicKey,
 			NodeIndex:        signer.NodeIndex,
@@ -775,11 +786,11 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 
 	return rmntypes.RemoteConfig{
 		ContractAddress:  rmnRemoteAddress,
-		ConfigDigest:     vc.Config.RMNHomeContractConfigDigest,
+		ConfigDigest:     vcBatch.Config.RMNHomeContractConfigDigest,
 		Signers:          signers,
-		FSign:            vc.Config.F,
-		ConfigVersion:    vc.Version,
-		RmnReportVersion: header.DigestHeader,
+		FSign:            vcBatch.Config.F,
+		ConfigVersion:    vcBatch.Version,
+		RmnReportVersion: digestHeaderBatch,
 	}, nil
 }
 
@@ -1820,9 +1831,9 @@ func (r *ccipChainReader) refresh(ctx context.Context) (NogoResponse, error) {
 	return r.updateFromResults(batchResult.Results)
 }
 
-// type rmnDigestHeader struct {
-// 	DigestHeader cciptypes.Bytes32
-// }
+type rmnDigestHeader struct {
+	DigestHeader cciptypes.Bytes32
+}
 
 // prepareBatchRequests creates the batch request for all configurations
 func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
@@ -1833,9 +1844,9 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 		dynamicConfig         offRampDynamicChainConfig
 		selectorsAndConf      selectorsAndConfigs
 		rmnRemoteAddress      []byte
-		// rmnDigestHeader       rmnDigestHeader
-		// rmnVersionConfig      versionedConfig
-		// feeQuoterConfig       feeQuoterStaticConfig
+		rmnDigestHeader       rmnDigestHeader
+		rmnVersionConfig      versionedConfig
+		feeQuoterConfig       feeQuoterStaticConfig
 	)
 
 	return contractreader.ExtendedBatchGetLatestValuesRequest{
@@ -1875,23 +1886,23 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 			Params:    map[string]any{},
 			ReturnVal: &rmnRemoteAddress,
 		}},
-		// consts.ContractNameRMNRemote: {
-		// 	{
-		// 		ReadName:  consts.MethodNameGetReportDigestHeader,
-		// 		Params:    map[string]any{},
-		// 		ReturnVal: &rmnDigestHeader,
-		// 	},
-		// 	{
-		// 		ReadName:  consts.MethodNameGetVersionedConfig,
-		// 		Params:    map[string]any{},
-		// 		ReturnVal: &rmnVersionConfig,
-		// 	},
-		// },
-		// consts.ContractNameFeeQuoter: {{
-		// 	ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
-		// 	Params:    map[string]any{},
-		// 	ReturnVal: &feeQuoterConfig,
-		// }},
+		consts.ContractNameRMNRemote: {
+			{
+				ReadName:  consts.MethodNameGetReportDigestHeader,
+				Params:    map[string]any{},
+				ReturnVal: &rmnDigestHeader,
+			},
+			{
+				ReadName:  consts.MethodNameGetVersionedConfig,
+				Params:    map[string]any{},
+				ReturnVal: &rmnVersionConfig,
+			},
+		},
+		consts.ContractNameFeeQuoter: {{
+			ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
+			Params:    map[string]any{},
+			ReturnVal: &feeQuoterConfig,
+		}},
 	}
 }
 
@@ -1917,6 +1928,20 @@ func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValu
 			}
 			r.lggr.Infow("Result is", "result", rmnProxy)
 			response.RMNProxy = rmnProxy
+
+		case consts.ContractNameRMNRemote:
+			rmnRemote, err := r.handleRMNRemoteResults(results)
+			if err != nil {
+				return NogoResponse{}, fmt.Errorf("handle RMN remote results: %w", err)
+			}
+			response.RMNRemote = rmnRemote
+
+		case consts.ContractNameFeeQuoter:
+			fq, err := r.handleFeeQuoterResults(results)
+			if err != nil {
+				return NogoResponse{}, fmt.Errorf("handle fee quoter results: %w", err)
+			}
+			response.FeeQuoter = fq
 
 		default:
 			r.lggr.Warnw("No handler found for contract", "contract", contract.Name)
@@ -1950,10 +1975,20 @@ func (r *ccipChainReader) handleRMNProxyResults(results []types.BatchReadResult)
 }
 
 type NogoResponse struct {
-	Offramp  OfframpNogoResponse
-	RMNProxy RMNProxyNogoResponse
+	Offramp   OfframpNogoResponse
+	RMNProxy  RMNProxyNogoResponse
+	RMNRemote RMNRemoteNogoResponse
+	FeeQuoter FeeQuoterNogoResponse
 }
 
+type FeeQuoterNogoResponse struct {
+	FeeQuoterStaticConfig feeQuoterStaticConfig
+}
+
+type RMNRemoteNogoResponse struct {
+	RMNRemoteDigestHeader    rmnDigestHeader
+	RMNRemoteVersionedConfig versionedConfig
+}
 type OfframpNogoResponse struct {
 	CommitLatestOCRConfig OCRConfigResponse
 	ExecLatestOCRConfig   OCRConfigResponse
@@ -1996,6 +2031,44 @@ func (r *ccipChainReader) handleOffRampResults(results []types.BatchReadResult) 
 			if typed, ok := val.(*selectorsAndConfigs); ok {
 				response.SelectorsAndConf = *typed
 			}
+		}
+	}
+	return response, nil
+}
+
+// handleRMNRemoteResults processes RMN remote-specific results
+func (r *ccipChainReader) handleRMNRemoteResults(results []types.BatchReadResult) (RMNRemoteNogoResponse, error) {
+	response := RMNRemoteNogoResponse{}
+	for i, result := range results {
+		val, err := result.GetResult()
+		if err != nil {
+			return RMNRemoteNogoResponse{}, fmt.Errorf("get RMN remote result %d: %w", i, err)
+		}
+		switch i {
+		case 0:
+			if typed, ok := val.(*rmnDigestHeader); ok {
+				response.RMNRemoteDigestHeader = *typed
+			}
+		case 1:
+			if typed, ok := val.(*versionedConfig); ok {
+				response.RMNRemoteVersionedConfig = *typed
+			}
+		}
+	}
+	return response, nil
+}
+
+// handleFeeQuoterResults processes fee quoter-specific results
+func (r *ccipChainReader) handleFeeQuoterResults(results []types.BatchReadResult) (FeeQuoterNogoResponse, error) {
+	response := FeeQuoterNogoResponse{}
+
+	if len(results) > 0 {
+		val, err := results[0].GetResult()
+		if err != nil {
+			return FeeQuoterNogoResponse{}, fmt.Errorf("get fee quoter result: %w", err)
+		}
+		if typed, ok := val.(*feeQuoterStaticConfig); ok {
+			response.FeeQuoterStaticConfig = *typed
 		}
 	}
 	return response, nil
