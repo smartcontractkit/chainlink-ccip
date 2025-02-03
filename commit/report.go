@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -27,7 +26,7 @@ func (p *Plugin) Reports(
 ) ([]ocr3types.ReportPlus[[]byte], error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseReports)
 
-	outcome, err := committypes.DecodeOutcome(outcomeBytes)
+	outcome, err := p.ocrTypeCodec.DecodeOutcome(outcomeBytes)
 	if err != nil {
 		lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
 		return nil, fmt.Errorf("decode outcome: %w", err)

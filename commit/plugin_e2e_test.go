@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -234,13 +235,13 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				preparePriceReaderMock(n.priceReader)
 			}
 
-			encodedPrevOutcome, err := tc.prevOutcome.Encode()
+			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := committypes.DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -432,13 +433,13 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				tc.mockPriceReader(n.priceReader)
 			}
 
-			encodedPrevOutcome, err := tc.prevOutcome.Encode()
+			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := committypes.DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -677,13 +678,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				tc.mockCCIPReader(n.ccipReader)
 			}
 
-			encodedPrevOutcome, err := tc.prevOutcome.Encode()
+			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := committypes.DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
