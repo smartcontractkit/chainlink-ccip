@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -131,6 +132,8 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
+	// TODO: set fetchFrom to the oldest pending commit report.
+	// TODO: or, cache commit reports so that we don't need to fetch them again.
 	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
@@ -159,14 +162,30 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, fetchFrom, lggr)
+	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(
+		ctx,
+		p.ccipReader,
+		p.commitRootsCache.CanExecute,
+		fetchFrom,
+		lggr,
+	)
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
 
-	// Remove cursed observations.
+	// If fully executed reports are detected, mark them in the cache.
+	// This cache will be re-initialized on each plugin restart.
+	for _, fullyExecutedCommit := range fullyExecutedCommits {
+		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
+	}
+
+	// Remove and snooze commit reports from cursed chains.
 	for chainSelector, isCursed := range ci.CursedSourceChains {
 		if isCursed {
+			// Snooze everything on a cursed chain.
+			for _, commit := range groupedCommits[chainSelector] {
+				p.commitRootsCache.Snooze(chainSelector, commit.MerkleRoot)
+			}
 			delete(groupedCommits, chainSelector)
 		}
 	}
@@ -292,8 +311,10 @@ func (p *Plugin) getMessagesObservation(
 	observation.TokenData = tkData
 
 	// Make sure encoded observation fits within the maximum observation size.
-	//observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)
-	observation, err = p.observationOptimizer.TruncateObservation(observation)
+	observationOptimizer := optimizers.NewObservationOptimizer(
+		lggr,
+		maxObservationLength)
+	observation, err = observationOptimizer.TruncateObservation(observation)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
 	}

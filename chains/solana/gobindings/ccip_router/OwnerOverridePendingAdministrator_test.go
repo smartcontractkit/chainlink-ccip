@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_RegisterTokenAdminRegistryViaGetCcipAdmin(t *testing.T) {
+func TestEncodeDecode_OwnerOverridePendingAdministrator(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("RegisterTokenAdminRegistryViaGetCcipAdmin"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("OwnerOverridePendingAdministrator"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(RegisterTokenAdminRegistryViaGetCcipAdmin)
+				params := new(OwnerOverridePendingAdministrator)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(RegisterTokenAdminRegistryViaGetCcipAdmin)
+				got := new(OwnerOverridePendingAdministrator)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

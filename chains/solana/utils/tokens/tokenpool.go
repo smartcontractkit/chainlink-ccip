@@ -22,7 +22,7 @@ type TokenPool struct {
 	FeeTokenConfig solana.PublicKey
 
 	// admin registry PDA
-	AdminRegistry solana.PublicKey
+	AdminRegistryPDA solana.PublicKey
 
 	// pool details
 	PoolProgram, PoolConfig, PoolSigner, PoolTokenAccount solana.PublicKey
@@ -44,7 +44,7 @@ type TokenPool struct {
 func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 	list := solana.PublicKeySlice{
 		tp.PoolLookupTable,  // 0
-		tp.AdminRegistry,    // 1
+		tp.AdminRegistryPDA, // 1
 		tp.PoolProgram,      // 2
 		tp.PoolConfig,       // 3 - writable
 		tp.PoolTokenAccount, // 4 - writable
@@ -66,7 +66,6 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-
 	// preload with defined config.EvmChainSelector
 	chainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipTokenPoolProgram)
 	if err != nil {
@@ -82,16 +81,16 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 
 	p := TokenPool{
-		Program:         program,
-		Mint:            mint,
-		FeeTokenConfig:  tokenConfigPda,
-		AdminRegistry:   tokenAdminRegistryPDA,
-		PoolProgram:     config.CcipTokenPoolProgram,
-		PoolLookupTable: solana.PublicKey{},
-		WritableIndexes: []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
-		User:            map[solana.PublicKey]solana.PublicKey{},
-		Chain:           map[uint64]solana.PublicKey{},
-		Billing:         map[uint64]solana.PublicKey{},
+		Program:          program,
+		Mint:             mint,
+		FeeTokenConfig:   tokenConfigPda,
+		AdminRegistryPDA: tokenAdminRegistryPDA,
+		PoolProgram:      config.CcipTokenPoolProgram,
+		PoolLookupTable:  solana.PublicKey{},
+		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
+		User:             map[solana.PublicKey]solana.PublicKey{},
+		Chain:            map[uint64]solana.PublicKey{},
+		Billing:          map[uint64]solana.PublicKey{},
 	}
 	p.Chain[config.EvmChainSelector] = chainPDA
 	p.Billing[config.EvmChainSelector] = billingPDA
@@ -195,7 +194,7 @@ func ParseTokenLookupTable(ctx context.Context, client *rpc.Client, token TokenP
 	poolChainConfig := token.Chain[config.EvmChainSelector]
 
 	tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
-	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistry, config.DefaultCommitment, &tokenAdminRegistry)
+	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 	if err != nil {
 		return nil, nil, err
 	}
