@@ -97,8 +97,8 @@ func Test_USDC_Transfer(t *testing.T) {
 
 	require.Len(t, outcome.Report.ChainReports, 1)
 	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
-	//Attestation data added to the both USDC messages
-	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
-	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
+	// 102, 103 and 104 are in the inflight message cache.
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{105})
+	//Attestation data added to the remaining USDC messages
+	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[0])
 }
