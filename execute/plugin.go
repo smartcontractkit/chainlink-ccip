@@ -40,6 +40,12 @@ import (
 
 type ContractDiscoveryInterface plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
 
+type inflightMessageCache interface {
+	IsInflight(src cciptypes.ChainSelector, msgID cciptypes.Bytes32) bool
+	MarkInflight(src cciptypes.ChainSelector, msgID cciptypes.Bytes32)
+	Delete(src cciptypes.ChainSelector, msgID cciptypes.Bytes32)
+}
+
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
 	donID        plugintypes.DonID
@@ -63,9 +69,12 @@ type Plugin struct {
 	lggr                  logger.Logger
 
 	// state
+
 	contractsInitialized bool
-	// this cache remembers commit root details to optimize DB lookups.
+	// commitRootsCache remembers commit root details to optimize DB lookups.
 	commitRootsCache cache.CommitsRootsCache
+	// inflightMessageCache prevents duplicate reports from being sent for the same message.
+	inflightMessageCache inflightMessageCache
 }
 
 func NewPlugin(
@@ -119,6 +128,9 @@ func NewPlugin(
 		commitRootsCache: cache.NewCommitRootsCache(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
+			time.Minute*5),
+		inflightMessageCache: cache.NewInflightMessageCache(
+			logutil.WithComponent(lggr, "InflightMessageCache"),
 			time.Minute*5),
 	}
 }
@@ -470,6 +482,16 @@ func (p *Plugin) Reports(
 			},
 			TransmissionScheduleOverride: transmissionSchedule,
 		},
+	}
+
+	// Update cache.
+	// Note: this could wait until should transmit, but the next round may start before then.
+	// For that reason we update caches here. If there is some sort of failure to transmit,
+	// messages will be delayed until the inflight cache expires and messages are reprocessed.
+	for _, chainReport := range decodedOutcome.Report.ChainReports {
+		for _, message := range chainReport.Messages {
+			p.inflightMessageCache.MarkInflight(chainReport.SourceChainSelector, message.Header.MessageID)
+		}
 	}
 
 	return r, nil

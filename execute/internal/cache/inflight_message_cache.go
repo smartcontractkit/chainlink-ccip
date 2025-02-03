@@ -5,8 +5,9 @@ import (
 
 	"github.com/patrickmn/go-cache"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 type InflightMessageCache struct {
@@ -26,15 +27,19 @@ func NewInflightMessageCache(lggr logger.Logger, flightAllowance time.Duration) 
 	}
 }
 
-func (c *InflightMessageCache) IsInflight(msgID ccipocr3.Bytes32) bool {
-	_, found := c.inflight.Get(msgID.String())
+func toID(src ccipocr3.ChainSelector, msgID ccipocr3.Bytes32) string {
+	return src.String() + msgID.String()
+}
+
+func (c *InflightMessageCache) IsInflight(src ccipocr3.ChainSelector, msgID ccipocr3.Bytes32) bool {
+	_, found := c.inflight.Get(toID(src, msgID))
 	return found
 }
 
-func (c *InflightMessageCache) MarkInflight(msgID ccipocr3.Bytes32) {
-	c.inflight.SetDefault(msgID.String(), struct{}{})
+func (c *InflightMessageCache) MarkInflight(src ccipocr3.ChainSelector, msgID ccipocr3.Bytes32) {
+	c.inflight.SetDefault(toID(src, msgID), struct{}{})
 }
 
-func (c *InflightMessageCache) Delete(msgID ccipocr3.Bytes32) {
-	c.inflight.Delete(msgID.String())
+func (c *InflightMessageCache) Delete(src ccipocr3.ChainSelector, msgID ccipocr3.Bytes32) {
+	c.inflight.Delete(toID(src, msgID))
 }
