@@ -22,6 +22,7 @@ use instructions::*;
 
 #[program]
 pub mod timelock {
+    #![warn(missing_docs)]
     use bytemuck::Zeroable;
 
     use super::*;
