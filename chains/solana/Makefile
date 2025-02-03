@@ -58,3 +58,7 @@ build-contracts:
 
 .PHONY: solana-checks
 solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
+
+.PHONY: docker-build-contracts
+docker-build-contracts:
+	docker run --rm -it -v $(shell pwd)/contracts:/workdir ${ANCHOR_IMAGE} anchor build
