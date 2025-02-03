@@ -1096,16 +1096,24 @@ func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (fee
 		consts.MethodNameFeeQuoterGetStaticConfig,
 		&staticConfig,
 	)
-
 	if err != nil {
 		return feeQuoterStaticConfig{}, fmt.Errorf("unable to lookup fee quoter (offramp static config): %w", err)
 	}
 
-	if len(staticConfig.LinkToken) == 0 {
+	result, err := r.refresh(ctx)
+	if err != nil {
+		return feeQuoterStaticConfig{}, fmt.Errorf("refresh: %w", err)
+	}
+
+	staticConfigBatch := result.FeeQuoter.FeeQuoterStaticConfig
+
+	r.lggr.Infow("got fee quoter static config", "staticConfig", staticConfig, "staticConfigBatch", staticConfigBatch)
+
+	if len(staticConfigBatch.LinkToken) == 0 {
 		return feeQuoterStaticConfig{}, fmt.Errorf("link token address is empty")
 	}
 
-	return staticConfig, nil
+	return staticConfigBatch, nil
 }
 
 // getFeeQuoterTokenPriceUSD gets the token price in USD of the given token address from the FeeQuoter contract on the
