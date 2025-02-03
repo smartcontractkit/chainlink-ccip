@@ -10,6 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
+// Initialization Flow //
 // Initializes the CCIP Router.
 //
 // The initialization of the Router is responsibility of Admin, nothing more than calling this method should be done first.

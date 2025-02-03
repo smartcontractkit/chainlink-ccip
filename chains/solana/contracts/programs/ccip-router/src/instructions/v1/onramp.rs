@@ -1,3 +1,5 @@
+use crate::events::on_ramp as events;
+use crate::extra_args::{EVMExtraArgsV2, SVMExtraArgsV1};
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
@@ -12,10 +14,9 @@ use super::price_math::get_validated_token_price;
 
 use crate::{seed, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM};
 use crate::{
-    BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, DestChainConfig,
-    EVMExtraArgsV2, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage,
-    SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMExtraArgsV1, SVMTokenAmount,
-    EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
+    BillingTokenConfig, CcipRouterError, CcipSend, DestChainConfig, GetFee, Nonce,
+    PerChainPerTokenConfig, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
+    SVM2AnyTokenTransfer, SVMTokenAmount, EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
 };
 
 pub fn get_fee<'info>(
@@ -67,7 +68,14 @@ pub fn ccip_send<'info>(
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
 
+    let sender = ctx.accounts.authority.key.to_owned();
     let dest_chain = &mut ctx.accounts.dest_chain_state;
+
+    require!(
+        !dest_chain.config.allow_list_enabled
+            || dest_chain.config.allowed_senders.contains(&sender),
+        CcipRouterError::SenderNotAllowed
+    );
 
     let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
 
@@ -163,7 +171,6 @@ pub fn ccip_send<'info>(
     );
     dest_chain.state.sequence_number = overflow_add.unwrap();
 
-    let sender = ctx.accounts.authority.key.to_owned();
     let receiver = message.receiver.clone();
     let source_chain_selector = config.svm_chain_selector;
     let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
@@ -259,7 +266,7 @@ pub fn ccip_send<'info>(
     let message_id = &hash(&new_message);
     new_message.header.message_id.clone_from(message_id);
 
-    emit!(CCIPMessageSent {
+    emit!(events::CCIPMessageSent {
         dest_chain_selector,
         sequence_number: new_message.header.sequence_number,
         message: new_message,

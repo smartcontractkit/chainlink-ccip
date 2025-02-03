@@ -19,28 +19,23 @@ import (
 // * `ctx` - The context containing the accounts required for accepting the admin role.
 // * `mint` - The public key of the token mint.
 type AcceptAdminRoleTokenAdminRegistry struct {
-	Mint *ag_solanago.PublicKey
 
 	// [0] = [] config
 	//
 	// [1] = [WRITE] tokenAdminRegistry
 	//
-	// [2] = [WRITE, SIGNER] authority
+	// [2] = [] mint
+	//
+	// [3] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewAcceptAdminRoleTokenAdminRegistryInstructionBuilder creates a new `AcceptAdminRoleTokenAdminRegistry` instruction builder.
 func NewAcceptAdminRoleTokenAdminRegistryInstructionBuilder() *AcceptAdminRoleTokenAdminRegistry {
 	nd := &AcceptAdminRoleTokenAdminRegistry{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
-}
-
-// SetMint sets the "mint" parameter.
-func (inst *AcceptAdminRoleTokenAdminRegistry) SetMint(mint ag_solanago.PublicKey) *AcceptAdminRoleTokenAdminRegistry {
-	inst.Mint = &mint
-	return inst
 }
 
 // SetConfigAccount sets the "config" account.
@@ -65,15 +60,26 @@ func (inst *AcceptAdminRoleTokenAdminRegistry) GetTokenAdminRegistryAccount() *a
 	return inst.AccountMetaSlice[1]
 }
 
+// SetMintAccount sets the "mint" account.
+func (inst *AcceptAdminRoleTokenAdminRegistry) SetMintAccount(mint ag_solanago.PublicKey) *AcceptAdminRoleTokenAdminRegistry {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(mint)
+	return inst
+}
+
+// GetMintAccount gets the "mint" account.
+func (inst *AcceptAdminRoleTokenAdminRegistry) GetMintAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *AcceptAdminRoleTokenAdminRegistry) SetAuthorityAccount(authority ag_solanago.PublicKey) *AcceptAdminRoleTokenAdminRegistry {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AcceptAdminRoleTokenAdminRegistry) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst AcceptAdminRoleTokenAdminRegistry) Build() *Instruction {
@@ -94,13 +100,6 @@ func (inst AcceptAdminRoleTokenAdminRegistry) ValidateAndBuild() (*Instruction, 
 }
 
 func (inst *AcceptAdminRoleTokenAdminRegistry) Validate() error {
-	// Check whether all (required) parameters are set:
-	{
-		if inst.Mint == nil {
-			return errors.New("Mint parameter is not set")
-		}
-	}
-
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -110,6 +109,9 @@ func (inst *AcceptAdminRoleTokenAdminRegistry) Validate() error {
 			return errors.New("accounts.TokenAdminRegistry is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.Mint is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -125,48 +127,36 @@ func (inst *AcceptAdminRoleTokenAdminRegistry) EncodeToTree(parent ag_treeout.Br
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Mint", *inst.Mint))
-					})
+					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("              mint", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
 }
 
 func (obj AcceptAdminRoleTokenAdminRegistry) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Mint` param:
-	err = encoder.Encode(obj.Mint)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *AcceptAdminRoleTokenAdminRegistry) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Mint`:
-	err = decoder.Decode(&obj.Mint)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 // NewAcceptAdminRoleTokenAdminRegistryInstruction declares a new AcceptAdminRoleTokenAdminRegistry instruction with the provided parameters and accounts.
 func NewAcceptAdminRoleTokenAdminRegistryInstruction(
-	// Parameters:
-	mint ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	tokenAdminRegistry ag_solanago.PublicKey,
+	mint ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AcceptAdminRoleTokenAdminRegistry {
 	return NewAcceptAdminRoleTokenAdminRegistryInstructionBuilder().
-		SetMint(mint).
 		SetConfigAccount(config).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
+		SetMintAccount(mint).
 		SetAuthorityAccount(authority)
 }

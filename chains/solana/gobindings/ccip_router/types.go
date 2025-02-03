@@ -1149,6 +1149,8 @@ type DestChainConfig struct {
 	GasPriceStalenessThreshold        uint32
 	EnforceOutOfOrder                 bool
 	ChainFamilySelector               [4]uint8
+	AllowedSenders                    []ag_solanago.PublicKey
+	AllowListEnabled                  bool
 }
 
 func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -1244,6 +1246,16 @@ func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	}
 	// Serialize `ChainFamilySelector` param:
 	err = encoder.Encode(obj.ChainFamilySelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `AllowedSenders` param:
+	err = encoder.Encode(obj.AllowedSenders)
+	if err != nil {
+		return err
+	}
+	// Serialize `AllowListEnabled` param:
+	err = encoder.Encode(obj.AllowListEnabled)
 	if err != nil {
 		return err
 	}
@@ -1343,6 +1355,16 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	}
 	// Deserialize `ChainFamilySelector`:
 	err = decoder.Decode(&obj.ChainFamilySelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AllowedSenders`:
+	err = decoder.Decode(&obj.AllowedSenders)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AllowListEnabled`:
+	err = decoder.Decode(&obj.AllowListEnabled)
 	if err != nil {
 		return err
 	}
@@ -1666,11 +1688,14 @@ const (
 	SourceTokenDataTooLarge_CcipRouterError
 	MessageGasLimitTooHigh_CcipRouterError
 	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
+	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
+	InvalidTokenAdminRegistryProposedAdmin_CcipRouterError
 	InvalidWritabilityBitmap_CcipRouterError
 	InvalidExtraArgsTag_CcipRouterError
 	InvalidChainFamilySelector_CcipRouterError
 	InvalidTokenReceiver_CcipRouterError
 	InvalidSVMAddress_CcipRouterError
+	SenderNotAllowed_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1757,6 +1782,10 @@ func (value CcipRouterError) String() string {
 		return "MessageGasLimitTooHigh"
 	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError:
 		return "ExtraArgOutOfOrderExecutionMustBeTrue"
+	case InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError:
+		return "InvalidTokenAdminRegistryInputsZeroAddress"
+	case InvalidTokenAdminRegistryProposedAdmin_CcipRouterError:
+		return "InvalidTokenAdminRegistryProposedAdmin"
 	case InvalidWritabilityBitmap_CcipRouterError:
 		return "InvalidWritabilityBitmap"
 	case InvalidExtraArgsTag_CcipRouterError:
@@ -1767,6 +1796,8 @@ func (value CcipRouterError) String() string {
 		return "InvalidTokenReceiver"
 	case InvalidSVMAddress_CcipRouterError:
 		return "InvalidSVMAddress"
+	case SenderNotAllowed_CcipRouterError:
+		return "SenderNotAllowed"
 	default:
 		return ""
 	}
