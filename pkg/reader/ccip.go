@@ -1640,7 +1640,16 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
 	}
 
-	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
+	result, err := r.refresh(ctx)
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
+	}
+
+	respFromBatch := result.Offramp.CommitLatestOCRConfig
+
+	r.lggr.Infow("got offramp config digest", "resp", resp, "respFromBatch", respFromBatch)
+
+	return respFromBatch.OCRConfig.ConfigInfo.ConfigDigest, nil
 }
 
 func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
@@ -1809,6 +1818,10 @@ func (r *ccipChainReader) refresh(ctx context.Context) (NogoResponse, error) {
 	return r.updateFromResults(batchResult.Results)
 }
 
+// type rmnDigestHeader struct {
+// 	DigestHeader cciptypes.Bytes32
+// }
+
 // prepareBatchRequests creates the batch request for all configurations
 func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
 	var (
@@ -1818,6 +1831,9 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 		dynamicConfig         offRampDynamicChainConfig
 		selectorsAndConf      selectorsAndConfigs
 		rmnRemoteAddress      []byte
+		// rmnDigestHeader       rmnDigestHeader
+		// rmnVersionConfig      versionedConfig
+		// feeQuoterConfig       feeQuoterStaticConfig
 	)
 
 	return contractreader.ExtendedBatchGetLatestValuesRequest{
@@ -1857,6 +1873,23 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 			Params:    map[string]any{},
 			ReturnVal: &rmnRemoteAddress,
 		}},
+		// consts.ContractNameRMNRemote: {
+		// 	{
+		// 		ReadName:  consts.MethodNameGetReportDigestHeader,
+		// 		Params:    map[string]any{},
+		// 		ReturnVal: &rmnDigestHeader,
+		// 	},
+		// 	{
+		// 		ReadName:  consts.MethodNameGetVersionedConfig,
+		// 		Params:    map[string]any{},
+		// 		ReturnVal: &rmnVersionConfig,
+		// 	},
+		// },
+		// consts.ContractNameFeeQuoter: {{
+		// 	ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
+		// 	Params:    map[string]any{},
+		// 	ReturnVal: &feeQuoterConfig,
+		// }},
 	}
 }
 
