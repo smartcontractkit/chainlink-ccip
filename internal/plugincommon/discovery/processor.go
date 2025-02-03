@@ -94,6 +94,11 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 		return fmt.Errorf("unable to get supported chains for Oracle %d: %w", ao.OracleID, err)
 	}
 
+	err = plugincommon.ValidateFChain(ao.Observation.FChain)
+	if err != nil {
+		return fmt.Errorf("invalid FChain: %w", err)
+	}
+
 	for contract, addrs := range ao.Observation.Addresses {
 		// some contract addresses come from the destination, others are from the source.
 		switch contract {
@@ -231,6 +236,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	fChain := consensus.GetConsensusMap(lggr, "fChain", agg.fChain, donThresh)
 	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
 
+	// We read onramp addresses from destChain offramp configs
 	if _, exists := fChain[cdp.dest]; !exists {
 		lggr.Warnf("missing fChain for dest (fChain[%d]), skipping onramp address lookup", cdp.dest)
 	} else {
