@@ -724,7 +724,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
 	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, r.destChain)
 	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
+		return rmntypes.RemoteConfig{}, fmt.Errorf("GetRMNRemoteConfigGetRMNRemoteConfig: %w", err)
 	}
 
 	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, lggr, r.destChain, proxyContractAddress)
@@ -1874,6 +1874,8 @@ func (r *ccipChainReader) handleContractResults(
 	offramp := OfframpNogoResponse{}
 	rmnProxy := RMNProxyNogoResponse{}
 
+	r.lggr.Infow("In handleContractResults - contract is", "contract", contract)
+
 	var err error
 	switch contract.Name {
 	case consts.ContractNameOffRamp:
@@ -1886,7 +1888,7 @@ func (r *ccipChainReader) handleContractResults(
 		r.lggr.Infow("In handleContractResults ContractNameRMNProxy")
 		rmnProxy, err = r.handleRMNProxyResults(results)
 		if err != nil {
-			return NogoResponse{}, fmt.Errorf("handle router results: %w", err)
+			return NogoResponse{}, fmt.Errorf("handle RMN proxy results: %w", err)
 		}
 	}
 
