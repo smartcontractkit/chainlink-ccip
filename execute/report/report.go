@@ -125,6 +125,7 @@ const (
 	Error                         messageStatus = "error"
 	ReadyToExecute                messageStatus = "ready_to_execute"
 	AlreadyExecuted               messageStatus = "already_executed"
+	AlreadyInflight               messageStatus = "already_inflight"
 	TokenDataNotReady             messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
 	PseudoDeleted                 messageStatus = "message_pseudo_deleted"
 	TokenDataFetchError           messageStatus = "token_data_fetch_error"
@@ -297,6 +298,23 @@ func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64) Chec
 		}
 		expectedNonce[report.SourceChain][sender] = expectedNonce[report.SourceChain][sender] + 1
 
+		return None, nil
+	}
+}
+
+type IsInflight func(src ccipocr3.ChainSelector, msgID ccipocr3.Bytes32) bool
+
+func CheckIfInflight(inflight IsInflight) Check {
+	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+		if inflight(report.SourceChain, msg.Header.MessageID) {
+			lggr.Infow(
+				"message already in flight",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", "inflight")
+			return AlreadyInflight, nil
+		}
 		return None, nil
 	}
 }

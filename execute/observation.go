@@ -173,6 +173,8 @@ func (p *Plugin) getCommitReportsObservation(
 		return exectypes.Observation{}, err
 	}
 
+	// TODO: message from fullyExecutedCommits which are in the inflight messages cache could be cleared here.
+
 	// If fully executed reports are detected, mark them in the cache.
 	// This cache will be re-initialized on each plugin restart.
 	for _, fullyExecutedCommit := range fullyExecutedCommits {
