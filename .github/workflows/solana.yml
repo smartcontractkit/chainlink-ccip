@@ -5,6 +5,12 @@ on:
     branches:
       - main
   pull_request:
+  workflow_call:
+    inputs:
+      commit_hash:
+        type: string
+        description: 'Commit hash'
+        required: true
 
 concurrency:
   group: solana-${{ github.ref }}
@@ -21,8 +27,12 @@ jobs:
     outputs:
       anchor_version: ${{ steps.anchorversion.outputs.anchor }}
     steps:
+      - name: Set commit hash
+        run: echo "COMMIT_HASH=${{ inputs.commit_hash || github.event.sha }}" >> $GITHUB_ENV
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        with:
+          ref: $COMMIT_HASH
       - name: Get Anchor Version
         id: anchorversion
         run: |
@@ -35,6 +45,8 @@ jobs:
     needs: [get_anchor_version]
     steps:
     - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      with:
+        ref: $COMMIT_HASH
     - name: cache docker build image
       id: cache-image
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
@@ -72,6 +84,8 @@ jobs:
     needs: [get_anchor_version, build_solana]
     steps:
     - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      with:
+        ref: $COMMIT_HASH
     - name: Cache cargo target dir
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
@@ -106,6 +120,8 @@ jobs:
     needs: [get_anchor_version, build_solana]
     steps:
       - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        with:
+          ref: $COMMIT_HASH
       - name: Cache cargo target dir
         uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
@@ -152,6 +168,8 @@ jobs:
     needs: [get_anchor_version, build_solana]
     steps:
       - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        with:
+          ref: $COMMIT_HASH
       - name: Cache cargo target dir
         uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
@@ -199,5 +217,3 @@ jobs:
         if: failure()
         shell: bash
         run: cat ./golangci-lint-report.xml
-          
-
