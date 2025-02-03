@@ -1608,23 +1608,6 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
-	type ConfigInfo struct {
-		ConfigDigest                   [32]byte
-		F                              uint8
-		N                              uint8
-		IsSignatureVerificationEnabled bool
-	}
-
-	type OCRConfig struct {
-		ConfigInfo   ConfigInfo
-		Signers      [][]byte
-		Transmitters [][]byte
-	}
-
-	type OCRConfigResponse struct {
-		OCRConfig OCRConfig
-	}
-
 	var resp OCRConfigResponse
 	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 		ctx,
@@ -1645,7 +1628,12 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
 	}
 
-	respFromBatch := result.Offramp.CommitLatestOCRConfig
+	var respFromBatch OCRConfigResponse
+	if pluginType == consts.PluginTypeCommit {
+		respFromBatch = result.Offramp.CommitLatestOCRConfig
+	} else {
+		respFromBatch = result.Offramp.ExecLatestOCRConfig
+	}
 
 	r.lggr.Infow("got offramp config digest", "resp", resp, "respFromBatch", respFromBatch)
 
