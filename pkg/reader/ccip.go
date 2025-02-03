@@ -1900,6 +1900,8 @@ func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValu
 			return NogoResponse{}, fmt.Errorf("handle %s results: %w", contract.Name, err)
 		}
 
+		r.lggr.Infow("Result is", "result", result)
+
 		// Set the result in the appropriate field using reflection
 		responseValue := reflect.ValueOf(&response).Elem()
 		field := responseValue.FieldByName(contract.Name)
@@ -1907,6 +1909,8 @@ func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValu
 			field.Set(reflect.ValueOf(result))
 		}
 	}
+
+	r.lggr.Infow("Response is", "response", response)
 
 	return response, nil
 }
