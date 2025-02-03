@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
@@ -62,7 +63,7 @@ func TestMessageHashing(t *testing.T) {
 	t.Run("SVMToAny", func(t *testing.T) {
 		t.Parallel()
 
-		extraArgs, err := SerializeExtraArgs(ccip_router.EVMExtraArgsV2{
+		extraArgs, err := SerializeExtraArgs(fee_quoter.EVMExtraArgsV2{
 			GasLimit:                 bin.Uint128{Lo: 1},
 			AllowOutOfOrderExecution: true,
 		}, EVMExtraArgsV2Tag)

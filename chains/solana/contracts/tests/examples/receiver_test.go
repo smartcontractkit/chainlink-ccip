@@ -78,10 +78,10 @@ func TestCcipReceiver(t *testing.T) {
 	t.Run("check ccip_receiver constraints", func(t *testing.T) {
 		t.Run("invalid chain + sender", func(t *testing.T) {
 			t.Parallel()
-			approvedSenderPDA, err := state.FindApprovedSender(config.SVMChainSelector, []byte{}, config.CcipBaseReceiver)
+			approvedSenderPDA, err := state.FindApprovedSender(config.SvmChainSelector, []byte{}, config.CcipBaseReceiver)
 			require.NoError(t, err)
 
-			ix, err := ccip_receiver.NewCcipReceiveInstruction(ccip_receiver.Any2SVMMessage{SourceChainSelector: config.SVMChainSelector}, user.PublicKey(), approvedSenderPDA, receiverState).ValidateAndBuild()
+			ix, err := ccip_receiver.NewCcipReceiveInstruction(ccip_receiver.Any2SVMMessage{SourceChainSelector: config.SvmChainSelector}, user.PublicKey(), approvedSenderPDA, receiverState).ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, user, rpc.CommitmentConfirmed, []string{"AccountNotInitialized"})
 		})
@@ -122,6 +122,7 @@ func TestCcipReceiver(t *testing.T) {
 		require.Equal(t, 0, initBalOwner)
 
 		ix, err := ccip_receiver.NewWithdrawTokensInstruction(123, 0, receiverState, tokenAdminATA, ownerATA, token.Mint.PublicKey(), token.Program, tokenAdmin, owner.PublicKey()).ValidateAndBuild()
+		require.NoError(t, err)
 		testutils.SendAndConfirm(ctx, t, solClient, []solana.Instruction{ix}, owner, rpc.CommitmentConfirmed)
 
 		_, finalBal, err := tokens.TokenBalance(ctx, solClient, tokenAdminATA, config.DefaultCommitment)
@@ -131,5 +132,4 @@ func TestCcipReceiver(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 123, finalBalOwner)
 	})
-
 }
