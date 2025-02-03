@@ -81,6 +81,7 @@ jobs:
           chainlink-product: daas
           crib-repo-ref: ${{ github.ref }}
           ns-name-prefix: "crib-daas-ci"
+          main-dns-zone: ${{ secrets.MAIN_DNS_ZONE_STAGE_PUBLIC }}
           websockets-services: "gap-${DEVSPACE_NAMESPACE}-geth-1337-ws,gap-${DEVSPACE_NAMESPACE}-geth-2337-ws"
 
 
