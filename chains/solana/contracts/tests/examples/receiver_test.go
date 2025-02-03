@@ -25,11 +25,9 @@ func TestCcipReceiver(t *testing.T) {
 	tokenAdmin, _, err := solana.FindProgramAddress([][]byte{[]byte("receiver_token_admin")}, config.CcipBaseReceiver)
 	require.NoError(t, err)
 
-	owner, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
+	owner := solana.MustPrivateKeyFromBase58("4D7Hw7YFWqN3jknCRuViYqxF3AKmYosQPnm3szmrR3bvnCPrxKchUCxfFWbQqMCb4oe7jfxynGmjFCTDSrPBdcUB")
 
-	user, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
+	user := solana.MustPrivateKeyFromBase58("5VNkUFwLJ12f71vBMW3XWUfRUpMUnzBxXhPPePi8CzaSXfmQAC842BQtSDkBXR85q4pp6kR7DSiFWBVWGLbFTSoq")
 
 	receiverState, _, err := solana.FindProgramAddress([][]byte{[]byte("state")}, config.CcipBaseReceiver)
 	require.NoError(t, err)

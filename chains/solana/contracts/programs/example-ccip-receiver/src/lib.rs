@@ -275,10 +275,6 @@ pub struct WithdrawTokens<'info> {
 }
 
 // BaseState contains the state for core safety checks that can be leveraged by the implementer
-// Base state contains a limited size allow and deny list
-// Both are included to handle the size limitations on solana
-// If user wants to allow a small number of chains, consider using the allow list (disable deny list)
-// If user wants to allow many chains, consider using the deny list (disable allow list)
 #[account]
 #[derive(InitSpace, Default, Debug)]
 pub struct BaseState {
