@@ -1503,12 +1503,12 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	}
 
 	response, err := r.refresh(ctx)
-	rmnRemoteAddressFromBatch := response.RMNProxy.RMNRemoteAddress
-
-	r.lggr.Infow("got RMN remote address", "rmnRemoteAddressFromNormalCall", rmnRemoteAddressFromNormalCall, "rmnRemoteAddressFromBatch", rmnRemoteAddressFromBatch)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
+	rmnRemoteAddressFromBatch := response.RMNProxy.RMNRemoteAddress
+
+	r.lggr.Infow("got RMN remote address", "rmnRemoteAddressFromNormalCall", rmnRemoteAddressFromNormalCall, "rmnRemoteAddressFromBatch", rmnRemoteAddressFromBatch)
 
 	return rmnRemoteAddressFromBatch, nil
 }
@@ -1889,6 +1889,8 @@ func (r *ccipChainReader) handleContractResults(
 			return NogoResponse{}, fmt.Errorf("handle router results: %w", err)
 		}
 	}
+
+	r.lggr.Infow("In handleContractResults - offramp is", "rmnProxy", rmnProxy, "offramp", offramp)
 	return NogoResponse{
 		Offramp:  offramp,
 		RMNProxy: rmnProxy,
@@ -1943,32 +1945,25 @@ func (r *ccipChainReader) handleOffRampResults(results []types.BatchReadResult) 
 		if err != nil {
 			return OfframpNogoResponse{}, fmt.Errorf("get offramp result %d: %w", i, err)
 		}
-		r.lggr.Infow("val is", "val", val)
-
 		switch i {
 		case 0:
 			if typed, ok := val.(*OCRConfigResponse); ok {
-				r.lggr.Infow("typed is", "typed", typed)
 				response.CommitLatestOCRConfig = *typed
 			}
 		case 1:
 			if typed, ok := val.(*OCRConfigResponse); ok {
-				r.lggr.Infow("typed is", "typed", typed)
 				response.ExecLatestOCRConfig = *typed
 			}
 		case 2:
 			if typed, ok := val.(*offRampStaticChainConfig); ok {
-				r.lggr.Infow("typed is", "typed", typed)
 				response.StaticConfig = *typed
 			}
 		case 3:
 			if typed, ok := val.(*offRampDynamicChainConfig); ok {
-				r.lggr.Infow("typed is", "typed", typed)
 				response.DynamicConfig = *typed
 			}
 		case 4:
 			if typed, ok := val.(*selectorsAndConfigs); ok {
-				r.lggr.Infow("typed is", "typed", typed)
 				response.SelectorsAndConf = *typed
 			}
 		}
