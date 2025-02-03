@@ -18,11 +18,6 @@
           "isSigner": false
         },
         {
-          "name": "tokenAdmin",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -259,7 +254,7 @@
           "isSigner": false
         },
         {
-          "name": "tokenAdmin",
+          "name": "ccipSender",
           "isMut": false,
           "isSigner": false
         },

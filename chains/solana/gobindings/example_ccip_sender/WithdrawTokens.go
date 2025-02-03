@@ -25,7 +25,7 @@ type WithdrawTokens struct {
 	//
 	// [4] = [] tokenProgram
 	//
-	// [5] = [] tokenAdmin
+	// [5] = [] ccipSender
 	//
 	// [6] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -106,14 +106,14 @@ func (inst *WithdrawTokens) GetTokenProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
-// SetTokenAdminAccount sets the "tokenAdmin" account.
-func (inst *WithdrawTokens) SetTokenAdminAccount(tokenAdmin ag_solanago.PublicKey) *WithdrawTokens {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenAdmin)
+// SetCcipSenderAccount sets the "ccipSender" account.
+func (inst *WithdrawTokens) SetCcipSenderAccount(ccipSender ag_solanago.PublicKey) *WithdrawTokens {
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(ccipSender)
 	return inst
 }
 
-// GetTokenAdminAccount gets the "tokenAdmin" account.
-func (inst *WithdrawTokens) GetTokenAdminAccount() *ag_solanago.AccountMeta {
+// GetCcipSenderAccount gets the "ccipSender" account.
+func (inst *WithdrawTokens) GetCcipSenderAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[5]
 }
 
@@ -174,7 +174,7 @@ func (inst *WithdrawTokens) Validate() error {
 			return errors.New("accounts.TokenProgram is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.TokenAdmin is not set")
+			return errors.New("accounts.CcipSender is not set")
 		}
 		if inst.AccountMetaSlice[6] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -204,7 +204,7 @@ func (inst *WithdrawTokens) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("     toToken", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("        mint", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("tokenProgram", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("  tokenAdmin", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("  ccipSender", inst.AccountMetaSlice[5]))
 						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice[6]))
 					})
 				})
@@ -249,7 +249,7 @@ func NewWithdrawTokensInstruction(
 	toTokenAccount ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
 	tokenProgram ag_solanago.PublicKey,
-	tokenAdmin ag_solanago.PublicKey,
+	ccipSender ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *WithdrawTokens {
 	return NewWithdrawTokensInstructionBuilder().
 		SetAmount(amount).
@@ -259,6 +259,6 @@ func NewWithdrawTokensInstruction(
 		SetToTokenAccountAccount(toTokenAccount).
 		SetMintAccount(mint).
 		SetTokenProgramAccount(tokenProgram).
-		SetTokenAdminAccount(tokenAdmin).
+		SetCcipSenderAccount(ccipSender).
 		SetAuthorityAccount(authority)
 }
