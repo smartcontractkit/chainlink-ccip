@@ -35,30 +35,29 @@ pub mod ccip_offramp {
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
-        ctx: Context<Initialize>, // TODO
+        ctx: Context<Initialize>,
         svm_chain_selector: u64,
         enable_execution_after: i64,
-        fee_aggregator: Pubkey,
+        router: Pubkey,
         fee_quoter: Pubkey,
-        link_token_mint: Pubkey,
+        offramp_lookup_table: Pubkey,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipOfframpError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
         config.version = 1;
         config.svm_chain_selector = svm_chain_selector;
-        config.link_token_mint = link_token_mint;
-
-        config.fee_quoter = fee_quoter;
         config.enable_manual_execution_after = enable_execution_after;
-
         config.owner = ctx.accounts.authority.key();
-
-        config.fee_aggregator = fee_aggregator;
-
         config.ocr3 = [
             Ocr3Config::new(OcrPluginType::Commit as u8),
             Ocr3Config::new(OcrPluginType::Execution as u8),
         ];
+
+        let reference_addresses = &mut ctx.accounts.reference_addresses;
+        reference_addresses.version = 1;
+        reference_addresses.router = router;
+        reference_addresses.fee_quoter = fee_quoter;
+        reference_addresses.offramp_lookup_table = offramp_lookup_table;
 
         ctx.accounts.state.latest_price_sequence_number = 0;
 

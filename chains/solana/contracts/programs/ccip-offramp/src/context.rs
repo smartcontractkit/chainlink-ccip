@@ -4,7 +4,8 @@ use solana_program::sysvar::instructions;
 use crate::messages::ExecutionReportSingleChain;
 use crate::program::CcipOfframp;
 use crate::state::{
-    CommitReport, Config, ExternalExecutionConfig, GlobalState, SourceChain, SourceChainConfig,
+    CommitReport, Config, ExternalExecutionConfig, GlobalState, ReferenceAddresses, SourceChain,
+    SourceChainConfig,
 };
 use crate::CcipOfframpError;
 
@@ -30,6 +31,7 @@ pub mod seed {
     pub const SOURCE_CHAIN_STATE: &[u8] = b"source_chain_state";
     pub const COMMIT_REPORT: &[u8] = b"commit_report";
     pub const CONFIG: &[u8] = b"config";
+    pub const REFERENCE_ADDRESSES: &[u8] = b"reference_addresses";
     pub const STATE: &[u8] = b"state";
 
     // arbitrary messaging signer
@@ -56,6 +58,15 @@ pub struct Initialize<'info> {
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
     )]
     pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        init,
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + ReferenceAddresses::INIT_SPACE,
+    )]
+    pub reference_addresses: Account<'info, ReferenceAddresses>,
 
     #[account(
         init,
@@ -267,6 +278,13 @@ pub struct CommitReportContext<'info> {
     pub config: AccountLoader<'info, Config>,
 
     #[account(
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+    )]
+    pub reference_addresses: Account<'info, ReferenceAddresses>,
+
+    #[account(
         mut,
         seeds = [seed::SOURCE_CHAIN_STATE, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
@@ -300,7 +318,7 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: fee quoter program account, used to invoke fee quoter with price updates
     #[account(
-        address = config.load()?.fee_quoter @ CcipOfframpError::InvalidInputs,
+        address = reference_addresses.fee_quoter @ CcipOfframpError::InvalidInputs,
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
@@ -308,7 +326,7 @@ pub struct CommitReportContext<'info> {
     #[account(
         seeds = [fee_quoter::context::seed::CONFIG],
         bump,
-        seeds::program = config.load()?.fee_quoter,
+        seeds::program = reference_addresses.fee_quoter,
     )]
     pub fee_quoter_config: UncheckedAccount<'info>,
     // remaining accounts
@@ -326,6 +344,13 @@ pub struct ExecuteReportContext<'info> {
         constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+    )]
+    pub reference_addresses: Account<'info, ReferenceAddresses>,
 
     #[account(
         seeds = [seed::SOURCE_CHAIN_STATE, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],

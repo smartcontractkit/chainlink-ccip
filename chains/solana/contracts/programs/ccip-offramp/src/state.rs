@@ -15,10 +15,15 @@ pub struct Config {
 
     _padding2: [u8; 8],
     pub ocr3: [Ocr3Config; 2],
-    pub fee_quoter: Pubkey,
+}
 
-    pub link_token_mint: Pubkey,
-    pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
+#[account]
+#[derive(InitSpace)]
+pub struct ReferenceAddresses {
+    pub version: u8,
+    pub router: Pubkey,
+    pub fee_quoter: Pubkey,
+    pub offramp_lookup_table: Pubkey,
 }
 
 #[zero_copy]

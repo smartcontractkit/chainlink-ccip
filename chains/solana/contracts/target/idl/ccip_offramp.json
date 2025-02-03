@@ -32,6 +32,11 @@
           "isSigner": false
         },
         {
+          "name": "referenceAddresses",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "state",
           "isMut": true,
           "isSigner": false
@@ -77,7 +82,7 @@
           "type": "i64"
         },
         {
-          "name": "feeAggregator",
+          "name": "router",
           "type": "publicKey"
         },
         {
@@ -85,7 +90,7 @@
           "type": "publicKey"
         },
         {
-          "name": "linkTokenMint",
+          "name": "offrampLookupTable",
           "type": "publicKey"
         }
       ]
@@ -435,6 +440,11 @@
           "isSigner": false
         },
         {
+          "name": "referenceAddresses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "sourceChainState",
           "isMut": true,
           "isSigner": false
@@ -558,6 +568,11 @@
           "isSigner": false
         },
         {
+          "name": "referenceAddresses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "sourceChainState",
           "isMut": false,
           "isSigner": false
@@ -635,6 +650,11 @@
       "accounts": [
         {
           "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "referenceAddresses",
           "isMut": false,
           "isSigner": false
         },
@@ -749,17 +769,29 @@
                 2
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReferenceAddresses",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "router",
+            "type": "publicKey"
           },
           {
             "name": "feeQuoter",
             "type": "publicKey"
           },
           {
-            "name": "linkTokenMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "feeAggregator",
+            "name": "offrampLookupTable",
             "type": "publicKey"
           }
         ]
