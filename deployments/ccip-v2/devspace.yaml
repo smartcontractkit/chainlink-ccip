@@ -169,6 +169,7 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - ccip
+              - ccip-v2-load-tests
               - additional-chains
           ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
@@ -191,9 +192,10 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - ccip
+              - ccip-v2-load-tests
               - additional-chains
               # Use ccip-v2-load-tests to customize blocktime parameter for individual geth network
-              # - ccip-v2-load-tests
+              # - ccip-v2-load-tests-customized-networks
           ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true

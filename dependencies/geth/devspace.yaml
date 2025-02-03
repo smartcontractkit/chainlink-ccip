@@ -45,7 +45,7 @@ deployments:
       releaseName: "geth"
       chart:
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-geth"
-        version: "0.3.0"
+        version: "1.0.0"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy
@@ -174,14 +174,6 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/additional-chains.yaml
       )
-  - name: ccip-v2-load-tests
-    merge: |-
-      $(
-        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
-        ADDITIONAL_CHAINS_COUNT=2 \
-        gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-load-tests.yaml
-      )
   - name: aws
     activation:
       - vars:
@@ -205,6 +197,30 @@ profiles:
                 extra_annotations:
                   nginx.ingress.kubernetes.io/backend-protocol: HTTP
                   external-dns.alpha.kubernetes.io/ttl: "120"
+  - name: ccip-v2-load-tests
+    merge:
+      deployments:
+        geth:
+          helm:
+            values:
+              resources:
+                requests:
+                  cpu: 1000m
+                  memory: 256Mi
+                limit:
+                  cpu: 4000m
+                  memory: 6Gi
+  # Use the profile to customize individual networks settings. For example blockTime property
+  # For selected networks. You will need to list all the networks to match the ADDITIONAL_CHAINS_COUNT
+  # property
+  - name: ccip-v2-load-tests-customized-networks
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        ADDITIONAL_CHAINS_COUNT=${ADDITIONAL_CHAINS_COUNT} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-load-tests.yaml
+      )
   - name: kind
     activation:
       - vars:
