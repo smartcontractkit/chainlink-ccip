@@ -254,7 +254,7 @@ func (p *processor) getGasPricesToUpdate(
 		if feeInfo == nil {
 			continue
 		}
-		
+
 		if p.cfg.DisableChainFeeDeviationCheck {
 			lggr.Debugf("chain fee deviation check disabled, skipping deviation check for chain %d", chain)
 			continue
