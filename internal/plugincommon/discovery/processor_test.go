@@ -659,7 +659,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 				},
 			},
 			fChain: defaultFChain,
-			errStr: "oracle 1 is not allowed to observe destination chain ChainSelector(1), can't observe any contracts",
+			errStr: "oracle 1 is not allowed to observe contract (OnRamp) on the destination chain ChainSelector(1)",
 		},
 		{
 			name:            "onramps are only discovered on dest (pass)",
@@ -705,36 +705,6 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 			fChain: defaultFChain,
 		},
 		{
-			name:            "FeeQuoter is discovered without onRamp discovery (error)",
-			supportedChains: []cciptypes.ChainSelector{dest, dest + 1, dest + 2},
-			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
-				consts.ContractNameFeeQuoter: {
-					dest + 1: cciptypes.UnknownAddress("1"),
-					dest + 2: cciptypes.UnknownAddress("2"),
-				},
-				consts.ContractNameOnRamp: {
-					dest + 1: cciptypes.UnknownAddress("a"),
-				},
-			},
-			fChain: defaultFChain,
-			errStr: "oracle 1 must observe onramp contract on chain",
-		},
-		{
-			name:            "Router is discovered without onRamp discovery (error)",
-			supportedChains: []cciptypes.ChainSelector{dest, dest + 1, dest + 2},
-			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
-				consts.ContractNameRouter: {
-					dest + 1: cciptypes.UnknownAddress("1"),
-					dest + 2: cciptypes.UnknownAddress("2"),
-				},
-				consts.ContractNameOnRamp: {
-					dest + 1: cciptypes.UnknownAddress("a"),
-				},
-			},
-			fChain: defaultFChain,
-			errStr: "oracle 1 must observe onramp contract on chain",
-		},
-		{
 			name:            "Invalid FChain (error)",
 			supportedChains: []cciptypes.ChainSelector{dest, dest + 1},
 			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
@@ -765,31 +735,9 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 				nil).Maybe()
 			defer mockHomeChain.AssertExpectations(t)
 
-			mockReader := mock_reader.NewMockCCIPReader(t)
-			mockReaderIface := reader.CCIPReader(mockReader)
-
-			// For onRamps we need to return addresses only for already observed onRamps
-			for chain, address := range tc.addresses[consts.ContractNameOnRamp] {
-				mockReader.EXPECT().GetContractAddress(consts.ContractNameOnRamp, chain).Return(address, nil).Maybe()
-			}
-			for chain := range tc.addresses[consts.ContractNameFeeQuoter] {
-				if tc.addresses[consts.ContractNameOnRamp][chain] != nil {
-					continue
-				}
-				mockReader.EXPECT().GetContractAddress(consts.ContractNameOnRamp, chain).
-					Return(nil, fmt.Errorf("err")).Maybe()
-			}
-			for chain := range tc.addresses[consts.ContractNameRouter] {
-				if tc.addresses[consts.ContractNameOnRamp][chain] != nil {
-					continue
-				}
-				mockReader.EXPECT().GetContractAddress(consts.ContractNameOnRamp, chain).
-					Return(nil, fmt.Errorf("err")).Maybe()
-			}
-
 			cdp := NewContractDiscoveryProcessor(
 				lggr,
-				&mockReaderIface,
+				nil, // reader, not needed for this test
 				mockHomeChain,
 				dest,
 				fRoleDON,

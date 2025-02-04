@@ -104,12 +104,6 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 		return fmt.Errorf("invalid FChain: %w", err)
 	}
 
-	if !supportedChains.Contains(cdp.dest) {
-		return fmt.Errorf(
-			"oracle %d is not allowed to observe destination chain %s, can't observe any contracts",
-			ao.OracleID, cdp.dest)
-	}
-
 	for contract, addrs := range ao.Observation.Addresses {
 		// some contract addresses come from the destination, others are from the source.
 		switch contract {
@@ -121,21 +115,18 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 					return fmt.Errorf(
 						"oracle %d is not allowed to observe chain %s for %s", ao.OracleID, chain, contract)
 				}
-				if chain == cdp.dest {
-					continue
-				}
-				_, err = (*cdp.reader).GetContractAddress(consts.ContractNameOnRamp, chain)
-				if err != nil {
-					return fmt.Errorf(
-						"oracle %d must observe onramp contract on chain %s before observing %s",
-						ao.OracleID, chain, contract)
-				}
 			}
+		// discovered on the destination chain.
 		case consts.ContractNameOnRamp,
 			consts.ContractNameOffRamp,
 			consts.ContractNameNonceManager,
 			consts.ContractNameRMNRemote:
-			// discovered on the destination chain. No extra checks needed.
+
+			if !supportedChains.Contains(cdp.dest) {
+				return fmt.Errorf(
+					"oracle %d is not allowed to observe contract (%s) on the destination chain %s",
+					ao.OracleID, contract, cdp.dest)
+			}
 		default:
 			return fmt.Errorf("unknown contract name %s", contract)
 		}
