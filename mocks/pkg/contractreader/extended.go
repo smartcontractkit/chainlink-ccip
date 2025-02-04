@@ -134,34 +134,43 @@ func (_c *MockExtended_Bind_Call) RunAndReturn(run func(context.Context, []types
 	return _c
 }
 
-// ExtendedBatchGetLatestValues provides a mock function with given fields: ctx, request
-func (_m *MockExtended) ExtendedBatchGetLatestValues(ctx context.Context, request contractreader.ExtendedBatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
-	ret := _m.Called(ctx, request)
+// ExtendedBatchGetLatestValues provides a mock function with given fields: ctx, request, graceful
+func (_m *MockExtended) ExtendedBatchGetLatestValues(ctx context.Context, request contractreader.ExtendedBatchGetLatestValuesRequest, graceful bool) (types.BatchGetLatestValuesResult, []string, error) {
+	ret := _m.Called(ctx, request, graceful)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExtendedBatchGetLatestValues")
 	}
 
 	var r0 types.BatchGetLatestValuesResult
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error)); ok {
-		return rf(ctx, request)
+	var r1 []string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest, bool) (types.BatchGetLatestValuesResult, []string, error)); ok {
+		return rf(ctx, request, graceful)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest) types.BatchGetLatestValuesResult); ok {
-		r0 = rf(ctx, request)
+	if rf, ok := ret.Get(0).(func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest, bool) types.BatchGetLatestValuesResult); ok {
+		r0 = rf(ctx, request, graceful)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(types.BatchGetLatestValuesResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest) error); ok {
-		r1 = rf(ctx, request)
+	if rf, ok := ret.Get(1).(func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest, bool) []string); ok {
+		r1 = rf(ctx, request, graceful)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]string)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest, bool) error); ok {
+		r2 = rf(ctx, request, graceful)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockExtended_ExtendedBatchGetLatestValues_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExtendedBatchGetLatestValues'
@@ -172,23 +181,24 @@ type MockExtended_ExtendedBatchGetLatestValues_Call struct {
 // ExtendedBatchGetLatestValues is a helper method to define mock.On call
 //   - ctx context.Context
 //   - request contractreader.ExtendedBatchGetLatestValuesRequest
-func (_e *MockExtended_Expecter) ExtendedBatchGetLatestValues(ctx interface{}, request interface{}) *MockExtended_ExtendedBatchGetLatestValues_Call {
-	return &MockExtended_ExtendedBatchGetLatestValues_Call{Call: _e.mock.On("ExtendedBatchGetLatestValues", ctx, request)}
+//   - graceful bool
+func (_e *MockExtended_Expecter) ExtendedBatchGetLatestValues(ctx interface{}, request interface{}, graceful interface{}) *MockExtended_ExtendedBatchGetLatestValues_Call {
+	return &MockExtended_ExtendedBatchGetLatestValues_Call{Call: _e.mock.On("ExtendedBatchGetLatestValues", ctx, request, graceful)}
 }
 
-func (_c *MockExtended_ExtendedBatchGetLatestValues_Call) Run(run func(ctx context.Context, request contractreader.ExtendedBatchGetLatestValuesRequest)) *MockExtended_ExtendedBatchGetLatestValues_Call {
+func (_c *MockExtended_ExtendedBatchGetLatestValues_Call) Run(run func(ctx context.Context, request contractreader.ExtendedBatchGetLatestValuesRequest, graceful bool)) *MockExtended_ExtendedBatchGetLatestValues_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(contractreader.ExtendedBatchGetLatestValuesRequest))
+		run(args[0].(context.Context), args[1].(contractreader.ExtendedBatchGetLatestValuesRequest), args[2].(bool))
 	})
 	return _c
 }
 
-func (_c *MockExtended_ExtendedBatchGetLatestValues_Call) Return(_a0 types.BatchGetLatestValuesResult, _a1 error) *MockExtended_ExtendedBatchGetLatestValues_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockExtended_ExtendedBatchGetLatestValues_Call) Return(_a0 types.BatchGetLatestValuesResult, _a1 []string, _a2 error) *MockExtended_ExtendedBatchGetLatestValues_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockExtended_ExtendedBatchGetLatestValues_Call) RunAndReturn(run func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error)) *MockExtended_ExtendedBatchGetLatestValues_Call {
+func (_c *MockExtended_ExtendedBatchGetLatestValues_Call) RunAndReturn(run func(context.Context, contractreader.ExtendedBatchGetLatestValuesRequest, bool) (types.BatchGetLatestValuesResult, []string, error)) *MockExtended_ExtendedBatchGetLatestValues_Call {
 	_c.Call.Return(run)
 	return _c
 }
