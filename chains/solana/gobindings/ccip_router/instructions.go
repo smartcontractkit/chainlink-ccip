@@ -124,6 +124,24 @@ var (
 	// * `dest_chain_config` - The new configuration for the destination chain.
 	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
 
+	// Docs
+	//
+	// # Arguments
+	//
+	// * `ctx`
+	// * `source_chain_selector`
+	// * `offramp`
+	Instruction_AllowOfframp = ag_binary.TypeID([8]byte{249, 234, 8, 137, 154, 58, 118, 218})
+
+	// Docs
+	//
+	// # Arguments
+	//
+	// * `ctx`
+	// * `source_chain_selector`
+	// * `offramp`
+	Instruction_RemoveAllowedOfframp = ag_binary.TypeID([8]byte{37, 208, 13, 224, 84, 37, 41, 252})
+
 	// Updates the SVM chain selector in the router configuration.
 	//
 	// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
@@ -332,6 +350,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateSourceChainConfig"
 	case Instruction_UpdateDestChainConfig:
 		return "UpdateDestChainConfig"
+	case Instruction_AllowOfframp:
+		return "AllowOfframp"
+	case Instruction_RemoveAllowedOfframp:
+		return "RemoveAllowedOfframp"
 	case Instruction_UpdateSvmChainSelector:
 		return "UpdateSvmChainSelector"
 	case Instruction_UpdateEnableManualExecutionAfter:
@@ -405,6 +427,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"update_dest_chain_config", (*UpdateDestChainConfig)(nil),
+		},
+		{
+			"allow_offramp", (*AllowOfframp)(nil),
+		},
+		{
+			"remove_allowed_offramp", (*RemoveAllowedOfframp)(nil),
 		},
 		{
 			"update_svm_chain_selector", (*UpdateSvmChainSelector)(nil),

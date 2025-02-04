@@ -350,7 +350,7 @@ pub mod tests {
             extra_args.gas_limit,
             evm_dest_chain.config.default_tx_gas_limit as u128
         );
-        assert_eq!(extra_args.allow_out_of_order_execution, false);
+        assert!(!extra_args.allow_out_of_order_execution);
 
         // evm - passed in data
         let extra_args = process_extra_args(
@@ -365,7 +365,7 @@ pub mod tests {
         .unwrap();
         assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
         assert_eq!(extra_args.gas_limit, 100);
-        assert_eq!(extra_args.allow_out_of_order_execution, true);
+        assert!(extra_args.allow_out_of_order_execution);
 
         // evm - fail to match
         assert_eq!(
@@ -381,7 +381,7 @@ pub mod tests {
             extra_args.gas_limit,
             svm_dest_chain.config.default_tx_gas_limit as u128
         );
-        assert_eq!(extra_args.allow_out_of_order_execution, false);
+        assert!(!extra_args.allow_out_of_order_execution);
 
         // svm - contains tokens but no receiver address
         assert_eq!(
@@ -410,7 +410,7 @@ pub mod tests {
             process_extra_args(&svm_dest_chain.config, &args.serialize_with_tag(), true).unwrap();
         assert_eq!(extra_args.bytes, args.serialize_with_tag());
         assert_eq!(extra_args.gas_limit, 100);
-        assert_eq!(extra_args.allow_out_of_order_execution, true);
+        assert!(extra_args.allow_out_of_order_execution);
 
         // svm - fail to match
         assert_eq!(

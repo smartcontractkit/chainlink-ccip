@@ -33,7 +33,7 @@ var (
 	// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
-	// This function is called by the CCIP Router to execute the CCIP message.
+	// This function is called by the CCIP Offramp to execute the CCIP message.
 	// The method name needs to be ccip_receive with Anchor encoding,
 	// if not using Anchor the discriminator needs to be [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]
 	// You can send as many accounts as you need, specifying if mutable or not.

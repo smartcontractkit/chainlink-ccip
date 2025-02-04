@@ -211,6 +211,36 @@ pub mod ccip_router {
         v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
     }
 
+    /// Docs
+    /// 
+    /// # Arguments
+    ///
+    /// * `ctx`
+    /// * `source_chain_selector`
+    /// * `offramp`
+    pub fn allow_offramp(
+        ctx: Context<AddAllowedOfframp>,
+        source_chain_selector: u64,
+        offramp: Pubkey,
+    ) -> Result<()> {
+        v1::admin::allow_offramp(ctx, source_chain_selector, offramp)
+    }
+
+    /// Docs
+    /// 
+    /// # Arguments
+    /// 
+    /// * `ctx`
+    /// * `source_chain_selector`
+    /// * `offramp`
+    pub fn remove_allowed_offramp(
+        ctx: Context<RemoveAllowedOfframp>,
+        source_chain_selector: u64,
+        offramp: Pubkey,
+    ) -> Result<()> {
+        v1::admin::remove_allowed_offramp(ctx, source_chain_selector, offramp)
+    }
+
     /// Updates the SVM chain selector in the router configuration.
     ///
     /// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.

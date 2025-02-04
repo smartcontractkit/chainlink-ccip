@@ -8,6 +8,7 @@ use crate::{
     TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
     UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
 };
+use crate::{AddAllowedOfframp, RemoveAllowedOfframp};
 
 use super::fees::do_billing_transfer;
 use super::ocr3base::ocr3_set;
@@ -124,6 +125,30 @@ pub fn update_dest_chain_config(
     emit!(events::DestChainConfigUpdated {
         dest_chain_selector,
         dest_chain_config,
+    });
+    Ok(())
+}
+
+pub fn allow_offramp(
+    _ctx: Context<AddAllowedOfframp>,
+    source_chain_selector: u64,
+    offramp: Pubkey,
+) -> Result<()> {
+    emit!(events::AddedAllowedOfframp {
+        source_chain_selector,
+        offramp,
+    });
+    Ok(())
+}
+
+pub fn remove_allowed_offramp(
+    _ctx: Context<RemoveAllowedOfframp>,
+    source_chain_selector: u64,
+    offramp: Pubkey,
+) -> Result<()> {
+    emit!(events::RemovedAllowedOfframp {
+        source_chain_selector,
+        offramp,
     });
     Ok(())
 }
