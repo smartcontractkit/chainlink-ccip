@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -315,10 +316,11 @@ func combineReportsAndMessages(
 
 func decodeAttributedObservations(
 	aos []types.AttributedObservation,
+	ocrTypeCodec ocrtypecodec.ExecCodec,
 ) ([]plugincommon.AttributedObservation[exectypes.Observation], error) {
 	decoded := make([]plugincommon.AttributedObservation[exectypes.Observation], len(aos))
 	for i, ao := range aos {
-		observation, err := exectypes.DecodeObservation(ao.Observation)
+		observation, err := ocrTypeCodec.DecodeObservation(ao.Observation)
 		if err != nil {
 			return nil, err
 		}
