@@ -56,5 +56,11 @@ ccip-router-contracts-go-tests:
 build-contracts:
 	cd ./contracts && anchor build
 
+# Note on CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
+# Sparse index significantly speeds up dependency fetching, supposedly default in 1.70 but anchor build was still using a slow git download
+.PHONY: docker-build-contracts
+docker-build-contracts:
+	docker run --rm -it -v $(shell pwd)/contracts:/workdir -e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse ${ANCHOR_IMAGE} anchor build
+
 .PHONY: solana-checks
 solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
