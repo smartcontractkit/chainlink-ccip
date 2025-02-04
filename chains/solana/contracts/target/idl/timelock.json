@@ -1327,6 +1327,12 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "state",
+            "type": {
+              "defined": "OperationState"
+            }
+          },
+          {
             "name": "timestamp",
             "type": "u64"
           },
@@ -1356,10 +1362,6 @@
                 32
               ]
             }
-          },
-          {
-            "name": "isFinalized",
-            "type": "bool"
           },
           {
             "name": "totalInstructions",
@@ -1526,6 +1528,26 @@
           },
           {
             "name": "Bypasser"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OperationState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Initialized"
+          },
+          {
+            "name": "Finalized"
+          },
+          {
+            "name": "Scheduled"
+          },
+          {
+            "name": "Done"
           }
         ]
       }

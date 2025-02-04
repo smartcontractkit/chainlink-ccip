@@ -364,7 +364,8 @@ func WaitForOperationToBeReady(ctx context.Context, client *rpc.Client, opPDA so
 		return fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	if opAccount.Timestamp == config.TimelockOpDoneTimestamp {
+	if opAccount.State == timelock.Done_OperationState {
+		// skip waiting if operation is already done
 		return nil
 	}
 

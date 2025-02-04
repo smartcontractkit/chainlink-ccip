@@ -463,9 +463,9 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 					}
 
 					require.Equal(t,
-						config.TimelockOpDoneTimestamp,
-						opAccount.Timestamp,
-						"Executed operation's time should be 1(DONE_TIMESTAMP)",
+						timelock.Done_OperationState,
+						opAccount.State,
+						"Executed operation should be marked as done",
 					)
 				})
 
@@ -510,9 +510,9 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 					}
 
 					require.Equal(t,
-						config.TimelockOpDoneTimestamp,
-						opAccount.Timestamp,
-						"Executed operation's time should be 1(DONE_TIMESTAMP)",
+						timelock.Done_OperationState,
+						opAccount.State,
+						"Executed operation should be marked as done",
 					)
 
 					recipientWsolBalance, err := solanaGoClient.GetTokenAccountBalance(
