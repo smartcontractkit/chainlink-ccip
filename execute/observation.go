@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -41,11 +42,16 @@ func (p *Plugin) Observation(
 	var err error
 	var previousOutcome exectypes.Outcome
 
-	previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
+	previousOutcome, err = p.ocrTypeCodec.DecodeOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 	lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
+
+	fChain, err := p.homeChain.GetFChain()
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("unable to get FChain: %w", err)
+	}
 
 	var discoveryObs dt.Observation
 	// discovery processor disabled by setting it to nil.
@@ -58,12 +64,13 @@ func (p *Plugin) Observation(
 		if !p.contractsInitialized {
 			lggr.Infow("contracts not initialized, only making discovery observations",
 				"discoveryObs", discoveryObs)
-			return exectypes.Observation{Contracts: discoveryObs}.Encode()
+			return p.ocrTypeCodec.EncodeObservation(exectypes.Observation{Contracts: discoveryObs, FChain: fChain})
 		}
 	}
 
 	observation := exectypes.Observation{
 		Contracts: discoveryObs,
+		FChain:    fChain,
 	}
 
 	state := previousOutcome.State.Next()
@@ -71,24 +78,31 @@ func (p *Plugin) Observation(
 	switch state {
 	case exectypes.GetCommitReports:
 		observation, err = p.getCommitReportsObservation(ctx, lggr, observation)
+		if err != nil {
+			return nil, fmt.Errorf("getCommitReportsObservation: %w", err)
+		}
 	case exectypes.GetMessages:
 		// Phase 2: Gather messages from the source chains and build the execution report.
 		observation, err = p.getMessagesObservation(ctx, lggr, previousOutcome, observation)
+		if err != nil {
+			lggr.Errorw("failed to getMessagesObservation", "err", err)
+			return nil, nil
+		}
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
 		observation, err = p.getFilterObservation(ctx, lggr, previousOutcome, observation)
+		if err != nil {
+			lggr.Errorw("failed to getFilterObservation", "err", err)
+			return nil, nil
+		}
 	default:
-		err = fmt.Errorf("unknown state")
-	}
-
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get observation: unknown state")
 	}
 
 	p.observer.TrackObservation(observation, state)
 	lggr.Infow("execute plugin got observation", "observation", observation)
 
-	return observation.Encode()
+	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
 func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.CurseInfo, error) {
@@ -98,7 +112,7 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
 	}
 
-	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, p.chainSupport.DestChain(), allSourceChains)
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
@@ -118,6 +132,8 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
+	// TODO: set fetchFrom to the oldest pending commit report.
+	// TODO: or, cache commit reports so that we don't need to fetch them again.
 	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
@@ -146,14 +162,30 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, lggr)
+	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(
+		ctx,
+		p.ccipReader,
+		p.commitRootsCache.CanExecute,
+		fetchFrom,
+		lggr,
+	)
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
 
-	// Remove cursed observations.
+	// If fully executed reports are detected, mark them in the cache.
+	// This cache will be re-initialized on each plugin restart.
+	for _, fullyExecutedCommit := range fullyExecutedCommits {
+		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
+	}
+
+	// Remove and snooze commit reports from cursed chains.
 	for chainSelector, isCursed := range ci.CursedSourceChains {
 		if isCursed {
+			// Snooze everything on a cursed chain.
+			for _, commit := range groupedCommits[chainSelector] {
+				p.commitRootsCache.Snooze(chainSelector, commit.MerkleRoot)
+			}
 			delete(groupedCommits, chainSelector)
 		}
 	}
@@ -279,8 +311,12 @@ func (p *Plugin) getMessagesObservation(
 	observation.TokenData = tkData
 
 	// Make sure encoded observation fits within the maximum observation size.
-	//observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)
-	observation, err = p.observationOptimizer.TruncateObservation(observation)
+	observationOptimizer := optimizers.NewObservationOptimizer(
+		lggr,
+		maxObservationLength,
+		p.ocrTypeCodec,
+	)
+	observation, err = observationOptimizer.TruncateObservation(observation)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
 	}
@@ -321,7 +357,7 @@ func (p *Plugin) getFilterObservation(
 	for srcChain, addrSet := range nonceRequestArgs {
 		// TODO: check if srcSelector is supported.
 		addrs := maps.Keys(addrSet)
-		nonces, err := p.ccipReader.Nonces(ctx, srcChain, p.destChain, addrs)
+		nonces, err := p.ccipReader.Nonces(ctx, srcChain, addrs)
 		if err != nil {
 			lggr.Errorw("unable to get nonces", "err", err)
 			continue

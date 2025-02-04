@@ -25,7 +25,7 @@ type PriceReader interface {
 	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
 	GetFeedPricesUSD(ctx context.Context,
-		tokens []ccipocr3.UnknownEncodedAddress) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error)
+		tokens []ccipocr3.UnknownEncodedAddress) (ccipocr3.TokenPriceMap, error)
 
 	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the specified chain
 	GetFeeQuoterTokenUpdates(
@@ -153,9 +153,9 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 func (pr *priceReader) GetFeedPricesUSD(
 	ctx context.Context,
 	tokens []ccipocr3.UnknownEncodedAddress,
-) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error) {
+) (ccipocr3.TokenPriceMap, error) {
 	lggr := logutil.WithContextValues(ctx, pr.lggr)
-	prices := make(map[ccipocr3.UnknownEncodedAddress]*big.Int, len(tokens))
+	prices := make(ccipocr3.TokenPriceMap)
 	if pr.feedChainReader() == nil {
 		lggr.Debug("node does not support feed chain")
 		return prices, nil
@@ -195,6 +195,11 @@ func (pr *priceReader) GetFeedPricesUSD(
 			continue
 		}
 
+		if latestRoundData.Answer == nil || latestRoundData.Answer.Cmp(big.NewInt(0)) <= 0 {
+			lggr.Errorw("latestRoundData.Answer is nil or non positive", "contract", boundContract.Address)
+			continue
+		}
+
 		// Normalize price for this contract
 		normalizedContractPrice := pr.normalizePrice(latestRoundData.Answer, *decimals)
 
@@ -206,7 +211,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 				lggr.Errorw("failed to calculate price", "token", token)
 				continue
 			}
-			prices[token] = price
+			prices[token] = ccipocr3.BigInt{Int: price}
 		}
 	}
 

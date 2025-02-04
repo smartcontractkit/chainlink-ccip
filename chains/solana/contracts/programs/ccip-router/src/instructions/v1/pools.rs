@@ -8,11 +8,7 @@ use solana_program::{
 };
 use solana_program::{program::get_return_data, program_pack::Pack};
 
-use crate::{
-    CcipRouterError, ExternalExecutionConfig, TokenAdminRegistry, CCIP_TOKENPOOL_CONFIG,
-    CCIP_TOKENPOOL_SIGNER, FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
-    TOKEN_POOL_BILLING_SEED, TOKEN_POOL_CONFIG_SEED,
-};
+use crate::{seed, CcipRouterError, ExternalExecutionConfig, TokenAdminRegistry};
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
@@ -83,91 +79,114 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     {
         // Check Token Admin Registry
         let (expected_token_admin_registry, _) = Pubkey::find_program_address(
-            &[TOKEN_ADMIN_REGISTRY_SEED, mint.key().as_ref()],
+            &[seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
             &router,
         );
-        require!(
-            token_admin_registry.key() == expected_token_admin_registry,
+        require_eq!(
+            token_admin_registry.key(),
+            expected_token_admin_registry,
             CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
         );
 
         // check pool program + pool config + pool signer
         let (expected_pool_config, _) = Pubkey::find_program_address(
-            &[CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
+            &[seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
             &pool_program.key(),
         );
         let (expected_pool_signer, _) = Pubkey::find_program_address(
-            &[CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
+            &[seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
             &pool_program.key(),
         );
-        require!(
-            *pool_config.owner == pool_program.key()
-                && pool_config.key() == expected_pool_config
-                && pool_signer.key() == expected_pool_signer,
+        require_eq!(
+            *pool_config.owner,
+            pool_program.key(),
+            CcipRouterError::InvalidInputsPoolAccounts
+        );
+        require_eq!(
+            pool_config.key(),
+            expected_pool_config,
+            CcipRouterError::InvalidInputsPoolAccounts
+        );
+        require_eq!(
+            pool_signer.key(),
+            expected_pool_signer,
             CcipRouterError::InvalidInputsPoolAccounts
         );
 
-        let (expected_fee_token_config, _) =
-            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()], &router);
-        require!(
-            fee_token_config.key() == expected_fee_token_config,
+        let (expected_fee_token_config, _) = Pubkey::find_program_address(
+            &[
+                fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+                mint.key.as_ref(),
+            ],
+            &fee_quoter::ID,
+        );
+        require_eq!(
+            fee_token_config.key(),
+            expected_fee_token_config,
             CcipRouterError::InvalidInputsConfigAccounts
         );
 
         // check token accounts
-        require!(
-            *mint.owner == token_program.key(),
+        require_eq!(
+            *mint.owner,
+            token_program.key(),
             CcipRouterError::InvalidInputsTokenAccounts
         );
-        require!(
-            user_token_account.key()
-                == get_associated_token_address_with_program_id(
-                    &token_receiver,
-                    &mint.key(),
-                    &token_program.key()
-                )
-                && pool_token_account.key()
-                    == get_associated_token_address_with_program_id(
-                        &pool_signer.key(),
-                        &mint.key(),
-                        &token_program.key()
-                    ),
+        require_eq!(
+            user_token_account.key(),
+            get_associated_token_address_with_program_id(
+                &token_receiver,
+                &mint.key(),
+                &token_program.key()
+            ),
+            CcipRouterError::InvalidInputsTokenAccounts
+        );
+        require_eq!(
+            pool_token_account.key(),
+            get_associated_token_address_with_program_id(
+                &pool_signer.key(),
+                &mint.key(),
+                &token_program.key()
+            ),
             CcipRouterError::InvalidInputsTokenAccounts
         );
 
         // check per token per chain configs
-        // billing: configured via CCIP router/fee quoter
+        // billing: configured via CCIP fee quoter
         // chain config: configured via pool
         let (expected_billing_config, _) = Pubkey::find_program_address(
             &[
-                TOKEN_POOL_BILLING_SEED,
+                fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
                 chain_selector.to_le_bytes().as_ref(),
                 mint.key().as_ref(),
             ],
-            &router,
+            &fee_quoter::ID,
         );
         let (expected_pool_chain_config, _) = Pubkey::find_program_address(
             &[
-                TOKEN_POOL_CONFIG_SEED,
+                seed::TOKEN_POOL_CONFIG,
                 chain_selector.to_le_bytes().as_ref(),
                 mint.key().as_ref(),
             ],
             &pool_program.key(),
         );
-        require!(
-            token_billing_config.key() == expected_billing_config, // TODO: determine if this can be zero key for optional billing config?
+        require_eq!(
+            token_billing_config.key(),
+            expected_billing_config, // TODO: determine if this can be zero key for optional billing config?
             CcipRouterError::InvalidInputsConfigAccounts
         );
-        require!(
-            pool_chain_config.key() == expected_pool_chain_config,
+        require_eq!(
+            pool_chain_config.key(),
+            expected_pool_chain_config,
             CcipRouterError::InvalidInputsConfigAccounts
         );
 
         // Check Lookup Table Address configured in TokenAdminRegistry
         let token_admin_registry_account: Account<TokenAdminRegistry> =
             Account::try_from(token_admin_registry)?;
-        require!(
-            token_admin_registry_account.lookup_table == lookup_table.key(),
+        require_eq!(
+            token_admin_registry_account.lookup_table,
+            lookup_table.key(),
             CcipRouterError::InvalidInputsLookupTableAccounts
         );
 
@@ -354,6 +373,7 @@ pub mod token_admin_registry_writable {
                 pending_administrator: Pubkey::default(),
                 lookup_table: Pubkey::default(),
                 writable_indexes: [0, 0],
+                mint: Pubkey::default(),
             };
 
             set(state, 0);
@@ -392,6 +412,7 @@ pub mod token_admin_registry_writable {
                     2u128.pow(127 - 7) + 2u128.pow(127 - 2) + 2u128.pow(127 - 4),
                     2u128.pow(127 - 8) + 2u128.pow(127 - 56) + 2u128.pow(127 - 100),
                 ],
+                mint: Pubkey::default(),
             };
 
             assert!(!is(state, 0));

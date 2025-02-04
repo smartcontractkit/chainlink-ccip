@@ -9,20 +9,19 @@ import (
 )
 
 type Config struct {
-	Version                         uint8
-	DefaultAllowOutOfOrderExecution uint8
-	Padding0                        [6]uint8
-	SvmChainSelector                uint64
-	DefaultGasLimit                 ag_binary.Uint128
-	Padding1                        [8]uint8
-	Owner                           ag_solanago.PublicKey
-	ProposedOwner                   ag_solanago.PublicKey
-	EnableManualExecutionAfter      int64
-	Padding2                        [8]uint8
-	Ocr3                            [2]Ocr3Config
-	MaxFeeJuelsPerMsg               ag_binary.Uint128
-	LinkTokenMint                   ag_solanago.PublicKey
-	FeeAggregator                   ag_solanago.PublicKey
+	Version                    uint8
+	Padding0                   [7]uint8
+	SvmChainSelector           uint64
+	EnableManualExecutionAfter int64
+	Padding1                   [8]uint8
+	MaxFeeJuelsPerMsg          ag_binary.Uint128
+	Owner                      ag_solanago.PublicKey
+	ProposedOwner              ag_solanago.PublicKey
+	Padding2                   [8]uint8
+	Ocr3                       [2]Ocr3Config
+	FeeQuoter                  ag_solanago.PublicKey
+	LinkTokenMint              ag_solanago.PublicKey
+	FeeAggregator              ag_solanago.PublicKey
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -38,11 +37,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `DefaultAllowOutOfOrderExecution` param:
-	err = encoder.Encode(obj.DefaultAllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
 	// Serialize `Padding0` param:
 	err = encoder.Encode(obj.Padding0)
 	if err != nil {
@@ -53,13 +47,18 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `DefaultGasLimit` param:
-	err = encoder.Encode(obj.DefaultGasLimit)
+	// Serialize `EnableManualExecutionAfter` param:
+	err = encoder.Encode(obj.EnableManualExecutionAfter)
 	if err != nil {
 		return err
 	}
 	// Serialize `Padding1` param:
 	err = encoder.Encode(obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxFeeJuelsPerMsg` param:
+	err = encoder.Encode(obj.MaxFeeJuelsPerMsg)
 	if err != nil {
 		return err
 	}
@@ -73,11 +72,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `EnableManualExecutionAfter` param:
-	err = encoder.Encode(obj.EnableManualExecutionAfter)
-	if err != nil {
-		return err
-	}
 	// Serialize `Padding2` param:
 	err = encoder.Encode(obj.Padding2)
 	if err != nil {
@@ -88,8 +82,8 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `MaxFeeJuelsPerMsg` param:
-	err = encoder.Encode(obj.MaxFeeJuelsPerMsg)
+	// Serialize `FeeQuoter` param:
+	err = encoder.Encode(obj.FeeQuoter)
 	if err != nil {
 		return err
 	}
@@ -125,11 +119,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `DefaultAllowOutOfOrderExecution`:
-	err = decoder.Decode(&obj.DefaultAllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
 	// Deserialize `Padding0`:
 	err = decoder.Decode(&obj.Padding0)
 	if err != nil {
@@ -140,13 +129,18 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `DefaultGasLimit`:
-	err = decoder.Decode(&obj.DefaultGasLimit)
+	// Deserialize `EnableManualExecutionAfter`:
+	err = decoder.Decode(&obj.EnableManualExecutionAfter)
 	if err != nil {
 		return err
 	}
 	// Deserialize `Padding1`:
 	err = decoder.Decode(&obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxFeeJuelsPerMsg`:
+	err = decoder.Decode(&obj.MaxFeeJuelsPerMsg)
 	if err != nil {
 		return err
 	}
@@ -160,11 +154,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `EnableManualExecutionAfter`:
-	err = decoder.Decode(&obj.EnableManualExecutionAfter)
-	if err != nil {
-		return err
-	}
 	// Deserialize `Padding2`:
 	err = decoder.Decode(&obj.Padding2)
 	if err != nil {
@@ -175,8 +164,8 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `MaxFeeJuelsPerMsg`:
-	err = decoder.Decode(&obj.MaxFeeJuelsPerMsg)
+	// Deserialize `FeeQuoter`:
+	err = decoder.Decode(&obj.FeeQuoter)
 	if err != nil {
 		return err
 	}
@@ -576,140 +565,13 @@ func (obj *CommitReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	return nil
 }
 
-type PerChainPerTokenConfig struct {
-	Version       uint8
-	ChainSelector uint64
-	Mint          ag_solanago.PublicKey
-	Billing       TokenBilling
-}
-
-var PerChainPerTokenConfigDiscriminator = [8]byte{183, 88, 20, 99, 246, 46, 51, 230}
-
-func (obj PerChainPerTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(PerChainPerTokenConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `ChainSelector` param:
-	err = encoder.Encode(obj.ChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `Mint` param:
-	err = encoder.Encode(obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Serialize `Billing` param:
-	err = encoder.Encode(obj.Billing)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *PerChainPerTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(PerChainPerTokenConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[183 88 20 99 246 46 51 230]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ChainSelector`:
-	err = decoder.Decode(&obj.ChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Mint`:
-	err = decoder.Decode(&obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Billing`:
-	err = decoder.Decode(&obj.Billing)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type BillingTokenConfigWrapper struct {
-	Version uint8
-	Config  BillingTokenConfig
-}
-
-var BillingTokenConfigWrapperDiscriminator = [8]byte{63, 178, 72, 57, 171, 66, 44, 151}
-
-func (obj BillingTokenConfigWrapper) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(BillingTokenConfigWrapperDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `Config` param:
-	err = encoder.Encode(obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *BillingTokenConfigWrapper) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(BillingTokenConfigWrapperDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[63 178 72 57 171 66 44 151]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Config`:
-	err = decoder.Decode(&obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type TokenAdminRegistry struct {
 	Version              uint8
 	Administrator        ag_solanago.PublicKey
 	PendingAdministrator ag_solanago.PublicKey
 	LookupTable          ag_solanago.PublicKey
 	WritableIndexes      [2]ag_binary.Uint128
+	Mint                 ag_solanago.PublicKey
 }
 
 var TokenAdminRegistryDiscriminator = [8]byte{70, 92, 207, 200, 76, 17, 57, 114}
@@ -742,6 +604,11 @@ func (obj TokenAdminRegistry) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `WritableIndexes` param:
 	err = encoder.Encode(obj.WritableIndexes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Mint` param:
+	err = encoder.Encode(obj.Mint)
 	if err != nil {
 		return err
 	}
@@ -784,6 +651,11 @@ func (obj *TokenAdminRegistry) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `WritableIndexes`:
 	err = decoder.Decode(&obj.WritableIndexes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Mint`:
+	err = decoder.Decode(&obj.Mint)
 	if err != nil {
 		return err
 	}

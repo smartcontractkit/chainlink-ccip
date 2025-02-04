@@ -16,18 +16,36 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-// validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
-func validateObserverReadingEligibility(
+// validateCommitReportsReadingEligibility validates that all commit reports' source chains are supported by observer
+func validateCommitReportsReadingEligibility(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+	observedData exectypes.CommitObservations,
+) error {
+	for chainSel := range observedData {
+		if !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
+		}
+		for _, data := range observedData[chainSel] {
+			if data.SourceChain != chainSel {
+				return fmt.Errorf("observer not allowed to read from chain %d", data.SourceChain)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateMsgsReadingEligibility checks all observed messages are from supported chains
+func validateMsgsReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedMsgs exectypes.MessageObservations,
 ) error {
-	// TODO: validate that CommitReports and Nonces are only observed if the destChain is supported.
-
 	for chainSel, msgs := range observedMsgs {
 		if len(msgs) == 0 {
 			continue
@@ -41,6 +59,7 @@ func validateObserverReadingEligibility(
 	return nil
 }
 
+// validateTokenDataObservations validates that all token data observations belong to already observed messages
 func validateTokenDataObservations(
 	observedMsgs exectypes.MessageObservations,
 	tokenData exectypes.TokenDataObservations,
@@ -52,6 +71,14 @@ func validateTokenDataObservations(
 	}
 
 	for chain, msgs := range observedMsgs {
+		chainTd, ok := tokenData[chain]
+		if !ok {
+			return fmt.Errorf("token data not found for chain %d", chain)
+		}
+		if len(msgs) != len(chainTd) {
+			return fmt.Errorf("unexpected number of token data observations for chain %d: expected %d, got %d",
+				chain, len(msgs), len(chainTd))
+		}
 		for seq, msg := range msgs {
 			if _, ok := tokenData[chain][seq]; !ok {
 				return fmt.Errorf("token data not found for message %s", msg)
@@ -59,6 +86,24 @@ func validateTokenDataObservations(
 		}
 	}
 
+	return nil
+}
+
+// validateCostlyMessagesObservations validates that all costly messages belong to already observed messages
+func validateCostlyMessagesObservations(
+	observedMsgs exectypes.MessageObservations,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+	msgs := observedMsgs.Flatten()
+	msgsIDMap := make(map[cciptypes.Bytes32]struct{})
+	for _, msg := range msgs {
+		msgsIDMap[msg.Header.MessageID] = struct{}{}
+	}
+	for _, id := range costlyMessages {
+		if _, ok := msgsIDMap[id]; !ok {
+			return fmt.Errorf("costly message %s not found in observed messages", id)
+		}
+	}
 	return nil
 }
 
@@ -73,11 +118,51 @@ func validateHashesExist(
 	}
 
 	for chain, msgs := range observedMsgs {
+		_, ok := hashes[chain]
+		if !ok {
+			return fmt.Errorf("hash not found for chain %d", chain)
+		}
+
 		for seq, msg := range msgs {
 			if _, ok := hashes[chain][seq]; !ok {
 				return fmt.Errorf("hash not found for message %s", msg)
 			}
 		}
+	}
+
+	return nil
+}
+
+// validateMessagesConformToCommitReports cross-checks messages and reports
+// 1. checks if the messages observed are exactly the same as the messages in the commit reports. No more and no less.
+// 2. checks all reports have their messages observed.
+func validateMessagesConformToCommitReports(
+	observedData exectypes.CommitObservations,
+	observedMsgs exectypes.MessageObservations,
+) error {
+	msgsCount := 0
+	for chain, report := range observedData {
+		for _, data := range report {
+			msgsMap, ok := observedMsgs[chain]
+			if !ok {
+				return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
+			}
+
+			for seqNum := data.SequenceNumberRange.Start(); seqNum <= data.SequenceNumberRange.End(); seqNum++ {
+				_, ok = msgsMap[seqNum]
+				if !ok {
+					return fmt.Errorf("no message observed for sequence number %d, "+
+						"while report's range sholud include it for chain %d", seqNum, chain)
+				}
+				msgsCount++
+			}
+		}
+	}
+	allMsgs := observedMsgs.Flatten()
+	// need to make sure that only messages that are in the commit reports are observed
+	if msgsCount != len(allMsgs) {
+		return fmt.Errorf("messages observed %d do not match the messages in the commit reports %d",
+			len(allMsgs), msgsCount)
 	}
 
 	return nil
@@ -114,19 +199,6 @@ func validateObservedSequenceNumbers(
 					return fmt.Errorf("executed message %d not in observed range %v", seqNum, data.SequenceNumberRange)
 				}
 			}
-
-			// no need to check for missing sequence numbers in the observed messages
-			if len(data.Messages) == 0 {
-				continue
-			}
-
-			if !msgsConformToSeqRange(data.Messages, data.SequenceNumberRange) {
-				return fmt.Errorf("messages don't conform to sequence numbers observed for chain %d, "+
-					"sequence numbers: %v",
-					data.SourceChain,
-					data.SequenceNumberRange,
-				)
-			}
 		}
 	}
 
@@ -156,7 +228,9 @@ var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
 
 // computeRanges takes a slice of reports and computes the smallest number of contiguous ranges
 // that cover all the sequence numbers in the reports.
+// Example: computeRanges([10, 12], [13, 15], [20, 22]) = [10,15], [20,22]
 // Note: reports need all messages to create a proof even if some are already executed.
+// Note: the provided reports must be sorted by sequence number range starting sequence number.
 func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, error) {
 	var ranges []cciptypes.SeqNumRange
 
@@ -172,7 +246,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 		} else if seqRange.End()+1 == report.SequenceNumberRange.Start() {
 			// extend the contiguous range
 			seqRange.SetEnd(report.SequenceNumberRange.End())
-		} else if report.SequenceNumberRange.Start() < seqRange.End() {
+		} else if report.SequenceNumberRange.Overlaps(seqRange) {
 			return nil, errOverlappingRanges
 		} else {
 			ranges = append(ranges, seqRange)
@@ -187,6 +261,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 	return ranges, nil
 }
 
+// groupByChainSelector groups the reports by their chain selector.
 func groupByChainSelector(
 	reports []plugintypes2.CommitPluginReportWithMeta) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
@@ -206,81 +281,47 @@ func groupByChainSelector(
 	return commitReportCache
 }
 
-// filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
-// Unordered inputs are supported.
-func filterOutExecutedMessages(
-	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
-) ([]exectypes.CommitData, error) {
-	sort.Slice(reports, func(i, j int) bool {
-		return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
-	})
-
-	// If none are executed, return the (sorted) input.
+// combineReportsAndMessages returns a new reports slice with fully executed messages removed.
+// Reports that have all of their messages executed are not included in the result.
+// The provided reports must be sorted by sequence number range starting sequence number.
+func combineReportsAndMessages(
+	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum,
+) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData) {
 	if len(executedMessages) == 0 {
 		return reports, nil
 	}
 
-	sort.Slice(executedMessages, func(i, j int) bool {
-		return executedMessages[i].Start() < executedMessages[j].Start()
-	})
+	// filtered contains the reports with fully executed messages removed
+	// and the executed messages appended to the report sorted by sequence number.
+	var pending []exectypes.CommitData
+	var fullyExecuted []exectypes.CommitData
 
-	// Make sure they do not overlap
-	previousMax := cciptypes.SeqNum(0)
-	for _, seqRange := range executedMessages {
-		if seqRange.Start() < previousMax {
-			return nil, errOverlappingRanges
+	for i, report := range reports {
+		reportRange := report.SequenceNumberRange
+
+		executedMsgsInReportRange := reportRange.FilterSlice(executedMessages)
+		if len(executedMsgsInReportRange) == reportRange.Length() { // skip fully executed report.
+			fullyExecuted = append(fullyExecuted, report)
+			continue
 		}
-		previousMax = seqRange.End()
+
+		sort.Slice(executedMsgsInReportRange, func(i, j int) bool {
+			return executedMsgsInReportRange[i] < executedMsgsInReportRange[j]
+		})
+		report.ExecutedMessages = append(reports[i].ExecutedMessages, executedMsgsInReportRange...)
+		pending = append(pending, report)
 	}
 
-	var filtered []exectypes.CommitData
-
-	reportIdx := 0
-	for _, executed := range executedMessages {
-		for i := reportIdx; i < len(reports); i++ {
-			reportRange := reports[i].SequenceNumberRange
-			if executed.End() < reportRange.Start() {
-				// No messages in current executed range are in reports[i]
-				// need to go to the next set of executed range.
-				break
-			}
-
-			if reportRange.Start() >= executed.Start() && reportRange.End() <= executed.End() {
-				// skip fully executed report.
-				reportIdx++
-				continue
-			}
-
-			s := executed.Start()
-			if reportRange.Start() > executed.Start() {
-				s = reportRange.Start()
-			}
-			for ; s <= executed.End(); s++ {
-				// This range runs into the next report.
-				if s > reports[i].SequenceNumberRange.End() {
-					reportIdx++
-					filtered = append(filtered, reports[i])
-					break
-				}
-				reports[i].ExecutedMessages = append(reports[i].ExecutedMessages, s)
-			}
-		}
-	}
-
-	// Add any remaining reports that were not fully executed.
-	for i := reportIdx; i < len(reports); i++ {
-		filtered = append(filtered, reports[i])
-	}
-
-	return filtered, nil
+	return pending, fullyExecuted
 }
 
 func decodeAttributedObservations(
 	aos []types.AttributedObservation,
+	ocrTypeCodec ocrtypecodec.ExecCodec,
 ) ([]plugincommon.AttributedObservation[exectypes.Observation], error) {
 	decoded := make([]plugincommon.AttributedObservation[exectypes.Observation], len(aos))
 	for i, ao := range aos {
-		observation, err := exectypes.DecodeObservation(ao.Observation)
+		observation, err := ocrTypeCodec.DecodeObservation(ao.Observation)
 		if err != nil {
 			return nil, err
 		}
@@ -583,10 +624,22 @@ func getConsensusObservation(
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	destChainSelector cciptypes.ChainSelector,
 	F int,
-	fChain map[cciptypes.ChainSelector]int,
+	destChain cciptypes.ChainSelector,
 ) (exectypes.Observation, error) {
-	if len(aos) < F {
-		return exectypes.Observation{}, fmt.Errorf("below F threshold")
+	observedFChains := make(map[cciptypes.ChainSelector][]int)
+	for _, ao := range aos {
+		obs := ao.Observation
+		for chain, f := range obs.FChain {
+			observedFChains[chain] = append(observedFChains[chain], f)
+		}
+	}
+	// consensus on the fChain map uses the role DON F value
+	// because all nodes can observe the home chain.
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(F))
+	fChain := consensus.GetConsensusMap(lggr, "fChain", observedFChains, donThresh)
+	_, ok := fChain[destChain] // check if the destination chain is in the FChain.
+	if !ok {
+		return exectypes.Observation{}, fmt.Errorf("destination chain %d is not in FChain", destChain)
 	}
 
 	lggr.Debugw("getConsensusObservation decoded observations", "aos", aos)

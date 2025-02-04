@@ -8,8 +8,9 @@ import (
 )
 
 type CommitInput struct {
-	PriceUpdates PriceUpdates
-	MerkleRoot   MerkleRoot
+	PriceUpdates  PriceUpdates
+	MerkleRoot    MerkleRoot
+	RmnSignatures [][64]uint8
 }
 
 func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -20,6 +21,11 @@ func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	}
 	// Serialize `MerkleRoot` param:
 	err = encoder.Encode(obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnSignatures` param:
+	err = encoder.Encode(obj.RmnSignatures)
 	if err != nil {
 		return err
 	}
@@ -34,6 +40,11 @@ func (obj *CommitInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	}
 	// Deserialize `MerkleRoot`:
 	err = decoder.Decode(&obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnSignatures`:
+	err = decoder.Decode(&obj.RmnSignatures)
 	if err != nil {
 		return err
 	}
@@ -337,13 +348,12 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 	return nil
 }
 
-type SVMExtraArgs struct {
+type Any2SVMRampExtraArgs struct {
 	ComputeUnits     uint32
 	IsWritableBitmap uint64
-	Accounts         []ag_solanago.PublicKey
 }
 
-func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Any2SVMRampExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ComputeUnits` param:
 	err = encoder.Encode(obj.ComputeUnits)
 	if err != nil {
@@ -354,15 +364,10 @@ func (obj SVMExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	if err != nil {
 		return err
 	}
-	// Serialize `Accounts` param:
-	err = encoder.Encode(obj.Accounts)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (obj *SVMExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Any2SVMRampExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ComputeUnits`:
 	err = decoder.Decode(&obj.ComputeUnits)
 	if err != nil {
@@ -373,44 +378,6 @@ func (obj *SVMExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	if err != nil {
 		return err
 	}
-	// Deserialize `Accounts`:
-	err = decoder.Decode(&obj.Accounts)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type AnyExtraArgs struct {
-	GasLimit                 ag_binary.Uint128
-	AllowOutOfOrderExecution bool
-}
-
-func (obj AnyExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `GasLimit` param:
-	err = encoder.Encode(obj.GasLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `AllowOutOfOrderExecution` param:
-	err = encoder.Encode(obj.AllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *AnyExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `GasLimit`:
-	err = decoder.Decode(&obj.GasLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `AllowOutOfOrderExecution`:
-	err = decoder.Decode(&obj.AllowOutOfOrderExecution)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -418,10 +385,9 @@ type Any2SVMRampMessage struct {
 	Header        RampMessageHeader
 	Sender        []byte
 	Data          []byte
-	LogicReceiver ag_solanago.PublicKey
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
-	ExtraArgs     SVMExtraArgs
+	ExtraArgs     Any2SVMRampExtraArgs
 	OnRampAddress []byte
 }
 
@@ -438,11 +404,6 @@ func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `Data` param:
 	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `LogicReceiver` param:
-	err = encoder.Encode(obj.LogicReceiver)
 	if err != nil {
 		return err
 	}
@@ -485,11 +446,6 @@ func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `LogicReceiver`:
-	err = decoder.Decode(&obj.LogicReceiver)
-	if err != nil {
-		return err
-	}
 	// Deserialize `TokenReceiver`:
 	err = decoder.Decode(&obj.TokenReceiver)
 	if err != nil {
@@ -518,7 +474,7 @@ type SVM2AnyRampMessage struct {
 	Sender         ag_solanago.PublicKey
 	Data           []byte
 	Receiver       []byte
-	ExtraArgs      AnyExtraArgs
+	ExtraArgs      []byte
 	FeeToken       ag_solanago.PublicKey
 	TokenAmounts   []SVM2AnyTokenTransfer
 	FeeTokenAmount CrossChainAmount
@@ -760,7 +716,7 @@ type SVM2AnyMessage struct {
 	Data         []byte
 	TokenAmounts []SVMTokenAmount
 	FeeToken     ag_solanago.PublicKey
-	ExtraArgs    ExtraArgsInput
+	ExtraArgs    []byte
 }
 
 func (obj SVM2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -850,81 +806,6 @@ func (obj *SVMTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	err = decoder.Decode(&obj.Amount)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-type ExtraArgsInput struct {
-	GasLimit                 *ag_binary.Uint128 `bin:"optional"`
-	AllowOutOfOrderExecution *bool              `bin:"optional"`
-}
-
-func (obj ExtraArgsInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `GasLimit` param (optional):
-	{
-		if obj.GasLimit == nil {
-			err = encoder.WriteBool(false)
-			if err != nil {
-				return err
-			}
-		} else {
-			err = encoder.WriteBool(true)
-			if err != nil {
-				return err
-			}
-			err = encoder.Encode(obj.GasLimit)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// Serialize `AllowOutOfOrderExecution` param (optional):
-	{
-		if obj.AllowOutOfOrderExecution == nil {
-			err = encoder.WriteBool(false)
-			if err != nil {
-				return err
-			}
-		} else {
-			err = encoder.WriteBool(true)
-			if err != nil {
-				return err
-			}
-			err = encoder.Encode(obj.AllowOutOfOrderExecution)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (obj *ExtraArgsInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `GasLimit` (optional):
-	{
-		ok, err := decoder.ReadBool()
-		if err != nil {
-			return err
-		}
-		if ok {
-			err = decoder.Decode(&obj.GasLimit)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// Deserialize `AllowOutOfOrderExecution` (optional):
-	{
-		ok, err := decoder.ReadBool()
-		if err != nil {
-			return err
-		}
-		if ok {
-			err = decoder.Decode(&obj.AllowOutOfOrderExecution)
-			if err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }
@@ -1118,17 +999,11 @@ func (obj *SourceChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 
 type DestChainState struct {
 	SequenceNumber uint64
-	UsdPerUnitGas  TimestampedPackedU224
 }
 
 func (obj DestChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `SequenceNumber` param:
 	err = encoder.Encode(obj.SequenceNumber)
-	if err != nil {
-		return err
-	}
-	// Serialize `UsdPerUnitGas` param:
-	err = encoder.Encode(obj.UsdPerUnitGas)
 	if err != nil {
 		return err
 	}
@@ -1141,117 +1016,22 @@ func (obj *DestChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	if err != nil {
 		return err
 	}
-	// Deserialize `UsdPerUnitGas`:
-	err = decoder.Decode(&obj.UsdPerUnitGas)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 type DestChainConfig struct {
-	IsEnabled                         bool
-	MaxNumberOfTokensPerMsg           uint16
-	MaxDataBytes                      uint32
-	MaxPerMsgGasLimit                 uint32
-	DestGasOverhead                   uint32
-	DestGasPerPayloadByte             uint16
-	DestDataAvailabilityOverheadGas   uint32
-	DestGasPerDataAvailabilityByte    uint16
-	DestDataAvailabilityMultiplierBps uint16
-	DefaultTokenFeeUsdcents           uint16
-	DefaultTokenDestGasOverhead       uint32
-	DefaultTxGasLimit                 uint32
-	GasMultiplierWeiPerEth            uint64
-	NetworkFeeUsdcents                uint32
-	GasPriceStalenessThreshold        uint32
-	EnforceOutOfOrder                 bool
-	ChainFamilySelector               [4]uint8
+	AllowedSenders   []ag_solanago.PublicKey
+	AllowListEnabled bool
 }
 
 func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `IsEnabled` param:
-	err = encoder.Encode(obj.IsEnabled)
+	// Serialize `AllowedSenders` param:
+	err = encoder.Encode(obj.AllowedSenders)
 	if err != nil {
 		return err
 	}
-	// Serialize `MaxNumberOfTokensPerMsg` param:
-	err = encoder.Encode(obj.MaxNumberOfTokensPerMsg)
-	if err != nil {
-		return err
-	}
-	// Serialize `MaxDataBytes` param:
-	err = encoder.Encode(obj.MaxDataBytes)
-	if err != nil {
-		return err
-	}
-	// Serialize `MaxPerMsgGasLimit` param:
-	err = encoder.Encode(obj.MaxPerMsgGasLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestGasOverhead` param:
-	err = encoder.Encode(obj.DestGasOverhead)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestGasPerPayloadByte` param:
-	err = encoder.Encode(obj.DestGasPerPayloadByte)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestDataAvailabilityOverheadGas` param:
-	err = encoder.Encode(obj.DestDataAvailabilityOverheadGas)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestGasPerDataAvailabilityByte` param:
-	err = encoder.Encode(obj.DestGasPerDataAvailabilityByte)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestDataAvailabilityMultiplierBps` param:
-	err = encoder.Encode(obj.DestDataAvailabilityMultiplierBps)
-	if err != nil {
-		return err
-	}
-	// Serialize `DefaultTokenFeeUsdcents` param:
-	err = encoder.Encode(obj.DefaultTokenFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Serialize `DefaultTokenDestGasOverhead` param:
-	err = encoder.Encode(obj.DefaultTokenDestGasOverhead)
-	if err != nil {
-		return err
-	}
-	// Serialize `DefaultTxGasLimit` param:
-	err = encoder.Encode(obj.DefaultTxGasLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `GasMultiplierWeiPerEth` param:
-	err = encoder.Encode(obj.GasMultiplierWeiPerEth)
-	if err != nil {
-		return err
-	}
-	// Serialize `NetworkFeeUsdcents` param:
-	err = encoder.Encode(obj.NetworkFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Serialize `GasPriceStalenessThreshold` param:
-	err = encoder.Encode(obj.GasPriceStalenessThreshold)
-	if err != nil {
-		return err
-	}
-	// Serialize `EnforceOutOfOrder` param:
-	err = encoder.Encode(obj.EnforceOutOfOrder)
-	if err != nil {
-		return err
-	}
-	// Serialize `ChainFamilySelector` param:
-	err = encoder.Encode(obj.ChainFamilySelector)
+	// Serialize `AllowListEnabled` param:
+	err = encoder.Encode(obj.AllowListEnabled)
 	if err != nil {
 		return err
 	}
@@ -1259,165 +1039,13 @@ func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 }
 
 func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `IsEnabled`:
-	err = decoder.Decode(&obj.IsEnabled)
+	// Deserialize `AllowedSenders`:
+	err = decoder.Decode(&obj.AllowedSenders)
 	if err != nil {
 		return err
 	}
-	// Deserialize `MaxNumberOfTokensPerMsg`:
-	err = decoder.Decode(&obj.MaxNumberOfTokensPerMsg)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MaxDataBytes`:
-	err = decoder.Decode(&obj.MaxDataBytes)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MaxPerMsgGasLimit`:
-	err = decoder.Decode(&obj.MaxPerMsgGasLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestGasOverhead`:
-	err = decoder.Decode(&obj.DestGasOverhead)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestGasPerPayloadByte`:
-	err = decoder.Decode(&obj.DestGasPerPayloadByte)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestDataAvailabilityOverheadGas`:
-	err = decoder.Decode(&obj.DestDataAvailabilityOverheadGas)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestGasPerDataAvailabilityByte`:
-	err = decoder.Decode(&obj.DestGasPerDataAvailabilityByte)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestDataAvailabilityMultiplierBps`:
-	err = decoder.Decode(&obj.DestDataAvailabilityMultiplierBps)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DefaultTokenFeeUsdcents`:
-	err = decoder.Decode(&obj.DefaultTokenFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DefaultTokenDestGasOverhead`:
-	err = decoder.Decode(&obj.DefaultTokenDestGasOverhead)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DefaultTxGasLimit`:
-	err = decoder.Decode(&obj.DefaultTxGasLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `GasMultiplierWeiPerEth`:
-	err = decoder.Decode(&obj.GasMultiplierWeiPerEth)
-	if err != nil {
-		return err
-	}
-	// Deserialize `NetworkFeeUsdcents`:
-	err = decoder.Decode(&obj.NetworkFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Deserialize `GasPriceStalenessThreshold`:
-	err = decoder.Decode(&obj.GasPriceStalenessThreshold)
-	if err != nil {
-		return err
-	}
-	// Deserialize `EnforceOutOfOrder`:
-	err = decoder.Decode(&obj.EnforceOutOfOrder)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ChainFamilySelector`:
-	err = decoder.Decode(&obj.ChainFamilySelector)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type TokenBilling struct {
-	MinFeeUsdcents    uint32
-	MaxFeeUsdcents    uint32
-	DeciBps           uint16
-	DestGasOverhead   uint32
-	DestBytesOverhead uint32
-	IsEnabled         bool
-}
-
-func (obj TokenBilling) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MinFeeUsdcents` param:
-	err = encoder.Encode(obj.MinFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Serialize `MaxFeeUsdcents` param:
-	err = encoder.Encode(obj.MaxFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Serialize `DeciBps` param:
-	err = encoder.Encode(obj.DeciBps)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestGasOverhead` param:
-	err = encoder.Encode(obj.DestGasOverhead)
-	if err != nil {
-		return err
-	}
-	// Serialize `DestBytesOverhead` param:
-	err = encoder.Encode(obj.DestBytesOverhead)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsEnabled` param:
-	err = encoder.Encode(obj.IsEnabled)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *TokenBilling) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MinFeeUsdcents`:
-	err = decoder.Decode(&obj.MinFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MaxFeeUsdcents`:
-	err = decoder.Decode(&obj.MaxFeeUsdcents)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DeciBps`:
-	err = decoder.Decode(&obj.DeciBps)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestGasOverhead`:
-	err = decoder.Decode(&obj.DestGasOverhead)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DestBytesOverhead`:
-	err = decoder.Decode(&obj.DestBytesOverhead)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsEnabled`:
-	err = decoder.Decode(&obj.IsEnabled)
+	// Deserialize `AllowListEnabled`:
+	err = decoder.Decode(&obj.AllowListEnabled)
 	if err != nil {
 		return err
 	}
@@ -1490,94 +1118,6 @@ func (obj *RateLimitTokenBucket) UnmarshalWithDecoder(decoder *ag_binary.Decoder
 	return nil
 }
 
-type BillingTokenConfig struct {
-	Enabled                    bool
-	Mint                       ag_solanago.PublicKey
-	UsdPerToken                TimestampedPackedU224
-	PremiumMultiplierWeiPerEth uint64
-}
-
-func (obj BillingTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Enabled` param:
-	err = encoder.Encode(obj.Enabled)
-	if err != nil {
-		return err
-	}
-	// Serialize `Mint` param:
-	err = encoder.Encode(obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Serialize `UsdPerToken` param:
-	err = encoder.Encode(obj.UsdPerToken)
-	if err != nil {
-		return err
-	}
-	// Serialize `PremiumMultiplierWeiPerEth` param:
-	err = encoder.Encode(obj.PremiumMultiplierWeiPerEth)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *BillingTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Enabled`:
-	err = decoder.Decode(&obj.Enabled)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Mint`:
-	err = decoder.Decode(&obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Deserialize `UsdPerToken`:
-	err = decoder.Decode(&obj.UsdPerToken)
-	if err != nil {
-		return err
-	}
-	// Deserialize `PremiumMultiplierWeiPerEth`:
-	err = decoder.Decode(&obj.PremiumMultiplierWeiPerEth)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type TimestampedPackedU224 struct {
-	Value     [28]uint8
-	Timestamp int64
-}
-
-func (obj TimestampedPackedU224) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Value` param:
-	err = encoder.Encode(obj.Value)
-	if err != nil {
-		return err
-	}
-	// Serialize `Timestamp` param:
-	err = encoder.Encode(obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *TimestampedPackedU224) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Value`:
-	err = decoder.Decode(&obj.Value)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Timestamp`:
-	err = decoder.Decode(&obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type OcrPluginType ag_binary.BorshEnum
 
 const (
@@ -1591,21 +1131,6 @@ func (value OcrPluginType) String() string {
 		return "Commit"
 	case Execution_OcrPluginType:
 		return "Execution"
-	default:
-		return ""
-	}
-}
-
-type MerkleError ag_binary.BorshEnum
-
-const (
-	InvalidProof_MerkleError MerkleError = iota
-)
-
-func (value MerkleError) String() string {
-	switch value {
-	case InvalidProof_MerkleError:
-		return "InvalidProof"
 	default:
 		return ""
 	}
@@ -1679,6 +1204,14 @@ const (
 	SourceTokenDataTooLarge_CcipRouterError
 	MessageGasLimitTooHigh_CcipRouterError
 	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
+	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
+	InvalidTokenAdminRegistryProposedAdmin_CcipRouterError
+	InvalidWritabilityBitmap_CcipRouterError
+	InvalidExtraArgsTag_CcipRouterError
+	InvalidChainFamilySelector_CcipRouterError
+	InvalidTokenReceiver_CcipRouterError
+	InvalidSVMAddress_CcipRouterError
+	SenderNotAllowed_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -1765,6 +1298,22 @@ func (value CcipRouterError) String() string {
 		return "MessageGasLimitTooHigh"
 	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError:
 		return "ExtraArgOutOfOrderExecutionMustBeTrue"
+	case InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError:
+		return "InvalidTokenAdminRegistryInputsZeroAddress"
+	case InvalidTokenAdminRegistryProposedAdmin_CcipRouterError:
+		return "InvalidTokenAdminRegistryProposedAdmin"
+	case InvalidWritabilityBitmap_CcipRouterError:
+		return "InvalidWritabilityBitmap"
+	case InvalidExtraArgsTag_CcipRouterError:
+		return "InvalidExtraArgsTag"
+	case InvalidChainFamilySelector_CcipRouterError:
+		return "InvalidChainFamilySelector"
+	case InvalidTokenReceiver_CcipRouterError:
+		return "InvalidTokenReceiver"
+	case InvalidSVMAddress_CcipRouterError:
+		return "InvalidSVMAddress"
+	case SenderNotAllowed_CcipRouterError:
+		return "SenderNotAllowed"
 	default:
 		return ""
 	}

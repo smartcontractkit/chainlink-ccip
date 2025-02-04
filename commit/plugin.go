@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -55,6 +57,7 @@ type Plugin struct {
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	discoveryProcessor  *discovery.ContractDiscoveryProcessor
 	metricsReporter     metrics.CommitPluginReporter
+	ocrTypeCodec        ocrtypecodec.CommitCodec
 
 	// state
 	contractsInitialized atomic.Bool
@@ -172,14 +175,17 @@ func NewPlugin(
 		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
 		metricsReporter:     reporter,
+		ocrTypeCodec:        ocrtypecodec.NewCommitCodecJSON(),
 	}
 }
 
+// Query returns the query for the next round.
+// NOTE: In most cases the Query phase should not return an error based on outCtx to prevent infinite retries.
 func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
 	var err error
 	var q committypes.Query
 
-	prevOutcome, err := committypes.DecodeOutcome(outCtx.PreviousOutcome)
+	prevOutcome, err := p.ocrTypeCodec.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
 	}
@@ -199,7 +205,7 @@ func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (ty
 		p.lggr.Errorw("get chain fee query", "err", err)
 	}
 
-	return q.Encode()
+	return p.ocrTypeCodec.EncodeQuery(q)
 }
 
 func (p *Plugin) ObservationQuorum(
@@ -214,6 +220,8 @@ func (p *Plugin) ObservationQuorum(
 	), nil
 }
 
+// Observation returns the observation for this round.
+// NOTE: In most cases the Observation phase should not return an error based on outCtx to prevent infinite retries.
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
@@ -234,7 +242,7 @@ func (p *Plugin) Observation(
 	// If the contracts are not initialized then only submit contracts discovery related observation.
 	if !p.contractsInitialized.Load() && p.discoveryProcessor != nil {
 		obs := committypes.Observation{DiscoveryObs: discoveryObs}
-		encoded, err := obs.Encode()
+		encoded, err := p.ocrTypeCodec.EncodeObservation(obs)
 		if err != nil {
 			return nil, fmt.Errorf("encode discovery observation: %w, observation: %+v", err, obs)
 		}
@@ -245,12 +253,12 @@ func (p *Plugin) Observation(
 		return encoded, nil
 	}
 
-	prevOutcome, err := committypes.DecodeOutcome(outCtx.PreviousOutcome)
+	prevOutcome, err := p.ocrTypeCodec.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
 	}
 
-	decodedQ, err := committypes.DecodeCommitPluginQuery(q)
+	decodedQ, err := p.ocrTypeCodec.DecodeQuery(q)
 	if err != nil {
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
@@ -276,7 +284,7 @@ func (p *Plugin) Observation(
 
 	p.metricsReporter.TrackObservation(obs)
 
-	encoded, err := obs.Encode()
+	encoded, err := p.ocrTypeCodec.EncodeObservation(obs)
 	if err != nil {
 		return nil, fmt.Errorf("encode observation: %w, observation: %+v, seq nr: %d", err, obs, outCtx.SeqNr)
 	}
@@ -359,12 +367,12 @@ func (p *Plugin) Outcome(
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseOutcome)
 	lggr.Debugw("commit plugin performing outcome", "attributedObservations", aos)
 
-	prevOutcome, err := committypes.DecodeOutcome(outCtx.PreviousOutcome)
+	prevOutcome, err := p.ocrTypeCodec.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
 	}
 
-	decodedQ, err := committypes.DecodeCommitPluginQuery(q)
+	decodedQ, err := p.ocrTypeCodec.DecodeQuery(q)
 	if err != nil {
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
@@ -375,7 +383,7 @@ func (p *Plugin) Outcome(
 	discoveryObservations := make([]plugincommon.AttributedObservation[dt.Observation], 0, len(aos))
 
 	for _, ao := range aos {
-		obs, err := committypes.DecodeCommitPluginObservation(ao.Observation)
+		obs, err := p.ocrTypeCodec.DecodeObservation(ao.Observation)
 		if err != nil {
 			lggr.Warnw("failed to decode observation, observation skipped", "err", err)
 			continue
@@ -403,7 +411,8 @@ func (p *Plugin) Outcome(
 		// we ignore the outcome of the discovery processor.
 		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
-			return nil, fmt.Errorf("discovery processor outcome: %w, seqNr: %d", err, outCtx.SeqNr)
+			p.lggr.Errorw("failed to get discovery processor outcome", "err", err)
+			return nil, nil
 		}
 		p.contractsInitialized.Store(true)
 	}
@@ -448,7 +457,7 @@ func (p *Plugin) Outcome(
 
 	lggr.Infow("Commit plugin finished outcome", "outcome", out)
 
-	return out.Encode()
+	return p.ocrTypeCodec.EncodeOutcome(out)
 }
 
 func (p *Plugin) getMainOutcome(
@@ -468,12 +477,15 @@ func (p *Plugin) getMainOutcome(
 	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
 	if waitingForPriceUpdatesToMakeItOnchain {
 		remainingPriceChecks := prevOutcome.MainOutcome.RemainingPriceChecks - 1
+		inflightOcrSeqNum := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber
+
 		if remainingPriceChecks < 0 {
 			remainingPriceChecks = 0
+			inflightOcrSeqNum = 0
 		}
 
 		return committypes.MainOutcome{
-			InflightPriceOcrSequenceNumber: prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+			InflightPriceOcrSequenceNumber: inflightOcrSeqNum,
 			RemainingPriceChecks:           remainingPriceChecks,
 		}
 	}
@@ -487,12 +499,20 @@ func (p *Plugin) getMainOutcome(
 func (p *Plugin) Close() error {
 	p.lggr.Infow("closing commit plugin")
 
-	return services.CloseAll(
+	closeable := []io.Closer{
 		p.merkleRootProcessor,
 		p.tokenPriceProcessor,
 		p.chainFeeProcessor,
 		p.discoveryProcessor,
-	)
+	}
+
+	// Chains without RMN don't initialize the RMNHomeReader
+	// TODO Consider initializing rmnHomeReader anyway but using some noop implementation
+	if p.rmnHomeReader != nil {
+		closeable = append(closeable, p.rmnHomeReader)
+	}
+
+	return services.CloseAll(closeable...)
 }
 
 // Assuming that we have to delegate a specific amount of time to the observation requests and the report requests.

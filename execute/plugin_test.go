@@ -33,24 +33,33 @@ import (
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
+var jsonOcrTypeCodec = ocrtypecodec.NewExecCodecJSON()
+
 func Test_getPendingExecutedReports(t *testing.T) {
+	canExecute := func(ret bool) CanExecuteHandle {
+		return func(cciptypes.ChainSelector, cciptypes.Bytes32) bool { return ret }
+	}
+
 	tests := []struct {
-		name    string
-		reports []plugintypes2.CommitPluginReportWithMeta
-		ranges  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
-		want    exectypes.CommitObservations
-		wantErr assert.ErrorAssertionFunc
+		name         string
+		reports      []plugintypes2.CommitPluginReportWithMeta
+		ranges       map[cciptypes.ChainSelector][]cciptypes.SeqNum
+		canExec      CanExecuteHandle
+		wantObs      exectypes.CommitObservations
+		wantExecuted []exectypes.CommitData
+		wantErr      assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
 			reports: nil,
 			ranges:  nil,
-			want:    exectypes.CommitObservations{},
+			wantObs: exectypes.CommitObservations{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -69,10 +78,10 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					},
 				},
 			},
-			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: nil,
 			},
-			want: exectypes.CommitObservations{
+			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
 						SourceChain:         1,
@@ -100,13 +109,10 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					},
 				},
 			},
-			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
-				1: {
-					cciptypes.NewSeqNumRange(1, 3),
-					cciptypes.NewSeqNumRange(7, 8),
-				},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {1, 2, 3, 7, 8},
 			},
-			want: exectypes.CommitObservations{
+			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
 						SourceChain:         1,
@@ -133,39 +139,99 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					Report:    cciptypes.CommitPluginReport{},
 				},
 			},
-			ranges:  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{},
-			want:    exectypes.CommitObservations{},
+			ranges:  map[cciptypes.ChainSelector][]cciptypes.SeqNum{},
+			wantObs: exectypes.CommitObservations{},
 			wantErr: assert.NoError,
+		},
+		{
+			name: "single fully-executed report",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						MerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: cciptypes.NewSeqNumRange(1, 10).ToSlice(),
+			},
+			wantObs: exectypes.CommitObservations{
+				1: nil,
+			},
+			wantExecuted: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+					Timestamp:           time.UnixMilli(10101010101),
+					BlockNum:            999,
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "single known-executed report",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						MerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			canExec: canExecute(false),
+			ranges:  nil,
+			wantObs: exectypes.CommitObservations{
+				1: nil,
+			},
+			wantExecuted: nil, // the executed message is not returned.
+			wantErr:      assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			if tt.canExec == nil {
+				tt.canExec = canExecute(true)
+			}
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			mockReader.On(
 				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			).Return(tt.reports, nil)
 			for k, v := range tt.ranges {
-				mockReader.On("ExecutedMessageRanges", mock.Anything, k, mock.Anything, mock.Anything).Return(v, nil)
+				mockReader.On("ExecutedMessages", mock.Anything, k, mock.Anything, mock.Anything).Return(v, nil)
 			}
 
 			// CCIP Reader mocks:
 			// once:
 			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
 			// for each chain selector:
-			//      ExecutedMessageRanges(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNumRange, error)
-			got, err := getPendingExecutedReports(
+			//      ExecutedMessages(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNum, error)
+			got, got2, err := getPendingExecutedReports(
 				context.Background(),
 				mockReader,
-				123,
+				tt.canExec,
 				time.Now(),
 				logger.Test(t),
 			)
 			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
 				return
 			}
-			assert.Equalf(t, tt.want, got, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantObs, got, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantExecuted, got2, "getPendingExecutedReports(...)")
 		})
 	}
 }
@@ -197,7 +263,7 @@ func TestPlugin_ObservationQuorum(t *testing.T) {
 
 func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 	ctx := tests.Context(t)
-	p := &Plugin{}
+	p := &Plugin{ocrTypeCodec: jsonOcrTypeCodec}
 	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: []byte("not a valid observation"),
 	})
@@ -207,7 +273,9 @@ func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 
 func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
 	ctx := tests.Context(t)
-	p := &Plugin{}
+	p := &Plugin{
+		ocrTypeCodec: jsonOcrTypeCodec,
+	}
 	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: []byte(`{"oracleID": "0xdeadbeef"}`),
 	})
@@ -215,7 +283,7 @@ func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "error finding supported chains by node: oracle ID 0 not found in oracleIDToP2pID")
 }
 
-func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
+func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
@@ -228,7 +296,8 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
 			0: {},
 		},
-		lggr: lggr,
+		ocrTypeCodec: jsonOcrTypeCodec,
+		lggr:         lggr,
 	}
 
 	observation := exectypes.NewObservation(nil, exectypes.MessageObservations{
@@ -240,13 +309,60 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 			},
 		},
 	}, nil, nil, nil, dt.Observation{}, nil)
-	encoded, err := observation.Encode()
+	encoded, err := jsonOcrTypeCodec.EncodeObservation(observation)
+	require.NoError(t, err)
+
+	prevOutcome := exectypes.Outcome{
+		State: exectypes.GetCommitReports,
+	}
+	encodedPrevOutcome, err := jsonOcrTypeCodec.EncodeOutcome(prevOutcome)
+	require.NoError(t, err)
+	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{PreviousOutcome: encodedPrevOutcome}, types.Query{},
+		types.AttributedObservation{
+			Observation: encoded,
+		})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validate observer reading eligibility: observer not allowed to read from chain 0")
+}
+
+func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+
+	mockHomeChain := reader_mock.NewMockHomeChain(t)
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet[cciptypes.ChainSelector](), nil)
+	defer mockHomeChain.AssertExpectations(t)
+
+	p := &Plugin{
+		homeChain: mockHomeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+		lggr:         lggr,
+		ocrTypeCodec: jsonOcrTypeCodec,
+	}
+
+	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{
+				MerkleRoot:          cciptypes.Bytes32{},
+				SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2),
+				SourceChain:         1,
+			},
+		},
+	}
+	observation := exectypes.NewObservation(
+		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+	)
+	encoded, err := jsonOcrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
 	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: encoded,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validate observer reading eligibility: observer not allowed to read from chain 0")
+	assert.Contains(t,
+		err.Error(),
+		"validate commit reports reading eligibility: observer not allowed to read from chain 1")
 }
 
 func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
@@ -254,7 +370,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
-	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(0)), nil)
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
 
 	p := &Plugin{
 		lggr:      lggr,
@@ -262,20 +378,21 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
 			0: {},
 		},
+		ocrTypeCodec: jsonOcrTypeCodec,
 	}
 
 	// Reports with duplicate roots.
 	root := cciptypes.Bytes32{}
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
-			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2), Messages: EmptyMessagesForRange(1, 2)},
-			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 5), Messages: EmptyMessagesForRange(1, 5)},
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2), SourceChain: 1},
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 5), SourceChain: 1},
 		},
 	}
 	observation := exectypes.NewObservation(
 		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
 	)
-	encoded, err := observation.Encode()
+	encoded, err := jsonOcrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
 	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: encoded,
@@ -284,9 +401,47 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "validate observed sequence numbers: duplicate merkle root")
 }
 
+func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+
+	mockHomeChain := reader_mock.NewMockHomeChain(t)
+	mockHomeChain.EXPECT().GetSupportedChainsForPeer(mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	mockDiscoveryProcessor := plugincommon_mock.NewMockPluginProcessor[dt.Query, dt.Observation, dt.Outcome](t)
+	mockDiscoveryProcessor.EXPECT().ValidateObservation(dt.Outcome{}, dt.Query{}, mock.Anything).Return(nil)
+
+	p := &Plugin{
+		lggr:      lggr,
+		homeChain: mockHomeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+		discovery:    mockDiscoveryProcessor,
+		ocrTypeCodec: jsonOcrTypeCodec,
+	}
+
+	// Reports with duplicate roots.
+	root := cciptypes.Bytes32{}
+	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+		1: {
+			{MerkleRoot: root, SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2), SourceChain: 1},
+		},
+	}
+	observation := exectypes.NewObservation(
+		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+	)
+	encoded, err := jsonOcrTypeCodec.EncodeObservation(observation)
+	require.NoError(t, err)
+	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+		Observation: encoded,
+	})
+	require.NoError(t, err)
+}
+
 func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
 	p := &Plugin{
-		lggr: logger.Test(t),
+		lggr:         logger.Test(t),
+		ocrTypeCodec: jsonOcrTypeCodec,
 	}
 	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{
 		PreviousOutcome: []byte("not a valid observation"),
@@ -299,11 +454,13 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
+	mockHomeChain.EXPECT().GetFChain().Return(map[cciptypes.ChainSelector]int{}, nil)
 
 	p := &Plugin{
 		homeChain:       mockHomeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{},
 		lggr:            lggr,
+		ocrTypeCodec:    jsonOcrTypeCodec,
 	}
 
 	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{}, nil)
@@ -314,18 +471,24 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 
 func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
-	expectedFChain := map[cciptypes.ChainSelector]int{
+	fChainMap := map[cciptypes.ChainSelector]int{
 		1: 1,
 		2: 2,
 	}
-	homeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 
 	p := &Plugin{
-		homeChain: homeChain,
-		lggr:      logger.Test(t),
+		lggr:         logger.Test(t),
+		ocrTypeCodec: jsonOcrTypeCodec,
 	}
-	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, nil)
+	observation, err := jsonOcrTypeCodec.EncodeObservation(exectypes.Observation{
+		Contracts: dt.Observation{}, FChain: fChainMap,
+	})
+	require.NoError(t, err)
+	_, err = p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+		{
+			Observation: observation,
+		},
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "destination chain 0 is not in FChain")
 }
@@ -333,7 +496,8 @@ func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 	ctx := tests.Context(t)
 	p := &Plugin{
-		lggr: logger.Test(t),
+		lggr:         logger.Test(t),
+		ocrTypeCodec: jsonOcrTypeCodec,
 	}
 	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil,
 		[]types.AttributedObservation{
@@ -348,59 +512,51 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {
 	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
-	expectedFChain := map[cciptypes.ChainSelector]int{
+	fChainMap := map[cciptypes.ChainSelector]int{
 		0: 1,
 		2: 2,
 	}
-	homeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	p := &Plugin{
-		homeChain: homeChain,
 		reportingCfg: ocr3types.ReportingPluginConfig{
 			F: 1,
 		},
-		lggr: logger.Test(t),
+		lggr:         logger.Test(t),
+		ocrTypeCodec: jsonOcrTypeCodec,
 	}
-	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil,
-		[]types.AttributedObservation{})
+	observation, err := jsonOcrTypeCodec.EncodeObservation(exectypes.Observation{
+		Contracts: dt.Observation{}, FChain: fChainMap,
+	})
+	require.NoError(t, err)
+	_, err = p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+		{
+			Observation: observation,
+		},
+	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "below F threshold")
-}
-
-func TestPlugin_Outcome_HomeChainError(t *testing.T) {
-	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
-	homeChain.On("GetFChain", mock.Anything).Return(nil, fmt.Errorf("test error"))
-
-	p := &Plugin{
-		homeChain: homeChain,
-		lggr:      logger.Test(t),
-	}
-	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to get FChain: test error")
+	// because fChain observations doesn't reach consensus with the low number of observations
+	assert.Contains(t, err.Error(), "destination chain 0 is not in FChain")
 }
 
 func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
 		0:  3,
 	}
-	homeChain.On("GetFChain", mock.Anything).Return(fChainMap, nil)
 
 	p := &Plugin{
-		homeChain: homeChain,
-		lggr:      logger.Test(t),
+		lggr:         logger.Test(t),
+		ocrTypeCodec: jsonOcrTypeCodec,
 	}
 
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {},
 	}
-	observation, err := exectypes.NewObservation(
-		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
-	).Encode()
+	observation, err := jsonOcrTypeCodec.EncodeObservation(exectypes.Observation{
+		CommitReports: commitReports,
+		Contracts:     dt.Observation{},
+		FChain:        fChainMap,
+	})
 	require.NoError(t, err)
 	outcome, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -413,16 +569,14 @@ func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 
 func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 	ctx := tests.Context(t)
-	homeChain := reader_mock.NewMockHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		0:  3,
 		10: 20,
 	}
-	homeChain.On("GetFChain", mock.Anything).Return(fChainMap, nil)
 
 	p := &Plugin{
-		homeChain: homeChain,
-		lggr:      logger.Test(t),
+		lggr:         logger.Test(t),
+		ocrTypeCodec: jsonOcrTypeCodec,
 	}
 
 	// map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
@@ -435,9 +589,9 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 			},
 		},
 	}
-	observation, err := exectypes.NewObservation(
-		nil, messages, nil, nil, nil, dt.Observation{}, nil,
-	).Encode()
+	observation, err := jsonOcrTypeCodec.EncodeObservation(exectypes.Observation{
+		Messages: messages, Contracts: dt.Observation{}, FChain: fChainMap,
+	})
 	require.NoError(t, err)
 	outcome, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -451,7 +605,8 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 func TestPlugin_Reports_UnableToParse(t *testing.T) {
 	ctx := tests.Context(t)
 	p := &Plugin{
-		lggr: logger.Test(t),
+		lggr:         logger.Test(t),
+		ocrTypeCodec: jsonOcrTypeCodec,
 	}
 	_, err := p.Reports(ctx, 0, ocr3types.Outcome("not a valid observation"))
 	require.Error(t, err)
@@ -463,8 +618,9 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
-	p := &Plugin{reportCodec: codec, lggr: logger.Test(t)}
-	report, err := exectypes.NewOutcome(exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}).Encode()
+	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: jsonOcrTypeCodec}
+	report, err := jsonOcrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
+		exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}))
 	require.NoError(t, err)
 
 	_, err = p.Reports(ctx, 0, report)
@@ -554,7 +710,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{
 						CursedSourceChains: map[cciptypes.ChainSelector]bool{
 							1: false,
@@ -576,7 +732,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{}, fmt.Errorf("test error"))
 
 				homeChain := basicHomeChain()
@@ -596,7 +752,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{GlobalCurse: true}, nil)
 
 				homeChain := basicHomeChain()
@@ -616,7 +772,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{CursedDestination: true}, nil)
 
 				homeChain := basicHomeChain()
@@ -636,7 +792,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{1: true}}, nil)
 
 				homeChain := basicHomeChain()

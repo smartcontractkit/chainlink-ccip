@@ -2,6 +2,7 @@ package commit
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -26,6 +27,7 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -65,7 +67,8 @@ func Test_maxQueryLength(t *testing.T) {
 		TokenPriceQuery: tokenprice.Query{},
 		ChainFeeQuery:   chainfee.Query{},
 	}
-	b, err := q.Encode()
+
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeQuery(q)
 	require.NoError(t, err)
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
@@ -126,7 +129,7 @@ func Test_maxObservationLength(t *testing.T) {
 	maxObs := committypes.Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenprice.Observation{
-			FeedTokenPrices: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
+			FeedTokenPrices: make(ccipocr3.TokenPriceMap),
 			FeeQuoterTokenUpdates: make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig,
 				estimatedMaxNumberOfPricedTokens),
 			FChain:    make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
@@ -146,20 +149,28 @@ func Test_maxObservationLength(t *testing.T) {
 		FChain: make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
 	}
 
-	for i := range maxObs.TokenPriceObs.FeedTokenPrices {
-		maxObs.TokenPriceObs.FeedTokenPrices[i] = ccipocr3.TokenPrice{
-			TokenID: ccipocr3.UnknownEncodedAddress(strings.Repeat("x", 20)),
-			Price:   ccipocr3.NewBigIntFromInt64(math.MaxInt64),
-		}
+	for i := range estimatedMaxNumberOfPricedTokens {
+		tokenID := ccipocr3.UnknownEncodedAddress(generateStringWithCounter(i, 20))
+		maxObs.TokenPriceObs.FeedTokenPrices[tokenID] = ccipocr3.NewBigIntFromInt64(math.MaxInt64)
 	}
 
-	b, err := maxObs.Encode()
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeObservation(maxObs)
 	require.NoError(t, err)
 
 	const testOffset = 50
 	assert.Greater(t, maxObservationLength, len(b)-testOffset)
 	assert.Less(t, maxObservationLength, len(b)+testOffset)
 	assert.Less(t, maxObservationLength, ocr3types.MaxMaxObservationLength)
+}
+
+// Generate a string with a counter and fill the rest with 'x's
+func generateStringWithCounter(counter, length int) string {
+	counterStr := fmt.Sprintf("%d", counter)
+	paddingLength := length - len(counterStr)
+	if paddingLength < 0 {
+		paddingLength = 0
+	}
+	return counterStr + strings.Repeat("x", paddingLength)
 }
 
 func Test_maxOutcomeLength(t *testing.T) {
@@ -181,7 +192,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 			},
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
-			TokenPrices: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
+			TokenPrices: make(ccipocr3.TokenPriceMap, estimatedMaxNumberOfSourceChains),
 		},
 		ChainFeeOutcome: chainfee.Outcome{
 			GasPrices: make([]ccipocr3.GasPriceChain, estimatedMaxNumberOfSourceChains),
@@ -217,12 +228,9 @@ func Test_maxOutcomeLength(t *testing.T) {
 			NodeIndex:        math.MaxUint64,
 		}
 	}
-
-	for i := range maxOutc.TokenPriceOutcome.TokenPrices {
-		maxOutc.TokenPriceOutcome.TokenPrices[i] = ccipocr3.TokenPrice{
-			TokenID: ccipocr3.UnknownEncodedAddress(strings.Repeat("x", 20)),
-			Price:   ccipocr3.NewBigIntFromInt64(math.MaxInt64),
-		}
+	for i := range estimatedMaxNumberOfPricedTokens {
+		tokenID := ccipocr3.UnknownEncodedAddress(generateStringWithCounter(i, 20))
+		maxOutc.TokenPriceOutcome.TokenPrices[tokenID] = ccipocr3.NewBigIntFromInt64(math.MaxInt64)
 	}
 
 	for i := range maxOutc.ChainFeeOutcome.GasPrices {
@@ -232,10 +240,10 @@ func Test_maxOutcomeLength(t *testing.T) {
 		}
 	}
 
-	b, err := maxOutc.Encode()
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(maxOutc)
 	require.NoError(t, err)
 
-	const testOffset = 10
+	const testOffset = 50
 	assert.Greater(t, maxOutcomeLength, len(b)-testOffset)
 	assert.Less(t, maxOutcomeLength, len(b)+testOffset)
 	assert.Less(t, maxOutcomeLength, ocr3types.MaxMaxOutcomeLength)

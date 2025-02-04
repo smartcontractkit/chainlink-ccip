@@ -740,6 +740,112 @@ func Test_newRequestID(t *testing.T) {
 	}
 }
 
+func Test_chainsWithSufficientObservationResponses(t *testing.T) {
+	b1 := [32]byte{0, 0, 0, 0, 1}
+	b2 := [32]byte{0, 0, 0, 0, 2}
+	b3 := [32]byte{0, 0, 0, 0, 3}
+
+	testCases := []struct {
+		name                    string
+		updateRequests          map[uint64]updateRequestWithMeta
+		rmnObservationResponses []rmnSignedObservationWithMeta
+		homeFMap                map[cciptypes.ChainSelector]int
+		expChains               mapset.Set[cciptypes.ChainSelector]
+	}{
+		{
+			name: "one case with all scenarios",
+			updateRequests: map[uint64]updateRequestWithMeta{
+				1: { // all good for source chain 1
+					Data: &rmnpb.FixedDestLaneUpdateRequest{
+						LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 1},
+						ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
+					},
+				},
+				2: { // f not found
+					Data: &rmnpb.FixedDestLaneUpdateRequest{
+						LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 2},
+						ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 20, MaxMsgNr: 30},
+					},
+				},
+				3: { // not enough observations
+					Data: &rmnpb.FixedDestLaneUpdateRequest{
+						LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 3},
+						ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 30, MaxMsgNr: 40},
+					},
+				},
+				4: { // zero observations
+					Data: &rmnpb.FixedDestLaneUpdateRequest{
+						LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 4},
+						ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 40, MaxMsgNr: 50},
+					},
+				},
+			},
+			rmnObservationResponses: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 1, OnrampAddress: chainS1OnRamp},
+									Root:           b1[:],
+									ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
+								},
+								{
+									LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 2, OnrampAddress: chainS1OnRamp},
+									Root:           b2[:],
+									ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 20, MaxMsgNr: 30},
+								},
+								{
+									LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 3, OnrampAddress: chainS1OnRamp},
+									Root:           b2[:],
+									ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 30, MaxMsgNr: 40},
+								},
+							},
+						},
+					},
+				},
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 1},
+									Root:           b1[:],
+									ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
+								},
+								{
+									LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 2, OnrampAddress: chainS1OnRamp},
+									Root:           b2[:],
+									ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 20, MaxMsgNr: 30},
+								},
+								{
+									LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 3, OnrampAddress: chainS1OnRamp},
+									Root:           b3[:],
+									ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 30, MaxMsgNr: 40},
+								},
+							},
+						},
+					},
+				},
+			},
+			homeFMap: map[cciptypes.ChainSelector]int{
+				1: 1, // at least f+1 = 2
+				3: 2, // at least f+1 = 3
+			},
+			expChains: mapset.NewSet(cciptypes.ChainSelector(1)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			lggr := logger.Test(t)
+			chains := chainsWithSufficientObservationResponses(
+				lggr, tc.updateRequests, tc.rmnObservationResponses, tc.homeFMap)
+			assert.True(t, tc.expChains.Equal(chains))
+		})
+	}
+}
+
 func getDeterministicPubKey(t *testing.T) *ed25519.PublicKey {
 	// deterministically create a public key by seeding with a 32char string.
 	publicKey, _, err := ed25519.GenerateKey(

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -82,8 +83,8 @@ func AssertClosedAccount(ctx context.Context, t *testing.T, solanaGoClient *rpc.
 	require.True(t, isClosed)
 }
 
-func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, t *testing.T) (ccip_router.Any2SVMRampMessage, [32]byte) {
-	msg, hash, err := ccip.CreateNextMessage(ctx, solanaGoClient)
+func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, t *testing.T, remainingAccounts []solana.PublicKey) (ccip_router.Any2SVMRampMessage, [32]byte) {
+	msg, hash, err := ccip.CreateNextMessage(ctx, solanaGoClient, remainingAccounts)
 	require.NoError(t, err)
 	return msg, hash
 }
@@ -94,8 +95,25 @@ func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceC
 	return num
 }
 
-func MakeAnyToSVMMessage(t *testing.T, tokenReceiver solana.PublicKey, logicReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SVMRampMessage, [32]byte) {
-	msg, hash, err := ccip.MakeAnyToSVMMessage(tokenReceiver, logicReceiver, evmChainSelector, solanaChainSelector, data)
+func MakeAnyToSVMMessage(t *testing.T, tokenReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte, msgAccounts []solana.PublicKey) (ccip_router.Any2SVMRampMessage, [32]byte) {
+	msg, hash, err := ccip.MakeAnyToSVMMessage(tokenReceiver, evmChainSelector, solanaChainSelector, data, msgAccounts)
 	require.NoError(t, err)
 	return msg, hash
+}
+
+func MustMarshalBorsh(t *testing.T, v interface{}) []byte {
+	bz, err := bin.MarshalBorsh(v)
+	require.NoError(t, err)
+	return bz
+}
+
+func MustSerializeExtraArgs(t *testing.T, data interface{}, tag string) []byte {
+	b, err := ccip.SerializeExtraArgs(data, tag)
+	require.NoError(t, err)
+	return b
+}
+
+func MustDeserializeExtraArgs[A any](t *testing.T, obj A, data []byte, tag string) A {
+	require.NoError(t, ccip.DeserializeExtraArgs(obj, data, tag))
+	return obj
 }

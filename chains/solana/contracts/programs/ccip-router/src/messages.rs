@@ -2,8 +2,6 @@ use std::convert::Into;
 
 use anchor_lang::prelude::*;
 
-pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
-
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic header for OnRamp & OffRamp messages.
 // The messageId is not expected to match hash(message), since it may originate from another ramp family
@@ -35,25 +33,18 @@ pub struct ExecutionReportSingleChain {
     pub proofs: Vec<[u8; 32]>,
 }
 
+// Any2SVMRampExtraArgs is used during the execute or manual execute calls (offramp only)
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct SVMExtraArgs {
+pub struct Any2SVMRampExtraArgs {
     pub compute_units: u32,
-    pub is_writable_bitmap: u64,
-    pub accounts: Vec<Pubkey>,
+    pub is_writable_bitmap: u64, // part of the message to avoid calculating it onchain
 }
 
-impl SVMExtraArgs {
+impl Any2SVMRampExtraArgs {
     pub fn len(&self) -> usize {
         4 // compute units
         + 8 // isWritable bitmap
-        + 4 + self.accounts.len() * 32 // additional accounts
     }
-}
-
-#[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
-pub struct AnyExtraArgs {
-    pub gas_limit: u128,
-    pub allow_out_of_order_execution: bool,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -61,15 +52,12 @@ pub struct Any2SVMRampMessage {
     pub header: RampMessageHeader,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
-    // In EVM receiver means the address that all the listed tokens will transfer to and the address of the message execution.
-    // In Solana the receiver is split into two:
-    // Logic Receiver is the Program ID of the user's program that will execute the message
-    pub logic_receiver: Pubkey,
     // Token Receiver is the address which the ATA will be calculated from.
     // If token receiver and message execution, then the token receiver must be a PDA from the logic receiver
+    // (Logic receiver is passed into relevant instructions through `remaining_accounts`)
     pub token_receiver: Pubkey,
     pub token_amounts: Vec<Any2SVMTokenTransfer>,
-    pub extra_args: SVMExtraArgs,
+    pub extra_args: Any2SVMRampExtraArgs,
     pub on_ramp_address: Vec<u8>,
 }
 
@@ -80,7 +68,6 @@ impl Any2SVMRampMessage {
         self.header.len() // header
         + 4 + self.sender.len() // sender
         + 4 + self.data.len() // data
-        + 32 // logic receiver
         + 32 // token receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
@@ -97,7 +84,7 @@ pub struct SVM2AnyRampMessage {
     pub sender: Pubkey,            // sender address on the source chain
     pub data: Vec<u8>,             // arbitrary data payload supplied by the message sender
     pub receiver: Vec<u8>,         // receiver address on the destination chain
-    pub extra_args: AnyExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
+    pub extra_args: Vec<u8>, // destination-chain specific extra args, such as the gasLimit for EVM chains
     pub fee_token: Pubkey,
     pub token_amounts: Vec<SVM2AnyTokenTransfer>,
     pub fee_token_amount: CrossChainAmount,
@@ -152,7 +139,7 @@ pub struct SVM2AnyMessage {
     pub data: Vec<u8>,
     pub token_amounts: Vec<SVMTokenAmount>,
     pub fee_token: Pubkey, // pass zero address if native SOL
-    pub extra_args: ExtraArgsInput,
+    pub extra_args: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default, Debug, PartialEq, Eq)]
@@ -161,22 +148,12 @@ pub struct SVMTokenAmount {
     pub amount: u64, // u64 - amount local to solana
 }
 
-#[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
-pub struct ExtraArgsInput {
-    pub gas_limit: Option<u128>,
-    pub allow_out_of_order_execution: Option<bool>,
-}
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
 pub struct CrossChainAmount {
     le_bytes: [u8; 32],
 }
 
 impl CrossChainAmount {
-    pub const ZERO: Self = Self {
-        le_bytes: [0u8; 32],
-    };
-
     pub fn to_bytes(self) -> [u8; 32] {
         self.le_bytes
     }

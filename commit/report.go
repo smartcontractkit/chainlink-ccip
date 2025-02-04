@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -23,28 +21,12 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// ReportInfo is the info data that will be sent with the along with the report
-// It will be used to determine if the report should be accepted or not
-type ReportInfo struct {
-	// RemoteF Max number of faulty RMN nodes; f+1 signers are required to verify a report.
-	RemoteF uint64 `json:"remoteF"`
-}
-
-func (ri ReportInfo) Encode() ([]byte, error) {
-	return json.Marshal(ri)
-}
-
-// Decode should be used to decode the report info
-func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
-	return json.Unmarshal(encodedReportInfo, ri)
-}
-
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseReports)
 
-	outcome, err := committypes.DecodeOutcome(outcomeBytes)
+	outcome, err := p.ocrTypeCodec.DecodeOutcome(outcomeBytes)
 	if err != nil {
 		lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
 		return nil, fmt.Errorf("decode outcome: %w", err)
@@ -59,14 +41,14 @@ func (p *Plugin) Reports(
 
 	var (
 		rep     cciptypes.CommitPluginReport
-		repInfo ReportInfo
+		repInfo cciptypes.CommitReportInfo
 	)
 
 	// MerkleRoots and RMNSignatures will be empty arrays if there is nothing to report
 	rep = cciptypes.CommitPluginReport{
 		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
 		PriceUpdates: cciptypes.PriceUpdates{
-			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
+			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
@@ -78,7 +60,11 @@ func (p *Plugin) Reports(
 	}
 
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
-		repInfo = ReportInfo{RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.FSign}
+		repInfo = cciptypes.CommitReportInfo{
+			RemoteF:     outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
+			MerkleRoots: rep.MerkleRoots,
+			TokenPrices: rep.PriceUpdates.TokenPriceUpdates,
+		}
 	}
 
 	if rep.IsEmpty() {
@@ -147,8 +133,8 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
-	var reportInfo ReportInfo
-	if err := reportInfo.Decode(r.Info); err != nil {
+	var reportInfo cciptypes.CommitReportInfo
+	if reportInfo, err = cciptypes.DecodeCommitReportInfo(r.Info); err != nil {
 		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report info: %w", err)
 	}
 

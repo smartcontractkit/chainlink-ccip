@@ -1,3 +1,4 @@
+use crate::events::off_ramp as events;
 use anchor_lang::prelude::*;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
@@ -12,22 +13,23 @@ use super::pools::{
     validate_and_parse_token_accounts, TokenAccounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::ocr3base::Signatures;
 use crate::{
-    Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
-    CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
-    ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
-    MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
-    SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
-    UsdPerTokenUpdated, UsdPerUnitGasUpdated, DEST_CHAIN_STATE_SEED,
-    EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+    seed, Any2SVMRampMessage, CcipRouterError, CommitInput, CommitReport, CommitReportContext,
+    ExecuteReportContext, ExecutionReportSingleChain, GlobalState, MessageExecutionState,
+    OcrPluginType, RampMessageHeader, SVMTokenAmount, SourceChain,
 };
 
 pub fn commit<'info>(
     ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
-    report_context_byte_words: [[u8; 32]; 3],
-    report: CommitInput,
-    signatures: Vec<[u8; 65]>,
+    report_context_byte_words: [[u8; 32]; 2],
+    raw_report: Vec<u8>,
+    rs: Vec<[u8; 32]>,
+    ss: Vec<[u8; 32]>,
+    raw_vs: [u8; 32],
 ) -> Result<()> {
+    let report = CommitInput::deserialize(&mut raw_report.as_ref())
+        .map_err(|_| CcipRouterError::InvalidInputs)?;
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
 
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
@@ -68,8 +70,8 @@ pub fn commit<'info>(
         // - the accounts to update DestChain for gas prices
         // They must be in order:
         // 1. state_account
-        // 2. token_accounts[]
-        // 3. gas_accounts[]
+        // 2. fee quoter token_accounts[]
+        // 3. fee quoter gas_accounts[]
         // matching the order of the price updates in the CommitInput.
         // They must also all be writable so they can be updated.
         let minimum_remaining_accounts = 1
@@ -84,7 +86,7 @@ pub fn commit<'info>(
         let ocr_sequence_number = report_context.sequence_number();
 
         // The Global state PDA is sent as a remaining_account as it is optional to avoid having the lock when not modifying it, so all validations need to be done manually
-        let (expected_state_key, _) = Pubkey::find_program_address(&[STATE_SEED], &crate::ID);
+        let (expected_state_key, _) = Pubkey::find_program_address(&[seed::STATE], &crate::ID);
         require_keys_eq!(
             ctx.remaining_accounts[0].key(),
             expected_state_key,
@@ -102,19 +104,37 @@ pub fn commit<'info>(
             global_state.latest_price_sequence_number = ocr_sequence_number;
             global_state.exit(&crate::ID)?; // as it is manually loaded, it also has to be manually written back
 
-            // For each token price update, unpack the corresponding remaining_account and update the price.
-            // Keep in mind that the remaining_accounts are sorted in the same order as tokens and gas price updates in the report.
-            for (i, update) in report.price_updates.token_price_updates.iter().enumerate() {
-                apply_token_price_update(update, &ctx.remaining_accounts[i + 1])?;
-            }
+            let cpi_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
+            let cpi_signer = &[&cpi_seeds[..]];
+            let cpi_program = ctx.accounts.fee_quoter.to_account_info();
+            let cpi_accounts = fee_quoter::cpi::accounts::UpdatePrices {
+                config: ctx.accounts.fee_quoter_config.to_account_info(),
+                authority: ctx.accounts.fee_billing_signer.to_account_info(),
+            };
+            let cpi_remaining_accounts = ctx.remaining_accounts[1..].to_vec();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, cpi_signer)
+                .with_remaining_accounts(cpi_remaining_accounts);
 
-            // Skip the first state account and the ones for token updates
-            let offset = report.price_updates.token_price_updates.len() + 1;
+            let token_price_updates = report
+                .price_updates
+                .token_price_updates
+                .iter()
+                .map(|u| fee_quoter::context::TokenPriceUpdate {
+                    source_token: u.source_token,
+                    usd_per_token: u.usd_per_token,
+                })
+                .collect();
+            let gas_price_update = report
+                .price_updates
+                .gas_price_updates
+                .iter()
+                .map(|u| fee_quoter::context::GasPriceUpdate {
+                    dest_chain_selector: u.dest_chain_selector,
+                    usd_per_unit_gas: u.usd_per_unit_gas,
+                })
+                .collect();
 
-            // Do the same for gas price updates
-            for (i, update) in report.price_updates.gas_price_updates.iter().enumerate() {
-                apply_gas_price_update(update, &ctx.remaining_accounts[i + offset])?;
-            }
+            fee_quoter::cpi::update_prices(cpi_ctx, token_price_updates, gas_price_update)?;
         } else {
             // TODO check if this is really necessary. EVM has this validation checking that the
             // array of merkle roots in the report is not empty. But here, considering we only have 1 root per report,
@@ -174,7 +194,7 @@ pub fn commit<'info>(
     commit_report.min_msg_nr = root.min_seq_nr;
     commit_report.max_msg_nr = root.max_seq_nr;
 
-    emit!(CommitReportAccepted {
+    emit!(events::CommitReportAccepted {
         merkle_root: root.clone(),
         price_updates: report.price_updates.clone(),
     });
@@ -186,7 +206,7 @@ pub fn commit<'info>(
         OcrPluginType::Commit as u8,
         report_context,
         &Ocr3ReportForCommit(&report),
-        &signatures,
+        Signatures { rs, ss, raw_vs },
     )?;
 
     Ok(())
@@ -194,10 +214,13 @@ pub fn commit<'info>(
 
 pub fn execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    execution_report: ExecutionReportSingleChain,
-    report_context_byte_words: [[u8; 32]; 3],
+    raw_execution_report: Vec<u8>,
+    report_context_byte_words: [[u8; 32]; 2],
     token_indexes: &[u8],
 ) -> Result<()> {
+    let execution_report =
+        ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+            .map_err(|_| CcipRouterError::InvalidInputs)?;
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
     // limit borrowing of ctx
     {
@@ -209,7 +232,11 @@ pub fn execute<'info>(
             OcrPluginType::Execution as u8,
             report_context,
             &Ocr3ReportForExecutionReportSingleChain(&execution_report),
-            &[],
+            Signatures {
+                rs: vec![],
+                ss: vec![],
+                raw_vs: [0u8; 32],
+            },
         )?;
     }
 
@@ -218,7 +245,7 @@ pub fn execute<'info>(
 
 pub fn manually_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    execution_report: ExecutionReportSingleChain,
+    raw_execution_report: Vec<u8>,
     token_indexes: &[u8],
 ) -> Result<()> {
     // limit borrowing of ctx
@@ -234,110 +261,15 @@ pub fn manually_execute<'info>(
             CcipRouterError::ManualExecutionNotAllowed
         );
     }
+    let execution_report =
+        ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+            .map_err(|_| CcipRouterError::InvalidInputs)?;
     internal_execute(ctx, execution_report, token_indexes)
 }
 
 /////////////
 // Helpers //
 /////////////
-
-fn apply_token_price_update<'info>(
-    token_update: &TokenPriceUpdate,
-    token_config_account_info: &'info AccountInfo<'info>,
-) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(
-        &[FEE_BILLING_TOKEN_CONFIG, token_update.source_token.as_ref()],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        token_config_account_info.key(),
-        expected,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        token_config_account_info.is_writable,
-        CcipRouterError::InvalidInputs
-    );
-
-    let token_config_account: &mut Account<BillingTokenConfigWrapper> =
-        &mut Account::try_from(token_config_account_info)?;
-
-    require!(
-        token_config_account.version == 1,
-        CcipRouterError::InvalidInputs
-    );
-
-    token_config_account.config.usd_per_token = TimestampedPackedU224 {
-        value: token_update.usd_per_token,
-        timestamp: Clock::get()?.unix_timestamp,
-    };
-
-    emit!(UsdPerTokenUpdated {
-        token: token_config_account.config.mint,
-        value: token_config_account.config.usd_per_token.value,
-        timestamp: token_config_account.config.usd_per_token.timestamp,
-    });
-
-    // As the account is manually loaded from the AccountInfo, it also needs to be manually
-    // written back to so the changes are persisted.
-    token_config_account.exit(&crate::ID)
-}
-
-fn apply_gas_price_update<'info>(
-    gas_update: &GasPriceUpdate,
-    dest_chain_state_account_info: &'info AccountInfo<'info>,
-) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(
-        &[
-            DEST_CHAIN_STATE_SEED,
-            gas_update.dest_chain_selector.to_le_bytes().as_ref(),
-        ],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        dest_chain_state_account_info.key(),
-        expected,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        dest_chain_state_account_info.is_writable,
-        CcipRouterError::InvalidInputs
-    );
-
-    // The passed-in chain_state account may refer to the same chain but it only corresponds to source.
-    // To update the price that values correspond to the destination, which is a different account.
-    // As the account is sent as additional accounts, then Anchor won't automatically (de)serialize the account
-    // as it is not the one in the context, so we have to do it manually load it and write it back
-    let dest_chain_state_account = &mut Account::try_from(dest_chain_state_account_info)?;
-    update_chain_state_gas_price(dest_chain_state_account, gas_update)?;
-    dest_chain_state_account.exit(&crate::ID)?;
-    Ok(())
-}
-
-fn update_chain_state_gas_price(
-    chain_state_account: &mut Account<DestChain>,
-    gas_update: &GasPriceUpdate,
-) -> Result<()> {
-    require!(
-        chain_state_account.version == 1,
-        CcipRouterError::InvalidInputs
-    );
-
-    chain_state_account.state.usd_per_unit_gas = TimestampedPackedU224 {
-        value: gas_update.usd_per_unit_gas,
-        timestamp: Clock::get()?.unix_timestamp,
-    };
-
-    emit!(UsdPerUnitGasUpdated {
-        dest_chain: gas_update.dest_chain_selector,
-        value: chain_state_account.state.usd_per_unit_gas.value,
-        timestamp: chain_state_account.state.usd_per_unit_gas.timestamp,
-    });
-
-    Ok(())
-}
 
 // internal_execute is the base execution logic without any additional validation
 fn internal_execute<'info>(
@@ -381,14 +313,12 @@ fn internal_execute<'info>(
     let original_state = execution_state::get(commit_report, message_header.sequence_number);
 
     if original_state == MessageExecutionState::Success {
-        emit!(SkippedAlreadyExecutedMessage {
+        emit!(events::SkippedAlreadyExecutedMessage {
             source_chain_selector: message_header.source_chain_selector,
             sequence_number: message_header.sequence_number,
         });
         return Ok(());
     }
-
-    let hashed_leaf = verify_merkle_root(&execution_report)?;
 
     // send tokens any -> SOL
     require!(
@@ -396,7 +326,7 @@ fn internal_execute<'info>(
             && token_indexes.len() == execution_report.offchain_token_data.len(),
         CcipRouterError::InvalidInputs,
     );
-    let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
+    let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
     let mut token_amounts = vec![SVMTokenAmount::default(); token_indexes.len()];
 
     // handle tokens
@@ -450,11 +380,13 @@ fn internal_execute<'info>(
             CcipRouterError::OfframpInvalidDataLength
         );
 
+        // parse pool return data into SVMTokenAmount
         token_amounts[i] = SVMTokenAmount {
             token: accs.mint.key(),
             amount: ReleaseOrMintOutV1::try_from_slice(&return_data)?.destination_amount,
         };
 
+        // validate user recieved tokens according to the amount returned by the token pool
         let post_bal = get_balance(accs.user_token_account)?;
         require!(
             post_bal >= init_bal && post_bal - init_bal == token_amounts[i].amount,
@@ -465,22 +397,17 @@ fn internal_execute<'info>(
     let message = Any2SVMMessage {
         message_id: execution_report.message.header.message_id,
         source_chain_selector: execution_report.source_chain_selector,
-        sender: execution_report.message.sender,
-        data: execution_report.message.data,
+        sender: execution_report.message.sender.clone(),
+        data: execution_report.message.data.clone(),
         token_amounts,
     };
 
-    // handle CPI call if there are extra accounts
+    // handle CPI call if there are message accounts in the remaining_accounts
     // case: no tokens, but there are remaining_accounts passed in
-    // case: tokens, but the first token has a non-zero index (indicating extra accounts before token accounts)
-    if should_execute_messaging(
-        &execution_report.message.logic_receiver,
-        ctx.remaining_accounts.is_empty(),
-    ) {
+    // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
+    let hashed_leaf = if should_execute_messaging(ctx.remaining_accounts, token_indexes) {
         let (msg_program, msg_accounts) = parse_messaging_accounts(
             token_indexes,
-            execution_report.message.logic_receiver,
-            &execution_report.message.extra_args.accounts,
             &execution_report.message.extra_args.is_writable_bitmap,
             ctx.remaining_accounts,
         )?;
@@ -513,13 +440,19 @@ fn internal_execute<'info>(
         };
 
         let seeds = &[
-            EXTERNAL_EXECUTION_CONFIG_SEED,
+            seed::EXTERNAL_EXECUTION_CONFIG,
             &[ctx.bumps.external_execution_config],
         ];
         let signer = &[&seeds[..]];
 
         invoke_signed(&instruction, &acc_infos, signer)?;
-    }
+        let recv_and_msg_account_keys = Some(*msg_program.key)
+            .into_iter()
+            .chain(msg_accounts.iter().map(|a| *a.key));
+        verify_merkle_root(&execution_report, recv_and_msg_account_keys)?
+    } else {
+        verify_merkle_root(&execution_report, None.into_iter())?
+    };
 
     let new_state = MessageExecutionState::Success;
     execution_state::set(
@@ -528,7 +461,7 @@ fn internal_execute<'info>(
         new_state.to_owned(),
     );
 
-    emit!(ExecutionStateChanged {
+    emit!(events::ExecutionStateChanged {
         source_chain_selector: message_header.source_chain_selector,
         sequence_number: message_header.sequence_number,
         message_id: message_header.message_id, // Unique identifier for the message, generated with the source chain's encoding scheme
@@ -559,11 +492,14 @@ fn get_token_accounts_for<'a>(
     Ok(accs)
 }
 
-// should_execute_messaging checks if:
-// 1. There is at least one account used for messaging (the first subset of accounts). This is because the first account is the program id to do the CPI
-// 2. AND the logic_receiver has a value different than zeros
-fn should_execute_messaging(logic_receiver: &Pubkey, remaining_accounts_empty: bool) -> bool {
-    !remaining_accounts_empty && *logic_receiver != Pubkey::default()
+// There is at least one account used for messaging (the first subset of accounts). This is because the first account is the program id to do the CPI
+fn should_execute_messaging<'a>(
+    remaining_accounts: &'a [AccountInfo<'a>],
+    token_indices: &[u8],
+) -> bool {
+    // The first entry in the accounts corresponds to a token, which means there is no logic receiver
+    let only_tokens = token_indices.first().map(|i| *i == 0).unwrap_or_default();
+    !remaining_accounts.is_empty() && !only_tokens
 }
 
 /// parse_message_accounts returns all the accounts needed to execute the CPI instruction
@@ -572,13 +508,13 @@ fn should_execute_messaging(logic_receiver: &Pubkey, remaining_accounts_empty: b
 ///
 /// # Arguments
 /// * `token_indexes` - start indexes of token pool accounts, used to determine ending index for arbitrary messaging accounts
-/// * `logic_receiver` - receiver address from x-chain message, used to validate `remaining_accounts`
-/// * `extra_args_accounts` - arbitrary messaging accounts from the x-chain message, used to validate `accounts`.
-/// * `remaining_accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [program, receiver, ...additional message accounts]
+/// * `remaining_accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [logic_receiver, ...additional message accounts]
+///
+/// # Return values
+//  * `logic_receiver` is the Program ID of the user's program that will execute the message.
+//  * `msg_accounts` the remaining list of accounts used for the arbitrary execution
 fn parse_messaging_accounts<'info>(
     token_indexes: &[u8],
-    logic_receiver: Pubkey,
-    extra_args_accounts: &[Pubkey],
     source_bitmap: &u64,
     remaining_accounts: &'info [AccountInfo<'info>],
 ) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
@@ -593,35 +529,27 @@ fn parse_messaging_accounts<'info>(
         CcipRouterError::InvalidInputs
     ); // there could be other remaining accounts used for tokens
 
-    let msg_program = &remaining_accounts[0];
+    let logic_receiver = &remaining_accounts[0];
     let msg_accounts = &remaining_accounts[1..end_index];
 
-    require!(
-        logic_receiver == msg_program.key(),
-        CcipRouterError::InvalidInputs,
-    );
-    require!(
-        msg_accounts.len() == extra_args_accounts.len(), // assert same number of accounts passed from message and transaction
-        CcipRouterError::InvalidInputs
-    );
-
-    // Validate the addresses of all the accounts match the ones in source chain
-    if msg_accounts.len() > 1 {
-        for (i, acc) in extra_args_accounts.iter().enumerate() {
-            let current_acc = &msg_accounts[i];
-            require!(*acc == current_acc.key(), CcipRouterError::InvalidInputs);
-            require!(
-                is_writable(source_bitmap, (i) as u8) == current_acc.is_writable,
-                CcipRouterError::InvalidInputs
-            );
-        }
+    // Validate that the bitmap corresponds to the individual writable flags
+    for (i, acc) in msg_accounts.iter().enumerate().skip(1) {
+        require!(
+            is_writable(source_bitmap, i as u8) == acc.is_writable,
+            CcipRouterError::InvalidWritabilityBitmap
+        );
     }
 
-    Ok((msg_program, msg_accounts))
+    Ok((logic_receiver, msg_accounts))
 }
 
-pub fn verify_merkle_root(execution_report: &ExecutionReportSingleChain) -> Result<[u8; 32]> {
-    let hashed_leaf = hash(&execution_report.message);
+pub fn verify_merkle_root(
+    execution_report: &ExecutionReportSingleChain,
+    // logic receiver followed by all other message account keys, when they were
+    // provided (i.e. when the message isn't a token transfer exclusively)
+    recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+) -> Result<[u8; 32]> {
+    let hashed_leaf = hash(&execution_report.message, recv_and_msg_account_keys);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
         calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
     require!(
@@ -670,7 +598,10 @@ pub fn validate_execution_report<'info>(
     Ok(())
 }
 
-fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
+fn hash(
+    msg: &Any2SVMRampMessage,
+    recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+) -> [u8; 32] {
     use anchor_lang::solana_program::keccak;
 
     // Calculate vectors size to ensure that the hash is unique
@@ -684,6 +615,10 @@ fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
+    let remaining_account_bytes: Vec<u8> = recv_and_msg_account_keys
+        .flat_map(|k| k.try_to_vec().unwrap())
+        .collect();
+
     // As similar as https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L111
     let result = keccak::hashv(&[
         LEAF_DOMAIN_SEPARATOR.as_slice(),
@@ -696,7 +631,6 @@ fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
         // message header
         &msg.header.message_id,
         &msg.token_receiver.to_bytes(),
-        &msg.logic_receiver.to_bytes(),
         &header_sequence_number,
         msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialized
         &header_nonce,
@@ -707,6 +641,8 @@ fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
         &msg.data,
         // token transfers
         msg.token_amounts.try_to_vec().unwrap().as_ref(), // borsh serialized
+        // Remaining accounts (passed outside `Any2SVMRampMessage`)
+        &remaining_account_bytes,
     ]);
 
     result.to_bytes()
@@ -835,7 +771,7 @@ mod tests {
     use ethnum::U256;
 
     use super::*;
-    use crate::{Any2SVMRampMessage, Any2SVMTokenTransfer, SVMExtraArgs};
+    use crate::{Any2SVMRampExtraArgs, Any2SVMRampMessage, Any2SVMTokenTransfer};
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
@@ -849,8 +785,6 @@ mod tests {
             ]
             .to_vec(),
             token_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
-                .unwrap(),
-            logic_receiver: Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8")
                 .unwrap(),
             data: vec![4, 5, 6],
             header: RampMessageHeader {
@@ -874,19 +808,22 @@ mod tests {
                 amount: U256::from_le_bytes([1; 32]).into(),
             }]
             .to_vec(),
-            extra_args: SVMExtraArgs {
+            extra_args: Any2SVMRampExtraArgs {
                 compute_units: 1000,
                 is_writable_bitmap: 1,
-                accounts: vec![
-                    Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
-                ],
             },
             on_ramp_address: on_ramp_address.clone(),
         };
-        let hash_result = hash(&message);
+        let remaining_account_keys = [
+            Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8").unwrap(),
+            Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
+        ]
+        .into_iter();
+
+        let hash_result = hash(&message, remaining_account_keys);
 
         assert_eq!(
-            "4db316059ebdabdb76b8b090d4df866c00de34c4f1ab959fc3ad142c8bde3bfa",
+            "8ceebcae8acd670231be9eb13203797bf6cb09e7a4851dd57600af3ed3945eb0",
             hex::encode(hash_result)
         );
     }

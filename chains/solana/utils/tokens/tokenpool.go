@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
 
 type TokenPool struct {
@@ -22,7 +22,7 @@ type TokenPool struct {
 	FeeTokenConfig solana.PublicKey
 
 	// admin registry PDA
-	AdminRegistry solana.PublicKey
+	AdminRegistryPDA solana.PublicKey
 
 	// pool details
 	PoolProgram, PoolConfig, PoolSigner, PoolTokenAccount solana.PublicKey
@@ -44,7 +44,7 @@ type TokenPool struct {
 func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 	list := solana.PublicKeySlice{
 		tp.PoolLookupTable,  // 0
-		tp.AdminRegistry,    // 1
+		tp.AdminRegistryPDA, // 1
 		tp.PoolProgram,      // 2
 		tp.PoolConfig,       // 3 - writable
 		tp.PoolTokenAccount, // 4 - writable
@@ -62,44 +62,43 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenAdminRegistryPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("token_admin_registry"), mint.PublicKey().Bytes()}, config.CcipRouterProgram)
+	tokenAdminRegistryPDA, _, err := state.FindTokenAdminRegistryPDA(mint.PublicKey(), config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-
 	// preload with defined config.EvmChainSelector
-	chainPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), binary.LittleEndian.AppendUint64([]byte{}, config.EvmChainSelector), mint.PublicKey().Bytes()}, config.CcipTokenPoolProgram)
+	chainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipTokenPoolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	billingPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_billing"), binary.LittleEndian.AppendUint64([]byte{}, config.EvmChainSelector), mint.PublicKey().Bytes()}, config.CcipRouterProgram)
+	billingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenConfigPda, _, err := solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), mint.PublicKey().Bytes()}, config.CcipRouterProgram)
+	tokenConfigPda, _, err := state.FindFqBillingTokenConfigPDA(mint.PublicKey(), config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
 
 	p := TokenPool{
-		Program:         program,
-		Mint:            mint,
-		FeeTokenConfig:  tokenConfigPda,
-		AdminRegistry:   tokenAdminRegistryPDA,
-		PoolProgram:     config.CcipTokenPoolProgram,
-		PoolLookupTable: solana.PublicKey{},
-		WritableIndexes: []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
-		User:            map[solana.PublicKey]solana.PublicKey{},
-		Chain:           map[uint64]solana.PublicKey{},
-		Billing:         map[uint64]solana.PublicKey{},
+		Program:          program,
+		Mint:             mint,
+		FeeTokenConfig:   tokenConfigPda,
+		AdminRegistryPDA: tokenAdminRegistryPDA,
+		PoolProgram:      config.CcipTokenPoolProgram,
+		PoolLookupTable:  solana.PublicKey{},
+		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
+		User:             map[solana.PublicKey]solana.PublicKey{},
+		Chain:            map[uint64]solana.PublicKey{},
+		Billing:          map[uint64]solana.PublicKey{},
 	}
 	p.Chain[config.EvmChainSelector] = chainPDA
 	p.Billing[config.EvmChainSelector] = billingPDA
-	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey())
+	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey())
+	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -118,14 +117,19 @@ func (tp *TokenPool) SetupLookupTable(ctx context.Context, client *rpc.Client, a
 	return common.AwaitSlotChange(ctx, client)
 }
 
-func TokenPoolConfigAddress(token solana.PublicKey) (solana.PublicKey, error) {
-	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_config"), token.Bytes()}, config.CcipTokenPoolProgram)
+func TokenPoolConfigAddress(token, programID solana.PublicKey) (solana.PublicKey, error) {
+	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_config"), token.Bytes()}, programID)
 	return addr, err
 }
 
-func TokenPoolSignerAddress(token solana.PublicKey) (solana.PublicKey, error) {
-	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_signer"), token.Bytes()}, config.CcipTokenPoolProgram)
+func TokenPoolSignerAddress(token, programID solana.PublicKey) (solana.PublicKey, error) {
+	addr, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_signer"), token.Bytes()}, programID)
 	return addr, err
+}
+
+func TokenPoolChainConfigPDA(chainSelector uint64, mint, programID solana.PublicKey) (solana.PublicKey, uint8, error) {
+	chainSelectorLE := common.Uint64ToLE(chainSelector)
+	return solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), chainSelectorLE, mint.Bytes()}, programID)
 }
 
 type EventBurnLock struct {
@@ -142,12 +146,19 @@ type EventMintRelease struct {
 }
 
 type EventChainConfigured struct {
-	Discriminator       [8]byte
-	ChainSelector       uint64
-	Token               []byte
-	PreviousToken       []byte
-	PoolAddress         []byte
-	PreviousPoolAddress []byte
+	Discriminator         [8]byte
+	ChainSelector         uint64
+	Token                 token_pool.RemoteAddress
+	PreviousToken         token_pool.RemoteAddress
+	PoolAddresses         []token_pool.RemoteAddress
+	PreviousPoolAddresses []token_pool.RemoteAddress
+}
+
+type EventRemotePoolsAppended struct {
+	Discriminator         [8]byte
+	ChainSelector         uint64
+	PoolAddresses         []token_pool.RemoteAddress
+	PreviousPoolAddresses []token_pool.RemoteAddress
 }
 
 type EventRateLimitConfigured struct {
@@ -183,7 +194,7 @@ func ParseTokenLookupTable(ctx context.Context, client *rpc.Client, token TokenP
 	poolChainConfig := token.Chain[config.EvmChainSelector]
 
 	tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
-	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistry, config.DefaultCommitment, &tokenAdminRegistry)
+	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 	if err != nil {
 		return nil, nil, err
 	}

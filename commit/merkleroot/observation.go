@@ -34,6 +34,9 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
+var ErrSignaturesNotProvidedByLeader = errors.New("rmn signatures were not provided by the leader, " +
+	"in most cases this indicates that the RMN nodes did not include any chain in their response")
+
 // ObservationQuorum requires "across all chains" at least 2F+1 observations.
 func (p *Processor) ObservationQuorum(
 	_ context.Context, _ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation,
@@ -60,6 +63,10 @@ func (p *Processor) Observation(
 	}
 
 	if err := p.verifyQuery(ctx, prevOutcome, q); err != nil {
+		if errors.Is(err, ErrSignaturesNotProvidedByLeader) {
+			p.lggr.Infow("RMN signatures not available, returning an empty observation", "err", err)
+			return Observation{}, nil
+		}
 		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
 
@@ -203,7 +210,7 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 
 	// If in the BuildingReport state and RMN signatures are required but not provided, return an error.
 	if nextState == buildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
-		return false, fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
+		return false, ErrSignaturesNotProvidedByLeader
 	}
 
 	// If in the BuildingReport state but RMN remote config is not available, return an error.
@@ -357,7 +364,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, o.chainSupport.DestChain(), allSourceChains)
+	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
@@ -420,7 +427,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 
 	for _, sourceChain := range sourceChains {
 		eg.Go(func() error {
-			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain, destChain)
+			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain)
 			if err != nil {
 				lggr.Errorf("failed to get expected next seq num for source chain %d: %s", sourceChain, err)
 				return nil
@@ -597,7 +604,7 @@ func (o observerImpl) ObserveRMNRemoteCfg(
 	dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
-	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx, dstChain)
+	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
 		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
 			// destination chain not supported

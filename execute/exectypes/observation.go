@@ -2,7 +2,6 @@ package exectypes
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -106,6 +105,8 @@ type Observation struct {
 
 	// Contracts are part of the initial discovery phase which runs to initialize the CCIP Reader.
 	Contracts dt.Observation `json:"contracts"`
+
+	FChain map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
 func (co CommitObservations) Flatten() []CommitData {
@@ -135,19 +136,4 @@ func NewObservation(
 		Contracts:      contracts,
 		Hashes:         hashes,
 	}
-}
-
-// Encode the Observation into a byte slice.
-func (obs Observation) Encode() ([]byte, error) {
-	return json.Marshal(obs)
-}
-
-// DecodeObservation from a byte slice into an Observation.
-func DecodeObservation(b []byte) (Observation, error) {
-	if len(b) == 0 {
-		return Observation{}, nil
-	}
-	obs := Observation{}
-	err := json.Unmarshal(b, &obs)
-	return obs, err
 }

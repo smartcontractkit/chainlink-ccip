@@ -25,8 +25,6 @@ import (
 
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
 // formed report that will be encoded for final transmission in the reporting phase.
-//
-//nolint:gocyclo
 func (p *Plugin) Outcome(
 	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
@@ -38,12 +36,12 @@ func (p *Plugin) Outcome(
 		"outctx", outctx,
 		"query", query,
 		"attributedObservations", aos)
-	previousOutcome, err := exectypes.DecodeOutcome(outctx.PreviousOutcome)
+	previousOutcome, err := p.ocrTypeCodec.DecodeOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 
-	decodedAos, err := decodeAttributedObservations(aos)
+	decodedAos, err := decodeAttributedObservations(aos, p.ocrTypeCodec)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode observations: %w", err)
 	}
@@ -66,16 +64,7 @@ func (p *Plugin) Outcome(
 		p.contractsInitialized = true
 	}
 
-	fChain, err := p.homeChain.GetFChain()
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
-	}
-	_, ok := fChain[p.destChain] // check if the destination chain is in the FChain.
-	if !ok {
-		return ocr3types.Outcome{}, fmt.Errorf("destination chain %d is not in FChain", p.destChain)
-	}
-
-	observation, err := getConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F, fChain)
+	observation, err := getConsensusObservation(lggr, decodedAos, p.destChain, p.reportingCfg.F, p.destChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
@@ -89,15 +78,13 @@ func (p *Plugin) Outcome(
 		outcome = p.getMessagesOutcome(lggr, observation)
 	case exectypes.Filter:
 		outcome, err = p.getFilterOutcome(ctx, lggr, observation, previousOutcome)
+		if err != nil {
+			// We want to have an empty previousOutcome in the next round. To achieve this we don't return an error.
+			lggr.Errorw("get filter outcome", "err", err)
+			return nil, nil
+		}
 	default:
 		panic("unknown state")
-	}
-
-	if err != nil {
-		lggr.Warnw(
-			fmt.Sprintf("[oracle %d] exec outcome error", p.reportingCfg.OracleID),
-			"err", err)
-		return nil, fmt.Errorf("unable to get outcome: %w", err)
 	}
 
 	// This may happen if there is nothing to observe, or during startup when the contracts have
@@ -107,7 +94,7 @@ func (p *Plugin) Outcome(
 			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
 			"execPluginState", state)
 		if p.contractsInitialized {
-			return exectypes.Outcome{State: exectypes.Initialized}.Encode()
+			return p.ocrTypeCodec.EncodeOutcome(exectypes.Outcome{State: exectypes.Initialized})
 		}
 		return nil, nil
 	}
@@ -115,7 +102,7 @@ func (p *Plugin) Outcome(
 	p.observer.TrackOutcome(outcome, state)
 	lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
 
-	return outcome.Encode()
+	return p.ocrTypeCodec.EncodeOutcome(outcome)
 }
 
 func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exectypes.Outcome {

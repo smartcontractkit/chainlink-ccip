@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
@@ -28,7 +29,6 @@ func TestMessageHashing(t *testing.T) {
 		h, err := HashAnyToSVMMessage(ccip_router.Any2SVMRampMessage{
 			Sender:        sender,
 			TokenReceiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
-			LogicReceiver: solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
 			Data:          []byte{4, 5, 6},
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{8, 5, 3},
@@ -37,12 +37,9 @@ func TestMessageHashing(t *testing.T) {
 				SequenceNumber:      89,
 				Nonce:               90,
 			},
-			ExtraArgs: ccip_router.SVMExtraArgs{
+			ExtraArgs: ccip_router.Any2SVMRampExtraArgs{
 				ComputeUnits:     1000,
 				IsWritableBitmap: GenerateBitMapForIndexes([]int{0}),
-				Accounts: []solana.PublicKey{
-					solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
-				},
 			},
 			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{
 				{
@@ -53,14 +50,24 @@ func TestMessageHashing(t *testing.T) {
 					Amount:            ccip_router.CrossChainAmount{LeBytes: tokenAmount},
 				},
 			},
-		}, config.OnRampAddress)
+		}, config.OnRampAddress,
+			[]solana.PublicKey{
+				solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
+				solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
+			})
 
 		require.NoError(t, err)
-		require.Equal(t, "4db316059ebdabdb76b8b090d4df866c00de34c4f1ab959fc3ad142c8bde3bfa", hex.EncodeToString(h))
+		require.Equal(t, "8ceebcae8acd670231be9eb13203797bf6cb09e7a4851dd57600af3ed3945eb0", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {
 		t.Parallel()
+
+		extraArgs, err := SerializeExtraArgs(fee_quoter.EVMExtraArgsV2{
+			GasLimit:                 bin.Uint128{Lo: 1},
+			AllowOutOfOrderExecution: true,
+		}, EVMExtraArgsV2Tag)
+		require.NoError(t, err)
 
 		h, err := HashSVMToAnyMessage(ccip_router.SVM2AnyRampMessage{
 			Header: ccip_router.RampMessageHeader{
@@ -70,13 +77,10 @@ func TestMessageHashing(t *testing.T) {
 				SequenceNumber:      30,
 				Nonce:               40,
 			},
-			Sender:   solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa"),
-			Data:     []byte{4, 5, 6},
-			Receiver: sender,
-			ExtraArgs: ccip_router.AnyExtraArgs{
-				GasLimit:                 bin.Uint128{Lo: 1},
-				AllowOutOfOrderExecution: true,
-			},
+			Sender:         solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa"),
+			Data:           []byte{4, 5, 6},
+			Receiver:       sender,
+			ExtraArgs:      extraArgs,
 			FeeToken:       solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			FeeTokenAmount: ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(50)},
 			FeeValueJuels:  ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(500)},
@@ -91,6 +95,6 @@ func TestMessageHashing(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "009bc51872fe41ea096bd881bf52e3daf07c80e112ffeeba6aa503d8281b6bfd", hex.EncodeToString(h))
+		require.Equal(t, "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7", hex.EncodeToString(h))
 	})
 }

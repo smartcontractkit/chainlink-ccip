@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// OFF RAMP FLOW
+// Off Ramp Flow //
 // Commits a report to the router.
 //
 // The method name needs to be commit with Anchor encoding.
@@ -30,13 +30,16 @@ import (
 // * `report_context_byte_words` - consists of:
 // * report_context_byte_words[0]: ConfigDigest
 // * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-// * report_context_byte_words[2]: ExtraHash
-// * `report` - The commit input report, single merkle root with RMN signatures and price updates
-// * `signatures` - The list of signatures. v0.29.0 - anchor idl does not build with ocr3base::SIGNATURE_LENGTH
+// * `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates
+// * `rs` - slice of R components of signatures
+// * `ss` - slice of S components of signatures
+// * `raw_vs` - array of V components of signatures
 type Commit struct {
-	ReportContextByteWords *[3][32]uint8
-	Report                 *CommitInput
-	Signatures             *[][65]uint8
+	ReportContextByteWords *[2][32]uint8
+	RawReport              *[]byte
+	Rs                     *[][32]uint8
+	Ss                     *[][32]uint8
+	RawVs                  *[32]uint8
 
 	// [0] = [] config
 	//
@@ -49,32 +52,50 @@ type Commit struct {
 	// [4] = [] systemProgram
 	//
 	// [5] = [] sysvarInstructions
+	//
+	// [6] = [] feeBillingSigner
+	//
+	// [7] = [] feeQuoter
+	//
+	// [8] = [] feeQuoterConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCommitInstructionBuilder creates a new `Commit` instruction builder.
 func NewCommitInstructionBuilder() *Commit {
 	nd := &Commit{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 9),
 	}
 	return nd
 }
 
 // SetReportContextByteWords sets the "reportContextByteWords" parameter.
-func (inst *Commit) SetReportContextByteWords(reportContextByteWords [3][32]uint8) *Commit {
+func (inst *Commit) SetReportContextByteWords(reportContextByteWords [2][32]uint8) *Commit {
 	inst.ReportContextByteWords = &reportContextByteWords
 	return inst
 }
 
-// SetReport sets the "report" parameter.
-func (inst *Commit) SetReport(report CommitInput) *Commit {
-	inst.Report = &report
+// SetRawReport sets the "rawReport" parameter.
+func (inst *Commit) SetRawReport(rawReport []byte) *Commit {
+	inst.RawReport = &rawReport
 	return inst
 }
 
-// SetSignatures sets the "signatures" parameter.
-func (inst *Commit) SetSignatures(signatures [][65]uint8) *Commit {
-	inst.Signatures = &signatures
+// SetRs sets the "rs" parameter.
+func (inst *Commit) SetRs(rs [][32]uint8) *Commit {
+	inst.Rs = &rs
+	return inst
+}
+
+// SetSs sets the "ss" parameter.
+func (inst *Commit) SetSs(ss [][32]uint8) *Commit {
+	inst.Ss = &ss
+	return inst
+}
+
+// SetRawVs sets the "rawVs" parameter.
+func (inst *Commit) SetRawVs(rawVs [32]uint8) *Commit {
+	inst.RawVs = &rawVs
 	return inst
 }
 
@@ -144,6 +165,39 @@ func (inst *Commit) GetSysvarInstructionsAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[5]
 }
 
+// SetFeeBillingSignerAccount sets the "feeBillingSigner" account.
+func (inst *Commit) SetFeeBillingSignerAccount(feeBillingSigner ag_solanago.PublicKey) *Commit {
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(feeBillingSigner)
+	return inst
+}
+
+// GetFeeBillingSignerAccount gets the "feeBillingSigner" account.
+func (inst *Commit) GetFeeBillingSignerAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[6]
+}
+
+// SetFeeQuoterAccount sets the "feeQuoter" account.
+func (inst *Commit) SetFeeQuoterAccount(feeQuoter ag_solanago.PublicKey) *Commit {
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(feeQuoter)
+	return inst
+}
+
+// GetFeeQuoterAccount gets the "feeQuoter" account.
+func (inst *Commit) GetFeeQuoterAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[7]
+}
+
+// SetFeeQuoterConfigAccount sets the "feeQuoterConfig" account.
+func (inst *Commit) SetFeeQuoterConfigAccount(feeQuoterConfig ag_solanago.PublicKey) *Commit {
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(feeQuoterConfig)
+	return inst
+}
+
+// GetFeeQuoterConfigAccount gets the "feeQuoterConfig" account.
+func (inst *Commit) GetFeeQuoterConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[8]
+}
+
 func (inst Commit) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -167,11 +221,17 @@ func (inst *Commit) Validate() error {
 		if inst.ReportContextByteWords == nil {
 			return errors.New("ReportContextByteWords parameter is not set")
 		}
-		if inst.Report == nil {
-			return errors.New("Report parameter is not set")
+		if inst.RawReport == nil {
+			return errors.New("RawReport parameter is not set")
 		}
-		if inst.Signatures == nil {
-			return errors.New("Signatures parameter is not set")
+		if inst.Rs == nil {
+			return errors.New("Rs parameter is not set")
+		}
+		if inst.Ss == nil {
+			return errors.New("Ss parameter is not set")
+		}
+		if inst.RawVs == nil {
+			return errors.New("RawVs parameter is not set")
 		}
 	}
 
@@ -195,6 +255,15 @@ func (inst *Commit) Validate() error {
 		if inst.AccountMetaSlice[5] == nil {
 			return errors.New("accounts.SysvarInstructions is not set")
 		}
+		if inst.AccountMetaSlice[6] == nil {
+			return errors.New("accounts.FeeBillingSigner is not set")
+		}
+		if inst.AccountMetaSlice[7] == nil {
+			return errors.New("accounts.FeeQuoter is not set")
+		}
+		if inst.AccountMetaSlice[8] == nil {
+			return errors.New("accounts.FeeQuoterConfig is not set")
+		}
 	}
 	return nil
 }
@@ -208,20 +277,25 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
-						paramsBranch.Child(ag_format.Param("                Report", *inst.Report))
-						paramsBranch.Child(ag_format.Param("            Signatures", *inst.Signatures))
+						paramsBranch.Child(ag_format.Param("             RawReport", *inst.RawReport))
+						paramsBranch.Child(ag_format.Param("                    Rs", *inst.Rs))
+						paramsBranch.Child(ag_format.Param("                    Ss", *inst.Ss))
+						paramsBranch.Child(ag_format.Param("                 RawVs", *inst.RawVs))
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=9]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("  sourceChainState", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("      commitReport", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[4]))
 						accountsBranch.Child(ag_format.Meta("sysvarInstructions", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("  feeBillingSigner", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("         feeQuoter", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("   feeQuoterConfig", inst.AccountMetaSlice[8]))
 					})
 				})
 		})
@@ -233,13 +307,23 @@ func (obj Commit) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `Report` param:
-	err = encoder.Encode(obj.Report)
+	// Serialize `RawReport` param:
+	err = encoder.Encode(obj.RawReport)
 	if err != nil {
 		return err
 	}
-	// Serialize `Signatures` param:
-	err = encoder.Encode(obj.Signatures)
+	// Serialize `Rs` param:
+	err = encoder.Encode(obj.Rs)
+	if err != nil {
+		return err
+	}
+	// Serialize `Ss` param:
+	err = encoder.Encode(obj.Ss)
+	if err != nil {
+		return err
+	}
+	// Serialize `RawVs` param:
+	err = encoder.Encode(obj.RawVs)
 	if err != nil {
 		return err
 	}
@@ -251,13 +335,23 @@ func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Report`:
-	err = decoder.Decode(&obj.Report)
+	// Deserialize `RawReport`:
+	err = decoder.Decode(&obj.RawReport)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Signatures`:
-	err = decoder.Decode(&obj.Signatures)
+	// Deserialize `Rs`:
+	err = decoder.Decode(&obj.Rs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Ss`:
+	err = decoder.Decode(&obj.Ss)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RawVs`:
+	err = decoder.Decode(&obj.RawVs)
 	if err != nil {
 		return err
 	}
@@ -267,24 +361,34 @@ func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 // NewCommitInstruction declares a new Commit instruction with the provided parameters and accounts.
 func NewCommitInstruction(
 	// Parameters:
-	reportContextByteWords [3][32]uint8,
-	report CommitInput,
-	signatures [][65]uint8,
+	reportContextByteWords [2][32]uint8,
+	rawReport []byte,
+	rs [][32]uint8,
+	ss [][32]uint8,
+	rawVs [32]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	sourceChainState ag_solanago.PublicKey,
 	commitReport ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
-	sysvarInstructions ag_solanago.PublicKey) *Commit {
+	sysvarInstructions ag_solanago.PublicKey,
+	feeBillingSigner ag_solanago.PublicKey,
+	feeQuoter ag_solanago.PublicKey,
+	feeQuoterConfig ag_solanago.PublicKey) *Commit {
 	return NewCommitInstructionBuilder().
 		SetReportContextByteWords(reportContextByteWords).
-		SetReport(report).
-		SetSignatures(signatures).
+		SetRawReport(rawReport).
+		SetRs(rs).
+		SetSs(ss).
+		SetRawVs(rawVs).
 		SetConfigAccount(config).
 		SetSourceChainStateAccount(sourceChainState).
 		SetCommitReportAccount(commitReport).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
-		SetSysvarInstructionsAccount(sysvarInstructions)
+		SetSysvarInstructionsAccount(sysvarInstructions).
+		SetFeeBillingSignerAccount(feeBillingSigner).
+		SetFeeQuoterAccount(feeQuoter).
+		SetFeeQuoterConfigAccount(feeQuoterConfig)
 }

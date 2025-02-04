@@ -13,14 +13,18 @@ type Query struct {
 }
 
 type Outcome struct {
-	TokenPrices []cciptypes.TokenPrice `json:"tokenPrices"`
+	TokenPrices cciptypes.TokenPriceMap `json:"tokenPrices"`
 }
 
 type Observation struct {
-	FeedTokenPrices       []cciptypes.TokenPrice                                         `json:"feedTokenPrices"`
+	FeedTokenPrices       cciptypes.TokenPriceMap                                        `json:"feedTokenPrices"`
 	FeeQuoterTokenUpdates map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig `json:"feeQuoterTokenUpdates"`
 	FChain                map[cciptypes.ChainSelector]int                                `json:"fChain"`
 	Timestamp             time.Time                                                      `json:"timestamp"`
+}
+
+func (obs Observation) IsEmpty() bool {
+	return len(obs.FeedTokenPrices) == 0 && len(obs.FeeQuoterTokenUpdates) == 0 && len(obs.FChain) == 0
 }
 
 // AggregateObservation is the aggregation of a list of observations

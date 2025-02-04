@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -10,6 +11,17 @@ import (
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+)
+
+const (
+	// HomeChainPollingInterval is the interval at which the home chain is polled for updates.
+	// It should be used by RMNHome and CCIPHome to poll the home chain for updates.
+	// Ethereum was selected for the home chain for CCIP, therefore polling more frequent
+	// than block time doesn't bring any value.
+	// We selected 15 seconds for simplicity, but this could be extended even further as
+	// we accept some delay when fetching the configuration updates.
+	// It's advised to use wrap that interval with some jitter to avoid congestion.
+	HomeChainPollingInterval = 15 * time.Second
 )
 
 // bindable is a helper interface to represent all different types of contract readers.

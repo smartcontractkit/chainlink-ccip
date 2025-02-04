@@ -5,9 +5,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
-
-	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
@@ -22,20 +21,25 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
+
+type ContractDiscoveryInterface plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
@@ -49,7 +53,7 @@ type Plugin struct {
 	reportCodec  cciptypes.ExecutePluginCodec
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
-	discovery    *discovery.ContractDiscoveryProcessor
+	discovery    ContractDiscoveryInterface
 	chainSupport plugincommon.ChainSupport
 	observer     metrics.Reporter
 
@@ -58,10 +62,12 @@ type Plugin struct {
 	costlyMessageObserver costlymessages.Observer
 	estimateProvider      cciptypes.EstimateProvider
 	lggr                  logger.Logger
+	ocrTypeCodec          ocrtypecodec.ExecCodec
 
-	observationOptimizer optimizers.ObservationOptimizer
 	// state
 	contractsInitialized bool
+	// this cache remembers commit root details to optimize DB lookups.
+	commitRootsCache cache.CommitsRootsCache
 }
 
 func NewPlugin(
@@ -111,8 +117,12 @@ func NewPlugin(
 			reportingCfg.OracleID,
 			destChain,
 		),
-		observer:             metricsReporter,
-		observationOptimizer: optimizers.NewObservationOptimizer(maxObservationLength),
+		observer: metricsReporter,
+		commitRootsCache: cache.NewCommitRootsCache(
+			logutil.WithComponent(lggr, "CommitRootsCache"),
+			offchainCfg.MessageVisibilityInterval.Duration(),
+			time.Minute*5),
+		ocrTypeCodec: ocrtypecodec.NewExecCodecJSON(),
 	}
 }
 
@@ -120,26 +130,27 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
+type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
+
+// getPendingExecutedReports is used to find commit reports which need to be executed.
+// It considers all commit reports as of the given timestamp. Of the reports found, the
+// provided canExecute function is used to filter out reports which the caller knows to
+// be ineligible (i.e. already executed, or snoozed for some reason). The final step
+// is to check their execution state to see if the messages for each report are already
+// executed. Any fully executed reports are returned separately for the caller to remember.
 func getPendingExecutedReports(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
-	dest cciptypes.ChainSelector,
+	canExecute CanExecuteHandle,
 	ts time.Time,
 	lggr logger.Logger,
-) (exectypes.CommitObservations, error) {
-	latestReportTS := time.Time{}
-	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
+) (exectypes.CommitObservations, []exectypes.CommitData /* fully executed roots */, error) {
+	var fullyExecuted []exectypes.CommitData
+	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
-
-	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
-	for _, report := range commitReports {
-		if report.Timestamp.After(latestReportTS) {
-			latestReportTS = report.Timestamp
-		}
-	}
 
 	groupedCommits := groupByChainSelector(commitReports)
 	lggr.Debugw("grouped commits before removing fully executed reports",
@@ -151,40 +162,76 @@ func getPendingExecutedReports(
 			continue
 		}
 
+		// Filter out reports that cannot be executed (executed or snoozed).
+		var filtered []exectypes.CommitData
+		{
+			var skippedCommitRoots []string
+			for _, commitReport := range reports {
+				if !canExecute(commitReport.SourceChain, commitReport.MerkleRoot) {
+					skippedCommitRoots = append(skippedCommitRoots, commitReport.MerkleRoot.String())
+					continue
+				}
+				filtered = append(filtered, commitReport)
+			}
+			lggr.Infow(
+				"skipping reports marked as executed or snoozed",
+				"selector", selector,
+				"skippedCommitRoots", skippedCommitRoots,
+			)
+		}
+		reports = filtered
+
+		lggr.Debugw("grouped reports", "selector", selector, "reports", reports, "count", len(reports))
+		sort.Slice(reports, func(i, j int) bool {
+			return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
+		})
+		// todo: remove this logs after investigating whether the sorting above can be safely removed
+		lggr.Debugw("sorted reports", "selector", selector, "reports", reports, "count", len(reports))
+
 		ranges, err := computeRanges(reports)
 		if err != nil {
-			return nil, err
+			return nil, nil, fmt.Errorf("compute report ranges: %w", err)
 		}
 
-		var executedMessages []cciptypes.SeqNumRange
+		executedMessageSet := mapset.NewSet[cciptypes.SeqNum]()
 		for _, seqRange := range ranges {
-			executedMessagesForRange, err2 := ccipReader.ExecutedMessageRanges(ctx, selector, dest, seqRange)
+			executedMessagesForRange, err2 := ccipReader.ExecutedMessages(ctx, selector, seqRange)
 			if err2 != nil {
-				return nil, err2
+				return nil, nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err2)
 			}
-			executedMessages = append(executedMessages, executedMessagesForRange...)
+			executedMessageSet = executedMessageSet.Union(mapset.NewSet(executedMessagesForRange...))
 		}
+
+		executedMessages := executedMessageSet.ToSlice()
+		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
 
 		// Remove fully executed reports.
-		groupedCommits[selector], err = filterOutExecutedMessages(reports, executedMessages)
-		if err != nil {
-			return nil, err
-		}
+		// Populate executed messages on the reports.
+		var executedCommits []exectypes.CommitData
+		groupedCommits[selector], executedCommits = combineReportsAndMessages(reports, executedMessages)
+		fullyExecuted = append(fullyExecuted, executedCommits...)
 	}
 
 	lggr.Debugw("grouped commits after removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
-	return groupedCommits, nil
+	return groupedCommits, fullyExecuted, nil
 }
 
 //nolint:gocyclo
 func (p *Plugin) ValidateObservation(
-	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
+	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
-	decodedObservation, err := exectypes.DecodeObservation(ao.Observation)
+	decodedObservation, err := p.ocrTypeCodec.DecodeObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("unable to decode observation: %w", err)
+	}
+
+	var previousOutcome exectypes.Outcome
+
+	previousOutcome, err = p.ocrTypeCodec.DecodeOutcome(outctx.PreviousOutcome)
+	if err != nil {
+		return fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 
 	supportedChains, err := p.supportedChains(ao.Observer)
@@ -192,21 +239,118 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	err = validateObserverReadingEligibility(supportedChains, decodedObservation.Messages)
-	if err != nil {
-		return fmt.Errorf("validate observer reading eligibility: %w", err)
+	state := previousOutcome.State.Next()
+	if state == exectypes.Initialized || state == exectypes.GetCommitReports {
+		err = validateNoMessageRelatedObservations(
+			decodedObservation.Messages,
+			decodedObservation.TokenData,
+			decodedObservation.Hashes,
+			decodedObservation.CostlyMessages,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err = validateCommonStateObservations(p, ao.Observer, decodedObservation, supportedChains); err != nil {
+		return err
+	}
+
+	// check message related validations when states can contain messages
+	if state == exectypes.GetMessages || state == exectypes.Filter {
+		if err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
+			return fmt.Errorf("validate observer reading eligibility: %w", err)
+		}
+
+		err = validateMessagesRelatedObservations(
+			decodedObservation.CommitReports,
+			decodedObservation.Messages,
+			decodedObservation.TokenData,
+			decodedObservation.Hashes,
+			decodedObservation.CostlyMessages,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateCommonStateObservations(
+	p *Plugin,
+	oracleID commontypes.OracleID,
+	decodedObservation exectypes.Observation,
+	supportedChains mapset.Set[cciptypes.ChainSelector],
+) error {
+	if err := plugincommon.ValidateFChain(decodedObservation.FChain); err != nil {
+		return fmt.Errorf("failed to validate FChain: %w", err)
+	}
+
+	// These checks are common to all states.
+	if err := validateCommitReportsReadingEligibility(supportedChains, decodedObservation.CommitReports); err != nil {
+		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
 	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
-	if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
-		return fmt.Errorf("validate hashes exist: %w", err)
+	if p.discovery != nil {
+		aos := plugincommon.AttributedObservation[dt.Observation]{
+			OracleID:    oracleID,
+			Observation: decodedObservation.Contracts,
+		}
+
+		if err := p.discovery.ValidateObservation(dt.Outcome{}, dt.Query{}, aos); err != nil {
+			return fmt.Errorf("process contracts: %w", err)
+		}
 	}
 
-	if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
+	return nil
+}
+
+func validateNoMessageRelatedObservations(
+	messages exectypes.MessageObservations,
+	tokenData exectypes.TokenDataObservations,
+	hashes exectypes.MessageHashes,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+	if len(messages) > 0 {
+		return fmt.Errorf("messages are not expected in initial or GetCommitRerports states")
+	}
+	if len(tokenData) > 0 {
+		return fmt.Errorf("token data is not expected in initial or GetCommitRerports states")
+	}
+	if len(costlyMessages) > 0 {
+		return fmt.Errorf("costly messages are not expected in initial or GetCommitRerports states")
+	}
+	if len(hashes) > 0 {
+		return fmt.Errorf("hashes are not expected in initial or GetCommitRerports states")
+	}
+
+	return nil
+}
+
+func validateMessagesRelatedObservations(
+	commitReports exectypes.CommitObservations,
+	messages exectypes.MessageObservations,
+	tokenData exectypes.TokenDataObservations,
+	hashes exectypes.MessageHashes,
+	costlyMessages []cciptypes.Bytes32,
+) error {
+
+	if err := validateMessagesConformToCommitReports(commitReports, messages); err != nil {
+		return fmt.Errorf("validate messages conform to commit reports: %w", err)
+	}
+	if err := validateHashesExist(messages, hashes); err != nil {
+		return fmt.Errorf("validate hashes exist: %w", err)
+	}
+	if err := validateTokenDataObservations(messages, tokenData); err != nil {
 		return fmt.Errorf("validate token data observations: %w", err)
+	}
+	if err := validateCostlyMessagesObservations(messages, costlyMessages); err != nil {
+		return fmt.Errorf("validate costly messages: %w", err)
 	}
 
 	return nil
@@ -268,10 +412,10 @@ func selectReport(
 }
 
 func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
-	var ri cciptypes.ExecuteReportInfo
+	merkleRoots := []cciptypes.MerkleRootChain{}
 
 	for _, commitReport := range report.CommitReports {
-		ri = append(ri, cciptypes.MerkleRootChain{
+		merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 			ChainSel:      commitReport.SourceChain,
 			OnRampAddress: commitReport.OnRampAddress,
 			SeqNumsRange:  commitReport.SequenceNumberRange,
@@ -279,7 +423,10 @@ func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
 		})
 	}
 
-	return ri
+	return cciptypes.ExecuteReportInfo{
+		AbstractReports: report.Report.ChainReports,
+		MerkleRoots:     merkleRoots,
+	}
 }
 
 func (p *Plugin) Reports(
@@ -292,7 +439,7 @@ func (p *Plugin) Reports(
 		return nil, nil
 	}
 
-	decodedOutcome, err := exectypes.DecodeOutcome(outcome)
+	decodedOutcome, err := p.ocrTypeCodec.DecodeOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}

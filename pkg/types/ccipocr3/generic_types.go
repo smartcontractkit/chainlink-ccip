@@ -4,12 +4,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 )
 
 type TokenPrice struct {
 	TokenID UnknownEncodedAddress `json:"tokenID"`
 	Price   BigInt                `json:"price"`
+}
+
+type TokenPriceMap map[UnknownEncodedAddress]BigInt
+
+func (t TokenPriceMap) ToSortedSlice() []TokenPrice {
+	var res []TokenPrice
+	for tokenID, price := range t {
+		res = append(res, TokenPrice{tokenID, price})
+	}
+
+	// sort the token prices by tokenID
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].TokenID < res[j].TokenID
+	})
+
+	return res
 }
 
 func NewTokenPrice(tokenID UnknownEncodedAddress, price *big.Int) TokenPrice {
@@ -91,12 +108,32 @@ func (s SeqNumRange) Contains(seq SeqNum) bool {
 	return s.Start() <= seq && seq <= s.End()
 }
 
+// FilterSlice returns a slice of sequence numbers that are contained in the range.
+func (s SeqNumRange) FilterSlice(seqNums []SeqNum) []SeqNum {
+	var contained []SeqNum
+	for _, seq := range seqNums {
+		if s.Contains(seq) {
+			contained = append(contained, seq)
+		}
+	}
+	return contained
+}
+
 func (s SeqNumRange) String() string {
 	return fmt.Sprintf("[%d -> %d]", s[0], s[1])
 }
 
 func (s SeqNumRange) Length() int {
 	return int(s.End() - s.Start() + 1)
+}
+
+// ToSlice returns a slice of sequence numbers in the range.
+func (s SeqNumRange) ToSlice() []SeqNum {
+	var seqs []SeqNum
+	for i := s.Start(); i <= s.End(); i++ {
+		seqs = append(seqs, i)
+	}
+	return seqs
 }
 
 type ChainSelector uint64
@@ -203,4 +240,8 @@ type RampTokenAmount struct {
 	// NOTE: this must be decoded before providing it as an execution input to the destination chain
 	// or hashing it. See Internal._hash(Any2EVMRampMessage) for more details as an example.
 	DestExecData Bytes `json:"destExecData"`
+	// DestExecDataDecoded is the same as DestExecData
+	// just decoded into a named collection of arguments in a generic format,
+	// which can be read by any destination chain family.
+	DestExecDataDecoded map[string]any `json:"destExecDataDecoded,omitempty"`
 }

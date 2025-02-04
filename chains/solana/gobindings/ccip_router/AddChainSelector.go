@@ -28,6 +28,8 @@ type AddChainSelector struct {
 	DestChainConfig   *DestChainConfig
 
 	// [0] = [WRITE] sourceChainState
+	// ··········· Adding a chain selector implies initializing the state for a new chain,
+	// ··········· hence the need to initialize two accounts.
 	//
 	// [1] = [WRITE] destChainState
 	//
@@ -66,12 +68,16 @@ func (inst *AddChainSelector) SetDestChainConfig(destChainConfig DestChainConfig
 }
 
 // SetSourceChainStateAccount sets the "sourceChainState" account.
+// Adding a chain selector implies initializing the state for a new chain,
+// hence the need to initialize two accounts.
 func (inst *AddChainSelector) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *AddChainSelector {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChainState).WRITE()
 	return inst
 }
 
 // GetSourceChainStateAccount gets the "sourceChainState" account.
+// Adding a chain selector implies initializing the state for a new chain,
+// hence the need to initialize two accounts.
 func (inst *AddChainSelector) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
