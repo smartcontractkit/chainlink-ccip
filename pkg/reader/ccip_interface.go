@@ -25,6 +25,13 @@ var (
 // Currently only one contract per chain per name is supported.
 type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 
+type ReaderOption func(*readerOptions)
+
+type readerOptions struct {
+	enableCache   bool
+	refreshPeriod time.Duration
+}
+
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
 	if resp == nil {
@@ -37,6 +44,27 @@ func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelecto
 	return resp
 }
 
+// WithCache enables caching with the specified refresh period
+func WithCache(refreshPeriod time.Duration) ReaderOption {
+	return func(o *readerOptions) {
+		o.enableCache = true
+		o.refreshPeriod = refreshPeriod
+	}
+}
+
+// applyOptions processes the provided options
+func applyOptions(opts ...ReaderOption) readerOptions {
+	options := readerOptions{
+		enableCache:   false,
+		refreshPeriod: 30 * time.Second, // default refresh period
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
+}
+
+// NewCCIPChainReader creates a new CCIP reader with optional caching
 func NewCCIPChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -45,8 +73,11 @@ func NewCCIPChainReader(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	extraDataCodec cciptypes.ExtraDataCodec,
+	opts ...ReaderOption,
 ) CCIPReader {
-	return newCCIPChainReaderInternal(
+	options := applyOptions(opts...)
+
+	reader := newCCIPChainReaderInternal(
 		ctx,
 		lggr,
 		contractReaders,
@@ -55,9 +86,15 @@ func NewCCIPChainReader(
 		offrampAddress,
 		extraDataCodec,
 	)
+
+	if options.enableCache {
+		return NewCachedChainReader(reader, options.refreshPeriod)
+	}
+	return reader
 }
 
-// NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
+// NewCCIPReaderWithExtendedContractReaders creates a new CCIP reader
+// with extended contract readers and optional caching
 func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -66,10 +103,17 @@ func NewCCIPReaderWithExtendedContractReaders(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	extraDataCodec cciptypes.ExtraDataCodec,
+	opts ...ReaderOption,
 ) CCIPReader {
+	options := applyOptions(opts...)
+
 	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, extraDataCodec)
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
+	}
+
+	if options.enableCache {
+		return NewCachedChainReader(cr, options.refreshPeriod)
 	}
 	return cr
 }

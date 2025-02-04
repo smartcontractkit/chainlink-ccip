@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"time"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
@@ -144,6 +145,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 		p.extraDataCodec,
+		readerpkg.WithCache(30*time.Second),
 	)
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(

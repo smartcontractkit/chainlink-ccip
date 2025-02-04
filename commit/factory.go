@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
@@ -182,6 +183,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 		p.extraDataCodec,
+		readerpkg.WithCache(30*time.Second),
 	)
 
 	// The node supports the chain that the token prices are on.
