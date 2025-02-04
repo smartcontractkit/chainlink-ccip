@@ -1876,22 +1876,26 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 				ReturnVal: &execLatestOCRConfig,
 			},
 			{
+				// x
 				ReadName:  consts.MethodNameOffRampGetStaticConfig,
 				Params:    map[string]any{},
 				ReturnVal: &staticConfig,
 			},
 			{
+				// x
 				ReadName:  consts.MethodNameOffRampGetDynamicConfig,
 				Params:    map[string]any{},
 				ReturnVal: &dynamicConfig,
 			},
 			{
+				// x
 				ReadName:  consts.MethodNameOffRampGetAllSourceChainConfigs,
 				Params:    map[string]any{},
 				ReturnVal: &selectorsAndConf,
 			},
 		},
 		consts.ContractNameRMNProxy: {{
+			// x
 			ReadName:  consts.MethodNameGetARM,
 			Params:    map[string]any{},
 			ReturnVal: &rmnRemoteAddress,

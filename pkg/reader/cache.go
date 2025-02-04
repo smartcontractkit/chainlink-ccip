@@ -2,7 +2,9 @@ package reader
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -301,7 +303,42 @@ func (r *CachedChainReader) GetContractAddress(contractName string, chain ccipty
 }
 
 func (r *CachedChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
-	return r.ccipReader.LinkPriceUSD(ctx)
+	// Ensure we can read from the destination chain
+	if err := validateExtendedReaderExistence(r.ccipReader.contractReaders, r.ccipReader.destChain); err != nil {
+		return cciptypes.BigInt{}, fmt.Errorf("failed to validate dest chain reader existence: %w", err)
+	}
+
+	// Get cached response
+	cachedResp, err := r.refresh(ctx)
+	if err != nil {
+		return cciptypes.BigInt{}, fmt.Errorf("failed to get cached response: %w", err)
+	}
+
+	// Get the link token from cached fee quoter config
+	feeQuoterCfg := cachedResp.FeeQuoter.FeeQuoterStaticConfig
+	if len(feeQuoterCfg.LinkToken) == 0 {
+		return cciptypes.BigInt{}, fmt.Errorf("link token address is empty in cached response")
+	}
+
+	// Get the token price
+	linkPriceUSD, err := r.ccipReader.getFeeQuoterTokenPriceUSD(ctx, feeQuoterCfg.LinkToken)
+	if err != nil {
+		return cciptypes.BigInt{}, fmt.Errorf("get LINK price in USD: %w", err)
+	}
+
+	if linkPriceUSD.Int == nil {
+		return cciptypes.BigInt{}, fmt.Errorf("LINK price is nil")
+	}
+
+	if linkPriceUSD.Int.Cmp(big.NewInt(0)) == 0 {
+		return cciptypes.BigInt{}, fmt.Errorf("LINK price is 0")
+	}
+
+	r.ccipReader.lggr.Infow("Got LINK price from cache",
+		"linkToken", hex.EncodeToString(feeQuoterCfg.LinkToken),
+		"priceUSD", linkPriceUSD)
+
+	return linkPriceUSD, nil
 }
 
 // ForceRefresh forces a cache refresh regardless of the refresh period
