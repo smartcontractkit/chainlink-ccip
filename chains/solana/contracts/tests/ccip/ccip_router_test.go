@@ -3758,6 +3758,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 
 			destChainIx, err := example_ccip_sender.NewInitChainConfigInstruction(config.EvmChainSelector, validReceiverAddress[:], emptyEVMExtraArgsV2, senderState, senderDestChainConfigPDA, user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
 
 			transferSolIx, err := system.NewTransferInstruction(1_000_000_000, user.PublicKey(), senderPDA).ValidateAndBuild()
 			require.NoError(t, err)
@@ -3802,6 +3803,7 @@ func TestCCIPRouter(t *testing.T) {
 						[]example_ccip_sender.SVMTokenAmount{}, // no tokens
 						[]byte{1, 2, 3},                        // message data
 						fc.feeToken,                            // empty fee token to indicate native SOL
+						[]uint8{},
 						senderState,
 						senderDestChainConfigPDA,
 						senderPDA,

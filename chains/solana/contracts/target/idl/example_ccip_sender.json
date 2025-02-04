@@ -164,6 +164,10 @@
         {
           "name": "feeToken",
           "type": "publicKey"
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -421,6 +425,23 @@
           }
         ]
       }
+    }
+  ],
+  "events": [
+    {
+      "name": "MessageSent",
+      "fields": [
+        {
+          "name": "messageId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [

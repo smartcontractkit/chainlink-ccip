@@ -16,6 +16,7 @@ type CcipSend struct {
 	TokenAmounts      *[]SVMTokenAmount
 	Data              *[]byte
 	FeeToken          *ag_solanago.PublicKey
+	TokenIndexes      *[]byte
 
 	// [0] = [] state
 	//
@@ -90,6 +91,12 @@ func (inst *CcipSend) SetData(data []byte) *CcipSend {
 // SetFeeToken sets the "feeToken" parameter.
 func (inst *CcipSend) SetFeeToken(feeToken ag_solanago.PublicKey) *CcipSend {
 	inst.FeeToken = &feeToken
+	return inst
+}
+
+// SetTokenIndexes sets the "tokenIndexes" parameter.
+func (inst *CcipSend) SetTokenIndexes(tokenIndexes []byte) *CcipSend {
+	inst.TokenIndexes = &tokenIndexes
 	return inst
 }
 
@@ -356,6 +363,9 @@ func (inst *CcipSend) Validate() error {
 		if inst.FeeToken == nil {
 			return errors.New("FeeToken parameter is not set")
 		}
+		if inst.TokenIndexes == nil {
+			return errors.New("TokenIndexes parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -436,11 +446,12 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("DestChainSelector", *inst.DestChainSelector))
 						paramsBranch.Child(ag_format.Param("     TokenAmounts", *inst.TokenAmounts))
 						paramsBranch.Child(ag_format.Param("             Data", *inst.Data))
 						paramsBranch.Child(ag_format.Param("         FeeToken", *inst.FeeToken))
+						paramsBranch.Child(ag_format.Param("     TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
@@ -492,6 +503,11 @@ func (obj CcipSend) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Serialize `TokenIndexes` param:
+	err = encoder.Encode(obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *CcipSend) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -515,6 +531,11 @@ func (obj *CcipSend) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error
 	if err != nil {
 		return err
 	}
+	// Deserialize `TokenIndexes`:
+	err = decoder.Decode(&obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -525,6 +546,7 @@ func NewCcipSendInstruction(
 	tokenAmounts []SVMTokenAmount,
 	data []byte,
 	feeToken ag_solanago.PublicKey,
+	tokenIndexes []byte,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
@@ -552,6 +574,7 @@ func NewCcipSendInstruction(
 		SetTokenAmounts(tokenAmounts).
 		SetData(data).
 		SetFeeToken(feeToken).
+		SetTokenIndexes(tokenIndexes).
 		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
 		SetCcipSenderAccount(ccipSender).

@@ -93,6 +93,11 @@ pub mod builder {
     }
 }
 
+#[event]
+pub struct MessageSent {
+    pub message_id: [u8; 32],
+}
+
 #[error_code]
 pub enum CcipSenderError {
     #[msg("Invalid router address")]
