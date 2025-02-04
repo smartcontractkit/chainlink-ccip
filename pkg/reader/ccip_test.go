@@ -956,14 +956,17 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	feeQuoterAddress := []byte{0x4}
 	contractReaders := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	contractReaders[chainC] = destCR
-	ccipReader := ccipChainReader{
+	ccipReader := newCCIPChainReaderInternal(
+		context.Background(),
 		logger.Test(t),
-		contractReaders,
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			chainC: destCR,
+		},
 		nil,
 		chainC,
-		string(offrampAddress),
+		offrampAddress,
 		ccipocr3.NewMockExtraDataCodec(t),
-	}
+	)
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
 		context.Background(), []types.BoundContract{{Name: "FeeQuoter",
