@@ -2,10 +2,6 @@ use std::convert::Into;
 
 use anchor_lang::prelude::*;
 
-// https://github.com/smartcontractkit/chainlink/blob/ff8a597fd9df653f8967427498eaa5a04b19febb/contracts/src/v0.8/ccip/libraries/Internal.sol#L276
-pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
-pub const CHAIN_FAMILY_SELECTOR_SVM: u32 = 0x1e10bdc4;
-
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic header for OnRamp & OffRamp messages.
 // The messageId is not expected to match hash(message), since it may originate from another ramp family

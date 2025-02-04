@@ -1,18 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
-use crate::context::RemoveBillingTokenConfig;
 use crate::events::admin as events;
-use crate::{seed, DisableDestChainSelectorConfig};
 use crate::{
-    AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
-    DestChainConfig, DestChainState, Ocr3ConfigInfo, OcrPluginType, SetOcrConfig,
-    SetTokenBillingConfig, SourceChainConfig, SourceChainState, TimestampedPackedU224,
-    TokenBilling, TransferOwnership, UpdateBillingTokenConfig, UpdateConfigCCIPRouter,
-    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
+    AcceptOwnership, AddChainSelector, CcipRouterError, DestChainConfig, DestChainState,
+    Ocr3ConfigInfo, OcrPluginType, SetOcrConfig, SourceChainConfig, SourceChainState,
+    TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
+    UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
 };
 
-use super::fee_quoter::do_billing_transfer;
+use super::fees::do_billing_transfer;
 use super::ocr3base::ocr3_set;
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
@@ -69,13 +66,7 @@ pub fn add_chain_selector(
     dest_chain_state.version = 1;
     dest_chain_state.chain_selector = new_chain_selector;
     dest_chain_state.config = dest_chain_config.clone();
-    dest_chain_state.state = DestChainState {
-        sequence_number: 0,
-        usd_per_unit_gas: TimestampedPackedU224 {
-            value: [0; 28],
-            timestamp: 0,
-        },
-    };
+    dest_chain_state.state = DestChainState { sequence_number: 0 };
 
     emit!(events::SourceChainAdded {
         source_chain_selector: new_chain_selector,
@@ -100,22 +91,6 @@ pub fn disable_source_chain_selector(
     emit!(events::SourceChainConfigUpdated {
         source_chain_selector,
         source_chain_config: chain_state.config.clone(),
-    });
-
-    Ok(())
-}
-
-pub fn disable_dest_chain_selector(
-    ctx: Context<DisableDestChainSelectorConfig>,
-    dest_chain_selector: u64,
-) -> Result<()> {
-    let chain_state = &mut ctx.accounts.dest_chain_state;
-
-    chain_state.config.is_enabled = false;
-
-    emit!(events::DestChainConfigUpdated {
-        dest_chain_selector,
-        dest_chain_config: chain_state.config.clone(),
     });
 
     Ok(())
@@ -175,19 +150,6 @@ pub fn update_enable_manual_execution_after(
     Ok(())
 }
 
-pub fn set_token_billing(
-    ctx: Context<SetTokenBillingConfig>,
-    chain_selector: u64,
-    mint: Pubkey,
-    cfg: TokenBilling,
-) -> Result<()> {
-    ctx.accounts.per_chain_per_token_config.version = 1; // update this if we change the account struct
-    ctx.accounts.per_chain_per_token_config.billing = cfg;
-    ctx.accounts.per_chain_per_token_config.chain_selector = chain_selector;
-    ctx.accounts.per_chain_per_token_config.mint = mint;
-    Ok(())
-}
-
 pub fn set_ocr_config(
     ctx: Context<SetOcrConfig>,
     plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
@@ -220,62 +182,6 @@ pub fn set_ocr_config(
         ctx.accounts.state.latest_price_sequence_number = 0;
     }
 
-    Ok(())
-}
-
-pub fn add_billing_token_config(
-    ctx: Context<AddBillingTokenConfig>,
-    config: BillingTokenConfig,
-) -> Result<()> {
-    emit!(events::FeeTokenAdded {
-        fee_token: config.mint,
-        enabled: config.enabled
-    });
-    ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
-    ctx.accounts.billing_token_config.config = config;
-    Ok(())
-}
-
-pub fn update_billing_token_config(
-    ctx: Context<UpdateBillingTokenConfig>,
-    config: BillingTokenConfig,
-) -> Result<()> {
-    if config.enabled != ctx.accounts.billing_token_config.config.enabled {
-        // enabled/disabled status has changed
-        match config.enabled {
-            true => emit!(events::FeeTokenEnabled {
-                fee_token: config.mint
-            }),
-            false => emit!(events::FeeTokenDisabled {
-                fee_token: config.mint
-            }),
-        }
-    }
-    // TODO should we emit an event if the config has changed regardless of the enabled/disabled?
-
-    ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
-    ctx.accounts.billing_token_config.config = config;
-    Ok(())
-}
-
-pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
-    // Close the receiver token account
-    // The context constraints already enforce that it holds 0 balance of the target SPL token
-    let cpi_accounts = token_interface::CloseAccount {
-        account: ctx.accounts.fee_token_receiver.to_account_info(),
-        destination: ctx.accounts.authority.to_account_info(),
-        authority: ctx.accounts.fee_billing_signer.to_account_info(),
-    };
-    let cpi_program = ctx.accounts.token_program.to_account_info();
-    let seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
-    let signer_seeds = &[&seeds[..]];
-    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-
-    token_interface::close_account(cpi_ctx)?;
-
-    emit!(events::FeeTokenRemoved {
-        fee_token: ctx.accounts.fee_token_mint.key()
-    });
     Ok(())
 }
 
@@ -329,20 +235,10 @@ fn validate_source_chain_config(
     Ok(())
 }
 
-fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig) -> Result<()> {
+fn validate_dest_chain_config(dest_chain_selector: u64, _config: &DestChainConfig) -> Result<()> {
+    // As of now, the config has very few properties and there is very little to validate yet.
+    // This is mainly a placeholder to add validations as that config object grows.
     // TODO improve errors
     require!(dest_chain_selector != 0, CcipRouterError::InvalidInputs);
-    require!(
-        config.default_tx_gas_limit != 0,
-        CcipRouterError::InvalidInputs
-    );
-    require!(
-        config.default_tx_gas_limit <= config.max_per_msg_gas_limit,
-        CcipRouterError::InvalidInputs
-    );
-    require!(
-        config.chain_family_selector != [0; 4],
-        CcipRouterError::InvalidInputs
-    );
     Ok(())
 }
