@@ -102,16 +102,6 @@ var (
 	// * `source_chain_selector` - The source chain selector to be disabled.
 	Instruction_DisableSourceChainSelector = ag_binary.TypeID([8]byte{58, 101, 54, 252, 248, 31, 226, 121})
 
-	// Disables the destination chain selector.
-	//
-	// The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for disabling the chain selector.
-	// * `dest_chain_selector` - The destination chain selector to be disabled.
-	Instruction_DisableDestChainSelector = ag_binary.TypeID([8]byte{214, 71, 132, 65, 177, 59, 170, 72})
-
 	// Updates the configuration of the source chain selector.
 	//
 	// The Admin is the only one able to update the source chain config.
@@ -236,68 +226,6 @@ var (
 	Instruction_SetPool = ag_binary.TypeID([8]byte{119, 30, 14, 180, 115, 225, 167, 238})
 
 	// Billing //
-	// Sets the token billing configuration.
-	//
-	// Only CCIP Admin can set the token billing configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-	// * `chain_selector` - The chain selector.
-	// * `mint` - The public key of the token mint.
-	// * `cfg` - The token billing configuration.
-	Instruction_SetTokenBilling = ag_binary.TypeID([8]byte{225, 230, 37, 71, 131, 209, 54, 230})
-
-	// Adds a billing token configuration.
-	// Only CCIP Admin can add a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for adding the billing token configuration.
-	// * `config` - The billing token configuration to be added.
-	Instruction_AddBillingTokenConfig = ag_binary.TypeID([8]byte{63, 156, 254, 216, 227, 53, 0, 69})
-
-	// Updates the billing token configuration.
-	// Only CCIP Admin can update a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the billing token configuration.
-	// * `config` - The new billing token configuration.
-	Instruction_UpdateBillingTokenConfig = ag_binary.TypeID([8]byte{140, 184, 124, 146, 204, 62, 244, 79})
-
-	// Removes the billing token configuration.
-	// Only CCIP Admin can remove a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for removing the billing token configuration.
-	Instruction_RemoveBillingTokenConfig = ag_binary.TypeID([8]byte{0, 194, 92, 161, 29, 8, 10, 91})
-
-	// Calculates the fee for sending a message to the destination chain.
-	//
-	// # Arguments
-	//
-	// * `_ctx` - The context containing the accounts required for the fee calculation.
-	// * `dest_chain_selector` - The chain selector for the destination chain.
-	// * `message` - The message to be sent.
-	//
-	// # Additional accounts
-	//
-	// In addition to the fixed amount of accounts defined in the `GetFee` context,
-	// the following accounts must be provided:
-	//
-	// * First, the billing token config accounts for each token sent with the message, sequentially.
-	// For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
-	// tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
-	// * Then, the per chain / per token config of every token sent with the message, sequentially
-	// in the same order.
-	//
-	// # Returns
-	//
-	// The fee amount in u64.
-	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
-
 	// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
 	// Only the CCIP Admin can withdraw billed funds.
 	//
@@ -400,8 +328,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AddChainSelector"
 	case Instruction_DisableSourceChainSelector:
 		return "DisableSourceChainSelector"
-	case Instruction_DisableDestChainSelector:
-		return "DisableDestChainSelector"
 	case Instruction_UpdateSourceChainConfig:
 		return "UpdateSourceChainConfig"
 	case Instruction_UpdateDestChainConfig:
@@ -426,16 +352,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferAdminRoleTokenAdminRegistry"
 	case Instruction_SetPool:
 		return "SetPool"
-	case Instruction_SetTokenBilling:
-		return "SetTokenBilling"
-	case Instruction_AddBillingTokenConfig:
-		return "AddBillingTokenConfig"
-	case Instruction_UpdateBillingTokenConfig:
-		return "UpdateBillingTokenConfig"
-	case Instruction_RemoveBillingTokenConfig:
-		return "RemoveBillingTokenConfig"
-	case Instruction_GetFee:
-		return "GetFee"
 	case Instruction_WithdrawBilledFunds:
 		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
@@ -485,9 +401,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"disable_source_chain_selector", (*DisableSourceChainSelector)(nil),
 		},
 		{
-			"disable_dest_chain_selector", (*DisableDestChainSelector)(nil),
-		},
-		{
 			"update_source_chain_config", (*UpdateSourceChainConfig)(nil),
 		},
 		{
@@ -522,21 +435,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_pool", (*SetPool)(nil),
-		},
-		{
-			"set_token_billing", (*SetTokenBilling)(nil),
-		},
-		{
-			"add_billing_token_config", (*AddBillingTokenConfig)(nil),
-		},
-		{
-			"update_billing_token_config", (*UpdateBillingTokenConfig)(nil),
-		},
-		{
-			"remove_billing_token_config", (*RemoveBillingTokenConfig)(nil),
-		},
-		{
-			"get_fee", (*GetFee)(nil),
 		},
 		{
 			"withdraw_billed_funds", (*WithdrawBilledFunds)(nil),

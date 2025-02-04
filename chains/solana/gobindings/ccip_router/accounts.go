@@ -19,6 +19,7 @@ type Config struct {
 	ProposedOwner              ag_solanago.PublicKey
 	Padding2                   [8]uint8
 	Ocr3                       [2]Ocr3Config
+	FeeQuoter                  ag_solanago.PublicKey
 	LinkTokenMint              ag_solanago.PublicKey
 	FeeAggregator              ag_solanago.PublicKey
 }
@@ -78,6 +79,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Ocr3` param:
 	err = encoder.Encode(obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeQuoter` param:
+	err = encoder.Encode(obj.FeeQuoter)
 	if err != nil {
 		return err
 	}
@@ -155,6 +161,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Ocr3`:
 	err = decoder.Decode(&obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeQuoter`:
+	err = decoder.Decode(&obj.FeeQuoter)
 	if err != nil {
 		return err
 	}
@@ -548,134 +559,6 @@ func (obj *CommitReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	}
 	// Deserialize `ExecutionStates`:
 	err = decoder.Decode(&obj.ExecutionStates)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type PerChainPerTokenConfig struct {
-	Version       uint8
-	ChainSelector uint64
-	Mint          ag_solanago.PublicKey
-	Billing       TokenBilling
-}
-
-var PerChainPerTokenConfigDiscriminator = [8]byte{183, 88, 20, 99, 246, 46, 51, 230}
-
-func (obj PerChainPerTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(PerChainPerTokenConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `ChainSelector` param:
-	err = encoder.Encode(obj.ChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `Mint` param:
-	err = encoder.Encode(obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Serialize `Billing` param:
-	err = encoder.Encode(obj.Billing)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *PerChainPerTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(PerChainPerTokenConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[183 88 20 99 246 46 51 230]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ChainSelector`:
-	err = decoder.Decode(&obj.ChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Mint`:
-	err = decoder.Decode(&obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Billing`:
-	err = decoder.Decode(&obj.Billing)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type BillingTokenConfigWrapper struct {
-	Version uint8
-	Config  BillingTokenConfig
-}
-
-var BillingTokenConfigWrapperDiscriminator = [8]byte{63, 178, 72, 57, 171, 66, 44, 151}
-
-func (obj BillingTokenConfigWrapper) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(BillingTokenConfigWrapperDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `Config` param:
-	err = encoder.Encode(obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *BillingTokenConfigWrapper) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(BillingTokenConfigWrapperDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[63 178 72 57 171 66 44 151]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Config`:
-	err = decoder.Decode(&obj.Config)
 	if err != nil {
 		return err
 	}

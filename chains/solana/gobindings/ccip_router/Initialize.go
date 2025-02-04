@@ -24,6 +24,7 @@ type Initialize struct {
 	SvmChainSelector     *uint64
 	EnableExecutionAfter *int64
 	FeeAggregator        *ag_solanago.PublicKey
+	FeeQuoter            *ag_solanago.PublicKey
 	LinkTokenMint        *ag_solanago.PublicKey
 	MaxFeeJuelsPerMsg    *ag_binary.Uint128
 
@@ -68,6 +69,12 @@ func (inst *Initialize) SetEnableExecutionAfter(enableExecutionAfter int64) *Ini
 // SetFeeAggregator sets the "feeAggregator" parameter.
 func (inst *Initialize) SetFeeAggregator(feeAggregator ag_solanago.PublicKey) *Initialize {
 	inst.FeeAggregator = &feeAggregator
+	return inst
+}
+
+// SetFeeQuoter sets the "feeQuoter" parameter.
+func (inst *Initialize) SetFeeQuoter(feeQuoter ag_solanago.PublicKey) *Initialize {
+	inst.FeeQuoter = &feeQuoter
 	return inst
 }
 
@@ -200,6 +207,9 @@ func (inst *Initialize) Validate() error {
 		if inst.FeeAggregator == nil {
 			return errors.New("FeeAggregator parameter is not set")
 		}
+		if inst.FeeQuoter == nil {
+			return errors.New("FeeQuoter parameter is not set")
+		}
 		if inst.LinkTokenMint == nil {
 			return errors.New("LinkTokenMint parameter is not set")
 		}
@@ -247,10 +257,11 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=6]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("    SvmChainSelector", *inst.SvmChainSelector))
 						paramsBranch.Child(ag_format.Param("EnableExecutionAfter", *inst.EnableExecutionAfter))
 						paramsBranch.Child(ag_format.Param("       FeeAggregator", *inst.FeeAggregator))
+						paramsBranch.Child(ag_format.Param("           FeeQuoter", *inst.FeeQuoter))
 						paramsBranch.Child(ag_format.Param("       LinkTokenMint", *inst.LinkTokenMint))
 						paramsBranch.Child(ag_format.Param("   MaxFeeJuelsPerMsg", *inst.MaxFeeJuelsPerMsg))
 					})
@@ -286,6 +297,11 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Serialize `FeeQuoter` param:
+	err = encoder.Encode(obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
 	// Serialize `LinkTokenMint` param:
 	err = encoder.Encode(obj.LinkTokenMint)
 	if err != nil {
@@ -314,6 +330,11 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
+	// Deserialize `FeeQuoter`:
+	err = decoder.Decode(&obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
 	// Deserialize `LinkTokenMint`:
 	err = decoder.Decode(&obj.LinkTokenMint)
 	if err != nil {
@@ -333,6 +354,7 @@ func NewInitializeInstruction(
 	svmChainSelector uint64,
 	enableExecutionAfter int64,
 	feeAggregator ag_solanago.PublicKey,
+	feeQuoter ag_solanago.PublicKey,
 	linkTokenMint ag_solanago.PublicKey,
 	maxFeeJuelsPerMsg ag_binary.Uint128,
 	// Accounts:
@@ -348,6 +370,7 @@ func NewInitializeInstruction(
 		SetSvmChainSelector(svmChainSelector).
 		SetEnableExecutionAfter(enableExecutionAfter).
 		SetFeeAggregator(feeAggregator).
+		SetFeeQuoter(feeQuoter).
 		SetLinkTokenMint(linkTokenMint).
 		SetMaxFeeJuelsPerMsg(maxFeeJuelsPerMsg).
 		SetConfigAccount(config).
