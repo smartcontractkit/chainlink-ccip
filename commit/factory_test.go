@@ -27,6 +27,7 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -66,7 +67,8 @@ func Test_maxQueryLength(t *testing.T) {
 		TokenPriceQuery: tokenprice.Query{},
 		ChainFeeQuery:   chainfee.Query{},
 	}
-	b, err := q.Encode()
+
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeQuery(q)
 	require.NoError(t, err)
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
@@ -152,7 +154,7 @@ func Test_maxObservationLength(t *testing.T) {
 		maxObs.TokenPriceObs.FeedTokenPrices[tokenID] = ccipocr3.NewBigIntFromInt64(math.MaxInt64)
 	}
 
-	b, err := maxObs.Encode()
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeObservation(maxObs)
 	require.NoError(t, err)
 
 	const testOffset = 50
@@ -238,7 +240,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 		}
 	}
 
-	b, err := maxOutc.Encode()
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(maxOutc)
 	require.NoError(t, err)
 
 	const testOffset = 50
