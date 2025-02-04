@@ -22,6 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
@@ -131,7 +132,7 @@ func TestCCIPRouter(t *testing.T) {
 	onRampAddress := [64]byte{1, 2, 3}
 	emptyAddress := [64]byte{}
 
-	validSourceChainConfig := ccip_router.SourceChainConfig{
+	validSourceChainConfig := ccip_offramp.SourceChainConfig{
 		OnRamp:    [2][64]byte{onRampAddress, emptyAddress},
 		IsEnabled: true,
 	}
