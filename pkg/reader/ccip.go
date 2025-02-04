@@ -1812,12 +1812,12 @@ var _ CCIPReader = (*ccipChainReader)(nil)
 func (r *ccipChainReader) refresh(ctx context.Context) (NogoResponse, error) {
 	requests := r.prepareBatchRequests()
 
-	batchResult, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValuesGraceful(ctx, requests)
+	batchResult, skipped, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(ctx, requests, true)
 	if err != nil {
 		return NogoResponse{}, fmt.Errorf("batch get latest values: %w", err)
 	}
 	// print the batchResult
-	for contract, results := range batchResult.Results {
+	for contract, results := range batchResult {
 		r.lggr.Infow("contract is", "contract", contract)
 		for i, result := range results {
 			r.lggr.Infow("result is", "result", result)
@@ -1829,15 +1829,15 @@ func (r *ccipChainReader) refresh(ctx context.Context) (NogoResponse, error) {
 		}
 	}
 
-	r.lggr.Infow("batchResult.SkippedNoBinds is", "batchResult.SkippedNoBinds", batchResult.SkippedNoBinds)
+	r.lggr.Infow("batchResult.SkippedNoBinds is", "batchResult.SkippedNoBinds", skipped)
 	// Log skipped contracts if any for debugging
 	// Clear skipped contract values from cache
-	if len(batchResult.SkippedNoBinds) > 0 {
-		r.lggr.Infow("some contracts were skipped due to no bindings", "contracts", batchResult.SkippedNoBinds)
+	if len(skipped) > 0 {
+		r.lggr.Infow("some contracts were skipped due to no bindings", "contracts", batchResult)
 		// c.clearSkippedContractValues(batchResult.SkippedNoBinds)
 	}
 
-	return r.updateFromResults(batchResult.Results)
+	return r.updateFromResults(batchResult)
 }
 
 type rmnDigestHeader struct {
