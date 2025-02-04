@@ -15,15 +15,16 @@ type observersCounter[T any] struct {
 }
 
 // OracleMinObservation provides a way to ensure a minimum number of observations for
-// some piece of data have occurred. It maintains an internal cache and provides a list
+// some piece of data have occurred (once per observer). It maintains an internal cache and provides a list
 // of valid or invalid data points.
 type OracleMinObservation[T any] interface {
 	Add(data T, oracleID commontypes.OracleID)
+	// GetValid Get all data points that have been observed by at least minObservation observers.
 	GetValid() []T
 }
 
-// minObservation is a helper object to filter data based on observation counts.
-// It keeps track of all inputs, determines if they are consistent
+// oracleMinObservation is a helper object to filter data based on observation counts.
+// It keeps track of all inputs per observer, determines if they are consistent
 // with one another, and whether they meet the required count threshold.
 type oracleMinObservation[T any] struct {
 	minObservation Threshold
@@ -31,8 +32,9 @@ type oracleMinObservation[T any] struct {
 	idFunc         func(T) [32]byte
 }
 
-// NewOracleMinObservation constructs a concrete MinObservation object. The
+// NewOracleMinObservation returns an OracleMinObservation with the
 // supplied idFunc is used to generate a uniqueID for the type being observed.
+// If idFunc is nil a default is used.
 func NewOracleMinObservation[T any](minThreshold Threshold, idFunc func(T) [32]byte) OracleMinObservation[T] {
 	if idFunc == nil {
 		idFunc = func(data T) [32]byte {
