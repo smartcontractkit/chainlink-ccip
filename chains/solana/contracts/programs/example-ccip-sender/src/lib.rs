@@ -19,9 +19,9 @@ pub const CCIP_GET_FEE_DISCRIMINATOR: [u8; 8] = [115, 195, 235, 161, 25, 219, 60
 /// Used to test CCIP Router execute.
 #[program]
 pub mod example_ccip_sender {
-    use anchor_spl::{
-        token_2022::spl_token_2022::{self, instruction::transfer_checked},
-        token_interface,
+    use anchor_spl::token_2022::spl_token_2022::{
+        self,
+        instruction::{approve_checked, transfer_checked},
     };
     use solana_program::{
         instruction::Instruction,
@@ -45,7 +45,7 @@ pub mod example_ccip_sender {
         fee_token: Pubkey,
     ) -> Result<()> {
         let message = SVM2AnyMessage {
-            receiver: ctx.accounts.chain_config.extra_args_bytes.clone(),
+            receiver: ctx.accounts.chain_config.recipient.clone(),
             data,
             token_amounts: token_amounts.clone(),
             fee_token,
@@ -57,7 +57,7 @@ pub mod example_ccip_sender {
             // transfer tokens to this contract and approve the router to take possession during message processing
         }
 
-        // TODO: get fee from router
+        // CPI: get fee from router
         let fee: GetFeeResult = {
             let acc_infos: Vec<AccountInfo> = [
                 ctx.accounts.ccip_fee_quoter_config.to_account_info(),
@@ -92,22 +92,60 @@ pub mod example_ccip_sender {
             GetFeeResult::try_from_slice(&data)?
         };
 
-        // TODO: if fee token is not native, transfer the fee amounts from sender to the program and approve the router
+        // if fee token is not native, transfer the fee amounts from sender to the program and approve the router
         if fee_token != Pubkey::default() {
-            token_interface::transfer_checked(
-                CpiContext::new_with_signer(
-                    ctx.accounts.ccip_fee_token_program.to_account_info(),
-                    token_interface::TransferChecked {
-                        from: ctx.accounts.authority_fee_token_ata.to_account_info(),
-                        mint: ctx.accounts.ccip_fee_token_mint.to_account_info(),
-                        to: ctx.accounts.ccip_fee_token_user_ata.to_account_info(),
-                        authority: ctx.accounts.ccip_sender.to_account_info(),
-                    },
-                    &[&[CCIP_SENDER], &[&[ctx.bumps.ccip_sender]]],
-                ),
-                fee.amount,
-                ctx.accounts.ccip_fee_token_mint.decimals,
-            )?;
+            let seeds = &[CCIP_SENDER, &[ctx.bumps.ccip_sender]];
+
+            // transfer to this program
+            {
+                // build transfer from token_2022 SDK, but set expected token program ID
+                let mut ix = transfer_checked(
+                    &spl_token_2022::ID,
+                    &ctx.accounts.authority_fee_token_ata.key(),
+                    &ctx.accounts.ccip_fee_token_mint.key(),
+                    &ctx.accounts.ccip_fee_token_user_ata.key(),
+                    &ctx.accounts.ccip_sender.key(),
+                    &[],
+                    fee.amount,
+                    ctx.accounts.ccip_fee_token_mint.decimals,
+                )?;
+                ix.program_id = ctx.accounts.ccip_fee_token_program.key(); // allow any custom token program
+                invoke_signed(
+                    &ix,
+                    &[
+                        ctx.accounts.authority_fee_token_ata.to_account_info(),
+                        ctx.accounts.ccip_fee_token_mint.to_account_info(),
+                        ctx.accounts.ccip_fee_token_user_ata.to_account_info(),
+                        ctx.accounts.ccip_sender.to_account_info(),
+                    ],
+                    &[seeds],
+                )?;
+            }
+
+            // approve router to withdraw from this program
+            {
+                let mut ix = approve_checked(
+                    &spl_token_2022::ID,
+                    &ctx.accounts.ccip_fee_token_user_ata.key(),
+                    &ctx.accounts.ccip_fee_token_mint.key(),
+                    &ctx.accounts.ccip_fee_billing_signer.key(),
+                    &ctx.accounts.ccip_sender.key(),
+                    &[],
+                    fee.amount,
+                    ctx.accounts.ccip_fee_token_mint.decimals,
+                )?;
+                ix.program_id = ctx.accounts.ccip_fee_token_program.key(); // allow any custom token program
+                invoke_signed(
+                    &ix,
+                    &[
+                        ctx.accounts.ccip_fee_token_user_ata.to_account_info(),
+                        ctx.accounts.ccip_fee_token_mint.to_account_info(),
+                        ctx.accounts.ccip_fee_billing_signer.to_account_info(),
+                        ctx.accounts.ccip_sender.to_account_info(),
+                    ],
+                    &[seeds],
+                )?;
+            }
         }
 
         let acc_infos: Vec<AccountInfo> = [
