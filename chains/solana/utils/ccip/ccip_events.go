@@ -52,6 +52,7 @@ type EventConfigSet struct {
 	F             uint8
 }
 
+// FeeQuoter-specific event
 type UsdPerTokenUpdated struct {
 	Discriminator [8]byte
 	Token         solana.PublicKey
@@ -59,6 +60,7 @@ type UsdPerTokenUpdated struct {
 	Timestamp     int64
 }
 
+// FeeQuoter-specific event
 type UsdPerUnitGasUpdated struct {
 	Discriminator [8]byte
 	DestChain     uint64

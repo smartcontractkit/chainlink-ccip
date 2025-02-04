@@ -3,10 +3,11 @@ package optimizers
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -79,7 +80,8 @@ func Test_truncateLastCommit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			op := NewObservationOptimizer(10000)
+			lggr := logger.Test(t)
+			op := NewObservationOptimizer(lggr, 10000)
 			truncated, _ := op.truncateLastCommit(tt.observation, tt.chain)
 			require.Equal(t, tt.expected, truncated)
 		})
@@ -166,7 +168,8 @@ func Test_truncateChain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			op := NewObservationOptimizer(10000) // size not important here
+			lggr := logger.Test(t)
+			op := NewObservationOptimizer(lggr, 10000) // size not important here
 			truncated := op.truncateChain(tt.observation, tt.chain)
 			require.Equal(t, tt.expected, truncated)
 		})
@@ -325,7 +328,8 @@ func Test_truncateObservation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.observation.TokenData = makeNoopTokenDataObservations(tt.observation.Messages)
 			tt.expected.TokenData = tt.observation.TokenData
-			op := NewObservationOptimizer(tt.maxSize)
+			lggr := logger.Test(t)
+			op := NewObservationOptimizer(lggr, tt.maxSize)
 			obs, err := op.TruncateObservation(tt.observation)
 			if tt.wantErr {
 				require.Error(t, err)

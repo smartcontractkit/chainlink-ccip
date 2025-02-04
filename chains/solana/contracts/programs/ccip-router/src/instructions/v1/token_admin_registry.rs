@@ -1,3 +1,9 @@
+use crate::{
+    events::token_admin_registry as events,
+    token_context::{
+        OverridePendingTokenAdminRegistryByCCIPAdmin, OverridePendingTokenAdminRegistryByOwner,
+    },
+};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
@@ -5,73 +11,155 @@ use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_l
 use super::pools::token_admin_registry_writable;
 
 use crate::{
-    seed, AcceptAdminRoleTokenAdminRegistry, AdministratorRegistered,
-    AdministratorTransferRequested, AdministratorTransferred, CcipRouterError,
-    ModifyTokenAdminRegistry, PoolSet, RegisterTokenAdminRegistryViaGetCCIPAdmin,
-    RegisterTokenAdminRegistryViaOwner, SetPoolTokenAdminRegistry,
+    seed,
+    token_context::{RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner},
+    AcceptAdminRoleTokenAdminRegistry, CcipRouterError, ModifyTokenAdminRegistry,
+    SetPoolTokenAdminRegistry,
 };
 
 const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;
 
-pub fn register_token_admin_registry_via_get_ccip_admin(
-    ctx: Context<RegisterTokenAdminRegistryViaGetCCIPAdmin>,
-    mint: Pubkey, // should we validate that this is a real token program?
+/// Proposes an administrator for the given token as pending administrator
+pub fn ccip_admin_propose_administrator(
+    ctx: Context<RegisterTokenAdminRegistryByCCIPAdmin>,
+    token_admin_registry_admin: Pubkey,
+) -> Result<()> {
+    let token_mint = ctx.accounts.mint.key().to_owned();
+    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+    init_with_pending_administrator(token_admin_registry, token_mint, token_admin_registry_admin)?;
+
+    Ok(())
+}
+
+/// Overrides the pending administrator for the given token
+pub fn ccip_admin_override_pending_administrator(
+    ctx: Context<OverridePendingTokenAdminRegistryByCCIPAdmin>,
     token_admin_registry_admin: Pubkey,
 ) -> Result<()> {
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
-    token_admin_registry.version = 1;
-    token_admin_registry.administrator = token_admin_registry_admin;
-    token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
-    token_admin_registry.lookup_table = Pubkey::new_from_array([0; 32]);
 
-    emit!(AdministratorRegistered {
-        token_mint: mint,
-        administrator: token_admin_registry_admin,
-    });
-
-    Ok(())
-}
-
-pub fn register_token_admin_registry_via_owner(
-    ctx: Context<RegisterTokenAdminRegistryViaOwner>,
-) -> Result<()> {
-    let token_mint = ctx.accounts.mint.key().to_owned();
-    let mint_authority = ctx.accounts.mint.mint_authority.to_owned();
-
-    require!(
-        mint_authority.is_some(),
-        CcipRouterError::InvalidInputsPoolAccounts
+    require_eq!(
+        token_admin_registry.administrator,
+        Pubkey::new_from_array([0; 32]),
+        CcipRouterError::InvalidTokenAdminRegistryProposedAdmin
     );
 
-    let administrator = mint_authority.unwrap();
+    token_admin_registry.pending_administrator = token_admin_registry_admin;
 
+    Ok(())
+}
+
+/// Proposes an administrator for the given token as pending administrator
+pub fn owner_propose_administrator(
+    ctx: Context<RegisterTokenAdminRegistryByOwner>,
+    token_admin_registry_admin: Pubkey,
+) -> Result<()> {
+    let token_mint = ctx.accounts.mint.key().to_owned();
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
-    token_admin_registry.version = 1;
-    token_admin_registry.administrator = administrator;
-    token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
-    token_admin_registry.lookup_table = Pubkey::new_from_array([0; 32]);
 
-    emit!(AdministratorRegistered {
-        token_mint,
-        administrator,
+    init_with_pending_administrator(token_admin_registry, token_mint, token_admin_registry_admin)?;
+
+    Ok(())
+}
+
+/// Overrides the pending administrator for the given token
+pub fn owner_override_pending_administrator(
+    ctx: Context<OverridePendingTokenAdminRegistryByOwner>,
+    token_admin_registry_admin: Pubkey,
+) -> Result<()> {
+    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+    require_eq!(
+        token_admin_registry.administrator,
+        Pubkey::new_from_array([0; 32]),
+        CcipRouterError::InvalidTokenAdminRegistryProposedAdmin
+    );
+
+    token_admin_registry.pending_administrator = token_admin_registry_admin;
+
+    Ok(())
+}
+
+fn init_with_pending_administrator(
+    token_admin_registry: &mut Account<'_, crate::TokenAdminRegistry>,
+    token_mint: Pubkey,
+    new_admin: Pubkey,
+) -> Result<()> {
+    require_neq!(
+        new_admin,
+        Pubkey::new_from_array([0; 32]),
+        CcipRouterError::InvalidTokenAdminRegistryInputsZeroAddress
+    );
+
+    token_admin_registry.version = 1;
+    token_admin_registry.administrator = Pubkey::new_from_array([0; 32]);
+    token_admin_registry.pending_administrator = new_admin;
+    token_admin_registry.lookup_table = Pubkey::new_from_array([0; 32]);
+    token_admin_registry.mint = token_mint;
+
+    emit!(events::AdministratorTransferRequested {
+        token: token_mint,
+        current_admin: Pubkey::new_from_array([0; 32]),
+        new_admin,
     });
 
     Ok(())
 }
 
-pub fn set_pool(
-    ctx: Context<SetPoolTokenAdminRegistry>,
-    mint: Pubkey,
-    writable_indexes: Vec<u8>,
+/// Transfers the administrator role for a token to a new address with a 2-step process
+pub fn transfer_admin_role_token_admin_registry(
+    ctx: Context<ModifyTokenAdminRegistry>,
+    new_admin: Pubkey,
 ) -> Result<()> {
-    // set new lookup table
+    let token_mint = ctx.accounts.mint.key().to_owned();
+    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+
+    token_admin_registry.pending_administrator = new_admin;
+
+    emit!(events::AdministratorTransferRequested {
+        token: token_mint,
+        current_admin: token_admin_registry.administrator,
+        new_admin,
+    });
+
+    Ok(())
+}
+
+/// Accepts the admin role for a token
+pub fn accept_admin_role_token_admin_registry(
+    ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
+) -> Result<()> {
+    let token_mint = ctx.accounts.mint.key().to_owned();
+    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
+    let new_admin = token_admin_registry.pending_administrator;
+
+    token_admin_registry.administrator = new_admin;
+    token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
+
+    emit!(events::AdministratorTransferred {
+        token: token_mint,
+        new_admin,
+    });
+
+    Ok(())
+}
+
+/// Sets the lookup table for pool for a token.
+/// TODO: Add a test with look up table as 0 address
+/// Setting the lookup table to address(0) effectively delists the token from CCIP.
+/// Setting the lookup table to any other address enables the token on CCIP.
+pub fn set_pool(ctx: Context<SetPoolTokenAdminRegistry>, writable_indexes: Vec<u8>) -> Result<()> {
+    let token_mint = ctx.accounts.mint.key().to_owned();
+
+    // Enable to overwrite the lookup table pool with 0 to deslist from CCIP
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
     let previous_pool = token_admin_registry.lookup_table;
     let new_pool = ctx.accounts.pool_lookuptable.key();
     token_admin_registry.lookup_table = new_pool;
 
     // set writable indexes
-    // used to build offchain tokenpool accounts in a transaction
+    // used to build offchain tokenpool additional accounts in the token transactions
     // indexes can be checked to indicate is_writable for the specific account
     // this is also used to validate to ensure the correct write permissions are used according the admin
     token_admin_registry_writable::reset(token_admin_registry);
@@ -92,24 +180,27 @@ pub fn set_pool(
             CcipRouterError::InvalidInputsLookupTableAccounts
         );
 
-        // calculate or retrieve expected addresses
+        // The mandatory accounts (PDAs) are stored in the lookup table to save space even if they can be infered
         let (token_admin_registry, _) = Pubkey::find_program_address(
-            &[seed::TOKEN_ADMIN_REGISTRY, mint.as_ref()],
+            &[seed::TOKEN_ADMIN_REGISTRY, token_mint.as_ref()],
             ctx.program_id,
         );
         let pool_program = lookup_table_account.addresses[2]; // cannot be calculated, can be custom per pool
         let token_program = lookup_table_account.addresses[6]; // cannot be calculated, can be custom per token
         let (pool_config, _) = Pubkey::find_program_address(
-            &[seed::CCIP_TOKENPOOL_CONFIG, mint.as_ref()],
+            &[seed::CCIP_TOKENPOOL_CONFIG, token_mint.as_ref()],
             &pool_program,
         );
         let (pool_signer, _) = Pubkey::find_program_address(
-            &[seed::CCIP_TOKENPOOL_SIGNER, mint.as_ref()],
+            &[seed::CCIP_TOKENPOOL_SIGNER, token_mint.as_ref()],
             &pool_program,
         );
         let (fee_billing_config, _) = Pubkey::find_program_address(
-            &[seed::FEE_BILLING_TOKEN_CONFIG, mint.as_ref()],
-            ctx.program_id,
+            &[
+                fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+                token_mint.as_ref(),
+            ],
+            &fee_quoter::ID,
         );
 
         let min_accounts = [
@@ -119,12 +210,12 @@ pub fn set_pool(
             pool_config,
             get_associated_token_address_with_program_id(
                 &pool_signer.key(),
-                &mint.key(),
+                &token_mint.key(),
                 &token_program.key(),
             ),
             pool_signer,
             token_program,
-            mint,
+            token_mint,
             fee_billing_config,
         ];
 
@@ -143,49 +234,10 @@ pub fn set_pool(
         }
     }
 
-    emit!(PoolSet {
-        token: mint,
+    emit!(events::PoolSet {
+        token: token_mint,
         previous_pool_lookup_table: previous_pool,
         new_pool_lookup_table: new_pool,
-    });
-
-    Ok(())
-}
-
-pub fn transfer_admin_role_token_admin_registry(
-    ctx: Context<ModifyTokenAdminRegistry>,
-    mint: Pubkey,
-    new_admin: Pubkey,
-) -> Result<()> {
-    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
-
-    if new_admin == Pubkey::new_from_array([0; 32]) {
-        token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
-    } else {
-        token_admin_registry.pending_administrator = new_admin;
-    }
-
-    emit!(AdministratorTransferRequested {
-        token: mint,
-        current_admin: token_admin_registry.administrator,
-        new_admin,
-    });
-
-    Ok(())
-}
-
-pub fn accept_admin_role_token_admin_registry(
-    ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
-    mint: Pubkey,
-) -> Result<()> {
-    let token_admin_registry = &mut ctx.accounts.token_admin_registry;
-    let new_admin = token_admin_registry.pending_administrator;
-    token_admin_registry.administrator = new_admin;
-    token_admin_registry.pending_administrator = Pubkey::new_from_array([0; 32]);
-
-    emit!(AdministratorTransferred {
-        token: mint,
-        new_admin,
     });
 
     Ok(())

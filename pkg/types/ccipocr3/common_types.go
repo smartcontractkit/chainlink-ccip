@@ -64,15 +64,15 @@ func (b Bytes) MarshalJSON() ([]byte, error) {
 
 func (b *Bytes) UnmarshalJSON(data []byte) error {
 	v := string(data)
-	if len(v) < 2 {
-		return fmt.Errorf("Bytes must be of at least length 2 (i.e, '0x' prefix): %s", v)
+	if len(v) < 4 {
+		return fmt.Errorf("bytes must be of at least length 2 (i.e, '\"0x\"'): %s", v)
 	}
 
 	// trim the start and end double quotes
 	v = v[1 : len(v)-1]
 
 	if !strings.HasPrefix(v, "0x") {
-		return fmt.Errorf("Bytes must start with '0x' prefix: %s", v)
+		return fmt.Errorf("bytes must start with '0x' prefix: %s", v)
 	}
 
 	// Decode everything after the '0x' prefix.
@@ -80,13 +80,6 @@ func (b *Bytes) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to decode hex: %w", err)
 	}
-
-	/*
-		// TODO: return nil instead of an empty slice. This breaks some tests.
-		if len(bs) == 0 {
-			return nil
-		}
-	*/
 
 	*b = bs
 	return nil
