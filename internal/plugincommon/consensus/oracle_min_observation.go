@@ -50,12 +50,10 @@ func NewOracleMinObservation[T any](minThreshold Threshold, idFunc func(T) [32]b
 
 func (cv *oracleMinObservation[T]) Add(data T, oracleID commontypes.OracleID) {
 	id := cv.idFunc(data)
-	if _, ok := cv.cache[id]; ok {
-		cv.cache[id].observers[oracleID] = struct{}{}
-	} else {
+	if _, ok := cv.cache[id]; !ok {
 		cv.cache[id] = &observersCounter[T]{data: data, observers: make(map[commontypes.OracleID]struct{})}
-		cv.cache[id].observers[oracleID] = struct{}{}
 	}
+	cv.cache[id].observers[oracleID] = struct{}{}
 }
 
 func (cv *oracleMinObservation[T]) GetValid() []T {
