@@ -78,27 +78,15 @@ type Extended interface {
 		request types.BatchGetLatestValuesRequest,
 	) (types.BatchGetLatestValuesResult, error)
 
-	// ExtendedBatchGetLatestValues performs automatic binding from contractNames to bound contracts, and
-	// contructs a BatchGetLatestValuesRequest with the resolved bindings.
+	// ExtendedBatchGetLatestValues performs automatic binding from contractNames to bound contracts,
+	// and constructs a BatchGetLatestValuesRequest with the resolved bindings.
+	// If graceful is true, contracts with no bindings will be skipped and returned in the skipped slice
+	// rather than returning an error.
 	ExtendedBatchGetLatestValues(
 		ctx context.Context,
 		request ExtendedBatchGetLatestValuesRequest,
-	) (types.BatchGetLatestValuesResult, error)
-
-	// ExtendedBatchGetLatestValuesGraceful performs the same operations as ExtendedBatchGetLatestValues
-	// but handles ErrNoBindings gracefully by:
-	// 1. Skipping contracts with no bindings instead of returning an error
-	// 2. Returning partial results for contracts that do have bindings
-	// 3. Including information about which contracts were skipped due to no bindings
-	ExtendedBatchGetLatestValuesGraceful(
-		ctx context.Context,
-		request ExtendedBatchGetLatestValuesRequest,
-	) (BatchGetLatestValuesGracefulResult, error)
-}
-
-type BatchGetLatestValuesGracefulResult struct {
-	Results        types.BatchGetLatestValuesResult
-	SkippedNoBinds []string // List of contract names that were skipped due to no bindings
+		graceful bool,
+	) (types.BatchGetLatestValuesResult, []string, error)
 }
 
 type ExtendedBatchGetLatestValuesRequest map[string]types.ContractBatch
@@ -250,23 +238,40 @@ func (e *extendedContractReader) BatchGetLatestValues(
 func (e *extendedContractReader) ExtendedBatchGetLatestValues(
 	ctx context.Context,
 	request ExtendedBatchGetLatestValuesRequest,
-) (types.BatchGetLatestValuesResult, error) {
+	graceful bool,
+) (types.BatchGetLatestValuesResult, []string, error) {
 	// Convert the request from contract names to BoundContracts
 	convertedRequest := make(types.BatchGetLatestValuesRequest)
+	var skippedContracts []string
 
 	for contractName, batch := range request {
 		// Get the binding for this contract name
 		binding, err := e.getOneBinding(contractName)
 		if err != nil {
-			return nil, fmt.Errorf("BatchGetLatestValues: failed to get binding for contract %s: %w", contractName, err)
+			if graceful && errors.Is(err, ErrNoBindings) {
+				// Track skipped contracts but continue processing
+				skippedContracts = append(skippedContracts, contractName)
+				continue
+			}
+			return nil, nil, fmt.Errorf("BatchGetLatestValues: failed to get binding for contract %s: %w", contractName, err)
 		}
 
 		// Use the resolved binding for the request
 		convertedRequest[binding.Binding] = batch
 	}
 
+	// If we have no valid bindings after filtering in graceful mode, return empty result
+	if graceful && len(convertedRequest) == 0 {
+		return make(types.BatchGetLatestValuesResult), skippedContracts, nil
+	}
+
 	// Call the underlying BatchGetLatestValues with the converted request
-	return e.BatchGetLatestValues(ctx, convertedRequest)
+	results, err := e.BatchGetLatestValues(ctx, convertedRequest)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return results, skippedContracts, nil
 }
 
 func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.BoundContract) error {
@@ -305,52 +310,6 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 	}
 
 	return nil
-}
-
-func (e *extendedContractReader) ExtendedBatchGetLatestValuesGraceful(
-	ctx context.Context,
-	request ExtendedBatchGetLatestValuesRequest,
-) (BatchGetLatestValuesGracefulResult, error) {
-	// Convert the request from contract names to BoundContracts
-	convertedRequest := make(types.BatchGetLatestValuesRequest)
-	var skippedContracts []string
-
-	for contractName, batch := range request {
-		// Get the binding for this contract name
-		binding, err := e.getOneBinding(contractName)
-		if err != nil {
-			if errors.Is(err, ErrNoBindings) {
-				// Track skipped contracts but continue processing
-				skippedContracts = append(skippedContracts, contractName)
-				continue
-			}
-			// Return error for any other binding issues
-			return BatchGetLatestValuesGracefulResult{}, fmt.Errorf(
-				"BatchGetLatestValuesGraceful: failed to get binding for contract %s: %w", contractName, err)
-		}
-
-		// Use the resolved binding for the request
-		convertedRequest[binding.Binding] = batch
-	}
-
-	// If we have no valid bindings after filtering, return empty result
-	if len(convertedRequest) == 0 {
-		return BatchGetLatestValuesGracefulResult{
-			Results:        make(types.BatchGetLatestValuesResult),
-			SkippedNoBinds: skippedContracts,
-		}, nil
-	}
-
-	// Call the underlying BatchGetLatestValues with the converted request
-	results, err := e.BatchGetLatestValues(ctx, convertedRequest)
-	if err != nil {
-		return BatchGetLatestValuesGracefulResult{}, err
-	}
-
-	return BatchGetLatestValuesGracefulResult{
-		Results:        results,
-		SkippedNoBinds: skippedContracts,
-	}, nil
 }
 
 func (e *extendedContractReader) GetBindings(contractName string) []ExtendedBoundContract {

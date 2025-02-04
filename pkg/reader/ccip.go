@@ -517,9 +517,10 @@ func (r *ccipChainReader) Nonces(
 		consts.ContractNameNonceManager: contractBatch,
 	}
 
-	batchResult, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(
+	batchResult, _, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(
 		ctx,
 		request,
+		false,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("batch get nonces failed: %w", err)
