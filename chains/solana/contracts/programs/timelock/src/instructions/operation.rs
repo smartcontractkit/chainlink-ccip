@@ -4,10 +4,11 @@ use anchor_lang::solana_program::keccak::HASH_BYTES;
 use access_controller::AccessController;
 
 use crate::constants::{
-    ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED, TIMELOCK_OPERATION_SEED, TIMELOCK_BYPASSER_OPERATION_SEED
+    ANCHOR_DISCRIMINATOR, TIMELOCK_BYPASSER_OPERATION_SEED, TIMELOCK_CONFIG_SEED,
+    TIMELOCK_ID_PADDED, TIMELOCK_OPERATION_SEED,
 };
 use crate::error::TimelockError;
-use crate::state::{Config, InstructionData, InstructionAccount, Operation};
+use crate::state::{Config, InstructionAccount, InstructionData, Operation};
 
 pub fn initialize_operation(
     op: &mut Account<Operation>,
@@ -54,9 +55,7 @@ pub fn append_instruction_data(
     Ok(())
 }
 
-pub fn finalize_operation(
-    op: &mut Account<Operation>,
-) -> Result<()> {
+pub fn finalize_operation(op: &mut Account<Operation>) -> Result<()> {
     op.is_finalized = true;
     Ok(())
 }
@@ -105,7 +104,7 @@ pub struct InitializeInstruction<'info> {
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE
-            + operation.instructions.iter().map(|ix| 
+            + operation.instructions.iter().map(|ix|
                 // program_id + 4 + data.len + 4 + accounts.len*34
                 32 + 4 + ix.data.len() + 4 + ix.accounts.len() * 34
             ).sum::<usize>()
@@ -260,7 +259,7 @@ pub struct InitializeBypasserInstruction<'info> {
         seeds = [TIMELOCK_BYPASSER_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE
-            + operation.instructions.iter().map(|ix| 
+            + operation.instructions.iter().map(|ix|
                 // program_id + 4 + data.len + 4 + accounts.len*34
                 32 + 4 + ix.data.len() + 4 + ix.accounts.len() * 34
             ).sum::<usize>()
