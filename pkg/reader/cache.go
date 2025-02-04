@@ -154,7 +154,7 @@ func (r *CachedChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Re
 		ContractAddress:  resp.RMNProxy.RMNRemoteAddress,
 		ConfigDigest:     resp.RMNRemote.RMNRemoteVersionedConfig.Config.RMNHomeContractConfigDigest,
 		Signers:          r.buildSigners(resp.RMNRemote.RMNRemoteVersionedConfig.Config.Signers),
-		FSign:            resp.RMNRemote.RMNRemoteVersionedConfig.Config.F,
+		FSign:            resp.RMNRemote.RMNRemoteVersionedConfig.Config.FSign,
 		ConfigVersion:    resp.RMNRemote.RMNRemoteVersionedConfig.Version,
 		RmnReportVersion: resp.RMNRemote.RMNRemoteDigestHeader.DigestHeader,
 	}
@@ -168,7 +168,7 @@ func (r *CachedChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Re
 		ContractAddress:  resp.RMNProxy.RMNRemoteAddress,
 		ConfigDigest:     resp.RMNRemote.RMNRemoteVersionedConfig.Config.RMNHomeContractConfigDigest,
 		Signers:          r.buildSigners(resp.RMNRemote.RMNRemoteVersionedConfig.Config.Signers),
-		FSign:            resp.RMNRemote.RMNRemoteVersionedConfig.Config.F,
+		FSign:            resp.RMNRemote.RMNRemoteVersionedConfig.Config.FSign,
 		ConfigVersion:    resp.RMNRemote.RMNRemoteVersionedConfig.Version,
 		RmnReportVersion: resp.RMNRemote.RMNRemoteDigestHeader.DigestHeader,
 	}, nil
