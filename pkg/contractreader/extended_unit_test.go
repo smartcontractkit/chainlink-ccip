@@ -68,15 +68,17 @@ func TestGetOneBinding(t *testing.T) {
 
 func TestExtendedBatchGetLatestValues(t *testing.T) {
 	tests := []struct {
-		name           string
-		bindings       map[string][]ExtendedBoundContract
-		request        ExtendedBatchGetLatestValuesRequest
-		mockResponse   types.BatchGetLatestValuesResult
-		expectedError  error
-		expectedResult types.BatchGetLatestValuesResult
+		name            string
+		bindings        map[string][]ExtendedBoundContract
+		request         ExtendedBatchGetLatestValuesRequest
+		mockResponse    types.BatchGetLatestValuesResult
+		graceful        bool
+		expectedError   error
+		expectedResult  types.BatchGetLatestValuesResult
+		expectedSkipped []string
 	}{
 		{
-			name: "single contract single read success",
+			name: "single contract single read success - non-graceful",
 			bindings: map[string][]ExtendedBoundContract{
 				"contract1": {
 					{Binding: types.BoundContract{Name: "contract1", Address: "0x123"}},
@@ -92,15 +94,43 @@ func TestExtendedBatchGetLatestValues(t *testing.T) {
 					{ReadName: "read1"},
 				},
 			},
+			graceful:      false,
 			expectedError: nil,
 			expectedResult: types.BatchGetLatestValuesResult{
 				types.BoundContract{Name: "contract1", Address: "0x123"}: {
 					{ReadName: "read1"},
 				},
 			},
+			expectedSkipped: nil,
 		},
 		{
-			name: "contract not found",
+			name: "single contract single read success - graceful",
+			bindings: map[string][]ExtendedBoundContract{
+				"contract1": {
+					{Binding: types.BoundContract{Name: "contract1", Address: "0x123"}},
+				},
+			},
+			request: ExtendedBatchGetLatestValuesRequest{
+				"contract1": {
+					{ReadName: "read1", Params: "params1", ReturnVal: "return1"},
+				},
+			},
+			mockResponse: types.BatchGetLatestValuesResult{
+				types.BoundContract{Name: "contract1", Address: "0x123"}: {
+					{ReadName: "read1"},
+				},
+			},
+			graceful:      true,
+			expectedError: nil,
+			expectedResult: types.BatchGetLatestValuesResult{
+				types.BoundContract{Name: "contract1", Address: "0x123"}: {
+					{ReadName: "read1"},
+				},
+			},
+			expectedSkipped: nil,
+		},
+		{
+			name: "contract not found - non-graceful",
 			bindings: map[string][]ExtendedBoundContract{
 				"contract1": {
 					{Binding: types.BoundContract{Name: "contract1", Address: "0x123"}},
@@ -111,12 +141,32 @@ func TestExtendedBatchGetLatestValues(t *testing.T) {
 					{ReadName: "read1", Params: "params1", ReturnVal: "return1"},
 				},
 			},
-			mockResponse:   nil,
-			expectedError:  ErrNoBindings,
-			expectedResult: nil,
+			mockResponse:    nil,
+			graceful:        false,
+			expectedError:   ErrNoBindings,
+			expectedResult:  nil,
+			expectedSkipped: nil,
 		},
 		{
-			name: "multiple bindings for contract",
+			name: "contract not found - graceful",
+			bindings: map[string][]ExtendedBoundContract{
+				"contract1": {
+					{Binding: types.BoundContract{Name: "contract1", Address: "0x123"}},
+				},
+			},
+			request: ExtendedBatchGetLatestValuesRequest{
+				"nonexistent": {
+					{ReadName: "read1", Params: "params1", ReturnVal: "return1"},
+				},
+			},
+			mockResponse:    nil,
+			graceful:        true,
+			expectedError:   nil,
+			expectedResult:  types.BatchGetLatestValuesResult{},
+			expectedSkipped: []string{"nonexistent"},
+		},
+		{
+			name: "multiple bindings error - both modes",
 			bindings: map[string][]ExtendedBoundContract{
 				"contract1": {
 					{Binding: types.BoundContract{Name: "contract1", Address: "0x123"}},
@@ -128,12 +178,55 @@ func TestExtendedBatchGetLatestValues(t *testing.T) {
 					{ReadName: "read1", Params: "params1", ReturnVal: "return1"},
 				},
 			},
-			mockResponse:   nil,
-			expectedError:  ErrTooManyBindings,
-			expectedResult: nil,
+			mockResponse:    nil,
+			graceful:        true, // Should fail even in graceful mode
+			expectedError:   ErrTooManyBindings,
+			expectedResult:  nil,
+			expectedSkipped: nil,
 		},
 		{
-			name: "multiple contracts success",
+			name: "multiple contracts with mixed results - graceful",
+			bindings: map[string][]ExtendedBoundContract{
+				"contract1": {
+					{Binding: types.BoundContract{Name: "contract1", Address: "0x123"}},
+				},
+				"contract2": {
+					{Binding: types.BoundContract{Name: "contract2", Address: "0x456"}},
+				},
+			},
+			request: ExtendedBatchGetLatestValuesRequest{
+				"contract1": {
+					{ReadName: "read1", Params: "params1", ReturnVal: "return1"},
+				},
+				"contract2": {
+					{ReadName: "read2", Params: "params2", ReturnVal: "return2"},
+				},
+				"nonexistent": {
+					{ReadName: "read3", Params: "params3", ReturnVal: "return3"},
+				},
+			},
+			mockResponse: types.BatchGetLatestValuesResult{
+				types.BoundContract{Name: "contract1", Address: "0x123"}: {
+					{ReadName: "read1"},
+				},
+				types.BoundContract{Name: "contract2", Address: "0x456"}: {
+					{ReadName: "read2"},
+				},
+			},
+			graceful:      true,
+			expectedError: nil,
+			expectedResult: types.BatchGetLatestValuesResult{
+				types.BoundContract{Name: "contract1", Address: "0x123"}: {
+					{ReadName: "read1"},
+				},
+				types.BoundContract{Name: "contract2", Address: "0x456"}: {
+					{ReadName: "read2"},
+				},
+			},
+			expectedSkipped: []string{"nonexistent"},
+		},
+		{
+			name: "multiple contracts - non-graceful",
 			bindings: map[string][]ExtendedBoundContract{
 				"contract1": {
 					{Binding: types.BoundContract{Name: "contract1", Address: "0x123"}},
@@ -158,6 +251,7 @@ func TestExtendedBatchGetLatestValues(t *testing.T) {
 					{ReadName: "read2"},
 				},
 			},
+			graceful:      false,
 			expectedError: nil,
 			expectedResult: types.BatchGetLatestValuesResult{
 				types.BoundContract{Name: "contract1", Address: "0x123"}: {
@@ -167,6 +261,28 @@ func TestExtendedBatchGetLatestValues(t *testing.T) {
 					{ReadName: "read2"},
 				},
 			},
+			expectedSkipped: nil,
+		},
+		{
+			name: "all contracts skipped - graceful",
+			bindings: map[string][]ExtendedBoundContract{
+				"contract1": {
+					{Binding: types.BoundContract{Name: "contract1", Address: "0x123"}},
+				},
+			},
+			request: ExtendedBatchGetLatestValuesRequest{
+				"nonexistent1": {
+					{ReadName: "read1", Params: "params1", ReturnVal: "return1"},
+				},
+				"nonexistent2": {
+					{ReadName: "read2", Params: "params2", ReturnVal: "return2"},
+				},
+			},
+			mockResponse:    nil,
+			graceful:        true,
+			expectedError:   nil,
+			expectedResult:  types.BatchGetLatestValuesResult{},
+			expectedSkipped: []string{"nonexistent1", "nonexistent2"},
 		},
 	}
 
@@ -178,22 +294,20 @@ func TestExtendedBatchGetLatestValues(t *testing.T) {
 				BatchGetLatestValuesResponse: tt.mockResponse,
 			}
 
-			// Create extended reader with mock
 			extendedReader := &extendedContractReader{
 				reader:                 mockReader,
 				contractBindingsByName: tt.bindings,
 				mu:                     &sync.RWMutex{},
 			}
 
-			// Execute test
-			result, err := extendedReader.ExtendedBatchGetLatestValues(context.Background(), tt.request)
+			result, skipped, err := extendedReader.ExtendedBatchGetLatestValues(context.Background(), tt.request, tt.graceful)
 
-			// Verify results
 			if tt.expectedError != nil {
 				assert.ErrorIs(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedResult, result)
+				assert.ElementsMatch(t, tt.expectedSkipped, skipped)
 			}
 		})
 	}
