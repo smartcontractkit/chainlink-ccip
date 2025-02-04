@@ -50,6 +50,7 @@ func (cv *oracleMinObservation[T]) Add(data T, oracleID commontypes.OracleID) {
 		cv.cache[id].observers[oracleID] = struct{}{}
 	} else {
 		cv.cache[id] = &observersCounter[T]{data: data, observers: make(map[commontypes.OracleID]struct{})}
+		cv.cache[id].observers[oracleID] = struct{}{}
 	}
 }
 
