@@ -34,8 +34,6 @@ var (
 
 	Instruction_InitializeOperation = ag_binary.TypeID([8]byte{15, 96, 217, 171, 124, 4, 113, 243})
 
-	Instruction_AppendInstructions = ag_binary.TypeID([8]byte{58, 58, 137, 122, 115, 51, 144, 134})
-
 	Instruction_InitializeInstruction = ag_binary.TypeID([8]byte{195, 230, 213, 135, 144, 148, 142, 85})
 
 	Instruction_AppendInstructionData = ag_binary.TypeID([8]byte{76, 77, 102, 131, 136, 12, 45, 5})
@@ -80,8 +78,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "BatchAddAccess"
 	case Instruction_InitializeOperation:
 		return "InitializeOperation"
-	case Instruction_AppendInstructions:
-		return "AppendInstructions"
 	case Instruction_InitializeInstruction:
 		return "InitializeInstruction"
 	case Instruction_AppendInstructionData:
@@ -144,9 +140,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"initialize_operation", (*InitializeOperation)(nil),
-		},
-		{
-			"append_instructions", (*AppendInstructions)(nil),
 		},
 		{
 			"initialize_instruction", (*InitializeInstruction)(nil),

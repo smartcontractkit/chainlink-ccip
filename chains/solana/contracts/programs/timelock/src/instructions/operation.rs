@@ -47,21 +47,6 @@ pub fn initialize_operation<'info>(
 
     Ok(())
 }
-// todo: idea for chunk instruction upload to support large instruction data(nearly 1232 bytes(-tx overhead) per instruction)
-// todo: adjust the account space calculation for InstructionData struct.
-
-// todo: remove this after tooling compatibility check / testing
-pub fn append_instructions<'info>(
-    ctx: Context<'_, '_, '_, 'info, AppendInstructions<'info>>,
-    _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; HASH_BYTES],
-    instructions_batch: Vec<InstructionData>,
-) -> Result<()> {
-    let op = &mut ctx.accounts.operation;
-    op.instructions.extend(instructions_batch);
-
-    Ok(())
-}
 
 pub fn initialize_instruction<'info>(
     ctx: Context<'_, '_, '_, 'info, InitializeInstruction<'info>>,
@@ -70,18 +55,13 @@ pub fn initialize_instruction<'info>(
     program_id: Pubkey,
     accounts: Vec<InstructionAccount>,
 ) -> Result<()> {
-    // todo: initialize intermediate instruction field with program id and accounts
     let op = &mut ctx.accounts.operation;
 
-    // create a new InstructionData with an empty `data`
-    let new_ix = InstructionData {
+    op.instructions.push(InstructionData {
         program_id,
         data: Vec::new(),
         accounts,
-    };
-
-    // push it into op.instructions
-    op.instructions.push(new_ix);
+    });
     Ok(())
 }
 
@@ -92,12 +72,8 @@ pub fn append_instruction_data<'info>(
     ix_index: u32,
     ix_data_chunk: Vec<u8>,
 ) -> Result<()> {
-    // todo: append instruction data with desired index and instruction data
     let op = &mut ctx.accounts.operation;
-
     let target_ix = &mut op.instructions[ix_index as usize];
-
-    // extend the data
     target_ix.data.extend_from_slice(&ix_data_chunk);
 
     // NOTE: no need to finalize instruction, verify_id will check the finalization

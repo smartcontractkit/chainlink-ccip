@@ -187,64 +187,6 @@
       ]
     },
     {
-      "name": "appendInstructions",
-      "accounts": [
-        {
-          "name": "operation",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "roleAccessController",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "timelockId",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "id",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "instructionsBatch",
-          "type": {
-            "vec": {
-              "defined": "InstructionData"
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "initializeInstruction",
       "accounts": [
         {
