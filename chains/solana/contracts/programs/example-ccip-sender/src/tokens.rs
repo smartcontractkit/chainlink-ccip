@@ -9,6 +9,7 @@ use anchor_spl::{
 use fee_quoter::messages::SVMTokenAmount;
 use solana_program::{address_lookup_table::state::AddressLookupTable, program::invoke_signed};
 
+#[allow(clippy::too_many_arguments)]
 pub fn transfer_to_self_and_approve<'a>(
     token_program: &AccountInfo<'a>,
     token_mint: &AccountInfo<'a>,

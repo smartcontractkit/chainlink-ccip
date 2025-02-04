@@ -3754,7 +3754,9 @@ func TestCCIPRouter(t *testing.T) {
 		require.NoError(t, err)
 
 		token0ATAIx, token0SenderATA, err := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint.PublicKey(), senderPDA, user.PublicKey())
+		require.NoError(t, err)
 		token1ATAIx, token1SenderATA, err := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint.PublicKey(), senderPDA, user.PublicKey())
+		require.NoError(t, err)
 
 		t.Run("setup", func(t *testing.T) {
 			initIx, err := example_ccip_sender.NewInitializeInstruction(config.CcipRouterProgram, senderState, user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
@@ -3898,8 +3900,7 @@ func TestCCIPRouter(t *testing.T) {
 					ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, token1.User[user.PublicKey()], token1.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
 					require.NoError(t, err)
 
-					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
-
+					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(1_400_000))
 				})
 			})
 		}
