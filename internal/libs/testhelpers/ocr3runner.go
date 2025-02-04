@@ -8,15 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"testing"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 )
 
@@ -100,16 +96,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 
 	// check that all the outcomes are the same.
 	if countUniqueOutcomes(outcomes) > 1 {
-		decodedOs := make([]exectypes.Outcome, len(outcomes))
-		for i, o := range outcomes {
-			decoded, err := exectypes.DecodeOutcome(o)
-			if err != nil {
-				return RoundResult[RI]{}, fmt.Errorf("error decoding outcomes: %w", err)
-			}
-			decodedOs[i] = decoded
-		}
-
-		return RoundResult[RI]{}, fmt.Errorf("outcomes are not equal, decoded outcomes: %v", decodedOs)
+		return RoundResult[RI]{}, fmt.Errorf("outcomes are not equal, check for outcome determinism")
 	}
 
 	r.previousOutcome = outcomes[0]
@@ -179,14 +166,6 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 		NotTransmitted: notTransmitted,
 		Outcome:        outcomes[0],
 	}, nil
-}
-
-func (r *OCR3Runner[RI]) MustRunRound(ctx context.Context, t *testing.T) exectypes.Outcome {
-	result, err := r.RunRound(ctx)
-	require.NoError(t, err)
-	outcome, err := exectypes.DecodeOutcome(result.Outcome)
-	require.NoError(t, err)
-	return outcome
 }
 
 func (r *OCR3Runner[RI]) selectLeader() ocr3types.ReportingPlugin[RI] {

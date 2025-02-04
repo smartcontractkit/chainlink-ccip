@@ -1297,7 +1297,8 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 				batch[0].ReadName == consts.MethodNameGetInboundNonce &&
 				batch[1].ReadName == consts.MethodNameGetInboundNonce
 		}),
-	).Return(responses, nil)
+		false,
+	).Return(responses, []string{}, nil)
 
 	ccipReader := &ccipChainReader{
 		lggr: logger.Test(t),
