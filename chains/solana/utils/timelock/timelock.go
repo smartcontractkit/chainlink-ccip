@@ -170,6 +170,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 			appendIx, err := timelock.NewAppendInstructionDataInstruction(
 				timelockID,
 				op.OperationID(),
+				//nolint:gosec
 				uint32(ixIndex), // which instruction index we are chunking
 				chunk,           // partial data
 				op.OperationPDA(),
@@ -253,6 +254,7 @@ func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority
 			appendIx, err := timelock.NewAppendBypasserInstructionDataInstruction(
 				timelockID,
 				op.OperationID(),
+				//nolint:gosec
 				uint32(ixIndex), // which instruction index we are chunking
 				chunk,           // partial data
 				op.OperationPDA(),
