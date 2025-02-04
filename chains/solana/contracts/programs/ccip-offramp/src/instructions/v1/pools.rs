@@ -41,8 +41,12 @@ pub fn calculate_token_pool_account_indices(
 }
 
 pub(super) struct TokenAccounts<'a> {
+    // The fields prefixed with `_` are not used by the offramp directly,
+    // but are present in the token lookup table anyway for other pool-related functionality.
+    // So, the code here still validates that they are correct, even if those values are not
+    // then read by this program.
     pub user_token_account: &'a AccountInfo<'a>,
-    pub token_billing_config: &'a AccountInfo<'a>,
+    pub _token_billing_config: &'a AccountInfo<'a>,
     pub pool_chain_config: &'a AccountInfo<'a>,
     pub pool_program: &'a AccountInfo<'a>,
     pub pool_config: &'a AccountInfo<'a>,
@@ -50,7 +54,7 @@ pub(super) struct TokenAccounts<'a> {
     pub pool_signer: &'a AccountInfo<'a>,
     pub token_program: &'a AccountInfo<'a>,
     pub mint: &'a AccountInfo<'a>,
-    pub fee_token_config: &'a AccountInfo<'a>,
+    pub _fee_token_config: &'a AccountInfo<'a>,
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
@@ -244,7 +248,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
 
     Ok(TokenAccounts {
         user_token_account,
-        token_billing_config,
+        _token_billing_config: token_billing_config,
         pool_chain_config,
         pool_program,
         pool_config,
@@ -252,7 +256,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         pool_signer,
         token_program,
         mint,
-        fee_token_config,
+        _fee_token_config: fee_token_config,
         remaining_accounts,
     })
 }
