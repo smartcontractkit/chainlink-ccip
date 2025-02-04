@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendInstructionData is the `appendInstructionData` instruction.
+// Append additional instruction data to an instruction of an existing standard operation.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the operation account.
+// - `_timelock_id`: The timelock identifier (for PDA derivation).
+// - `_id`: The operation identifier.
+// - `ix_index`: The index of the instruction to which the data will be appended.
+// - `ix_data_chunk`: A chunk of data to be appended.
 type AppendInstructionData struct {
 	TimelockId  *[32]uint8
 	Id          *[32]uint8

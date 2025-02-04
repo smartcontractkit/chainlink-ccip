@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeBypasserInstruction is the `initializeBypasserInstruction` instruction.
+// Initialize an instruction for a bypasser operation.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the bypasser operation account.
+// - `_timelock_id`: The timelock identifier.
+// - `_id`: The operation identifier.
+// - `program_id`: The target program for the instruction.
+// - `accounts`: The list of accounts required for the instruction.
 type InitializeBypasserInstruction struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

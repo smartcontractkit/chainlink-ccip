@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// BypasserExecuteBatch is the `bypasserExecuteBatch` instruction.
+// Execute a bypasser operation immediately.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the bypasser execution account.
+// - `timelock_id`: The timelock identifier.
+// - `id`: The operation identifier.
 type BypasserExecuteBatch struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

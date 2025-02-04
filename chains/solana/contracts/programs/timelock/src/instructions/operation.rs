@@ -9,21 +9,6 @@ use crate::constants::{
 use crate::error::TimelockError;
 use crate::state::{Config, InstructionData, InstructionAccount, Operation};
 
-/// Operation management for timelock system, handling both standard (timelock-enforced)
-/// and bypass (emergency) operations.
-///
-/// Standard Operation Flow:
-/// - initialize -> append(init_ix, append_ix_data) -> finalize -> schedule -> execute_batch
-/// - Enforces timelock delays and predecessor dependencies
-///
-/// Bypass Operation Flow:
-/// - initialize -> append(init_ix, append_ix_data) -> finalize -> bypass_execute_batch
-/// - No required delay or additional checks, closes operation account after execution
-///
-/// Implementation uses separate code paths and PDAs for each operation type
-/// to maintain clear security boundaries and audit trails, despite similar logic.
-/// All operations enforce state transitions, size limits, and role-based access.
-///
 pub fn initialize_operation(
     op: &mut Account<Operation>,
     id: [u8; HASH_BYTES],

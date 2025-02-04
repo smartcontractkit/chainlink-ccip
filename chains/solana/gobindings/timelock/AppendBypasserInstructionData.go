@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendBypasserInstructionData is the `appendBypasserInstructionData` instruction.
+// Append additional data to an instruction of a bypasser operation.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the bypasser operation account.
+// - `_timelock_id`: The timelock identifier.
+// - `_id`: The operation identifier.
+// - `ix_index`: The index of the instruction.
+// - `ix_data_chunk`: The data to append.
 type AppendBypasserInstructionData struct {
 	TimelockId  *[32]uint8
 	Id          *[32]uint8

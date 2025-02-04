@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeInstruction is the `initializeInstruction` instruction.
+// Append a new instruction to an existing standard operation.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the operation account.
+// - `_timelock_id`: The timelock identifier (for PDA derivation).
+// - `_id`: The operation identifier.
+// - `program_id`: The target program for the instruction.
+// - `accounts`: The list of accounts required for the instruction.
 type InitializeInstruction struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8
