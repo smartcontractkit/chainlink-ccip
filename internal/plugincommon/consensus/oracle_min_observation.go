@@ -2,9 +2,11 @@ package consensus
 
 import (
 	"fmt"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"golang.org/x/crypto/sha3"
+
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 type observersCounter[T any] struct {

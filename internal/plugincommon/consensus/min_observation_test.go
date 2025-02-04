@@ -2,8 +2,9 @@ package consensus_test
 
 import (
 	"fmt"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"testing"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"

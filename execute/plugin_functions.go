@@ -3,8 +3,9 @@ package execute
 import (
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"sort"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -476,7 +477,8 @@ func mergeTokenObservations(
 	fChain map[cciptypes.ChainSelector]int,
 ) exectypes.TokenDataObservations {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
-	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData])
+	validators :=
+		make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
 
 	for _, ao := range aos {
