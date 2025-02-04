@@ -22,6 +22,9 @@ packages:
             CCIPReader:
             PriceReader:
             RMNHome:
+    github.com/smartcontractkit/chainlink-ccip/pkg/reader/configcache:
+        interfaces:
+            ConfigCacher:
     github.com/smartcontractkit/chainlink-ccip/pkg/contractreader:
         interfaces:
             Extended:

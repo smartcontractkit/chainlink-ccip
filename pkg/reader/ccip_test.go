@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
@@ -22,12 +21,16 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	zapcore "go.uber.org/zap/zapcore"
+
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	configcache_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader/configcache"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader/configcache"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -61,7 +64,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		returnVal interface{},
 	) {
 		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
-		v := returnVal.(*sourceChainConfig)
+		v := returnVal.(*cciptypes.SourceChainConfig)
 
 		fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
 			"0x%d000000000000000000000000000000000000000", sourceChain),
@@ -390,37 +393,6 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	require.ErrorIs(t, err, expectedErr)
 }
 
-func addDestinationContractAssertions(
-	extended *reader_mocks.MockExtended,
-	destNonceMgr, destRMNRemote, destFeeQuoter []byte,
-) {
-	// mock the call to get the nonce manager
-	extended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetStaticConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*offRampStaticChainConfig)
-		v.NonceManager = destNonceMgr
-		v.RmnRemote = destRMNRemote
-	}))
-	// mock the call to get the fee quoter
-	extended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetDynamicConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*offRampDynamicChainConfig)
-		v.FeeQuoter = destFeeQuoter
-	}))
-}
-
 // The round1 version returns NoBindingFound errors for onramp contracts to simulate
 // the two-phase approach to discovering those contracts.
 func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
@@ -432,8 +404,6 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	destRMNRemote := []byte{0x4}
 	destFeeQuoter := []byte{0x5}
 	destRouter := []byte{0x6}
-	//srcRouters := []byte{0x7, 0x8}
-	//srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
 
 	// Build expected addresses.
 	var expectedContractAddresses ContractAddresses
@@ -448,47 +418,48 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameNonceManager, destChain, destNonceMgr)
 
 	mockReaders := make(map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
+	mockDestCache := configcache_mocks.NewMockConfigCacher(t)
+	mockSourceCaches := make(map[cciptypes.ChainSelector]*configcache_mocks.MockConfigCacher)
 
 	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
-	addDestinationContractAssertions(mockReaders[destChain], destNonceMgr, destRMNRemote, destFeeQuoter)
 
-	mockReaders[destChain].EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*selectorsAndConfigs)
-		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
-		v.SourceChainConfigs = []sourceChainConfig{
-			{
-				OnRamp:    onramps[0],
-				Router:    destRouter,
-				IsEnabled: true,
+	// Mock destination chain config calls through cache
+	mockDestCache.EXPECT().GetOffRampAllChains(mock.Anything).Return(
+		cciptypes.SelectorsAndConfigs{
+			Selectors: []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])},
+			SourceChainConfigs: []cciptypes.SourceChainConfig{
+				{
+					OnRamp:    onramps[0],
+					Router:    destRouter,
+					IsEnabled: true,
+				},
+				{
+					OnRamp:    onramps[1],
+					Router:    destRouter,
+					IsEnabled: true,
+				},
 			},
-			{
-				OnRamp:    onramps[1],
-				Router:    destRouter,
-				IsEnabled: true,
-			},
-		}
-	}))
+		}, nil)
+
+	mockDestCache.EXPECT().GetOffRampStaticConfig(mock.Anything).Return(
+		cciptypes.OffRampStaticChainConfig{
+			NonceManager: destNonceMgr,
+			RmnRemote:    destRMNRemote,
+		}, nil)
+
+	mockDestCache.EXPECT().GetOffRampDynamicConfig(mock.Anything).Return(
+		cciptypes.OffRampDynamicChainConfig{
+			FeeQuoter: destFeeQuoter,
+		}, nil)
 
 	// mock calls to get fee quoter from onramps and source chain config from offramp.
 	for _, selector := range sourceChain {
 		mockReaders[selector] = reader_mocks.NewMockExtended(t)
+		mockSourceCaches[selector] = configcache_mocks.NewMockConfigCacher(t)
 
 		// ErrNoBindings is ignored.
-		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
-			mock.Anything,
-			consts.ContractNameOnRamp,
-			consts.MethodNameOnRampGetDynamicConfig,
-			primitives.Unconfirmed,
-			map[string]any{},
-			mock.Anything,
-		).Return(contractreader.ErrNoBindings)
+		mockSourceCaches[selector].EXPECT().GetOnRampDynamicConfig(mock.Anything).Return(
+			cciptypes.GetOnRampDynamicConfigResponse{}, contractreader.ErrNoBindings)
 
 		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
 			mock.Anything,
@@ -513,6 +484,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		destChain:       destChain,
 		contractReaders: castToExtended,
 		lggr:            lggr,
+		caches: map[cciptypes.ChainSelector]configcache.ConfigCacher{
+			destChain:      mockDestCache,
+			sourceChain[0]: mockSourceCaches[sourceChain[0]],
+			sourceChain[1]: mockSourceCaches[sourceChain[1]],
+		},
 	}
 
 	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
@@ -591,50 +567,54 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRouter, destChain, destRouter[0])
 
 	mockReaders := make(map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
+	mockSourceCaches := make(map[cciptypes.ChainSelector]*configcache_mocks.MockConfigCacher)
 
+	// Setup destination chain mocks
 	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
-	addDestinationContractAssertions(mockReaders[destChain], destNonceMgr, destRMNRemote, destFeeQuoter)
+	mockDestCache := configcache_mocks.NewMockConfigCacher(t)
 
-	mockReaders[destChain].EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*selectorsAndConfigs)
-		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
-		v.SourceChainConfigs = []sourceChainConfig{
-			{
-				OnRamp:    onramps[0],
-				Router:    destRouter[0],
-				IsEnabled: true,
+	// Mock destination chain config calls through cache
+	mockDestCache.EXPECT().GetOffRampAllChains(mock.Anything).Return(
+		cciptypes.SelectorsAndConfigs{
+			Selectors: []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])},
+			SourceChainConfigs: []cciptypes.SourceChainConfig{
+				{
+					OnRamp:    onramps[0],
+					Router:    destRouter[0],
+					IsEnabled: true,
+				},
+				{
+					OnRamp:    onramps[1],
+					Router:    destRouter[1],
+					IsEnabled: true,
+				},
 			},
-			{
-				OnRamp:    onramps[1],
-				Router:    destRouter[1],
-				IsEnabled: true,
-			},
-		}
-	}))
+		}, nil)
 
-	// mock calls to get fee quoter from onramps and source chain config from offramp.
+	mockDestCache.EXPECT().GetOffRampStaticConfig(mock.Anything).Return(
+		cciptypes.OffRampStaticChainConfig{
+			NonceManager: destNonceMgr,
+			RmnRemote:    destRMNRemote,
+		}, nil)
+
+	mockDestCache.EXPECT().GetOffRampDynamicConfig(mock.Anything).Return(
+		cciptypes.OffRampDynamicChainConfig{
+			FeeQuoter: destFeeQuoter,
+		}, nil)
+
+	// Setup source chain mocks
 	for i, selector := range sourceChain {
 		mockReaders[selector] = reader_mocks.NewMockExtended(t)
+		mockSourceCaches[selector] = configcache_mocks.NewMockConfigCacher(t)
 
-		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
-			mock.Anything,
-			consts.ContractNameOnRamp,
-			consts.MethodNameOnRampGetDynamicConfig,
-			primitives.Unconfirmed,
-			map[string]any{},
-			mock.Anything,
-		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-			v := returnVal.(*getOnRampDynamicConfigResponse)
-			v.DynamicConfig.FeeQuoter = srcFeeQuoters[i]
-		}))
+		mockSourceCaches[selector].EXPECT().GetOnRampDynamicConfig(mock.Anything).Return(
+			cciptypes.GetOnRampDynamicConfigResponse{
+				DynamicConfig: cciptypes.OnRampDynamicConfig{
+					FeeQuoter: srcFeeQuoters[i],
+				},
+			}, nil)
 
+		// Mock the router config through direct reader since it's not cached
 		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
 			mock.Anything,
 			consts.ContractNameOnRamp,
@@ -655,11 +635,16 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		castToExtended[sel] = v
 	}
 
-	// create the reader
+	// create the reader with caches
 	ccipChainReader := &ccipChainReader{
 		destChain:       destChain,
 		contractReaders: castToExtended,
 		lggr:            logger.Test(t),
+		caches: map[cciptypes.ChainSelector]configcache.ConfigCacher{
+			destChain:      mockDestCache,
+			sourceChain[0]: mockSourceCaches[sourceChain[0]],
+			sourceChain[1]: mockSourceCaches[sourceChain[1]],
+		},
 	}
 
 	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
@@ -675,16 +660,13 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 	sourceChain2 := cciptypes.ChainSelector(3)
 	destExtended := reader_mocks.NewMockExtended(t)
 
-	// mock the call for sourceChain2 - failure
+	// Create mock cache but maintain same error behavior
+	mockCache := configcache_mocks.NewMockConfigCacher(t)
+
+	// mock the call for sourceChain2 - failure, maintaining same error
 	getLatestValueErr := errors.New("some error")
-	destExtended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(getLatestValueErr)
+	mockCache.EXPECT().GetOffRampAllChains(mock.Anything).Return(
+		cciptypes.SelectorsAndConfigs{}, getLatestValueErr)
 
 	// get static config call won't occur because the source chain config call failed.
 
@@ -698,6 +680,9 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 			// that we have readers for.
 			sourceChain1: reader_mocks.NewMockExtended(t),
 			sourceChain2: reader_mocks.NewMockExtended(t),
+		},
+		caches: map[cciptypes.ChainSelector]configcache.ConfigCacher{
+			destChain: mockCache,
 		},
 		lggr: logger.Test(t),
 	}
@@ -714,36 +699,31 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	sourceChain2 := cciptypes.ChainSelector(3)
 	destExtended := reader_mocks.NewMockExtended(t)
 
-	// mock the call for source chain configs
-	destExtended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil) // doesn't matter for this test
-	// mock the call to get the nonce manager - failure
+	// Create a mock cache for the destination chain
+	mockCache := configcache_mocks.NewMockConfigCacher(t)
+
+	// Mock the call for source chain configs via cache
+	mockCache.EXPECT().GetOffRampAllChains(mock.Anything).Return(
+		cciptypes.SelectorsAndConfigs{
+			Selectors:          []uint64{},
+			SourceChainConfigs: []cciptypes.SourceChainConfig{},
+		}, nil)
+
+	// Mock the call to get the static config - failure
 	getLatestValueErr := errors.New("some error")
-	destExtended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetStaticConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(getLatestValueErr)
+	mockCache.EXPECT().GetOffRampStaticConfig(mock.Anything).Return(
+		cciptypes.OffRampStaticChainConfig{}, getLatestValueErr)
 
 	// create the reader
 	ccipChainReader := &ccipChainReader{
 		destChain: destChain,
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-			destChain: destExtended,
-			// these won't be used in this test, but are needed because
-			// we determine the source chain selectors to query from the chains
-			// that we have readers for.
+			destChain:    destExtended,
 			sourceChain1: reader_mocks.NewMockExtended(t),
 			sourceChain2: reader_mocks.NewMockExtended(t),
+		},
+		caches: map[cciptypes.ChainSelector]configcache.ConfigCacher{
+			destChain: mockCache,
 		},
 		lggr: logger.Test(t),
 	}
@@ -773,29 +753,30 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 
 func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
-	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
-	destCR.EXPECT().HealthReport().Return(nil)
-	destCR.EXPECT().GetLatestValue(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Run(func(
-		ctx context.Context,
-		readIdentifier string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params interface{},
-		returnVal interface{},
-	) {
-		cfg := returnVal.(*feeQuoterStaticConfig)
-		cfg.MaxFeeJuelsPerMsg = cciptypes.NewBigIntFromInt64(10)
-		cfg.LinkToken = []byte{0x3, 0x4}
-		cfg.StalenessThreshold = 12
-	}).Return(nil)
+	mockCache := configcache_mocks.NewMockConfigCacher(t)
+
+	// Setup expected config
+	expectedConfig := cciptypes.FeeQuoterStaticConfig{
+		MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
+		LinkToken:          []byte{0x3, 0x4},
+		StalenessThreshold: 12,
+	}
 
 	offrampAddress := []byte{0x3}
 	feeQuoterAddress := []byte{0x4}
+
+	// Add expectation for the OffRamp bind that happens during initialization
+	destCR.EXPECT().Bind(
+		mock.Anything,
+		[]types.BoundContract{{
+			Name:    consts.ContractNameOffRamp,
+			Address: typeconv.AddressBytesToString(offrampAddress, uint64(chainC)),
+		}},
+	).Return(nil)
+
+	// Mock the cache to return the expected config
+	mockCache.EXPECT().GetFeeQuoterConfig(mock.Anything).Return(expectedConfig, nil).Once()
+
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
@@ -805,9 +786,25 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
+	// Replace the automatically created cache with our mock
+	ccipReader.caches = map[cciptypes.ChainSelector]configcache.ConfigCacher{
+		chainC: mockCache,
+	}
+
+	// Add expectation for the FeeQuoter bind
+	destCR.EXPECT().Bind(
+		mock.Anything,
+		[]types.BoundContract{{
+			Name:    "FeeQuoter",
+			Address: typeconv.AddressBytesToString(feeQuoterAddress, uint64(chainC)),
+		}},
+	).Return(nil)
+
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
-		context.Background(), []types.BoundContract{{Name: "FeeQuoter",
-			Address: typeconv.AddressBytesToString(feeQuoterAddress, 111_111)}}))
+		context.Background(), []types.BoundContract{{
+			Name:    "FeeQuoter",
+			Address: typeconv.AddressBytesToString(feeQuoterAddress, uint64(chainC)),
+		}}))
 
 	ctx := context.Background()
 	cfg, err := ccipReader.getDestFeeQuoterStaticConfig(ctx)
@@ -923,23 +920,17 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	tokenAddr := []byte{0x3, 0x4}
 	destCR := reader_mocks.NewMockExtended(t)
+	mockCache := configcache_mocks.NewMockConfigCacher(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 
-	destCR.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetStaticConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		cfg := returnVal.(*feeQuoterStaticConfig)
-		cfg.MaxFeeJuelsPerMsg = cciptypes.NewBigIntFromInt64(10)
-		cfg.LinkToken = []byte{0x3, 0x4}
-		cfg.StalenessThreshold = 12
-	}))
+	// Mock the config cache to return the FeeQuoter config
+	mockCache.EXPECT().GetFeeQuoterConfig(mock.Anything).Return(cciptypes.FeeQuoterStaticConfig{
+		MaxFeeJuelsPerMsg:  cciptypes.NewBigIntFromInt64(10),
+		LinkToken:          tokenAddr,
+		StalenessThreshold: 12,
+	}, nil).Once()
 
-	// mock the call to get the fee quoter
+	// mock the call to get the fee quoter token price
 	destCR.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameFeeQuoter,
@@ -956,13 +947,17 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	feeQuoterAddress := []byte{0x4}
 	contractReaders := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	contractReaders[chainC] = destCR
+
 	ccipReader := ccipChainReader{
-		logger.Test(t),
-		contractReaders,
-		nil,
-		chainC,
-		string(offrampAddress),
-		ccipocr3.NewMockExtraDataCodec(t),
+		lggr:            logger.Test(t),
+		contractReaders: contractReaders,
+		contractWriters: nil,
+		destChain:       chainC,
+		offrampAddress:  string(offrampAddress),
+		extraDataCodec:  ccipocr3.NewMockExtraDataCodec(t),
+		caches: map[cciptypes.ChainSelector]configcache.ConfigCacher{
+			chainC: mockCache,
+		},
 	}
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
