@@ -1,3 +1,12 @@
+package reader
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+)
+
 type cache struct {
 	sync.RWMutex
 	data          NogoResponse
