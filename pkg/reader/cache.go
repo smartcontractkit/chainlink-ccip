@@ -10,13 +10,14 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 var _ CCIPReader = (*CachedChainReader)(nil)
@@ -186,47 +187,63 @@ func (r *CachedChainReader) buildSigners(signers []signer) []rmntypes.RemoteSign
 }
 
 // Forward other CCIPReader interface methods to the underlying reader
-func (r *CachedChainReader) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, limit int) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+func (r *CachedChainReader) CommitReportsGTETimestamp(
+	ctx context.Context, ts time.Time, limit int) ([]plugintypes2.CommitPluginReportWithMeta, error) {
 	return r.ccipReader.CommitReportsGTETimestamp(ctx, ts, limit)
 }
 
-func (r *CachedChainReader) ExecutedMessages(ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) ([]cciptypes.SeqNum, error) {
+func (r *CachedChainReader) ExecutedMessages(
+	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) ([]cciptypes.SeqNum, error) {
 	return r.ccipReader.ExecutedMessages(ctx, source, seqNumRange)
 }
 
-func (r *CachedChainReader) MsgsBetweenSeqNums(ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) ([]cciptypes.Message, error) {
+func (r *CachedChainReader) MsgsBetweenSeqNums(
+	ctx context.Context,
+	sourceChainSelector cciptypes.ChainSelector,
+	seqNumRange cciptypes.SeqNumRange) ([]cciptypes.Message, error) {
 	return r.ccipReader.MsgsBetweenSeqNums(ctx, sourceChainSelector, seqNumRange)
 }
 
-func (r *CachedChainReader) GetExpectedNextSequenceNumber(ctx context.Context, sourceChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+func (r *CachedChainReader) GetExpectedNextSequenceNumber(
+	ctx context.Context, sourceChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	return r.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChainSelector)
 }
 
-func (r *CachedChainReader) NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
+func (r *CachedChainReader) NextSeqNum(
+	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
 	return r.ccipReader.NextSeqNum(ctx, chains)
 }
 
-func (r *CachedChainReader) Nonces(ctx context.Context, sourceChainSelector cciptypes.ChainSelector, addresses []string) (map[string]uint64, error) {
+func (r *CachedChainReader) Nonces(
+	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, addresses []string) (map[string]uint64, error) {
 	return r.ccipReader.Nonces(ctx, sourceChainSelector, addresses)
 }
 
-func (r *CachedChainReader) GetChainsFeeComponents(ctx context.Context, chains []cciptypes.ChainSelector) map[cciptypes.ChainSelector]types.ChainFeeComponents {
+func (r *CachedChainReader) GetChainsFeeComponents(
+	ctx context.Context,
+	chains []cciptypes.ChainSelector) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	return r.ccipReader.GetChainsFeeComponents(ctx, chains)
 }
 
-func (r *CachedChainReader) GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error) {
+func (r *CachedChainReader) GetDestChainFeeComponents(
+	ctx context.Context) (types.ChainFeeComponents, error) {
 	return r.ccipReader.GetDestChainFeeComponents(ctx)
 }
 
-func (r *CachedChainReader) GetWrappedNativeTokenPriceUSD(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.BigInt {
+func (r *CachedChainReader) GetWrappedNativeTokenPriceUSD(
+	ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.BigInt {
 	return r.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, selectors)
 }
 
-func (r *CachedChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
+func (r *CachedChainReader) GetChainFeePriceUpdate(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
 	return r.ccipReader.GetChainFeePriceUpdate(ctx, selectors)
 }
 
-func (r *CachedChainReader) GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error) {
+func (r *CachedChainReader) GetRmnCurseInfo(
+	ctx context.Context,
+	sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error) {
 	return r.ccipReader.GetRmnCurseInfo(ctx, sourceChainSelectors)
 }
 
@@ -234,7 +251,8 @@ func (r *CachedChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, er
 	return r.ccipReader.GetLatestPriceSeqNr(ctx)
 }
 
-func (r *CachedChainReader) GetMedianDataAvailabilityGasConfig(ctx context.Context) (cciptypes.DataAvailabilityGasConfig, error) {
+func (r *CachedChainReader) GetMedianDataAvailabilityGasConfig(
+	ctx context.Context) (cciptypes.DataAvailabilityGasConfig, error) {
 	return r.ccipReader.GetMedianDataAvailabilityGasConfig(ctx)
 }
 
