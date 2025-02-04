@@ -36,6 +36,7 @@ func init() {
 }
 
 var (
+	// Initialization Flow //
 	// Initializes the CCIP Router.
 	//
 	// The initialization of the Router is responsibility of Admin, nothing more than calling this method should be done first.
@@ -67,6 +68,7 @@ var (
 	// The new owner must be a signer of the transaction.
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
+	// Config //
 	// Updates the fee aggregator in the router configuration.
 	// The Admin is the only one able to update the fee aggregator.
 	//
@@ -99,16 +101,6 @@ var (
 	// * `ctx` - The context containing the accounts required for disabling the chain selector.
 	// * `source_chain_selector` - The source chain selector to be disabled.
 	Instruction_DisableSourceChainSelector = ag_binary.TypeID([8]byte{58, 101, 54, 252, 248, 31, 226, 121})
-
-	// Disables the destination chain selector.
-	//
-	// The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for disabling the chain selector.
-	// * `dest_chain_selector` - The destination chain selector to be disabled.
-	Instruction_DisableDestChainSelector = ag_binary.TypeID([8]byte{214, 71, 132, 65, 177, 59, 170, 72})
 
 	// Updates the configuration of the source chain selector.
 	//
@@ -153,23 +145,73 @@ var (
 	// * `new_enable_manual_execution_after` - The new minimum amount of time required.
 	Instruction_UpdateEnableManualExecutionAfter = ag_binary.TypeID([8]byte{157, 236, 73, 92, 84, 197, 152, 105})
 
+	// Sets the OCR configuration.
+	// Only CCIP Admin can set the OCR configuration.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for setting the OCR configuration.
+	// * `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].
+	// * `config_info` - The OCR configuration information.
+	// * `signers` - The list of signers.
+	// * `transmitters` - The list of transmitters.
+	Instruction_SetOcrConfig = ag_binary.TypeID([8]byte{4, 131, 107, 110, 250, 158, 244, 200})
+
+	// Token Admin Registry //
 	// Registers the Token Admin Registry via the CCIP Admin
 	//
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for registration.
-	// * `mint` - The public key of the token mint.
-	// * `token_admin_registry_admin` - The public key of the token admin registry admin.
-	Instruction_RegisterTokenAdminRegistryViaGetCcipAdmin = ag_binary.TypeID([8]byte{46, 246, 21, 58, 175, 69, 40, 202})
+	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+	Instruction_CcipAdminProposeAdministrator = ag_binary.TypeID([8]byte{218, 37, 139, 107, 142, 228, 51, 219})
 
-	// Registers the Token Admin Registry via the token owner.
+	// Overrides the pending admin of the Token Admin Registry
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for registration.
+	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+	Instruction_CcipAdminOverridePendingAdministrator = ag_binary.TypeID([8]byte{163, 206, 164, 199, 248, 92, 36, 46})
+
+	// Registers the Token Admin Registry by the token owner.
 	//
 	// The Authority of the Mint Token can claim the registry of the token.
 	//
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for registration.
-	Instruction_RegisterTokenAdminRegistryViaOwner = ag_binary.TypeID([8]byte{85, 191, 10, 113, 134, 138, 144, 16})
+	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+	Instruction_OwnerProposeAdministrator = ag_binary.TypeID([8]byte{175, 81, 160, 246, 206, 132, 18, 22})
+
+	// Overrides the pending admin of the Token Admin Registry by the token owner
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for registration.
+	// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+	Instruction_OwnerOverridePendingAdministrator = ag_binary.TypeID([8]byte{230, 111, 134, 149, 203, 168, 118, 201})
+
+	// Accepts the admin role of the token admin registry.
+	//
+	// The Pending Admin must call this function to accept the admin role of the Token Admin Registry.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for accepting the admin role.
+	// * `mint` - The public key of the token mint.
+	Instruction_AcceptAdminRoleTokenAdminRegistry = ag_binary.TypeID([8]byte{106, 240, 16, 173, 137, 213, 163, 246})
+
+	// Transfers the admin role of the token admin registry to a new admin.
+	//
+	// Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for the transfer.
+	// * `mint` - The public key of the token mint.
+	// * `new_admin` - The public key of the new admin.
+	Instruction_TransferAdminRoleTokenAdminRegistry = ag_binary.TypeID([8]byte{178, 98, 203, 181, 203, 107, 106, 14})
 
 	// Sets the pool lookup table for a given token mint.
 	//
@@ -183,101 +225,7 @@ var (
 	// * `is_writable` - index of account in lookup table that is writable
 	Instruction_SetPool = ag_binary.TypeID([8]byte{119, 30, 14, 180, 115, 225, 167, 238})
 
-	// Transfers the admin role of the token admin registry to a new admin.
-	//
-	// Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for the transfer.
-	// * `mint` - The public key of the token mint.
-	// * `new_admin` - The public key of the new admin.
-	Instruction_TransferAdminRoleTokenAdminRegistry = ag_binary.TypeID([8]byte{178, 98, 203, 181, 203, 107, 106, 14})
-
-	// Accepts the admin role of the token admin registry.
-	//
-	// The Pending Admin must call this function to accept the admin role of the Token Admin Registry.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for accepting the admin role.
-	// * `mint` - The public key of the token mint.
-	Instruction_AcceptAdminRoleTokenAdminRegistry = ag_binary.TypeID([8]byte{106, 240, 16, 173, 137, 213, 163, 246})
-
-	// Sets the token billing configuration.
-	//
-	// Only CCIP Admin can set the token billing configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-	// * `chain_selector` - The chain selector.
-	// * `mint` - The public key of the token mint.
-	// * `cfg` - The token billing configuration.
-	Instruction_SetTokenBilling = ag_binary.TypeID([8]byte{225, 230, 37, 71, 131, 209, 54, 230})
-
-	// Sets the OCR configuration.
-	// Only CCIP Admin can set the OCR configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for setting the OCR configuration.
-	// * `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].
-	// * `config_info` - The OCR configuration information.
-	// * `signers` - The list of signers.
-	// * `transmitters` - The list of transmitters.
-	Instruction_SetOcrConfig = ag_binary.TypeID([8]byte{4, 131, 107, 110, 250, 158, 244, 200})
-
-	// Adds a billing token configuration.
-	// Only CCIP Admin can add a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for adding the billing token configuration.
-	// * `config` - The billing token configuration to be added.
-	Instruction_AddBillingTokenConfig = ag_binary.TypeID([8]byte{63, 156, 254, 216, 227, 53, 0, 69})
-
-	// Updates the billing token configuration.
-	// Only CCIP Admin can update a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the billing token configuration.
-	// * `config` - The new billing token configuration.
-	Instruction_UpdateBillingTokenConfig = ag_binary.TypeID([8]byte{140, 184, 124, 146, 204, 62, 244, 79})
-
-	// Removes the billing token configuration.
-	// Only CCIP Admin can remove a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for removing the billing token configuration.
-	Instruction_RemoveBillingTokenConfig = ag_binary.TypeID([8]byte{0, 194, 92, 161, 29, 8, 10, 91})
-
-	// Calculates the fee for sending a message to the destination chain.
-	//
-	// # Arguments
-	//
-	// * `_ctx` - The context containing the accounts required for the fee calculation.
-	// * `dest_chain_selector` - The chain selector for the destination chain.
-	// * `message` - The message to be sent.
-	//
-	// # Additional accounts
-	//
-	// In addition to the fixed amount of accounts defined in the `GetFee` context,
-	// the following accounts must be provided:
-	//
-	// * First, the billing token config accounts for each token sent with the message, sequentially.
-	// For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
-	// tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
-	// * Then, the per chain / per token config of every token sent with the message, sequentially
-	// in the same order.
-	//
-	// # Returns
-	//
-	// The fee amount in u64.
-	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
-
+	// Billing //
 	// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
 	// Only the CCIP Admin can withdraw billed funds.
 	//
@@ -288,14 +236,14 @@ var (
 	// * `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0.
 	Instruction_WithdrawBilledFunds = ag_binary.TypeID([8]byte{16, 116, 73, 38, 77, 232, 6, 28})
 
-	// ON RAMP FLOW
+	// On Ramp Flow //
 	// Sends a message to the destination chain.
 	//
 	// Request a message to be sent to the destination chain.
 	// The method name needs to be ccip_send with Anchor encoding.
 	// This function is called by the CCIP Sender Contract (or final user) to send a message to the CCIP Router.
 	// The message will be sent to the receiver on the destination chain selector.
-	// This message emits the event CCIPSendRequested with all the necessary data to be retrieved by the OffChain Code
+	// This message emits the event CCIPMessageSent with all the necessary data to be retrieved by the OffChain Code
 	//
 	// # Arguments
 	//
@@ -304,7 +252,7 @@ var (
 	// * `message` - The message to be sent. The size limit of data is 256 bytes.
 	Instruction_CcipSend = ag_binary.TypeID([8]byte{108, 216, 134, 191, 249, 234, 33, 84})
 
-	// OFF RAMP FLOW
+	// Off Ramp Flow //
 	// Commits a report to the router.
 	//
 	// The method name needs to be commit with Anchor encoding.
@@ -330,7 +278,6 @@ var (
 	// * `raw_vs` - array of V components of signatures
 	Instruction_Commit = ag_binary.TypeID([8]byte{223, 140, 142, 165, 229, 208, 156, 74})
 
-	// OFF RAMP FLOW
 	// Executes a message on the destination chain.
 	//
 	// The method name needs to be execute with Anchor encoding.
@@ -381,8 +328,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AddChainSelector"
 	case Instruction_DisableSourceChainSelector:
 		return "DisableSourceChainSelector"
-	case Instruction_DisableDestChainSelector:
-		return "DisableDestChainSelector"
 	case Instruction_UpdateSourceChainConfig:
 		return "UpdateSourceChainConfig"
 	case Instruction_UpdateDestChainConfig:
@@ -391,28 +336,22 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateSvmChainSelector"
 	case Instruction_UpdateEnableManualExecutionAfter:
 		return "UpdateEnableManualExecutionAfter"
-	case Instruction_RegisterTokenAdminRegistryViaGetCcipAdmin:
-		return "RegisterTokenAdminRegistryViaGetCcipAdmin"
-	case Instruction_RegisterTokenAdminRegistryViaOwner:
-		return "RegisterTokenAdminRegistryViaOwner"
-	case Instruction_SetPool:
-		return "SetPool"
-	case Instruction_TransferAdminRoleTokenAdminRegistry:
-		return "TransferAdminRoleTokenAdminRegistry"
-	case Instruction_AcceptAdminRoleTokenAdminRegistry:
-		return "AcceptAdminRoleTokenAdminRegistry"
-	case Instruction_SetTokenBilling:
-		return "SetTokenBilling"
 	case Instruction_SetOcrConfig:
 		return "SetOcrConfig"
-	case Instruction_AddBillingTokenConfig:
-		return "AddBillingTokenConfig"
-	case Instruction_UpdateBillingTokenConfig:
-		return "UpdateBillingTokenConfig"
-	case Instruction_RemoveBillingTokenConfig:
-		return "RemoveBillingTokenConfig"
-	case Instruction_GetFee:
-		return "GetFee"
+	case Instruction_CcipAdminProposeAdministrator:
+		return "CcipAdminProposeAdministrator"
+	case Instruction_CcipAdminOverridePendingAdministrator:
+		return "CcipAdminOverridePendingAdministrator"
+	case Instruction_OwnerProposeAdministrator:
+		return "OwnerProposeAdministrator"
+	case Instruction_OwnerOverridePendingAdministrator:
+		return "OwnerOverridePendingAdministrator"
+	case Instruction_AcceptAdminRoleTokenAdminRegistry:
+		return "AcceptAdminRoleTokenAdminRegistry"
+	case Instruction_TransferAdminRoleTokenAdminRegistry:
+		return "TransferAdminRoleTokenAdminRegistry"
+	case Instruction_SetPool:
+		return "SetPool"
 	case Instruction_WithdrawBilledFunds:
 		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
@@ -462,9 +401,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"disable_source_chain_selector", (*DisableSourceChainSelector)(nil),
 		},
 		{
-			"disable_dest_chain_selector", (*DisableDestChainSelector)(nil),
-		},
-		{
 			"update_source_chain_config", (*UpdateSourceChainConfig)(nil),
 		},
 		{
@@ -477,37 +413,28 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"update_enable_manual_execution_after", (*UpdateEnableManualExecutionAfter)(nil),
 		},
 		{
-			"register_token_admin_registry_via_get_ccip_admin", (*RegisterTokenAdminRegistryViaGetCcipAdmin)(nil),
+			"set_ocr_config", (*SetOcrConfig)(nil),
 		},
 		{
-			"register_token_admin_registry_via_owner", (*RegisterTokenAdminRegistryViaOwner)(nil),
+			"ccip_admin_propose_administrator", (*CcipAdminProposeAdministrator)(nil),
 		},
 		{
-			"set_pool", (*SetPool)(nil),
+			"ccip_admin_override_pending_administrator", (*CcipAdminOverridePendingAdministrator)(nil),
 		},
 		{
-			"transfer_admin_role_token_admin_registry", (*TransferAdminRoleTokenAdminRegistry)(nil),
+			"owner_propose_administrator", (*OwnerProposeAdministrator)(nil),
+		},
+		{
+			"owner_override_pending_administrator", (*OwnerOverridePendingAdministrator)(nil),
 		},
 		{
 			"accept_admin_role_token_admin_registry", (*AcceptAdminRoleTokenAdminRegistry)(nil),
 		},
 		{
-			"set_token_billing", (*SetTokenBilling)(nil),
+			"transfer_admin_role_token_admin_registry", (*TransferAdminRoleTokenAdminRegistry)(nil),
 		},
 		{
-			"set_ocr_config", (*SetOcrConfig)(nil),
-		},
-		{
-			"add_billing_token_config", (*AddBillingTokenConfig)(nil),
-		},
-		{
-			"update_billing_token_config", (*UpdateBillingTokenConfig)(nil),
-		},
-		{
-			"remove_billing_token_config", (*RemoveBillingTokenConfig)(nil),
-		},
-		{
-			"get_fee", (*GetFee)(nil),
+			"set_pool", (*SetPool)(nil),
 		},
 		{
 			"withdraw_billed_funds", (*WithdrawBilledFunds)(nil),

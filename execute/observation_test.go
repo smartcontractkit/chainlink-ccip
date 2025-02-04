@@ -10,7 +10,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -25,7 +24,6 @@ func Test_getMessagesObservation(t *testing.T) {
 	msgHasher := mocks.NewMessageHasher()
 	tokenDataObserver := tokendata.NoopTokenDataObserver{}
 	costlyMessageObserver := costlymessages.NoopObserver{}
-	observationOptimizer := optimizers.NewObservationOptimizer(maxObservationLength)
 
 	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})
 	//require.NoError(t, err)
@@ -36,7 +34,7 @@ func Test_getMessagesObservation(t *testing.T) {
 		msgHasher:             msgHasher,
 		tokenDataObserver:     &tokenDataObserver,
 		costlyMessageObserver: &costlyMessageObserver,
-		observationOptimizer:  observationOptimizer,
+		ocrTypeCodec:          jsonOcrTypeCodec,
 	}
 
 	tests := []struct {

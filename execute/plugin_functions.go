@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -259,6 +260,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 	return ranges, nil
 }
 
+// groupByChainSelector groups the reports by their chain selector.
 func groupByChainSelector(
 	reports []plugintypes2.CommitPluginReportWithMeta) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
@@ -278,24 +280,27 @@ func groupByChainSelector(
 	return commitReportCache
 }
 
-// filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
+// combineReportsAndMessages returns a new reports slice with fully executed messages removed.
 // Reports that have all of their messages executed are not included in the result.
 // The provided reports must be sorted by sequence number range starting sequence number.
-func filterOutExecutedMessages(
-	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum) []exectypes.CommitData {
+func combineReportsAndMessages(
+	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum,
+) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData) {
 	if len(executedMessages) == 0 {
-		return reports
+		return reports, nil
 	}
 
 	// filtered contains the reports with fully executed messages removed
 	// and the executed messages appended to the report sorted by sequence number.
-	var filtered []exectypes.CommitData
+	var pending []exectypes.CommitData
+	var fullyExecuted []exectypes.CommitData
 
 	for i, report := range reports {
 		reportRange := report.SequenceNumberRange
 
 		executedMsgsInReportRange := reportRange.FilterSlice(executedMessages)
 		if len(executedMsgsInReportRange) == reportRange.Length() { // skip fully executed report.
+			fullyExecuted = append(fullyExecuted, report)
 			continue
 		}
 
@@ -303,18 +308,19 @@ func filterOutExecutedMessages(
 			return executedMsgsInReportRange[i] < executedMsgsInReportRange[j]
 		})
 		report.ExecutedMessages = append(reports[i].ExecutedMessages, executedMsgsInReportRange...)
-		filtered = append(filtered, report)
+		pending = append(pending, report)
 	}
 
-	return filtered
+	return pending, fullyExecuted
 }
 
 func decodeAttributedObservations(
 	aos []types.AttributedObservation,
+	ocrTypeCodec ocrtypecodec.ExecCodec,
 ) ([]plugincommon.AttributedObservation[exectypes.Observation], error) {
 	decoded := make([]plugincommon.AttributedObservation[exectypes.Observation], len(aos))
 	for i, ao := range aos {
-		observation, err := exectypes.DecodeObservation(ao.Observation)
+		observation, err := ocrTypeCodec.DecodeObservation(ao.Observation)
 		if err != nil {
 			return nil, err
 		}
@@ -618,10 +624,6 @@ func getConsensusObservation(
 	F int,
 	destChain cciptypes.ChainSelector,
 ) (exectypes.Observation, error) {
-	if len(aos) < F {
-		return exectypes.Observation{}, fmt.Errorf("below F threshold")
-	}
-
 	observedFChains := make(map[cciptypes.ChainSelector][]int)
 	for _, ao := range aos {
 		obs := ao.Observation

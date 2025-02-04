@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 
 	"github.com/stretchr/testify/require"
 
@@ -174,16 +175,19 @@ func TestPluginReports(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			ocrTypeCodec := ocrtypecodec.NewCommitCodecJSON()
+
 			cs := plugincommon.NewMockChainSupport(t)
 			p := Plugin{
 				lggr:            lggr,
 				reportCodec:     reportCodec,
+				ocrTypeCodec:    ocrTypeCodec,
 				oracleIDToP2PID: map[commontypes.OracleID]libocrtypes.PeerID{1: {1}},
 				chainSupport:    cs,
 			}
 			cs.EXPECT().SupportsDestChain(commontypes.OracleID(1)).Return(true, nil).Maybe()
 
-			outcomeBytes, err := tc.outc.Encode()
+			outcomeBytes, err := ocrTypeCodec.EncodeOutcome(tc.outc)
 			require.NoError(t, err)
 
 			reports, err := p.Reports(ctx, 0, outcomeBytes)
@@ -209,7 +213,10 @@ func TestPluginReports(t *testing.T) {
 
 func TestPluginReports_InvalidOutcome(t *testing.T) {
 	lggr := logger.Test(t)
-	p := Plugin{lggr: lggr}
+	p := Plugin{
+		lggr:         lggr,
+		ocrTypeCodec: ocrtypecodec.NewCommitCodecJSON(),
+	}
 	_, err := p.Reports(tests.Context(t), 0, []byte("invalid json"))
 	require.Error(t, err)
 }

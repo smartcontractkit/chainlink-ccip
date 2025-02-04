@@ -78,8 +78,43 @@ type PluginFactory struct {
 	rmnCrypto         cciptypes.RMNCrypto
 }
 
+type CommitPluginFactoryParams struct {
+	Lggr              logger.Logger
+	DonID             plugintypes.DonID
+	OcrConfig         reader.OCR3ConfigWithMeta
+	CommitCodec       cciptypes.CommitPluginCodec
+	MsgHasher         cciptypes.MessageHasher
+	ExtraDataCodec    cciptypes.ExtraDataCodec
+	HomeChainReader   reader.HomeChain
+	HomeChainSelector cciptypes.ChainSelector
+	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
+	RmnPeerClient     rmn.PeerClient
+	RmnCrypto         cciptypes.RMNCrypto
+}
+
+// NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by
+// the factory. It is safe to assume that a factory instance will create exactly one plugin instance.
+func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
+	return &PluginFactory{
+		baseLggr:          params.Lggr,
+		donID:             params.DonID,
+		ocrConfig:         params.OcrConfig,
+		commitCodec:       params.CommitCodec,
+		msgHasher:         params.MsgHasher,
+		extraDataCodec:    params.ExtraDataCodec,
+		homeChainReader:   params.HomeChainReader,
+		homeChainSelector: params.HomeChainSelector,
+		contractReaders:   params.ContractReaders,
+		chainWriters:      params.ContractWriters,
+		rmnPeerClient:     params.RmnPeerClient,
+		rmnCrypto:         params.RmnCrypto,
+	}
+}
+
 // NewPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by the
 // factory. It is safe to assume that a factory instance will create exactly one plugin instance.
+// deprecated: use NewCommitPluginFactory instead
 func NewPluginFactory(
 	lggr logger.Logger,
 	donID plugintypes.DonID,

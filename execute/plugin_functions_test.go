@@ -454,15 +454,16 @@ func Test_groupByChainSelector(t *testing.T) {
 	}
 }
 
-func Test_filterOutFullyExecutedMessages(t *testing.T) {
+func Test_combineReportsAndMessages(t *testing.T) {
 	type args struct {
 		reports          []exectypes.CommitData
 		executedMessages []cciptypes.SeqNum
 	}
 	tests := []struct {
-		name string
-		args args
-		want []exectypes.CommitData
+		name         string
+		args         args
+		wantPending  []exectypes.CommitData
+		wantExecuted []exectypes.CommitData
 	}{
 		{
 			name: "empty",
@@ -470,7 +471,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				reports:          nil,
 				executedMessages: nil,
 			},
-			want: nil,
+			wantPending: nil,
 		},
 		{
 			name: "empty2",
@@ -478,7 +479,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				reports:          []exectypes.CommitData{},
 				executedMessages: nil,
 			},
-			want: []exectypes.CommitData{},
+			wantPending: []exectypes.CommitData{},
 		},
 		{
 			name: "no executed messages",
@@ -490,7 +491,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				},
 				executedMessages: nil,
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
@@ -506,7 +507,12 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				},
 				executedMessages: cciptypes.NewSeqNumRange(0, 100).ToSlice(),
 			},
-			want: nil,
+			wantPending: nil,
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
+			},
 		},
 		{
 			name: "2 partially executed",
@@ -518,7 +524,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				},
 				executedMessages: cciptypes.NewSeqNumRange(15, 35).ToSlice(),
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{
 					SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					ExecutedMessages:    []cciptypes.SeqNum{15, 16, 17, 18, 19, 20},
@@ -542,7 +548,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				},
 				executedMessages: cciptypes.NewSeqNumRange(15, 55).ToSlice(),
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{
 					SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					ExecutedMessages:    []cciptypes.SeqNum{15, 16, 17, 18, 19, 20},
@@ -551,6 +557,9 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 					ExecutedMessages:    []cciptypes.SeqNum{50, 51, 52, 53, 54, 55},
 				},
+			},
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 			},
 		},
 		{
@@ -563,9 +572,12 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				},
 				executedMessages: cciptypes.NewSeqNumRange(10, 20).ToSlice(),
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
+			},
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 			},
 		},
 		{
@@ -578,70 +590,45 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 				},
 				executedMessages: cciptypes.NewSeqNumRange(50, 60).ToSlice(),
 			},
-			want: []exectypes.CommitData{
+			wantPending: []exectypes.CommitData{
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 			},
-		},
-		{
-			name: "sort-report",
-			args: args{
-				reports: []exectypes.CommitData{
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
-					},
-				},
-				executedMessages: nil,
-			},
-			want: []exectypes.CommitData{
-				{
-					SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
-				},
-				{
-					SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
-				},
-				{
-					SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
-				},
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 			},
 		},
 		{
 			name: "sort-executed",
 			args: args{
 				reports: []exectypes.CommitData{
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
-					},
-					{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
-					},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+					{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 				},
 				executedMessages: cciptypes.NewSeqNumRange(10, 60).ToSlice(),
 			},
-			want: nil,
+			wantPending: nil,
+			wantExecuted: []exectypes.CommitData{
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
+				{SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := filterOutExecutedMessages(tt.args.reports, tt.args.executedMessages)
-			assert.Equalf(t, tt.want, got, "filterOutExecutedMessages(%v, %v)", tt.args.reports, tt.args.executedMessages)
+			got, got2 := combineReportsAndMessages(tt.args.reports, tt.args.executedMessages)
+			assert.Equal(t, tt.wantPending, got)
+			assert.Equal(t, tt.wantExecuted, got2)
 		})
 	}
 }
 
 func Test_decodeAttributedObservations(t *testing.T) {
 	mustEncode := func(obs exectypes.Observation) []byte {
-		enc, err := obs.Encode()
+		enc, err := jsonOcrTypeCodec.EncodeObservation(obs)
 		if err != nil {
 			t.Fatal("Unable to encode")
 		}
@@ -737,7 +724,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := decodeAttributedObservations(tt.args)
+			got, err := decodeAttributedObservations(tt.args, jsonOcrTypeCodec)
 			if !tt.wantErr(t, err, fmt.Sprintf("decodeAttributedObservations(%v)", tt.args)) {
 				return
 			}
@@ -761,7 +748,6 @@ func Test_getConsensusObservation(t *testing.T) {
 		want    exectypes.Observation
 		wantErr assert.ErrorAssertionFunc
 	}{
-
 		{
 			name: "empty",
 			args: args{
@@ -793,6 +779,50 @@ func Test_getConsensusObservation(t *testing.T) {
 					},
 				},
 			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "consensus when exactly f+1",
+			args: args{
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+				},
+			},
+			want: exectypes.Observation{
+				Nonces: exectypes.NonceObservations{
+					1: {
+						"0x1": 1,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "no consensus when less than f+1",
+			args: args{
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+					{
+						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+					},
+				},
+			},
+			want:    exectypes.Observation{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -1401,7 +1431,7 @@ func Test_allSeqNrsObserved(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := msgsConformToSeqRange(tt.msgs, tt.numberRange); got != tt.want {
-				t.Errorf("msgsConformToSeqRange() = %v, want %v", got, tt.want)
+				t.Errorf("msgsConformToSeqRange() = %v, wantPending %v", got, tt.want)
 			}
 		})
 	}

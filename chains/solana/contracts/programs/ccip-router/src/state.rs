@@ -16,6 +16,7 @@ pub struct Config {
 
     _padding2: [u8; 8],
     pub ocr3: [Ocr3Config; 2],
+    pub fee_quoter: Pubkey,
 
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
@@ -87,33 +88,28 @@ pub struct SourceChain {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainState {
     pub sequence_number: u64, // The last used sequence number
-    pub usd_per_unit_gas: TimestampedPackedU224,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainConfig {
-    pub is_enabled: bool, // Whether this destination chain is enabled
+    // list of senders authorized to send messages to this destination chain.
+    // Note: The attribute name `max_len` is slightly misleading: it is not in any
+    // way limiting the actual length of the vector during initialization; it just
+    // helps the InitSpace derive macro work out the initial space. We can leave it at
+    // zero and calculate the actual length in the instruction context.
+    #[max_len(0)]
+    pub allowed_senders: Vec<Pubkey>,
+    pub allow_list_enabled: bool,
+}
 
-    pub max_number_of_tokens_per_msg: u16, // Maximum number of distinct ERC20 token transferred per message
-    pub max_data_bytes: u32,               // Maximum payload data size in bytes
-    pub max_per_msg_gas_limit: u32,        // Maximum gas limit for messages targeting EVMs
-    pub dest_gas_overhead: u32, //  Gas charged on top of the gasLimit to cover destination chain costs
-    pub dest_gas_per_payload_byte_base: u32, // Base gas cost per byte up to threshold
-    pub dest_gas_per_payload_byte_high: u32, // Higher gas cost per byte after threshold
-    pub dest_gas_per_payload_byte_threshold: u32, // Threshold in bytes for higher gas cost
-    pub dest_data_availability_overhead_gas: u32, // Extra data availability gas charged on top of the message, e.g. for OCR
-    pub dest_gas_per_data_availability_byte: u16, // Amount of gas to charge per byte of message data that needs availability
-    pub dest_data_availability_multiplier_bps: u16, // Multiplier for data availability gas, multiples of bps, or 0.0001
+impl DestChainConfig {
+    pub fn space(&self) -> usize {
+        Self::INIT_SPACE + self.dynamic_space()
+    }
 
-    // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
-    pub default_token_fee_usdcents: u16, // Default token fee charged per token transfer
-    pub default_token_dest_gas_overhead: u32, //  Default gas charged to execute the token transfer on the destination chain
-    pub default_tx_gas_limit: u32,            // Default gas limit for a tx
-    pub gas_multiplier_wei_per_eth: u64, // Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
-    pub network_fee_usdcents: u32, // Flat network fee to charge for messages, multiples of 0.01 USD
-    pub gas_price_staleness_threshold: u32, // The amount of time a gas price can be stale before it is considered invalid (0 means disabled)
-    pub enforce_out_of_order: bool, // Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
-    pub chain_family_selector: [u8; 4], // Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+    pub fn dynamic_space(&self) -> usize {
+        self.allowed_senders.len() * std::mem::size_of::<Pubkey>()
+    }
 }
 
 #[account]
@@ -149,27 +145,6 @@ pub struct CommitReport {
     pub execution_states: u128,
 }
 
-#[account]
-#[derive(InitSpace, Debug)]
-pub struct PerChainPerTokenConfig {
-    pub version: u8,         // schema version
-    pub chain_selector: u64, // remote chain
-    pub mint: Pubkey,        // token on solana
-
-    pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
-}
-
-#[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct TokenBilling {
-    pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
-    pub max_fee_usdcents: u32, // Maximum fee to charge per token transfer, multiples of 0.01 USD
-    pub deci_bps: u16, // Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
-    pub dest_gas_overhead: u32, // Gas charged to execute the token transfer on the destination chain
-    // Extra data availability bytes that are returned from the source pool and sent
-    pub dest_bytes_overhead: u32, // to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
-    pub is_enabled: bool,         // Whether this token has custom transfer fees
-}
-
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct RateLimitTokenBucket {
     pub tokens: u128,      // Current number of tokens that are in the bucket.
@@ -177,31 +152,6 @@ pub struct RateLimitTokenBucket {
     pub is_enabled: bool,  // Indication whether the rate limiting is enabled or not
     pub capacity: u128,    // Maximum number of tokens that can be in the bucket.
     pub rate: u128,        // Number of tokens per second that the bucket is refilled.
-}
-
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
-pub struct BillingTokenConfig {
-    // NOTE: when modifying this struct, make sure to update the version in the wrapper
-    pub enabled: bool,
-    pub mint: Pubkey,
-
-    // price tracking
-    pub usd_per_token: TimestampedPackedU224,
-    // billing configs
-    pub premium_multiplier_wei_per_eth: u64,
-}
-
-#[account]
-#[derive(InitSpace, Debug)]
-pub struct BillingTokenConfigWrapper {
-    pub version: u8,
-    pub config: BillingTokenConfig,
-}
-
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
-pub struct TimestampedPackedU224 {
-    pub value: [u8; 28],
-    pub timestamp: i64, // maintaining the type that SVM returns for the time (solana_program::clock::UnixTimestamp = i64)
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]

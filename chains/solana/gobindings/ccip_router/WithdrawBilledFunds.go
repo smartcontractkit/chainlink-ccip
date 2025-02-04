@@ -10,6 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
+// Billing //
 // Transfers the accumulated billed fees in a particular token to an arbitrary token account.
 // Only the CCIP Admin can withdraw billed funds.
 //

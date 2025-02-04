@@ -114,8 +114,11 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         );
 
         let (expected_fee_token_config, _) = Pubkey::find_program_address(
-            &[seed::FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()],
-            &router,
+            &[
+                fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+                mint.key.as_ref(),
+            ],
+            &fee_quoter::ID,
         );
         require_eq!(
             fee_token_config.key(),
@@ -149,15 +152,15 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         );
 
         // check per token per chain configs
-        // billing: configured via CCIP router/fee quoter
+        // billing: configured via CCIP fee quoter
         // chain config: configured via pool
         let (expected_billing_config, _) = Pubkey::find_program_address(
             &[
-                seed::TOKEN_POOL_BILLING,
+                fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
                 chain_selector.to_le_bytes().as_ref(),
                 mint.key().as_ref(),
             ],
-            &router,
+            &fee_quoter::ID,
         );
         let (expected_pool_chain_config, _) = Pubkey::find_program_address(
             &[
@@ -370,6 +373,7 @@ pub mod token_admin_registry_writable {
                 pending_administrator: Pubkey::default(),
                 lookup_table: Pubkey::default(),
                 writable_indexes: [0, 0],
+                mint: Pubkey::default(),
             };
 
             set(state, 0);
@@ -408,6 +412,7 @@ pub mod token_admin_registry_writable {
                     2u128.pow(127 - 7) + 2u128.pow(127 - 2) + 2u128.pow(127 - 4),
                     2u128.pow(127 - 8) + 2u128.pow(127 - 56) + 2u128.pow(127 - 100),
                 ],
+                mint: Pubkey::default(),
             };
 
             assert!(!is(state, 0));

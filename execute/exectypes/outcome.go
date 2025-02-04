@@ -1,10 +1,7 @@
 package exectypes
 
 import (
-	"encoding/json"
 	"sort"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -77,12 +74,12 @@ func NewOutcome(
 	selectedCommits []CommitData,
 	report cciptypes.ExecutePluginReport,
 ) Outcome {
-	return newSortedOutcome(state, selectedCommits, report)
+	return NewSortedOutcome(state, selectedCommits, report)
 }
 
-// newSortedOutcome ensures canonical ordering of the outcome.
+// NewSortedOutcome ensures canonical ordering of the outcome.
 // TODO: handle canonicalization in the encoder.
-func newSortedOutcome(
+func NewSortedOutcome(
 	state PluginState,
 	pendingCommits []CommitData,
 	report cciptypes.ExecutePluginReport,
@@ -107,22 +104,4 @@ func newSortedOutcome(
 		CommitReports: pendingCommitsCP,
 		Report:        cciptypes.ExecutePluginReport{ChainReports: reportCP},
 	}
-}
-
-// Encode encodes the outcome by first sorting the pending commit reports and the chain reports
-// and then JSON marshalling.
-// The encoding MUST be deterministic.
-func (o Outcome) Encode() (ocr3types.Outcome, error) {
-	// We sort again here in case construction is not via the constructor.
-	return json.Marshal(newSortedOutcome(o.State, o.CommitReports, o.Report))
-}
-
-// DecodeOutcome decodes the outcome from JSON. An empty string is treated as an empty outcome.
-func DecodeOutcome(b ocr3types.Outcome) (Outcome, error) {
-	if len(b) == 0 {
-		return Outcome{}, nil
-	}
-	o := Outcome{}
-	err := json.Unmarshal(b, &o)
-	return o, err
 }

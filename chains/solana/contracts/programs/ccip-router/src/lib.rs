@@ -21,9 +21,6 @@ use crate::messages::*;
 mod instructions;
 use crate::instructions::*;
 
-mod extra_args;
-use crate::extra_args::*;
-
 // Anchor discriminators for CPI calls
 const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
@@ -47,6 +44,10 @@ pub mod ccip_router {
 
     use super::*;
 
+    //////////////////////////
+    /// Initialization Flow //
+    //////////////////////////
+
     /// Initializes the CCIP Router.
     ///
     /// The initialization of the Router is responsibility of Admin, nothing more than calling this method should be done first.
@@ -62,6 +63,7 @@ pub mod ccip_router {
         svm_chain_selector: u64,
         enable_execution_after: i64,
         fee_aggregator: Pubkey,
+        fee_quoter: Pubkey,
         link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
     ) -> Result<()> {
@@ -72,6 +74,8 @@ pub mod ccip_router {
         config.enable_manual_execution_after = enable_execution_after;
         config.link_token_mint = link_token_mint;
         config.max_fee_juels_per_msg = max_fee_juels_per_msg;
+
+        config.fee_quoter = fee_quoter;
 
         config.owner = ctx.accounts.authority.key();
 
@@ -113,6 +117,10 @@ pub mod ccip_router {
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         v1::admin::accept_ownership(ctx)
     }
+
+    /////////////
+    /// Config //
+    /////////////
 
     /// Updates the fee aggregator in the router configuration.
     /// The Admin is the only one able to update the fee aggregator.
@@ -167,21 +175,6 @@ pub mod ccip_router {
         source_chain_selector: u64,
     ) -> Result<()> {
         v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
-    }
-
-    /// Disables the destination chain selector.
-    ///
-    /// The Admin is the only one able to disable the chain selector as destination. This method is thought of as an emergency kill-switch.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for disabling the chain selector.
-    /// * `dest_chain_selector` - The destination chain selector to be disabled.
-    pub fn disable_dest_chain_selector(
-        ctx: Context<UpdateDestChainSelectorConfig>,
-        dest_chain_selector: u64,
-    ) -> Result<()> {
-        v1::admin::disable_dest_chain_selector(ctx, dest_chain_selector)
     }
 
     /// Updates the configuration of the source chain selector.
@@ -249,107 +242,6 @@ pub mod ccip_router {
         v1::admin::update_enable_manual_execution_after(ctx, new_enable_manual_execution_after)
     }
 
-    /// Registers the Token Admin Registry via the CCIP Admin
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for registration.
-    /// * `mint` - The public key of the token mint.
-    /// * `token_admin_registry_admin` - The public key of the token admin registry admin.
-    pub fn register_token_admin_registry_via_get_ccip_admin(
-        ctx: Context<RegisterTokenAdminRegistryViaGetCCIPAdmin>,
-        mint: Pubkey, // should we validate that this is a real token program?
-        token_admin_registry_admin: Pubkey,
-    ) -> Result<()> {
-        v1::token_admin_registry::register_token_admin_registry_via_get_ccip_admin(
-            ctx,
-            mint,
-            token_admin_registry_admin,
-        )
-    }
-
-    /// Registers the Token Admin Registry via the token owner.
-    ///
-    /// The Authority of the Mint Token can claim the registry of the token.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for registration.
-    pub fn register_token_admin_registry_via_owner(
-        ctx: Context<RegisterTokenAdminRegistryViaOwner>,
-    ) -> Result<()> {
-        v1::token_admin_registry::register_token_admin_registry_via_owner(ctx)
-    }
-
-    /// Sets the pool lookup table for a given token mint.
-    ///
-    /// The administrator of the token admin registry can set the pool lookup table for a given token mint.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for setting the pool.
-    /// * `mint` - The public key of the token mint.
-    /// * `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.
-    /// * `is_writable` - index of account in lookup table that is writable
-    pub fn set_pool(
-        ctx: Context<SetPoolTokenAdminRegistry>,
-        mint: Pubkey,
-        writable_indexes: Vec<u8>,
-    ) -> Result<()> {
-        v1::token_admin_registry::set_pool(ctx, mint, writable_indexes)
-    }
-
-    /// Transfers the admin role of the token admin registry to a new admin.
-    ///
-    /// Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for the transfer.
-    /// * `mint` - The public key of the token mint.
-    /// * `new_admin` - The public key of the new admin.
-    pub fn transfer_admin_role_token_admin_registry(
-        ctx: Context<ModifyTokenAdminRegistry>,
-        mint: Pubkey,
-        new_admin: Pubkey,
-    ) -> Result<()> {
-        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
-    }
-
-    /// Accepts the admin role of the token admin registry.
-    ///
-    /// The Pending Admin must call this function to accept the admin role of the Token Admin Registry.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for accepting the admin role.
-    /// * `mint` - The public key of the token mint.
-    pub fn accept_admin_role_token_admin_registry(
-        ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
-        mint: Pubkey,
-    ) -> Result<()> {
-        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
-    }
-
-    /// Sets the token billing configuration.
-    ///
-    /// Only CCIP Admin can set the token billing configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-    /// * `chain_selector` - The chain selector.
-    /// * `mint` - The public key of the token mint.
-    /// * `cfg` - The token billing configuration.
-    pub fn set_token_billing(
-        ctx: Context<SetTokenBillingConfig>,
-        chain_selector: u64,
-        mint: Pubkey,
-        cfg: TokenBilling,
-    ) -> Result<()> {
-        v1::admin::set_token_billing(ctx, chain_selector, mint, cfg)
-    }
-
     /// Sets the OCR configuration.
     /// Only CCIP Admin can set the OCR configuration.
     ///
@@ -370,73 +262,120 @@ pub mod ccip_router {
         v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
     }
 
-    /// Adds a billing token configuration.
-    /// Only CCIP Admin can add a billing token configuration.
+    ///////////////////////////
+    /// Token Admin Registry //
+    ///////////////////////////
+
+    /// Registers the Token Admin Registry via the CCIP Admin
     ///
     /// # Arguments
     ///
-    /// * `ctx` - The context containing the accounts required for adding the billing token configuration.
-    /// * `config` - The billing token configuration to be added.
-    pub fn add_billing_token_config(
-        ctx: Context<AddBillingTokenConfig>,
-        config: BillingTokenConfig,
+    /// * `ctx` - The context containing the accounts required for registration.
+    /// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+    pub fn ccip_admin_propose_administrator(
+        ctx: Context<RegisterTokenAdminRegistryByCCIPAdmin>,
+        token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::admin::add_billing_token_config(ctx, config)
+        v1::token_admin_registry::ccip_admin_propose_administrator(ctx, token_admin_registry_admin)
     }
 
-    /// Updates the billing token configuration.
-    /// Only CCIP Admin can update a billing token configuration.
+    /// Overrides the pending admin of the Token Admin Registry
     ///
     /// # Arguments
     ///
-    /// * `ctx` - The context containing the accounts required for updating the billing token configuration.
-    /// * `config` - The new billing token configuration.
-    pub fn update_billing_token_config(
-        ctx: Context<UpdateBillingTokenConfig>,
-        config: BillingTokenConfig,
+    /// * `ctx` - The context containing the accounts required for registration.
+    /// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+    pub fn ccip_admin_override_pending_administrator(
+        ctx: Context<OverridePendingTokenAdminRegistryByCCIPAdmin>,
+        token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::admin::update_billing_token_config(ctx, config)
+        v1::token_admin_registry::ccip_admin_override_pending_administrator(
+            ctx,
+            token_admin_registry_admin,
+        )
     }
 
-    /// Removes the billing token configuration.
-    /// Only CCIP Admin can remove a billing token configuration.
+    /// Registers the Token Admin Registry by the token owner.
+    ///
+    /// The Authority of the Mint Token can claim the registry of the token.
     ///
     /// # Arguments
     ///
-    /// * `ctx` - The context containing the accounts required for removing the billing token configuration.
-    pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
-        v1::admin::remove_billing_token_config(ctx)
+    /// * `ctx` - The context containing the accounts required for registration.
+    /// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+    pub fn owner_propose_administrator(
+        ctx: Context<RegisterTokenAdminRegistryByOwner>,
+        token_admin_registry_admin: Pubkey,
+    ) -> Result<()> {
+        v1::token_admin_registry::owner_propose_administrator(ctx, token_admin_registry_admin)
     }
 
-    /// Calculates the fee for sending a message to the destination chain.
+    /// Overrides the pending admin of the Token Admin Registry by the token owner
     ///
     /// # Arguments
     ///
-    /// * `_ctx` - The context containing the accounts required for the fee calculation.
-    /// * `dest_chain_selector` - The chain selector for the destination chain.
-    /// * `message` - The message to be sent.
-    ///
-    /// # Additional accounts
-    ///
-    /// In addition to the fixed amount of accounts defined in the `GetFee` context,
-    /// the following accounts must be provided:
-    ///
-    /// * First, the billing token config accounts for each token sent with the message, sequentially.
-    ///   For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
-    ///   tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
-    /// * Then, the per chain / per token config of every token sent with the message, sequentially
-    ///   in the same order.
-    ///
-    /// # Returns
-    ///
-    /// The fee amount in u64.
-    pub fn get_fee<'info>(
-        ctx: Context<'_, '_, 'info, 'info, GetFee>,
-        dest_chain_selector: u64,
-        message: SVM2AnyMessage,
-    ) -> Result<u64> {
-        v1::onramp::get_fee(ctx, dest_chain_selector, message)
+    /// * `ctx` - The context containing the accounts required for registration.
+    /// * `token_admin_registry_admin` - The public key of the token admin registry admin to propose.
+    pub fn owner_override_pending_administrator(
+        ctx: Context<OverridePendingTokenAdminRegistryByOwner>,
+        token_admin_registry_admin: Pubkey,
+    ) -> Result<()> {
+        v1::token_admin_registry::owner_override_pending_administrator(
+            ctx,
+            token_admin_registry_admin,
+        )
     }
+
+    /// Accepts the admin role of the token admin registry.
+    ///
+    /// The Pending Admin must call this function to accept the admin role of the Token Admin Registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for accepting the admin role.
+    /// * `mint` - The public key of the token mint.
+    pub fn accept_admin_role_token_admin_registry(
+        ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
+    ) -> Result<()> {
+        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx)
+    }
+
+    /// Transfers the admin role of the token admin registry to a new admin.
+    ///
+    /// Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the transfer.
+    /// * `mint` - The public key of the token mint.
+    /// * `new_admin` - The public key of the new admin.
+    pub fn transfer_admin_role_token_admin_registry(
+        ctx: Context<ModifyTokenAdminRegistry>,
+        new_admin: Pubkey,
+    ) -> Result<()> {
+        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, new_admin)
+    }
+
+    /// Sets the pool lookup table for a given token mint.
+    ///
+    /// The administrator of the token admin registry can set the pool lookup table for a given token mint.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for setting the pool.
+    /// * `mint` - The public key of the token mint.
+    /// * `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.
+    /// * `is_writable` - index of account in lookup table that is writable
+    pub fn set_pool(
+        ctx: Context<SetPoolTokenAdminRegistry>,
+        writable_indexes: Vec<u8>,
+    ) -> Result<()> {
+        v1::token_admin_registry::set_pool(ctx, writable_indexes)
+    }
+
+    //////////////
+    /// Billing //
+    //////////////
 
     /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
     /// Only the CCIP Admin can withdraw billed funds.
@@ -454,14 +393,17 @@ pub mod ccip_router {
         v1::admin::withdraw_billed_funds(ctx, transfer_all, desired_amount)
     }
 
-    /// ON RAMP FLOW
+    ///////////////////
+    /// On Ramp Flow //
+    ///////////////////
+
     /// Sends a message to the destination chain.
     ///
     /// Request a message to be sent to the destination chain.
     /// The method name needs to be ccip_send with Anchor encoding.
     /// This function is called by the CCIP Sender Contract (or final user) to send a message to the CCIP Router.
     /// The message will be sent to the receiver on the destination chain selector.
-    /// This message emits the event CCIPSendRequested with all the necessary data to be retrieved by the OffChain Code
+    /// This message emits the event CCIPMessageSent with all the necessary data to be retrieved by the OffChain Code
     ///
     /// # Arguments
     ///
@@ -477,7 +419,10 @@ pub mod ccip_router {
         v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
 
-    /// OFF RAMP FLOW
+    ////////////////////
+    /// Off Ramp Flow //
+    ////////////////////
+
     /// Commits a report to the router.
     ///
     /// The method name needs to be commit with Anchor encoding.
@@ -512,7 +457,6 @@ pub mod ccip_router {
         v1::offramp::commit(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
     }
 
-    /// OFF RAMP FLOW
     /// Executes a message on the destination chain.
     ///
     /// The method name needs to be execute with Anchor encoding.
@@ -650,6 +594,10 @@ pub enum CcipRouterError {
     MessageGasLimitTooHigh,
     #[msg("Extra arg out of order execution must be true")]
     ExtraArgOutOfOrderExecutionMustBeTrue,
+    #[msg("New Admin can not be zero address")]
+    InvalidTokenAdminRegistryInputsZeroAddress,
+    #[msg("An already owned registry can not be proposed")]
+    InvalidTokenAdminRegistryProposedAdmin,
     #[msg("Invalid writability bitmap")]
     InvalidWritabilityBitmap,
     #[msg("Invalid extra args tag")]
@@ -660,4 +608,6 @@ pub enum CcipRouterError {
     InvalidTokenReceiver,
     #[msg("Invalid SVM address")]
     InvalidSVMAddress,
+    #[msg("Sender not allowed for that destination chain")]
+    SenderNotAllowed,
 }
