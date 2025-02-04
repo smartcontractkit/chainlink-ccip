@@ -765,8 +765,8 @@ func TestMcmWithTimelock(t *testing.T) {
 						}
 
 						require.Equal(t,
-							config.TimelockOpDoneTimestamp,
-							opAccount.Timestamp,
+							timelock.Done_OperationState,
+							opAccount.State,
 							"Executed operation's time should be 1(DONE_TIMESTAMP)",
 						)
 
@@ -1483,7 +1483,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				var opAccount timelock.Operation
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment, &opAccount)
 				require.NoError(t, err)
-				require.Equal(t, config.TimelockOpDoneTimestamp, opAccount.Timestamp, "Op1 should be marked as executed")
+				require.Equal(t, timelock.Done_OperationState, opAccount.State, "Op1 should be marked as done")
 
 				// Verify treasury balance
 				_, treasuryBalance, tberr := tokens.TokenBalance(ctx, solanaGoClient, treasuryATA, config.DefaultCommitment)
@@ -1583,7 +1583,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				var opAccount timelock.Operation
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, op2.OperationPDA(), config.DefaultCommitment, &opAccount)
 				require.NoError(t, err)
-				require.Equal(t, config.TimelockOpDoneTimestamp, opAccount.Timestamp, "Op2 should be marked as executed")
+				require.Equal(t, timelock.Done_OperationState, opAccount.State, "Op2 should be marked as done")
 			})
 		})
 
@@ -2432,7 +2432,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						require.NoError(t, err, "failed to get account info")
 					}
 					require.Equal(t, timelockOp.OperationID(), opAccount.Id, "Operation ID does not match")
-					require.Equal(t, true, opAccount.IsFinalized, "Operation state is invalid")
+					require.Equal(t, timelock.Scheduled_OperationState, opAccount.State, "Operation state is invalid")
 
 					werr := timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, timelockOp.OperationPDA(), config.DefaultCommitment)
 					require.NoError(t, werr)
@@ -2478,9 +2478,9 @@ func TestMcmWithTimelock(t *testing.T) {
 						}
 
 						require.Equal(t,
-							config.TimelockOpDoneTimestamp,
-							opAccount.Timestamp,
-							"Executed operation's time should be 1(DONE_TIMESTAMP)",
+							timelock.Done_OperationState,
+							opAccount.State,
+							"Executed operation should be marked as done",
 						)
 					}
 				})

@@ -260,8 +260,8 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			}
 
 			require.Equal(t,
-				true,
-				opAccount.IsFinalized,
+				timelock.Finalized_OperationState,
+				opAccount.State,
 				"operation is not finalized",
 			)
 

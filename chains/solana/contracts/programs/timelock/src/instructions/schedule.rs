@@ -33,7 +33,7 @@ pub fn schedule_batch<'info>(
     );
 
     let op = &mut ctx.accounts.operation;
-    op.timestamp = scheduled_time;
+    op.schedule(scheduled_time);
 
     for (i, ix) in op.instructions.iter().enumerate() {
         // check for 8-byte Anchor discriminator (since our internally developed programs use Anchor)
@@ -69,8 +69,9 @@ pub struct ScheduleBatch<'info> {
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
-        constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled
+        // NOTE: order matters here, we need to check if the operation is already scheduled before checking if it is finalized
+        constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled,
+        constraint = operation.is_finalized() @ TimelockError::OperationNotFinalized,
     )]
     pub operation: Box<Account<'info, Operation>>,
 

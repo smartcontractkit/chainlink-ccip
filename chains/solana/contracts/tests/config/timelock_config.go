@@ -14,7 +14,6 @@ var (
 	BatchAddAccessChunkSize = 24
 	MinDelay                = uint64(1)
 	TimelockEmptyOpID       = [32]byte{}
-	TimelockOpDoneTimestamp = uint64(1)
 	MaxFunctionSelectorLen  = 128
 
 	// operational constraints

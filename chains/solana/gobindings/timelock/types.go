@@ -217,3 +217,27 @@ func (value Role) String() string {
 		return ""
 	}
 }
+
+type OperationState ag_binary.BorshEnum
+
+const (
+	Initialized_OperationState OperationState = iota
+	Finalized_OperationState
+	Scheduled_OperationState
+	Done_OperationState
+)
+
+func (value OperationState) String() string {
+	switch value {
+	case Initialized_OperationState:
+		return "Initialized"
+	case Finalized_OperationState:
+		return "Finalized"
+	case Scheduled_OperationState:
+		return "Scheduled"
+	case Done_OperationState:
+		return "Done"
+	default:
+		return ""
+	}
+}
