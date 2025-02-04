@@ -114,6 +114,16 @@ func (r *CachedChainReader) GetOffRampConfigDigest(ctx context.Context, pluginTy
 		return [32]byte{}, err
 	}
 
+	readerData, err := r.ccipReader.GetOffRampConfigDigest(ctx, pluginType)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	r.ccipReader.lggr.Infow("Getting offramp config digest",
+		"pluginType", pluginType,
+		"respfromcache", resp,
+		"readerData", readerData)
+
 	var respFromBatch OCRConfigResponse
 	if pluginType == consts.PluginTypeCommit {
 		respFromBatch = resp.Offramp.CommitLatestOCRConfig
@@ -129,6 +139,15 @@ func (r *CachedChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Re
 	if err != nil {
 		return rmntypes.RemoteConfig{}, err
 	}
+
+	respFromReader, err := r.ccipReader.GetRMNRemoteConfig(ctx)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, err
+	}
+
+	r.ccipReader.lggr.Infow("Getting RMN remote config",
+		"respfromcache", resp,
+		"readerData", respFromReader)
 
 	// Here we need to construct the RMN config from our cached response
 	return rmntypes.RemoteConfig{
