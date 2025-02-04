@@ -1860,6 +1860,7 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 	return contractreader.ExtendedBatchGetLatestValuesRequest{
 		consts.ContractNameOffRamp: {
 			{
+				// x
 				ReadName: consts.MethodNameOffRampLatestConfigDetails,
 				Params: map[string]any{
 					"ocrPluginType": consts.PluginTypeCommit,
@@ -1867,6 +1868,7 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 				ReturnVal: &commitLatestOCRConfig,
 			},
 			{
+				// x
 				ReadName: consts.MethodNameOffRampLatestConfigDetails,
 				Params: map[string]any{
 					"ocrPluginType": consts.PluginTypeExecute,
@@ -1896,11 +1898,13 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 		}},
 		consts.ContractNameRMNRemote: {
 			{
+				// x
 				ReadName:  consts.MethodNameGetReportDigestHeader,
 				Params:    map[string]any{},
 				ReturnVal: &rmnDigestHeader,
 			},
 			{
+				// x
 				ReadName:  consts.MethodNameGetVersionedConfig,
 				Params:    map[string]any{},
 				ReturnVal: &rmnVersionConfig,
