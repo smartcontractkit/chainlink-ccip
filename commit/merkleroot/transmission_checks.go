@@ -13,14 +13,19 @@ import (
 
 // ValidateMerkleRootsState validates the proposed merkle roots against the current on-chain state.
 // This function is not-pure as it reads from the chain by making one network/reader call.
+//
+//nolint:gocyclo //todo
 func ValidateMerkleRootsState(
 	ctx context.Context,
-	proposedMerkleRoots []cciptypes.MerkleRootChain,
+	proposedBlessedMerkleRoots []cciptypes.MerkleRootChain,
+	proposedUnblessedMerkleRoots []cciptypes.MerkleRootChain,
 	reader reader.CCIPReader,
 ) error {
-	if len(proposedMerkleRoots) == 0 {
+	if len(proposedBlessedMerkleRoots) == 0 && len(proposedUnblessedMerkleRoots) == 0 {
 		return nil
 	}
+
+	proposedMerkleRoots := append(proposedBlessedMerkleRoots, proposedUnblessedMerkleRoots...)
 
 	chainSet := mapset.NewSet[cciptypes.ChainSelector]()
 	newNextOnRampSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
@@ -52,6 +57,31 @@ func ValidateMerkleRootsState(
 		if newNextOnRampSeqNum != offRampExpNextSeqNum {
 			return fmt.Errorf("unexpected seq nums offRampNext=%d newOnRampNext=%d",
 				offRampExpNextSeqNum, newNextOnRampSeqNum)
+		}
+	}
+
+	sourceChainsConfig, err := reader.GetOffRampSourceChainsConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("get offRamp source chains config: %w", err)
+	}
+
+	for _, r := range proposedBlessedMerkleRoots {
+		sourceChainCfg, ok := sourceChainsConfig[r.ChainSel]
+		if !ok {
+			return fmt.Errorf("chain %d is not in the offRampSourceChainsConfig", r.ChainSel)
+		}
+		if sourceChainCfg.IsRMNVerificationDisabled {
+			return fmt.Errorf("chain %d is RMN-disabled but root is blessed", r.ChainSel)
+		}
+	}
+
+	for _, r := range proposedUnblessedMerkleRoots {
+		sourceChainCfg, ok := sourceChainsConfig[r.ChainSel]
+		if !ok {
+			return fmt.Errorf("chain %d is not in the offRampSourceChainsConfig", r.ChainSel)
+		}
+		if !sourceChainCfg.IsRMNVerificationDisabled {
+			return fmt.Errorf("chain %d is RMN-enabled but root is unblessed", r.ChainSel)
 		}
 	}
 

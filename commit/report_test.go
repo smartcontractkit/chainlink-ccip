@@ -133,7 +133,7 @@ func TestPluginReports(t *testing.T) {
 			},
 			expReports: []ccipocr3.CommitPluginReport{
 				{
-					MerkleRoots: []ccipocr3.MerkleRootChain{
+					BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
 						{
 							ChainSel:      3,
 							OnRampAddress: []byte{1, 2, 3},
@@ -265,7 +265,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 				lggr: logger.Test(t),
 			}
 			report := ccipocr3.CommitPluginReport{
-				MerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
+				BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
 			}
 			stale := p.isStaleReport(p.lggr, tc.reportSeqNum, tc.onChainSeqNum, report)
 			require.Equal(t, tc.shouldBeStale, stale)

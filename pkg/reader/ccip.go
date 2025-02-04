@@ -115,8 +115,9 @@ type PriceUpdates struct {
 }
 
 type CommitReportAcceptedEvent struct {
-	MerkleRoots  []MerkleRoot
-	PriceUpdates PriceUpdates
+	BlessedMerkleRoots   []MerkleRoot
+	UnblessedMerkleRoots []MerkleRoot
+	PriceUpdates         PriceUpdates
 }
 
 // ---------------------------------------------------
@@ -168,8 +169,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		lggr.Debugw("processing commit report", "report", ev, "item", item)
 
-		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.MerkleRoots))
-		for _, mr := range ev.MerkleRoots {
+		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
+		blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots))
+		for _, mr := range ev.BlessedMerkleRoots {
 			onRampAddress, err := r.GetContractAddress(
 				consts.ContractNameOnRamp,
 				cciptypes.ChainSelector(mr.SourceChainSelector),
@@ -179,7 +181,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				continue
 			}
 
-			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
+			blessedMerkleRoots = append(blessedMerkleRoots, cciptypes.MerkleRootChain{
 				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
 				OnRampAddress: onRampAddress,
 				SeqNumsRange: cciptypes.NewSeqNumRange(
@@ -189,6 +191,30 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				MerkleRoot: mr.MerkleRoot,
 			})
 		}
+
+		// -------------------------------------------
+		unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots))
+		for _, mr := range ev.UnblessedMerkleRoots { // todo: dup code
+			onRampAddress, err := r.GetContractAddress(
+				consts.ContractNameOnRamp,
+				cciptypes.ChainSelector(mr.SourceChainSelector),
+			)
+			if err != nil {
+				r.lggr.Errorw("get onRamp address for selector %d: %w", mr.SourceChainSelector, err)
+				continue
+			}
+
+			unblessedMerkleRoots = append(unblessedMerkleRoots, cciptypes.MerkleRootChain{
+				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
+				OnRampAddress: onRampAddress,
+				SeqNumsRange: cciptypes.NewSeqNumRange(
+					cciptypes.SeqNum(mr.MinSeqNr),
+					cciptypes.SeqNum(mr.MaxSeqNr),
+				),
+				MerkleRoot: mr.MerkleRoot,
+			})
+		}
+		// -------------------------------------------
 
 		priceUpdates := cciptypes.PriceUpdates{
 			TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
@@ -217,8 +243,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
-				MerkleRoots:  merkleRoots,
-				PriceUpdates: priceUpdates,
+				BlessedMerkleRoots:   blessedMerkleRoots,
+				UnblessedMerkleRoots: unblessedMerkleRoots,
+				PriceUpdates:         priceUpdates,
 			},
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
 			BlockNum:  blockNum,
@@ -865,7 +892,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
-		sourceConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, lggr)
+		sourceConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, lggr, true)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
@@ -1117,14 +1144,15 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
 //
 //nolint:lll // It's a URL.
-type sourceChainConfig struct {
-	Router    []byte // local router
-	IsEnabled bool
-	MinSeqNr  uint64
-	OnRamp    cciptypes.UnknownAddress
+type SourceChainConfig struct {
+	Router                    []byte // local router
+	IsEnabled                 bool
+	MinSeqNr                  uint64
+	IsRMNVerificationDisabled bool
+	OnRamp                    cciptypes.UnknownAddress
 }
 
-func (scc sourceChainConfig) check() (bool /* enabled */, error) {
+func (scc SourceChainConfig) check() (bool /* enabled */, error) {
 	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
 	if !scc.IsEnabled {
 		return false, nil
@@ -1148,12 +1176,12 @@ func (scc sourceChainConfig) check() (bool /* enabled */, error) {
 // getOffRampSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source
 // chain. If some chain is disabled it is not included in the response.
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
-	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
+	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
-	res := make(map[cciptypes.ChainSelector]sourceChainConfig)
+	res := make(map[cciptypes.ChainSelector]SourceChainConfig)
 	mu := new(sync.Mutex)
 
 	eg := new(errgroup.Group)
@@ -1164,7 +1192,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 
 		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
 		eg.Go(func() error {
-			resp := sourceChainConfig{}
+			resp := SourceChainConfig{}
 			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOffRamp,
@@ -1206,19 +1234,20 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 // selectorsAndConfigs wraps the return values from getAllSourceChainConfigs.
 type selectorsAndConfigs struct {
 	Selectors          []uint64            `mapstructure:"F0"`
-	SourceChainConfigs []sourceChainConfig `mapstructure:"F1"`
+	SourceChainConfigs []SourceChainConfig `mapstructure:"F1"`
 }
 
 // getAllOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for dest chain
 func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	ctx context.Context,
 	lggr logger.Logger,
-) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
+	onlyEnabledChains bool,
+) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
-	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
+	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
 
 	var resp selectorsAndConfigs
 	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
@@ -1249,7 +1278,7 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 		if err != nil {
 			return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
 		}
-		if !enabled {
+		if onlyEnabledChains && !enabled {
 			// We don't want to process disabled chains prematurely.
 			lggr.Debugw("source chain is disabled", "chain", chainSel)
 			continue
@@ -1275,7 +1304,6 @@ type offRampStaticChainConfig struct {
 type offRampDynamicChainConfig struct {
 	FeeQuoter                               []byte `json:"feeQuoter"`
 	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
-	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
 	MessageInterceptor                      []byte `json:"messageInterceptor"`
 }
 
@@ -1631,6 +1659,14 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
 }
 
+// GetOffRampSourceChainsConfig returns all the source chains configs including disabled chains.
+//
+//nolint:revive // todo
+func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.
+	Context) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+	return r.getAllOffRampSourceChainsConfig(ctx, r.lggr, false)
+}
+
 func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
 	ev, is := (seq.Data).(*CommitReportAcceptedEvent)
 	if !is {
@@ -1642,7 +1678,7 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 			seq.Timestamp, gteTimestamp.Unix())
 	}
 
-	if err := validateMerkleRoots(ev.MerkleRoots); err != nil {
+	if err := validateMerkleRoots(append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)); err != nil {
 		return nil, fmt.Errorf("merkle roots: %w", err)
 	}
 

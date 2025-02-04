@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 )
 
+//nolint:gocyclo //todo
 func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
@@ -41,8 +42,20 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		OfframpAddress:    offRampAddress,
 	}
 
+	rmnEnabledChains, err := p.rmnHomeReader.GetRMNEnabledSourceChains(prevOutcome.RMNRemoteCfg.ConfigDigest)
+	if err != nil {
+		return Query{}, fmt.Errorf("get RMN enabled chains %s: %w",
+			prevOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
+	}
+
 	reqUpdates := make([]*rmnpb.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
+		if !rmnEnabledChains[sourceChainRange.ChainSel] {
+			lggr.Debugw("chain not RMN-enabled, signatures not requested",
+				"chain", sourceChainRange.ChainSel, "rmnEnabledChains", rmnEnabledChains)
+			continue
+		}
+
 		onRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
 			lggr.Warnw("failed to get onRamp address", "chain", sourceChainRange.ChainSel, "err", err)
@@ -59,6 +72,12 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 				MaxMsgNr: uint64(sourceChainRange.SeqNumRange.End()),
 			},
 		})
+	}
+
+	if len(reqUpdates) == 0 {
+		lggr.Debugw("no RMN-enabled chains to request signatures, empty query returned",
+			"rmnEnabledChains", rmnEnabledChains)
+		return Query{}, nil
 	}
 
 	ctxQuery, cancel := context.WithTimeout(ctx, p.offchainCfg.RMNSignaturesTimeout)

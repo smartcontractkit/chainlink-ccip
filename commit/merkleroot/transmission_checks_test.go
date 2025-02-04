@@ -76,7 +76,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			rep := cciptypes.CommitPluginReport{}
 			chains := make([]cciptypes.ChainSelector, 0, len(tc.onRampNextSeqNum))
 			for _, snc := range tc.onRampNextSeqNum {
-				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
+				rep.BlessedMerkleRoots = append(rep.BlessedMerkleRoots, cciptypes.MerkleRootChain{
 					ChainSel:     snc.ChainSel,
 					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
 				})
@@ -84,7 +84,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			}
 			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
 
-			err := ValidateMerkleRootsState(ctx, rep.MerkleRoots, reader)
+			err := ValidateMerkleRootsState(ctx, rep.BlessedMerkleRoots, rep.UnblessedMerkleRoots, reader)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
