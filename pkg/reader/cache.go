@@ -119,17 +119,17 @@ func (r *CachedChainReader) GetOffRampConfigDigest(ctx context.Context, pluginTy
 		return [32]byte{}, err
 	}
 
-	r.ccipReader.lggr.Infow("Getting offramp config digest",
-		"pluginType", pluginType,
-		"respfromcache", resp,
-		"readerData", readerData)
-
 	var respFromBatch OCRConfigResponse
 	if pluginType == consts.PluginTypeCommit {
 		respFromBatch = resp.Offramp.CommitLatestOCRConfig
 	} else {
 		respFromBatch = resp.Offramp.ExecLatestOCRConfig
 	}
+
+	r.ccipReader.lggr.Infow("Getting offramp config digest",
+		"pluginType", pluginType,
+		"respfromcache", respFromBatch.OCRConfig.ConfigInfo.ConfigDigest,
+		"readerData", readerData)
 
 	return respFromBatch.OCRConfig.ConfigInfo.ConfigDigest, nil
 }
@@ -145,8 +145,17 @@ func (r *CachedChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Re
 		return rmntypes.RemoteConfig{}, err
 	}
 
+	ret := rmntypes.RemoteConfig{
+		ContractAddress:  resp.RMNProxy.RMNRemoteAddress,
+		ConfigDigest:     resp.RMNRemote.RMNRemoteVersionedConfig.Config.RMNHomeContractConfigDigest,
+		Signers:          r.buildSigners(resp.RMNRemote.RMNRemoteVersionedConfig.Config.Signers),
+		FSign:            resp.RMNRemote.RMNRemoteVersionedConfig.Config.F,
+		ConfigVersion:    resp.RMNRemote.RMNRemoteVersionedConfig.Version,
+		RmnReportVersion: resp.RMNRemote.RMNRemoteDigestHeader.DigestHeader,
+	}
+
 	r.ccipReader.lggr.Infow("Getting RMN remote config",
-		"respfromcache", resp,
+		"respfromcache", ret,
 		"readerData", respFromReader)
 
 	// Here we need to construct the RMN config from our cached response
