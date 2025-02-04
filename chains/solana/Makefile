@@ -38,7 +38,7 @@ lint-go-fix:
 
 .PHONY: anchor-go-gen
 anchor-go-gen:
-	cd ./contracts && rm -rf ./target && anchor build && cd .. && ./scripts/anchor-go-gen.sh
+	make build-contracts && ./scripts/anchor-go-gen.sh
 
 .PHONY: format
 format:
@@ -54,7 +54,7 @@ ccip-router-contracts-go-tests:
 
 .PHONY: build-contracts
 build-contracts:
-	cd ./contracts && anchor build
+	cd ./contracts && rm -rf ./target && anchor build && cd -
 
 # Note on CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 # Sparse index significantly speeds up dependency fetching, supposedly default in 1.70 but anchor build was still using a slow git download
