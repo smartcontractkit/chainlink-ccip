@@ -565,7 +565,8 @@ func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) 
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
-		OracleID: oracleID,
+		OracleID:    oracleID,
+		Observation: dummyObservation,
 	}
 
 	err := cdp.ValidateObservation(discoverytypes.Outcome{}, discoverytypes.Query{}, ao)
@@ -591,7 +592,8 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
-		OracleID: oracleID,
+		OracleID:    oracleID,
+		Observation: dummyObservation,
 	}
 
 	err := cdp.ValidateObservation(discoverytypes.Outcome{}, discoverytypes.Query{}, ao)
@@ -625,7 +627,8 @@ func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedCha
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
-		OracleID: oracleID,
+		OracleID:    oracleID,
+		Observation: dummyObservation,
 	}
 
 	err := cdp.ValidateObservation(discoverytypes.Outcome{}, discoverytypes.Query{}, ao)
@@ -640,6 +643,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 		name            string
 		supportedChains []cciptypes.ChainSelector
 		addresses       reader.ContractAddresses
+		fChain          map[cciptypes.ChainSelector]int
 		errStr          string
 	}{
 		{
@@ -654,6 +658,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
+			fChain: defaultFChain,
 			errStr: "oracle 1 is not allowed to observe contract (OnRamp) on the destination chain ChainSelector(1)",
 		},
 		{
@@ -666,6 +671,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
+			fChain: defaultFChain,
 		},
 		{
 			name:            "FeeQuoter is discovered on the same chain (error)",
@@ -677,18 +683,39 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
+			fChain: defaultFChain,
 			errStr: "oracle 1 is not allowed to observe chain ChainSelector",
 		},
 		{
 			name:            "FeeQuoter is discovered on the same chain (pass)",
-			supportedChains: []cciptypes.ChainSelector{dest + 1, dest + 2, dest + 3},
+			supportedChains: []cciptypes.ChainSelector{dest, dest + 1, dest + 2, dest + 3},
 			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameFeeQuoter: {
 					dest + 1: cciptypes.UnknownAddress("1"),
 					dest + 2: cciptypes.UnknownAddress("2"),
 					dest + 3: cciptypes.UnknownAddress("3"),
 				},
+				// Need to observe onramps to be able to observe feequoters
+				consts.ContractNameOnRamp: {
+					dest + 1: cciptypes.UnknownAddress("a"),
+					dest + 2: cciptypes.UnknownAddress("b"),
+					dest + 3: cciptypes.UnknownAddress("c"),
+				},
 			},
+			fChain: defaultFChain,
+		},
+		{
+			name:            "Invalid FChain (error)",
+			supportedChains: []cciptypes.ChainSelector{dest, dest + 1},
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+				consts.ContractNameOnRamp: {
+					dest + 1: cciptypes.UnknownAddress("1"),
+				},
+			},
+			fChain: map[cciptypes.ChainSelector]int{
+				dest: -2,
+			},
+			errStr: "fChain for chain 1 is not positive: -2",
 		},
 	}
 
@@ -704,7 +731,8 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 			}
 
 			mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-			mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(mapset.NewSet(tc.supportedChains...), nil)
+			mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(mapset.NewSet(tc.supportedChains...),
+				nil).Maybe()
 			defer mockHomeChain.AssertExpectations(t)
 
 			cdp := NewContractDiscoveryProcessor(
@@ -720,6 +748,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 				OracleID: oracleID,
 				Observation: discoverytypes.Observation{
 					Addresses: tc.addresses,
+					FChain:    tc.fChain,
 				},
 			}
 
@@ -731,4 +760,18 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 			}
 		})
 	}
+}
+
+var defaultFChain = map[cciptypes.ChainSelector]int{
+	1: 1,
+}
+var dummyObservation = discoverytypes.Observation{
+	FChain: map[cciptypes.ChainSelector]int{
+		1: 1,
+	},
+	Addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+		consts.ContractNameOnRamp: {
+			1: cciptypes.UnknownAddress("someaddress"),
+		},
+	},
 }
