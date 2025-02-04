@@ -6,9 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -234,7 +237,59 @@ func (r *CachedChainReader) GetMedianDataAvailabilityGasConfig(ctx context.Conte
 }
 
 func (r *CachedChainReader) DiscoverContracts(ctx context.Context) (ContractAddresses, error) {
-	return r.ccipReader.DiscoverContracts(ctx)
+	lggr := logutil.WithContextValues(ctx, r.ccipReader.lggr)
+	resp := make(ContractAddresses)
+
+	// Get cached response
+	cachedResp, err := r.refresh(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cached response: %w", err)
+	}
+
+	// Discover destination contracts if the dest chain is supported.
+	if err := validateExtendedReaderExistence(r.ccipReader.contractReaders, r.ccipReader.destChain); err == nil {
+		// Use data from cache for static and dynamic configs
+		resp = resp.Append(
+			consts.ContractNameNonceManager,
+			r.ccipReader.destChain,
+			cachedResp.Offramp.StaticConfig.NonceManager)
+		resp = resp.Append(consts.ContractNameRMNRemote, r.ccipReader.destChain, cachedResp.Offramp.StaticConfig.RmnRemote)
+		resp = resp.Append(consts.ContractNameFeeQuoter, r.ccipReader.destChain, cachedResp.Offramp.DynamicConfig.FeeQuoter)
+
+		// Process source chain configs from cache
+		selAndConf := cachedResp.Offramp.SelectorsAndConf
+		for i, sourceChain := range selAndConf.Selectors {
+			cfg := selAndConf.SourceChainConfigs[i]
+			if !cfg.IsEnabled {
+				continue
+			}
+			resp = resp.Append(consts.ContractNameOnRamp, cciptypes.ChainSelector(sourceChain), cfg.OnRamp)
+			if len(resp[consts.ContractNameRouter][r.ccipReader.destChain]) == 0 {
+				resp = resp.Append(consts.ContractNameRouter, r.ccipReader.destChain, cfg.Router)
+				lggr.Infow("appending router contract address", "address", cfg.Router)
+			}
+		}
+	}
+
+	lggr.Infow("discovered contracts from cache", "contracts", resp)
+
+	// The following calls are on dynamically configured chains which may not
+	// be available when this function is called.
+	myChains := maps.Keys(r.ccipReader.contractReaders)
+
+	// Read onRamps for FeeQuoter in DynamicConfig.
+	dynamicConfigs := r.ccipReader.getOnRampDynamicConfigs(ctx, lggr, myChains)
+	for chain, cfg := range dynamicConfigs {
+		resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.DynamicConfig.FeeQuoter)
+	}
+
+	// Read onRamps for Router in DestChainConfig.
+	destChainConfig := r.ccipReader.getOnRampDestChainConfig(ctx, myChains)
+	for chain, cfg := range destChainConfig {
+		resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
+	}
+
+	return resp, nil
 }
 
 func (r *CachedChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
