@@ -788,9 +788,9 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		ContractAddress:  rmnRemoteAddress,
 		ConfigDigest:     vcBatch.Config.RMNHomeContractConfigDigest,
 		Signers:          signers,
-		FSign:            vcBatch.Config.F,
+		FSign:            vcBatch.Config.FSign,
 		ConfigVersion:    vcBatch.Version,
-		RmnReportVersion: digestHeaderBatch,
+		RmnReportVersion: header.DigestHeader,
 	}, nil
 }
 
@@ -861,15 +861,14 @@ func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
 	return result
 }
 
-// discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
+// discoverOffRampContracts uses the offRamp for destChain to discover the addresses of other contracts.
 func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
 	lggr logger.Logger,
-	chain cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
 	// Exit without an error if we cannot read the destination.
-	if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
-		return nil, fmt.Errorf("validate extended reader existence: %w", err)
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return nil, fmt.Errorf("validate extended reader existence for destChain(%d): %w", r.destChain, err)
 	}
 
 	// build up resp as we go.
@@ -877,7 +876,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
-		sourceConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, lggr, chain)
+		sourceConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, lggr)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
@@ -891,8 +890,8 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			cfg := sourceConfigs[sourceChain]
 			resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
 			// The local router is located in each source sourceChain config. Add it once.
-			if len(resp[consts.ContractNameRouter][chain]) == 0 {
-				resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
+			if len(resp[consts.ContractNameRouter][r.destChain]) == 0 {
+				resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
 				lggr.Infow("appending router contract address", "address", cfg.Router)
 			}
 		}
@@ -903,7 +902,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		var staticConfig offRampStaticChainConfig
 		err := r.getDestinationData(
 			ctx,
-			chain,
+			r.destChain,
 			consts.ContractNameOffRamp,
 			consts.MethodNameOffRampGetStaticConfig,
 			&staticConfig,
@@ -921,8 +920,8 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 		lggr.Infow("got offramp static config", "staticConfig", staticConfig, "staticConfigBatch", staticConfigBatch)
 
-		resp = resp.Append(consts.ContractNameNonceManager, chain, staticConfigBatch.NonceManager)
-		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfigBatch.RmnRemote)
+		resp = resp.Append(consts.ContractNameNonceManager, r.destChain, staticConfigBatch.NonceManager)
+		resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, staticConfigBatch.RmnRemote)
 		lggr.Infow("appending RMN remote contract address", "address", staticConfigBatch.RmnRemote)
 	}
 
@@ -931,7 +930,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		var dynamicConfig offRampDynamicChainConfig
 		err := r.getDestinationData(
 			ctx,
-			chain,
+			r.destChain,
 			consts.ContractNameOffRamp,
 			consts.MethodNameOffRampGetDynamicConfig,
 			&dynamicConfig,
@@ -949,7 +948,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 		lggr.Infow("got offramp dynamic config", "dynamicConfig", dynamicConfig, "dynamicConfigBatch", dynamicConfigBatch)
 
-		resp = resp.Append(consts.ContractNameFeeQuoter, chain, dynamicConfigBatch.FeeQuoter)
+		resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, dynamicConfigBatch.FeeQuoter)
 		lggr.Infow("appending fee quoter contract address", "address", dynamicConfigBatch.FeeQuoter)
 	}
 
@@ -962,7 +961,9 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddres
 
 	// Discover destination contracts if the dest chain is supported.
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err == nil {
-		resp, err = r.discoverOffRampContracts(ctx, lggr, r.destChain)
+		resp, err = r.discoverOffRampContracts(ctx, lggr)
+		// Can't continue with discovery if the destination chain is not available.
+		// We read source chains OnRamps from there, and onRamps are essential for feeQuoter and Router discovery.
 		if err != nil {
 			return nil, fmt.Errorf("discover destination contracts: %w", err)
 		}
@@ -1251,13 +1252,12 @@ type selectorsAndConfigs struct {
 	SourceChainConfigs []sourceChainConfig `mapstructure:"F1"`
 }
 
-// getAllOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for the provided chain.
+// getAllOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for dest chain
 func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	ctx context.Context,
 	lggr logger.Logger,
-	chain cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
@@ -1266,7 +1266,7 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	call, err := r.refresh(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source chain configs for source chain %d: %w",
-			chain, err)
+			r.destChain, err)
 	}
 
 	resp := call.Offramp.SelectorsAndConf
@@ -1275,7 +1275,7 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
 	}
 
-	lggr.Infow("got source chain configs", "configs", resp, "chain", chain)
+	lggr.Infow("got source chain configs", "configs", resp, "chain", r.destChain)
 
 	// Populate the map.
 	for i := range resp.Selectors {
@@ -1498,7 +1498,7 @@ type signer struct {
 type config struct {
 	RMNHomeContractConfigDigest cciptypes.Bytes32 `json:"rmnHomeContractConfigDigest"`
 	Signers                     []signer          `json:"signers"`
-	F                           uint64            `json:"f"` // previously: MinSigners
+	FSign                       uint64            `json:"fSign"` // previously: MinSigners
 }
 
 // versionedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.

@@ -77,6 +77,39 @@ type PluginFactory struct {
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
 
+type PluginFactoryParams struct {
+	Lggr             logger.Logger
+	DonID            plugintypes.DonID
+	OcrConfig        reader.OCR3ConfigWithMeta
+	ExecCodec        cciptypes.ExecutePluginCodec
+	MsgHasher        cciptypes.MessageHasher
+	ExtraDataCodec   cciptypes.ExtraDataCodec
+	HomeChainReader  reader.HomeChain
+	TokenDataEncoder cciptypes.TokenDataEncoder
+	EstimateProvider cciptypes.EstimateProvider
+	ContractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
+}
+
+// NewExecutePluginFactory creates a new PluginFactory instance. For execute plugin, oracle instances are not managed by
+// the factory. It is safe to assume that a factory instance will create exactly one plugin instance.
+func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
+	return &PluginFactory{
+		baseLggr:         params.Lggr,
+		donID:            params.DonID,
+		ocrConfig:        params.OcrConfig,
+		execCodec:        params.ExecCodec,
+		msgHasher:        params.MsgHasher,
+		extraDataCodec:   params.ExtraDataCodec,
+		homeChainReader:  params.HomeChainReader,
+		estimateProvider: params.EstimateProvider,
+		tokenDataEncoder: params.TokenDataEncoder,
+		contractReaders:  params.ContractReaders,
+		chainWriters:     params.ContractWriters,
+	}
+}
+
+// deprectated: use NewExececutePluginFactory
 func NewPluginFactory(
 	lggr logger.Logger,
 	donID plugintypes.DonID,

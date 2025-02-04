@@ -24,3 +24,7 @@ type Observation struct {
 	// TODO: some sort of request flag to avoid including this every time.
 	// Request bool
 }
+
+func (o Observation) IsEmpty() bool {
+	return len(o.Addresses) == 0
+}

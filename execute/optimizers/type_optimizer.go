@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -17,13 +18,17 @@ type ObservationOptimizer struct {
 	maxEncodedSize    int
 	emptyEncodedSizes EmptyEncodeSizes
 	lggr              logger.Logger
+	ocrTypeCodec      ocrtypecodec.ExecCodec
 }
 
-func NewObservationOptimizer(lggr logger.Logger, maxEncodedSize int) ObservationOptimizer {
+func NewObservationOptimizer(
+	lggr logger.Logger, maxEncodedSize int, ocrTypeCodec ocrtypecodec.ExecCodec,
+) ObservationOptimizer {
 	return ObservationOptimizer{
 		lggr:              logutil.WithComponent(lggr, "ObservationOptimizer"),
 		maxEncodedSize:    maxEncodedSize,
 		emptyEncodedSizes: NewEmptyEncodeSizes(),
+		ocrTypeCodec:      ocrTypeCodec,
 	}
 }
 
@@ -61,7 +66,7 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 //nolint:gocyclo
 func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observation) (exectypes.Observation, error) {
 	obs := observation
-	encodedObs, err := obs.Encode()
+	encodedObs, err := op.ocrTypeCodec.EncodeObservation(obs)
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
@@ -101,7 +106,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 				seqNum++
 				// Once we assert the estimation is less than the max size we double-check with actual encoding size.
 				// Otherwise, we short circuit after checking the estimation only
-				if encodedObsSize <= op.maxEncodedSize && fitsWithinSize(obs, op.maxEncodedSize) {
+				if encodedObsSize <= op.maxEncodedSize && fitsWithinSize(op.ocrTypeCodec, obs, op.maxEncodedSize) {
 					return obs, nil
 				}
 			}
@@ -119,7 +124,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 
 			// Once we assert the estimation is less than the max size we double-check with actual encoding size.
 			// Otherwise, we short circuit after checking the estimation only
-			if encodedObsSize <= op.maxEncodedSize && fitsWithinSize(obs, op.maxEncodedSize) {
+			if encodedObsSize <= op.maxEncodedSize && fitsWithinSize(op.ocrTypeCodec, obs, op.maxEncodedSize) {
 				return obs, nil
 			}
 		}
@@ -129,7 +134,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 		}
 		// Encoding again after doing a full iteration on all chains and removing messages/commits.
 		// That is because using encoded sizes is not 100% accurate and there are some missing bytes in the calculation.
-		encodedObs, err = obs.Encode()
+		encodedObs, err = op.ocrTypeCodec.EncodeObservation(obs)
 		if err != nil {
 			return exectypes.Observation{}, err
 		}
@@ -139,8 +144,8 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 	return obs, nil
 }
 
-func fitsWithinSize(obs exectypes.Observation, maxEncodedSize int) bool {
-	encodedObs, err := obs.Encode()
+func fitsWithinSize(codec ocrtypecodec.ExecCodec, obs exectypes.Observation, maxEncodedSize int) bool {
+	encodedObs, err := codec.EncodeObservation(obs)
 	if err != nil {
 		return false
 	}

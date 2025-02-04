@@ -43,18 +43,24 @@ type CcipSend struct {
 	//
 	// [6] = [] feeTokenMint
 	//
-	// [7] = [] feeTokenConfig
-	//
-	// [8] = [] linkTokenConfig
-	//
-	// [9] = [] feeTokenUserAssociatedAccount
+	// [7] = [] feeTokenUserAssociatedAccount
 	// ··········· If paying with native SOL, this must be the zero address.
 	//
-	// [10] = [WRITE] feeTokenReceiver
+	// [8] = [WRITE] feeTokenReceiver
 	//
-	// [11] = [] feeBillingSigner
+	// [9] = [] feeBillingSigner
 	//
-	// [12] = [WRITE] tokenPoolsSigner
+	// [10] = [] feeQuoter
+	//
+	// [11] = [] feeQuoterConfig
+	//
+	// [12] = [] feeQuoterDestChain
+	//
+	// [13] = [] feeQuoterBillingTokenConfig
+	//
+	// [14] = [] feeQuoterLinkTokenConfig
+	//
+	// [15] = [WRITE] tokenPoolsSigner
 	// ··········· CPI signers, optional if no tokens are being transferred.
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
@@ -62,7 +68,7 @@ type CcipSend struct {
 // NewCcipSendInstructionBuilder creates a new `CcipSend` instruction builder.
 func NewCcipSendInstructionBuilder() *CcipSend {
 	nd := &CcipSend{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 13),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 16),
 	}
 	return nd
 }
@@ -162,74 +168,107 @@ func (inst *CcipSend) GetFeeTokenMintAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[6]
 }
 
-// SetFeeTokenConfigAccount sets the "feeTokenConfig" account.
-func (inst *CcipSend) SetFeeTokenConfigAccount(feeTokenConfig ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(feeTokenConfig)
-	return inst
-}
-
-// GetFeeTokenConfigAccount gets the "feeTokenConfig" account.
-func (inst *CcipSend) GetFeeTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
-}
-
-// SetLinkTokenConfigAccount sets the "linkTokenConfig" account.
-func (inst *CcipSend) SetLinkTokenConfigAccount(linkTokenConfig ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(linkTokenConfig)
-	return inst
-}
-
-// GetLinkTokenConfigAccount gets the "linkTokenConfig" account.
-func (inst *CcipSend) GetLinkTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
-}
-
 // SetFeeTokenUserAssociatedAccountAccount sets the "feeTokenUserAssociatedAccount" account.
 // If paying with native SOL, this must be the zero address.
 func (inst *CcipSend) SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssociatedAccount ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(feeTokenUserAssociatedAccount)
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(feeTokenUserAssociatedAccount)
 	return inst
 }
 
 // GetFeeTokenUserAssociatedAccountAccount gets the "feeTokenUserAssociatedAccount" account.
 // If paying with native SOL, this must be the zero address.
 func (inst *CcipSend) GetFeeTokenUserAssociatedAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice[7]
 }
 
 // SetFeeTokenReceiverAccount sets the "feeTokenReceiver" account.
 func (inst *CcipSend) SetFeeTokenReceiverAccount(feeTokenReceiver ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(feeTokenReceiver).WRITE()
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(feeTokenReceiver).WRITE()
 	return inst
 }
 
 // GetFeeTokenReceiverAccount gets the "feeTokenReceiver" account.
 func (inst *CcipSend) GetFeeTokenReceiverAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
+	return inst.AccountMetaSlice[8]
 }
 
 // SetFeeBillingSignerAccount sets the "feeBillingSigner" account.
 func (inst *CcipSend) SetFeeBillingSignerAccount(feeBillingSigner ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(feeBillingSigner)
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(feeBillingSigner)
 	return inst
 }
 
 // GetFeeBillingSignerAccount gets the "feeBillingSigner" account.
 func (inst *CcipSend) GetFeeBillingSignerAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[9]
+}
+
+// SetFeeQuoterAccount sets the "feeQuoter" account.
+func (inst *CcipSend) SetFeeQuoterAccount(feeQuoter ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(feeQuoter)
+	return inst
+}
+
+// GetFeeQuoterAccount gets the "feeQuoter" account.
+func (inst *CcipSend) GetFeeQuoterAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[10]
+}
+
+// SetFeeQuoterConfigAccount sets the "feeQuoterConfig" account.
+func (inst *CcipSend) SetFeeQuoterConfigAccount(feeQuoterConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[11] = ag_solanago.Meta(feeQuoterConfig)
+	return inst
+}
+
+// GetFeeQuoterConfigAccount gets the "feeQuoterConfig" account.
+func (inst *CcipSend) GetFeeQuoterConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[11]
+}
+
+// SetFeeQuoterDestChainAccount sets the "feeQuoterDestChain" account.
+func (inst *CcipSend) SetFeeQuoterDestChainAccount(feeQuoterDestChain ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[12] = ag_solanago.Meta(feeQuoterDestChain)
+	return inst
+}
+
+// GetFeeQuoterDestChainAccount gets the "feeQuoterDestChain" account.
+func (inst *CcipSend) GetFeeQuoterDestChainAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[12]
+}
+
+// SetFeeQuoterBillingTokenConfigAccount sets the "feeQuoterBillingTokenConfig" account.
+func (inst *CcipSend) SetFeeQuoterBillingTokenConfigAccount(feeQuoterBillingTokenConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[13] = ag_solanago.Meta(feeQuoterBillingTokenConfig)
+	return inst
+}
+
+// GetFeeQuoterBillingTokenConfigAccount gets the "feeQuoterBillingTokenConfig" account.
+func (inst *CcipSend) GetFeeQuoterBillingTokenConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[13]
+}
+
+// SetFeeQuoterLinkTokenConfigAccount sets the "feeQuoterLinkTokenConfig" account.
+func (inst *CcipSend) SetFeeQuoterLinkTokenConfigAccount(feeQuoterLinkTokenConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[14] = ag_solanago.Meta(feeQuoterLinkTokenConfig)
+	return inst
+}
+
+// GetFeeQuoterLinkTokenConfigAccount gets the "feeQuoterLinkTokenConfig" account.
+func (inst *CcipSend) GetFeeQuoterLinkTokenConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[14]
 }
 
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 // CPI signers, optional if no tokens are being transferred.
 func (inst *CcipSend) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[12] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
+	inst.AccountMetaSlice[15] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 // CPI signers, optional if no tokens are being transferred.
 func (inst *CcipSend) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[12]
+	return inst.AccountMetaSlice[15]
 }
 
 func (inst CcipSend) Build() *Instruction {
@@ -287,21 +326,30 @@ func (inst *CcipSend) Validate() error {
 			return errors.New("accounts.FeeTokenMint is not set")
 		}
 		if inst.AccountMetaSlice[7] == nil {
-			return errors.New("accounts.FeeTokenConfig is not set")
-		}
-		if inst.AccountMetaSlice[8] == nil {
-			return errors.New("accounts.LinkTokenConfig is not set")
-		}
-		if inst.AccountMetaSlice[9] == nil {
 			return errors.New("accounts.FeeTokenUserAssociatedAccount is not set")
 		}
-		if inst.AccountMetaSlice[10] == nil {
+		if inst.AccountMetaSlice[8] == nil {
 			return errors.New("accounts.FeeTokenReceiver is not set")
 		}
-		if inst.AccountMetaSlice[11] == nil {
+		if inst.AccountMetaSlice[9] == nil {
 			return errors.New("accounts.FeeBillingSigner is not set")
 		}
+		if inst.AccountMetaSlice[10] == nil {
+			return errors.New("accounts.FeeQuoter is not set")
+		}
+		if inst.AccountMetaSlice[11] == nil {
+			return errors.New("accounts.FeeQuoterConfig is not set")
+		}
 		if inst.AccountMetaSlice[12] == nil {
+			return errors.New("accounts.FeeQuoterDestChain is not set")
+		}
+		if inst.AccountMetaSlice[13] == nil {
+			return errors.New("accounts.FeeQuoterBillingTokenConfig is not set")
+		}
+		if inst.AccountMetaSlice[14] == nil {
+			return errors.New("accounts.FeeQuoterLinkTokenConfig is not set")
+		}
+		if inst.AccountMetaSlice[15] == nil {
 			return errors.New("accounts.TokenPoolsSigner is not set")
 		}
 	}
@@ -324,20 +372,23 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=13]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        destChainState", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("                 nonce", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("       feeTokenProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("          feeTokenMint", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("        feeTokenConfig", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("       linkTokenConfig", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("feeTokenUserAssociated", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("      feeTokenReceiver", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("      feeBillingSigner", inst.AccountMetaSlice[11]))
-						accountsBranch.Child(ag_format.Meta("      tokenPoolsSigner", inst.AccountMetaSlice[12]))
+					instructionBranch.Child("Accounts[len=16]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("                     config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("             destChainState", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("                      nonce", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("                  authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("            feeTokenProgram", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("               feeTokenMint", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("     feeTokenUserAssociated", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("           feeTokenReceiver", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("           feeBillingSigner", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("                  feeQuoter", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("            feeQuoterConfig", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("         feeQuoterDestChain", inst.AccountMetaSlice[12]))
+						accountsBranch.Child(ag_format.Meta("feeQuoterBillingTokenConfig", inst.AccountMetaSlice[13]))
+						accountsBranch.Child(ag_format.Meta("   feeQuoterLinkTokenConfig", inst.AccountMetaSlice[14]))
+						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[15]))
 					})
 				})
 		})
@@ -394,11 +445,14 @@ func NewCcipSendInstruction(
 	systemProgram ag_solanago.PublicKey,
 	feeTokenProgram ag_solanago.PublicKey,
 	feeTokenMint ag_solanago.PublicKey,
-	feeTokenConfig ag_solanago.PublicKey,
-	linkTokenConfig ag_solanago.PublicKey,
 	feeTokenUserAssociatedAccount ag_solanago.PublicKey,
 	feeTokenReceiver ag_solanago.PublicKey,
 	feeBillingSigner ag_solanago.PublicKey,
+	feeQuoter ag_solanago.PublicKey,
+	feeQuoterConfig ag_solanago.PublicKey,
+	feeQuoterDestChain ag_solanago.PublicKey,
+	feeQuoterBillingTokenConfig ag_solanago.PublicKey,
+	feeQuoterLinkTokenConfig ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
 	return NewCcipSendInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
@@ -411,10 +465,13 @@ func NewCcipSendInstruction(
 		SetSystemProgramAccount(systemProgram).
 		SetFeeTokenProgramAccount(feeTokenProgram).
 		SetFeeTokenMintAccount(feeTokenMint).
-		SetFeeTokenConfigAccount(feeTokenConfig).
-		SetLinkTokenConfigAccount(linkTokenConfig).
 		SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssociatedAccount).
 		SetFeeTokenReceiverAccount(feeTokenReceiver).
 		SetFeeBillingSignerAccount(feeBillingSigner).
+		SetFeeQuoterAccount(feeQuoter).
+		SetFeeQuoterConfigAccount(feeQuoterConfig).
+		SetFeeQuoterDestChainAccount(feeQuoterDestChain).
+		SetFeeQuoterBillingTokenConfigAccount(feeQuoterBillingTokenConfig).
+		SetFeeQuoterLinkTokenConfigAccount(feeQuoterLinkTokenConfig).
 		SetTokenPoolsSignerAccount(tokenPoolsSigner)
 }
