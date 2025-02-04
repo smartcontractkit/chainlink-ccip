@@ -324,26 +324,10 @@ pub struct UpdateConfigCCIPRouter<'info> {
 }
 
 #[derive(Accounts)]
-pub struct UpdateSupportedChainsConfigCCIPRouter<'info> {
-    #[account(
-        mut,
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 #[instruction(source_chain_selector: u64, offramp: Pubkey)]
 pub struct AddAllowedOfframp<'info> {
     #[account(
         init,
-        // seeds = [seed::ALLOWED_OFFRAMP],
         seeds = [seed::ALLOWED_OFFRAMP, source_chain_selector.to_le_bytes().as_ref(), offramp.as_ref()],
         bump,
         payer = authority,

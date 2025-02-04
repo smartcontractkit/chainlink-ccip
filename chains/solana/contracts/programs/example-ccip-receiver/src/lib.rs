@@ -345,10 +345,6 @@ impl BaseState {
 #[derive(InitSpace, Default, Debug)]
 pub struct ApprovedSender {}
 
-#[account]
-#[derive(Copy, Debug, InitSpace)]
-pub struct AllowedOfframp {}
-
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct Any2SVMMessage {
     pub message_id: [u8; 32],

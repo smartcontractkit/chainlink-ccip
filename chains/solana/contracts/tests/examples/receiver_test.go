@@ -31,12 +31,8 @@ func TestCcipReceiver(t *testing.T) {
 
 	ccipAdmin := solana.MustPrivateKeyFromBase58("4D7Hw7YFWqN3jknCRuViYqxF3AKmYosQPnm3szmrR3bvnCPrxKchUCxfFWbQqMCb4oe7jfxynGmjFCTDSrPBdcUB")
 	user := solana.MustPrivateKeyFromBase58("5VNkUFwLJ12f71vBMW3XWUfRUpMUnzBxXhPPePi8CzaSXfmQAC842BQtSDkBXR85q4pp6kR7DSiFWBVWGLbFTSoq")
-
-	offramp, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-
-	invalidOfframp, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
+	offramp := solana.MustPrivateKeyFromBase58("3y3shDibTQ6NGGFDaCWJu6cfFNXje7Qb9uNWsLJqZ7sMANUugsWhLr5daVADhcceFcU2cMXPqL7r6oKr6eqUpQFP")
+	invalidOfframp := solana.MustPrivateKeyFromBase58("DJkkQW479LLsWAxAik8kpjKAmd6xRRptqYt7eGRbftoFy3nLJRtCBh42yD2V1kqdg6Q5CWFtN84uS4oit3iAsa3")
 
 	receiverState, _, err := solana.FindProgramAddress([][]byte{[]byte("state")}, config.CcipBaseReceiver)
 	require.NoError(t, err)
@@ -62,13 +58,16 @@ func TestCcipReceiver(t *testing.T) {
 			}
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
+			feeAggregator := solana.MustPrivateKeyFromBase58("4mKsN4bLEPTQerRRCMALWMFKnkP1xiaC3rYCzcmEmgCu5yrf2eDCPH3jHbsaAg1giKKFwrxk9oUzVxHLYokS1QhN")
+			linkTokenMint := solana.MustPrivateKeyFromBase58("2e6af6HmHgxmrv5dLVSqAzerPrLsjEJyyRATvjiBLPpahFv3wdE2NQqaHWjtb8WdVLrvoLchNLoHBr4KVC1GAxBC")
+
 			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
 			ix, err := ccip_router.NewInitializeInstruction(
 				1,
 				config.EnableExecutionAfter,
-				RandomPublicKey(),
+				feeAggregator.PublicKey(),
 				config.FeeQuoterProgram,
-				RandomPublicKey(),
+				linkTokenMint.PublicKey(),
 				defaultMaxFeeJuelsPerMsg,
 				config.RouterConfigPDA,
 				config.RouterStatePDA,
@@ -227,9 +226,4 @@ func TestCcipReceiver(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 123, finalBalOwner)
 	})
-}
-
-func RandomPublicKey() solana.PublicKey {
-	private, _ := solana.NewRandomPrivateKey()
-	return private.PublicKey()
 }
