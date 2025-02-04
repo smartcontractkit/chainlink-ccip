@@ -2,7 +2,6 @@ package exectypes
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -137,19 +136,4 @@ func NewObservation(
 		Contracts:      contracts,
 		Hashes:         hashes,
 	}
-}
-
-// Encode the Observation into a byte slice.
-func (obs Observation) Encode() ([]byte, error) {
-	return json.Marshal(obs)
-}
-
-// DecodeObservation from a byte slice into an Observation.
-func DecodeObservation(b []byte) (Observation, error) {
-	if len(b) == 0 {
-		return Observation{}, nil
-	}
-	obs := Observation{}
-	err := json.Unmarshal(b, &obs)
-	return obs, err
 }
