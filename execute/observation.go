@@ -48,6 +48,15 @@ func (p *Plugin) Observation(
 	}
 	lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 
+	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
+	if previousOutcome.State == exectypes.Filter {
+		for _, chainReport := range previousOutcome.Report.ChainReports {
+			for _, message := range chainReport.Messages {
+				p.inflightMessageCache.MarkInflight(chainReport.SourceChainSelector, message.Header.MessageID)
+			}
+		}
+	}
+
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("unable to get FChain: %w", err)

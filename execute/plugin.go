@@ -482,16 +482,6 @@ func (p *Plugin) Reports(
 		},
 	}
 
-	// Update cache.
-	// Note: this could wait until should transmit, but the next round may start before then.
-	// For that reason we update caches here. If there is some sort of failure to transmit,
-	// messages will be delayed until the inflight cache expires and messages are reprocessed.
-	for _, chainReport := range decodedOutcome.Report.ChainReports {
-		for _, message := range chainReport.Messages {
-			p.inflightMessageCache.MarkInflight(chainReport.SourceChainSelector, message.Header.MessageID)
-		}
-	}
-
 	return r, nil
 }
 

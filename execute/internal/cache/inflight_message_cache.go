@@ -8,12 +8,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+// InflightMessageCache keeps track of messages that are currently in flight,
+// used to prevent duplicate reports from being sent for the same message.
 type InflightMessageCache struct {
-	// inflight is a cache of messages that are currently in flight. This cache
-	// is used to prevent duplicate reports from being sent for the same message.
 	inflight *cache.Cache
 }
 
+// NewInflightMessageCache creates a new InflightMessageCache with the given cache expiry.
 func NewInflightMessageCache(cacheExpiry time.Duration) *InflightMessageCache {
 	return &InflightMessageCache{
 		inflight: cache.New(cacheExpiry, CleanupInterval),
