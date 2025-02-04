@@ -28,7 +28,7 @@ pub const fn uninitialized(v: u8) -> bool {
 
 /// Fixed seeds for PDA derivation: different context must use different seeds.
 pub mod seed {
-    pub const SOURCE_CHAIN_STATE: &[u8] = b"source_chain_state";
+    pub const SOURCE_CHAIN: &[u8] = b"source_chain_state";
     pub const COMMIT_REPORT: &[u8] = b"commit_report";
     pub const CONFIG: &[u8] = b"config";
     pub const REFERENCE_ADDRESSES: &[u8] = b"reference_addresses";
@@ -205,7 +205,7 @@ pub struct AddSourceChain<'info> {
     /// hence the need to initialize two accounts.
     #[account(
         init,
-        seeds = [seed::SOURCE_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + SourceChain::INIT_SPACE,
@@ -229,7 +229,7 @@ pub struct AddSourceChain<'info> {
 pub struct UpdateSourceChain<'info> {
     #[account(
         mut,
-        seeds = [seed::SOURCE_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipOfframpError::InvalidInputs,
     )]
@@ -286,7 +286,7 @@ pub struct CommitReportContext<'info> {
 
     #[account(
         mut,
-        seeds = [seed::SOURCE_CHAIN_STATE, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipOfframpError::InvalidInputs,
     )]
@@ -353,7 +353,7 @@ pub struct ExecuteReportContext<'info> {
     pub reference_addresses: Account<'info, ReferenceAddresses>,
 
     #[account(
-        seeds = [seed::SOURCE_CHAIN_STATE, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipOfframpError::InvalidInputs,
     )]

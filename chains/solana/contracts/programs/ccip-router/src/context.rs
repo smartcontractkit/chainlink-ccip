@@ -30,8 +30,6 @@ pub mod seed {
     pub const NONCE: &[u8] = b"nonce";
     pub const CONFIG: &[u8] = b"config";
 
-    // arbitrary messaging signer
-    pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
     // token pool interaction signer
     pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
     // signer for billing fee token transfer
@@ -108,15 +106,6 @@ pub struct InitializeCCIPRouter<'info> {
     // Initialization only allowed by program upgrade authority
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipRouterError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
-
-    #[account(
-        init,
-        seeds = [seed::EXTERNAL_EXECUTION_CONFIG],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + ExternalExecutionConfig::INIT_SPACE,
-    )]
-    pub external_execution_config: Account<'info, ExternalExecutionConfig>, // messaging CPI signer initialization
 
     #[account(
         init,

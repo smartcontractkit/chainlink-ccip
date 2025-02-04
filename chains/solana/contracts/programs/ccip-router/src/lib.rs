@@ -330,6 +330,14 @@ pub mod ccip_router {
     }
 }
 
+// TODO this is a hack because Anchor + Anchor-Go fail to include all errors in the IDL and the gobindings.
+// By having this first (though unused) error enum here, it does pick up the actual (second) error enum
+#[error_code]
+pub enum AnchorErrorHack {
+    Something,
+    Else,
+}
+
 #[error_code]
 pub enum CcipRouterError {
     #[msg("The given sequence interval is invalid")]

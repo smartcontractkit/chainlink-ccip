@@ -36,16 +36,14 @@ type Initialize struct {
 	//
 	// [4] = [] programData
 	//
-	// [5] = [WRITE] externalExecutionConfig
-	//
-	// [6] = [WRITE] tokenPoolsSigner
+	// [5] = [WRITE] tokenPoolsSigner
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 7),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
 }
@@ -129,26 +127,15 @@ func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
-// SetExternalExecutionConfigAccount sets the "externalExecutionConfig" account.
-func (inst *Initialize) SetExternalExecutionConfigAccount(externalExecutionConfig ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(externalExecutionConfig).WRITE()
-	return inst
-}
-
-// GetExternalExecutionConfigAccount gets the "externalExecutionConfig" account.
-func (inst *Initialize) GetExternalExecutionConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
-}
-
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 func (inst *Initialize) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 func (inst *Initialize) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice[5]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -203,9 +190,6 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.ProgramData is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.ExternalExecutionConfig is not set")
-		}
-		if inst.AccountMetaSlice[6] == nil {
 			return errors.New("accounts.TokenPoolsSigner is not set")
 		}
 	}
@@ -229,14 +213,13 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                 config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("                program", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("            programData", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[6]))
+					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("         program", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("     programData", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("tokenPoolsSigner", inst.AccountMetaSlice[5]))
 					})
 				})
 		})
@@ -302,7 +285,6 @@ func NewInitializeInstruction(
 	systemProgram ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey,
-	externalExecutionConfig ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetSvmChainSelector(svmChainSelector).
@@ -314,6 +296,5 @@ func NewInitializeInstruction(
 		SetSystemProgramAccount(systemProgram).
 		SetProgramAccount(program).
 		SetProgramDataAccount(programData).
-		SetExternalExecutionConfigAccount(externalExecutionConfig).
 		SetTokenPoolsSignerAccount(tokenPoolsSigner)
 }

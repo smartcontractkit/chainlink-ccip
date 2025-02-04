@@ -69,7 +69,7 @@ func NextCommitReportContext() [2][32]byte {
 }
 
 func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, remainingAccounts []solana.PublicKey) (ccip_offramp.Any2SVMRampMessage, [32]byte, error) {
-	nextSeq, err := NextSequenceNumber(ctx, solanaGoClient, config.EvmSourceChainStatePDA)
+	nextSeq, err := NextSequenceNumber(ctx, solanaGoClient, config.OfframpEvmSourceChainPDA)
 	if err != nil {
 		return ccip_offramp.Any2SVMRampMessage{}, [32]byte{}, err
 	}
