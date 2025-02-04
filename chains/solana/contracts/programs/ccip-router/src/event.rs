@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     context::MerkleRoot, DestChainConfig, MessageExecutionState, PriceUpdates, SVM2AnyRampMessage,
-    SourceChainConfig, TokenBilling,
+    SourceChainConfig,
 };
 
 pub mod events {
@@ -144,14 +144,6 @@ pub mod events {
             pub new_admin: Pubkey,
         }
     }
-}
-
-#[event]
-// TODO: Check why this is not used
-pub struct TokenTransferFeeConfigUpdated {
-    pub dest_chain_selector: u64,
-    pub token: Pubkey,
-    pub token_transfer_fee_config: TokenBilling,
 }
 
 #[event]
