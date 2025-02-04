@@ -48,9 +48,12 @@ var (
 
 	Instruction_ExecuteBatch = ag_binary.TypeID([8]byte{112, 159, 211, 51, 238, 70, 212, 60})
 
+	// Bypasser functions
 	Instruction_InitializeBypasserOperation = ag_binary.TypeID([8]byte{58, 27, 48, 204, 19, 197, 63, 26})
 
-	Instruction_AppendBypasserInstructions = ag_binary.TypeID([8]byte{127, 68, 8, 210, 106, 213, 25, 215})
+	Instruction_InitializeBypasserInstruction = ag_binary.TypeID([8]byte{50, 17, 205, 172, 175, 140, 195, 39})
+
+	Instruction_AppendBypasserInstructionData = ag_binary.TypeID([8]byte{184, 232, 151, 222, 111, 117, 215, 197})
 
 	Instruction_FinalizeBypasserOperation = ag_binary.TypeID([8]byte{45, 55, 198, 51, 124, 24, 169, 250})
 
@@ -94,8 +97,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "ExecuteBatch"
 	case Instruction_InitializeBypasserOperation:
 		return "InitializeBypasserOperation"
-	case Instruction_AppendBypasserInstructions:
-		return "AppendBypasserInstructions"
+	case Instruction_InitializeBypasserInstruction:
+		return "InitializeBypasserInstruction"
+	case Instruction_AppendBypasserInstructionData:
+		return "AppendBypasserInstructionData"
 	case Instruction_FinalizeBypasserOperation:
 		return "FinalizeBypasserOperation"
 	case Instruction_ClearBypasserOperation:
@@ -166,7 +171,10 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize_bypasser_operation", (*InitializeBypasserOperation)(nil),
 		},
 		{
-			"append_bypasser_instructions", (*AppendBypasserInstructions)(nil),
+			"initialize_bypasser_instruction", (*InitializeBypasserInstruction)(nil),
+		},
+		{
+			"append_bypasser_instruction_data", (*AppendBypasserInstructionData)(nil),
 		},
 		{
 			"finalize_bypasser_operation", (*FinalizeBypasserOperation)(nil),

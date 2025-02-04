@@ -121,8 +121,6 @@ func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccoun
 
 // instructions builder for preloading instructions to timelock operation
 func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey, proposerAc solana.PublicKey) ([]solana.Instruction, error) {
-	const MaxChunkSize = 491
-
 	ixs := []solana.Instruction{}
 	initOpIx, ioErr := timelock.NewInitializeOperationInstruction(
 		timelockID,
@@ -163,7 +161,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		offset := 0
 
 		for offset < len(rawData) {
-			end := offset + MaxChunkSize
+			end := offset + config.AppendIxDataChunkSize
 			if end > len(rawData) {
 				end = len(rawData)
 			}
@@ -224,21 +222,52 @@ func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority
 	}
 	ixs = append(ixs, initOpIx)
 
-	for _, instruction := range op.ToInstructionData() {
-		appendIxsIx, apErr := timelock.NewAppendBypasserInstructionsInstruction(
+	for ixIndex, ixData := range op.ToInstructionData() {
+		initIx, err := timelock.NewInitializeBypasserInstructionInstruction(
 			timelockID,
 			op.OperationID(),
-			[]timelock.InstructionData{instruction}, // this should be a slice of instruction within 1232 bytes
+			ixData.ProgramId, // ProgramId
+			ixData.Accounts,  // The list of accounts for this instruction
+			// Accounts:
 			op.OperationPDA(),
 			GetConfigPDA(timelockID),
 			bypasserAc,
 			authority,
-			solana.SystemProgramID, // for reallocation
+			solana.SystemProgramID,
 		).ValidateAndBuild()
-		if apErr != nil {
-			return nil, fmt.Errorf("failed to build append instructions instruction: %w", apErr)
+		if err != nil {
+			return nil, fmt.Errorf("failed building InitializeInstruction (ixIndex=%d): %w", ixIndex, err)
 		}
-		ixs = append(ixs, appendIxsIx)
+		ixs = append(ixs, initIx)
+
+		rawData := ixData.Data
+		offset := 0
+
+		for offset < len(rawData) {
+			end := offset + config.AppendIxDataChunkSize
+			if end > len(rawData) {
+				end = len(rawData)
+			}
+			chunk := rawData[offset:end]
+
+			appendIx, err := timelock.NewAppendBypasserInstructionDataInstruction(
+				timelockID,
+				op.OperationID(),
+				uint32(ixIndex), // which instruction index we are chunking
+				chunk,           // partial data
+				op.OperationPDA(),
+				GetConfigPDA(timelockID),
+				bypasserAc,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return nil, fmt.Errorf("failed building AppendInstructionData (ixIndex=%d): %w", ixIndex, err)
+			}
+			ixs = append(ixs, appendIx)
+
+			offset = end
+		}
 	}
 
 	finOpIx, foErr := timelock.NewFinalizeBypasserOperationInstruction(

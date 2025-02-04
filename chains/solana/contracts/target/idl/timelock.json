@@ -547,6 +547,9 @@
     },
     {
       "name": "initializeBypasserOperation",
+      "docs": [
+        "Bypasser functions"
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -609,7 +612,7 @@
       ]
     },
     {
-      "name": "appendBypasserInstructions",
+      "name": "initializeBypasserInstruction",
       "accounts": [
         {
           "name": "operation",
@@ -657,12 +660,74 @@
           }
         },
         {
-          "name": "instructionsBatch",
+          "name": "programId",
+          "type": "publicKey"
+        },
+        {
+          "name": "accounts",
           "type": {
             "vec": {
-              "defined": "InstructionData"
+              "defined": "InstructionAccount"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "appendBypasserInstructionData",
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "ixIndex",
+          "type": "u32"
+        },
+        {
+          "name": "ixDataChunk",
+          "type": "bytes"
         }
       ]
     },
