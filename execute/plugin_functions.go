@@ -297,9 +297,9 @@ func mergeMessageObservations(
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) exectypes.MessageObservations {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[cciptypes.Message])
+	validators := make(map[cciptypes.ChainSelector]consensus.OracleMinObservation[cciptypes.Message])
 	for selector, f := range fChain {
-		validators[selector] = consensus.NewMinObservation[cciptypes.Message](consensus.FPlus1(f), nil)
+		validators[selector] = consensus.NewOracleMinObservation[cciptypes.Message](consensus.FPlus1(f), nil)
 	}
 
 	// Add messages to the validator for each chain selector.
@@ -343,10 +343,10 @@ func mergeCommitObservations(
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) exectypes.CommitObservations {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[exectypes.CommitData])
+	validators := make(map[cciptypes.ChainSelector]consensus.OracleMinObservation[exectypes.CommitData])
 	for selector, f := range fChain {
 		validators[selector] =
-			consensus.NewMinObservation[exectypes.CommitData](consensus.FPlus1(f), nil)
+			consensus.NewOracleMinObservation[exectypes.CommitData](consensus.FPlus1(f), nil)
 	}
 
 	// Add reports to the validator for each chain selector.
@@ -384,7 +384,7 @@ func mergeMessageHashes(
 	fChain map[cciptypes.ChainSelector]int,
 ) exectypes.MessageHashes {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
-	validators := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]consensus.MinObservation[cciptypes.Bytes32])
+	validators := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]consensus.OracleMinObservation[cciptypes.Bytes32])
 	results := make(exectypes.MessageHashes)
 
 	for _, ao := range aos {
@@ -400,13 +400,13 @@ func mergeMessageHashes(
 			}
 
 			if _, ok1 := validators[selector]; !ok1 {
-				validators[selector] = make(map[cciptypes.SeqNum]consensus.MinObservation[cciptypes.Bytes32])
+				validators[selector] = make(map[cciptypes.SeqNum]consensus.OracleMinObservation[cciptypes.Bytes32])
 			}
 
 			for seqNr, hash := range seqMap {
 				if _, ok := validators[selector][seqNr]; !ok {
 					validators[selector][seqNr] =
-						consensus.NewMinObservation[cciptypes.Bytes32](consensus.FPlus1(f), nil)
+						consensus.NewOracleMinObservation[cciptypes.Bytes32](consensus.FPlus1(f), nil)
 				}
 				validators[selector][seqNr].Add(hash, ao.OracleID)
 			}
@@ -435,7 +435,7 @@ func mergeTokenObservations(
 	fChain map[cciptypes.ChainSelector]int,
 ) exectypes.TokenDataObservations {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
-	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
 
 	for _, ao := range aos {
@@ -451,7 +451,7 @@ func mergeTokenObservations(
 			}
 
 			if _, ok1 := validators[selector]; !ok1 {
-				validators[selector] = make(map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+				validators[selector] = make(map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData])
 			}
 
 			initResultsAndValidators(selector, f, seqMap, results, validators, ao.OracleID)
@@ -483,7 +483,7 @@ func initResultsAndValidators(
 	f int,
 	seqMap map[cciptypes.SeqNum]exectypes.MessageTokenData,
 	results exectypes.TokenDataObservations,
-	validators map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData],
+	validators map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.OracleMinObservation[exectypes.TokenData],
 	oracleID commontypes.OracleID,
 ) {
 	for seqNr, msgTokenData := range seqMap {
@@ -495,7 +495,7 @@ func initResultsAndValidators(
 			messageTokenID := reader.NewMessageTokenID(seqNr, tokenIndex)
 			if _, ok := validators[selector][messageTokenID]; !ok {
 				validators[selector][messageTokenID] =
-					consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
+					consensus.NewOracleMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
 			}
 			validators[selector][messageTokenID].Add(tokenData, oracleID)
 		}
@@ -516,7 +516,7 @@ func mergeNonceObservations(
 	}
 
 	// Create one validator because nonces are only observed from the destination chain.
-	validator := consensus.NewMinObservation[NonceTriplet](consensus.FPlus1(fChainDest), nil)
+	validator := consensus.NewOracleMinObservation[NonceTriplet](consensus.FPlus1(fChainDest), nil)
 
 	// Add reports to the validator for each chain selector.
 	for _, ao := range daos {
