@@ -76,7 +76,7 @@ pub mod example_ccip_sender {
 
         // CPI: get fee from router
         let fee: GetFeeResult = {
-            let acc_infos: Vec<AccountInfo> = [
+            let mut acc_infos: Vec<AccountInfo> = [
                 ctx.accounts.ccip_fee_quoter_config.to_account_info(),
                 ctx.accounts.ccip_fee_quoter_dest_chain.to_account_info(),
                 ctx.accounts
@@ -87,6 +87,18 @@ pub mod example_ccip_sender {
                     .to_account_info(),
             ]
             .to_vec();
+
+            // add tokens to fee quoter request
+            let billing_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut token_accounts
+                .iter()
+                .map(|a| a.fee_token_config.to_account_info())
+                .collect();
+            let per_chain_per_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut token_accounts
+                .iter()
+                .map(|a| a.token_billing_config.to_account_info())
+                .collect();
+            acc_infos.append(billing_token_config_accs);
+            acc_infos.append(per_chain_per_token_config_accs);
 
             let acc_metas: Vec<AccountMeta> = acc_infos
                 .to_vec()
@@ -125,7 +137,7 @@ pub mod example_ccip_sender {
         }
 
         // minimum set of ccipSend accounts
-        let acc_infos: Vec<AccountInfo> = [
+        let mut acc_infos: Vec<AccountInfo> = [
             ctx.accounts.ccip_config.to_account_info(),
             ctx.accounts.ccip_dest_chain_state.to_account_info(),
             ctx.accounts.ccip_sender_nonce.to_account_info(),
@@ -148,6 +160,11 @@ pub mod example_ccip_sender {
             ctx.accounts.ccip_token_pools_signer.to_account_info(),
         ]
         .to_vec();
+
+        // pass token accounts along with ccipSend instruction
+        for tokens in token_accounts {
+            acc_infos.append(&mut tokens.pool_accounts.to_vec());
+        }
 
         let acc_metas: Vec<AccountMeta> = acc_infos
             .to_vec()

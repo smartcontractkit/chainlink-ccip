@@ -3753,6 +3753,9 @@ func TestCCIPRouter(t *testing.T) {
 		senderNoncePDA, err := state.FindNoncePDA(config.EvmChainSelector, senderPDA, config.CcipRouterProgram)
 		require.NoError(t, err)
 
+		token0ATAIx, token0SenderATA, err := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint.PublicKey(), senderPDA, user.PublicKey())
+		token1ATAIx, token1SenderATA, err := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint.PublicKey(), senderPDA, user.PublicKey())
+
 		t.Run("setup", func(t *testing.T) {
 			initIx, err := example_ccip_sender.NewInitializeInstruction(config.CcipRouterProgram, senderState, user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
@@ -3766,7 +3769,7 @@ func TestCCIPRouter(t *testing.T) {
 			approveLinkIx, err := tokens.TokenApproveChecked(1e9, 9, link22.program, link22.userATA, link22.mint, senderPDA, user.PublicKey(), nil)
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferSolIx, wsolATAIx, approveLinkIx, link22ATAIx, initIx, destChainIx}, user, rpc.CommitmentConfirmed)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferSolIx, wsolATAIx, approveLinkIx, link22ATAIx, initIx, destChainIx, token0ATAIx, token1ATAIx}, user, rpc.CommitmentConfirmed)
 		})
 
 		feeConfig := []struct {
@@ -3831,7 +3834,72 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("Can send message and tokens", func(t *testing.T) {
-					// TODO
+					base := example_ccip_sender.NewCcipSendInstruction(
+						config.EvmChainSelector,
+						[]example_ccip_sender.SVMTokenAmount{
+							{
+								Token:  token0.Mint.PublicKey(),
+								Amount: 1,
+							},
+							{
+								Token:  token1.Mint.PublicKey(),
+								Amount: 2,
+							},
+						},
+						[]byte{1, 2, 3}, // message data
+						fc.feeToken,     // empty fee token to indicate native SOL
+						[]uint8{2, 15},
+						senderState,
+						senderDestChainConfigPDA,
+						senderPDA,
+						fc.userATA,
+						user.PublicKey(),
+						solana.SystemProgramID,
+						config.CcipRouterProgram,
+						config.RouterConfigPDA,
+						config.EvmDestChainStatePDA,
+						senderNoncePDA,
+						fc.feeProgram,
+						fc.feeMint,
+						fc.feeSenderATA,
+						fc.feeBillingATA,
+						config.BillingSignerPDA,
+						config.FeeQuoterProgram,
+						config.FqConfigPDA,
+						config.FqEvmDestChainPDA,
+						fc.feeTokenBillingConfigPDA,
+						link22.fqBillingConfigPDA,
+						config.ExternalTokenPoolsSignerPDA,
+					)
+					// pass user token accounts
+					base.AccountMetaSlice = append(
+						base.AccountMetaSlice,
+						solana.Meta(token0.User[user.PublicKey()]).WRITE(),
+						solana.Meta(token1.User[user.PublicKey()]).WRITE(),
+					)
+
+					// pass token pool accounts with the sender program ATA
+					tokenMetas0, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0SenderATA)
+					require.NoError(t, err)
+					base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
+					tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token1, token1SenderATA)
+					require.NoError(t, err)
+					base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
+					addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
+					for k, v := range ccipSendLookupTable {
+						addressTables[k] = v
+					}
+
+					ix, err := base.ValidateAndBuild()
+					require.NoError(t, err)
+
+					ixApprove0, err := tokens.TokenApproveChecked(1, 0, token0.Program, token0.User[user.PublicKey()], token0.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
+					require.NoError(t, err)
+					ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, token1.User[user.PublicKey()], token1.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
+					require.NoError(t, err)
+
+					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
+
 				})
 			})
 		}
