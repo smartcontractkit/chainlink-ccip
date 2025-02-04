@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -73,9 +74,11 @@ func (p *Plugin) Reports(
 	}
 
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
+		allRoots := append(blessedMerkleRoots, unblessedMerkleRoots...)
+		sort.Slice(allRoots, func(i, j int) bool { return allRoots[i].ChainSel < allRoots[j].ChainSel })
 		repInfo = cciptypes.CommitReportInfo{
 			RemoteF:     outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
-			MerkleRoots: append(blessedMerkleRoots, unblessedMerkleRoots...),
+			MerkleRoots: allRoots,
 			TokenPrices: rep.PriceUpdates.TokenPriceUpdates,
 		}
 	}

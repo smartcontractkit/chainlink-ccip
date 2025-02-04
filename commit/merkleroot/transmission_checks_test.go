@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -83,6 +84,12 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				chains = append(chains, snc.ChainSel)
 			}
 			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
+
+			reader.EXPECT().GetOffRampSourceChainsConfig(ctx).
+				Return(map[cciptypes.ChainSelector]reader2.SourceChainConfig{
+					10: {IsRMNVerificationDisabled: false},
+					20: {IsRMNVerificationDisabled: false},
+				}, nil).Maybe()
 
 			err := ValidateMerkleRootsState(ctx, rep.BlessedMerkleRoots, rep.UnblessedMerkleRoots, reader)
 			if tc.expErr {
