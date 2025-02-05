@@ -312,7 +312,7 @@ pub fn get_balance<'a>(token_account: &'a AccountInfo<'a>) -> Result<u64> {
 mod token_admin_registry_writable {
     use super::super::pools::router_state::TokenAdminRegistry;
 
-    pub fn is(tar: &TokenAdminRegistry, index: u8) -> bool {
+    pub(super) fn is(tar: &TokenAdminRegistry, index: u8) -> bool {
         match index < 128 {
             true => tar.writable_indexes[0] & 1 << (127 - index) != 0,
             false => tar.writable_indexes[1] & 1 << (255 - index) != 0,
