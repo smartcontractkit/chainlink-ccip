@@ -64,8 +64,11 @@ func (p *Processor) Observation(
 
 	if err := p.verifyQuery(ctx, prevOutcome, q); err != nil {
 		if errors.Is(err, ErrSignaturesNotProvidedByLeader) {
-			p.lggr.Infow("RMN signatures not available, returning an empty observation", "err", err)
-			return Observation{}, nil
+			lggr.Warnw("RMN signatures not available, returning only fChain", "err", err)
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nil
 		}
 		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
