@@ -103,6 +103,15 @@ jobs:
         df -h .
         echo "Contents of docker tar:"
         ls -lh contracts/docker-build.tar
+    - name: Debug space and cache
+      run: |
+        echo "Directory sizes:"
+        du -h /root/.cache/solana || true
+        du -h . || true
+        echo "Available space:"
+        df -h
+        echo "Docker image details:"
+        docker image ls -a
     - name: load cached image
       run: |
         docker load --input contracts/docker-build.tar
