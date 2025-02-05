@@ -16,12 +16,212 @@ var (
 	_                      = errors.ErrUnsupported
 )
 var (
-	ErrUnauthorized = &customErrorDef{
+	ErrInvalidInputs = &customErrorDef{
 		code: 6000,
-		msg:  "The signer is unauthorized",
-		name: "Unauthorized",
+		msg:  "Invalid inputs",
+		name: "InvalidInputs",
 	}
-	Errors = map[int]CustomError{6000: ErrUnauthorized}
+	ErrOverflow = &customErrorDef{
+		code: 6001,
+		msg:  "overflow occurred.",
+		name: "Overflow",
+	}
+	ErrWrongMultiSig = &customErrorDef{
+		code: 6002,
+		msg:  "Invalid multisig",
+		name: "WrongMultiSig",
+	}
+	ErrWrongChainId = &customErrorDef{
+		code: 6003,
+		msg:  "Invalid chainID",
+		name: "WrongChainId",
+	}
+	ErrInvalidSignature = &customErrorDef{
+		code: 6004,
+		msg:  "Invalid signature",
+		name: "InvalidSignature",
+	}
+	ErrFailedEcdsaRecover = &customErrorDef{
+		code: 6005,
+		msg:  "Failed ECDSA recover",
+		name: "FailedEcdsaRecover",
+	}
+	ErrInvalidRootLen = &customErrorDef{
+		code: 6006,
+		msg:  "Invalid root length",
+		name: "InvalidRootLen",
+	}
+	ErrSignersNotFinalized = &customErrorDef{
+		code: 6007,
+		msg:  "Config signers not finalized",
+		name: "SignersNotFinalized",
+	}
+	ErrSignersAlreadyFinalized = &customErrorDef{
+		code: 6008,
+		msg:  "Config signers already finalized",
+		name: "SignersAlreadyFinalized",
+	}
+	ErrSignaturesAlreadyFinalized = &customErrorDef{
+		code: 6009,
+		msg:  "Signatures already finalized",
+		name: "SignaturesAlreadyFinalized",
+	}
+	ErrSignatureCountMismatch = &customErrorDef{
+		code: 6010,
+		msg:  "Uploaded signatures count mismatch",
+		name: "SignatureCountMismatch",
+	}
+	ErrTooManySignatures = &customErrorDef{
+		code: 6011,
+		msg:  "Too many signatures",
+		name: "TooManySignatures",
+	}
+	ErrSignaturesNotFinalized = &customErrorDef{
+		code: 6012,
+		msg:  "Signatures not finalized",
+		name: "SignaturesNotFinalized",
+	}
+	ErrSignaturesRootMismatch = &customErrorDef{
+		code: 6013,
+		msg:  "Signatures root mismatch",
+		name: "SignaturesRootMismatch",
+	}
+	ErrSignaturesValidUntilMismatch = &customErrorDef{
+		code: 6014,
+		msg:  "Signatures valid until mismatch",
+		name: "SignaturesValidUntilMismatch",
+	}
+	ErrMismatchedInputSignerVectorsLength = &customErrorDef{
+		code: 6200,
+		msg:  "The input vectors for signer addresses and signer groups must have the same length",
+		name: "MismatchedInputSignerVectorsLength",
+	}
+	ErrOutOfBoundsNumOfSigners = &customErrorDef{
+		code: 6201,
+		msg:  "The number of signers is 0 or greater than MAX_NUM_SIGNERS",
+		name: "OutOfBoundsNumOfSigners",
+	}
+	ErrMismatchedInputGroupArraysLength = &customErrorDef{
+		code: 6202,
+		msg:  "The input arrays for group parents and group quorums must be of length NUM_GROUPS",
+		name: "MismatchedInputGroupArraysLength",
+	}
+	ErrGroupTreeNotWellFormed = &customErrorDef{
+		code: 6203,
+		msg:  "the group tree isn't well-formed.",
+		name: "GroupTreeNotWellFormed",
+	}
+	ErrSignerInDisabledGroup = &customErrorDef{
+		code: 6204,
+		msg:  "a disabled group contains a signer.",
+		name: "SignerInDisabledGroup",
+	}
+	ErrOutOfBoundsGroupQuorum = &customErrorDef{
+		code: 6205,
+		msg:  "the quorum of some group is larger than the number of signers in it.",
+		name: "OutOfBoundsGroupQuorum",
+	}
+	ErrSignersAddressesMustBeStrictlyIncreasing = &customErrorDef{
+		code: 6206,
+		msg:  "the signers' addresses are not a strictly increasing monotone sequence.",
+		name: "SignersAddressesMustBeStrictlyIncreasing",
+	}
+	ErrSignedHashAlreadySeen = &customErrorDef{
+		code: 6207,
+		msg:  "The combination of signature and valid_until has already been seen",
+		name: "SignedHashAlreadySeen",
+	}
+	ErrInvalidSigner = &customErrorDef{
+		code: 6208,
+		msg:  "Invalid signer",
+		name: "InvalidSigner",
+	}
+	ErrMissingConfig = &customErrorDef{
+		code: 6209,
+		msg:  "Missing configuration",
+		name: "MissingConfig",
+	}
+	ErrInsufficientSigners = &customErrorDef{
+		code: 6210,
+		msg:  "Insufficient signers",
+		name: "InsufficientSigners",
+	}
+	ErrValidUntilHasAlreadyPassed = &customErrorDef{
+		code: 6211,
+		msg:  "Valid until has already passed",
+		name: "ValidUntilHasAlreadyPassed",
+	}
+	ErrProofCannotBeVerified = &customErrorDef{
+		code: 6212,
+		msg:  "Proof cannot be verified",
+		name: "ProofCannotBeVerified",
+	}
+	ErrPendingOps = &customErrorDef{
+		code: 6213,
+		msg:  "Pending operations",
+		name: "PendingOps",
+	}
+	ErrWrongPreOpCount = &customErrorDef{
+		code: 6214,
+		msg:  "Wrong pre-operation count",
+		name: "WrongPreOpCount",
+	}
+	ErrWrongPostOpCount = &customErrorDef{
+		code: 6215,
+		msg:  "Wrong post-operation count",
+		name: "WrongPostOpCount",
+	}
+	ErrPostOpCountReached = &customErrorDef{
+		code: 6216,
+		msg:  "Post-operation count reached",
+		name: "PostOpCountReached",
+	}
+	ErrRootExpired = &customErrorDef{
+		code: 6217,
+		msg:  "Root expired",
+		name: "RootExpired",
+	}
+	ErrWrongNonce = &customErrorDef{
+		code: 6218,
+		msg:  "Wrong nonce",
+		name: "WrongNonce",
+	}
+	Errors = map[int]CustomError{
+		6000: ErrInvalidInputs,
+		6001: ErrOverflow,
+		6002: ErrWrongMultiSig,
+		6003: ErrWrongChainId,
+		6004: ErrInvalidSignature,
+		6005: ErrFailedEcdsaRecover,
+		6006: ErrInvalidRootLen,
+		6007: ErrSignersNotFinalized,
+		6008: ErrSignersAlreadyFinalized,
+		6009: ErrSignaturesAlreadyFinalized,
+		6010: ErrSignatureCountMismatch,
+		6011: ErrTooManySignatures,
+		6012: ErrSignaturesNotFinalized,
+		6013: ErrSignaturesRootMismatch,
+		6014: ErrSignaturesValidUntilMismatch,
+		6200: ErrMismatchedInputSignerVectorsLength,
+		6201: ErrOutOfBoundsNumOfSigners,
+		6202: ErrMismatchedInputGroupArraysLength,
+		6203: ErrGroupTreeNotWellFormed,
+		6204: ErrSignerInDisabledGroup,
+		6205: ErrOutOfBoundsGroupQuorum,
+		6206: ErrSignersAddressesMustBeStrictlyIncreasing,
+		6207: ErrSignedHashAlreadySeen,
+		6208: ErrInvalidSigner,
+		6209: ErrMissingConfig,
+		6210: ErrInsufficientSigners,
+		6211: ErrValidUntilHasAlreadyPassed,
+		6212: ErrProofCannotBeVerified,
+		6213: ErrPendingOps,
+		6214: ErrWrongPreOpCount,
+		6215: ErrWrongPostOpCount,
+		6216: ErrPostOpCountReached,
+		6217: ErrRootExpired,
+		6218: ErrWrongNonce,
+	}
 )
 
 type CustomError interface {
