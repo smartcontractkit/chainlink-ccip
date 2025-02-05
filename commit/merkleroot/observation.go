@@ -272,10 +272,15 @@ func (p *Processor) getObservation(
 			return Observation{}, nextState, nil
 		}
 
-		rmnEnabledChains, err := p.rmnHomeReader.GetRMNEnabledSourceChains(previousOutcome.RMNRemoteCfg.ConfigDigest)
-		if err != nil {
-			return Observation{}, nextState, fmt.Errorf("failed to get RMN enabled source chains for %s: %w",
-				previousOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
+		rmnEnabledChains := make(map[cciptypes.ChainSelector]bool)
+
+		if p.offchainCfg.RMNEnabled {
+			var err error
+			rmnEnabledChains, err = p.rmnHomeReader.GetRMNEnabledSourceChains(previousOutcome.RMNRemoteCfg.ConfigDigest)
+			if err != nil {
+				return Observation{}, nextState, fmt.Errorf("failed to get RMN enabled source chains for %s: %w",
+					previousOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
+			}
 		}
 
 		return Observation{
