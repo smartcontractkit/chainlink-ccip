@@ -34,8 +34,15 @@ pub fn initialize(
 pub fn batch_add_access<'info>(
     ctx: Context<'_, '_, '_, 'info, BatchAddAccess<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _role: Role,
+    role: Role,
 ) -> Result<()> {
+    let expected = ctx.accounts.config.get_role_controller(&role);
+    require_keys_eq!(
+        expected,
+        ctx.accounts.role_access_controller.key(),
+        TimelockError::InvalidAccessController
+    );
+
     require!(
         !ctx.remaining_accounts.is_empty(),
         TimelockError::InvalidInput
@@ -106,7 +113,6 @@ pub struct BatchAddAccess<'info> {
     #[account(
         mut,
         owner = access_controller_program.key(),
-        address = config.get_role_controller(&role) @ TimelockError::InvalidAccessController,
     )]
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
