@@ -21,10 +21,11 @@ import (
 // It's setup to use RMN to query which messages to include in the merkle root and ensures
 // the newly built merkle roots are the same as RMN roots.
 type Processor struct {
-	oracleID               commontypes.OracleID
-	oracleIDToP2pID        map[commontypes.OracleID]libocrtypes.PeerID
-	offchainCfg            pluginconfig.CommitOffchainConfig
-	destChain              cciptypes.ChainSelector
+	oracleID        commontypes.OracleID
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
+	offchainCfg     pluginconfig.CommitOffchainConfig
+	destChain       cciptypes.ChainSelector
+	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
 	lggr                   logger.Logger
 	observer               Observer
 	ccipReader             readerpkg.CCIPReader
