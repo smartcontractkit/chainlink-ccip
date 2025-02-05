@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
@@ -148,24 +148,24 @@ type EventMintRelease struct {
 type EventChainConfigured struct {
 	Discriminator         [8]byte
 	ChainSelector         uint64
-	Token                 token_pool.RemoteAddress
-	PreviousToken         token_pool.RemoteAddress
-	PoolAddresses         []token_pool.RemoteAddress
-	PreviousPoolAddresses []token_pool.RemoteAddress
+	Token                 test_token_pool.RemoteAddress
+	PreviousToken         test_token_pool.RemoteAddress
+	PoolAddresses         []test_token_pool.RemoteAddress
+	PreviousPoolAddresses []test_token_pool.RemoteAddress
 }
 
 type EventRemotePoolsAppended struct {
 	Discriminator         [8]byte
 	ChainSelector         uint64
-	PoolAddresses         []token_pool.RemoteAddress
-	PreviousPoolAddresses []token_pool.RemoteAddress
+	PoolAddresses         []test_token_pool.RemoteAddress
+	PreviousPoolAddresses []test_token_pool.RemoteAddress
 }
 
 type EventRateLimitConfigured struct {
 	Discriminator     [8]byte
 	ChainSelector     uint64
-	OutboundRateLimit token_pool.RateLimitConfig
-	InboundRateLimit  token_pool.RateLimitConfig
+	OutboundRateLimit test_token_pool.RateLimitConfig
+	InboundRateLimit  test_token_pool.RateLimitConfig
 }
 
 type EventChainRemoved struct {
