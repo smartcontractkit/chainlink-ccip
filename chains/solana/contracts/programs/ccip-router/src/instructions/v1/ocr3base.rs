@@ -16,7 +16,7 @@ pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 
     + 32; // length of rawVs
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+#[derive(InitSpace, Default)]
 pub(super) struct ReportContext {
     // byte_words consists of:
     // [0]: ConfigDigest

@@ -255,7 +255,7 @@ pub mod ccip_router {
     pub fn set_ocr_config(
         ctx: Context<SetOcrConfig>,
         plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
-        config_info: Ocr3ConfigInfo,
+        config_info: Ocr3ConfigInfoInput,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
