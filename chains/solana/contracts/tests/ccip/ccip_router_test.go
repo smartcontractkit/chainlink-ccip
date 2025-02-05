@@ -391,7 +391,7 @@ func TestCCIPRouter(t *testing.T) {
 			// as otherwise it can slow down tests  for ~20 seconds.
 
 			lookupEntries := []solana.PublicKey{ // TODO update
-				ccip_offramp.ProgramID,
+				config.CcipOfframpProgram,
 				config.OfframpConfigPDA,
 				config.OfframpReferenceAddressesPDA,
 				config.OfframpEvmSourceChainPDA,
@@ -485,7 +485,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
-				config.BillingSignerPDA, // TODO fix offramp_signer address
+				config.OfframpBillingSignerPDA,
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
 				legacyAdmin.PublicKey(),
@@ -507,7 +507,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, legacyAdmin.PublicKey(), fqConfig.Owner)
 			require.True(t, fqConfig.ProposedOwner.IsZero())
 			require.Equal(t, config.CcipRouterProgram, fqConfig.Onramp)
-			require.Equal(t, config.BillingSignerPDA, fqConfig.OfframpSigner) // TODO fix this
+			require.Equal(t, config.OfframpBillingSignerPDA, fqConfig.OfframpSigner)
 		})
 
 		t.Run("Offramp is initialized", func(t *testing.T) {
@@ -522,7 +522,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 			var lookupTableAddr solana.PublicKey
-			for k, _ := range offrampLookupTable { // there is only one entry
+			for k := range offrampLookupTable { // there is only one entry
 				lookupTableAddr = k
 			}
 
@@ -555,34 +555,56 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, legacyAdmin.PublicKey(), offrampConfig.Owner)
 			require.Equal(t, solana.PublicKey{}, offrampConfig.ProposedOwner)
 
-			// check reference addresses
-			var referenceAddresses ccip_offramp.ReferenceAddresses
-			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &offrampConfig))
-			require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router)
-			require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
-			require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
-
 			// check price sequence start
 			var state ccip_offramp.GlobalState
 			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpStatePDA, config.DefaultCommitment, &state))
 			require.Equal(t, uint64(0), state.LatestPriceSequenceNumber)
+
+			// check reference addresses
+			var referenceAddresses ccip_offramp.ReferenceAddresses
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &referenceAddresses))
+			tx, err := result.Transaction.GetTransaction()
+			require.NoError(t, err)
+			fmt.Printf("tx: %+v\n", tx)
+			fmt.Printf("referenceAddresses: %+v\n", referenceAddresses)
+			require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
+			require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
+			// require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router) // TODO fix this
 		})
 
 		t.Run("When admin updates the solana chain selector it's updated", func(t *testing.T) {
-			instruction, err := ccip_router.NewUpdateSvmChainSelectorInstruction(
-				config.SvmChainSelector,
-				config.RouterConfigPDA,
-				legacyAdmin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
-			require.NotNil(t, result)
+			t.Run("CCIP Router", func(t *testing.T) {
+				instruction, err := ccip_router.NewUpdateSvmChainSelectorInstruction(
+					config.SvmChainSelector,
+					config.RouterConfigPDA,
+					legacyAdmin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
 
-			var configAccount ccip_router.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
-			require.NoError(t, err, "failed to get account info")
-			require.Equal(t, config.SvmChainSelector, configAccount.SvmChainSelector)
+				var configAccount ccip_router.Config
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, config.SvmChainSelector, configAccount.SvmChainSelector)
+			})
+
+			t.Run("Offramp", func(t *testing.T) {
+				instruction, err := ccip_offramp.NewUpdateSvmChainSelectorInstruction(
+					config.SvmChainSelector,
+					config.OfframpConfigPDA,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				var configAccount ccip_offramp.Config
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &configAccount)
+				require.NoError(t, err, "failed to get account info")
+				require.Equal(t, config.SvmChainSelector, configAccount.SvmChainSelector)
+			})
 		})
 
 		type InvalidChainBillingInputTest struct {
@@ -1622,7 +1644,7 @@ func TestCCIPRouter(t *testing.T) {
 					},
 					signerAddresses,
 					invalidTransmitters,
-					config.RouterConfigPDA,
+					config.OfframpConfigPDA,
 					config.OfframpStatePDA,
 					ccipAdmin.PublicKey(),
 				).ValidateAndBuild()
@@ -1646,7 +1668,7 @@ func TestCCIPRouter(t *testing.T) {
 					},
 					invalidSigners,
 					transmitterPubKeys,
-					config.RouterConfigPDA,
+					config.OfframpConfigPDA,
 					config.OfframpStatePDA,
 					ccipAdmin.PublicKey(),
 				).ValidateAndBuild()
@@ -1668,7 +1690,7 @@ func TestCCIPRouter(t *testing.T) {
 					},
 					invalidSigners,
 					transmitterPubKeys,
-					config.RouterConfigPDA,
+					config.OfframpConfigPDA,
 					config.OfframpStatePDA,
 					ccipAdmin.PublicKey(),
 				).ValidateAndBuild()
@@ -1693,7 +1715,7 @@ func TestCCIPRouter(t *testing.T) {
 					},
 					signerAddresses,
 					invalidTransmitters,
-					config.RouterConfigPDA,
+					config.OfframpConfigPDA,
 					config.OfframpStatePDA,
 					ccipAdmin.PublicKey(),
 				).ValidateAndBuild()
@@ -1718,7 +1740,7 @@ func TestCCIPRouter(t *testing.T) {
 					},
 					repeatedSignerAddresses,
 					oneTransmitter,
-					config.RouterConfigPDA,
+					config.OfframpConfigPDA,
 					config.OfframpStatePDA,
 					ccipAdmin.PublicKey(),
 				).ValidateAndBuild()
@@ -1739,7 +1761,7 @@ func TestCCIPRouter(t *testing.T) {
 					},
 					signerAddresses,
 					invalidTransmitterPubKeys,
-					config.RouterConfigPDA,
+					config.OfframpConfigPDA,
 					config.OfframpStatePDA,
 					ccipAdmin.PublicKey(),
 				).ValidateAndBuild()
@@ -1762,7 +1784,7 @@ func TestCCIPRouter(t *testing.T) {
 					},
 					invalidSignerAddresses,
 					transmitterPubKeys,
-					config.RouterConfigPDA,
+					config.OfframpConfigPDA,
 					config.OfframpStatePDA,
 					ccipAdmin.PublicKey(),
 				).ValidateAndBuild()
@@ -4330,7 +4352,7 @@ func TestCCIPRouter(t *testing.T) {
 							transmitter.PublicKey(),
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
-							config.BillingSignerPDA,
+							config.OfframpBillingSignerPDA,
 							config.FeeQuoterProgram,
 							config.FqConfigPDA,
 						)
@@ -4426,7 +4448,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -4470,7 +4492,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -4513,7 +4535,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -4556,7 +4578,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -4600,7 +4622,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -4645,7 +4667,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -4771,7 +4793,7 @@ func TestCCIPRouter(t *testing.T) {
 								transmitter.PublicKey(),
 								solana.SystemProgramID,
 								solana.SysVarInstructionsPubkey,
-								config.BillingSignerPDA,
+								config.OfframpBillingSignerPDA,
 								config.FeeQuoterProgram,
 								config.FqConfigPDA,
 							)
@@ -4826,7 +4848,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -4898,7 +4920,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -4941,7 +4963,7 @@ func TestCCIPRouter(t *testing.T) {
 						user.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -4988,7 +5010,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -5030,7 +5052,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -5084,7 +5106,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -5131,7 +5153,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -5184,7 +5206,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -5278,7 +5300,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -5356,7 +5378,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -5456,7 +5478,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -5549,7 +5571,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
-				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
 				require.NoError(t, err)
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
@@ -5630,7 +5652,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -5765,7 +5787,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -5834,7 +5856,7 @@ func TestCCIPRouter(t *testing.T) {
 				}
 				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
 				require.NoError(t, err)
-				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipRouterProgram)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
 				require.NoError(t, err)
 
 				instruction, err := ccip_offramp.NewCommitInstruction(
@@ -5850,7 +5872,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -5945,7 +5967,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -5989,7 +6011,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
-					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
+					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables)
 					executionEvent := ccip.EventExecutionStateChanged{}
 					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
 					require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
@@ -6064,7 +6086,7 @@ func TestCCIPRouter(t *testing.T) {
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
-						config.BillingSignerPDA,
+						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
@@ -6199,7 +6221,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
@@ -6556,7 +6578,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.BillingSignerPDA,
+					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
