@@ -1,0 +1,83 @@
+deployments:
+  {{- range .Chains }}
+  geth-{{ .NetworkId }}:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: "geth-{{ .NetworkId }}"
+      chart:
+        # todo: Add conditional here for local charts support
+        name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-geth"
+        version: "1.0.0"
+      # for simplicity, we define all the values here
+      # they can be defined the same way in values.yml
+      # devspace merges these "values" with the "values.yaml" before deploy
+      valuesFiles:
+        {{- if eq $.Provider "kind" }}
+        - ${LOCAL_VALUES_DIR}/geth-node/env.kind.yaml
+        {{- end }}
+        {{- if eq $.Provider "aws" }}
+        - ${LOCAL_VALUES_DIR}/geth-node/env.aws-staging.yaml
+        {{- end }}
+        {{- if eq $.Product "ccip" }}
+        - ${LOCAL_VALUES_DIR}/geth-node/product.ccip.yaml
+        {{- end }}
+        {{- if eq $.UseCase "ccip-load-tests" }}
+        - ${LOCAL_VALUES_DIR}/geth-node/use-case.ccip-load-tests.yaml
+        {{- end }}
+      values:
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+        version: v1.12.0
+        wsRpcPort: 8546
+        httpRpcPort: 8544
+        chains:
+          - networkId: "{{ .NetworkId }}"
+          {{- if .BlockTime }}
+            blockTime: {{ .BlockTime }}
+          {{- end }}
+        networkPolicyDefault:
+          ingress:
+            allowCustomCidrs: true
+            # Should be a comma separated list of CIDR blocks. To include
+            # AWS ALB private CIDRs and optionally other custom CIDRs.
+            # Example format: 10.0.0.0/16,192.168.0.1/24
+            customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+        networkPolicy:
+          enabled: true
+          extraIngressSelectors:
+            # whitelist chainlink-don deployment from donut dependency
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: chainlink-don
+            # whitelist blockscout
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: blockscout-stack
+        ingress:
+          enabled: true
+          hosts:
+            - host: ${DEVSPACE_NAMESPACE}-geth-{{ .NetworkId }}-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: "geth-{{ .NetworkId }}"
+                        port:
+                          number: 8544
+            - host: ${DEVSPACE_NAMESPACE}-geth-{{ .NetworkId }}-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: "geth-{{ .NetworkId }}"
+                        port:
+                          number: 8546
+  {{- end }}

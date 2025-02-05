@@ -1,0 +1,7 @@
+chains:
+  # Fast network
+  - networkId: 1337
+    blockTime: 4
+  # Slow network
+  - networkId: 2337
+    blockTime: 20

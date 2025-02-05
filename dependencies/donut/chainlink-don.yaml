@@ -51,9 +51,10 @@ vars:
     default: 1
   # chains
   # Option to generate variable number of networks to be configured in Node config
-  ADDITIONAL_CHAINS_COUNT:
+  # It is required when network-generated profile is activated
+  CHAINS_COUNT:
     source: env
-    default: 0
+    default: 2
   # switch
   ENABLE_DON_BASE:
     source: env
@@ -199,18 +200,13 @@ profiles:
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.ava-spruce-calm.yaml
   # to support load testing scenarios, the profile generate variable number of chain configs
-  - name: network-additional-geth-chains
-    merge: |-
-      $(
-        ADDITIONAL_CHAINS_COUNT=${ADDITIONAL_CHAINS_COUNT} \
-        gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/network.geth-n-chains.yaml
-      )
+  # It relies on CHAINS_COUNT property to generate variable number of network configs
   - name: network-generated
     merge: |-
       $(
-        SCRIPT_DIR=./scripts/ccip_load_tests_config \
-        go run ./scripts/ccip_load_tests_config/main.go
+        pushd ./scripts/network_configs/ > /dev/null
+        go run main.go \
+          -chains-count="${CHAINS_COUNT}"
       )
   # versions
   - name: version-latest

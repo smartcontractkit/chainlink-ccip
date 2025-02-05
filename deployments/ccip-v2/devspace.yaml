@@ -41,12 +41,16 @@ vars:
   DON_BOOT_NODE_COUNT:
     source: env
     default: 1
-  ADDITIONAL_CHAINS_COUNT:
+  CHAINS_COUNT:
     source: env
-    default: 0
+    default: 2
   ENABLE_MONITORING:
     source: env
     default: false
+  CHAINLINK_PRODUCT:
+    source: env
+    default: ccip
+
 imports:
   - path: ${IMPORTS_DIR}/lib-common
   - path: ${IMPORTS_DIR}/lib-aws
@@ -164,48 +168,39 @@ profiles:
         path: dependencies
         value:
           geth:
-            path: ${DEPENDENCIES_DIR}/geth
+            path: ${DEPENDENCIES_DIR}/geth-v2
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-            profiles:
-              - ccip
-              - ccip-v2-load-tests
-              - additional-chains
           ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - version-from-env
-              - network-geth-chain-1337
-              - network-geth-chain-2337
-              - network-additional-geth-chains
+              - network-generated
   - name: load-tests
     patches:
+      - op: add
+        path: vars
+        value:
+          USE_CASE:
+            source: env
+            default: ccip-load-tests
       - op: add
         path: dependencies
         value:
           geth:
-            path: ${DEPENDENCIES_DIR}/geth
+            path: ${DEPENDENCIES_DIR}/geth-v2
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-            profiles:
-              - ccip
-              - ccip-v2-load-tests
-              - additional-chains
-              # Use ccip-v2-load-tests to customize blocktime parameter for individual geth network
-              # - ccip-v2-load-tests-customized-networks
           ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - version-from-env
-              - network-geth-chain-1337
-              - network-geth-chain-2337
-              - network-additional-geth-chains
-              # Use network-generated to customize parameters for individual geth network
-              # - network-generated
+              - network-generated
+
   - name: default-aws
     parents:
       - profile: default

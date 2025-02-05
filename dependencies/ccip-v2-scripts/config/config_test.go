@@ -23,13 +23,13 @@ func testData() TestData {
 			TmpDir:            "./tmp",
 		},
 		DevspaceEnvWithAdditionalChains: DevspaceEnv{
-			Namespace:             "crib-test",
-			Provider:              "aws",
-			DonBootNodeCount:      1,
-			DonNodeCount:          4,
-			IngressBaseDomain:     "test.cl",
-			TmpDir:                "./tmp",
-			AdditionalChainsCount: 2,
+			Namespace:         "crib-test",
+			Provider:          "aws",
+			DonBootNodeCount:  1,
+			DonNodeCount:      4,
+			IngressBaseDomain: "test.cl",
+			TmpDir:            "./tmp",
+			ChainsCount:       4,
 		},
 	}
 }
@@ -46,13 +46,13 @@ func TestGetEnvConfig(t *testing.T) {
 func TestGetEnvConfig_AdditionalChains(t *testing.T) {
 	t.Parallel()
 	env := DevspaceEnv{
-		Namespace:             "crib-test",
-		Provider:              "aws",
-		DonBootNodeCount:      1,
-		DonNodeCount:          4,
-		IngressBaseDomain:     "test.cl",
-		TmpDir:                "./tmp",
-		AdditionalChainsCount: 2,
+		Namespace:         "crib-test",
+		Provider:          "aws",
+		DonBootNodeCount:  1,
+		DonNodeCount:      4,
+		IngressBaseDomain: "test.cl",
+		TmpDir:            "./tmp",
+		ChainsCount:       4,
 	}
 
 	config, err := GetEnvConfig(env)

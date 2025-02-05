@@ -55,13 +55,15 @@ func getChainConfigurers(env DevspaceEnv) []ChainConfigurer {
 		NewChainConfigurer(env, uint64(2337), "beta"),
 	}
 
-	//nolint:gosec
-	for i := 1; i <= env.AdditionalChainsCount; i++ {
-		const baseChainID uint64 = 90000000
-		chainID := baseChainID + uint64(i)
-		c := NewChainConfigurer(env, chainID, fmt.Sprintf("nchain-%d", chainID))
+	if env.ChainsCount > 2 {
+		//nolint:gosec
+		for i := 1; i <= env.ChainsCount-2; i++ {
+			const baseChainID uint64 = 90000000
+			chainID := baseChainID + uint64(i)
+			c := NewChainConfigurer(env, chainID, fmt.Sprintf("nchain-%d", chainID))
 
-		chainConfigurers = append(chainConfigurers, c)
+			chainConfigurers = append(chainConfigurers, c)
+		}
 	}
 	return chainConfigurers
 }

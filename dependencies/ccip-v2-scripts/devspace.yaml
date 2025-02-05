@@ -8,9 +8,9 @@ vars:
   TMP_DIR:
     source: env
     default: "${DEVSPACE_TMPDIR}/ccip-v2"
-  ADDITIONAL_CHAINS_COUNT:
+  CHAINS_COUNT:
     source: env
-    default: 0
+    default: 2
 
 pipelines:
   # deploy home chain contracts and return capability registry address

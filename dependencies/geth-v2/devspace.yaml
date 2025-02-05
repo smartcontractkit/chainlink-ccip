@@ -1,0 +1,73 @@
+---
+version: v2beta1
+name: geth
+
+vars:
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  LOCAL_VALUES_DIR:
+    source: env
+    default: ./values
+  # Product can be chainlink or ccip. Based on the chosen profile it will activate specific mutations
+  CHAINLINK_PRODUCT:
+    source: env
+    default: "chainlink"
+  # Use this to activate patches specific to your use case, for example ccip-load-tests
+  USE_CASE:
+    source: env
+    default: "default"
+  # This is just a hack to always enable the profile
+  ENABLE_BASE_PROFILE:
+    source: env
+    default: true
+  # Use chain overrides to override configuration for individual chains
+  # Useful for load testing
+  CHAIN_OVERRIDES_FILENAME:
+    source: env
+    default: default.yaml
+  # How many blockchain networks should it deploy
+  # By default it will create beta (1337) and alpha (2337) chains, the minimum number is 1
+  CHAINS_COUNT:
+    source: env
+    default: 2
+
+pipelines:
+  kind:
+    run: |-
+      ensure_pull_secrets --all
+      run_pipelines deploy
+  deploy:
+    run: |-
+      create_deployments --all
+
+pullSecrets:
+  regcred-stage-ecr:
+    registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-stage-ecr
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        # vars don't work here, = releaseName
+        release: "geth"
+    events: ["after:deploy:geth"]
+
+# The list of deployments is generated from the template
+profiles:
+  - name: base
+    activation:
+      - vars:
+          ENABLE_BASE_PROFILE: "true"
+    merge: |-
+      $(
+        pushd ./scripts/generate_base_profile > /dev/null
+        go run main.go -chain-overrides-dir="./../../values/chain-overrides/" \
+          -chain-overrides-file="${CHAIN_OVERRIDES_FILENAME}" \
+          -chains-count="${CHAINS_COUNT}" -provider="${PROVIDER}" \
+          -product="${CHAINLINK_PRODUCT}" -use-case="${USE_CASE}"
+      )
