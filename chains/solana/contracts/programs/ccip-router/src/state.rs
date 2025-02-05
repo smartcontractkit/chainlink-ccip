@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
 pub struct Config {
     pub version: u8,
     _padding0: [u8; 7],
@@ -23,7 +23,7 @@ pub struct Config {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+#[derive(InitSpace, Default)]
 pub struct Ocr3ConfigInfo {
     pub config_digest: [u8; 32], // 32-byte hash of configuration
     pub f: u8,                   // f+1 = number of signatures per report
@@ -31,12 +31,37 @@ pub struct Ocr3ConfigInfo {
     pub is_signature_verification_enabled: u8, // bool -> bytemuck::Pod compliant required for zero_copy
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct Ocr3ConfigInfoInput {
+    pub config_digest: [u8; 32],
+    pub f: u8,
+    pub n: u8,
+    pub is_signature_verification_enabled: u8,
+}
+
+// Provide a conversion from the input type to the stored type.
+impl From<Ocr3ConfigInfoInput> for Ocr3ConfigInfo {
+    fn from(input: Ocr3ConfigInfoInput) -> Self {
+        Self {
+            config_digest: input.config_digest,
+            f: input.f,
+            n: input.n,
+            is_signature_verification_enabled: input.is_signature_verification_enabled,
+        }
+    }
+}
+
 // TODO: do we need to verify signers and transmitters are different? (between the two groups)
 // signers: pubkey is 20-byte address, secp256k1 curve ECDSA
 // transmitters: 32-byte pubkey, ed25519
 
+// todo: conflicting implementation
+// 25 | #[zero_copy]
+//    | ------------ first implementation here
+// 26 | #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)
+// todo: remove above
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+#[derive(InitSpace, Default)]
 pub struct Ocr3Config {
     pub plugin_type: u8, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
     pub config_info: Ocr3ConfigInfo,

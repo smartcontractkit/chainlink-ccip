@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
-#[constant]
+// todo: wip - function or associated item not found in `usize`
+// #[constant]
 pub const MAX_ORACLES: usize = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx
 
 #[error_code]
