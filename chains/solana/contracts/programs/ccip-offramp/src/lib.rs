@@ -37,9 +37,6 @@ pub mod ccip_offramp {
         ctx: Context<Initialize>,
         svm_chain_selector: u64,
         enable_execution_after: i64,
-        router: Pubkey,
-        fee_quoter: Pubkey,
-        offramp_lookup_table: Pubkey,
     ) -> Result<()> {
         {
             let mut config = ctx.accounts.config.load_init()?;
@@ -54,14 +51,14 @@ pub mod ccip_offramp {
             ];
         }
 
-        msg!("Router address: {:?}", router.to_string());
-        // panic!();
-
-        let reference_addresses = &mut ctx.accounts.reference_addresses;
-        reference_addresses.version = 1;
-        reference_addresses.router = router;
-        reference_addresses.fee_quoter = fee_quoter;
-        reference_addresses.offramp_lookup_table = offramp_lookup_table;
+        ctx.accounts
+            .reference_addresses
+            .set_inner(ReferenceAddresses {
+                version: 1,
+                router: ctx.accounts.router.key(),
+                fee_quoter: ctx.accounts.fee_quoter.key(),
+                offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
+            });
 
         ctx.accounts.state.latest_price_sequence_number = 0;
 

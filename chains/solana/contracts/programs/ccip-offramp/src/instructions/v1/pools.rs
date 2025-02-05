@@ -88,9 +88,14 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             &[seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
             &router,
         );
-        require_eq!(
+        require_keys_eq!(
             token_admin_registry.key(),
             expected_token_admin_registry,
+            CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts
+        );
+        require_keys_eq!(
+            *token_admin_registry.owner,
+            router,
             CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts
         );
 
@@ -103,17 +108,17 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             &[seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
             &pool_program.key(),
         );
-        require_eq!(
+        require_keys_eq!(
             *pool_config.owner,
             pool_program.key(),
             CcipOfframpError::InvalidInputsPoolAccounts
         );
-        require_eq!(
+        require_keys_eq!(
             pool_config.key(),
             expected_pool_config,
             CcipOfframpError::InvalidInputsPoolAccounts
         );
-        require_eq!(
+        require_keys_eq!(
             pool_signer.key(),
             expected_pool_signer,
             CcipOfframpError::InvalidInputsPoolAccounts
@@ -126,19 +131,19 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             ],
             &fee_quoter,
         );
-        require_eq!(
+        require_keys_eq!(
             fee_token_config.key(),
             expected_fee_token_config,
             CcipOfframpError::InvalidInputsConfigAccounts
         );
 
         // check token accounts
-        require_eq!(
+        require_keys_eq!(
             *mint.owner,
             token_program.key(),
             CcipOfframpError::InvalidInputsTokenAccounts
         );
-        require_eq!(
+        require_keys_eq!(
             user_token_account.key(),
             get_associated_token_address_with_program_id(
                 &token_receiver,
@@ -147,7 +152,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             ),
             CcipOfframpError::InvalidInputsTokenAccounts
         );
-        require_eq!(
+        require_keys_eq!(
             pool_token_account.key(),
             get_associated_token_address_with_program_id(
                 &pool_signer.key(),
@@ -176,21 +181,25 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             ],
             &pool_program.key(),
         );
-        require_eq!(
+        require_keys_eq!(
             token_billing_config.key(),
             expected_billing_config, // TODO: determine if this can be zero key for optional billing config?
             CcipOfframpError::InvalidInputsConfigAccounts
         );
-        require_eq!(
+        require_keys_eq!(
             pool_chain_config.key(),
             expected_pool_chain_config,
             CcipOfframpError::InvalidInputsConfigAccounts
         );
 
         // Check Lookup Table Address configured in TokenAdminRegistry
-        let token_admin_registry_account: Account<router_state::TokenAdminRegistry> =
-            Account::try_from(token_admin_registry)?;
-        require_eq!(
+        // For that, deserialize the TokenAdminRegistry first. It has already been checked that it is
+        // the right PDA address and that its owner is the Router program, so it's safe to deserialize the data directly
+        let token_admin_registry_data = &mut &token_admin_registry.data.borrow()[..];
+        let token_admin_registry_account =
+            router_state::TokenAdminRegistry::try_deserialize(token_admin_registry_data)
+                .map_err(|_| CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts)?;
+        require_keys_eq!(
             token_admin_registry_account.lookup_table,
             lookup_table.key(),
             CcipOfframpError::InvalidInputsLookupTableAccounts
@@ -198,9 +207,8 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
 
         // Check Lookup Table Entries
         let lookup_table_data = &mut &lookup_table.data.borrow()[..];
-        let lookup_table_account: AddressLookupTable =
-            AddressLookupTable::deserialize(lookup_table_data)
-                .map_err(|_| CcipOfframpError::InvalidInputsLookupTableAccounts)?;
+        let lookup_table_account = AddressLookupTable::deserialize(lookup_table_data)
+            .map_err(|_| CcipOfframpError::InvalidInputsLookupTableAccounts)?;
 
         // reconstruct + validate expected values in token pool lookup table
         // base set of constant accounts (9)

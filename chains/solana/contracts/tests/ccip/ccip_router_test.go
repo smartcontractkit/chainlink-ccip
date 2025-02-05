@@ -529,11 +529,11 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := ccip_offramp.NewInitializeInstruction(
 				invalidSVMChainSelector,
 				config.EnableExecutionAfter,
+				config.OfframpConfigPDA,
+				config.OfframpReferenceAddressesPDA,
 				config.CcipRouterProgram,
 				config.FeeQuoterProgram,
 				lookupTableAddr,
-				config.OfframpConfigPDA,
-				config.OfframpReferenceAddressesPDA,
 				config.OfframpStatePDA,
 				config.OfframpExternalExecutionConfigPDA,
 				config.OfframpTokenPoolsSignerPDA,
@@ -563,13 +563,9 @@ func TestCCIPRouter(t *testing.T) {
 			// check reference addresses
 			var referenceAddresses ccip_offramp.ReferenceAddresses
 			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &referenceAddresses))
-			tx, err := result.Transaction.GetTransaction()
-			require.NoError(t, err)
-			fmt.Printf("tx: %+v\n", tx)
-			fmt.Printf("referenceAddresses: %+v\n", referenceAddresses)
 			require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
 			require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
-			require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router) // TODO fix this
+			require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router)
 		})
 
 		t.Run("When admin updates the solana chain selector it's updated", func(t *testing.T) {
@@ -5917,6 +5913,31 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("token happy path", func(t *testing.T) {
+				// TODO this is a throw-away setup stage until we implement the offramp authorization logic in the pool
+				t.Run("Setup: set offramp as token pool ramp authority", func(t *testing.T) {
+					poolCases := []struct {
+						Name       string
+						PoolConfig solana.PublicKey
+						Admin      solana.PrivateKey
+					}{
+						{"Token0", token0.PoolConfig, token0PoolAdmin},
+						{"Token1", token1.PoolConfig, token1PoolAdmin},
+					}
+
+					for _, p := range poolCases {
+						t.Run(p.Name, func(t *testing.T) {
+							ix, err := token_pool.NewSetRampAuthorityInstruction(
+								config.OfframpTokenPoolsSignerPDA,
+								p.PoolConfig,
+								p.Admin.PublicKey(),
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, p.Admin, config.DefaultCommitment)
+						})
+					}
+				})
+
 				t.Run("single token", func(t *testing.T) {
 					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint.PublicKey(), config.DefaultCommitment)
 					require.NoError(t, err)
@@ -6608,7 +6629,7 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.ExternalTokenPoolsSignerPDA,
+					config.OfframpTokenPoolsSignerPDA,
 				)
 
 				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
@@ -6639,7 +6660,7 @@ func TestCCIPRouter(t *testing.T) {
 					legacyAdmin.PublicKey(),
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
-					config.ExternalTokenPoolsSignerPDA,
+					config.OfframpTokenPoolsSignerPDA,
 				)
 
 				tokenMetas, addressTables, err = tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])

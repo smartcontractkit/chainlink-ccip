@@ -37,6 +37,21 @@
           "isSigner": false
         },
         {
+          "name": "router",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "offrampLookupTable",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "state",
           "isMut": true,
           "isSigner": false
@@ -80,18 +95,6 @@
         {
           "name": "enableExecutionAfter",
           "type": "i64"
-        },
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "feeQuoter",
-          "type": "publicKey"
-        },
-        {
-          "name": "offrampLookupTable",
-          "type": "publicKey"
         }
       ]
     },

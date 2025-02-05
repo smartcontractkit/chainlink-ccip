@@ -68,6 +68,13 @@ pub struct Initialize<'info> {
     )]
     pub reference_addresses: Account<'info, ReferenceAddresses>,
 
+    /// CHECK: Router address
+    pub router: UncheckedAccount<'info>,
+    /// CHECK: FeeQuoter address
+    pub fee_quoter: UncheckedAccount<'info>,
+    /// CHECK: ALT address
+    pub offramp_lookup_table: UncheckedAccount<'info>,
+
     #[account(
         init,
         seeds = [seed::STATE],
