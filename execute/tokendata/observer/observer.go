@@ -1,10 +1,11 @@
-package tokendata
+package observer
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/lbtc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -81,6 +82,26 @@ func NewConfigBasedCompositeObservers(
 					c.USDCCCTPObserverConfig.CacheExpirationInterval.Duration(),
 					c.USDCCCTPObserverConfig.CacheCleanupInterval.Duration(),
 					c.USDCCCTPObserverConfig.ObserveTimeout.Duration(),
+				)
+			}
+		case c.LBTCObserverConfig != nil:
+			observer, err := lbtc.NewLBTCTokenObserver(lggr, destChainSelector, *c.LBTCObserverConfig)
+			if err != nil {
+				return nil, fmt.Errorf("create LBTC token observer: %w", err)
+			}
+
+			if c.LBTCObserverConfig.NumWorkers == 0 {
+				lggr.Info("Using foreground observer for LBTC")
+				observers[i] = observer
+			} else {
+				lggr.Info("Using background observer for LBTC")
+				observers[i] = NewBackgroundObserver(
+					lggr,
+					observer,
+					c.LBTCObserverConfig.NumWorkers,
+					c.LBTCObserverConfig.CacheExpirationInterval.Duration(),
+					c.LBTCObserverConfig.CacheCleanupInterval.Duration(),
+					c.LBTCObserverConfig.ObserveTimeout.Duration(),
 				)
 			}
 		default:

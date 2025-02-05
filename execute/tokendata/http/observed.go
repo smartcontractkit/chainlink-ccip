@@ -1,4 +1,4 @@
-package usdc
+package http
 
 import (
 	"context"
@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 const (
@@ -19,6 +19,9 @@ const (
 	// We can't keep them forever, so we don't track messages which are waiting for longer than 70 minutes
 	cacheExpiration = 70 * time.Minute
 	cacheCleanup    = 10 * time.Minute
+
+	LBTC = "lbtc"
+	USDC = "usdc"
 )
 
 var (
@@ -37,7 +40,7 @@ var (
 				float64(5 * time.Second),
 			},
 		},
-		[]string{"statusCode"},
+		[]string{"tokenSymbol", "statusCode"},
 	)
 	promTimeToAttestation = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -54,13 +57,14 @@ var (
 				float64(60 * time.Minute),
 			},
 		},
-		[]string{},
+		[]string{"tokenSymbol"},
 	)
 )
 
 type observedHTTPClient struct {
 	HTTPClient
 	lggr                   logger.Logger
+	tokenSymbol            string
 	requestDurations       *prometheus.HistogramVec
 	timeToAttestation      *prometheus.HistogramVec
 	timeToAttestationCache *cache.Cache
@@ -69,10 +73,12 @@ type observedHTTPClient struct {
 func newObservedHTTPClient(
 	httpClient HTTPClient,
 	lggr logger.Logger,
+	tokenSymbol string,
 ) *observedHTTPClient {
 	return &observedHTTPClient{
 		HTTPClient:             httpClient,
 		lggr:                   lggr,
+		tokenSymbol:            tokenSymbol,
 		requestDurations:       promAttestationDurations,
 		timeToAttestationCache: cache.New(cacheExpiration, cacheCleanup),
 		timeToAttestation:      promTimeToAttestation,
@@ -90,9 +96,23 @@ func (o *observedHTTPClient) Get(
 	o.trackTimeToAttestation(start, messageHash.String(), status)
 
 	o.requestDurations.
-		WithLabelValues(strconv.Itoa(int(status))).
+		WithLabelValues(o.tokenSymbol, strconv.Itoa(int(status))).
 		Observe(float64(duration))
 
+	return result, status, err
+}
+
+func (o *observedHTTPClient) Post(
+	ctx context.Context,
+	bodyBytes cciptypes.Bytes,
+) (cciptypes.Bytes, HTTPStatus, error) {
+	start := time.Now()
+	result, status, err := o.HTTPClient.Post(ctx, bodyBytes)
+	duration := time.Since(start)
+
+	o.requestDurations.
+		WithLabelValues(o.tokenSymbol, strconv.Itoa(int(status))).
+		Observe(float64(duration))
 	return result, status, err
 }
 
@@ -115,8 +135,8 @@ func (o *observedHTTPClient) trackTimeToAttestation(
 		// and we don't need to track that
 		if seen {
 			duration := time.Since(messageSeenFirst.(time.Time))
-			o.timeToAttestation.WithLabelValues().Observe(float64(duration))
-			o.lggr.Infow("Observed time to attestation for USDC message",
+			o.timeToAttestation.WithLabelValues(o.tokenSymbol).Observe(float64(duration))
+			o.lggr.Infow("Observed time to attestation for a message",
 				"hash", hash,
 				"duration", duration.String(),
 			)

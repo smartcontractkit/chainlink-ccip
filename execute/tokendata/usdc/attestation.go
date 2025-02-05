@@ -2,9 +2,12 @@ package usdc
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/http"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -14,32 +17,45 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-var (
-	ErrDataMissing     = errors.New("token data missing")
-	ErrNotReady        = errors.New("token data not ready")
-	ErrRateLimit       = errors.New("token data API is being rate limited")
-	ErrTimeout         = errors.New("token data API timed out")
-	ErrUnknownResponse = errors.New("unexpected response from attestation API")
+type attestationStatus string
+
+const (
+	apiVersion      = "v1"
+	attestationPath = "attestations"
+
+	// defaultCoolDownDurationSec defines the default time to wait after getting rate limited.
+	// this value is only used if the 429 response does not contain the Retry-After header
+	defaultCoolDownDuration = 5 * time.Minute
+
+	attestationStatusSuccess attestationStatus = "complete"
+	attestationStatusPending attestationStatus = "pending_confirmations"
 )
 
-// AttestationStatus is a struct holding all the necessary information to build payload to
-// mint USDC on the destination chain. Valid AttestationStatus always contains MessageHash and Attestation.
-// In case of failure, Error is populated with more details.
-type AttestationStatus struct {
-	// MessageHash is the hash of the message that the attestation was fetched for. It's going to be MessageSent event hash
-	MessageHash cciptypes.Bytes
-	// Attestation is the attestation data fetched from the API, encoded in bytes
-	Attestation cciptypes.Bytes
-	// Error is the error that occurred during fetching the attestation data
-	Error error
+type httpResponse struct {
+	Status      attestationStatus `json:"status"`
+	Attestation string            `json:"attestation"`
+	Error       string            `json:"error"`
 }
 
-func SuccessAttestationStatus(messageHash cciptypes.Bytes, attestation cciptypes.Bytes) AttestationStatus {
-	return AttestationStatus{MessageHash: messageHash, Attestation: attestation}
+func (r httpResponse) validate() error {
+	if r.Error != "" {
+		return fmt.Errorf("attestation API error: %s", r.Error)
+	}
+	if r.Status == "" {
+		return fmt.Errorf("invalid attestation response")
+	}
+	if r.Status != attestationStatusSuccess {
+		return tokendata.ErrNotReady
+	}
+	return nil
 }
 
-func ErrorAttestationStatus(err error) AttestationStatus {
-	return AttestationStatus{Error: err}
+func (r httpResponse) attestationToBytes() (cciptypes.Bytes, error) {
+	attestationBytes, err := cciptypes.NewBytesFromString(r.Attestation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode attestation hex: %w", err)
+	}
+	return attestationBytes, nil
 }
 
 type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
@@ -58,12 +74,12 @@ type AttestationClient interface {
 	Attestations(
 		ctx context.Context,
 		msgs map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
-	) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error)
+	) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus, error)
 }
 
 type sequentialAttestationClient struct {
 	lggr   logger.Logger
-	client HTTPClient
+	client http.HTTPClient
 	hasher hashutil.Hasher[[32]byte]
 }
 
@@ -71,11 +87,13 @@ func NewSequentialAttestationClient(
 	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,
 ) (AttestationClient, error) {
-	client, err := GetHTTPClient(
+	client, err := http.GetHTTPClient(
 		lggr,
-		config.AttestationAPI,
+		http.USDC,
+		fmt.Sprintf("%s/%s/%s", config.AttestationAPI, apiVersion, attestationPath),
 		config.AttestationAPIInterval.Duration(),
 		config.AttestationAPITimeout.Duration(),
+		defaultCoolDownDuration,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %w", err)
@@ -90,12 +108,12 @@ func NewSequentialAttestationClient(
 func (s *sequentialAttestationClient) Attestations(
 	ctx context.Context,
 	messagesByChain map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
-) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
+) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus, error) {
 	lggr := logutil.WithContextValues(ctx, s.lggr)
-	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus)
+	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus)
 
 	for chainSelector, messagesByTokenID := range messagesByChain {
-		outcome[chainSelector] = make(map[reader.MessageTokenID]AttestationStatus)
+		outcome[chainSelector] = make(map[reader.MessageTokenID]tokendata.AttestationStatus)
 
 		for tokenID, message := range messagesByTokenID {
 			lggr.Debugw(
@@ -114,27 +132,43 @@ func (s *sequentialAttestationClient) Attestations(
 func (s *sequentialAttestationClient) fetchSingleMessage(
 	ctx context.Context,
 	message cciptypes.Bytes,
-) AttestationStatus {
-	response, _, err := s.client.Get(ctx, s.hasher.Hash(message))
+) tokendata.AttestationStatus {
+	body, _, err := s.client.Get(ctx, s.hasher.Hash(message))
 	if err != nil {
-		return ErrorAttestationStatus(err)
+		return tokendata.ErrorAttestationStatus(err)
+	}
+	response, err := parsePayload(body)
+	if err != nil {
+		return tokendata.ErrorAttestationStatus(err)
+	}
+	return tokendata.SuccessAttestationStatus(message, response)
+}
+
+func parsePayload(body cciptypes.Bytes) (cciptypes.Bytes, error) {
+	var response httpResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode json: %w", err)
 	}
 
-	return SuccessAttestationStatus(message, response)
+	if err := response.validate(); err != nil {
+		return nil, err
+	}
+
+	return response.attestationToBytes()
 }
 
 type FakeAttestationClient struct {
-	Data map[string]AttestationStatus
+	Data map[string]tokendata.AttestationStatus
 }
 
 func (f FakeAttestationClient) Attestations(
 	_ context.Context,
 	messagesByChain map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
-) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
-	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus)
+) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus, error) {
+	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus)
 
 	for chainSelector, messagesByTokenID := range messagesByChain {
-		outcome[chainSelector] = make(map[reader.MessageTokenID]AttestationStatus)
+		outcome[chainSelector] = make(map[reader.MessageTokenID]tokendata.AttestationStatus)
 
 		for tokenID, message := range messagesByTokenID {
 			outcome[chainSelector][tokenID] = f.Data[string(message)]

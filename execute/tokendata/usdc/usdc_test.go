@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -79,7 +80,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
-				Data: map[string]usdc.AttestationStatus{
+				Data: map[string]tokendata.AttestationStatus{
 					"message10": {Attestation: []byte{10_1}},
 					"message12": {Attestation: []byte{12_1}},
 				},
@@ -111,7 +112,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
-				Data: map[string]usdc.AttestationStatus{
+				Data: map[string]tokendata.AttestationStatus{
 					"message10_1": {Attestation: []byte{10_1}},
 					"message11_1": {Attestation: []byte{11_1}},
 					"message12_2": {Attestation: []byte{12_2}},
@@ -157,7 +158,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
-				Data: map[string]usdc.AttestationStatus{
+				Data: map[string]tokendata.AttestationStatus{
 					"message10_0": {Attestation: []byte{10_0}},
 					"message10_1": {Attestation: []byte{10_1}},
 					"message10_2": {Attestation: []byte{10_2}},
@@ -195,9 +196,9 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
-				Data: map[string]usdc.AttestationStatus{
+				Data: map[string]tokendata.AttestationStatus{
 					"message10_0": {Attestation: []byte{10_0}},
-					"message10_1": {Error: usdc.ErrNotReady},
+					"message10_1": {Error: tokendata.ErrNotReady},
 				},
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
@@ -207,7 +208,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 						exectypes.TokenData{
 							Ready:     false,
 							Data:      nil,
-							Error:     usdc.ErrNotReady,
+							Error:     tokendata.ErrNotReady,
 							Supported: true,
 						},
 						exectypes.NotSupportedTokenData(),
