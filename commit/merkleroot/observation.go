@@ -268,8 +268,13 @@ func (p *Processor) getObservation(
 	case buildingReport:
 		if q.RetryRMNSignatures {
 			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
-			// So there's nothing to observe, i.e. we don't want to build the report yet.
-			return Observation{}, nextState, nil
+			// So there's nothing to observe except for fChain, i.e. we don't want to build the report yet.
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				// We check q.RetryRMNSignatures there and return the appropriate state and outcome
+				// in order to retry.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nextState, nil
 		}
 		return Observation{
 			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),

@@ -182,6 +182,10 @@ func NewPlugin(
 // Query returns the query for the next round.
 // NOTE: In most cases the Query phase should not return an error based on outCtx to prevent infinite retries.
 func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
+	// Ensure that sequence number is in the context for consumption by all
+	// downstream processors and the ccip reader.
+	ctx, _ = logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseQuery)
+
 	var err error
 	var q committypes.Query
 
