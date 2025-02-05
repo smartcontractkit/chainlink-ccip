@@ -18,8 +18,10 @@ pub enum ErrorCode {
     Full = 2,
 }
 
-#[constant]
 pub const MAX_ADDRS: usize = 64;
+// exposed constant for IDL
+#[constant]
+pub const MAX_ADDRS_U64: u64 = MAX_ADDRS as u64;
 
 #[zero_copy]
 pub struct AccessList {
