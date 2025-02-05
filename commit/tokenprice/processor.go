@@ -16,7 +16,8 @@ import (
 )
 
 type processor struct {
-	oracleID         commontypes.OracleID
+	oracleID commontypes.OracleID
+	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
 	lggr             logger.Logger
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
