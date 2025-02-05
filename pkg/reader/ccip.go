@@ -1185,18 +1185,13 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Remo
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote report digest header: %w", err)
 	}
 
-	// get the RMN remote address from the proxy
-	var rmnRemoteAddress []byte
-	err = r.getDestinationData(
-		ctx,
-		r.destChain,
-		consts.ContractNameRMNProxy,
-		consts.MethodNameGetARM,
-		&rmnRemoteAddress,
-	)
+	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, r.destChain)
 	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
+
+	// get the RMN remote address from the proxy
+	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, r.lggr, r.destChain, proxyContractAddress)
 
 	r.lggr.Infow("Direct call response RMNRemoteConfig",
 		"contractAddress", hex.EncodeToString(rmnRemoteAddress),
@@ -1214,6 +1209,32 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Remo
 		ConfigVersion:    config.RMNRemote.VersionedConfig.Version,
 		RmnReportVersion: config.RMNRemote.DigestHeader.DigestHeader,
 	}, nil
+}
+
+func (r *ccipChainReader) getRMNRemoteAddress(
+	ctx context.Context,
+	lggr logger.Logger,
+	chain cciptypes.ChainSelector,
+	rmnRemoteProxyAddress []byte) ([]byte, error) {
+	_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
+	if err != nil {
+		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
+	}
+
+	// get the RMN remote address from the proxy
+	var rmnRemoteAddress []byte
+	err = r.getDestinationData(
+		ctx,
+		chain,
+		consts.ContractNameRMNProxy,
+		consts.MethodNameGetARM,
+		&rmnRemoteAddress,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
+	}
+
+	return rmnRemoteAddress, nil
 }
 
 // GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
