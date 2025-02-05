@@ -61,6 +61,11 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		})
 	}
 
+	if len(reqUpdates) == 0 {
+		lggr.Debugw("no RMN-enabled chains to request signatures, empty query returned")
+		return Query{}, nil
+	}
+
 	ctxQuery, cancel := context.WithTimeout(ctx, p.offchainCfg.RMNSignaturesTimeout)
 	defer cancel()
 
