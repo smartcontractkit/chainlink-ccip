@@ -858,7 +858,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	// Get from cache
 	config, err := r.cache.GetChainConfig(ctx, r.destChain)
 	if err != nil {
-		return nil, fmt.Errorf("get chain config: %w", err)
+		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
 
 	resp := make(ContractAddresses)
@@ -1375,7 +1375,6 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	lggr logger.Logger,
 	chain cciptypes.ChainSelector,
 	rmnRemoteProxyAddress []byte) ([]byte, error) {
-	// Still need to bind the contract before accessing it
 	_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
 	if err != nil {
 		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
