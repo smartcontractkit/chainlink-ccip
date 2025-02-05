@@ -64,10 +64,11 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	}
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything).
 		Return(expectedContracts, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
+	mockHomeChain.EXPECT().GetAllChainConfigs().Return(nil, nil)
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
@@ -140,10 +141,11 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 	}
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything).
 		Return(nil, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
+	mockHomeChain.EXPECT().GetAllChainConfigs().Return(nil, nil)
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
@@ -179,9 +181,10 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	discoveryErr := fmt.Errorf("discovery error")
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything).
+		DiscoverContracts(mock.Anything, mock.Anything).
 		Return(nil, discoveryErr)
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
+	mockHomeChain.EXPECT().GetAllChainConfigs().Return(nil, nil)
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 

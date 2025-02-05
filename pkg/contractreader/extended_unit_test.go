@@ -5,9 +5,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetOneBinding(t *testing.T) {
