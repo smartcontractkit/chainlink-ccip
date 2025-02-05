@@ -10,14 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AcceptOwnership is the `acceptOwnership` instruction.
+// AcceptOwnership is the `accept_ownership` instruction.
 type AcceptOwnership struct {
 	TimelockId *[32]uint8
 
 	// [0] = [WRITE] config
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAcceptOwnershipInstructionBuilder creates a new `AcceptOwnership` instruction builder.
@@ -28,9 +28,9 @@ func NewAcceptOwnershipInstructionBuilder() *AcceptOwnership {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *AcceptOwnership) SetTimelockId(timelockId [32]uint8) *AcceptOwnership {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "_timelock_id" parameter.
+func (inst *AcceptOwnership) SetTimelockId(_timelock_id [32]uint8) *AcceptOwnership {
+	inst.TimelockId = &_timelock_id
 	return inst
 }
 
@@ -42,7 +42,7 @@ func (inst *AcceptOwnership) SetConfigAccount(config ag_solanago.PublicKey) *Acc
 
 // GetConfigAccount gets the "config" account.
 func (inst *AcceptOwnership) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -53,7 +53,7 @@ func (inst *AcceptOwnership) SetAuthorityAccount(authority ag_solanago.PublicKey
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AcceptOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst AcceptOwnership) Build() *Instruction {
@@ -103,13 +103,13 @@ func (inst *AcceptOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("  TimelockId", *inst.TimelockId))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
@@ -135,12 +135,12 @@ func (obj *AcceptOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewAcceptOwnershipInstruction declares a new AcceptOwnership instruction with the provided parameters and accounts.
 func NewAcceptOwnershipInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	_timelock_id [32]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AcceptOwnership {
 	return NewAcceptOwnershipInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(_timelock_id).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }

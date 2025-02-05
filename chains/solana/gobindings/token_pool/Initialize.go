@@ -19,12 +19,12 @@ type Initialize struct {
 	//
 	// [1] = [] mint
 	//
-	// [2] = [WRITE] poolSigner
+	// [2] = [WRITE] pool_signer
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
-	// [4] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [4] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
@@ -35,15 +35,15 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetPoolType sets the "poolType" parameter.
-func (inst *Initialize) SetPoolType(poolType PoolType) *Initialize {
-	inst.PoolType = &poolType
+// SetPoolType sets the "pool_type" parameter.
+func (inst *Initialize) SetPoolType(pool_type PoolType) *Initialize {
+	inst.PoolType = &pool_type
 	return inst
 }
 
-// SetRampAuthority sets the "rampAuthority" parameter.
-func (inst *Initialize) SetRampAuthority(rampAuthority ag_solanago.PublicKey) *Initialize {
-	inst.RampAuthority = &rampAuthority
+// SetRampAuthority sets the "ramp_authority" parameter.
+func (inst *Initialize) SetRampAuthority(ramp_authority ag_solanago.PublicKey) *Initialize {
+	inst.RampAuthority = &ramp_authority
 	return inst
 }
 
@@ -55,7 +55,7 @@ func (inst *Initialize) SetConfigAccount(config ag_solanago.PublicKey) *Initiali
 
 // GetConfigAccount gets the "config" account.
 func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -66,18 +66,18 @@ func (inst *Initialize) SetMintAccount(mint ag_solanago.PublicKey) *Initialize {
 
 // GetMintAccount gets the "mint" account.
 func (inst *Initialize) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetPoolSignerAccount sets the "poolSigner" account.
+// SetPoolSignerAccount sets the "pool_signer" account.
 func (inst *Initialize) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(poolSigner).WRITE()
 	return inst
 }
 
-// GetPoolSignerAccount gets the "poolSigner" account.
+// GetPoolSignerAccount gets the "pool_signer" account.
 func (inst *Initialize) GetPoolSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -88,18 +88,18 @@ func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *In
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -161,17 +161,17 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("     PoolType", *inst.PoolType))
-						paramsBranch.Child(ag_format.Param("RampAuthority", *inst.RampAuthority))
+						paramsBranch.Child(ag_format.Param("      PoolType", *inst.PoolType))
+						paramsBranch.Child(ag_format.Param(" RampAuthority", *inst.RampAuthority))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("   poolSigner", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("          mint", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("   pool_signer", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(4)))
 					})
 				})
 		})
@@ -207,8 +207,8 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	poolType PoolType,
-	rampAuthority ag_solanago.PublicKey,
+	pool_type PoolType,
+	ramp_authority ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
@@ -216,8 +216,8 @@ func NewInitializeInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetPoolType(poolType).
-		SetRampAuthority(rampAuthority).
+		SetPoolType(pool_type).
+		SetRampAuthority(ramp_authority).
 		SetConfigAccount(config).
 		SetMintAccount(mint).
 		SetPoolSignerAccount(poolSigner).

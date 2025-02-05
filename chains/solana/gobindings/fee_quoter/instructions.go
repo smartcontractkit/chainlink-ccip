@@ -14,8 +14,8 @@ import (
 
 var ProgramID ag_solanago.PublicKey
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,29 +28,6 @@ func init() {
 }
 
 var (
-	// Initializes the Fee Quoter.
-	//
-	// The initialization is responsibility of Admin, nothing more than calling this method should be done first.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for initialization.
-	// * `svm_chain_selector` - The chain selector for SVM.
-	// * `default_gas_limit` - The default gas limit for other destination chains.
-	// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
-	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	// Transfers the ownership of the fee quoter to a new proposed owner.
-	//
-	// Shared func signature with other programs
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for the transfer.
-	// * `proposed_owner` - The public key of the new proposed owner.
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
 	// Accepts the ownership of the fee quoter by the proposed owner.
 	//
 	// Shared func signature with other programs
@@ -69,15 +46,6 @@ var (
 	// * `ctx` - The context containing the accounts required for adding the billing token configuration.
 	// * `config` - The billing token configuration to be added.
 	Instruction_AddBillingTokenConfig = ag_binary.TypeID([8]byte{63, 156, 254, 216, 227, 53, 0, 69})
-
-	// Updates the billing token configuration.
-	// Only CCIP Admin can update a billing token configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the billing token configuration.
-	// * `config` - The new billing token configuration.
-	Instruction_UpdateBillingTokenConfig = ag_binary.TypeID([8]byte{140, 184, 124, 146, 204, 62, 244, 79})
 
 	// Adds a new destination chain selector to the fee quoter.
 	//
@@ -100,31 +68,6 @@ var (
 	// * `ctx` - The context containing the accounts required for disabling the chain selector.
 	// * `chain_selector` - The destination chain selector to be disabled.
 	Instruction_DisableDestChain = ag_binary.TypeID([8]byte{200, 195, 114, 206, 152, 86, 50, 41})
-
-	// Updates the configuration of the destination chain selector.
-	//
-	// The Admin is the only one able to update the destination chain config.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the chain selector.
-	// * `chain_selector` - The destination chain selector to be updated.
-	// * `dest_chain_config` - The new configuration for the destination chain.
-	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
-
-	// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
-	// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
-	// and overwriting it if it does.
-	//
-	// Only the Admin can perform this operation.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-	// * `chain_selector` - The chain selector.
-	// * `mint` - The public key of the token mint.
-	// * `cfg` - The token transfer fee configuration.
-	Instruction_SetTokenTransferFeeConfig = ag_binary.TypeID([8]byte{76, 243, 16, 214, 126, 11, 254, 77})
 
 	// Calculates the fee for sending a message to the destination chain.
 	//
@@ -155,32 +98,89 @@ var (
 	// - deserialized and processed extra args
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 
+	// Initializes the Fee Quoter.
+	//
+	// The initialization is responsibility of Admin, nothing more than calling this method should be done first.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for initialization.
+	// * `svm_chain_selector` - The chain selector for SVM.
+	// * `default_gas_limit` - The default gas limit for other destination chains.
+	// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
+	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
+	// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
+	// and overwriting it if it does.
+	//
+	// Only the Admin can perform this operation.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
+	// * `chain_selector` - The chain selector.
+	// * `mint` - The public key of the token mint.
+	// * `cfg` - The token transfer fee configuration.
+	Instruction_SetTokenTransferFeeConfig = ag_binary.TypeID([8]byte{76, 243, 16, 214, 126, 11, 254, 77})
+
+	// Transfers the ownership of the fee quoter to a new proposed owner.
+	//
+	// Shared func signature with other programs
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for the transfer.
+	// * `proposed_owner` - The public key of the new proposed owner.
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
+
+	// Updates the billing token configuration.
+	// Only CCIP Admin can update a billing token configuration.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the billing token configuration.
+	// * `config` - The new billing token configuration.
+	Instruction_UpdateBillingTokenConfig = ag_binary.TypeID([8]byte{140, 184, 124, 146, 204, 62, 244, 79})
+
+	// Updates the configuration of the destination chain selector.
+	//
+	// The Admin is the only one able to update the destination chain config.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the chain selector.
+	// * `chain_selector` - The destination chain selector to be updated.
+	// * `dest_chain_config` - The new configuration for the destination chain.
+	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
+
 	Instruction_UpdatePrices = ag_binary.TypeID([8]byte{62, 161, 234, 136, 106, 26, 18, 160})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
 	case Instruction_AddBillingTokenConfig:
 		return "AddBillingTokenConfig"
-	case Instruction_UpdateBillingTokenConfig:
-		return "UpdateBillingTokenConfig"
 	case Instruction_AddDestChain:
 		return "AddDestChain"
 	case Instruction_DisableDestChain:
 		return "DisableDestChain"
-	case Instruction_UpdateDestChainConfig:
-		return "UpdateDestChainConfig"
-	case Instruction_SetTokenTransferFeeConfig:
-		return "SetTokenTransferFeeConfig"
 	case Instruction_GetFee:
 		return "GetFee"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_SetTokenTransferFeeConfig:
+		return "SetTokenTransferFeeConfig"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_UpdateBillingTokenConfig:
+		return "UpdateBillingTokenConfig"
+	case Instruction_UpdateDestChainConfig:
+		return "UpdateDestChainConfig"
 	case Instruction_UpdatePrices:
 		return "UpdatePrices"
 	default:
@@ -204,37 +204,37 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnership)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "add_billing_token_config", Type: (*AddBillingTokenConfig)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "add_dest_chain", Type: (*AddDestChain)(nil),
 		},
 		{
-			"add_billing_token_config", (*AddBillingTokenConfig)(nil),
+			Name: "disable_dest_chain", Type: (*DisableDestChain)(nil),
 		},
 		{
-			"update_billing_token_config", (*UpdateBillingTokenConfig)(nil),
+			Name: "get_fee", Type: (*GetFee)(nil),
 		},
 		{
-			"add_dest_chain", (*AddDestChain)(nil),
+			Name: "initialize", Type: (*Initialize)(nil),
 		},
 		{
-			"disable_dest_chain", (*DisableDestChain)(nil),
+			Name: "set_token_transfer_fee_config", Type: (*SetTokenTransferFeeConfig)(nil),
 		},
 		{
-			"update_dest_chain_config", (*UpdateDestChainConfig)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnership)(nil),
 		},
 		{
-			"set_token_transfer_fee_config", (*SetTokenTransferFeeConfig)(nil),
+			Name: "update_billing_token_config", Type: (*UpdateBillingTokenConfig)(nil),
 		},
 		{
-			"get_fee", (*GetFee)(nil),
+			Name: "update_dest_chain_config", Type: (*UpdateDestChainConfig)(nil),
 		},
 		{
-			"update_prices", (*UpdatePrices)(nil),
+			Name: "update_prices", Type: (*UpdatePrices)(nil),
 		},
 	},
 )
@@ -272,14 +272,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -291,4 +291,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

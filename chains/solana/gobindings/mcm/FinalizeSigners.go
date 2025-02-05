@@ -10,16 +10,16 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// FinalizeSigners is the `finalizeSigners` instruction.
+// FinalizeSigners is the `finalize_signers` instruction.
 type FinalizeSigners struct {
 	MultisigId *[32]uint8
 
-	// [0] = [] multisigConfig
+	// [0] = [] multisig_config
 	//
-	// [1] = [WRITE] configSigners
+	// [1] = [WRITE] config_signers
 	//
 	// [2] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewFinalizeSignersInstructionBuilder creates a new `FinalizeSigners` instruction builder.
@@ -30,32 +30,32 @@ func NewFinalizeSignersInstructionBuilder() *FinalizeSigners {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *FinalizeSigners) SetMultisigId(multisigId [32]uint8) *FinalizeSigners {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *FinalizeSigners) SetMultisigId(multisig_id [32]uint8) *FinalizeSigners {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
-// SetMultisigConfigAccount sets the "multisigConfig" account.
+// SetMultisigConfigAccount sets the "multisig_config" account.
 func (inst *FinalizeSigners) SetMultisigConfigAccount(multisigConfig ag_solanago.PublicKey) *FinalizeSigners {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(multisigConfig)
 	return inst
 }
 
-// GetMultisigConfigAccount gets the "multisigConfig" account.
+// GetMultisigConfigAccount gets the "multisig_config" account.
 func (inst *FinalizeSigners) GetMultisigConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetConfigSignersAccount sets the "configSigners" account.
+// SetConfigSignersAccount sets the "config_signers" account.
 func (inst *FinalizeSigners) SetConfigSignersAccount(configSigners ag_solanago.PublicKey) *FinalizeSigners {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(configSigners).WRITE()
 	return inst
 }
 
-// GetConfigSignersAccount gets the "configSigners" account.
+// GetConfigSignersAccount gets the "config_signers" account.
 func (inst *FinalizeSigners) GetConfigSignersAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -66,7 +66,7 @@ func (inst *FinalizeSigners) SetAuthorityAccount(authority ag_solanago.PublicKey
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *FinalizeSigners) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst FinalizeSigners) Build() *Instruction {
@@ -119,14 +119,14 @@ func (inst *FinalizeSigners) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param(" MultisigId", *inst.MultisigId))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("multisigConfig", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta(" configSigners", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("multisig_config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta(" config_signers", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -152,13 +152,13 @@ func (obj *FinalizeSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewFinalizeSignersInstruction declares a new FinalizeSigners instruction with the provided parameters and accounts.
 func NewFinalizeSignersInstruction(
 	// Parameters:
-	multisigId [32]uint8,
+	multisig_id [32]uint8,
 	// Accounts:
 	multisigConfig ag_solanago.PublicKey,
 	configSigners ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *FinalizeSigners {
 	return NewFinalizeSignersInstructionBuilder().
-		SetMultisigId(multisigId).
+		SetMultisigId(multisig_id).
 		SetMultisigConfigAccount(multisigConfig).
 		SetConfigSignersAccount(configSigners).
 		SetAuthorityAccount(authority)

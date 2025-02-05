@@ -23,10 +23,10 @@ type DisableDestChain struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] destChain
+	// [1] = [WRITE] dest_chain
 	//
 	// [2] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewDisableDestChainInstructionBuilder creates a new `DisableDestChain` instruction builder.
@@ -37,9 +37,9 @@ func NewDisableDestChainInstructionBuilder() *DisableDestChain {
 	return nd
 }
 
-// SetChainSelector sets the "chainSelector" parameter.
-func (inst *DisableDestChain) SetChainSelector(chainSelector uint64) *DisableDestChain {
-	inst.ChainSelector = &chainSelector
+// SetChainSelector sets the "chain_selector" parameter.
+func (inst *DisableDestChain) SetChainSelector(chain_selector uint64) *DisableDestChain {
+	inst.ChainSelector = &chain_selector
 	return inst
 }
 
@@ -51,18 +51,18 @@ func (inst *DisableDestChain) SetConfigAccount(config ag_solanago.PublicKey) *Di
 
 // GetConfigAccount gets the "config" account.
 func (inst *DisableDestChain) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetDestChainAccount sets the "destChain" account.
+// SetDestChainAccount sets the "dest_chain" account.
 func (inst *DisableDestChain) SetDestChainAccount(destChain ag_solanago.PublicKey) *DisableDestChain {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(destChain).WRITE()
 	return inst
 }
 
-// GetDestChainAccount gets the "destChain" account.
+// GetDestChainAccount gets the "dest_chain" account.
 func (inst *DisableDestChain) GetDestChainAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -73,7 +73,7 @@ func (inst *DisableDestChain) SetAuthorityAccount(authority ag_solanago.PublicKe
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *DisableDestChain) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst DisableDestChain) Build() *Instruction {
@@ -126,14 +126,14 @@ func (inst *DisableDestChain) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ChainSelector", *inst.ChainSelector))
+						paramsBranch.Child(ag_format.Param(" ChainSelector", *inst.ChainSelector))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("destChain", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("    config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("dest_chain", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta(" authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -159,13 +159,13 @@ func (obj *DisableDestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 // NewDisableDestChainInstruction declares a new DisableDestChain instruction with the provided parameters and accounts.
 func NewDisableDestChainInstruction(
 	// Parameters:
-	chainSelector uint64,
+	chain_selector uint64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	destChain ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *DisableDestChain {
 	return NewDisableDestChainInstructionBuilder().
-		SetChainSelector(chainSelector).
+		SetChainSelector(chain_selector).
 		SetConfigAccount(config).
 		SetDestChainAccount(destChain).
 		SetAuthorityAccount(authority)

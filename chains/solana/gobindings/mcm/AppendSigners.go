@@ -10,17 +10,17 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendSigners is the `appendSigners` instruction.
+// AppendSigners is the `append_signers` instruction.
 type AppendSigners struct {
 	MultisigId   *[32]uint8
 	SignersBatch *[][20]uint8
 
-	// [0] = [] multisigConfig
+	// [0] = [] multisig_config
 	//
-	// [1] = [WRITE] configSigners
+	// [1] = [WRITE] config_signers
 	//
 	// [2] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAppendSignersInstructionBuilder creates a new `AppendSigners` instruction builder.
@@ -31,38 +31,38 @@ func NewAppendSignersInstructionBuilder() *AppendSigners {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *AppendSigners) SetMultisigId(multisigId [32]uint8) *AppendSigners {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *AppendSigners) SetMultisigId(multisig_id [32]uint8) *AppendSigners {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
-// SetSignersBatch sets the "signersBatch" parameter.
-func (inst *AppendSigners) SetSignersBatch(signersBatch [][20]uint8) *AppendSigners {
-	inst.SignersBatch = &signersBatch
+// SetSignersBatch sets the "signers_batch" parameter.
+func (inst *AppendSigners) SetSignersBatch(signers_batch [][20]uint8) *AppendSigners {
+	inst.SignersBatch = &signers_batch
 	return inst
 }
 
-// SetMultisigConfigAccount sets the "multisigConfig" account.
+// SetMultisigConfigAccount sets the "multisig_config" account.
 func (inst *AppendSigners) SetMultisigConfigAccount(multisigConfig ag_solanago.PublicKey) *AppendSigners {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(multisigConfig)
 	return inst
 }
 
-// GetMultisigConfigAccount gets the "multisigConfig" account.
+// GetMultisigConfigAccount gets the "multisig_config" account.
 func (inst *AppendSigners) GetMultisigConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetConfigSignersAccount sets the "configSigners" account.
+// SetConfigSignersAccount sets the "config_signers" account.
 func (inst *AppendSigners) SetConfigSignersAccount(configSigners ag_solanago.PublicKey) *AppendSigners {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(configSigners).WRITE()
 	return inst
 }
 
-// GetConfigSignersAccount gets the "configSigners" account.
+// GetConfigSignersAccount gets the "config_signers" account.
 func (inst *AppendSigners) GetConfigSignersAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -73,7 +73,7 @@ func (inst *AppendSigners) SetAuthorityAccount(authority ag_solanago.PublicKey) 
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AppendSigners) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst AppendSigners) Build() *Instruction {
@@ -129,15 +129,15 @@ func (inst *AppendSigners) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("  MultisigId", *inst.MultisigId))
-						paramsBranch.Child(ag_format.Param("SignersBatch", *inst.SignersBatch))
+						paramsBranch.Child(ag_format.Param("   MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param(" SignersBatch", *inst.SignersBatch))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("multisigConfig", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta(" configSigners", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("multisig_config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta(" config_signers", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -173,15 +173,15 @@ func (obj *AppendSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 // NewAppendSignersInstruction declares a new AppendSigners instruction with the provided parameters and accounts.
 func NewAppendSignersInstruction(
 	// Parameters:
-	multisigId [32]uint8,
-	signersBatch [][20]uint8,
+	multisig_id [32]uint8,
+	signers_batch [][20]uint8,
 	// Accounts:
 	multisigConfig ag_solanago.PublicKey,
 	configSigners ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AppendSigners {
 	return NewAppendSignersInstructionBuilder().
-		SetMultisigId(multisigId).
-		SetSignersBatch(signersBatch).
+		SetMultisigId(multisig_id).
+		SetSignersBatch(signers_batch).
 		SetMultisigConfigAccount(multisigConfig).
 		SetConfigSignersAccount(configSigners).
 		SetAuthorityAccount(authority)

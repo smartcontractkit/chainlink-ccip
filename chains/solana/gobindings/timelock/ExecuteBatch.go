@@ -10,23 +10,23 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ExecuteBatch is the `executeBatch` instruction.
+// ExecuteBatch is the `execute_batch` instruction.
 type ExecuteBatch struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8
 
 	// [0] = [WRITE] operation
 	//
-	// [1] = [] predecessorOperation
+	// [1] = [] predecessor_operation
 	//
 	// [2] = [] config
 	//
-	// [3] = [] timelockSigner
+	// [3] = [] timelock_signer
 	//
-	// [4] = [] roleAccessController
+	// [4] = [] role_access_controller
 	//
 	// [5] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewExecuteBatchInstructionBuilder creates a new `ExecuteBatch` instruction builder.
@@ -37,9 +37,9 @@ func NewExecuteBatchInstructionBuilder() *ExecuteBatch {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *ExecuteBatch) SetTimelockId(timelockId [32]uint8) *ExecuteBatch {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "timelock_id" parameter.
+func (inst *ExecuteBatch) SetTimelockId(timelock_id [32]uint8) *ExecuteBatch {
+	inst.TimelockId = &timelock_id
 	return inst
 }
 
@@ -57,18 +57,18 @@ func (inst *ExecuteBatch) SetOperationAccount(operation ag_solanago.PublicKey) *
 
 // GetOperationAccount gets the "operation" account.
 func (inst *ExecuteBatch) GetOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetPredecessorOperationAccount sets the "predecessorOperation" account.
+// SetPredecessorOperationAccount sets the "predecessor_operation" account.
 func (inst *ExecuteBatch) SetPredecessorOperationAccount(predecessorOperation ag_solanago.PublicKey) *ExecuteBatch {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(predecessorOperation)
 	return inst
 }
 
-// GetPredecessorOperationAccount gets the "predecessorOperation" account.
+// GetPredecessorOperationAccount gets the "predecessor_operation" account.
 func (inst *ExecuteBatch) GetPredecessorOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -79,29 +79,29 @@ func (inst *ExecuteBatch) SetConfigAccount(config ag_solanago.PublicKey) *Execut
 
 // GetConfigAccount gets the "config" account.
 func (inst *ExecuteBatch) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetTimelockSignerAccount sets the "timelockSigner" account.
+// SetTimelockSignerAccount sets the "timelock_signer" account.
 func (inst *ExecuteBatch) SetTimelockSignerAccount(timelockSigner ag_solanago.PublicKey) *ExecuteBatch {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(timelockSigner)
 	return inst
 }
 
-// GetTimelockSignerAccount gets the "timelockSigner" account.
+// GetTimelockSignerAccount gets the "timelock_signer" account.
 func (inst *ExecuteBatch) GetTimelockSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+// SetRoleAccessControllerAccount sets the "role_access_controller" account.
 func (inst *ExecuteBatch) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *ExecuteBatch {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
-// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+// GetRoleAccessControllerAccount gets the "role_access_controller" account.
 func (inst *ExecuteBatch) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -112,7 +112,7 @@ func (inst *ExecuteBatch) SetAuthorityAccount(authority ag_solanago.PublicKey) *
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ExecuteBatch) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
 func (inst ExecuteBatch) Build() *Instruction {
@@ -177,18 +177,18 @@ func (inst *ExecuteBatch) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param(" TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("         Id", *inst.Id))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("predecessorOperation", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("      timelockSigner", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("             operation", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta(" predecessor_operation", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("       timelock_signer", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("role_access_controller", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice.Get(5)))
 					})
 				})
 		})
@@ -224,7 +224,7 @@ func (obj *ExecuteBatch) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 // NewExecuteBatchInstruction declares a new ExecuteBatch instruction with the provided parameters and accounts.
 func NewExecuteBatchInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	timelock_id [32]uint8,
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
@@ -234,7 +234,7 @@ func NewExecuteBatchInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ExecuteBatch {
 	return NewExecuteBatchInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(timelock_id).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetPredecessorOperationAccount(predecessorOperation).

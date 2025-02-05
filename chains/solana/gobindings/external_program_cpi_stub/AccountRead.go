@@ -10,11 +10,11 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AccountRead is the `accountRead` instruction.
+// AccountRead is the `account_read` instruction.
 type AccountRead struct {
 
-	// [0] = [] u8Value
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [0] = [] u8_value
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAccountReadInstructionBuilder creates a new `AccountRead` instruction builder.
@@ -25,15 +25,15 @@ func NewAccountReadInstructionBuilder() *AccountRead {
 	return nd
 }
 
-// SetU8ValueAccount sets the "u8Value" account.
+// SetU8ValueAccount sets the "u8_value" account.
 func (inst *AccountRead) SetU8ValueAccount(u8Value ag_solanago.PublicKey) *AccountRead {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(u8Value)
 	return inst
 }
 
-// GetU8ValueAccount gets the "u8Value" account.
+// GetU8ValueAccount gets the "u8_value" account.
 func (inst *AccountRead) GetU8ValueAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 func (inst AccountRead) Build() *Instruction {
@@ -76,7 +76,7 @@ func (inst *AccountRead) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("u8Value", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("u8_value", inst.AccountMetaSlice.Get(0)))
 					})
 				})
 		})

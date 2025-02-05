@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ClearSignatures is the `clearSignatures` instruction.
+// ClearSignatures is the `clear_signatures` instruction.
 type ClearSignatures struct {
 	MultisigId *[32]uint8
 	Root       *[32]uint8
@@ -19,7 +19,7 @@ type ClearSignatures struct {
 	// [0] = [WRITE] signatures
 	//
 	// [1] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewClearSignaturesInstructionBuilder creates a new `ClearSignatures` instruction builder.
@@ -30,9 +30,9 @@ func NewClearSignaturesInstructionBuilder() *ClearSignatures {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *ClearSignatures) SetMultisigId(multisigId [32]uint8) *ClearSignatures {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *ClearSignatures) SetMultisigId(multisig_id [32]uint8) *ClearSignatures {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
@@ -42,9 +42,9 @@ func (inst *ClearSignatures) SetRoot(root [32]uint8) *ClearSignatures {
 	return inst
 }
 
-// SetValidUntil sets the "validUntil" parameter.
-func (inst *ClearSignatures) SetValidUntil(validUntil uint32) *ClearSignatures {
-	inst.ValidUntil = &validUntil
+// SetValidUntil sets the "valid_until" parameter.
+func (inst *ClearSignatures) SetValidUntil(valid_until uint32) *ClearSignatures {
+	inst.ValidUntil = &valid_until
 	return inst
 }
 
@@ -56,7 +56,7 @@ func (inst *ClearSignatures) SetSignaturesAccount(signatures ag_solanago.PublicK
 
 // GetSignaturesAccount gets the "signatures" account.
 func (inst *ClearSignatures) GetSignaturesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -67,7 +67,7 @@ func (inst *ClearSignatures) SetAuthorityAccount(authority ag_solanago.PublicKey
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ClearSignatures) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst ClearSignatures) Build() *Instruction {
@@ -123,15 +123,15 @@ func (inst *ClearSignatures) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MultisigId", *inst.MultisigId))
-						paramsBranch.Child(ag_format.Param("      Root", *inst.Root))
-						paramsBranch.Child(ag_format.Param("ValidUntil", *inst.ValidUntil))
+						paramsBranch.Child(ag_format.Param(" MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param("       Root", *inst.Root))
+						paramsBranch.Child(ag_format.Param(" ValidUntil", *inst.ValidUntil))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("signatures", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta(" authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("signatures", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta(" authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
@@ -177,16 +177,16 @@ func (obj *ClearSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewClearSignaturesInstruction declares a new ClearSignatures instruction with the provided parameters and accounts.
 func NewClearSignaturesInstruction(
 	// Parameters:
-	multisigId [32]uint8,
+	multisig_id [32]uint8,
 	root [32]uint8,
-	validUntil uint32,
+	valid_until uint32,
 	// Accounts:
 	signatures ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ClearSignatures {
 	return NewClearSignaturesInstructionBuilder().
-		SetMultisigId(multisigId).
+		SetMultisigId(multisig_id).
 		SetRoot(root).
-		SetValidUntil(validUntil).
+		SetValidUntil(valid_until).
 		SetSignaturesAccount(signatures).
 		SetAuthorityAccount(authority)
 }

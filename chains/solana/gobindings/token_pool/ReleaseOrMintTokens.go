@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ReleaseOrMintTokens is the `releaseOrMintTokens` instruction.
+// ReleaseOrMintTokens is the `release_or_mint_tokens` instruction.
 type ReleaseOrMintTokens struct {
 	ReleaseOrMint *ReleaseOrMintInV1
 
@@ -18,18 +18,18 @@ type ReleaseOrMintTokens struct {
 	//
 	// [1] = [WRITE] config
 	//
-	// [2] = [] tokenProgram
+	// [2] = [] token_program
 	//
 	// [3] = [WRITE] mint
 	//
-	// [4] = [] poolSigner
+	// [4] = [] pool_signer
 	//
-	// [5] = [WRITE] poolTokenAccount
+	// [5] = [WRITE] pool_token_account
 	//
-	// [6] = [WRITE] chainConfig
+	// [6] = [WRITE] chain_config
 	//
-	// [7] = [WRITE] receiverTokenAccount
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [7] = [WRITE] receiver_token_account
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewReleaseOrMintTokensInstructionBuilder creates a new `ReleaseOrMintTokens` instruction builder.
@@ -40,9 +40,9 @@ func NewReleaseOrMintTokensInstructionBuilder() *ReleaseOrMintTokens {
 	return nd
 }
 
-// SetReleaseOrMint sets the "releaseOrMint" parameter.
-func (inst *ReleaseOrMintTokens) SetReleaseOrMint(releaseOrMint ReleaseOrMintInV1) *ReleaseOrMintTokens {
-	inst.ReleaseOrMint = &releaseOrMint
+// SetReleaseOrMint sets the "release_or_mint" parameter.
+func (inst *ReleaseOrMintTokens) SetReleaseOrMint(release_or_mint ReleaseOrMintInV1) *ReleaseOrMintTokens {
+	inst.ReleaseOrMint = &release_or_mint
 	return inst
 }
 
@@ -54,7 +54,7 @@ func (inst *ReleaseOrMintTokens) SetAuthorityAccount(authority ag_solanago.Publi
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ReleaseOrMintTokens) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -65,18 +65,18 @@ func (inst *ReleaseOrMintTokens) SetConfigAccount(config ag_solanago.PublicKey) 
 
 // GetConfigAccount gets the "config" account.
 func (inst *ReleaseOrMintTokens) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 func (inst *ReleaseOrMintTokens) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *ReleaseOrMintTokens {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 func (inst *ReleaseOrMintTokens) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -87,51 +87,51 @@ func (inst *ReleaseOrMintTokens) SetMintAccount(mint ag_solanago.PublicKey) *Rel
 
 // GetMintAccount gets the "mint" account.
 func (inst *ReleaseOrMintTokens) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetPoolSignerAccount sets the "poolSigner" account.
+// SetPoolSignerAccount sets the "pool_signer" account.
 func (inst *ReleaseOrMintTokens) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *ReleaseOrMintTokens {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(poolSigner)
 	return inst
 }
 
-// GetPoolSignerAccount gets the "poolSigner" account.
+// GetPoolSignerAccount gets the "pool_signer" account.
 func (inst *ReleaseOrMintTokens) GetPoolSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetPoolTokenAccountAccount sets the "poolTokenAccount" account.
+// SetPoolTokenAccountAccount sets the "pool_token_account" account.
 func (inst *ReleaseOrMintTokens) SetPoolTokenAccountAccount(poolTokenAccount ag_solanago.PublicKey) *ReleaseOrMintTokens {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(poolTokenAccount).WRITE()
 	return inst
 }
 
-// GetPoolTokenAccountAccount gets the "poolTokenAccount" account.
+// GetPoolTokenAccountAccount gets the "pool_token_account" account.
 func (inst *ReleaseOrMintTokens) GetPoolTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 func (inst *ReleaseOrMintTokens) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *ReleaseOrMintTokens {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 func (inst *ReleaseOrMintTokens) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetReceiverTokenAccountAccount sets the "receiverTokenAccount" account.
+// SetReceiverTokenAccountAccount sets the "receiver_token_account" account.
 func (inst *ReleaseOrMintTokens) SetReceiverTokenAccountAccount(receiverTokenAccount ag_solanago.PublicKey) *ReleaseOrMintTokens {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(receiverTokenAccount).WRITE()
 	return inst
 }
 
-// GetReceiverTokenAccountAccount gets the "receiverTokenAccount" account.
+// GetReceiverTokenAccountAccount gets the "receiver_token_account" account.
 func (inst *ReleaseOrMintTokens) GetReceiverTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
 func (inst ReleaseOrMintTokens) Build() *Instruction {
@@ -199,19 +199,19 @@ func (inst *ReleaseOrMintTokens) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ReleaseOrMint", *inst.ReleaseOrMint))
+						paramsBranch.Child(ag_format.Param("  ReleaseOrMint", *inst.ReleaseOrMint))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta(" tokenProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("   poolSigner", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("    poolToken", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("receiverToken", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("         config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("  token_program", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("           mint", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("    pool_signer", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("    pool_token_", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("   chain_config", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("receiver_token_", inst.AccountMetaSlice.Get(7)))
 					})
 				})
 		})
@@ -237,7 +237,7 @@ func (obj *ReleaseOrMintTokens) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 // NewReleaseOrMintTokensInstruction declares a new ReleaseOrMintTokens instruction with the provided parameters and accounts.
 func NewReleaseOrMintTokensInstruction(
 	// Parameters:
-	releaseOrMint ReleaseOrMintInV1,
+	release_or_mint ReleaseOrMintInV1,
 	// Accounts:
 	authority ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
@@ -248,7 +248,7 @@ func NewReleaseOrMintTokensInstruction(
 	chainConfig ag_solanago.PublicKey,
 	receiverTokenAccount ag_solanago.PublicKey) *ReleaseOrMintTokens {
 	return NewReleaseOrMintTokensInstructionBuilder().
-		SetReleaseOrMint(releaseOrMint).
+		SetReleaseOrMint(release_or_mint).
 		SetAuthorityAccount(authority).
 		SetConfigAccount(config).
 		SetTokenProgramAccount(tokenProgram).

@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// FinalizeBypasserOperation is the `finalizeBypasserOperation` instruction.
+// FinalizeBypasserOperation is the `finalize_bypasser_operation` instruction.
 type FinalizeBypasserOperation struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8
@@ -19,10 +19,10 @@ type FinalizeBypasserOperation struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [] roleAccessController
+	// [2] = [] role_access_controller
 	//
 	// [3] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewFinalizeBypasserOperationInstructionBuilder creates a new `FinalizeBypasserOperation` instruction builder.
@@ -33,9 +33,9 @@ func NewFinalizeBypasserOperationInstructionBuilder() *FinalizeBypasserOperation
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *FinalizeBypasserOperation) SetTimelockId(timelockId [32]uint8) *FinalizeBypasserOperation {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "timelock_id" parameter.
+func (inst *FinalizeBypasserOperation) SetTimelockId(timelock_id [32]uint8) *FinalizeBypasserOperation {
+	inst.TimelockId = &timelock_id
 	return inst
 }
 
@@ -53,7 +53,7 @@ func (inst *FinalizeBypasserOperation) SetOperationAccount(operation ag_solanago
 
 // GetOperationAccount gets the "operation" account.
 func (inst *FinalizeBypasserOperation) GetOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -64,18 +64,18 @@ func (inst *FinalizeBypasserOperation) SetConfigAccount(config ag_solanago.Publi
 
 // GetConfigAccount gets the "config" account.
 func (inst *FinalizeBypasserOperation) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+// SetRoleAccessControllerAccount sets the "role_access_controller" account.
 func (inst *FinalizeBypasserOperation) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *FinalizeBypasserOperation {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
-// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+// GetRoleAccessControllerAccount gets the "role_access_controller" account.
 func (inst *FinalizeBypasserOperation) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -86,7 +86,7 @@ func (inst *FinalizeBypasserOperation) SetAuthorityAccount(authority ag_solanago
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *FinalizeBypasserOperation) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst FinalizeBypasserOperation) Build() *Instruction {
@@ -145,16 +145,16 @@ func (inst *FinalizeBypasserOperation) EncodeToTree(parent ag_treeout.Branches) 
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param(" TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("         Id", *inst.Id))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("             operation", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("role_access_controller", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -190,7 +190,7 @@ func (obj *FinalizeBypasserOperation) UnmarshalWithDecoder(decoder *ag_binary.De
 // NewFinalizeBypasserOperationInstruction declares a new FinalizeBypasserOperation instruction with the provided parameters and accounts.
 func NewFinalizeBypasserOperationInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	timelock_id [32]uint8,
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
@@ -198,7 +198,7 @@ func NewFinalizeBypasserOperationInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *FinalizeBypasserOperation {
 	return NewFinalizeBypasserOperationInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(timelock_id).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).

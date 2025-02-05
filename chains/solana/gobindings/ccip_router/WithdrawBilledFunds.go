@@ -23,20 +23,20 @@ type WithdrawBilledFunds struct {
 	TransferAll   *bool
 	DesiredAmount *uint64
 
-	// [0] = [] feeTokenMint
+	// [0] = [] fee_token_mint
 	//
-	// [1] = [WRITE] feeTokenAccum
+	// [1] = [WRITE] fee_token_accum
 	//
 	// [2] = [WRITE] recipient
 	//
-	// [3] = [] tokenProgram
+	// [3] = [] token_program
 	//
-	// [4] = [] feeBillingSigner
+	// [4] = [] fee_billing_signer
 	//
 	// [5] = [] config
 	//
 	// [6] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewWithdrawBilledFundsInstructionBuilder creates a new `WithdrawBilledFunds` instruction builder.
@@ -47,38 +47,38 @@ func NewWithdrawBilledFundsInstructionBuilder() *WithdrawBilledFunds {
 	return nd
 }
 
-// SetTransferAll sets the "transferAll" parameter.
-func (inst *WithdrawBilledFunds) SetTransferAll(transferAll bool) *WithdrawBilledFunds {
-	inst.TransferAll = &transferAll
+// SetTransferAll sets the "transfer_all" parameter.
+func (inst *WithdrawBilledFunds) SetTransferAll(transfer_all bool) *WithdrawBilledFunds {
+	inst.TransferAll = &transfer_all
 	return inst
 }
 
-// SetDesiredAmount sets the "desiredAmount" parameter.
-func (inst *WithdrawBilledFunds) SetDesiredAmount(desiredAmount uint64) *WithdrawBilledFunds {
-	inst.DesiredAmount = &desiredAmount
+// SetDesiredAmount sets the "desired_amount" parameter.
+func (inst *WithdrawBilledFunds) SetDesiredAmount(desired_amount uint64) *WithdrawBilledFunds {
+	inst.DesiredAmount = &desired_amount
 	return inst
 }
 
-// SetFeeTokenMintAccount sets the "feeTokenMint" account.
+// SetFeeTokenMintAccount sets the "fee_token_mint" account.
 func (inst *WithdrawBilledFunds) SetFeeTokenMintAccount(feeTokenMint ag_solanago.PublicKey) *WithdrawBilledFunds {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(feeTokenMint)
 	return inst
 }
 
-// GetFeeTokenMintAccount gets the "feeTokenMint" account.
+// GetFeeTokenMintAccount gets the "fee_token_mint" account.
 func (inst *WithdrawBilledFunds) GetFeeTokenMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetFeeTokenAccumAccount sets the "feeTokenAccum" account.
+// SetFeeTokenAccumAccount sets the "fee_token_accum" account.
 func (inst *WithdrawBilledFunds) SetFeeTokenAccumAccount(feeTokenAccum ag_solanago.PublicKey) *WithdrawBilledFunds {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(feeTokenAccum).WRITE()
 	return inst
 }
 
-// GetFeeTokenAccumAccount gets the "feeTokenAccum" account.
+// GetFeeTokenAccumAccount gets the "fee_token_accum" account.
 func (inst *WithdrawBilledFunds) GetFeeTokenAccumAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetRecipientAccount sets the "recipient" account.
@@ -89,29 +89,29 @@ func (inst *WithdrawBilledFunds) SetRecipientAccount(recipient ag_solanago.Publi
 
 // GetRecipientAccount gets the "recipient" account.
 func (inst *WithdrawBilledFunds) GetRecipientAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 func (inst *WithdrawBilledFunds) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *WithdrawBilledFunds {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 func (inst *WithdrawBilledFunds) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetFeeBillingSignerAccount sets the "feeBillingSigner" account.
+// SetFeeBillingSignerAccount sets the "fee_billing_signer" account.
 func (inst *WithdrawBilledFunds) SetFeeBillingSignerAccount(feeBillingSigner ag_solanago.PublicKey) *WithdrawBilledFunds {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(feeBillingSigner)
 	return inst
 }
 
-// GetFeeBillingSignerAccount gets the "feeBillingSigner" account.
+// GetFeeBillingSignerAccount gets the "fee_billing_signer" account.
 func (inst *WithdrawBilledFunds) GetFeeBillingSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -122,7 +122,7 @@ func (inst *WithdrawBilledFunds) SetConfigAccount(config ag_solanago.PublicKey) 
 
 // GetConfigAccount gets the "config" account.
 func (inst *WithdrawBilledFunds) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -133,7 +133,7 @@ func (inst *WithdrawBilledFunds) SetAuthorityAccount(authority ag_solanago.Publi
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *WithdrawBilledFunds) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
 func (inst WithdrawBilledFunds) Build() *Instruction {
@@ -201,19 +201,19 @@ func (inst *WithdrawBilledFunds) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("  TransferAll", *inst.TransferAll))
-						paramsBranch.Child(ag_format.Param("DesiredAmount", *inst.DesiredAmount))
+						paramsBranch.Child(ag_format.Param("   TransferAll", *inst.TransferAll))
+						paramsBranch.Child(ag_format.Param(" DesiredAmount", *inst.DesiredAmount))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    feeTokenMint", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   feeTokenAccum", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("       recipient", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("    tokenProgram", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("feeBillingSigner", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("    fee_token_mint", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("   fee_token_accum", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("         recipient", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("     token_program", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("fee_billing_signer", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice.Get(6)))
 					})
 				})
 		})
@@ -249,8 +249,8 @@ func (obj *WithdrawBilledFunds) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 // NewWithdrawBilledFundsInstruction declares a new WithdrawBilledFunds instruction with the provided parameters and accounts.
 func NewWithdrawBilledFundsInstruction(
 	// Parameters:
-	transferAll bool,
-	desiredAmount uint64,
+	transfer_all bool,
+	desired_amount uint64,
 	// Accounts:
 	feeTokenMint ag_solanago.PublicKey,
 	feeTokenAccum ag_solanago.PublicKey,
@@ -260,8 +260,8 @@ func NewWithdrawBilledFundsInstruction(
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *WithdrawBilledFunds {
 	return NewWithdrawBilledFundsInstructionBuilder().
-		SetTransferAll(transferAll).
-		SetDesiredAmount(desiredAmount).
+		SetTransferAll(transfer_all).
+		SetDesiredAmount(desired_amount).
 		SetFeeTokenMintAccount(feeTokenMint).
 		SetFeeTokenAccumAccount(feeTokenAccum).
 		SetRecipientAccount(recipient).

@@ -8,7 +8,71 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Config struct {
+type AccessControllerAccount struct {
+	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
+	AccessList    AccessList
+}
+
+var AccessControllerAccountDiscriminator = [8]byte{143, 45, 12, 204, 220, 20, 114, 87}
+
+func (obj AccessControllerAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(AccessControllerAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccessList` param:
+	err = encoder.Encode(obj.AccessList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AccessControllerAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(AccessControllerAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[143 45 12 204 220 20 114 87]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccessList`:
+	err = decoder.Decode(&obj.AccessList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigAccount struct {
 	TimelockId                    [32]uint8
 	Owner                         ag_solanago.PublicKey
 	ProposedOwner                 ag_solanago.PublicKey
@@ -20,11 +84,11 @@ type Config struct {
 	BlockedSelectors              BlockedSelectors
 }
 
-var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
+var ConfigAccountDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
 
-func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(ConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -76,14 +140,14 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ConfigDiscriminator[:]) {
+		if !discriminator.Equal(ConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[155 12 170 224 30 250 204 130]",
@@ -138,7 +202,7 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	return nil
 }
 
-type Operation struct {
+type OperationAccount struct {
 	Timestamp         uint64
 	Id                [32]uint8
 	Predecessor       [32]uint8
@@ -148,11 +212,11 @@ type Operation struct {
 	Instructions      []InstructionData
 }
 
-var OperationDiscriminator = [8]byte{171, 150, 196, 17, 229, 166, 58, 44}
+var OperationAccountDiscriminator = [8]byte{171, 150, 196, 17, 229, 166, 58, 44}
 
-func (obj Operation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj OperationAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(OperationDiscriminator[:], false)
+	err = encoder.WriteBytes(OperationAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -194,14 +258,14 @@ func (obj Operation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 
-func (obj *Operation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *OperationAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(OperationDiscriminator[:]) {
+		if !discriminator.Equal(OperationAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[171 150 196 17 229 166 58 44]",

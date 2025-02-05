@@ -186,7 +186,7 @@ jobs:
           rm -rf target/idl &&\
           anchor build"
 
-          go install github.com/gagliardetto/anchor-go@v0.2.3
+          go install github.com/fragmetric-labs/solana-anchor-go
           ./scripts/anchor-go-gen.sh
           make format
           git diff --exit-code

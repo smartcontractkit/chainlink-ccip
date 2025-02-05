@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// TransferOwnership is the `transferOwnership` instruction.
+// TransferOwnership is the `transfer_ownership` instruction.
 type TransferOwnership struct {
 	MultisigId    *[32]uint8
 	ProposedOwner *ag_solanago.PublicKey
@@ -18,7 +18,7 @@ type TransferOwnership struct {
 	// [0] = [WRITE] config
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewTransferOwnershipInstructionBuilder creates a new `TransferOwnership` instruction builder.
@@ -29,15 +29,15 @@ func NewTransferOwnershipInstructionBuilder() *TransferOwnership {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *TransferOwnership) SetMultisigId(multisigId [32]uint8) *TransferOwnership {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "_multisig_id" parameter.
+func (inst *TransferOwnership) SetMultisigId(_multisig_id [32]uint8) *TransferOwnership {
+	inst.MultisigId = &_multisig_id
 	return inst
 }
 
-// SetProposedOwner sets the "proposedOwner" parameter.
-func (inst *TransferOwnership) SetProposedOwner(proposedOwner ag_solanago.PublicKey) *TransferOwnership {
-	inst.ProposedOwner = &proposedOwner
+// SetProposedOwner sets the "proposed_owner" parameter.
+func (inst *TransferOwnership) SetProposedOwner(proposed_owner ag_solanago.PublicKey) *TransferOwnership {
+	inst.ProposedOwner = &proposed_owner
 	return inst
 }
 
@@ -49,7 +49,7 @@ func (inst *TransferOwnership) SetConfigAccount(config ag_solanago.PublicKey) *T
 
 // GetConfigAccount gets the "config" account.
 func (inst *TransferOwnership) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -60,7 +60,7 @@ func (inst *TransferOwnership) SetAuthorityAccount(authority ag_solanago.PublicK
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *TransferOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst TransferOwnership) Build() *Instruction {
@@ -113,14 +113,14 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("   MultisigId", *inst.MultisigId))
-						paramsBranch.Child(ag_format.Param("ProposedOwner", *inst.ProposedOwner))
+						paramsBranch.Child(ag_format.Param("    MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param(" ProposedOwner", *inst.ProposedOwner))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
@@ -156,14 +156,14 @@ func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 // NewTransferOwnershipInstruction declares a new TransferOwnership instruction with the provided parameters and accounts.
 func NewTransferOwnershipInstruction(
 	// Parameters:
-	multisigId [32]uint8,
-	proposedOwner ag_solanago.PublicKey,
+	_multisig_id [32]uint8,
+	proposed_owner ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *TransferOwnership {
 	return NewTransferOwnershipInstructionBuilder().
-		SetMultisigId(multisigId).
-		SetProposedOwner(proposedOwner).
+		SetMultisigId(_multisig_id).
+		SetProposedOwner(proposed_owner).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }

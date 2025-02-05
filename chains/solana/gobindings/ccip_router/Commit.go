@@ -43,22 +43,22 @@ type Commit struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] sourceChainState
+	// [1] = [WRITE] source_chain_state
 	//
-	// [2] = [WRITE] commitReport
+	// [2] = [WRITE] commit_report
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
-	// [4] = [] systemProgram
+	// [4] = [] system_program
 	//
-	// [5] = [] sysvarInstructions
+	// [5] = [] sysvar_instructions
 	//
-	// [6] = [] feeBillingSigner
+	// [6] = [] fee_billing_signer
 	//
-	// [7] = [] feeQuoter
+	// [7] = [] fee_quoter
 	//
-	// [8] = [] feeQuoterConfig
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [8] = [] fee_quoter_config
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewCommitInstructionBuilder creates a new `Commit` instruction builder.
@@ -69,15 +69,15 @@ func NewCommitInstructionBuilder() *Commit {
 	return nd
 }
 
-// SetReportContextByteWords sets the "reportContextByteWords" parameter.
-func (inst *Commit) SetReportContextByteWords(reportContextByteWords [2][32]uint8) *Commit {
-	inst.ReportContextByteWords = &reportContextByteWords
+// SetReportContextByteWords sets the "report_context_byte_words" parameter.
+func (inst *Commit) SetReportContextByteWords(report_context_byte_words [2][32]uint8) *Commit {
+	inst.ReportContextByteWords = &report_context_byte_words
 	return inst
 }
 
-// SetRawReport sets the "rawReport" parameter.
-func (inst *Commit) SetRawReport(rawReport []byte) *Commit {
-	inst.RawReport = &rawReport
+// SetRawReport sets the "raw_report" parameter.
+func (inst *Commit) SetRawReport(raw_report []byte) *Commit {
+	inst.RawReport = &raw_report
 	return inst
 }
 
@@ -93,9 +93,9 @@ func (inst *Commit) SetSs(ss [][32]uint8) *Commit {
 	return inst
 }
 
-// SetRawVs sets the "rawVs" parameter.
-func (inst *Commit) SetRawVs(rawVs [32]uint8) *Commit {
-	inst.RawVs = &rawVs
+// SetRawVs sets the "raw_vs" parameter.
+func (inst *Commit) SetRawVs(raw_vs [32]uint8) *Commit {
+	inst.RawVs = &raw_vs
 	return inst
 }
 
@@ -107,29 +107,29 @@ func (inst *Commit) SetConfigAccount(config ag_solanago.PublicKey) *Commit {
 
 // GetConfigAccount gets the "config" account.
 func (inst *Commit) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetSourceChainStateAccount sets the "sourceChainState" account.
+// SetSourceChainStateAccount sets the "source_chain_state" account.
 func (inst *Commit) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *Commit {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(sourceChainState).WRITE()
 	return inst
 }
 
-// GetSourceChainStateAccount gets the "sourceChainState" account.
+// GetSourceChainStateAccount gets the "source_chain_state" account.
 func (inst *Commit) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetCommitReportAccount sets the "commitReport" account.
+// SetCommitReportAccount sets the "commit_report" account.
 func (inst *Commit) SetCommitReportAccount(commitReport ag_solanago.PublicKey) *Commit {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(commitReport).WRITE()
 	return inst
 }
 
-// GetCommitReportAccount gets the "commitReport" account.
+// GetCommitReportAccount gets the "commit_report" account.
 func (inst *Commit) GetCommitReportAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -140,62 +140,62 @@ func (inst *Commit) SetAuthorityAccount(authority ag_solanago.PublicKey) *Commit
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Commit) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *Commit) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Commit {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *Commit) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetSysvarInstructionsAccount sets the "sysvarInstructions" account.
+// SetSysvarInstructionsAccount sets the "sysvar_instructions" account.
 func (inst *Commit) SetSysvarInstructionsAccount(sysvarInstructions ag_solanago.PublicKey) *Commit {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(sysvarInstructions)
 	return inst
 }
 
-// GetSysvarInstructionsAccount gets the "sysvarInstructions" account.
+// GetSysvarInstructionsAccount gets the "sysvar_instructions" account.
 func (inst *Commit) GetSysvarInstructionsAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetFeeBillingSignerAccount sets the "feeBillingSigner" account.
+// SetFeeBillingSignerAccount sets the "fee_billing_signer" account.
 func (inst *Commit) SetFeeBillingSignerAccount(feeBillingSigner ag_solanago.PublicKey) *Commit {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(feeBillingSigner)
 	return inst
 }
 
-// GetFeeBillingSignerAccount gets the "feeBillingSigner" account.
+// GetFeeBillingSignerAccount gets the "fee_billing_signer" account.
 func (inst *Commit) GetFeeBillingSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetFeeQuoterAccount sets the "feeQuoter" account.
+// SetFeeQuoterAccount sets the "fee_quoter" account.
 func (inst *Commit) SetFeeQuoterAccount(feeQuoter ag_solanago.PublicKey) *Commit {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(feeQuoter)
 	return inst
 }
 
-// GetFeeQuoterAccount gets the "feeQuoter" account.
+// GetFeeQuoterAccount gets the "fee_quoter" account.
 func (inst *Commit) GetFeeQuoterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
-// SetFeeQuoterConfigAccount sets the "feeQuoterConfig" account.
+// SetFeeQuoterConfigAccount sets the "fee_quoter_config" account.
 func (inst *Commit) SetFeeQuoterConfigAccount(feeQuoterConfig ag_solanago.PublicKey) *Commit {
 	inst.AccountMetaSlice[8] = ag_solanago.Meta(feeQuoterConfig)
 	return inst
 }
 
-// GetFeeQuoterConfigAccount gets the "feeQuoterConfig" account.
+// GetFeeQuoterConfigAccount gets the "fee_quoter_config" account.
 func (inst *Commit) GetFeeQuoterConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice.Get(8)
 }
 
 func (inst Commit) Build() *Instruction {
@@ -278,24 +278,24 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
-						paramsBranch.Child(ag_format.Param("             RawReport", *inst.RawReport))
-						paramsBranch.Child(ag_format.Param("                    Rs", *inst.Rs))
-						paramsBranch.Child(ag_format.Param("                    Ss", *inst.Ss))
-						paramsBranch.Child(ag_format.Param("                 RawVs", *inst.RawVs))
+						paramsBranch.Child(ag_format.Param("   ReportContextByteWords", *inst.ReportContextByteWords))
+						paramsBranch.Child(ag_format.Param("                RawReport", *inst.RawReport))
+						paramsBranch.Child(ag_format.Param("                       Rs", *inst.Rs))
+						paramsBranch.Child(ag_format.Param("                       Ss", *inst.Ss))
+						paramsBranch.Child(ag_format.Param("                    RawVs", *inst.RawVs))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=9]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("  sourceChainState", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("      commitReport", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("sysvarInstructions", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("  feeBillingSigner", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("         feeQuoter", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("   feeQuoterConfig", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("             config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta(" source_chain_state", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("      commit_report", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("          authority", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("     system_program", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("sysvar_instructions", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta(" fee_billing_signer", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("         fee_quoter", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("  fee_quoter_config", inst.AccountMetaSlice.Get(8)))
 					})
 				})
 		})
@@ -361,11 +361,11 @@ func (obj *Commit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 // NewCommitInstruction declares a new Commit instruction with the provided parameters and accounts.
 func NewCommitInstruction(
 	// Parameters:
-	reportContextByteWords [2][32]uint8,
-	rawReport []byte,
+	report_context_byte_words [2][32]uint8,
+	raw_report []byte,
 	rs [][32]uint8,
 	ss [][32]uint8,
-	rawVs [32]uint8,
+	raw_vs [32]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	sourceChainState ag_solanago.PublicKey,
@@ -377,11 +377,11 @@ func NewCommitInstruction(
 	feeQuoter ag_solanago.PublicKey,
 	feeQuoterConfig ag_solanago.PublicKey) *Commit {
 	return NewCommitInstructionBuilder().
-		SetReportContextByteWords(reportContextByteWords).
-		SetRawReport(rawReport).
+		SetReportContextByteWords(report_context_byte_words).
+		SetRawReport(raw_report).
 		SetRs(rs).
 		SetSs(ss).
-		SetRawVs(rawVs).
+		SetRawVs(raw_vs).
 		SetConfigAccount(config).
 		SetSourceChainStateAccount(sourceChainState).
 		SetCommitReportAccount(commitReport).

@@ -24,12 +24,12 @@ type TransferAdminRoleTokenAdminRegistry struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] tokenAdminRegistry
+	// [1] = [WRITE] token_admin_registry
 	//
 	// [2] = [] mint
 	//
 	// [3] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewTransferAdminRoleTokenAdminRegistryInstructionBuilder creates a new `TransferAdminRoleTokenAdminRegistry` instruction builder.
@@ -40,9 +40,9 @@ func NewTransferAdminRoleTokenAdminRegistryInstructionBuilder() *TransferAdminRo
 	return nd
 }
 
-// SetNewAdmin sets the "newAdmin" parameter.
-func (inst *TransferAdminRoleTokenAdminRegistry) SetNewAdmin(newAdmin ag_solanago.PublicKey) *TransferAdminRoleTokenAdminRegistry {
-	inst.NewAdmin = &newAdmin
+// SetNewAdmin sets the "new_admin" parameter.
+func (inst *TransferAdminRoleTokenAdminRegistry) SetNewAdmin(new_admin ag_solanago.PublicKey) *TransferAdminRoleTokenAdminRegistry {
+	inst.NewAdmin = &new_admin
 	return inst
 }
 
@@ -54,18 +54,18 @@ func (inst *TransferAdminRoleTokenAdminRegistry) SetConfigAccount(config ag_sola
 
 // GetConfigAccount gets the "config" account.
 func (inst *TransferAdminRoleTokenAdminRegistry) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
+// SetTokenAdminRegistryAccount sets the "token_admin_registry" account.
 func (inst *TransferAdminRoleTokenAdminRegistry) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *TransferAdminRoleTokenAdminRegistry {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
 	return inst
 }
 
-// GetTokenAdminRegistryAccount gets the "tokenAdminRegistry" account.
+// GetTokenAdminRegistryAccount gets the "token_admin_registry" account.
 func (inst *TransferAdminRoleTokenAdminRegistry) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -76,7 +76,7 @@ func (inst *TransferAdminRoleTokenAdminRegistry) SetMintAccount(mint ag_solanago
 
 // GetMintAccount gets the "mint" account.
 func (inst *TransferAdminRoleTokenAdminRegistry) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -87,7 +87,7 @@ func (inst *TransferAdminRoleTokenAdminRegistry) SetAuthorityAccount(authority a
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *TransferAdminRoleTokenAdminRegistry) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst TransferAdminRoleTokenAdminRegistry) Build() *Instruction {
@@ -143,15 +143,15 @@ func (inst *TransferAdminRoleTokenAdminRegistry) EncodeToTree(parent ag_treeout.
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("NewAdmin", *inst.NewAdmin))
+						paramsBranch.Child(ag_format.Param(" NewAdmin", *inst.NewAdmin))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("              mint", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("token_admin_registry", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                mint", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -177,14 +177,14 @@ func (obj *TransferAdminRoleTokenAdminRegistry) UnmarshalWithDecoder(decoder *ag
 // NewTransferAdminRoleTokenAdminRegistryInstruction declares a new TransferAdminRoleTokenAdminRegistry instruction with the provided parameters and accounts.
 func NewTransferAdminRoleTokenAdminRegistryInstruction(
 	// Parameters:
-	newAdmin ag_solanago.PublicKey,
+	new_admin ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	tokenAdminRegistry ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *TransferAdminRoleTokenAdminRegistry {
 	return NewTransferAdminRoleTokenAdminRegistryInstructionBuilder().
-		SetNewAdmin(newAdmin).
+		SetNewAdmin(new_admin).
 		SetConfigAccount(config).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
 		SetMintAccount(mint).

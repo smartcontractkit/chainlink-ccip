@@ -37,20 +37,20 @@ type Execute struct {
 
 	// [0] = [] config
 	//
-	// [1] = [] sourceChainState
+	// [1] = [] source_chain_state
 	//
-	// [2] = [WRITE] commitReport
+	// [2] = [WRITE] commit_report
 	//
-	// [3] = [] externalExecutionConfig
+	// [3] = [] external_execution_config
 	//
 	// [4] = [WRITE, SIGNER] authority
 	//
-	// [5] = [] systemProgram
+	// [5] = [] system_program
 	//
-	// [6] = [] sysvarInstructions
+	// [6] = [] sysvar_instructions
 	//
-	// [7] = [] tokenPoolsSigner
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [7] = [] token_pools_signer
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewExecuteInstructionBuilder creates a new `Execute` instruction builder.
@@ -61,21 +61,21 @@ func NewExecuteInstructionBuilder() *Execute {
 	return nd
 }
 
-// SetRawExecutionReport sets the "rawExecutionReport" parameter.
-func (inst *Execute) SetRawExecutionReport(rawExecutionReport []byte) *Execute {
-	inst.RawExecutionReport = &rawExecutionReport
+// SetRawExecutionReport sets the "raw_execution_report" parameter.
+func (inst *Execute) SetRawExecutionReport(raw_execution_report []byte) *Execute {
+	inst.RawExecutionReport = &raw_execution_report
 	return inst
 }
 
-// SetReportContextByteWords sets the "reportContextByteWords" parameter.
-func (inst *Execute) SetReportContextByteWords(reportContextByteWords [2][32]uint8) *Execute {
-	inst.ReportContextByteWords = &reportContextByteWords
+// SetReportContextByteWords sets the "report_context_byte_words" parameter.
+func (inst *Execute) SetReportContextByteWords(report_context_byte_words [2][32]uint8) *Execute {
+	inst.ReportContextByteWords = &report_context_byte_words
 	return inst
 }
 
-// SetTokenIndexes sets the "tokenIndexes" parameter.
-func (inst *Execute) SetTokenIndexes(tokenIndexes []byte) *Execute {
-	inst.TokenIndexes = &tokenIndexes
+// SetTokenIndexes sets the "token_indexes" parameter.
+func (inst *Execute) SetTokenIndexes(token_indexes []byte) *Execute {
+	inst.TokenIndexes = &token_indexes
 	return inst
 }
 
@@ -87,40 +87,40 @@ func (inst *Execute) SetConfigAccount(config ag_solanago.PublicKey) *Execute {
 
 // GetConfigAccount gets the "config" account.
 func (inst *Execute) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetSourceChainStateAccount sets the "sourceChainState" account.
+// SetSourceChainStateAccount sets the "source_chain_state" account.
 func (inst *Execute) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *Execute {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(sourceChainState)
 	return inst
 }
 
-// GetSourceChainStateAccount gets the "sourceChainState" account.
+// GetSourceChainStateAccount gets the "source_chain_state" account.
 func (inst *Execute) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetCommitReportAccount sets the "commitReport" account.
+// SetCommitReportAccount sets the "commit_report" account.
 func (inst *Execute) SetCommitReportAccount(commitReport ag_solanago.PublicKey) *Execute {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(commitReport).WRITE()
 	return inst
 }
 
-// GetCommitReportAccount gets the "commitReport" account.
+// GetCommitReportAccount gets the "commit_report" account.
 func (inst *Execute) GetCommitReportAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetExternalExecutionConfigAccount sets the "externalExecutionConfig" account.
+// SetExternalExecutionConfigAccount sets the "external_execution_config" account.
 func (inst *Execute) SetExternalExecutionConfigAccount(externalExecutionConfig ag_solanago.PublicKey) *Execute {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(externalExecutionConfig)
 	return inst
 }
 
-// GetExternalExecutionConfigAccount gets the "externalExecutionConfig" account.
+// GetExternalExecutionConfigAccount gets the "external_execution_config" account.
 func (inst *Execute) GetExternalExecutionConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -131,40 +131,40 @@ func (inst *Execute) SetAuthorityAccount(authority ag_solanago.PublicKey) *Execu
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Execute) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *Execute) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Execute {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *Execute) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetSysvarInstructionsAccount sets the "sysvarInstructions" account.
+// SetSysvarInstructionsAccount sets the "sysvar_instructions" account.
 func (inst *Execute) SetSysvarInstructionsAccount(sysvarInstructions ag_solanago.PublicKey) *Execute {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(sysvarInstructions)
 	return inst
 }
 
-// GetSysvarInstructionsAccount gets the "sysvarInstructions" account.
+// GetSysvarInstructionsAccount gets the "sysvar_instructions" account.
 func (inst *Execute) GetSysvarInstructionsAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
+// SetTokenPoolsSignerAccount sets the "token_pools_signer" account.
 func (inst *Execute) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *Execute {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(tokenPoolsSigner)
 	return inst
 }
 
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
+// GetTokenPoolsSignerAccount gets the "token_pools_signer" account.
 func (inst *Execute) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
 func (inst Execute) Build() *Instruction {
@@ -238,21 +238,21 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("    RawExecutionReport", *inst.RawExecutionReport))
-						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
-						paramsBranch.Child(ag_format.Param("          TokenIndexes", *inst.TokenIndexes))
+						paramsBranch.Child(ag_format.Param("       RawExecutionReport", *inst.RawExecutionReport))
+						paramsBranch.Child(ag_format.Param("   ReportContextByteWords", *inst.ReportContextByteWords))
+						paramsBranch.Child(ag_format.Param("             TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                 config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       sourceChainState", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("           commitReport", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("     sysvarInstructions", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("                   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("       source_chain_state", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("            commit_report", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("external_execution_config", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("                authority", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("           system_program", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("      sysvar_instructions", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("       token_pools_signer", inst.AccountMetaSlice.Get(7)))
 					})
 				})
 		})
@@ -298,9 +298,9 @@ func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 // NewExecuteInstruction declares a new Execute instruction with the provided parameters and accounts.
 func NewExecuteInstruction(
 	// Parameters:
-	rawExecutionReport []byte,
-	reportContextByteWords [2][32]uint8,
-	tokenIndexes []byte,
+	raw_execution_report []byte,
+	report_context_byte_words [2][32]uint8,
+	token_indexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	sourceChainState ag_solanago.PublicKey,
@@ -311,9 +311,9 @@ func NewExecuteInstruction(
 	sysvarInstructions ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *Execute {
 	return NewExecuteInstructionBuilder().
-		SetRawExecutionReport(rawExecutionReport).
-		SetReportContextByteWords(reportContextByteWords).
-		SetTokenIndexes(tokenIndexes).
+		SetRawExecutionReport(raw_execution_report).
+		SetReportContextByteWords(report_context_byte_words).
+		SetTokenIndexes(token_indexes).
 		SetConfigAccount(config).
 		SetSourceChainStateAccount(sourceChainState).
 		SetCommitReportAccount(commitReport).

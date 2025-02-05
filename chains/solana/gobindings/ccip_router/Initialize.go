@@ -34,16 +34,16 @@ type Initialize struct {
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
+	// [3] = [] system_program
 	//
 	// [4] = [] program
 	//
-	// [5] = [] programData
+	// [5] = [] program_data
 	//
-	// [6] = [WRITE] externalExecutionConfig
+	// [6] = [WRITE] external_execution_config
 	//
-	// [7] = [WRITE] tokenPoolsSigner
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [7] = [WRITE] token_pools_signer
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
@@ -54,39 +54,39 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetSvmChainSelector sets the "svmChainSelector" parameter.
-func (inst *Initialize) SetSvmChainSelector(svmChainSelector uint64) *Initialize {
-	inst.SvmChainSelector = &svmChainSelector
+// SetSvmChainSelector sets the "svm_chain_selector" parameter.
+func (inst *Initialize) SetSvmChainSelector(svm_chain_selector uint64) *Initialize {
+	inst.SvmChainSelector = &svm_chain_selector
 	return inst
 }
 
-// SetEnableExecutionAfter sets the "enableExecutionAfter" parameter.
-func (inst *Initialize) SetEnableExecutionAfter(enableExecutionAfter int64) *Initialize {
-	inst.EnableExecutionAfter = &enableExecutionAfter
+// SetEnableExecutionAfter sets the "enable_execution_after" parameter.
+func (inst *Initialize) SetEnableExecutionAfter(enable_execution_after int64) *Initialize {
+	inst.EnableExecutionAfter = &enable_execution_after
 	return inst
 }
 
-// SetFeeAggregator sets the "feeAggregator" parameter.
-func (inst *Initialize) SetFeeAggregator(feeAggregator ag_solanago.PublicKey) *Initialize {
-	inst.FeeAggregator = &feeAggregator
+// SetFeeAggregator sets the "fee_aggregator" parameter.
+func (inst *Initialize) SetFeeAggregator(fee_aggregator ag_solanago.PublicKey) *Initialize {
+	inst.FeeAggregator = &fee_aggregator
 	return inst
 }
 
-// SetFeeQuoter sets the "feeQuoter" parameter.
-func (inst *Initialize) SetFeeQuoter(feeQuoter ag_solanago.PublicKey) *Initialize {
-	inst.FeeQuoter = &feeQuoter
+// SetFeeQuoter sets the "fee_quoter" parameter.
+func (inst *Initialize) SetFeeQuoter(fee_quoter ag_solanago.PublicKey) *Initialize {
+	inst.FeeQuoter = &fee_quoter
 	return inst
 }
 
-// SetLinkTokenMint sets the "linkTokenMint" parameter.
-func (inst *Initialize) SetLinkTokenMint(linkTokenMint ag_solanago.PublicKey) *Initialize {
-	inst.LinkTokenMint = &linkTokenMint
+// SetLinkTokenMint sets the "link_token_mint" parameter.
+func (inst *Initialize) SetLinkTokenMint(link_token_mint ag_solanago.PublicKey) *Initialize {
+	inst.LinkTokenMint = &link_token_mint
 	return inst
 }
 
-// SetMaxFeeJuelsPerMsg sets the "maxFeeJuelsPerMsg" parameter.
-func (inst *Initialize) SetMaxFeeJuelsPerMsg(maxFeeJuelsPerMsg ag_binary.Uint128) *Initialize {
-	inst.MaxFeeJuelsPerMsg = &maxFeeJuelsPerMsg
+// SetMaxFeeJuelsPerMsg sets the "max_fee_juels_per_msg" parameter.
+func (inst *Initialize) SetMaxFeeJuelsPerMsg(max_fee_juels_per_msg ag_binary.Uint128) *Initialize {
+	inst.MaxFeeJuelsPerMsg = &max_fee_juels_per_msg
 	return inst
 }
 
@@ -98,7 +98,7 @@ func (inst *Initialize) SetConfigAccount(config ag_solanago.PublicKey) *Initiali
 
 // GetConfigAccount gets the "config" account.
 func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetStateAccount sets the "state" account.
@@ -109,7 +109,7 @@ func (inst *Initialize) SetStateAccount(state ag_solanago.PublicKey) *Initialize
 
 // GetStateAccount gets the "state" account.
 func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -120,18 +120,18 @@ func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *In
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetProgramAccount sets the "program" account.
@@ -142,40 +142,40 @@ func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initia
 
 // GetProgramAccount gets the "program" account.
 func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetProgramDataAccount sets the "programData" account.
+// SetProgramDataAccount sets the "program_data" account.
 func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(programData)
 	return inst
 }
 
-// GetProgramDataAccount gets the "programData" account.
+// GetProgramDataAccount gets the "program_data" account.
 func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetExternalExecutionConfigAccount sets the "externalExecutionConfig" account.
+// SetExternalExecutionConfigAccount sets the "external_execution_config" account.
 func (inst *Initialize) SetExternalExecutionConfigAccount(externalExecutionConfig ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(externalExecutionConfig).WRITE()
 	return inst
 }
 
-// GetExternalExecutionConfigAccount gets the "externalExecutionConfig" account.
+// GetExternalExecutionConfigAccount gets the "external_execution_config" account.
 func (inst *Initialize) GetExternalExecutionConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
+// SetTokenPoolsSignerAccount sets the "token_pools_signer" account.
 func (inst *Initialize) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
+// GetTokenPoolsSignerAccount gets the "token_pools_signer" account.
 func (inst *Initialize) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -258,24 +258,24 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=6]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("    SvmChainSelector", *inst.SvmChainSelector))
-						paramsBranch.Child(ag_format.Param("EnableExecutionAfter", *inst.EnableExecutionAfter))
-						paramsBranch.Child(ag_format.Param("       FeeAggregator", *inst.FeeAggregator))
-						paramsBranch.Child(ag_format.Param("           FeeQuoter", *inst.FeeQuoter))
-						paramsBranch.Child(ag_format.Param("       LinkTokenMint", *inst.LinkTokenMint))
-						paramsBranch.Child(ag_format.Param("   MaxFeeJuelsPerMsg", *inst.MaxFeeJuelsPerMsg))
+						paramsBranch.Child(ag_format.Param("      SvmChainSelector", *inst.SvmChainSelector))
+						paramsBranch.Child(ag_format.Param("  EnableExecutionAfter", *inst.EnableExecutionAfter))
+						paramsBranch.Child(ag_format.Param("         FeeAggregator", *inst.FeeAggregator))
+						paramsBranch.Child(ag_format.Param("             FeeQuoter", *inst.FeeQuoter))
+						paramsBranch.Child(ag_format.Param("         LinkTokenMint", *inst.LinkTokenMint))
+						paramsBranch.Child(ag_format.Param("     MaxFeeJuelsPerMsg", *inst.MaxFeeJuelsPerMsg))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                 config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("                  state", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("                program", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("            programData", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("                   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                    state", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("           system_program", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("                  program", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("             program_data", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("external_execution_config", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("       token_pools_signer", inst.AccountMetaSlice.Get(7)))
 					})
 				})
 		})
@@ -351,12 +351,12 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	svmChainSelector uint64,
-	enableExecutionAfter int64,
-	feeAggregator ag_solanago.PublicKey,
-	feeQuoter ag_solanago.PublicKey,
-	linkTokenMint ag_solanago.PublicKey,
-	maxFeeJuelsPerMsg ag_binary.Uint128,
+	svm_chain_selector uint64,
+	enable_execution_after int64,
+	fee_aggregator ag_solanago.PublicKey,
+	fee_quoter ag_solanago.PublicKey,
+	link_token_mint ag_solanago.PublicKey,
+	max_fee_juels_per_msg ag_binary.Uint128,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	state ag_solanago.PublicKey,
@@ -367,12 +367,12 @@ func NewInitializeInstruction(
 	externalExecutionConfig ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetSvmChainSelector(svmChainSelector).
-		SetEnableExecutionAfter(enableExecutionAfter).
-		SetFeeAggregator(feeAggregator).
-		SetFeeQuoter(feeQuoter).
-		SetLinkTokenMint(linkTokenMint).
-		SetMaxFeeJuelsPerMsg(maxFeeJuelsPerMsg).
+		SetSvmChainSelector(svm_chain_selector).
+		SetEnableExecutionAfter(enable_execution_after).
+		SetFeeAggregator(fee_aggregator).
+		SetFeeQuoter(fee_quoter).
+		SetLinkTokenMint(link_token_mint).
+		SetMaxFeeJuelsPerMsg(max_fee_juels_per_msg).
 		SetConfigAccount(config).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority).

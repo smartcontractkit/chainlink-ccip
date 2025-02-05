@@ -16,20 +16,20 @@ type Initialize struct {
 	ChainId    *uint64
 	MultisigId *[32]uint8
 
-	// [0] = [WRITE] multisigConfig
+	// [0] = [WRITE] multisig_config
 	//
 	// [1] = [WRITE, SIGNER] authority
 	//
-	// [2] = [] systemProgram
+	// [2] = [] system_program
 	//
 	// [3] = [] program
 	//
-	// [4] = [] programData
+	// [4] = [] program_data
 	//
-	// [5] = [WRITE] rootMetadata
+	// [5] = [WRITE] root_metadata
 	//
-	// [6] = [WRITE] expiringRootAndOpCount
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [6] = [WRITE] expiring_root_and_op_count
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
@@ -40,27 +40,27 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetChainId sets the "chainId" parameter.
-func (inst *Initialize) SetChainId(chainId uint64) *Initialize {
-	inst.ChainId = &chainId
+// SetChainId sets the "chain_id" parameter.
+func (inst *Initialize) SetChainId(chain_id uint64) *Initialize {
+	inst.ChainId = &chain_id
 	return inst
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *Initialize) SetMultisigId(multisigId [32]uint8) *Initialize {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *Initialize) SetMultisigId(multisig_id [32]uint8) *Initialize {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
-// SetMultisigConfigAccount sets the "multisigConfig" account.
+// SetMultisigConfigAccount sets the "multisig_config" account.
 func (inst *Initialize) SetMultisigConfigAccount(multisigConfig ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(multisigConfig).WRITE()
 	return inst
 }
 
-// GetMultisigConfigAccount gets the "multisigConfig" account.
+// GetMultisigConfigAccount gets the "multisig_config" account.
 func (inst *Initialize) GetMultisigConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -71,18 +71,18 @@ func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *In
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetProgramAccount sets the "program" account.
@@ -93,40 +93,40 @@ func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initia
 
 // GetProgramAccount gets the "program" account.
 func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetProgramDataAccount sets the "programData" account.
+// SetProgramDataAccount sets the "program_data" account.
 func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(programData)
 	return inst
 }
 
-// GetProgramDataAccount gets the "programData" account.
+// GetProgramDataAccount gets the "program_data" account.
 func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetRootMetadataAccount sets the "rootMetadata" account.
+// SetRootMetadataAccount sets the "root_metadata" account.
 func (inst *Initialize) SetRootMetadataAccount(rootMetadata ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(rootMetadata).WRITE()
 	return inst
 }
 
-// GetRootMetadataAccount gets the "rootMetadata" account.
+// GetRootMetadataAccount gets the "root_metadata" account.
 func (inst *Initialize) GetRootMetadataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetExpiringRootAndOpCountAccount sets the "expiringRootAndOpCount" account.
+// SetExpiringRootAndOpCountAccount sets the "expiring_root_and_op_count" account.
 func (inst *Initialize) SetExpiringRootAndOpCountAccount(expiringRootAndOpCount ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(expiringRootAndOpCount).WRITE()
 	return inst
 }
 
-// GetExpiringRootAndOpCountAccount gets the "expiringRootAndOpCount" account.
+// GetExpiringRootAndOpCountAccount gets the "expiring_root_and_op_count" account.
 func (inst *Initialize) GetExpiringRootAndOpCountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -194,19 +194,19 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("   ChainId", *inst.ChainId))
-						paramsBranch.Child(ag_format.Param("MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param("    ChainId", *inst.ChainId))
+						paramsBranch.Child(ag_format.Param(" MultisigId", *inst.MultisigId))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        multisigConfig", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("               program", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("           programData", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("          rootMetadata", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("expiringRootAndOpCount", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("           multisig_config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                 authority", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("            system_program", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("                   program", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("              program_data", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("             root_metadata", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("expiring_root_and_op_count", inst.AccountMetaSlice.Get(6)))
 					})
 				})
 		})
@@ -242,8 +242,8 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	chainId uint64,
-	multisigId [32]uint8,
+	chain_id uint64,
+	multisig_id [32]uint8,
 	// Accounts:
 	multisigConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -253,8 +253,8 @@ func NewInitializeInstruction(
 	rootMetadata ag_solanago.PublicKey,
 	expiringRootAndOpCount ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetChainId(chainId).
-		SetMultisigId(multisigId).
+		SetChainId(chain_id).
+		SetMultisigId(multisig_id).
 		SetMultisigConfigAccount(multisigConfig).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

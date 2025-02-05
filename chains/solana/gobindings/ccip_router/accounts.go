@@ -8,7 +8,115 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Config struct {
+type CommitReportAccount struct {
+	Version         uint8
+	ChainSelector   uint64
+	MerkleRoot      [32]uint8
+	Timestamp       int64
+	MinMsgNr        uint64
+	MaxMsgNr        uint64
+	ExecutionStates ag_binary.Uint128
+}
+
+var CommitReportAccountDiscriminator = [8]byte{46, 231, 247, 231, 174, 68, 34, 26}
+
+func (obj CommitReportAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(CommitReportAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `MerkleRoot` param:
+	err = encoder.Encode(obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Serialize `MinMsgNr` param:
+	err = encoder.Encode(obj.MinMsgNr)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxMsgNr` param:
+	err = encoder.Encode(obj.MaxMsgNr)
+	if err != nil {
+		return err
+	}
+	// Serialize `ExecutionStates` param:
+	err = encoder.Encode(obj.ExecutionStates)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CommitReportAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(CommitReportAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[46 231 247 231 174 68 34 26]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MerkleRoot`:
+	err = decoder.Decode(&obj.MerkleRoot)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MinMsgNr`:
+	err = decoder.Decode(&obj.MinMsgNr)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxMsgNr`:
+	err = decoder.Decode(&obj.MaxMsgNr)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ExecutionStates`:
+	err = decoder.Decode(&obj.ExecutionStates)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigAccount struct {
 	Version                    uint8
 	Padding0                   [7]uint8
 	SvmChainSelector           uint64
@@ -24,11 +132,11 @@ type Config struct {
 	FeeAggregator              ag_solanago.PublicKey
 }
 
-var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
+var ConfigAccountDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
 
-func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(ConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -100,14 +208,14 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ConfigDiscriminator[:]) {
+		if !discriminator.Equal(ConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[155 12 170 224 30 250 204 130]",
@@ -182,135 +290,18 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	return nil
 }
 
-type GlobalState struct {
-	LatestPriceSequenceNumber uint64
-}
-
-var GlobalStateDiscriminator = [8]byte{163, 46, 74, 168, 216, 123, 133, 98}
-
-func (obj GlobalState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(GlobalStateDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `LatestPriceSequenceNumber` param:
-	err = encoder.Encode(obj.LatestPriceSequenceNumber)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *GlobalState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(GlobalStateDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[163 46 74 168 216 123 133 98]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `LatestPriceSequenceNumber`:
-	err = decoder.Decode(&obj.LatestPriceSequenceNumber)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type SourceChain struct {
-	Version       uint8
-	ChainSelector uint64
-	State         SourceChainState
-	Config        SourceChainConfig
-}
-
-var SourceChainDiscriminator = [8]byte{242, 235, 220, 98, 252, 121, 191, 216}
-
-func (obj SourceChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(SourceChainDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `ChainSelector` param:
-	err = encoder.Encode(obj.ChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `State` param:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return err
-	}
-	// Serialize `Config` param:
-	err = encoder.Encode(obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *SourceChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(SourceChainDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[242 235 220 98 252 121 191 216]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ChainSelector`:
-	err = decoder.Decode(&obj.ChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Config`:
-	err = decoder.Decode(&obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type DestChain struct {
+type DestChainAccount struct {
 	Version       uint8
 	ChainSelector uint64
 	State         DestChainState
 	Config        DestChainConfig
 }
 
-var DestChainDiscriminator = [8]byte{77, 18, 241, 132, 212, 54, 218, 16}
+var DestChainAccountDiscriminator = [8]byte{77, 18, 241, 132, 212, 54, 218, 16}
 
-func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj DestChainAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(DestChainDiscriminator[:], false)
+	err = encoder.WriteBytes(DestChainAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -337,14 +328,14 @@ func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 
-func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *DestChainAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(DestChainDiscriminator[:]) {
+		if !discriminator.Equal(DestChainAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[77 18 241 132 212 54 218 16]",
@@ -374,16 +365,88 @@ func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	return nil
 }
 
-type Nonce struct {
+type ExternalExecutionConfigAccount struct{}
+
+var ExternalExecutionConfigAccountDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
+
+func (obj ExternalExecutionConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ExternalExecutionConfigAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ExternalExecutionConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ExternalExecutionConfigAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[159 157 150 212 168 103 117 39]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	return nil
+}
+
+type GlobalStateAccount struct {
+	LatestPriceSequenceNumber uint64
+}
+
+var GlobalStateAccountDiscriminator = [8]byte{163, 46, 74, 168, 216, 123, 133, 98}
+
+func (obj GlobalStateAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(GlobalStateAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `LatestPriceSequenceNumber` param:
+	err = encoder.Encode(obj.LatestPriceSequenceNumber)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *GlobalStateAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(GlobalStateAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[163 46 74 168 216 123 133 98]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `LatestPriceSequenceNumber`:
+	err = decoder.Decode(&obj.LatestPriceSequenceNumber)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type NonceAccount struct {
 	Version uint8
 	Counter uint64
 }
 
-var NonceDiscriminator = [8]byte{143, 197, 147, 95, 106, 165, 50, 43}
+var NonceAccountDiscriminator = [8]byte{143, 197, 147, 95, 106, 165, 50, 43}
 
-func (obj Nonce) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj NonceAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(NonceDiscriminator[:], false)
+	err = encoder.WriteBytes(NonceAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -400,14 +463,14 @@ func (obj Nonce) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Nonce) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *NonceAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(NonceDiscriminator[:]) {
+		if !discriminator.Equal(NonceAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[143 197 147 95 106 165 50 43]",
@@ -427,51 +490,18 @@ func (obj *Nonce) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-type ExternalExecutionConfig struct{}
+type SourceChainAccount struct {
+	Version       uint8
+	ChainSelector uint64
+	State         SourceChainState
+	Config        SourceChainConfig
+}
 
-var ExternalExecutionConfigDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
+var SourceChainAccountDiscriminator = [8]byte{242, 235, 220, 98, 252, 121, 191, 216}
 
-func (obj ExternalExecutionConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SourceChainAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ExternalExecutionConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(ExternalExecutionConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[159 157 150 212 168 103 117 39]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	return nil
-}
-
-type CommitReport struct {
-	Version         uint8
-	ChainSelector   uint64
-	MerkleRoot      [32]uint8
-	Timestamp       int64
-	MinMsgNr        uint64
-	MaxMsgNr        uint64
-	ExecutionStates ag_binary.Uint128
-}
-
-var CommitReportDiscriminator = [8]byte{46, 231, 247, 231, 174, 68, 34, 26}
-
-func (obj CommitReport) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(CommitReportDiscriminator[:], false)
+	err = encoder.WriteBytes(SourceChainAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -485,45 +515,30 @@ func (obj CommitReport) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	if err != nil {
 		return err
 	}
-	// Serialize `MerkleRoot` param:
-	err = encoder.Encode(obj.MerkleRoot)
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
 	if err != nil {
 		return err
 	}
-	// Serialize `Timestamp` param:
-	err = encoder.Encode(obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	// Serialize `MinMsgNr` param:
-	err = encoder.Encode(obj.MinMsgNr)
-	if err != nil {
-		return err
-	}
-	// Serialize `MaxMsgNr` param:
-	err = encoder.Encode(obj.MaxMsgNr)
-	if err != nil {
-		return err
-	}
-	// Serialize `ExecutionStates` param:
-	err = encoder.Encode(obj.ExecutionStates)
+	// Serialize `Config` param:
+	err = encoder.Encode(obj.Config)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *CommitReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SourceChainAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(CommitReportDiscriminator[:]) {
+		if !discriminator.Equal(SourceChainAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[46 231 247 231 174 68 34 26]",
+				"[242 235 220 98 252 121 191 216]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}
@@ -537,35 +552,20 @@ func (obj *CommitReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	if err != nil {
 		return err
 	}
-	// Deserialize `MerkleRoot`:
-	err = decoder.Decode(&obj.MerkleRoot)
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Timestamp`:
-	err = decoder.Decode(&obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MinMsgNr`:
-	err = decoder.Decode(&obj.MinMsgNr)
-	if err != nil {
-		return err
-	}
-	// Deserialize `MaxMsgNr`:
-	err = decoder.Decode(&obj.MaxMsgNr)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ExecutionStates`:
-	err = decoder.Decode(&obj.ExecutionStates)
+	// Deserialize `Config`:
+	err = decoder.Decode(&obj.Config)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-type TokenAdminRegistry struct {
+type TokenAdminRegistryAccount struct {
 	Version              uint8
 	Administrator        ag_solanago.PublicKey
 	PendingAdministrator ag_solanago.PublicKey
@@ -574,11 +574,11 @@ type TokenAdminRegistry struct {
 	Mint                 ag_solanago.PublicKey
 }
 
-var TokenAdminRegistryDiscriminator = [8]byte{70, 92, 207, 200, 76, 17, 57, 114}
+var TokenAdminRegistryAccountDiscriminator = [8]byte{70, 92, 207, 200, 76, 17, 57, 114}
 
-func (obj TokenAdminRegistry) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj TokenAdminRegistryAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(TokenAdminRegistryDiscriminator[:], false)
+	err = encoder.WriteBytes(TokenAdminRegistryAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -615,14 +615,14 @@ func (obj TokenAdminRegistry) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	return nil
 }
 
-func (obj *TokenAdminRegistry) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *TokenAdminRegistryAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(TokenAdminRegistryDiscriminator[:]) {
+		if !discriminator.Equal(TokenAdminRegistryAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[70 92 207 200 76 17 57 114]",

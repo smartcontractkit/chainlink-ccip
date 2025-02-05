@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeBypasserOperation is the `initializeBypasserOperation` instruction.
+// InitializeBypasserOperation is the `initialize_bypasser_operation` instruction.
 type InitializeBypasserOperation struct {
 	TimelockId       *[32]uint8
 	Id               *[32]uint8
@@ -21,12 +21,12 @@ type InitializeBypasserOperation struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [] roleAccessController
+	// [2] = [] role_access_controller
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
-	// [4] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [4] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeBypasserOperationInstructionBuilder creates a new `InitializeBypasserOperation` instruction builder.
@@ -37,9 +37,9 @@ func NewInitializeBypasserOperationInstructionBuilder() *InitializeBypasserOpera
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *InitializeBypasserOperation) SetTimelockId(timelockId [32]uint8) *InitializeBypasserOperation {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "timelock_id" parameter.
+func (inst *InitializeBypasserOperation) SetTimelockId(timelock_id [32]uint8) *InitializeBypasserOperation {
+	inst.TimelockId = &timelock_id
 	return inst
 }
 
@@ -55,9 +55,9 @@ func (inst *InitializeBypasserOperation) SetSalt(salt [32]uint8) *InitializeBypa
 	return inst
 }
 
-// SetInstructionCount sets the "instructionCount" parameter.
-func (inst *InitializeBypasserOperation) SetInstructionCount(instructionCount uint32) *InitializeBypasserOperation {
-	inst.InstructionCount = &instructionCount
+// SetInstructionCount sets the "instruction_count" parameter.
+func (inst *InitializeBypasserOperation) SetInstructionCount(instruction_count uint32) *InitializeBypasserOperation {
+	inst.InstructionCount = &instruction_count
 	return inst
 }
 
@@ -69,7 +69,7 @@ func (inst *InitializeBypasserOperation) SetOperationAccount(operation ag_solana
 
 // GetOperationAccount gets the "operation" account.
 func (inst *InitializeBypasserOperation) GetOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -80,18 +80,18 @@ func (inst *InitializeBypasserOperation) SetConfigAccount(config ag_solanago.Pub
 
 // GetConfigAccount gets the "config" account.
 func (inst *InitializeBypasserOperation) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+// SetRoleAccessControllerAccount sets the "role_access_controller" account.
 func (inst *InitializeBypasserOperation) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *InitializeBypasserOperation {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
-// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+// GetRoleAccessControllerAccount gets the "role_access_controller" account.
 func (inst *InitializeBypasserOperation) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -102,18 +102,18 @@ func (inst *InitializeBypasserOperation) SetAuthorityAccount(authority ag_solana
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *InitializeBypasserOperation) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *InitializeBypasserOperation) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeBypasserOperation {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *InitializeBypasserOperation) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 func (inst InitializeBypasserOperation) Build() *Instruction {
@@ -181,19 +181,19 @@ func (inst *InitializeBypasserOperation) EncodeToTree(parent ag_treeout.Branches
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("      TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("              Id", *inst.Id))
-						paramsBranch.Child(ag_format.Param("            Salt", *inst.Salt))
-						paramsBranch.Child(ag_format.Param("InstructionCount", *inst.InstructionCount))
+						paramsBranch.Child(ag_format.Param("       TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("               Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param("             Salt", *inst.Salt))
+						paramsBranch.Child(ag_format.Param(" InstructionCount", *inst.InstructionCount))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("       systemProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("             operation", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("role_access_controller", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("        system_program", inst.AccountMetaSlice.Get(4)))
 					})
 				})
 		})
@@ -249,10 +249,10 @@ func (obj *InitializeBypasserOperation) UnmarshalWithDecoder(decoder *ag_binary.
 // NewInitializeBypasserOperationInstruction declares a new InitializeBypasserOperation instruction with the provided parameters and accounts.
 func NewInitializeBypasserOperationInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	timelock_id [32]uint8,
 	id [32]uint8,
 	salt [32]uint8,
-	instructionCount uint32,
+	instruction_count uint32,
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
@@ -260,10 +260,10 @@ func NewInitializeBypasserOperationInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *InitializeBypasserOperation {
 	return NewInitializeBypasserOperationInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(timelock_id).
 		SetId(id).
 		SetSalt(salt).
-		SetInstructionCount(instructionCount).
+		SetInstructionCount(instruction_count).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).
 		SetRoleAccessControllerAccount(roleAccessController).

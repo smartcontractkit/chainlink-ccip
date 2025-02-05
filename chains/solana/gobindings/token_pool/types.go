@@ -7,91 +7,233 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type RateLimitTokenBucket struct {
-	Tokens      uint64
-	LastUpdated uint64
-	Cfg         RateLimitConfig
+type Burned struct {
+	Sender ag_solanago.PublicKey
+	Amount uint64
 }
 
-func (obj RateLimitTokenBucket) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Tokens` param:
-	err = encoder.Encode(obj.Tokens)
+func (obj Burned) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Sender` param:
+	err = encoder.Encode(obj.Sender)
 	if err != nil {
 		return err
 	}
-	// Serialize `LastUpdated` param:
-	err = encoder.Encode(obj.LastUpdated)
-	if err != nil {
-		return err
-	}
-	// Serialize `Cfg` param:
-	err = encoder.Encode(obj.Cfg)
+	// Serialize `Amount` param:
+	err = encoder.Encode(obj.Amount)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *RateLimitTokenBucket) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Tokens`:
-	err = decoder.Decode(&obj.Tokens)
+func (obj *Burned) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
 	if err != nil {
 		return err
 	}
-	// Deserialize `LastUpdated`:
-	err = decoder.Decode(&obj.LastUpdated)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Cfg`:
-	err = decoder.Decode(&obj.Cfg)
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-type RateLimitConfig struct {
-	Enabled  bool
-	Capacity uint64
-	Rate     uint64
+type ChainConfig struct {
+	Remote            RemoteConfig
+	InboundRateLimit  RateLimitTokenBucket
+	OutboundRateLimit RateLimitTokenBucket
 }
 
-func (obj RateLimitConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Enabled` param:
-	err = encoder.Encode(obj.Enabled)
+func (obj ChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Remote` param:
+	err = encoder.Encode(obj.Remote)
 	if err != nil {
 		return err
 	}
-	// Serialize `Capacity` param:
-	err = encoder.Encode(obj.Capacity)
+	// Serialize `InboundRateLimit` param:
+	err = encoder.Encode(obj.InboundRateLimit)
 	if err != nil {
 		return err
 	}
-	// Serialize `Rate` param:
-	err = encoder.Encode(obj.Rate)
+	// Serialize `OutboundRateLimit` param:
+	err = encoder.Encode(obj.OutboundRateLimit)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *RateLimitConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Enabled`:
-	err = decoder.Decode(&obj.Enabled)
+func (obj *ChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Remote`:
+	err = decoder.Decode(&obj.Remote)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Capacity`:
-	err = decoder.Decode(&obj.Capacity)
+	// Deserialize `InboundRateLimit`:
+	err = decoder.Decode(&obj.InboundRateLimit)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Rate`:
-	err = decoder.Decode(&obj.Rate)
+	// Deserialize `OutboundRateLimit`:
+	err = decoder.Decode(&obj.OutboundRateLimit)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+type Config struct {
+	Version          uint8
+	PoolType         PoolType
+	TokenProgram     ag_solanago.PublicKey
+	Mint             ag_solanago.PublicKey
+	Decimals         uint8
+	PoolSigner       ag_solanago.PublicKey
+	PoolTokenAccount ag_solanago.PublicKey
+	Owner            ag_solanago.PublicKey
+	ProposedOwner    ag_solanago.PublicKey
+	RampAuthority    ag_solanago.PublicKey
+}
+
+func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `PoolType` param:
+	err = encoder.Encode(obj.PoolType)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenProgram` param:
+	err = encoder.Encode(obj.TokenProgram)
+	if err != nil {
+		return err
+	}
+	// Serialize `Mint` param:
+	err = encoder.Encode(obj.Mint)
+	if err != nil {
+		return err
+	}
+	// Serialize `Decimals` param:
+	err = encoder.Encode(obj.Decimals)
+	if err != nil {
+		return err
+	}
+	// Serialize `PoolSigner` param:
+	err = encoder.Encode(obj.PoolSigner)
+	if err != nil {
+		return err
+	}
+	// Serialize `PoolTokenAccount` param:
+	err = encoder.Encode(obj.PoolTokenAccount)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `RampAuthority` param:
+	err = encoder.Encode(obj.RampAuthority)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PoolType`:
+	err = decoder.Decode(&obj.PoolType)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenProgram`:
+	err = decoder.Decode(&obj.TokenProgram)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Mint`:
+	err = decoder.Decode(&obj.Mint)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Decimals`:
+	err = decoder.Decode(&obj.Decimals)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PoolSigner`:
+	err = decoder.Decode(&obj.PoolSigner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PoolTokenAccount`:
+	err = decoder.Decode(&obj.PoolTokenAccount)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RampAuthority`:
+	err = decoder.Decode(&obj.RampAuthority)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigChanged struct {
+	Config RateLimitConfig
+}
+
+func (obj ConfigChanged) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Config` param:
+	err = encoder.Encode(obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigChanged) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Config`:
+	err = decoder.Decode(&obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ExternalExecutionConfig struct{}
+
+func (obj ExternalExecutionConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
@@ -188,6 +330,236 @@ func (obj *LockOrBurnOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	}
 	// Deserialize `DestPoolData`:
 	err = decoder.Decode(&obj.DestPoolData)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Locked struct {
+	Sender ag_solanago.PublicKey
+	Amount uint64
+}
+
+func (obj Locked) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Sender` param:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Serialize `Amount` param:
+	err = encoder.Encode(obj.Amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Locked) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Minted struct {
+	Sender    ag_solanago.PublicKey
+	Recipient ag_solanago.PublicKey
+	Amount    uint64
+}
+
+func (obj Minted) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Sender` param:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Serialize `Recipient` param:
+	err = encoder.Encode(obj.Recipient)
+	if err != nil {
+		return err
+	}
+	// Serialize `Amount` param:
+	err = encoder.Encode(obj.Amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Minted) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Recipient`:
+	err = decoder.Decode(&obj.Recipient)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type PoolType ag_binary.BorshEnum
+
+const (
+	PoolTypeLockAndRelease PoolType = iota
+	PoolTypeBurnAndMint
+	PoolTypeWrapped
+)
+
+func (value PoolType) String() string {
+	switch value {
+	case PoolTypeLockAndRelease:
+		return "LockAndRelease"
+	case PoolTypeBurnAndMint:
+		return "BurnAndMint"
+	case PoolTypeWrapped:
+		return "Wrapped"
+	default:
+		return ""
+	}
+}
+
+type RateLimitConfig struct {
+	Enabled  bool
+	Capacity uint64
+	Rate     uint64
+}
+
+func (obj RateLimitConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Enabled` param:
+	err = encoder.Encode(obj.Enabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `Capacity` param:
+	err = encoder.Encode(obj.Capacity)
+	if err != nil {
+		return err
+	}
+	// Serialize `Rate` param:
+	err = encoder.Encode(obj.Rate)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RateLimitConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Enabled`:
+	err = decoder.Decode(&obj.Enabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Capacity`:
+	err = decoder.Decode(&obj.Capacity)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Rate`:
+	err = decoder.Decode(&obj.Rate)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type RateLimitConfigured struct {
+	ChainSelector     uint64
+	OutboundRateLimit RateLimitConfig
+	InboundRateLimit  RateLimitConfig
+}
+
+func (obj RateLimitConfigured) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `OutboundRateLimit` param:
+	err = encoder.Encode(obj.OutboundRateLimit)
+	if err != nil {
+		return err
+	}
+	// Serialize `InboundRateLimit` param:
+	err = encoder.Encode(obj.InboundRateLimit)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RateLimitConfigured) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OutboundRateLimit`:
+	err = decoder.Decode(&obj.OutboundRateLimit)
+	if err != nil {
+		return err
+	}
+	// Deserialize `InboundRateLimit`:
+	err = decoder.Decode(&obj.InboundRateLimit)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type RateLimitTokenBucket struct {
+	Tokens      uint64
+	LastUpdated uint64
+	Cfg         RateLimitConfig
+}
+
+func (obj RateLimitTokenBucket) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Tokens` param:
+	err = encoder.Encode(obj.Tokens)
+	if err != nil {
+		return err
+	}
+	// Serialize `LastUpdated` param:
+	err = encoder.Encode(obj.LastUpdated)
+	if err != nil {
+		return err
+	}
+	// Serialize `Cfg` param:
+	err = encoder.Encode(obj.Cfg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RateLimitTokenBucket) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Tokens`:
+	err = decoder.Decode(&obj.Tokens)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LastUpdated`:
+	err = decoder.Decode(&obj.LastUpdated)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Cfg`:
+	err = decoder.Decode(&obj.Cfg)
 	if err != nil {
 		return err
 	}
@@ -320,6 +692,160 @@ func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	return nil
 }
 
+type Released struct {
+	Sender    ag_solanago.PublicKey
+	Recipient ag_solanago.PublicKey
+	Amount    uint64
+}
+
+func (obj Released) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Sender` param:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Serialize `Recipient` param:
+	err = encoder.Encode(obj.Recipient)
+	if err != nil {
+		return err
+	}
+	// Serialize `Amount` param:
+	err = encoder.Encode(obj.Amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Released) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Recipient`:
+	err = decoder.Decode(&obj.Recipient)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type RemoteAddress struct {
+	Address []byte
+}
+
+func (obj RemoteAddress) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Address` param:
+	err = encoder.Encode(obj.Address)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RemoteAddress) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Address`:
+	err = decoder.Decode(&obj.Address)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type RemoteChainConfigured struct {
+	ChainSelector         uint64
+	Token                 RemoteAddress
+	PreviousToken         RemoteAddress
+	PoolAddresses         []RemoteAddress
+	PreviousPoolAddresses []RemoteAddress
+}
+
+func (obj RemoteChainConfigured) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `Token` param:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return err
+	}
+	// Serialize `PreviousToken` param:
+	err = encoder.Encode(obj.PreviousToken)
+	if err != nil {
+		return err
+	}
+	// Serialize `PoolAddresses` param:
+	err = encoder.Encode(obj.PoolAddresses)
+	if err != nil {
+		return err
+	}
+	// Serialize `PreviousPoolAddresses` param:
+	err = encoder.Encode(obj.PreviousPoolAddresses)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RemoteChainConfigured) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PreviousToken`:
+	err = decoder.Decode(&obj.PreviousToken)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PoolAddresses`:
+	err = decoder.Decode(&obj.PoolAddresses)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PreviousPoolAddresses`:
+	err = decoder.Decode(&obj.PreviousPoolAddresses)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type RemoteChainRemoved struct {
+	ChainSelector uint64
+}
+
+func (obj RemoteChainRemoved) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RemoteChainRemoved) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type RemoteConfig struct {
 	PoolAddresses []RemoteAddress
 	TokenAddress  RemoteAddress
@@ -364,45 +890,101 @@ func (obj *RemoteConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	return nil
 }
 
-type RemoteAddress struct {
-	Address []byte
+type RemotePoolsAppended struct {
+	ChainSelector         uint64
+	PoolAddresses         []RemoteAddress
+	PreviousPoolAddresses []RemoteAddress
 }
 
-func (obj RemoteAddress) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Address` param:
-	err = encoder.Encode(obj.Address)
+func (obj RemotePoolsAppended) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `PoolAddresses` param:
+	err = encoder.Encode(obj.PoolAddresses)
+	if err != nil {
+		return err
+	}
+	// Serialize `PreviousPoolAddresses` param:
+	err = encoder.Encode(obj.PreviousPoolAddresses)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *RemoteAddress) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Address`:
-	err = decoder.Decode(&obj.Address)
+func (obj *RemotePoolsAppended) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PoolAddresses`:
+	err = decoder.Decode(&obj.PoolAddresses)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PreviousPoolAddresses`:
+	err = decoder.Decode(&obj.PreviousPoolAddresses)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-type PoolType ag_binary.BorshEnum
+type RouterUpdated struct {
+	OldAuthority ag_solanago.PublicKey
+	NewAuthority ag_solanago.PublicKey
+}
 
-const (
-	LockAndRelease_PoolType PoolType = iota
-	BurnAndMint_PoolType
-	Wrapped_PoolType
-)
-
-func (value PoolType) String() string {
-	switch value {
-	case LockAndRelease_PoolType:
-		return "LockAndRelease"
-	case BurnAndMint_PoolType:
-		return "BurnAndMint"
-	case Wrapped_PoolType:
-		return "Wrapped"
-	default:
-		return ""
+func (obj RouterUpdated) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `OldAuthority` param:
+	err = encoder.Encode(obj.OldAuthority)
+	if err != nil {
+		return err
 	}
+	// Serialize `NewAuthority` param:
+	err = encoder.Encode(obj.NewAuthority)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RouterUpdated) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `OldAuthority`:
+	err = decoder.Decode(&obj.OldAuthority)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NewAuthority`:
+	err = decoder.Decode(&obj.NewAuthority)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TokensConsumed struct {
+	Tokens uint64
+}
+
+func (obj TokensConsumed) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Tokens` param:
+	err = encoder.Encode(obj.Tokens)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TokensConsumed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Tokens`:
+	err = decoder.Decode(&obj.Tokens)
+	if err != nil {
+		return err
+	}
+	return nil
 }

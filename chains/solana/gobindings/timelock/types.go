@@ -7,6 +7,83 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type AccessController struct {
+	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
+	AccessList    AccessList
+}
+
+func (obj AccessController) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccessList` param:
+	err = encoder.Encode(obj.AccessList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AccessController) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccessList`:
+	err = decoder.Decode(&obj.AccessList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type AccessList struct {
+	Xs  [64]ag_solanago.PublicKey
+	Len uint64
+}
+
+func (obj AccessList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Xs` param:
+	err = encoder.Encode(obj.Xs)
+	if err != nil {
+		return err
+	}
+	// Serialize `Len` param:
+	err = encoder.Encode(obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AccessList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Xs`:
+	err = decoder.Decode(&obj.Xs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Len`:
+	err = decoder.Decode(&obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type BlockedSelectors struct {
 	Xs  [128][8]uint8
 	Len uint64
@@ -40,15 +117,20 @@ func (obj *BlockedSelectors) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	return nil
 }
 
-type InstructionData struct {
-	ProgramId ag_solanago.PublicKey
-	Data      []byte
-	Accounts  []InstructionAccount
+type BypasserCallExecuted struct {
+	Index  uint64
+	Target ag_solanago.PublicKey
+	Data   []byte
 }
 
-func (obj InstructionData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ProgramId` param:
-	err = encoder.Encode(obj.ProgramId)
+func (obj BypasserCallExecuted) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Index` param:
+	err = encoder.Encode(obj.Index)
+	if err != nil {
+		return err
+	}
+	// Serialize `Target` param:
+	err = encoder.Encode(obj.Target)
 	if err != nil {
 		return err
 	}
@@ -57,17 +139,17 @@ func (obj InstructionData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	if err != nil {
 		return err
 	}
-	// Serialize `Accounts` param:
-	err = encoder.Encode(obj.Accounts)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (obj *InstructionData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ProgramId`:
-	err = decoder.Decode(&obj.ProgramId)
+func (obj *BypasserCallExecuted) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Index`:
+	err = decoder.Decode(&obj.Index)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Target`:
+	err = decoder.Decode(&obj.Target)
 	if err != nil {
 		return err
 	}
@@ -76,8 +158,322 @@ func (obj *InstructionData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	if err != nil {
 		return err
 	}
-	// Deserialize `Accounts`:
-	err = decoder.Decode(&obj.Accounts)
+	return nil
+}
+
+type CallExecuted struct {
+	Id     [32]uint8
+	Index  uint64
+	Target ag_solanago.PublicKey
+	Data   []byte
+}
+
+func (obj CallExecuted) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Id` param:
+	err = encoder.Encode(obj.Id)
+	if err != nil {
+		return err
+	}
+	// Serialize `Index` param:
+	err = encoder.Encode(obj.Index)
+	if err != nil {
+		return err
+	}
+	// Serialize `Target` param:
+	err = encoder.Encode(obj.Target)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CallExecuted) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Id`:
+	err = decoder.Decode(&obj.Id)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Index`:
+	err = decoder.Decode(&obj.Index)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Target`:
+	err = decoder.Decode(&obj.Target)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type CallScheduled struct {
+	Id          [32]uint8
+	Index       uint64
+	Target      ag_solanago.PublicKey
+	Predecessor [32]uint8
+	Salt        [32]uint8
+	Delay       uint64
+	Data        []byte
+}
+
+func (obj CallScheduled) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Id` param:
+	err = encoder.Encode(obj.Id)
+	if err != nil {
+		return err
+	}
+	// Serialize `Index` param:
+	err = encoder.Encode(obj.Index)
+	if err != nil {
+		return err
+	}
+	// Serialize `Target` param:
+	err = encoder.Encode(obj.Target)
+	if err != nil {
+		return err
+	}
+	// Serialize `Predecessor` param:
+	err = encoder.Encode(obj.Predecessor)
+	if err != nil {
+		return err
+	}
+	// Serialize `Salt` param:
+	err = encoder.Encode(obj.Salt)
+	if err != nil {
+		return err
+	}
+	// Serialize `Delay` param:
+	err = encoder.Encode(obj.Delay)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CallScheduled) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Id`:
+	err = decoder.Decode(&obj.Id)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Index`:
+	err = decoder.Decode(&obj.Index)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Target`:
+	err = decoder.Decode(&obj.Target)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Predecessor`:
+	err = decoder.Decode(&obj.Predecessor)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Salt`:
+	err = decoder.Decode(&obj.Salt)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Delay`:
+	err = decoder.Decode(&obj.Delay)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Cancelled struct {
+	Id [32]uint8
+}
+
+func (obj Cancelled) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Id` param:
+	err = encoder.Encode(obj.Id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Cancelled) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Id`:
+	err = decoder.Decode(&obj.Id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Config struct {
+	TimelockId                    [32]uint8
+	Owner                         ag_solanago.PublicKey
+	ProposedOwner                 ag_solanago.PublicKey
+	ProposerRoleAccessController  ag_solanago.PublicKey
+	ExecutorRoleAccessController  ag_solanago.PublicKey
+	CancellerRoleAccessController ag_solanago.PublicKey
+	BypasserRoleAccessController  ag_solanago.PublicKey
+	MinDelay                      uint64
+	BlockedSelectors              BlockedSelectors
+}
+
+func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposerRoleAccessController` param:
+	err = encoder.Encode(obj.ProposerRoleAccessController)
+	if err != nil {
+		return err
+	}
+	// Serialize `ExecutorRoleAccessController` param:
+	err = encoder.Encode(obj.ExecutorRoleAccessController)
+	if err != nil {
+		return err
+	}
+	// Serialize `CancellerRoleAccessController` param:
+	err = encoder.Encode(obj.CancellerRoleAccessController)
+	if err != nil {
+		return err
+	}
+	// Serialize `BypasserRoleAccessController` param:
+	err = encoder.Encode(obj.BypasserRoleAccessController)
+	if err != nil {
+		return err
+	}
+	// Serialize `MinDelay` param:
+	err = encoder.Encode(obj.MinDelay)
+	if err != nil {
+		return err
+	}
+	// Serialize `BlockedSelectors` param:
+	err = encoder.Encode(obj.BlockedSelectors)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposerRoleAccessController`:
+	err = decoder.Decode(&obj.ProposerRoleAccessController)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ExecutorRoleAccessController`:
+	err = decoder.Decode(&obj.ExecutorRoleAccessController)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CancellerRoleAccessController`:
+	err = decoder.Decode(&obj.CancellerRoleAccessController)
+	if err != nil {
+		return err
+	}
+	// Deserialize `BypasserRoleAccessController`:
+	err = decoder.Decode(&obj.BypasserRoleAccessController)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MinDelay`:
+	err = decoder.Decode(&obj.MinDelay)
+	if err != nil {
+		return err
+	}
+	// Deserialize `BlockedSelectors`:
+	err = decoder.Decode(&obj.BlockedSelectors)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type FunctionSelectorBlocked struct {
+	Selector [8]uint8
+}
+
+func (obj FunctionSelectorBlocked) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Selector` param:
+	err = encoder.Encode(obj.Selector)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *FunctionSelectorBlocked) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Selector`:
+	err = decoder.Decode(&obj.Selector)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type FunctionSelectorUnblocked struct {
+	Selector [8]uint8
+}
+
+func (obj FunctionSelectorUnblocked) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Selector` param:
+	err = encoder.Encode(obj.Selector)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *FunctionSelectorUnblocked) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Selector`:
+	err = decoder.Decode(&obj.Selector)
 	if err != nil {
 		return err
 	}
@@ -128,90 +524,192 @@ func (obj *InstructionAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	return nil
 }
 
-type TimelockError ag_binary.BorshEnum
+type InstructionData struct {
+	ProgramId ag_solanago.PublicKey
+	Data      []byte
+	Accounts  []InstructionAccount
+}
 
-const (
-	InvalidInput_TimelockError TimelockError = iota
-	Overflow_TimelockError
-	InvalidId_TimelockError
-	OperationNotFinalized_TimelockError
-	OperationAlreadyFinalized_TimelockError
-	TooManyInstructions_TimelockError
-	OperationAlreadyScheduled_TimelockError
-	DelayInsufficient_TimelockError
-	OperationNotCancellable_TimelockError
-	OperationNotReady_TimelockError
-	OperationAlreadyExecuted_TimelockError
-	MissingDependency_TimelockError
-	InvalidAccessController_TimelockError
-	BlockedSelector_TimelockError
-	AlreadyBlocked_TimelockError
-	SelectorNotFound_TimelockError
-	MaxCapacityReached_TimelockError
-)
-
-func (value TimelockError) String() string {
-	switch value {
-	case InvalidInput_TimelockError:
-		return "InvalidInput"
-	case Overflow_TimelockError:
-		return "Overflow"
-	case InvalidId_TimelockError:
-		return "InvalidId"
-	case OperationNotFinalized_TimelockError:
-		return "OperationNotFinalized"
-	case OperationAlreadyFinalized_TimelockError:
-		return "OperationAlreadyFinalized"
-	case TooManyInstructions_TimelockError:
-		return "TooManyInstructions"
-	case OperationAlreadyScheduled_TimelockError:
-		return "OperationAlreadyScheduled"
-	case DelayInsufficient_TimelockError:
-		return "DelayInsufficient"
-	case OperationNotCancellable_TimelockError:
-		return "OperationNotCancellable"
-	case OperationNotReady_TimelockError:
-		return "OperationNotReady"
-	case OperationAlreadyExecuted_TimelockError:
-		return "OperationAlreadyExecuted"
-	case MissingDependency_TimelockError:
-		return "MissingDependency"
-	case InvalidAccessController_TimelockError:
-		return "InvalidAccessController"
-	case BlockedSelector_TimelockError:
-		return "BlockedSelector"
-	case AlreadyBlocked_TimelockError:
-		return "AlreadyBlocked"
-	case SelectorNotFound_TimelockError:
-		return "SelectorNotFound"
-	case MaxCapacityReached_TimelockError:
-		return "MaxCapacityReached"
-	default:
-		return ""
+func (obj InstructionData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ProgramId` param:
+	err = encoder.Encode(obj.ProgramId)
+	if err != nil {
+		return err
 	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	// Serialize `Accounts` param:
+	err = encoder.Encode(obj.Accounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *InstructionData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ProgramId`:
+	err = decoder.Decode(&obj.ProgramId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Accounts`:
+	err = decoder.Decode(&obj.Accounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MinDelayChange struct {
+	OldDuration uint64
+	NewDuration uint64
+}
+
+func (obj MinDelayChange) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `OldDuration` param:
+	err = encoder.Encode(obj.OldDuration)
+	if err != nil {
+		return err
+	}
+	// Serialize `NewDuration` param:
+	err = encoder.Encode(obj.NewDuration)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MinDelayChange) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `OldDuration`:
+	err = decoder.Decode(&obj.OldDuration)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NewDuration`:
+	err = decoder.Decode(&obj.NewDuration)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Operation struct {
+	Timestamp         uint64
+	Id                [32]uint8
+	Predecessor       [32]uint8
+	Salt              [32]uint8
+	IsFinalized       bool
+	TotalInstructions uint32
+	Instructions      []InstructionData
+}
+
+func (obj Operation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Serialize `Id` param:
+	err = encoder.Encode(obj.Id)
+	if err != nil {
+		return err
+	}
+	// Serialize `Predecessor` param:
+	err = encoder.Encode(obj.Predecessor)
+	if err != nil {
+		return err
+	}
+	// Serialize `Salt` param:
+	err = encoder.Encode(obj.Salt)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsFinalized` param:
+	err = encoder.Encode(obj.IsFinalized)
+	if err != nil {
+		return err
+	}
+	// Serialize `TotalInstructions` param:
+	err = encoder.Encode(obj.TotalInstructions)
+	if err != nil {
+		return err
+	}
+	// Serialize `Instructions` param:
+	err = encoder.Encode(obj.Instructions)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Operation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Id`:
+	err = decoder.Decode(&obj.Id)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Predecessor`:
+	err = decoder.Decode(&obj.Predecessor)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Salt`:
+	err = decoder.Decode(&obj.Salt)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsFinalized`:
+	err = decoder.Decode(&obj.IsFinalized)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TotalInstructions`:
+	err = decoder.Decode(&obj.TotalInstructions)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Instructions`:
+	err = decoder.Decode(&obj.Instructions)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type Role ag_binary.BorshEnum
 
 const (
-	Admin_Role Role = iota
-	Proposer_Role
-	Executor_Role
-	Canceller_Role
-	Bypasser_Role
+	RoleAdmin Role = iota
+	RoleProposer
+	RoleExecutor
+	RoleCanceller
+	RoleBypasser
 )
 
 func (value Role) String() string {
 	switch value {
-	case Admin_Role:
+	case RoleAdmin:
 		return "Admin"
-	case Proposer_Role:
+	case RoleProposer:
 		return "Proposer"
-	case Executor_Role:
+	case RoleExecutor:
 		return "Executor"
-	case Canceller_Role:
+	case RoleCanceller:
 		return "Canceller"
-	case Bypasser_Role:
+	case RoleBypasser:
 		return "Bypasser"
 	default:
 		return ""

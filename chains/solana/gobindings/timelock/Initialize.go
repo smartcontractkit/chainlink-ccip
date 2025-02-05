@@ -19,22 +19,22 @@ type Initialize struct {
 	//
 	// [1] = [WRITE, SIGNER] authority
 	//
-	// [2] = [] systemProgram
+	// [2] = [] system_program
 	//
 	// [3] = [] program
 	//
-	// [4] = [] programData
+	// [4] = [] program_data
 	//
-	// [5] = [] accessControllerProgram
+	// [5] = [] access_controller_program
 	//
-	// [6] = [] proposerRoleAccessController
+	// [6] = [] proposer_role_access_controller
 	//
-	// [7] = [] executorRoleAccessController
+	// [7] = [] executor_role_access_controller
 	//
-	// [8] = [] cancellerRoleAccessController
+	// [8] = [] canceller_role_access_controller
 	//
-	// [9] = [] bypasserRoleAccessController
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [9] = [] bypasser_role_access_controller
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
@@ -45,15 +45,15 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *Initialize) SetTimelockId(timelockId [32]uint8) *Initialize {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "timelock_id" parameter.
+func (inst *Initialize) SetTimelockId(timelock_id [32]uint8) *Initialize {
+	inst.TimelockId = &timelock_id
 	return inst
 }
 
-// SetMinDelay sets the "minDelay" parameter.
-func (inst *Initialize) SetMinDelay(minDelay uint64) *Initialize {
-	inst.MinDelay = &minDelay
+// SetMinDelay sets the "min_delay" parameter.
+func (inst *Initialize) SetMinDelay(min_delay uint64) *Initialize {
+	inst.MinDelay = &min_delay
 	return inst
 }
 
@@ -65,7 +65,7 @@ func (inst *Initialize) SetConfigAccount(config ag_solanago.PublicKey) *Initiali
 
 // GetConfigAccount gets the "config" account.
 func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -76,18 +76,18 @@ func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *In
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetProgramAccount sets the "program" account.
@@ -98,73 +98,73 @@ func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initia
 
 // GetProgramAccount gets the "program" account.
 func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetProgramDataAccount sets the "programData" account.
+// SetProgramDataAccount sets the "program_data" account.
 func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(programData)
 	return inst
 }
 
-// GetProgramDataAccount gets the "programData" account.
+// GetProgramDataAccount gets the "program_data" account.
 func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetAccessControllerProgramAccount sets the "accessControllerProgram" account.
+// SetAccessControllerProgramAccount sets the "access_controller_program" account.
 func (inst *Initialize) SetAccessControllerProgramAccount(accessControllerProgram ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(accessControllerProgram)
 	return inst
 }
 
-// GetAccessControllerProgramAccount gets the "accessControllerProgram" account.
+// GetAccessControllerProgramAccount gets the "access_controller_program" account.
 func (inst *Initialize) GetAccessControllerProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetProposerRoleAccessControllerAccount sets the "proposerRoleAccessController" account.
+// SetProposerRoleAccessControllerAccount sets the "proposer_role_access_controller" account.
 func (inst *Initialize) SetProposerRoleAccessControllerAccount(proposerRoleAccessController ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(proposerRoleAccessController)
 	return inst
 }
 
-// GetProposerRoleAccessControllerAccount gets the "proposerRoleAccessController" account.
+// GetProposerRoleAccessControllerAccount gets the "proposer_role_access_controller" account.
 func (inst *Initialize) GetProposerRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetExecutorRoleAccessControllerAccount sets the "executorRoleAccessController" account.
+// SetExecutorRoleAccessControllerAccount sets the "executor_role_access_controller" account.
 func (inst *Initialize) SetExecutorRoleAccessControllerAccount(executorRoleAccessController ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(executorRoleAccessController)
 	return inst
 }
 
-// GetExecutorRoleAccessControllerAccount gets the "executorRoleAccessController" account.
+// GetExecutorRoleAccessControllerAccount gets the "executor_role_access_controller" account.
 func (inst *Initialize) GetExecutorRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
-// SetCancellerRoleAccessControllerAccount sets the "cancellerRoleAccessController" account.
+// SetCancellerRoleAccessControllerAccount sets the "canceller_role_access_controller" account.
 func (inst *Initialize) SetCancellerRoleAccessControllerAccount(cancellerRoleAccessController ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[8] = ag_solanago.Meta(cancellerRoleAccessController)
 	return inst
 }
 
-// GetCancellerRoleAccessControllerAccount gets the "cancellerRoleAccessController" account.
+// GetCancellerRoleAccessControllerAccount gets the "canceller_role_access_controller" account.
 func (inst *Initialize) GetCancellerRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice.Get(8)
 }
 
-// SetBypasserRoleAccessControllerAccount sets the "bypasserRoleAccessController" account.
+// SetBypasserRoleAccessControllerAccount sets the "bypasser_role_access_controller" account.
 func (inst *Initialize) SetBypasserRoleAccessControllerAccount(bypasserRoleAccessController ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[9] = ag_solanago.Meta(bypasserRoleAccessController)
 	return inst
 }
 
-// GetBypasserRoleAccessControllerAccount gets the "bypasserRoleAccessController" account.
+// GetBypasserRoleAccessControllerAccount gets the "bypasser_role_access_controller" account.
 func (inst *Initialize) GetBypasserRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice.Get(9)
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -241,22 +241,22 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("  MinDelay", *inst.MinDelay))
+						paramsBranch.Child(ag_format.Param(" TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("   MinDelay", *inst.MinDelay))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("                    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("                systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("                      program", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("                  programData", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("      accessControllerProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta(" proposerRoleAccessController", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta(" executorRoleAccessController", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("cancellerRoleAccessController", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta(" bypasserRoleAccessController", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("                          config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                       authority", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                  system_program", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("                         program", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("                    program_data", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("       access_controller_program", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta(" proposer_role_access_controller", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta(" executor_role_access_controller", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("canceller_role_access_controller", inst.AccountMetaSlice.Get(8)))
+						accountsBranch.Child(ag_format.Meta(" bypasser_role_access_controller", inst.AccountMetaSlice.Get(9)))
 					})
 				})
 		})
@@ -292,8 +292,8 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	timelockId [32]uint8,
-	minDelay uint64,
+	timelock_id [32]uint8,
+	min_delay uint64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -306,8 +306,8 @@ func NewInitializeInstruction(
 	cancellerRoleAccessController ag_solanago.PublicKey,
 	bypasserRoleAccessController ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetTimelockId(timelockId).
-		SetMinDelay(minDelay).
+		SetTimelockId(timelock_id).
+		SetMinDelay(min_delay).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

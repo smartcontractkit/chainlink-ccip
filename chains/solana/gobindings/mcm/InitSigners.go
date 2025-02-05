@@ -10,19 +10,19 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitSigners is the `initSigners` instruction.
+// InitSigners is the `init_signers` instruction.
 type InitSigners struct {
 	MultisigId   *[32]uint8
 	TotalSigners *uint8
 
-	// [0] = [] multisigConfig
+	// [0] = [] multisig_config
 	//
-	// [1] = [WRITE] configSigners
+	// [1] = [WRITE] config_signers
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitSignersInstructionBuilder creates a new `InitSigners` instruction builder.
@@ -33,38 +33,38 @@ func NewInitSignersInstructionBuilder() *InitSigners {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *InitSigners) SetMultisigId(multisigId [32]uint8) *InitSigners {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *InitSigners) SetMultisigId(multisig_id [32]uint8) *InitSigners {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
-// SetTotalSigners sets the "totalSigners" parameter.
-func (inst *InitSigners) SetTotalSigners(totalSigners uint8) *InitSigners {
-	inst.TotalSigners = &totalSigners
+// SetTotalSigners sets the "total_signers" parameter.
+func (inst *InitSigners) SetTotalSigners(total_signers uint8) *InitSigners {
+	inst.TotalSigners = &total_signers
 	return inst
 }
 
-// SetMultisigConfigAccount sets the "multisigConfig" account.
+// SetMultisigConfigAccount sets the "multisig_config" account.
 func (inst *InitSigners) SetMultisigConfigAccount(multisigConfig ag_solanago.PublicKey) *InitSigners {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(multisigConfig)
 	return inst
 }
 
-// GetMultisigConfigAccount gets the "multisigConfig" account.
+// GetMultisigConfigAccount gets the "multisig_config" account.
 func (inst *InitSigners) GetMultisigConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetConfigSignersAccount sets the "configSigners" account.
+// SetConfigSignersAccount sets the "config_signers" account.
 func (inst *InitSigners) SetConfigSignersAccount(configSigners ag_solanago.PublicKey) *InitSigners {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(configSigners).WRITE()
 	return inst
 }
 
-// GetConfigSignersAccount gets the "configSigners" account.
+// GetConfigSignersAccount gets the "config_signers" account.
 func (inst *InitSigners) GetConfigSignersAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -75,18 +75,18 @@ func (inst *InitSigners) SetAuthorityAccount(authority ag_solanago.PublicKey) *I
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *InitSigners) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *InitSigners) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitSigners {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *InitSigners) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst InitSigners) Build() *Instruction {
@@ -145,16 +145,16 @@ func (inst *InitSigners) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("  MultisigId", *inst.MultisigId))
-						paramsBranch.Child(ag_format.Param("TotalSigners", *inst.TotalSigners))
+						paramsBranch.Child(ag_format.Param("   MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param(" TotalSigners", *inst.TotalSigners))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("multisigConfig", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta(" configSigners", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta(" systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("multisig_config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta(" config_signers", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta(" system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -190,16 +190,16 @@ func (obj *InitSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 // NewInitSignersInstruction declares a new InitSigners instruction with the provided parameters and accounts.
 func NewInitSignersInstruction(
 	// Parameters:
-	multisigId [32]uint8,
-	totalSigners uint8,
+	multisig_id [32]uint8,
+	total_signers uint8,
 	// Accounts:
 	multisigConfig ag_solanago.PublicKey,
 	configSigners ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *InitSigners {
 	return NewInitSignersInstructionBuilder().
-		SetMultisigId(multisigId).
-		SetTotalSigners(totalSigners).
+		SetMultisigId(multisig_id).
+		SetTotalSigners(total_signers).
 		SetMultisigConfigAccount(multisigConfig).
 		SetConfigSignersAccount(configSigners).
 		SetAuthorityAccount(authority).

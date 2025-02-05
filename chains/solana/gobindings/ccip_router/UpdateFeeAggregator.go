@@ -25,8 +25,8 @@ type UpdateFeeAggregator struct {
 	//
 	// [1] = [SIGNER] authority
 	//
-	// [2] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [2] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUpdateFeeAggregatorInstructionBuilder creates a new `UpdateFeeAggregator` instruction builder.
@@ -37,9 +37,9 @@ func NewUpdateFeeAggregatorInstructionBuilder() *UpdateFeeAggregator {
 	return nd
 }
 
-// SetFeeAggregator sets the "feeAggregator" parameter.
-func (inst *UpdateFeeAggregator) SetFeeAggregator(feeAggregator ag_solanago.PublicKey) *UpdateFeeAggregator {
-	inst.FeeAggregator = &feeAggregator
+// SetFeeAggregator sets the "fee_aggregator" parameter.
+func (inst *UpdateFeeAggregator) SetFeeAggregator(fee_aggregator ag_solanago.PublicKey) *UpdateFeeAggregator {
+	inst.FeeAggregator = &fee_aggregator
 	return inst
 }
 
@@ -51,7 +51,7 @@ func (inst *UpdateFeeAggregator) SetConfigAccount(config ag_solanago.PublicKey) 
 
 // GetConfigAccount gets the "config" account.
 func (inst *UpdateFeeAggregator) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -62,18 +62,18 @@ func (inst *UpdateFeeAggregator) SetAuthorityAccount(authority ag_solanago.Publi
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UpdateFeeAggregator) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *UpdateFeeAggregator) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateFeeAggregator {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *UpdateFeeAggregator) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst UpdateFeeAggregator) Build() *Instruction {
@@ -126,14 +126,14 @@ func (inst *UpdateFeeAggregator) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("FeeAggregator", *inst.FeeAggregator))
+						paramsBranch.Child(ag_format.Param(" FeeAggregator", *inst.FeeAggregator))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -159,13 +159,13 @@ func (obj *UpdateFeeAggregator) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 // NewUpdateFeeAggregatorInstruction declares a new UpdateFeeAggregator instruction with the provided parameters and accounts.
 func NewUpdateFeeAggregatorInstruction(
 	// Parameters:
-	feeAggregator ag_solanago.PublicKey,
+	fee_aggregator ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *UpdateFeeAggregator {
 	return NewUpdateFeeAggregatorInstructionBuilder().
-		SetFeeAggregator(feeAggregator).
+		SetFeeAggregator(fee_aggregator).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

@@ -23,14 +23,14 @@ type UpdateDestChainConfig struct {
 	DestChainSelector *uint64
 	DestChainConfig   *DestChainConfig
 
-	// [0] = [WRITE] destChainState
+	// [0] = [WRITE] dest_chain_state
 	//
 	// [1] = [] config
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUpdateDestChainConfigInstructionBuilder creates a new `UpdateDestChainConfig` instruction builder.
@@ -41,27 +41,27 @@ func NewUpdateDestChainConfigInstructionBuilder() *UpdateDestChainConfig {
 	return nd
 }
 
-// SetDestChainSelector sets the "destChainSelector" parameter.
-func (inst *UpdateDestChainConfig) SetDestChainSelector(destChainSelector uint64) *UpdateDestChainConfig {
-	inst.DestChainSelector = &destChainSelector
+// SetDestChainSelector sets the "dest_chain_selector" parameter.
+func (inst *UpdateDestChainConfig) SetDestChainSelector(dest_chain_selector uint64) *UpdateDestChainConfig {
+	inst.DestChainSelector = &dest_chain_selector
 	return inst
 }
 
-// SetDestChainConfig sets the "destChainConfig" parameter.
-func (inst *UpdateDestChainConfig) SetDestChainConfig(destChainConfig DestChainConfig) *UpdateDestChainConfig {
-	inst.DestChainConfig = &destChainConfig
+// SetDestChainConfig sets the "dest_chain_config" parameter.
+func (inst *UpdateDestChainConfig) SetDestChainConfig(dest_chain_config DestChainConfig) *UpdateDestChainConfig {
+	inst.DestChainConfig = &dest_chain_config
 	return inst
 }
 
-// SetDestChainStateAccount sets the "destChainState" account.
+// SetDestChainStateAccount sets the "dest_chain_state" account.
 func (inst *UpdateDestChainConfig) SetDestChainStateAccount(destChainState ag_solanago.PublicKey) *UpdateDestChainConfig {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(destChainState).WRITE()
 	return inst
 }
 
-// GetDestChainStateAccount gets the "destChainState" account.
+// GetDestChainStateAccount gets the "dest_chain_state" account.
 func (inst *UpdateDestChainConfig) GetDestChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -72,7 +72,7 @@ func (inst *UpdateDestChainConfig) SetConfigAccount(config ag_solanago.PublicKey
 
 // GetConfigAccount gets the "config" account.
 func (inst *UpdateDestChainConfig) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -83,18 +83,18 @@ func (inst *UpdateDestChainConfig) SetAuthorityAccount(authority ag_solanago.Pub
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UpdateDestChainConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *UpdateDestChainConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateDestChainConfig {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *UpdateDestChainConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst UpdateDestChainConfig) Build() *Instruction {
@@ -153,16 +153,16 @@ func (inst *UpdateDestChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("DestChainSelector", *inst.DestChainSelector))
-						paramsBranch.Child(ag_format.Param("  DestChainConfig", *inst.DestChainConfig))
+						paramsBranch.Child(ag_format.Param("  DestChainSelector", *inst.DestChainSelector))
+						paramsBranch.Child(ag_format.Param("    DestChainConfig", *inst.DestChainConfig))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("destChainState", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta(" systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("dest_chain_state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("  system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -198,16 +198,16 @@ func (obj *UpdateDestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decode
 // NewUpdateDestChainConfigInstruction declares a new UpdateDestChainConfig instruction with the provided parameters and accounts.
 func NewUpdateDestChainConfigInstruction(
 	// Parameters:
-	destChainSelector uint64,
-	destChainConfig DestChainConfig,
+	dest_chain_selector uint64,
+	dest_chain_config DestChainConfig,
 	// Accounts:
 	destChainState ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *UpdateDestChainConfig {
 	return NewUpdateDestChainConfigInstructionBuilder().
-		SetDestChainSelector(destChainSelector).
-		SetDestChainConfig(destChainConfig).
+		SetDestChainSelector(dest_chain_selector).
+		SetDestChainConfig(dest_chain_config).
 		SetDestChainStateAccount(destChainState).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).

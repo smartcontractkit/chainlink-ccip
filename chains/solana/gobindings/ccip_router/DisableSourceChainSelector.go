@@ -21,12 +21,12 @@ import (
 type DisableSourceChainSelector struct {
 	SourceChainSelector *uint64
 
-	// [0] = [WRITE] sourceChainState
+	// [0] = [WRITE] source_chain_state
 	//
 	// [1] = [] config
 	//
 	// [2] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewDisableSourceChainSelectorInstructionBuilder creates a new `DisableSourceChainSelector` instruction builder.
@@ -37,21 +37,21 @@ func NewDisableSourceChainSelectorInstructionBuilder() *DisableSourceChainSelect
 	return nd
 }
 
-// SetSourceChainSelector sets the "sourceChainSelector" parameter.
-func (inst *DisableSourceChainSelector) SetSourceChainSelector(sourceChainSelector uint64) *DisableSourceChainSelector {
-	inst.SourceChainSelector = &sourceChainSelector
+// SetSourceChainSelector sets the "source_chain_selector" parameter.
+func (inst *DisableSourceChainSelector) SetSourceChainSelector(source_chain_selector uint64) *DisableSourceChainSelector {
+	inst.SourceChainSelector = &source_chain_selector
 	return inst
 }
 
-// SetSourceChainStateAccount sets the "sourceChainState" account.
+// SetSourceChainStateAccount sets the "source_chain_state" account.
 func (inst *DisableSourceChainSelector) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *DisableSourceChainSelector {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChainState).WRITE()
 	return inst
 }
 
-// GetSourceChainStateAccount gets the "sourceChainState" account.
+// GetSourceChainStateAccount gets the "source_chain_state" account.
 func (inst *DisableSourceChainSelector) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -62,7 +62,7 @@ func (inst *DisableSourceChainSelector) SetConfigAccount(config ag_solanago.Publ
 
 // GetConfigAccount gets the "config" account.
 func (inst *DisableSourceChainSelector) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -73,7 +73,7 @@ func (inst *DisableSourceChainSelector) SetAuthorityAccount(authority ag_solanag
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *DisableSourceChainSelector) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst DisableSourceChainSelector) Build() *Instruction {
@@ -126,14 +126,14 @@ func (inst *DisableSourceChainSelector) EncodeToTree(parent ag_treeout.Branches)
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("SourceChainSelector", *inst.SourceChainSelector))
+						paramsBranch.Child(ag_format.Param("  SourceChainSelector", *inst.SourceChainSelector))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("sourceChainState", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("source_chain_state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -159,13 +159,13 @@ func (obj *DisableSourceChainSelector) UnmarshalWithDecoder(decoder *ag_binary.D
 // NewDisableSourceChainSelectorInstruction declares a new DisableSourceChainSelector instruction with the provided parameters and accounts.
 func NewDisableSourceChainSelectorInstruction(
 	// Parameters:
-	sourceChainSelector uint64,
+	source_chain_selector uint64,
 	// Accounts:
 	sourceChainState ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *DisableSourceChainSelector {
 	return NewDisableSourceChainSelectorInstructionBuilder().
-		SetSourceChainSelector(sourceChainSelector).
+		SetSourceChainSelector(source_chain_selector).
 		SetSourceChainStateAccount(sourceChainState).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)

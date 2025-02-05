@@ -10,11 +10,11 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// U8InstructionData is the `u8InstructionData` instruction.
+// U8InstructionData is the `u8_instruction_data` instruction.
 type U8InstructionData struct {
 	Data *uint8
 
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewU8InstructionDataInstructionBuilder creates a new `U8InstructionData` instruction builder.

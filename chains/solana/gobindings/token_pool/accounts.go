@@ -8,7 +8,71 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Config struct {
+type ChainConfigAccount struct {
+	Remote            RemoteConfig
+	InboundRateLimit  RateLimitTokenBucket
+	OutboundRateLimit RateLimitTokenBucket
+}
+
+var ChainConfigAccountDiscriminator = [8]byte{13, 177, 233, 141, 212, 29, 148, 56}
+
+func (obj ChainConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ChainConfigAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Remote` param:
+	err = encoder.Encode(obj.Remote)
+	if err != nil {
+		return err
+	}
+	// Serialize `InboundRateLimit` param:
+	err = encoder.Encode(obj.InboundRateLimit)
+	if err != nil {
+		return err
+	}
+	// Serialize `OutboundRateLimit` param:
+	err = encoder.Encode(obj.OutboundRateLimit)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ChainConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ChainConfigAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[13 177 233 141 212 29 148 56]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Remote`:
+	err = decoder.Decode(&obj.Remote)
+	if err != nil {
+		return err
+	}
+	// Deserialize `InboundRateLimit`:
+	err = decoder.Decode(&obj.InboundRateLimit)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OutboundRateLimit`:
+	err = decoder.Decode(&obj.OutboundRateLimit)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigAccount struct {
 	Version          uint8
 	PoolType         PoolType
 	TokenProgram     ag_solanago.PublicKey
@@ -21,11 +85,11 @@ type Config struct {
 	RampAuthority    ag_solanago.PublicKey
 }
 
-var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
+var ConfigAccountDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
 
-func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(ConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -82,14 +146,14 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ConfigDiscriminator[:]) {
+		if !discriminator.Equal(ConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[155 12 170 224 30 250 204 130]",
@@ -149,96 +213,32 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	return nil
 }
 
-type ExternalExecutionConfig struct{}
+type ExternalExecutionConfigAccount struct{}
 
-var ExternalExecutionConfigDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
+var ExternalExecutionConfigAccountDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
 
-func (obj ExternalExecutionConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ExternalExecutionConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ExternalExecutionConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(ExternalExecutionConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ExternalExecutionConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ExternalExecutionConfigDiscriminator[:]) {
+		if !discriminator.Equal(ExternalExecutionConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[159 157 150 212 168 103 117 39]",
 				fmt.Sprint(discriminator[:]))
 		}
-	}
-	return nil
-}
-
-type ChainConfig struct {
-	Remote            RemoteConfig
-	InboundRateLimit  RateLimitTokenBucket
-	OutboundRateLimit RateLimitTokenBucket
-}
-
-var ChainConfigDiscriminator = [8]byte{13, 177, 233, 141, 212, 29, 148, 56}
-
-func (obj ChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(ChainConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Remote` param:
-	err = encoder.Encode(obj.Remote)
-	if err != nil {
-		return err
-	}
-	// Serialize `InboundRateLimit` param:
-	err = encoder.Encode(obj.InboundRateLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `OutboundRateLimit` param:
-	err = encoder.Encode(obj.OutboundRateLimit)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(ChainConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[13 177 233 141 212 29 148 56]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Remote`:
-	err = decoder.Decode(&obj.Remote)
-	if err != nil {
-		return err
-	}
-	// Deserialize `InboundRateLimit`:
-	err = decoder.Decode(&obj.InboundRateLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OutboundRateLimit`:
-	err = decoder.Decode(&obj.OutboundRateLimit)
-	if err != nil {
-		return err
 	}
 	return nil
 }

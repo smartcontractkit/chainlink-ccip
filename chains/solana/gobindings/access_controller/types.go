@@ -7,6 +7,50 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type AccessController struct {
+	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
+	AccessList    AccessList
+}
+
+func (obj AccessController) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccessList` param:
+	err = encoder.Encode(obj.AccessList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AccessController) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccessList`:
+	err = decoder.Decode(&obj.AccessList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type AccessList struct {
 	Xs  [64]ag_solanago.PublicKey
 	Len uint64

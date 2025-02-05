@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetRoot is the `setRoot` instruction.
+// SetRoot is the `set_root` instruction.
 type SetRoot struct {
 	MultisigId    *[32]uint8
 	Root          *[32]uint8
@@ -18,20 +18,20 @@ type SetRoot struct {
 	Metadata      *RootMetadataInput
 	MetadataProof *[][32]uint8
 
-	// [0] = [WRITE] rootSignatures
+	// [0] = [WRITE] root_signatures
 	//
-	// [1] = [WRITE] rootMetadata
+	// [1] = [WRITE] root_metadata
 	//
-	// [2] = [WRITE] seenSignedHashes
+	// [2] = [WRITE] seen_signed_hashes
 	//
-	// [3] = [WRITE] expiringRootAndOpCount
+	// [3] = [WRITE] expiring_root_and_op_count
 	//
-	// [4] = [] multisigConfig
+	// [4] = [] multisig_config
 	//
 	// [5] = [WRITE, SIGNER] authority
 	//
-	// [6] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [6] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetRootInstructionBuilder creates a new `SetRoot` instruction builder.
@@ -42,9 +42,9 @@ func NewSetRootInstructionBuilder() *SetRoot {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *SetRoot) SetMultisigId(multisigId [32]uint8) *SetRoot {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *SetRoot) SetMultisigId(multisig_id [32]uint8) *SetRoot {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
@@ -54,9 +54,9 @@ func (inst *SetRoot) SetRoot(root [32]uint8) *SetRoot {
 	return inst
 }
 
-// SetValidUntil sets the "validUntil" parameter.
-func (inst *SetRoot) SetValidUntil(validUntil uint32) *SetRoot {
-	inst.ValidUntil = &validUntil
+// SetValidUntil sets the "valid_until" parameter.
+func (inst *SetRoot) SetValidUntil(valid_until uint32) *SetRoot {
+	inst.ValidUntil = &valid_until
 	return inst
 }
 
@@ -66,65 +66,65 @@ func (inst *SetRoot) SetMetadata(metadata RootMetadataInput) *SetRoot {
 	return inst
 }
 
-// SetMetadataProof sets the "metadataProof" parameter.
-func (inst *SetRoot) SetMetadataProof(metadataProof [][32]uint8) *SetRoot {
-	inst.MetadataProof = &metadataProof
+// SetMetadataProof sets the "metadata_proof" parameter.
+func (inst *SetRoot) SetMetadataProof(metadata_proof [][32]uint8) *SetRoot {
+	inst.MetadataProof = &metadata_proof
 	return inst
 }
 
-// SetRootSignaturesAccount sets the "rootSignatures" account.
+// SetRootSignaturesAccount sets the "root_signatures" account.
 func (inst *SetRoot) SetRootSignaturesAccount(rootSignatures ag_solanago.PublicKey) *SetRoot {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(rootSignatures).WRITE()
 	return inst
 }
 
-// GetRootSignaturesAccount gets the "rootSignatures" account.
+// GetRootSignaturesAccount gets the "root_signatures" account.
 func (inst *SetRoot) GetRootSignaturesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetRootMetadataAccount sets the "rootMetadata" account.
+// SetRootMetadataAccount sets the "root_metadata" account.
 func (inst *SetRoot) SetRootMetadataAccount(rootMetadata ag_solanago.PublicKey) *SetRoot {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(rootMetadata).WRITE()
 	return inst
 }
 
-// GetRootMetadataAccount gets the "rootMetadata" account.
+// GetRootMetadataAccount gets the "root_metadata" account.
 func (inst *SetRoot) GetRootMetadataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSeenSignedHashesAccount sets the "seenSignedHashes" account.
+// SetSeenSignedHashesAccount sets the "seen_signed_hashes" account.
 func (inst *SetRoot) SetSeenSignedHashesAccount(seenSignedHashes ag_solanago.PublicKey) *SetRoot {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(seenSignedHashes).WRITE()
 	return inst
 }
 
-// GetSeenSignedHashesAccount gets the "seenSignedHashes" account.
+// GetSeenSignedHashesAccount gets the "seen_signed_hashes" account.
 func (inst *SetRoot) GetSeenSignedHashesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetExpiringRootAndOpCountAccount sets the "expiringRootAndOpCount" account.
+// SetExpiringRootAndOpCountAccount sets the "expiring_root_and_op_count" account.
 func (inst *SetRoot) SetExpiringRootAndOpCountAccount(expiringRootAndOpCount ag_solanago.PublicKey) *SetRoot {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(expiringRootAndOpCount).WRITE()
 	return inst
 }
 
-// GetExpiringRootAndOpCountAccount gets the "expiringRootAndOpCount" account.
+// GetExpiringRootAndOpCountAccount gets the "expiring_root_and_op_count" account.
 func (inst *SetRoot) GetExpiringRootAndOpCountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetMultisigConfigAccount sets the "multisigConfig" account.
+// SetMultisigConfigAccount sets the "multisig_config" account.
 func (inst *SetRoot) SetMultisigConfigAccount(multisigConfig ag_solanago.PublicKey) *SetRoot {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(multisigConfig)
 	return inst
 }
 
-// GetMultisigConfigAccount gets the "multisigConfig" account.
+// GetMultisigConfigAccount gets the "multisig_config" account.
 func (inst *SetRoot) GetMultisigConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -135,18 +135,18 @@ func (inst *SetRoot) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetRo
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetRoot) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *SetRoot) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetRoot {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *SetRoot) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
 func (inst SetRoot) Build() *Instruction {
@@ -223,22 +223,22 @@ func (inst *SetRoot) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("   MultisigId", *inst.MultisigId))
-						paramsBranch.Child(ag_format.Param("         Root", *inst.Root))
-						paramsBranch.Child(ag_format.Param("   ValidUntil", *inst.ValidUntil))
-						paramsBranch.Child(ag_format.Param("     Metadata", *inst.Metadata))
-						paramsBranch.Child(ag_format.Param("MetadataProof", *inst.MetadataProof))
+						paramsBranch.Child(ag_format.Param("    MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param("          Root", *inst.Root))
+						paramsBranch.Child(ag_format.Param("    ValidUntil", *inst.ValidUntil))
+						paramsBranch.Child(ag_format.Param("      Metadata", *inst.Metadata))
+						paramsBranch.Child(ag_format.Param(" MetadataProof", *inst.MetadataProof))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        rootSignatures", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("          rootMetadata", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("      seenSignedHashes", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("expiringRootAndOpCount", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("        multisigConfig", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("           root_signatures", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("             root_metadata", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("        seen_signed_hashes", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("expiring_root_and_op_count", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("           multisig_config", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("                 authority", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("            system_program", inst.AccountMetaSlice.Get(6)))
 					})
 				})
 		})
@@ -304,11 +304,11 @@ func (obj *SetRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 // NewSetRootInstruction declares a new SetRoot instruction with the provided parameters and accounts.
 func NewSetRootInstruction(
 	// Parameters:
-	multisigId [32]uint8,
+	multisig_id [32]uint8,
 	root [32]uint8,
-	validUntil uint32,
+	valid_until uint32,
 	metadata RootMetadataInput,
-	metadataProof [][32]uint8,
+	metadata_proof [][32]uint8,
 	// Accounts:
 	rootSignatures ag_solanago.PublicKey,
 	rootMetadata ag_solanago.PublicKey,
@@ -318,11 +318,11 @@ func NewSetRootInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *SetRoot {
 	return NewSetRootInstructionBuilder().
-		SetMultisigId(multisigId).
+		SetMultisigId(multisig_id).
 		SetRoot(root).
-		SetValidUntil(validUntil).
+		SetValidUntil(valid_until).
 		SetMetadata(metadata).
-		SetMetadataProof(metadataProof).
+		SetMetadataProof(metadata_proof).
 		SetRootSignaturesAccount(rootSignatures).
 		SetRootMetadataAccount(rootMetadata).
 		SetSeenSignedHashesAccount(seenSignedHashes).

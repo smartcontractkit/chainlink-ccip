@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetConfig is the `setConfig` instruction.
+// SetConfig is the `set_config` instruction.
 type SetConfig struct {
 	MultisigId   *[32]uint8
 	SignerGroups *[]byte
@@ -18,18 +18,18 @@ type SetConfig struct {
 	GroupParents *[32]uint8
 	ClearRoot    *bool
 
-	// [0] = [WRITE] multisigConfig
+	// [0] = [WRITE] multisig_config
 	//
-	// [1] = [WRITE] configSigners
+	// [1] = [WRITE] config_signers
 	//
-	// [2] = [WRITE] rootMetadata
+	// [2] = [WRITE] root_metadata
 	//
-	// [3] = [WRITE] expiringRootAndOpCount
+	// [3] = [WRITE] expiring_root_and_op_count
 	//
 	// [4] = [WRITE, SIGNER] authority
 	//
-	// [5] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [5] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetConfigInstructionBuilder creates a new `SetConfig` instruction builder.
@@ -40,78 +40,78 @@ func NewSetConfigInstructionBuilder() *SetConfig {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *SetConfig) SetMultisigId(multisigId [32]uint8) *SetConfig {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *SetConfig) SetMultisigId(multisig_id [32]uint8) *SetConfig {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
-// SetSignerGroups sets the "signerGroups" parameter.
-func (inst *SetConfig) SetSignerGroups(signerGroups []byte) *SetConfig {
-	inst.SignerGroups = &signerGroups
+// SetSignerGroups sets the "signer_groups" parameter.
+func (inst *SetConfig) SetSignerGroups(signer_groups []byte) *SetConfig {
+	inst.SignerGroups = &signer_groups
 	return inst
 }
 
-// SetGroupQuorums sets the "groupQuorums" parameter.
-func (inst *SetConfig) SetGroupQuorums(groupQuorums [32]uint8) *SetConfig {
-	inst.GroupQuorums = &groupQuorums
+// SetGroupQuorums sets the "group_quorums" parameter.
+func (inst *SetConfig) SetGroupQuorums(group_quorums [32]uint8) *SetConfig {
+	inst.GroupQuorums = &group_quorums
 	return inst
 }
 
-// SetGroupParents sets the "groupParents" parameter.
-func (inst *SetConfig) SetGroupParents(groupParents [32]uint8) *SetConfig {
-	inst.GroupParents = &groupParents
+// SetGroupParents sets the "group_parents" parameter.
+func (inst *SetConfig) SetGroupParents(group_parents [32]uint8) *SetConfig {
+	inst.GroupParents = &group_parents
 	return inst
 }
 
-// SetClearRoot sets the "clearRoot" parameter.
-func (inst *SetConfig) SetClearRoot(clearRoot bool) *SetConfig {
-	inst.ClearRoot = &clearRoot
+// SetClearRoot sets the "clear_root" parameter.
+func (inst *SetConfig) SetClearRoot(clear_root bool) *SetConfig {
+	inst.ClearRoot = &clear_root
 	return inst
 }
 
-// SetMultisigConfigAccount sets the "multisigConfig" account.
+// SetMultisigConfigAccount sets the "multisig_config" account.
 func (inst *SetConfig) SetMultisigConfigAccount(multisigConfig ag_solanago.PublicKey) *SetConfig {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(multisigConfig).WRITE()
 	return inst
 }
 
-// GetMultisigConfigAccount gets the "multisigConfig" account.
+// GetMultisigConfigAccount gets the "multisig_config" account.
 func (inst *SetConfig) GetMultisigConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetConfigSignersAccount sets the "configSigners" account.
+// SetConfigSignersAccount sets the "config_signers" account.
 func (inst *SetConfig) SetConfigSignersAccount(configSigners ag_solanago.PublicKey) *SetConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(configSigners).WRITE()
 	return inst
 }
 
-// GetConfigSignersAccount gets the "configSigners" account.
+// GetConfigSignersAccount gets the "config_signers" account.
 func (inst *SetConfig) GetConfigSignersAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetRootMetadataAccount sets the "rootMetadata" account.
+// SetRootMetadataAccount sets the "root_metadata" account.
 func (inst *SetConfig) SetRootMetadataAccount(rootMetadata ag_solanago.PublicKey) *SetConfig {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(rootMetadata).WRITE()
 	return inst
 }
 
-// GetRootMetadataAccount gets the "rootMetadata" account.
+// GetRootMetadataAccount gets the "root_metadata" account.
 func (inst *SetConfig) GetRootMetadataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetExpiringRootAndOpCountAccount sets the "expiringRootAndOpCount" account.
+// SetExpiringRootAndOpCountAccount sets the "expiring_root_and_op_count" account.
 func (inst *SetConfig) SetExpiringRootAndOpCountAccount(expiringRootAndOpCount ag_solanago.PublicKey) *SetConfig {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(expiringRootAndOpCount).WRITE()
 	return inst
 }
 
-// GetExpiringRootAndOpCountAccount gets the "expiringRootAndOpCount" account.
+// GetExpiringRootAndOpCountAccount gets the "expiring_root_and_op_count" account.
 func (inst *SetConfig) GetExpiringRootAndOpCountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -122,18 +122,18 @@ func (inst *SetConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *Set
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *SetConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetConfig {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *SetConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
 func (inst SetConfig) Build() *Instruction {
@@ -207,21 +207,21 @@ func (inst *SetConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("  MultisigId", *inst.MultisigId))
-						paramsBranch.Child(ag_format.Param("SignerGroups", *inst.SignerGroups))
-						paramsBranch.Child(ag_format.Param("GroupQuorums", *inst.GroupQuorums))
-						paramsBranch.Child(ag_format.Param("GroupParents", *inst.GroupParents))
-						paramsBranch.Child(ag_format.Param("   ClearRoot", *inst.ClearRoot))
+						paramsBranch.Child(ag_format.Param("   MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param(" SignerGroups", *inst.SignerGroups))
+						paramsBranch.Child(ag_format.Param(" GroupQuorums", *inst.GroupQuorums))
+						paramsBranch.Child(ag_format.Param(" GroupParents", *inst.GroupParents))
+						paramsBranch.Child(ag_format.Param("    ClearRoot", *inst.ClearRoot))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        multisigConfig", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("         configSigners", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("          rootMetadata", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("expiringRootAndOpCount", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("           multisig_config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("            config_signers", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("             root_metadata", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("expiring_root_and_op_count", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("                 authority", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("            system_program", inst.AccountMetaSlice.Get(5)))
 					})
 				})
 		})
@@ -287,11 +287,11 @@ func (obj *SetConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 // NewSetConfigInstruction declares a new SetConfig instruction with the provided parameters and accounts.
 func NewSetConfigInstruction(
 	// Parameters:
-	multisigId [32]uint8,
-	signerGroups []byte,
-	groupQuorums [32]uint8,
-	groupParents [32]uint8,
-	clearRoot bool,
+	multisig_id [32]uint8,
+	signer_groups []byte,
+	group_quorums [32]uint8,
+	group_parents [32]uint8,
+	clear_root bool,
 	// Accounts:
 	multisigConfig ag_solanago.PublicKey,
 	configSigners ag_solanago.PublicKey,
@@ -300,11 +300,11 @@ func NewSetConfigInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *SetConfig {
 	return NewSetConfigInstructionBuilder().
-		SetMultisigId(multisigId).
-		SetSignerGroups(signerGroups).
-		SetGroupQuorums(groupQuorums).
-		SetGroupParents(groupParents).
-		SetClearRoot(clearRoot).
+		SetMultisigId(multisig_id).
+		SetSignerGroups(signer_groups).
+		SetGroupQuorums(group_quorums).
+		SetGroupParents(group_parents).
+		SetClearRoot(clear_root).
 		SetMultisigConfigAccount(multisigConfig).
 		SetConfigSignersAccount(configSigners).
 		SetRootMetadataAccount(rootMetadata).

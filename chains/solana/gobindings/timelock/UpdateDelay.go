@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// UpdateDelay is the `updateDelay` instruction.
+// UpdateDelay is the `update_delay` instruction.
 type UpdateDelay struct {
 	TimelockId *[32]uint8
 	Delay      *uint64
@@ -18,7 +18,7 @@ type UpdateDelay struct {
 	// [0] = [WRITE] config
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUpdateDelayInstructionBuilder creates a new `UpdateDelay` instruction builder.
@@ -29,9 +29,9 @@ func NewUpdateDelayInstructionBuilder() *UpdateDelay {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *UpdateDelay) SetTimelockId(timelockId [32]uint8) *UpdateDelay {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "_timelock_id" parameter.
+func (inst *UpdateDelay) SetTimelockId(_timelock_id [32]uint8) *UpdateDelay {
+	inst.TimelockId = &_timelock_id
 	return inst
 }
 
@@ -49,7 +49,7 @@ func (inst *UpdateDelay) SetConfigAccount(config ag_solanago.PublicKey) *UpdateD
 
 // GetConfigAccount gets the "config" account.
 func (inst *UpdateDelay) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -60,7 +60,7 @@ func (inst *UpdateDelay) SetAuthorityAccount(authority ag_solanago.PublicKey) *U
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UpdateDelay) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst UpdateDelay) Build() *Instruction {
@@ -113,14 +113,14 @@ func (inst *UpdateDelay) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("     Delay", *inst.Delay))
+						paramsBranch.Child(ag_format.Param("  TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("       Delay", *inst.Delay))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
@@ -156,13 +156,13 @@ func (obj *UpdateDelay) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 // NewUpdateDelayInstruction declares a new UpdateDelay instruction with the provided parameters and accounts.
 func NewUpdateDelayInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	_timelock_id [32]uint8,
 	delay uint64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *UpdateDelay {
 	return NewUpdateDelayInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(_timelock_id).
 		SetDelay(delay).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
