@@ -269,7 +269,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     })
 }
 
-pub fn interact_with_pool(
+pub(super) fn interact_with_pool(
     pool_program: Pubkey,
     signer: Pubkey,
     acc_infos: Vec<AccountInfo>,
@@ -309,7 +309,7 @@ pub fn get_balance<'a>(token_account: &'a AccountInfo<'a>) -> Result<u64> {
     Ok(acc.amount)
 }
 
-pub mod token_admin_registry_writable {
+mod token_admin_registry_writable {
     use super::super::pools::router_state::TokenAdminRegistry;
 
     pub fn is(tar: &TokenAdminRegistry, index: u8) -> bool {
