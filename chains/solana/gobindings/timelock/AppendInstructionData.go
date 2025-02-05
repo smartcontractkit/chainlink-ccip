@@ -10,24 +10,20 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Initialize a new standard timelock operation.
-//
-// This sets up a new operation with the given ID, predecessor, salt, and expected number of instructions.
+// Append additional instruction data to an instruction of an existing standard operation.
 //
 // # Parameters
 //
 // - `ctx`: The context containing the operation account.
-// - `_timelock_id`: A padded identifier for the timelock (unused here but required for PDA derivation).
-// - `id`: The unique identifier for the operation.
-// - `predecessor`: The identifier of the predecessor operation.
-// - `salt`: A salt value to help create unique PDAs.
-// - `instruction_count`: The total number of instructions that will be added to this operation.
-type InitializeOperation struct {
-	TimelockId       *[32]uint8
-	Id               *[32]uint8
-	Predecessor      *[32]uint8
-	Salt             *[32]uint8
-	InstructionCount *uint32
+// - `_timelock_id`: The timelock identifier (for PDA derivation).
+// - `_id`: The operation identifier.
+// - `ix_index`: The index of the instruction to which the data will be appended.
+// - `ix_data_chunk`: A chunk of data to be appended.
+type AppendInstructionData struct {
+	TimelockId  *[32]uint8
+	Id          *[32]uint8
+	IxIndex     *uint32
+	IxDataChunk *[]byte
 
 	// [0] = [WRITE] operation
 	//
@@ -41,117 +37,111 @@ type InitializeOperation struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewInitializeOperationInstructionBuilder creates a new `InitializeOperation` instruction builder.
-func NewInitializeOperationInstructionBuilder() *InitializeOperation {
-	nd := &InitializeOperation{
+// NewAppendInstructionDataInstructionBuilder creates a new `AppendInstructionData` instruction builder.
+func NewAppendInstructionDataInstructionBuilder() *AppendInstructionData {
+	nd := &AppendInstructionData{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
 
 // SetTimelockId sets the "timelockId" parameter.
-func (inst *InitializeOperation) SetTimelockId(timelockId [32]uint8) *InitializeOperation {
+func (inst *AppendInstructionData) SetTimelockId(timelockId [32]uint8) *AppendInstructionData {
 	inst.TimelockId = &timelockId
 	return inst
 }
 
 // SetId sets the "id" parameter.
-func (inst *InitializeOperation) SetId(id [32]uint8) *InitializeOperation {
+func (inst *AppendInstructionData) SetId(id [32]uint8) *AppendInstructionData {
 	inst.Id = &id
 	return inst
 }
 
-// SetPredecessor sets the "predecessor" parameter.
-func (inst *InitializeOperation) SetPredecessor(predecessor [32]uint8) *InitializeOperation {
-	inst.Predecessor = &predecessor
+// SetIxIndex sets the "ixIndex" parameter.
+func (inst *AppendInstructionData) SetIxIndex(ixIndex uint32) *AppendInstructionData {
+	inst.IxIndex = &ixIndex
 	return inst
 }
 
-// SetSalt sets the "salt" parameter.
-func (inst *InitializeOperation) SetSalt(salt [32]uint8) *InitializeOperation {
-	inst.Salt = &salt
-	return inst
-}
-
-// SetInstructionCount sets the "instructionCount" parameter.
-func (inst *InitializeOperation) SetInstructionCount(instructionCount uint32) *InitializeOperation {
-	inst.InstructionCount = &instructionCount
+// SetIxDataChunk sets the "ixDataChunk" parameter.
+func (inst *AppendInstructionData) SetIxDataChunk(ixDataChunk []byte) *AppendInstructionData {
+	inst.IxDataChunk = &ixDataChunk
 	return inst
 }
 
 // SetOperationAccount sets the "operation" account.
-func (inst *InitializeOperation) SetOperationAccount(operation ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendInstructionData) SetOperationAccount(operation ag_solanago.PublicKey) *AppendInstructionData {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(operation).WRITE()
 	return inst
 }
 
 // GetOperationAccount gets the "operation" account.
-func (inst *InitializeOperation) GetOperationAccount() *ag_solanago.AccountMeta {
+func (inst *AppendInstructionData) GetOperationAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *InitializeOperation) SetConfigAccount(config ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendInstructionData) SetConfigAccount(config ag_solanago.PublicKey) *AppendInstructionData {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *InitializeOperation) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *AppendInstructionData) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetRoleAccessControllerAccount sets the "roleAccessController" account.
-func (inst *InitializeOperation) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendInstructionData) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *AppendInstructionData {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
 // GetRoleAccessControllerAccount gets the "roleAccessController" account.
-func (inst *InitializeOperation) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
+func (inst *AppendInstructionData) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *InitializeOperation) SetAuthorityAccount(authority ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendInstructionData) SetAuthorityAccount(authority ag_solanago.PublicKey) *AppendInstructionData {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *InitializeOperation) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *AppendInstructionData) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *InitializeOperation) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeOperation {
+func (inst *AppendInstructionData) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AppendInstructionData {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *InitializeOperation) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *AppendInstructionData) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
-func (inst InitializeOperation) Build() *Instruction {
+func (inst AppendInstructionData) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_InitializeOperation,
+		TypeID: Instruction_AppendInstructionData,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst InitializeOperation) ValidateAndBuild() (*Instruction, error) {
+func (inst AppendInstructionData) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *InitializeOperation) Validate() error {
+func (inst *AppendInstructionData) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.TimelockId == nil {
@@ -160,14 +150,11 @@ func (inst *InitializeOperation) Validate() error {
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
-		if inst.Predecessor == nil {
-			return errors.New("Predecessor parameter is not set")
+		if inst.IxIndex == nil {
+			return errors.New("IxIndex parameter is not set")
 		}
-		if inst.Salt == nil {
-			return errors.New("Salt parameter is not set")
-		}
-		if inst.InstructionCount == nil {
-			return errors.New("InstructionCount parameter is not set")
+		if inst.IxDataChunk == nil {
+			return errors.New("IxDataChunk parameter is not set")
 		}
 	}
 
@@ -192,21 +179,20 @@ func (inst *InitializeOperation) Validate() error {
 	return nil
 }
 
-func (inst *InitializeOperation) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *AppendInstructionData) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("InitializeOperation")).
+			programBranch.Child(ag_format.Instruction("AppendInstructionData")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("      TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("              Id", *inst.Id))
-						paramsBranch.Child(ag_format.Param("     Predecessor", *inst.Predecessor))
-						paramsBranch.Child(ag_format.Param("            Salt", *inst.Salt))
-						paramsBranch.Child(ag_format.Param("InstructionCount", *inst.InstructionCount))
+					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param(" TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("         Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param("    IxIndex", *inst.IxIndex))
+						paramsBranch.Child(ag_format.Param("IxDataChunk", *inst.IxDataChunk))
 					})
 
 					// Accounts of the instruction:
@@ -221,7 +207,7 @@ func (inst *InitializeOperation) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj InitializeOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj AppendInstructionData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `TimelockId` param:
 	err = encoder.Encode(obj.TimelockId)
 	if err != nil {
@@ -232,24 +218,19 @@ func (obj InitializeOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (e
 	if err != nil {
 		return err
 	}
-	// Serialize `Predecessor` param:
-	err = encoder.Encode(obj.Predecessor)
+	// Serialize `IxIndex` param:
+	err = encoder.Encode(obj.IxIndex)
 	if err != nil {
 		return err
 	}
-	// Serialize `Salt` param:
-	err = encoder.Encode(obj.Salt)
-	if err != nil {
-		return err
-	}
-	// Serialize `InstructionCount` param:
-	err = encoder.Encode(obj.InstructionCount)
+	// Serialize `IxDataChunk` param:
+	err = encoder.Encode(obj.IxDataChunk)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *InitializeOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *AppendInstructionData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TimelockId`:
 	err = decoder.Decode(&obj.TimelockId)
 	if err != nil {
@@ -260,44 +241,37 @@ func (obj *InitializeOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Predecessor`:
-	err = decoder.Decode(&obj.Predecessor)
+	// Deserialize `IxIndex`:
+	err = decoder.Decode(&obj.IxIndex)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Salt`:
-	err = decoder.Decode(&obj.Salt)
-	if err != nil {
-		return err
-	}
-	// Deserialize `InstructionCount`:
-	err = decoder.Decode(&obj.InstructionCount)
+	// Deserialize `IxDataChunk`:
+	err = decoder.Decode(&obj.IxDataChunk)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewInitializeOperationInstruction declares a new InitializeOperation instruction with the provided parameters and accounts.
-func NewInitializeOperationInstruction(
+// NewAppendInstructionDataInstruction declares a new AppendInstructionData instruction with the provided parameters and accounts.
+func NewAppendInstructionDataInstruction(
 	// Parameters:
 	timelockId [32]uint8,
 	id [32]uint8,
-	predecessor [32]uint8,
-	salt [32]uint8,
-	instructionCount uint32,
+	ixIndex uint32,
+	ixDataChunk []byte,
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *InitializeOperation {
-	return NewInitializeOperationInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *AppendInstructionData {
+	return NewAppendInstructionDataInstructionBuilder().
 		SetTimelockId(timelockId).
 		SetId(id).
-		SetPredecessor(predecessor).
-		SetSalt(salt).
-		SetInstructionCount(instructionCount).
+		SetIxIndex(ixIndex).
+		SetIxDataChunk(ixDataChunk).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).
 		SetRoleAccessControllerAccount(roleAccessController).

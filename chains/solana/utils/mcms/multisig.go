@@ -10,7 +10,7 @@ import (
 )
 
 type Multisig struct {
-	PaddedName                [32]byte
+	PaddedID                  [32]byte
 	SignerPDA                 solana.PublicKey
 	ConfigPDA                 solana.PublicKey
 	RootMetadataPDA           solana.PublicKey

@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// BlockFunctionSelector is the `blockFunctionSelector` instruction.
+// Block a function selector from being called.
+//
+// Only the admin can block function selectors.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the configuration account.
+// - `_timelock_id`: The timelock identifier.
+// - `selector`: The 8-byte function selector(Anchor discriminator) to block.
 type BlockFunctionSelector struct {
 	TimelockId *[32]uint8
 	Selector   *[8]uint8

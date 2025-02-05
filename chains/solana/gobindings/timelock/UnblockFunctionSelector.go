@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// UnblockFunctionSelector is the `unblockFunctionSelector` instruction.
+// Unblock a previously blocked function selector.
+//
+// Only the admin can unblock function selectors.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the configuration account.
+// - `_timelock_id`: The timelock identifier.
+// - `selector`: The function selector to unblock.
 type UnblockFunctionSelector struct {
 	TimelockId *[32]uint8
 	Selector   *[8]uint8

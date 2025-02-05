@@ -162,7 +162,7 @@ func NewValidMcmConfig(msigID [32]byte, signerPrivateKeys []string, signerGroups
 
 func GetNewMcmMultisig(name [32]byte) Multisig {
 	return Multisig{
-		PaddedName:                name,
+		PaddedID:                  name,
 		SignerPDA:                 GetSignerPDA(name),
 		ConfigPDA:                 GetConfigPDA(name),
 		RootMetadataPDA:           GetRootMetadataPDA(name),

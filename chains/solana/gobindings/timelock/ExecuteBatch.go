@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ExecuteBatch is the `executeBatch` instruction.
+// Execute a scheduled batch of instructions.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the accounts required for execution.
+// - `timelock_id`: The timelock identifier.
+// - `id`: The operation identifier.
 type ExecuteBatch struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

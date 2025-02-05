@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ClearBypasserOperation is the `clearBypasserOperation` instruction.
+// Clear a finalized bypasser operation.
+//
+// Closes the bypasser operation account.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the bypasser operation account.
+// - `_timelock_id`: The timelock identifier.
+// - `_id`: The operation identifier.
 type ClearBypasserOperation struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

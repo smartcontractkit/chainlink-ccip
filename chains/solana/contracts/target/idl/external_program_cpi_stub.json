@@ -81,6 +81,19 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "bigInstructionData",
+      "docs": [
+        "instruction that accepts arbitrarily large instruction data."
+      ],
+      "accounts": [],
+      "args": [
+        {
+          "name": "data",
+          "type": "bytes"
+        }
+      ]
     }
   ],
   "accounts": [

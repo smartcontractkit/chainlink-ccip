@@ -72,6 +72,9 @@ impl Operation {
         hashv(&[&encoded_data]).to_bytes()
     }
 
+    // Validate instruction data integrity by computing a salted hash of the instruction data
+    // and comparing it against the stored operation ID. This ensures the uploaded
+    // instructions remain unaltered between stored account and execution
     pub fn verify_id(&self) -> bool {
         self.hash_instructions(self.salt) == self.id
     }

@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ClearOperation is the `clearOperation` instruction.
+// Clear an operation that has been finalized.
+//
+// This effectively closes the operation account so that it can be reinitialized later.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the operation account.
+// - `_timelock_id`: The timelock identifier.
+// - `_id`: The operation identifier.
 type ClearOperation struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

@@ -10,7 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AcceptOwnership is the `acceptOwnership` instruction.
+// Accept ownership of the timelock.
+//
+// The proposed new owner must call this function to assume ownership.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the configuration account.
+// - `_timelock_id`: The timelock identifier.
 type AcceptOwnership struct {
 	TimelockId *[32]uint8
 

@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// BatchAddAccess is the `batchAddAccess` instruction.
+// Add a new access role in batch. Only the admin is allowed to perform this operation.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the accounts required for batch adding access.
+// - `timelock_id`: A unique, padded identifier for this timelock instance.
+// - `role`: The role to be added.
 type BatchAddAccess struct {
 	TimelockId *[32]uint8
 	Role       *Role
