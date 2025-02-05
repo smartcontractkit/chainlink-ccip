@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
-use solana_program::{program::invoke_signed, system_instruction};
+use solana_program::{program::invoke, system_instruction};
 
 use crate::context::{seed, CcipSend};
 use crate::messages::SVM2AnyMessage;
@@ -85,10 +85,9 @@ pub fn transfer_and_wrap_native_sol<'info>(
         CcipRouterError::InsufficientLamports
     );
 
-    invoke_signed(
+    invoke(
         &system_instruction::transfer(&from.key(), &to.key(), amount),
         &[from.to_account_info(), to.to_account_info()],
-        &[&[FEE_BILLING_SIGNER, &[signer_bump]]],
     )?;
 
     let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
