@@ -3,6 +3,8 @@ export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
 export ANCHOR_VERSION ?=v0.29.0
 export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
+# Allow overriding the output directory for docker builds
+TARGET_DIR ?= $(PWD)/contracts/target
 
 .PHONY: projectserum_version
 anchor_version:
@@ -60,7 +62,13 @@ build-contracts:
 # Sparse index significantly speeds up dependency fetching, supposedly default in 1.70 but anchor build was still using a slow git download
 .PHONY: docker-build-contracts
 docker-build-contracts:
-	docker run --rm -it -v $(shell pwd)/contracts:/workdir -e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse ${ANCHOR_IMAGE} anchor build
+	docker run --rm -it \
+		-v $(shell pwd)/contracts:/workdir \
+		-v ${TARGET_DIR}:/workdir/target \
+		-e CARGO_TARGET_DIR=/workdir/target \
+		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
+		${ANCHOR_IMAGE} anchor build
+
 
 .PHONY: solana-checks
 solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
