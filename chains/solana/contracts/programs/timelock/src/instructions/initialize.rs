@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use access_controller::AccessController;
+use access_controller::{AccessController, AccessControllerProgram};
 
 use crate::constants::{ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED};
 use crate::error::{AuthError, TimelockError};
@@ -87,7 +87,7 @@ pub struct Initialize<'info> {
     pub program_data: Account<'info, ProgramData>,
 
     // access controller program and states per role
-    pub access_controller_program: Program<'info, access_controller::program::AccessController>,
+    pub access_controller_program: Program<'info, AccessControllerProgram>,
     #[account(owner = access_controller_program.key())]
     pub proposer_role_access_controller: AccountLoader<'info, AccessController>,
     #[account(owner = access_controller_program.key())]
@@ -107,7 +107,7 @@ pub struct BatchAddAccess<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    pub access_controller_program: Program<'info, access_controller::program::AccessController>,
+    pub access_controller_program: Program<'info, AccessControllerProgram>,
 
     // NOTE: access controller for the role of access list
     #[account(
