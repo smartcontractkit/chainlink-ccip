@@ -947,6 +947,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-lockrelease-token-pool"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "example-burnmint-token-pool",
+ "solana-program",
+ "spl-math",
+]
+
+[[package]]
 name = "example_ccip_receiver"
 version = "0.1.0-dev"
 dependencies = [

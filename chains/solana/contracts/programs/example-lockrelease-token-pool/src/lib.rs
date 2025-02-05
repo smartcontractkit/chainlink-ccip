@@ -1,23 +1,16 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
-use anchor_spl::token_2022::spl_token_2022::{
-    self,
-    instruction::{burn, mint_to},
-};
+use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
+use example_burnmint_token_pool::{common::*, rate_limiter::*};
 
-declare_id!("TokenPooL11111111111111111111111111BurnMint");
-
-pub mod context;
+mod context;
 use crate::context::*;
 
-pub mod rate_limiter;
-use crate::rate_limiter::*;
-
-pub mod common;
-use crate::common::*;
+declare_id!("TokenPooL11111111111111111111111LockReLease");
 
 #[program]
-pub mod example_burnmint_token_pool {
+pub mod example_lockrelease_token_pool {
+
     use super::*;
 
     pub fn initialize<'info>(
@@ -146,14 +139,16 @@ pub mod example_burnmint_token_pool {
             inbound_rate_limit,
         )?;
 
-        mint_tokens(
+        release_tokens(
             ctx.accounts.token_program.key(),
             ctx.accounts.receiver_token_account.to_account_info(),
+            ctx.accounts.pool_token_account.to_account_info(),
             ctx.accounts.mint.to_account_info(),
             ctx.accounts.pool_signer.to_account_info(),
             ctx.bumps.pool_signer,
             release_or_mint,
             parsed_amount,
+            ctx.accounts.mint.decimals,
         )?;
 
         Ok(ReleaseOrMintOutV1 {
@@ -172,15 +167,7 @@ pub mod example_burnmint_token_pool {
             &ctx.accounts.state.config.allow_list,
         )?;
 
-        burn_tokens(
-            ctx.accounts.token_program.key(),
-            ctx.accounts.pool_token_account.to_account_info(),
-            ctx.accounts.mint.to_account_info(),
-            ctx.accounts.pool_signer.to_account_info(),
-            ctx.bumps.pool_signer,
-            ctx.accounts.authority.key(),
-            lock_or_burn,
-        )?;
+        lock_tokens(ctx.accounts.authority.key(), lock_or_burn)?;
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.remote.token_address.clone(),
@@ -189,32 +176,40 @@ pub mod example_burnmint_token_pool {
     }
 }
 
-#[account]
-#[derive(InitSpace)]
-pub struct State {
-    pub version: u8,
-    pub config: Config,
+pub fn lock_tokens<'a>(sender: Pubkey, lock_or_burn: LockOrBurnInV1) -> Result<()> {
+    // receiver -> token pool (occurs outside pool)
+    // hold tokens
+    emit!(Locked {
+        sender,
+        amount: lock_or_burn.amount,
+    });
+
+    Ok(())
 }
 
-pub fn burn_tokens<'a>(
+pub fn release_tokens<'a>(
     token_program: Pubkey,
+    receiver_token_account: AccountInfo<'a>,
     pool_token_account: AccountInfo<'a>,
+
     mint: AccountInfo<'a>,
     pool_signer: AccountInfo<'a>,
     pool_signer_bump: u8,
-    sender: Pubkey,
-    lock_or_burn: LockOrBurnInV1,
+    release_or_mint: ReleaseOrMintInV1,
+    parsed_amount: u64,
+    decimals: u8,
 ) -> Result<()> {
-    // receiver -> token pool (occurs outside pool)
-    // burn tokens held in pool
-    // https://docs.rs/spl-token-2022/latest/spl_token_2022/instruction/fn.burn.html
-    let mut ix = burn(
+    // transfer from pool -> receiver
+    // https://docs.rs/spl-token-2022/latest/spl_token_2022/instruction/fn.transfer.html
+    let mut ix = transfer_checked(
         &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
         &pool_token_account.key(),
         &mint.key(),
+        &receiver_token_account.key(),
         &pool_signer.key(),
         &[],
-        lock_or_burn.amount,
+        parsed_amount,
+        decimals,
     )?;
     ix.program_id = token_program; // set to user specified program
 
@@ -223,49 +218,18 @@ pub fn burn_tokens<'a>(
         &mint.key().to_bytes(),
         &[pool_signer_bump],
     ];
-    invoke_signed(&ix, &[pool_token_account, mint, pool_signer], &[&seeds[..]])?;
-
-    emit!(Burned {
-        sender,
-        amount: lock_or_burn.amount,
-    });
-
-    Ok(())
-}
-
-pub fn mint_tokens<'a>(
-    token_program: Pubkey,
-    receiver_token_account: AccountInfo<'a>,
-    mint: AccountInfo<'a>,
-    pool_signer: AccountInfo<'a>,
-    pool_signer_bump: u8,
-    release_or_mint: ReleaseOrMintInV1,
-    parsed_amount: u64,
-) -> Result<()> {
-    // mint to receiver
-    // https://docs.rs/spl-token-2022/latest/spl_token_2022/instruction/fn.mint_to.html
-    let mut ix = mint_to(
-        &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
-        &mint.key(),
-        &receiver_token_account.key(),
-        &pool_signer.key(),
-        &[],
-        parsed_amount,
-    )?;
-    ix.program_id = token_program.key(); // set to user specified program
-
-    let seeds = &[
-        POOL_SIGNER_SEED,
-        &mint.key().to_bytes(),
-        &[pool_signer_bump],
-    ];
     invoke_signed(
         &ix,
-        &[receiver_token_account, mint, pool_signer.clone()],
+        &[
+            pool_token_account,
+            mint,
+            receiver_token_account,
+            pool_signer.clone(),
+        ],
         &[&seeds[..]],
     )?;
 
-    emit!(Minted {
+    emit!(Released {
         sender: pool_signer.key(),
         recipient: release_or_mint.receiver,
         amount: parsed_amount,
