@@ -569,7 +569,7 @@ func TestCCIPRouter(t *testing.T) {
 			fmt.Printf("referenceAddresses: %+v\n", referenceAddresses)
 			require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
 			require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
-			// require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router) // TODO fix this
+			require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router) // TODO fix this
 		})
 
 		t.Run("When admin updates the solana chain selector it's updated", func(t *testing.T) {

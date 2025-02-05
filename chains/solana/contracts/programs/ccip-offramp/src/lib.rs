@@ -33,7 +33,6 @@ pub mod ccip_offramp {
     /// * `ctx` - The context containing the accounts required for initialization.
     /// * `svm_chain_selector` - The chain selector for SVM.
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
-    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
         svm_chain_selector: u64,
@@ -42,16 +41,21 @@ pub mod ccip_offramp {
         fee_quoter: Pubkey,
         offramp_lookup_table: Pubkey,
     ) -> Result<()> {
-        let mut config = ctx.accounts.config.load_init()?;
-        require!(config.version == 0, CcipOfframpError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
-        config.version = 1;
-        config.svm_chain_selector = svm_chain_selector;
-        config.enable_manual_execution_after = enable_execution_after;
-        config.owner = ctx.accounts.authority.key();
-        config.ocr3 = [
-            Ocr3Config::new(OcrPluginType::Commit as u8),
-            Ocr3Config::new(OcrPluginType::Execution as u8),
-        ];
+        {
+            let mut config = ctx.accounts.config.load_init()?;
+            require!(config.version == 0, CcipOfframpError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
+            config.version = 1;
+            config.svm_chain_selector = svm_chain_selector;
+            config.enable_manual_execution_after = enable_execution_after;
+            config.owner = ctx.accounts.authority.key();
+            config.ocr3 = [
+                Ocr3Config::new(OcrPluginType::Commit as u8),
+                Ocr3Config::new(OcrPluginType::Execution as u8),
+            ];
+        }
+
+        msg!("Router address: {:?}", router.to_string());
+        // panic!();
 
         let reference_addresses = &mut ctx.accounts.reference_addresses;
         reference_addresses.version = 1;
