@@ -211,6 +211,40 @@ pub mod ccip_router {
         v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
     }
 
+    /// Add an offramp address to the list of offramps allowed by the router, for a
+    /// particular source chain. External users will check this list before accepting
+    /// a `ccip_receive` CPI.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for this operation.
+    /// * `source_chain_selector` - The source chain for the offramp's lane.
+    /// * `offramp` - The offramp's address.
+    pub fn allow_offramp(
+        ctx: Context<AddAllowedOfframp>,
+        source_chain_selector: u64,
+        offramp: Pubkey,
+    ) -> Result<()> {
+        v1::admin::allow_offramp(ctx, source_chain_selector, offramp)
+    }
+
+    /// Remove an offramp address from the list of offramps allowed by the router, for a
+    /// particular source chain. External users will check this list before accepting
+    /// a `ccip_receive` CPI.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for this operation.
+    /// * `source_chain_selector` - The source chain for the offramp's lane.
+    /// * `offramp` - The offramp's address.
+    pub fn remove_allowed_offramp(
+        ctx: Context<RemoveAllowedOfframp>,
+        source_chain_selector: u64,
+        offramp: Pubkey,
+    ) -> Result<()> {
+        v1::admin::remove_allowed_offramp(ctx, source_chain_selector, offramp)
+    }
+
     /// Updates the SVM chain selector in the router configuration.
     ///
     /// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.

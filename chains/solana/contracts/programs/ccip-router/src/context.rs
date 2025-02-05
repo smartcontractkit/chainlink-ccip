@@ -36,6 +36,7 @@ pub mod seed {
     pub const COMMIT_REPORT: &[u8] = b"commit_report";
     pub const NONCE: &[u8] = b"nonce";
     pub const CONFIG: &[u8] = b"config";
+    pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
     pub const STATE: &[u8] = b"state";
 
     // arbitrary messaging signer
@@ -321,6 +322,61 @@ pub struct UpdateConfigCCIPRouter<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+#[instruction(source_chain_selector: u64, offramp: Pubkey)]
+pub struct AddAllowedOfframp<'info> {
+    #[account(
+        init,
+        seeds = [seed::ALLOWED_OFFRAMP, source_chain_selector.to_le_bytes().as_ref(), offramp.as_ref()],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + AllowedOfframp::INIT_SPACE,
+    )]
+    pub allowed_offramp: Account<'info, AllowedOfframp>,
+
+    #[account(
+        mut,
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(source_chain_selector: u64, offramp: Pubkey)]
+pub struct RemoveAllowedOfframp<'info> {
+    #[account(
+        mut,
+        seeds = [seed::ALLOWED_OFFRAMP, source_chain_selector.to_le_bytes().as_ref(), offramp.as_ref()],
+        bump,
+        close = authority,
+    )]
+    pub allowed_offramp: Account<'info, AllowedOfframp>,
+
+    #[account(
+        mut,
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+#[derive(Copy, Debug, InitSpace)]
+pub struct AllowedOfframp {}
 
 #[derive(Accounts)]
 pub struct SetOcrConfig<'info> {
