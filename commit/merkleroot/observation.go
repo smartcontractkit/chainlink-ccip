@@ -271,9 +271,17 @@ func (p *Processor) getObservation(
 			// So there's nothing to observe, i.e. we don't want to build the report yet.
 			return Observation{}, nextState, nil
 		}
+
+		rmnEnabledChains, err := p.rmnHomeReader.GetRMNEnabledSourceChains(previousOutcome.RMNRemoteCfg.ConfigDigest)
+		if err != nil {
+			return Observation{}, nextState, fmt.Errorf("failed to get RMN enabled source chains for %s: %w",
+				previousOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
+		}
+
 		return Observation{
-			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			FChain:      p.observer.ObserveFChain(ctx),
+			MerkleRoots:      p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
+			FChain:           p.observer.ObserveFChain(ctx),
+			RMNEnabledChains: rmnEnabledChains,
 		}, nextState, nil
 	case waitingForReportTransmission:
 		return Observation{

@@ -29,6 +29,9 @@ type RMNHome interface {
 	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.HomeNodeInfo, error)
 	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
 	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) bool
+	// GetRMNEnabledSourceChains gets the RMN-enabled source chains for the given configDigest.
+	// If a chain is not RMN-enabled it means that we don't need to do RMN signature related operations for that chain.
+	GetRMNEnabledSourceChains(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]bool, error)
 	// GetFObserve gets the F value for each source chain in the given configDigest.
 	// Maximum number of faulty observers; F+1 observers required to agree on an observation for a source chain.
 	GetFObserve(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
@@ -115,6 +118,22 @@ func (r *rmnHome) GetFObserve(configDigest cciptypes.Bytes32) (map[cciptypes.Cha
 		return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
 	}
 	return state.rmnHomeConfig[configDigest].SourceChainF, nil
+}
+
+func (r *rmnHome) GetRMNEnabledSourceChains(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]bool, error) {
+	state := r.bgPoller.getRMNHomeState()
+	homeCfg, ok := state.rmnHomeConfig[configDigest]
+	if !ok {
+		return map[cciptypes.ChainSelector]bool{},
+			fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
+	}
+
+	enabledChains := make(map[cciptypes.ChainSelector]bool, len(homeCfg.SourceChainF))
+	for chain := range homeCfg.SourceChainF {
+		enabledChains[chain] = true
+	}
+
+	return map[cciptypes.ChainSelector]bool{}, nil
 }
 
 func (r *rmnHome) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {

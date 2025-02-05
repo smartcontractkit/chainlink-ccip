@@ -61,7 +61,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		returnVal interface{},
 	) {
 		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
-		v := returnVal.(*sourceChainConfig)
+		v := returnVal.(*SourceChainConfig)
 
 		fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
 			"0x%d000000000000000000000000000000000000000", sourceChain),
@@ -462,7 +462,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*selectorsAndConfigs)
 		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
-		v.SourceChainConfigs = []sourceChainConfig{
+		v.SourceChainConfigs = []SourceChainConfig{
 			{
 				OnRamp:    onramps[0],
 				Router:    destRouter,
@@ -605,7 +605,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*selectorsAndConfigs)
 		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
-		v.SourceChainConfigs = []sourceChainConfig{
+		v.SourceChainConfigs = []SourceChainConfig{
 			{
 				OnRamp:    onramps[0],
 				Router:    destRouter[0],

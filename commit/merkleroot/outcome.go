@@ -227,11 +227,15 @@ func buildMerkleRootsOutcome(
 				OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
 			}
 
-			if signedRoots.Contains(rk) {
+			switch {
+			case signedRoots.Contains(rk):
 				lggr.Infow("Root is signed, appending to the report", "root", rk)
 				rootsToReport = append(rootsToReport, root)
-			} else {
-				lggr.Infow("Root not signed by RMN, skipping from the report", "root", rk)
+			case !consensusObservation.RMNEnabledChains[root.ChainSel]:
+				lggr.Infow("Root is not signed, but RMN is disabled for the chain, appending to the report", "root", rk)
+				rootsToReport = append(rootsToReport, root)
+			default:
+				lggr.Infow("Root not signed, skipping from the report", "root", rk)
 			}
 		}
 		roots = rootsToReport
@@ -240,6 +244,7 @@ func buildMerkleRootsOutcome(
 	outcome := Outcome{
 		OutcomeType:         outcomeType,
 		RootsToReport:       roots,
+		RMNEnabledChains:    consensusObservation.RMNEnabledChains,
 		OffRampNextSeqNums:  prevOutcome.OffRampNextSeqNums,
 		RMNReportSignatures: sigs,
 		RMNRemoteCfg:        prevOutcome.RMNRemoteCfg,
@@ -329,6 +334,7 @@ func getConsensusObservation(
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 	consensusObs := consensusObservation{
 		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
+		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
 		OnRampMaxSeqNums: consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFChainPlus1),
 		OffRampNextSeqNums: consensus.GetConsensusMap(
 			lggr,
