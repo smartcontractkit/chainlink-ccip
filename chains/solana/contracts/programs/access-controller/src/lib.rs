@@ -18,7 +18,8 @@ pub enum ErrorCode {
     Full = 2,
 }
 
-#[constant]
+// todo: wip - function or associated item not found in `usize`
+// #[constant]
 pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]
