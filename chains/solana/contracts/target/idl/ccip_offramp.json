@@ -1538,51 +1538,6 @@
   ],
   "events": [
     {
-      "name": "FeeTokenAdded",
-      "fields": [
-        {
-          "name": "feeToken",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "enabled",
-          "type": "bool",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FeeTokenEnabled",
-      "fields": [
-        {
-          "name": "feeToken",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FeeTokenDisabled",
-      "fields": [
-        {
-          "name": "feeToken",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FeeTokenRemoved",
-      "fields": [
-        {
-          "name": "feeToken",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
       "name": "SourceChainConfigUpdated",
       "fields": [
         {
@@ -1718,56 +1673,6 @@
           "type": {
             "defined": "MessageExecutionState"
           },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "UsdPerUnitGasUpdated",
-      "fields": [
-        {
-          "name": "destChain",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "value",
-          "type": {
-            "array": [
-              "u8",
-              28
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "timestamp",
-          "type": "i64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "UsdPerTokenUpdated",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "value",
-          "type": {
-            "array": [
-              "u8",
-              28
-            ]
-          },
-          "index": false
-        },
-        {
-          "name": "timestamp",
-          "type": "i64",
           "index": false
         }
       ]

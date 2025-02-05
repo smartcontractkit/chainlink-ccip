@@ -68,11 +68,11 @@ pub struct Initialize<'info> {
     )]
     pub reference_addresses: Account<'info, ReferenceAddresses>,
 
-    /// CHECK: Router address
+    /// CHECK: Router address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub router: UncheckedAccount<'info>,
-    /// CHECK: FeeQuoter address
+    /// CHECK: FeeQuoter address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub fee_quoter: UncheckedAccount<'info>,
-    /// CHECK: ALT address
+    /// CHECK: ALT address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub offramp_lookup_table: UncheckedAccount<'info>,
 
     #[account(
@@ -337,9 +337,9 @@ pub struct CommitReportContext<'info> {
     )]
     pub fee_quoter_config: UncheckedAccount<'info>,
     // remaining accounts
-    // global state account (to update the price sequence number)
-    // [...billingTokenConfig accounts]
-    // [...chainConfig accounts]
+    // global state account (to update the last seen price sequence number)
+    // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
+    // [...chainConfig accounts] fee quoter accounts used to store gas prices
 }
 
 #[derive(Accounts)]
