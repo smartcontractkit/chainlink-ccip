@@ -92,10 +92,10 @@ fn internal_execute<'info>(
     let svm_chain_selector = config.svm_chain_selector;
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-    let source_chain_state = &ctx.accounts.source_chain_state;
+    let source_chain = &ctx.accounts.source_chain;
     require!(
         is_on_ramp_configured(
-            &source_chain_state.config,
+            &source_chain.config,
             &execution_report.message.on_ramp_address
         ),
         CcipOfframpError::InvalidInputs
@@ -112,7 +112,7 @@ fn internal_execute<'info>(
 
     validate_execution_report(
         &execution_report,
-        source_chain_state,
+        source_chain,
         commit_report,
         &message_header,
         svm_chain_selector,

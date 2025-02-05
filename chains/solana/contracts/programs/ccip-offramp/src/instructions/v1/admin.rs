@@ -9,7 +9,7 @@ use crate::context::{
 use crate::event::admin::{
     OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded, SourceChainConfigUpdated,
 };
-use crate::state::{Ocr3ConfigInfo, SourceChainConfig, SourceChainState};
+use crate::state::{Ocr3ConfigInfo, SourceChain, SourceChainConfig, SourceChainState};
 use crate::CcipOfframpError;
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
@@ -43,12 +43,14 @@ pub fn add_source_chain(
     source_chain_config: SourceChainConfig,
 ) -> Result<()> {
     // Set source chain config & state
-    let source_chain_state = &mut ctx.accounts.source_chain_state;
+    let source_chain = &mut ctx.accounts.source_chain;
     validate_source_chain_config(new_chain_selector, &source_chain_config)?;
-    source_chain_state.version = 1;
-    source_chain_state.chain_selector = new_chain_selector;
-    source_chain_state.config = source_chain_config.clone();
-    source_chain_state.state = SourceChainState { min_seq_nr: 1 };
+    source_chain.set_inner(SourceChain {
+        version: 1,
+        chain_selector: new_chain_selector,
+        state: SourceChainState { min_seq_nr: 1 },
+        config: source_chain_config.clone(),
+    });
 
     emit!(SourceChainAdded {
         source_chain_selector: new_chain_selector,
@@ -62,13 +64,13 @@ pub fn disable_source_chain_selector(
     ctx: Context<UpdateSourceChain>,
     source_chain_selector: u64,
 ) -> Result<()> {
-    let chain_state = &mut ctx.accounts.source_chain_state;
+    let source_chain = &mut ctx.accounts.source_chain;
 
-    chain_state.config.is_enabled = false;
+    source_chain.config.is_enabled = false;
 
     emit!(SourceChainConfigUpdated {
         source_chain_selector,
-        source_chain_config: chain_state.config.clone(),
+        source_chain_config: source_chain.config.clone(),
     });
 
     Ok(())
@@ -81,7 +83,7 @@ pub fn update_source_chain_config(
 ) -> Result<()> {
     validate_source_chain_config(source_chain_selector, &source_chain_config)?;
 
-    ctx.accounts.source_chain_state.config = source_chain_config.clone();
+    ctx.accounts.source_chain.config = source_chain_config.clone();
 
     emit!(SourceChainConfigUpdated {
         source_chain_selector,

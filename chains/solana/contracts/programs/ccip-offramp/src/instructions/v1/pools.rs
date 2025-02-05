@@ -7,9 +7,9 @@ use solana_program::{
     program::invoke_signed,
 };
 
+use super::messages::router_state;
 use super::messages::ReleaseOrMintInV1;
 
-use crate::instructions::v1::messages::router_state;
 use crate::{seed, CcipOfframpError};
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;

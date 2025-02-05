@@ -21,7 +21,7 @@ import (
 type DisableSourceChainSelector struct {
 	SourceChainSelector *uint64
 
-	// [0] = [WRITE] sourceChainState
+	// [0] = [WRITE] sourceChain
 	//
 	// [1] = [] config
 	//
@@ -43,14 +43,14 @@ func (inst *DisableSourceChainSelector) SetSourceChainSelector(sourceChainSelect
 	return inst
 }
 
-// SetSourceChainStateAccount sets the "sourceChainState" account.
-func (inst *DisableSourceChainSelector) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *DisableSourceChainSelector {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChainState).WRITE()
+// SetSourceChainAccount sets the "sourceChain" account.
+func (inst *DisableSourceChainSelector) SetSourceChainAccount(sourceChain ag_solanago.PublicKey) *DisableSourceChainSelector {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChain).WRITE()
 	return inst
 }
 
-// GetSourceChainStateAccount gets the "sourceChainState" account.
-func (inst *DisableSourceChainSelector) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
+// GetSourceChainAccount gets the "sourceChain" account.
+func (inst *DisableSourceChainSelector) GetSourceChainAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -104,7 +104,7 @@ func (inst *DisableSourceChainSelector) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.SourceChainState is not set")
+			return errors.New("accounts.SourceChain is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Config is not set")
@@ -131,9 +131,9 @@ func (inst *DisableSourceChainSelector) EncodeToTree(parent ag_treeout.Branches)
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("sourceChainState", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("sourceChain", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("     config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("  authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -161,12 +161,12 @@ func NewDisableSourceChainSelectorInstruction(
 	// Parameters:
 	sourceChainSelector uint64,
 	// Accounts:
-	sourceChainState ag_solanago.PublicKey,
+	sourceChain ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *DisableSourceChainSelector {
 	return NewDisableSourceChainSelectorInstructionBuilder().
 		SetSourceChainSelector(sourceChainSelector).
-		SetSourceChainStateAccount(sourceChainState).
+		SetSourceChainAccount(sourceChain).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }

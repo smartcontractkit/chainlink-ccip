@@ -25,17 +25,14 @@ pub fn commit<'info>(
     let config = ctx.accounts.config.load()?;
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-    let source_chain_state = &mut ctx.accounts.source_chain_state;
+    let source_chain = &mut ctx.accounts.source_chain;
 
     require!(
-        source_chain_state.config.is_enabled,
+        source_chain.config.is_enabled,
         CcipOfframpError::UnsupportedSourceChainSelector
     );
     require!(
-        is_on_ramp_configured(
-            &source_chain_state.config,
-            &report.merkle_root.on_ramp_address
-        ),
+        is_on_ramp_configured(&source_chain.config, &report.merkle_root.on_ramp_address),
         CcipOfframpError::InvalidInputs
     );
 
@@ -156,7 +153,7 @@ pub fn commit<'info>(
         CcipOfframpError::InvalidSequenceInterval
     ); // As we have 64 slots to store the execution state
     require!(
-        source_chain_state.state.min_seq_nr == root.min_seq_nr,
+        source_chain.state.min_seq_nr == root.min_seq_nr,
         CcipOfframpError::InvalidSequenceInterval
     );
     require!(root.merkle_root != [0; 32], CcipOfframpError::InvalidProof);
@@ -172,7 +169,7 @@ pub fn commit<'info>(
         CcipOfframpError::ReachedMaxSequenceNumber
     );
 
-    source_chain_state.state.min_seq_nr = next_seq_nr.unwrap();
+    source_chain.state.min_seq_nr = next_seq_nr.unwrap();
 
     let clock: Clock = Clock::get()?;
     commit_report.version = 1;

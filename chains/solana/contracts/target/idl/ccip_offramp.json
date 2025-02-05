@@ -168,7 +168,7 @@
       ],
       "accounts": [
         {
-          "name": "sourceChainState",
+          "name": "sourceChain",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -219,7 +219,7 @@
       ],
       "accounts": [
         {
-          "name": "sourceChainState",
+          "name": "sourceChain",
           "isMut": true,
           "isSigner": false
         },
@@ -256,7 +256,7 @@
       ],
       "accounts": [
         {
-          "name": "sourceChainState",
+          "name": "sourceChain",
           "isMut": true,
           "isSigner": false
         },
@@ -448,7 +448,7 @@
           "isSigner": false
         },
         {
-          "name": "sourceChainState",
+          "name": "sourceChain",
           "isMut": true,
           "isSigner": false
         },
@@ -576,7 +576,7 @@
           "isSigner": false
         },
         {
-          "name": "sourceChainState",
+          "name": "sourceChain",
           "isMut": false,
           "isSigner": false
         },
@@ -662,7 +662,7 @@
           "isSigner": false
         },
         {
-          "name": "sourceChainState",
+          "name": "sourceChain",
           "isMut": false,
           "isSigner": false
         },

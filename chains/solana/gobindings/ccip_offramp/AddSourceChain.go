@@ -21,7 +21,7 @@ type AddSourceChain struct {
 	NewChainSelector  *uint64
 	SourceChainConfig *SourceChainConfig
 
-	// [0] = [WRITE] sourceChainState
+	// [0] = [WRITE] sourceChain
 	// ··········· Adding a chain selector implies initializing the state for a new chain,
 	// ··········· hence the need to initialize two accounts.
 	//
@@ -53,18 +53,18 @@ func (inst *AddSourceChain) SetSourceChainConfig(sourceChainConfig SourceChainCo
 	return inst
 }
 
-// SetSourceChainStateAccount sets the "sourceChainState" account.
+// SetSourceChainAccount sets the "sourceChain" account.
 // Adding a chain selector implies initializing the state for a new chain,
 // hence the need to initialize two accounts.
-func (inst *AddSourceChain) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *AddSourceChain {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChainState).WRITE()
+func (inst *AddSourceChain) SetSourceChainAccount(sourceChain ag_solanago.PublicKey) *AddSourceChain {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChain).WRITE()
 	return inst
 }
 
-// GetSourceChainStateAccount gets the "sourceChainState" account.
+// GetSourceChainAccount gets the "sourceChain" account.
 // Adding a chain selector implies initializing the state for a new chain,
 // hence the need to initialize two accounts.
-func (inst *AddSourceChain) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
+func (inst *AddSourceChain) GetSourceChainAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -132,7 +132,7 @@ func (inst *AddSourceChain) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.SourceChainState is not set")
+			return errors.New("accounts.SourceChain is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Config is not set")
@@ -163,10 +163,10 @@ func (inst *AddSourceChain) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("sourceChainState", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("   systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("  sourceChain", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -205,14 +205,14 @@ func NewAddSourceChainInstruction(
 	newChainSelector uint64,
 	sourceChainConfig SourceChainConfig,
 	// Accounts:
-	sourceChainState ag_solanago.PublicKey,
+	sourceChain ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AddSourceChain {
 	return NewAddSourceChainInstructionBuilder().
 		SetNewChainSelector(newChainSelector).
 		SetSourceChainConfig(sourceChainConfig).
-		SetSourceChainStateAccount(sourceChainState).
+		SetSourceChainAccount(sourceChain).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

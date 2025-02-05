@@ -45,7 +45,7 @@ type Commit struct {
 	//
 	// [1] = [] referenceAddresses
 	//
-	// [2] = [WRITE] sourceChainState
+	// [2] = [WRITE] sourceChain
 	//
 	// [3] = [WRITE] commitReport
 	//
@@ -123,14 +123,14 @@ func (inst *Commit) GetReferenceAddressesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-// SetSourceChainStateAccount sets the "sourceChainState" account.
-func (inst *Commit) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *Commit {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(sourceChainState).WRITE()
+// SetSourceChainAccount sets the "sourceChain" account.
+func (inst *Commit) SetSourceChainAccount(sourceChain ag_solanago.PublicKey) *Commit {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(sourceChain).WRITE()
 	return inst
 }
 
-// GetSourceChainStateAccount gets the "sourceChainState" account.
-func (inst *Commit) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
+// GetSourceChainAccount gets the "sourceChain" account.
+func (inst *Commit) GetSourceChainAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
@@ -257,7 +257,7 @@ func (inst *Commit) Validate() error {
 			return errors.New("accounts.ReferenceAddresses is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.SourceChainState is not set")
+			return errors.New("accounts.SourceChain is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.CommitReport is not set")
@@ -305,7 +305,7 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("referenceAddresses", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("  sourceChainState", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("       sourceChain", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("      commitReport", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[4]))
 						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[5]))
@@ -386,7 +386,7 @@ func NewCommitInstruction(
 	// Accounts:
 	config ag_solanago.PublicKey,
 	referenceAddresses ag_solanago.PublicKey,
-	sourceChainState ag_solanago.PublicKey,
+	sourceChain ag_solanago.PublicKey,
 	commitReport ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
@@ -402,7 +402,7 @@ func NewCommitInstruction(
 		SetRawVs(rawVs).
 		SetConfigAccount(config).
 		SetReferenceAddressesAccount(referenceAddresses).
-		SetSourceChainStateAccount(sourceChainState).
+		SetSourceChainAccount(sourceChain).
 		SetCommitReportAccount(commitReport).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

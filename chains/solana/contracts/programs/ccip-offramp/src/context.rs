@@ -15,7 +15,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 /// Maximum acceptable config version accepted by this module: any accounts with higher
 /// version numbers than this will be rejected.
 pub const MAX_CONFIG_V: u8 = 1;
-const MAX_CHAINSTATE_V: u8 = 1;
+const MAX_CHAIN_V: u8 = 1;
 const MAX_COMMITREPORT_V: u8 = 1;
 
 pub const fn valid_version(v: u8, max_version: u8) -> bool {
@@ -217,7 +217,7 @@ pub struct AddSourceChain<'info> {
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + SourceChain::INIT_SPACE,
     )]
-    pub source_chain_state: Account<'info, SourceChain>,
+    pub source_chain: Account<'info, SourceChain>,
 
     #[account(
         seeds = [seed::CONFIG],
@@ -238,9 +238,9 @@ pub struct UpdateSourceChain<'info> {
         mut,
         seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidInputs,
     )]
-    pub source_chain_state: Account<'info, SourceChain>,
+    pub source_chain: Account<'info, SourceChain>,
 
     #[account(
         seeds = [seed::CONFIG],
@@ -295,9 +295,9 @@ pub struct CommitReportContext<'info> {
         mut,
         seeds = [seed::SOURCE_CHAIN, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidInputs,
     )]
-    pub source_chain_state: Account<'info, SourceChain>,
+    pub source_chain: Account<'info, SourceChain>,
 
     #[account(
         init,
@@ -362,9 +362,9 @@ pub struct ExecuteReportContext<'info> {
     #[account(
         seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain_state.version, MAX_CHAINSTATE_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidInputs,
     )]
-    pub source_chain_state: Account<'info, SourceChain>,
+    pub source_chain: Account<'info, SourceChain>,
 
     #[account(
         mut,
