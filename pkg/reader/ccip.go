@@ -1185,7 +1185,21 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Remo
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote report digest header: %w", err)
 	}
 
+	// get the RMN remote address from the proxy
+	var rmnRemoteAddress []byte
+	err = r.getDestinationData(
+		ctx,
+		r.destChain,
+		consts.ContractNameRMNProxy,
+		consts.MethodNameGetARM,
+		&rmnRemoteAddress,
+	)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
+	}
+
 	r.lggr.Infow("Direct call response RMNRemoteConfig",
+		"contractAddress", hex.EncodeToString(rmnRemoteAddress),
 		"configDigest", hex.EncodeToString(vc.Config.RMNHomeContractConfigDigest[:]),
 		"signers", len(vc.Config.Signers),
 		"FSign", vc.Config.FSign,
@@ -1310,9 +1324,23 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		return nil, fmt.Errorf("unable to lookup fee quoter (offramp dynamic config): %w", err)
 	}
 
+	var selectorsAndConfigs selectorsAndConfigs
+	err = r.contractReaders[r.destChain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameOffRampGetAllSourceChainConfigs,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&selectorsAndConfigs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to lookup onRamp and router (offramp source chain configs): %w", err)
+	}
+
 	r.lggr.Infow("Direct call response discoverOffRampContracts",
 		"staticConfig", staticConfig,
-		"dynamicConfig", dynamicConfig)
+		"dynamicConfig", dynamicConfig,
+		"selectorsAndConf", selectorsAndConfigs)
 
 	resp := make(ContractAddresses)
 
@@ -2014,7 +2042,7 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		} else {
 			respFromCache = config.Offramp.ExecLatestOCRConfig
 		}
-		r.lggr.Infow("Cache response",
+		r.lggr.Infow("Cache response OCRConfigResponse",
 			"pluginType", pluginType,
 			"configDigest", hex.EncodeToString(respFromCache.OCRConfig.ConfigInfo.ConfigDigest[:]),
 			"F", respFromCache.OCRConfig.ConfigInfo.F,
@@ -2044,7 +2072,7 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
 	}
 
-	r.lggr.Infow("Direct call response",
+	r.lggr.Infow("Direct call response OCRConfigResponse",
 		"pluginType", pluginType,
 		"configDigest", hex.EncodeToString(resp.OCRConfig.ConfigInfo.ConfigDigest[:]),
 		"F", resp.OCRConfig.ConfigInfo.F,
