@@ -34,7 +34,7 @@ import (
 )
 
 // Default refresh period for cache if not specified
-const defaultRefreshPeriod = 0 * time.Second
+const defaultRefreshPeriod = 30 * time.Second
 
 // ChainConfigSnapshot represents the complete configuration state of the chain
 type ChainConfigSnapshot struct {
