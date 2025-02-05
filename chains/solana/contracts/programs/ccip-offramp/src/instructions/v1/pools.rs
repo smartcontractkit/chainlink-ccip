@@ -326,7 +326,7 @@ mod token_admin_registry_writable {
 
         // set writable inserts bits from left to right
         // index 0 is left-most bit
-        pub fn set(tar: &mut TokenAdminRegistry, index: u8) {
+        fn set(tar: &mut TokenAdminRegistry, index: u8) {
             match index < 128 {
                 true => {
                     tar.writable_indexes[0] |= 1 << (127 - index);
@@ -337,7 +337,7 @@ mod token_admin_registry_writable {
             }
         }
 
-        pub fn reset(tar: &mut TokenAdminRegistry) {
+        fn reset(tar: &mut TokenAdminRegistry) {
             tar.writable_indexes = [0, 0];
         }
 
