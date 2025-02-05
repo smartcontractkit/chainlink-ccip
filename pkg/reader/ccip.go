@@ -1192,6 +1192,9 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Remo
 
 	// get the RMN remote address from the proxy
 	rmnRemoteAddress, err := r.getRMNRemoteAddressDirect(ctx, r.lggr, r.destChain, proxyContractAddress)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMN remote address: %w", err)
+	}
 
 	r.lggr.Infow("Direct call response RMNRemoteConfig",
 		"contractAddress", hex.EncodeToString(rmnRemoteAddress),
