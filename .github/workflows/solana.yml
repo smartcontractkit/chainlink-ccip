@@ -93,6 +93,16 @@ jobs:
         fail-on-cache-miss: true
         path: chains/solana/contracts/docker-build.tar
         key: ${{ runner.os }}-solana-build-${{ needs.get_anchor_version.outputs.anchor_version }}-${{ hashFiles('**/Cargo.lock') }}
+    - name: Detailed space diagnostics
+      run: |
+        echo "Docker info:"
+        docker info
+        echo "Docker root dir space:"
+        df -h $(docker info -f '{{.DockerRootDir}}')
+        echo "Current directory space:"
+        df -h .
+        echo "Contents of docker tar:"
+        ls -lh contracts/docker-build.tar
     - name: load cached image
       run: |
         docker load --input contracts/docker-build.tar
