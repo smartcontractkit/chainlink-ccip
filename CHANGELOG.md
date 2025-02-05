@@ -1,5 +1,21 @@
 # @chainlink/crib
 
+## 2.3.0
+
+### Minor Changes
+
+- [#390](https://github.com/smartcontractkit/crib/pull/390) [`fba81a8`](https://github.com/smartcontractkit/crib/commit/fba81a8f852eac75e441d390c742013b87b6ff95) Thanks [@scheibinger](https://github.com/scheibinger)! - Downgrade postgres to v16 which is closer to what we have in production
+
+- [#376](https://github.com/smartcontractkit/crib/pull/376) [`3cd6bf8`](https://github.com/smartcontractkit/crib/commit/3cd6bf897bc222b94b04c62de838f012e03a5507) Thanks [@scheibinger](https://github.com/scheibinger)! - Deploy geth and job-distributor on crib nodes, for more reliability
+
+- [#372](https://github.com/smartcontractkit/crib/pull/372) [`033a503`](https://github.com/smartcontractkit/crib/commit/033a5037da1736cfcfcd5a3396368d1d034e4507) Thanks [@scheibinger](https://github.com/scheibinger)! - Add profile to enable service-monitor for prometheus
+
+- [#370](https://github.com/smartcontractkit/crib/pull/370) [`a468bf9`](https://github.com/smartcontractkit/crib/commit/a468bf9d862197779aff2a51e0798e918a6eeffa) Thanks [@scheibinger](https://github.com/scheibinger)! - Make dashboard management avaialable via CRIB CLI
+
+- [#375](https://github.com/smartcontractkit/crib/pull/375) [`605ac1b`](https://github.com/smartcontractkit/crib/commit/605ac1b720b04b1cb836f5fc00154f916128688d) Thanks [@scheibinger](https://github.com/scheibinger)! - Enable prometheus exporter by default in crib staging
+
+- [#388](https://github.com/smartcontractkit/crib/pull/388) [`6ec0eba`](https://github.com/smartcontractkit/crib/commit/6ec0eba30f1277673cfce1c22bc1bcfc8a9b079e) Thanks [@scheibinger](https://github.com/scheibinger)! - Added geth-v2 dependency
+
 ## 2.2.0
 
 ### Minor Changes
