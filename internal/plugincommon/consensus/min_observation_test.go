@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
 
@@ -104,6 +106,17 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			if !assert.ElementsMatch(t, got, tt.valid) {
 				t.Errorf("GetValid() = %v, valid %v", got, tt.valid)
 			}
+
+			oracleValidator := consensus.NewOracleMinObservation[exectypes.CommitData](tt.min, idFunc)
+			for i, report := range tt.reports {
+				oracleValidator.Add(report, commontypes.OracleID(i))
+			}
+
+			// Test the results
+			got = validator.GetValid()
+			if !assert.ElementsMatch(t, got, tt.valid) {
+				t.Errorf("GetValid() = %v, valid %v", got, tt.valid)
+			}
 		})
 	}
 }
@@ -130,6 +143,19 @@ func Test_CommitReportValidator_Generics(t *testing.T) {
 
 	wantValid := []Generic{wantValue}
 	got := validator.GetValid()
+	if !assert.ElementsMatch(t, got, wantValid) {
+		t.Errorf("GetValid() = %v, valid %v", got, wantValid)
+	}
+
+	oracleValidator := consensus.NewOracleMinObservation[Generic](2, idFunc)
+
+	oracleValidator.Add(wantValue, 1)
+	oracleValidator.Add(wantValue, 2)
+	oracleValidator.Add(otherValue, 3)
+
+	// Test the results
+
+	got = validator.GetValid()
 	if !assert.ElementsMatch(t, got, wantValid) {
 		t.Errorf("GetValid() = %v, valid %v", got, wantValid)
 	}
