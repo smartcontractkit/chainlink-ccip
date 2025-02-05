@@ -1140,14 +1140,27 @@ func (r *ccipChainReader) buildSigners(signers []signer) []rmntypes.RemoteSigner
 }
 
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
-	// Get from cache
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+
 	config, err := r.getChainConfig(ctx, r.destChain)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)
 	}
 
+	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
+	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
+	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, r.destChain)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
+	}
+
+	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, lggr, r.destChain, proxyContractAddress)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
+	}
+
 	return rmntypes.RemoteConfig{
-		ContractAddress:  config.RMNProxy.RemoteAddress,
+		ContractAddress:  rmnRemoteAddress,
 		ConfigDigest:     config.RMNRemote.VersionedConfig.Config.RMNHomeContractConfigDigest,
 		Signers:          r.buildSigners(config.RMNRemote.VersionedConfig.Config.Signers),
 		FSign:            config.RMNRemote.VersionedConfig.Config.FSign,
