@@ -50,10 +50,7 @@
         },
         {
           "name": "owner",
-          "signer": true,
-          "relations": [
-            "state"
-          ]
+          "signer": true
         },
         {
           "name": "address"
@@ -104,10 +101,7 @@
         },
         {
           "name": "owner",
-          "signer": true,
-          "relations": [
-            "state"
-          ]
+          "signer": true
         },
         {
           "name": "address"

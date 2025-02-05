@@ -32,22 +32,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -79,63 +64,11 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "billing_token_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  102,
-                  101,
-                  101,
-                  95,
-                  98,
-                  105,
-                  108,
-                  108,
-                  105,
-                  110,
-                  103,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "token_config.mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "token_program"
@@ -145,60 +78,7 @@
         },
         {
           "name": "fee_token_receiver",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "path": "fee_billing_signer"
-              },
-              {
-                "kind": "account",
-                "path": "token_program"
-              },
-              {
-                "kind": "account",
-                "path": "fee_token_mint"
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                140,
-                151,
-                37,
-                143,
-                78,
-                36,
-                137,
-                241,
-                187,
-                61,
-                16,
-                41,
-                20,
-                142,
-                13,
-                131,
-                11,
-                90,
-                19,
-                153,
-                218,
-                255,
-                16,
-                132,
-                4,
-                142,
-                123,
-                216,
-                219,
-                233,
-                248,
-                89
-              ]
-            }
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -206,42 +86,13 @@
           "signer": true
         },
         {
-          "name": "fee_billing_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  102,
-                  101,
-                  101,
-                  95,
-                  98,
-                  105,
-                  108,
-                  108,
-                  105,
-                  110,
-                  103,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              }
-            ]
-          }
+          "name": "fee_billing_signer"
         },
         {
-          "name": "associated_token_program",
-          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+          "name": "associated_token_program"
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -281,49 +132,11 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "dest_chain",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  101,
-                  115,
-                  116,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "dest_chain_selector"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -331,8 +144,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -374,49 +186,11 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "dest_chain",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  101,
-                  115,
-                  116,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "chain_selector"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -474,92 +248,16 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
-          "name": "dest_chain",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  101,
-                  115,
-                  116,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "destination_chain_selector"
-              }
-            ]
-          }
+          "name": "dest_chain"
         },
         {
           "name": "billing_token_config"
         },
         {
-          "name": "link_token_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  102,
-                  101,
-                  101,
-                  95,
-                  98,
-                  105,
-                  108,
-                  108,
-                  105,
-                  110,
-                  103,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "config.link_token_mint",
-                "account": "Config"
-              }
-            ]
-          }
+          "name": "link_token_config"
         }
       ],
       "args": [
@@ -610,22 +308,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -633,12 +316,10 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         },
         {
-          "name": "program",
-          "address": "FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw"
+          "name": "program"
         },
         {
           "name": "program_data"
@@ -691,69 +372,11 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "per_chain_per_token_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  101,
-                  114,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  95,
-                  112,
-                  101,
-                  114,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "chain_selector"
-              },
-              {
-                "kind": "arg",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -761,8 +384,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -809,22 +431,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -861,63 +468,11 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "billing_token_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  102,
-                  101,
-                  101,
-                  95,
-                  98,
-                  105,
-                  108,
-                  108,
-                  105,
-                  110,
-                  103,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "token_config.mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -960,49 +515,11 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "dest_chain",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  101,
-                  115,
-                  116,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "chain_selector"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1039,22 +556,7 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "authority",
