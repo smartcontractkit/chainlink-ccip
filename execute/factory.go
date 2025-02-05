@@ -108,35 +108,6 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 	}
 }
 
-// deprectated: use NewExececutePluginFactory
-func NewPluginFactory(
-	lggr logger.Logger,
-	donID plugintypes.DonID,
-	ocrConfig reader.OCR3ConfigWithMeta,
-	execCodec cciptypes.ExecutePluginCodec,
-	msgHasher cciptypes.MessageHasher,
-	extraDataCodec cciptypes.ExtraDataCodec,
-	homeChainReader reader.HomeChain,
-	tokenDataEncoder cciptypes.TokenDataEncoder,
-	estimateProvider cciptypes.EstimateProvider,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
-) *PluginFactory {
-	return &PluginFactory{
-		baseLggr:         lggr,
-		donID:            donID,
-		ocrConfig:        ocrConfig,
-		execCodec:        execCodec,
-		msgHasher:        msgHasher,
-		extraDataCodec:   extraDataCodec,
-		homeChainReader:  homeChainReader,
-		estimateProvider: estimateProvider,
-		contractReaders:  contractReaders,
-		chainWriters:     chainWriters,
-		tokenDataEncoder: tokenDataEncoder,
-	}
-}
-
 func (p PluginFactory) NewReportingPlugin(
 	ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
