@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -152,7 +153,7 @@ func (u *TokenDataObserver) fetchUSDCEventMessages(
 func (u *TokenDataObserver) fetchAttestations(
 	ctx context.Context,
 	usdcMessages map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
-) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
+) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus, error) {
 	attestations, err := u.attestationClient.Attestations(ctx, usdcMessages)
 	if err != nil {
 		return nil, err
@@ -164,7 +165,7 @@ func (u *TokenDataObserver) extractTokenData(
 	ctx context.Context,
 	lggr logger.Logger,
 	messages exectypes.MessageObservations,
-	attestations map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus,
+	attestations map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus,
 ) (exectypes.TokenDataObservations, error) {
 	tokenObservations := make(exectypes.TokenDataObservations)
 
@@ -198,16 +199,16 @@ func (u *TokenDataObserver) attestationToTokenData(
 	ctx context.Context,
 	seqNr cciptypes.SeqNum,
 	tokenIndex int,
-	attestations map[reader.MessageTokenID]AttestationStatus,
+	attestations map[reader.MessageTokenID]tokendata.AttestationStatus,
 ) exectypes.TokenData {
 	status, ok := attestations[reader.NewMessageTokenID(seqNr, tokenIndex)]
 	if !ok {
-		return exectypes.NewErrorTokenData(ErrDataMissing)
+		return exectypes.NewErrorTokenData(tokendata.ErrDataMissing)
 	}
 	if status.Error != nil {
 		return exectypes.NewErrorTokenData(status.Error)
 	}
-	tokenData, err := u.attestationEncoder(ctx, status.MessageHash, status.Attestation)
+	tokenData, err := u.attestationEncoder(ctx, status.ID, status.Attestation)
 	if err != nil {
 		return exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
 	}

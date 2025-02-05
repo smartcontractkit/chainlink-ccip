@@ -48,6 +48,7 @@ type TokenDataObserverConfig struct {
 	Version string `json:"version"`
 
 	*USDCCCTPObserverConfig
+	*LBTCObserverConfig
 }
 
 // WellFormed checks that the observer's config is syntactically correct - proper struct is initialized based on type
@@ -189,4 +190,24 @@ func (t USDCCCTPTokenConfig) Validate() error {
 		return errors.New("SourceMessageTransmitterAddress not set")
 	}
 	return nil
+}
+
+type LBTCObserverConfig struct {
+	SourcePoolAddressByChain map[cciptypes.ChainSelector]string `json:"sourcePoolAddressByChain"`
+	AttestationAPI           string                             `json:"attestationAPI"`
+	// AttestationAPITimeout defines the timeout for the attestation API.
+	AttestationAPITimeout *commonconfig.Duration `json:"attestationAPITimeout"`
+	// AttestationAPIInterval defines the rate in requests per second that the attestation API can be called.
+	// Default set according to the APIs documentated 10 requests per second rate limit.
+	AttestationAPIInterval  *commonconfig.Duration `json:"attestationAPIInterval"`
+	AttestationAPIBatchSize int                    `json:"attestationAPIBatchSize"`
+
+	// NumWorkers is the number of concurrent workers.
+	NumWorkers int `json:"numWorkers"`
+	// CacheExpirationInterval is the interval after which the cached token data will expire.
+	CacheExpirationInterval *commonconfig.Duration `json:"cacheExpirationInterval"`
+	// CacheCleanupInterval is the interval after which the cache expired data will be cleaned up.
+	CacheCleanupInterval *commonconfig.Duration `json:"cacheCleanupInterval"`
+	// ObserveTimeout is the timeout for the actual synchronous Observe calls.
+	ObserveTimeout *commonconfig.Duration `json:"observeTimeout"`
 }

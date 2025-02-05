@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -27,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
@@ -241,7 +241,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
 
-	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
+	tkObs, err := observer.NewConfigBasedCompositeObservers(
 		ctx,
 		it.lggr,
 		it.dstSelector,
@@ -312,7 +312,7 @@ func (it *IntTest) newNode(
 	cfg pluginconfig.ExecuteOffchainConfig,
 	homeChain reader.HomeChain,
 	ep cciptypes.EstimateProvider,
-	tokenDataObserver tokendata.TokenDataObserver,
+	tokenDataObserver observer.TokenDataObserver,
 	costlyMessageObserver costlymessages.Observer,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,

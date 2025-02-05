@@ -1,13 +1,14 @@
-package usdc
+package http
 
 import (
 	"context"
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
@@ -20,9 +21,9 @@ func Test_ObservedMetrics(t *testing.T) {
 	successCount := 10
 
 	ctx := tests.Context(t)
-	client200 := newObservedHTTPClient(fake{status: 200}, logger.Test(t))
-	client400 := newObservedHTTPClient(fake{status: 400}, logger.Test(t))
-	client500 := newObservedHTTPClient(fake{status: 500, err: fmt.Errorf("error")}, logger.Test(t))
+	client200 := newObservedHTTPClient(fake{status: 200}, logger.Test(t), USDC)
+	client400 := newObservedHTTPClient(fake{status: 400}, logger.Test(t), USDC)
+	client500 := newObservedHTTPClient(fake{status: 500, err: fmt.Errorf("error")}, logger.Test(t), USDC)
 
 	for i := 0; i < successCount; i++ {
 		_, st, _ := client200.Get(ctx, cciptypes.Bytes32{})
@@ -51,7 +52,7 @@ func Test_ObservedMetrics(t *testing.T) {
 func Test_TimeToAttestation(t *testing.T) {
 	ctx := tests.Context(t)
 	http := &fake{status: 200}
-	client := newObservedHTTPClient(http, logger.Test(t))
+	client := newObservedHTTPClient(http, logger.Test(t), USDC)
 
 	t.Cleanup(func() {
 		client.timeToAttestation.Reset()
@@ -112,4 +113,8 @@ type fake struct {
 
 func (f fake) Get(_ context.Context, messageHash cciptypes.Bytes32) (cciptypes.Bytes, HTTPStatus, error) {
 	return messageHash[:], HTTPStatus(f.status), f.err
+}
+
+func (f fake) Post(_ context.Context, bodyBytes cciptypes.Bytes) (cciptypes.Bytes, HTTPStatus, error) {
+	return bodyBytes, HTTPStatus(f.status), f.err
 }

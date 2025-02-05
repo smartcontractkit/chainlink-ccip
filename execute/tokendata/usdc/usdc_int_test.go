@@ -15,6 +15,7 @@ import (
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -400,24 +401,24 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 						TokenData: []exectypes.TokenData{
 							exectypes.NewSuccessTokenData(m1.tokenData()),
 							exectypes.NotSupportedTokenData(),
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 					2: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 				},
 				sepoliaChain: {
 					10: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 					11: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 				},
