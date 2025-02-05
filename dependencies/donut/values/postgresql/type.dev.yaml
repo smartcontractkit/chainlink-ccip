@@ -19,7 +19,7 @@ primary:
   persistence:
     enabled: false
     size: 8Gi
-    storageClass: gp2
+    storageClass: gp3
 networkPolicy:
   enabled: false
 volumePermissions:

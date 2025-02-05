@@ -180,7 +180,6 @@ profiles:
               - network-geth-chain-1337
               - network-geth-chain-2337
               - network-additional-geth-chains
-              - monitoring-service-monitor
   - name: load-tests
     patches:
       - op: add
@@ -205,16 +204,36 @@ profiles:
               - network-geth-chain-1337
               - network-geth-chain-2337
               - network-additional-geth-chains
-              - monitoring-service-monitor
-              - ccip-load-testing-aws-staging
               # Use network-generated to customize parameters for individual geth network
               # - network-generated
+  - name: default-aws
+    parents:
+      - profile: default
+    patches:
+      - op: add
+        path: dependencies.ccip-don.profiles
+        value: monitoring-service-monitor
+  - name: load-tests-aws
+    parents:
+      - profile: load-tests
+    patches:
+      - op: add
+        path: dependencies.ccip-don.profiles
+        value: monitoring-service-monitor
+      - op: add
+        path: dependencies.ccip-don.profiles
+        value: ccip-load-testing-aws-staging
+
 commands:
-  ccip-v2:
+  ccip-v2-kind:
     command: devspace run-pipeline ccip-v2 -p default
     description: Run the ccip v2 pipeline.
     appendArgs: true
-  ccip-v2-load-tests:
+  ccip-v2-aws:
+    command: devspace run-pipeline ccip-v2 -p default-aws
+    description: Run the ccip v2 pipeline.
+    appendArgs: true
+  ccip-v2-load-tests-aws:
     command: devspace run-pipeline ccip-v2 -p load-tests
     description: Run the ccip v2 pipeline.
     appendArgs: true

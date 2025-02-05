@@ -146,6 +146,7 @@ profiles:
         DON_NODE_COUNT=${DON_NODE_COUNT} \
         DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
         PROVIDER=${PROVIDER} \
+        POSTGRES_CHART_VERSION="15.5.9" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.base.yaml
       )
