@@ -14,6 +14,7 @@ import (
 type Initialize struct {
 	PoolType      *PoolType
 	RampAuthority *ag_solanago.PublicKey
+	CcipRouter    *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
 	//
@@ -44,6 +45,12 @@ func (inst *Initialize) SetPoolType(poolType PoolType) *Initialize {
 // SetRampAuthority sets the "rampAuthority" parameter.
 func (inst *Initialize) SetRampAuthority(rampAuthority ag_solanago.PublicKey) *Initialize {
 	inst.RampAuthority = &rampAuthority
+	return inst
+}
+
+// SetCcipRouter sets the "ccipRouter" parameter.
+func (inst *Initialize) SetCcipRouter(ccipRouter ag_solanago.PublicKey) *Initialize {
+	inst.CcipRouter = &ccipRouter
 	return inst
 }
 
@@ -128,6 +135,9 @@ func (inst *Initialize) Validate() error {
 		if inst.RampAuthority == nil {
 			return errors.New("RampAuthority parameter is not set")
 		}
+		if inst.CcipRouter == nil {
+			return errors.New("CcipRouter parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -160,9 +170,10 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("     PoolType", *inst.PoolType))
 						paramsBranch.Child(ag_format.Param("RampAuthority", *inst.RampAuthority))
+						paramsBranch.Child(ag_format.Param("   CcipRouter", *inst.CcipRouter))
 					})
 
 					// Accounts of the instruction:
@@ -188,6 +199,11 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Serialize `CcipRouter` param:
+	err = encoder.Encode(obj.CcipRouter)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -201,6 +217,11 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
+	// Deserialize `CcipRouter`:
+	err = decoder.Decode(&obj.CcipRouter)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -209,6 +230,7 @@ func NewInitializeInstruction(
 	// Parameters:
 	poolType PoolType,
 	rampAuthority ag_solanago.PublicKey,
+	ccipRouter ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
@@ -218,6 +240,7 @@ func NewInitializeInstruction(
 	return NewInitializeInstructionBuilder().
 		SetPoolType(poolType).
 		SetRampAuthority(rampAuthority).
+		SetCcipRouter(ccipRouter).
 		SetConfigAccount(config).
 		SetMintAccount(mint).
 		SetPoolSignerAccount(poolSigner).

@@ -29,6 +29,7 @@ pub mod token_pool {
         ctx: Context<InitializeTokenPool>,
         pool_type: PoolType,
         ramp_authority: Pubkey,
+        ccip_router: Pubkey,
     ) -> Result<()> {
         let token_info = ctx.accounts.mint.to_account_info();
 
@@ -45,6 +46,7 @@ pub mod token_pool {
         );
         config.owner = ctx.accounts.authority.key();
         config.ramp_authority = ramp_authority;
+        config.ccip_router = ccip_router;
 
         Ok(())
     }
@@ -67,8 +69,7 @@ pub mod token_pool {
         Ok(())
     }
 
-    // set_ramp_authority changes the expected signer for mint/release + burn/lock method calls
-    // this is used to update the router address
+    // set_ramp_authority changes the expected signer for burn/lock method calls
     pub fn set_ramp_authority(ctx: Context<SetConfig>, new_authority: Pubkey) -> Result<()> {
         require!(
             new_authority != Pubkey::zeroed(),
@@ -77,9 +78,26 @@ pub mod token_pool {
 
         let old_authority = ctx.accounts.config.ramp_authority;
         ctx.accounts.config.ramp_authority = new_authority;
-        emit!(RouterUpdated {
+        emit!(RampAuthorityUpdated {
             old_authority,
             new_authority
+        });
+        Ok(())
+    }
+
+    // set_router changes the router program ID. This is used to derive the list
+    // of valid mint/release callers (offramps).
+    pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
+        require!(
+            new_router != Pubkey::zeroed(),
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let old_router = ctx.accounts.config.ccip_router;
+        ctx.accounts.config.ccip_router = new_router;
+        emit!(RouterUpdated {
+            old_router,
+            new_router
         });
         Ok(())
     }
@@ -507,7 +525,9 @@ pub struct Config {
     // ownership
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-    ramp_authority: Pubkey, // signer for CCIP calls
+
+    ramp_authority: Pubkey,
+    ccip_router: Pubkey,
 }
 
 #[account]

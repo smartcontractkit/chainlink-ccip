@@ -227,6 +227,7 @@ func TestCCIPRouter(t *testing.T) {
 			ixInit0, err := token_pool.NewInitializeInstruction(
 				token_pool.BurnAndMint_PoolType,
 				config.ExternalTokenPoolsSignerPDA,
+				config.CcipRouterProgram,
 				token0.PoolConfig,
 				token0.Mint.PublicKey(),
 				token0.PoolSigner,
@@ -238,6 +239,7 @@ func TestCCIPRouter(t *testing.T) {
 			ixInit1, err := token_pool.NewInitializeInstruction(
 				token_pool.BurnAndMint_PoolType,
 				config.ExternalTokenPoolsSignerPDA,
+				config.CcipRouterProgram,
 				token1.PoolConfig,
 				token1.Mint.PublicKey(),
 				token1.PoolSigner,

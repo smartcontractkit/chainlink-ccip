@@ -41,6 +41,10 @@
         {
           "name": "rampAuthority",
           "type": "publicKey"
+        },
+        {
+          "name": "ccipRouter",
+          "type": "publicKey"
         }
       ]
     },
@@ -98,6 +102,27 @@
       "args": [
         {
           "name": "newAuthority",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setRouter",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newRouter",
           "type": "publicKey"
         }
       ]
@@ -318,6 +343,15 @@
           "isSigner": true
         },
         {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
+        },
+        {
           "name": "config",
           "isMut": true,
           "isSigner": false
@@ -463,6 +497,10 @@
           },
           {
             "name": "rampAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "ccipRouter",
             "type": "publicKey"
           }
         ]
@@ -897,7 +935,7 @@
       ]
     },
     {
-      "name": "RouterUpdated",
+      "name": "RampAuthorityUpdated",
       "fields": [
         {
           "name": "oldAuthority",
@@ -906,6 +944,21 @@
         },
         {
           "name": "newAuthority",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "RouterUpdated",
+      "fields": [
+        {
+          "name": "oldRouter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "newRouter",
           "type": "publicKey",
           "index": false
         }

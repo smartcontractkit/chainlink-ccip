@@ -19,6 +19,7 @@ type Config struct {
 	Owner            ag_solanago.PublicKey
 	ProposedOwner    ag_solanago.PublicKey
 	RampAuthority    ag_solanago.PublicKey
+	CcipRouter       ag_solanago.PublicKey
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -76,6 +77,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `RampAuthority` param:
 	err = encoder.Encode(obj.RampAuthority)
+	if err != nil {
+		return err
+	}
+	// Serialize `CcipRouter` param:
+	err = encoder.Encode(obj.CcipRouter)
 	if err != nil {
 		return err
 	}
@@ -143,6 +149,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `RampAuthority`:
 	err = decoder.Decode(&obj.RampAuthority)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CcipRouter`:
+	err = decoder.Decode(&obj.CcipRouter)
 	if err != nil {
 		return err
 	}
