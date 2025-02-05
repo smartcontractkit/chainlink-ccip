@@ -39,6 +39,7 @@ var (
 	// router/onramp PDAs
 	// example programs
 	CcipBaseReceiver = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+	CcipBaseSender   = solana.MustPublicKeyFromBase58("CcipSender111111111111111111111111111111111")
 
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	RouterStatePDA, _, _                     = state.FindStatePDA(CcipRouterProgram)

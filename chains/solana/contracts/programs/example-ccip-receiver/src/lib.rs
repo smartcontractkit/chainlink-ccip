@@ -147,6 +147,10 @@ pub struct CcipReceive<'info> {
         bump,
     )]
     pub approved_sender: Account<'info, ApprovedSender>, // if PDA does not exist, the message sender and/or source chain are not approved
+    #[account(
+        seeds = [b"state"],
+        bump,
+    )]
     pub state: Account<'info, BaseState>,
 }
 
