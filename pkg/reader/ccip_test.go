@@ -390,37 +390,6 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	require.ErrorIs(t, err, expectedErr)
 }
 
-func addDestinationContractAssertions(
-	extended *reader_mocks.MockExtended,
-	destNonceMgr, destRMNRemote, destFeeQuoter []byte,
-) {
-	// mock the call to get the nonce manager
-	extended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetStaticConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*offRampStaticChainConfig)
-		v.NonceManager = destNonceMgr
-		v.RmnRemote = destRMNRemote
-	}))
-	// mock the call to get the fee quoter
-	extended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetDynamicConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*offRampDynamicChainConfig)
-		v.FeeQuoter = destFeeQuoter
-	}))
-}
-
 // The round1 version returns NoBindingFound errors for onramp contracts to simulate
 // the two-phase approach to discovering those contracts.
 func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
