@@ -124,11 +124,3 @@ func validateReaderExistence(
 	}
 	return nil
 }
-
-// Helper function to handle type assertions
-func assertAndAssignConfig[T any](val interface{}, errMsg string) (*T, error) {
-	if typed, ok := val.(*T); ok {
-		return typed, nil
-	}
-	return nil, fmt.Errorf(errMsg, val)
-}

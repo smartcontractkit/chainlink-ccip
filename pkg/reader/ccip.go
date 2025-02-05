@@ -36,35 +36,6 @@ import (
 // Default refresh period for cache if not specified
 const defaultRefreshPeriod = 30 * time.Second
 
-// ChainConfigSnapshot represents the complete configuration state of the chain
-type ChainConfigSnapshot struct {
-	Offramp   OfframpConfig
-	RMNProxy  RMNProxyConfig
-	RMNRemote RMNRemoteConfig
-	FeeQuoter FeeQuoterConfig
-}
-
-type FeeQuoterConfig struct {
-	StaticConfig feeQuoterStaticConfig
-}
-
-type RMNRemoteConfig struct {
-	DigestHeader    rmnDigestHeader
-	VersionedConfig versionedConfig
-}
-
-type OfframpConfig struct {
-	CommitLatestOCRConfig OCRConfigResponse
-	ExecLatestOCRConfig   OCRConfigResponse
-	StaticConfig          offRampStaticChainConfig
-	DynamicConfig         offRampDynamicChainConfig
-	SelectorsAndConf      selectorsAndConfigs
-}
-
-type RMNProxyConfig struct {
-	RemoteAddress []byte
-}
-
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
 // can be generated.
 type ccipChainReader struct {
@@ -74,7 +45,7 @@ type ccipChainReader struct {
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
 	extraDataCodec  cciptypes.ExtraDataCodec
-	cache           *configCache
+	cache           ConfigCache
 }
 
 func newCCIPChainReaderInternal(
@@ -98,8 +69,10 @@ func newCCIPChainReaderInternal(
 		destChain:       destChain,
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
 		extraDataCodec:  extraDataCodec,
-		cache:           newConfigCache(defaultRefreshPeriod),
 	}
+
+	// Initialize cache with readers
+	reader.cache = newConfigCache(lggr, crs, defaultRefreshPeriod)
 
 	contracts := ContractAddresses{
 		consts.ContractNameOffRamp: {
@@ -171,289 +144,6 @@ type ConfigInfo struct {
 	F                              uint8
 	N                              uint8
 	IsSignatureVerificationEnabled bool
-}
-
-// ---------------------------------------------------
-
-// prepareBatchRequests creates the batch request for all configurations
-func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
-	var (
-		commitLatestOCRConfig OCRConfigResponse
-		execLatestOCRConfig   OCRConfigResponse
-		staticConfig          offRampStaticChainConfig
-		dynamicConfig         offRampDynamicChainConfig
-		selectorsAndConf      selectorsAndConfigs
-		rmnRemoteAddress      []byte
-		rmnDigestHeader       rmnDigestHeader
-		rmnVersionConfig      versionedConfig
-		feeQuoterConfig       feeQuoterStaticConfig
-	)
-
-	return contractreader.ExtendedBatchGetLatestValuesRequest{
-		consts.ContractNameOffRamp: {
-			{
-				ReadName: consts.MethodNameOffRampLatestConfigDetails,
-				Params: map[string]any{
-					"ocrPluginType": consts.PluginTypeCommit,
-				},
-				ReturnVal: &commitLatestOCRConfig,
-			},
-			{
-				ReadName: consts.MethodNameOffRampLatestConfigDetails,
-				Params: map[string]any{
-					"ocrPluginType": consts.PluginTypeExecute,
-				},
-				ReturnVal: &execLatestOCRConfig,
-			},
-			{
-				ReadName:  consts.MethodNameOffRampGetStaticConfig,
-				Params:    map[string]any{},
-				ReturnVal: &staticConfig,
-			},
-			{
-				ReadName:  consts.MethodNameOffRampGetDynamicConfig,
-				Params:    map[string]any{},
-				ReturnVal: &dynamicConfig,
-			},
-			{
-				ReadName:  consts.MethodNameOffRampGetAllSourceChainConfigs,
-				Params:    map[string]any{},
-				ReturnVal: &selectorsAndConf,
-			},
-		},
-		consts.ContractNameRMNProxy: {{
-			ReadName:  consts.MethodNameGetARM,
-			Params:    map[string]any{},
-			ReturnVal: &rmnRemoteAddress,
-		}},
-		consts.ContractNameRMNRemote: {
-			{
-				ReadName:  consts.MethodNameGetReportDigestHeader,
-				Params:    map[string]any{},
-				ReturnVal: &rmnDigestHeader,
-			},
-			{
-				ReadName:  consts.MethodNameGetVersionedConfig,
-				Params:    map[string]any{},
-				ReturnVal: &rmnVersionConfig,
-			},
-		},
-		consts.ContractNameFeeQuoter: {{
-			ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
-			Params:    map[string]any{},
-			ReturnVal: &feeQuoterConfig,
-		}},
-	}
-}
-
-// fetchChainConfig fetches the latest configuration for a specific chain
-func (r *ccipChainReader) fetchChainConfig(
-	ctx context.Context,
-	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
-	reader, exists := r.contractReaders[chainSel]
-	if !exists {
-		return ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
-	}
-
-	requests := r.prepareBatchRequests()
-	batchResult, skipped, err := reader.ExtendedBatchGetLatestValues(ctx, requests, true)
-	if err != nil {
-		return ChainConfigSnapshot{}, fmt.Errorf("batch get latest values for chain %d: %w", chainSel, err)
-	}
-
-	if len(skipped) > 0 {
-		r.lggr.Infow("some contracts were skipped due to no bindings",
-			"chain", chainSel,
-			"contracts", skipped)
-	}
-
-	return r.updateFromResults(batchResult)
-}
-
-func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error) {
-	config := ChainConfigSnapshot{}
-
-	for contract, results := range batchResult {
-		var err error
-		switch contract.Name {
-		case consts.ContractNameOffRamp:
-			config.Offramp, err = r.processOfframpResults(results)
-			if err != nil {
-				return ChainConfigSnapshot{}, fmt.Errorf("process offramp results: %w", err)
-			}
-
-		case consts.ContractNameRMNProxy:
-			config.RMNProxy, err = r.processRMNProxyResults(results)
-			if err != nil {
-				return ChainConfigSnapshot{}, fmt.Errorf("process RMN proxy results: %w", err)
-			}
-
-		case consts.ContractNameRMNRemote:
-			config.RMNRemote, err = r.processRMNRemoteResults(results)
-			if err != nil {
-				return ChainConfigSnapshot{}, fmt.Errorf("process RMN remote results: %w", err)
-			}
-
-		case consts.ContractNameFeeQuoter:
-			config.FeeQuoter, err = r.processFeeQuoterResults(results)
-			if err != nil {
-				return ChainConfigSnapshot{}, fmt.Errorf("process fee quoter results: %w", err)
-			}
-
-		default:
-			r.lggr.Warnw("Unhandled contract in batch results", "contract", contract.Name)
-		}
-	}
-
-	return config, nil
-}
-
-// resultProcessor defines a function type for processing individual results
-type resultProcessor func(interface{}) error
-
-func (r *ccipChainReader) processOfframpResults(
-	results []types.BatchReadResult) (OfframpConfig, error) {
-
-	if len(results) != 5 {
-		return OfframpConfig{}, fmt.Errorf("expected 5 offramp results, got %d", len(results))
-	}
-
-	config := OfframpConfig{}
-
-	// Define processors for each expected result
-	processors := []resultProcessor{
-		// CommitLatestOCRConfig
-		func(val interface{}) error {
-			typed, ok := val.(*OCRConfigResponse)
-			if !ok {
-				return fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
-			}
-			config.CommitLatestOCRConfig = *typed
-			return nil
-		},
-		// ExecLatestOCRConfig
-		func(val interface{}) error {
-			typed, ok := val.(*OCRConfigResponse)
-			if !ok {
-				return fmt.Errorf("invalid type for ExecLatestOCRConfig: %T", val)
-			}
-			config.ExecLatestOCRConfig = *typed
-			return nil
-		},
-		// StaticConfig
-		func(val interface{}) error {
-			typed, ok := val.(*offRampStaticChainConfig)
-			if !ok {
-				return fmt.Errorf("invalid type for StaticConfig: %T", val)
-			}
-			config.StaticConfig = *typed
-			return nil
-		},
-		// DynamicConfig
-		func(val interface{}) error {
-			typed, ok := val.(*offRampDynamicChainConfig)
-			if !ok {
-				return fmt.Errorf("invalid type for DynamicConfig: %T", val)
-			}
-			config.DynamicConfig = *typed
-			return nil
-		},
-		// SelectorsAndConf
-		func(val interface{}) error {
-			typed, ok := val.(*selectorsAndConfigs)
-			if !ok {
-				return fmt.Errorf("invalid type for SelectorsAndConf: %T", val)
-			}
-			config.SelectorsAndConf = *typed
-			return nil
-		},
-	}
-
-	// Process each result with its corresponding processor
-	for i, result := range results {
-		val, err := result.GetResult()
-		if err != nil {
-			return OfframpConfig{}, fmt.Errorf("get offramp result %d: %w", i, err)
-		}
-
-		if err := processors[i](val); err != nil {
-			return OfframpConfig{}, fmt.Errorf("process result %d: %w", i, err)
-		}
-	}
-
-	return config, nil
-}
-
-func (r *ccipChainReader) processRMNProxyResults(results []types.BatchReadResult) (RMNProxyConfig, error) {
-	if len(results) != 1 {
-		return RMNProxyConfig{}, fmt.Errorf("expected 1 RMN proxy result, got %d", len(results))
-	}
-
-	val, err := results[0].GetResult()
-	if err != nil {
-		return RMNProxyConfig{}, fmt.Errorf("get RMN proxy result: %w", err)
-	}
-
-	if bytes, ok := val.(*[]byte); ok {
-		return RMNProxyConfig{
-			RemoteAddress: *bytes,
-		}, nil
-	}
-
-	return RMNProxyConfig{}, fmt.Errorf("invalid type for RMN proxy remote address: %T", val)
-}
-
-func (r *ccipChainReader) processRMNRemoteResults(results []types.BatchReadResult) (RMNRemoteConfig, error) {
-	config := RMNRemoteConfig{}
-
-	if len(results) != 2 {
-		return RMNRemoteConfig{}, fmt.Errorf("expected 2 RMN remote results, got %d", len(results))
-	}
-
-	// Process DigestHeader
-	val, err := results[0].GetResult()
-	if err != nil {
-		return RMNRemoteConfig{}, fmt.Errorf("get RMN remote digest header result: %w", err)
-	}
-
-	typed, ok := val.(*rmnDigestHeader)
-	if !ok {
-		return RMNRemoteConfig{}, fmt.Errorf("invalid type for RMN remote digest header: %T", val)
-	}
-	config.DigestHeader = *typed
-
-	// Process VersionedConfig
-	val, err = results[1].GetResult()
-	if err != nil {
-		return RMNRemoteConfig{}, fmt.Errorf("get RMN remote versioned config result: %w", err)
-	}
-
-	vconf, ok := val.(*versionedConfig)
-	if !ok {
-		return RMNRemoteConfig{}, fmt.Errorf("invalid type for RMN remote versioned config: %T", val)
-	}
-	config.VersionedConfig = *vconf
-
-	return config, nil
-}
-
-func (r *ccipChainReader) processFeeQuoterResults(results []types.BatchReadResult) (FeeQuoterConfig, error) {
-	if len(results) != 1 {
-		return FeeQuoterConfig{}, fmt.Errorf("expected 1 fee quoter result, got %d", len(results))
-	}
-
-	val, err := results[0].GetResult()
-	if err != nil {
-		return FeeQuoterConfig{}, fmt.Errorf("get fee quoter result: %w", err)
-	}
-
-	if typed, ok := val.(*feeQuoterStaticConfig); ok {
-		return FeeQuoterConfig{
-			StaticConfig: *typed,
-		}, nil
-	}
-
-	return FeeQuoterConfig{}, fmt.Errorf("invalid type for fee quoter static config: %T", val)
 }
 
 // ---------------------------------------------------
@@ -1065,7 +755,7 @@ func (r *ccipChainReader) buildSigners(signers []signer) []rmntypes.RemoteSigner
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	config, err := r.getChainConfig(ctx, r.destChain)
+	config, err := r.cache.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)
 	}
@@ -1163,8 +853,10 @@ func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
 func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
 ) (ContractAddresses, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+
 	// Get from cache
-	config, err := r.getChainConfig(ctx, r.destChain)
+	config, err := r.cache.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return nil, fmt.Errorf("get chain config: %w", err)
 	}
@@ -1180,16 +872,32 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 		resp = resp.Append(consts.ContractNameOnRamp, cciptypes.ChainSelector(chainSel), cfg.OnRamp)
 		if len(resp[consts.ContractNameRouter][r.destChain]) == 0 {
+			lggr.Infow("appending router contract address",
+				"address", hex.EncodeToString(cfg.Router),
+				"chain", r.destChain)
 			resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
 		}
 	}
 
 	// Add static config contracts
-	resp = resp.Append(consts.ContractNameNonceManager, r.destChain, config.Offramp.StaticConfig.NonceManager)
-	resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, config.Offramp.StaticConfig.RmnRemote)
+	if len(config.Offramp.StaticConfig.RmnRemote) > 0 {
+		lggr.Infow("appending RMN remote contract address",
+			"address", hex.EncodeToString(config.Offramp.StaticConfig.RmnRemote),
+			"chain", r.destChain)
+		resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, config.Offramp.StaticConfig.RmnRemote)
+	}
+
+	if len(config.Offramp.StaticConfig.NonceManager) > 0 {
+		resp = resp.Append(consts.ContractNameNonceManager, r.destChain, config.Offramp.StaticConfig.NonceManager)
+	}
 
 	// Add dynamic config contracts
-	resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, config.Offramp.DynamicConfig.FeeQuoter)
+	if len(config.Offramp.DynamicConfig.FeeQuoter) > 0 {
+		lggr.Infow("appending fee quoter contract address",
+			"address", hex.EncodeToString(config.Offramp.DynamicConfig.FeeQuoter),
+			"chain", r.destChain)
+		resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, config.Offramp.DynamicConfig.FeeQuoter)
+	}
 
 	return resp, nil
 }
@@ -1327,7 +1035,7 @@ type feeQuoterStaticConfig struct {
 // getDestFeeQuoterStaticConfig returns the destination chain's Fee Quoter's StaticConfig
 func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (feeQuoterStaticConfig, error) {
 	// Get from cache
-	config, err := r.getChainConfig(ctx, r.destChain)
+	config, err := r.cache.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return feeQuoterStaticConfig{}, fmt.Errorf("get chain config: %w", err)
 	}
@@ -1674,7 +1382,7 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	}
 
 	// Get the address from cache instead of making a contract call
-	config, err := r.getChainConfig(ctx, chain)
+	config, err := r.cache.GetChainConfig(ctx, chain)
 	if err != nil {
 		return nil, fmt.Errorf("get chain config: %w", err)
 	}
@@ -1773,7 +1481,7 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 }
 
 func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
-	config, err := r.getChainConfig(ctx, r.destChain)
+	config, err := r.cache.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("get chain config: %w", err)
 	}
