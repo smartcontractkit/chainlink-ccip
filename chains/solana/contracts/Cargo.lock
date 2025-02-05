@@ -653,6 +653,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ccip_offramp"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "ethnum",
+ "fee_quoter",
+ "hex",
+ "solana-program",
+]
+
+[[package]]
 name = "ccip_router"
 version = "0.1.0-dev"
 dependencies = [

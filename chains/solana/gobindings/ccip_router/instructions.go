@@ -92,27 +92,6 @@ var (
 	// * `dest_chain_config` - The configuration for the chain as destination.
 	Instruction_AddChainSelector = ag_binary.TypeID([8]byte{28, 60, 171, 0, 195, 113, 56, 7})
 
-	// Disables the source chain selector.
-	//
-	// The Admin is the only one able to disable the chain selector as source. This method is thought of as an emergency kill-switch.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for disabling the chain selector.
-	// * `source_chain_selector` - The source chain selector to be disabled.
-	Instruction_DisableSourceChainSelector = ag_binary.TypeID([8]byte{58, 101, 54, 252, 248, 31, 226, 121})
-
-	// Updates the configuration of the source chain selector.
-	//
-	// The Admin is the only one able to update the source chain config.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the chain selector.
-	// * `source_chain_selector` - The source chain selector to be updated.
-	// * `source_chain_config` - The new configuration for the source chain.
-	Instruction_UpdateSourceChainConfig = ag_binary.TypeID([8]byte{52, 85, 37, 124, 209, 140, 181, 104})
-
 	// Updates the configuration of the destination chain selector.
 	//
 	// The Admin is the only one able to update the destination chain config.
@@ -133,29 +112,6 @@ var (
 	// * `ctx` - The context containing the accounts required for updating the configuration.
 	// * `new_chain_selector` - The new chain selector for SVM.
 	Instruction_UpdateSvmChainSelector = ag_binary.TypeID([8]byte{164, 212, 71, 101, 166, 113, 26, 93})
-
-	// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
-	//
-	// This is part of the OffRamp Configuration for SVM.
-	// The Admin is the only one able to update this config.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `new_enable_manual_execution_after` - The new minimum amount of time required.
-	Instruction_UpdateEnableManualExecutionAfter = ag_binary.TypeID([8]byte{157, 236, 73, 92, 84, 197, 152, 105})
-
-	// Sets the OCR configuration.
-	// Only CCIP Admin can set the OCR configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for setting the OCR configuration.
-	// * `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].
-	// * `config_info` - The OCR configuration information.
-	// * `signers` - The list of signers.
-	// * `transmitters` - The list of transmitters.
-	Instruction_SetOcrConfig = ag_binary.TypeID([8]byte{4, 131, 107, 110, 250, 158, 244, 200})
 
 	// Token Admin Registry //
 	// Registers the Token Admin Registry via the CCIP Admin
@@ -251,66 +207,6 @@ var (
 	// * `dest_chain_selector` - The chain selector for the destination chain.
 	// * `message` - The message to be sent. The size limit of data is 256 bytes.
 	Instruction_CcipSend = ag_binary.TypeID([8]byte{108, 216, 134, 191, 249, 234, 33, 84})
-
-	// Off Ramp Flow //
-	// Commits a report to the router.
-	//
-	// The method name needs to be commit with Anchor encoding.
-	//
-	// This function is called by the OffChain when committing one Report to the SVM Router.
-	// In this Flow only one report is sent, the Commit Report. This is different as EVM does,
-	// this is because here all the chain state is stored in one account per Merkle Tree Root.
-	// So, to avoid having to send a dynamic size array of accounts, in this message only one Commit Report Account is sent.
-	// This message validates the signatures of the report and stores the Merkle Root in the Commit Report Account.
-	// The Report must contain an interval of messages, and the min of them must be the next sequence number expected.
-	// The max size of the interval is 64.
-	// This message emits two events: CommitReportAccepted and Transmitted.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for the commit.
-	// * `report_context_byte_words` - consists of:
-	// * report_context_byte_words[0]: ConfigDigest
-	// * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-	// * `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates
-	// * `rs` - slice of R components of signatures
-	// * `ss` - slice of S components of signatures
-	// * `raw_vs` - array of V components of signatures
-	Instruction_Commit = ag_binary.TypeID([8]byte{223, 140, 142, 165, 229, 208, 156, 74})
-
-	// Executes a message on the destination chain.
-	//
-	// The method name needs to be execute with Anchor encoding.
-	//
-	// This function is called by the OffChain when executing one Report to the SVM Router.
-	// In this Flow only one message is sent, the Execution Report. This is different as EVM does,
-	// this is because there is no try/catch mechanism to allow batch execution.
-	// This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.
-	// The message must be untouched to be executed.
-	// This message emits the event ExecutionStateChanged with the new state of the message.
-	// Finally, executes the CPI instruction to the receiver program in the ccip_receive message.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for the execute.
-	// * `raw_execution_report` - the serialized execution report containing only one message and proofs
-	// * `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)
-	// *  consists of:
-	// * report_context_byte_words[0]: ConfigDigest
-	// * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-	Instruction_Execute = ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
-
-	// Manually executes a report to the router.
-	//
-	// When a message is not being executed, then the user can trigger the execution manually.
-	// No verification over the transmitter, but the message needs to be in some commit report.
-	// It validates that the required time has passed since the commit and then executes the report.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for the execution.
-	// * `raw_execution_report` - The serialized execution report containing the message and proofs.
-	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -326,18 +222,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateFeeAggregator"
 	case Instruction_AddChainSelector:
 		return "AddChainSelector"
-	case Instruction_DisableSourceChainSelector:
-		return "DisableSourceChainSelector"
-	case Instruction_UpdateSourceChainConfig:
-		return "UpdateSourceChainConfig"
 	case Instruction_UpdateDestChainConfig:
 		return "UpdateDestChainConfig"
 	case Instruction_UpdateSvmChainSelector:
 		return "UpdateSvmChainSelector"
-	case Instruction_UpdateEnableManualExecutionAfter:
-		return "UpdateEnableManualExecutionAfter"
-	case Instruction_SetOcrConfig:
-		return "SetOcrConfig"
 	case Instruction_CcipAdminProposeAdministrator:
 		return "CcipAdminProposeAdministrator"
 	case Instruction_CcipAdminOverridePendingAdministrator:
@@ -356,12 +244,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
 		return "CcipSend"
-	case Instruction_Commit:
-		return "Commit"
-	case Instruction_Execute:
-		return "Execute"
-	case Instruction_ManuallyExecute:
-		return "ManuallyExecute"
 	default:
 		return ""
 	}
@@ -398,22 +280,10 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"add_chain_selector", (*AddChainSelector)(nil),
 		},
 		{
-			"disable_source_chain_selector", (*DisableSourceChainSelector)(nil),
-		},
-		{
-			"update_source_chain_config", (*UpdateSourceChainConfig)(nil),
-		},
-		{
 			"update_dest_chain_config", (*UpdateDestChainConfig)(nil),
 		},
 		{
 			"update_svm_chain_selector", (*UpdateSvmChainSelector)(nil),
-		},
-		{
-			"update_enable_manual_execution_after", (*UpdateEnableManualExecutionAfter)(nil),
-		},
-		{
-			"set_ocr_config", (*SetOcrConfig)(nil),
 		},
 		{
 			"ccip_admin_propose_administrator", (*CcipAdminProposeAdministrator)(nil),
@@ -441,15 +311,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"ccip_send", (*CcipSend)(nil),
-		},
-		{
-			"commit", (*Commit)(nil),
-		},
-		{
-			"execute", (*Execute)(nil),
-		},
-		{
-			"manually_execute", (*ManuallyExecute)(nil),
 		},
 	},
 )

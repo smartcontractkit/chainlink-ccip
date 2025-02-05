@@ -25,6 +25,7 @@ wallet = "id.json"
 [programs.localnet]
 access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
 ccip_router = "C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"
+ccip_offramp = "offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5"
 mcm = "6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX"
 timelock = "LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn"
 fee_quoter = "FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw"

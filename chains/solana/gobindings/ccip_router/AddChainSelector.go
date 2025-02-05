@@ -23,28 +23,23 @@ import (
 // * `source_chain_config` - The configuration for the chain as source.
 // * `dest_chain_config` - The configuration for the chain as destination.
 type AddChainSelector struct {
-	NewChainSelector  *uint64
-	SourceChainConfig *SourceChainConfig
-	DestChainConfig   *DestChainConfig
+	NewChainSelector *uint64
+	DestChainConfig  *DestChainConfig
 
-	// [0] = [WRITE] sourceChainState
-	// ··········· Adding a chain selector implies initializing the state for a new chain,
-	// ··········· hence the need to initialize two accounts.
+	// [0] = [WRITE] destChainState
 	//
-	// [1] = [WRITE] destChainState
+	// [1] = [] config
 	//
-	// [2] = [] config
+	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [WRITE, SIGNER] authority
-	//
-	// [4] = [] systemProgram
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewAddChainSelectorInstructionBuilder creates a new `AddChainSelector` instruction builder.
 func NewAddChainSelectorInstructionBuilder() *AddChainSelector {
 	nd := &AddChainSelector{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -55,75 +50,54 @@ func (inst *AddChainSelector) SetNewChainSelector(newChainSelector uint64) *AddC
 	return inst
 }
 
-// SetSourceChainConfig sets the "sourceChainConfig" parameter.
-func (inst *AddChainSelector) SetSourceChainConfig(sourceChainConfig SourceChainConfig) *AddChainSelector {
-	inst.SourceChainConfig = &sourceChainConfig
-	return inst
-}
-
 // SetDestChainConfig sets the "destChainConfig" parameter.
 func (inst *AddChainSelector) SetDestChainConfig(destChainConfig DestChainConfig) *AddChainSelector {
 	inst.DestChainConfig = &destChainConfig
 	return inst
 }
 
-// SetSourceChainStateAccount sets the "sourceChainState" account.
-// Adding a chain selector implies initializing the state for a new chain,
-// hence the need to initialize two accounts.
-func (inst *AddChainSelector) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChainState).WRITE()
-	return inst
-}
-
-// GetSourceChainStateAccount gets the "sourceChainState" account.
-// Adding a chain selector implies initializing the state for a new chain,
-// hence the need to initialize two accounts.
-func (inst *AddChainSelector) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
 // SetDestChainStateAccount sets the "destChainState" account.
 func (inst *AddChainSelector) SetDestChainStateAccount(destChainState ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(destChainState).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(destChainState).WRITE()
 	return inst
 }
 
 // GetDestChainStateAccount gets the "destChainState" account.
 func (inst *AddChainSelector) GetDestChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[0]
 }
 
 // SetConfigAccount sets the "config" account.
 func (inst *AddChainSelector) SetConfigAccount(config ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(config)
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
 func (inst *AddChainSelector) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *AddChainSelector) SetAuthorityAccount(authority ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AddChainSelector) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *AddChainSelector) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *AddChainSelector) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst AddChainSelector) Build() *Instruction {
@@ -149,9 +123,6 @@ func (inst *AddChainSelector) Validate() error {
 		if inst.NewChainSelector == nil {
 			return errors.New("NewChainSelector parameter is not set")
 		}
-		if inst.SourceChainConfig == nil {
-			return errors.New("SourceChainConfig parameter is not set")
-		}
 		if inst.DestChainConfig == nil {
 			return errors.New("DestChainConfig parameter is not set")
 		}
@@ -160,18 +131,15 @@ func (inst *AddChainSelector) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.SourceChainState is not set")
-		}
-		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.DestChainState is not set")
 		}
-		if inst.AccountMetaSlice[2] == nil {
+		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Config is not set")
 		}
-		if inst.AccountMetaSlice[3] == nil {
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
-		if inst.AccountMetaSlice[4] == nil {
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -187,19 +155,17 @@ func (inst *AddChainSelector) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param(" NewChainSelector", *inst.NewChainSelector))
-						paramsBranch.Child(ag_format.Param("SourceChainConfig", *inst.SourceChainConfig))
-						paramsBranch.Child(ag_format.Param("  DestChainConfig", *inst.DestChainConfig))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("NewChainSelector", *inst.NewChainSelector))
+						paramsBranch.Child(ag_format.Param(" DestChainConfig", *inst.DestChainConfig))
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("sourceChainState", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("  destChainState", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("   systemProgram", inst.AccountMetaSlice[4]))
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("destChainState", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta(" systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -208,11 +174,6 @@ func (inst *AddChainSelector) EncodeToTree(parent ag_treeout.Branches) {
 func (obj AddChainSelector) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `NewChainSelector` param:
 	err = encoder.Encode(obj.NewChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `SourceChainConfig` param:
-	err = encoder.Encode(obj.SourceChainConfig)
 	if err != nil {
 		return err
 	}
@@ -229,11 +190,6 @@ func (obj *AddChainSelector) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	if err != nil {
 		return err
 	}
-	// Deserialize `SourceChainConfig`:
-	err = decoder.Decode(&obj.SourceChainConfig)
-	if err != nil {
-		return err
-	}
 	// Deserialize `DestChainConfig`:
 	err = decoder.Decode(&obj.DestChainConfig)
 	if err != nil {
@@ -246,19 +202,15 @@ func (obj *AddChainSelector) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 func NewAddChainSelectorInstruction(
 	// Parameters:
 	newChainSelector uint64,
-	sourceChainConfig SourceChainConfig,
 	destChainConfig DestChainConfig,
 	// Accounts:
-	sourceChainState ag_solanago.PublicKey,
 	destChainState ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AddChainSelector {
 	return NewAddChainSelectorInstructionBuilder().
 		SetNewChainSelector(newChainSelector).
-		SetSourceChainConfig(sourceChainConfig).
 		SetDestChainConfig(destChainConfig).
-		SetSourceChainStateAccount(sourceChainState).
 		SetDestChainStateAccount(destChainState).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).

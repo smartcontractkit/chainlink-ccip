@@ -4,7 +4,6 @@ use anchor_spl::token_interface;
 use fee_quoter::messages::TokenTransferAdditionalData;
 
 use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
-use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token,
@@ -217,6 +216,8 @@ pub fn ccip_send<'info>(
 
 mod helpers {
     use super::*;
+
+    pub const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
 
     pub(super) fn token_transfer(
         lock_or_burn_out_data: LockOrBurnOutV1,

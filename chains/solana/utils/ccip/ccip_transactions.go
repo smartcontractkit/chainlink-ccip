@@ -7,7 +7,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 )
 
@@ -17,7 +17,7 @@ type Signatures struct {
 	RawVs [32]byte
 }
 
-func SignCommitReport(ctx [2][32]byte, report ccip_router.CommitInput, baseSigners []eth.Signer) (sigs Signatures, err error) {
+func SignCommitReport(ctx [2][32]byte, report ccip_offramp.CommitInput, baseSigners []eth.Signer) (sigs Signatures, err error) {
 	hash, err := HashCommitReport(ctx, report)
 	if err != nil {
 		return Signatures{}, err

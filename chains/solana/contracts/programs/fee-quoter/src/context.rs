@@ -296,7 +296,7 @@ pub struct UpdatePrices<'info> {
     pub config: Account<'info, Config>,
 
     // Only the offramp can update prices
-    #[account(address = config.offramp_signer @ FeeQuoterError::Unauthorized)]
+    #[account(address = config.offramp_signer @ FeeQuoterError::Unauthorized)] // TODO change
     pub authority: Signer<'info>,
 }
 
