@@ -259,7 +259,7 @@ pub struct WithdrawTokens<'info> {
     )]
     pub to_token_account: InterfaceAccount<'info, TokenAccount>,
     pub mint: InterfaceAccount<'info, Mint>,
-    #[account(address = *mint.to_account_info().owner)]
+    #[account(constraint = token_program.key == mint.to_account_info().owner)]
     /// CHECK: CPI to token program
     pub token_program: AccountInfo<'info>,
     #[account(
