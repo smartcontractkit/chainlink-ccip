@@ -65,42 +65,6 @@ type RMNProxyConfig struct {
 	RemoteAddress []byte
 }
 
-// chainCache represents the cache for a single chain
-type chainCache struct {
-	sync.RWMutex
-	data        ChainConfigSnapshot
-	lastRefresh time.Time
-}
-
-// configCache handles caching of chain configuration data for multiple chains
-type configCache struct {
-	sync.RWMutex
-	chainCaches   map[cciptypes.ChainSelector]*chainCache
-	refreshPeriod time.Duration
-}
-
-// newConfigCache creates a new multi-chain config cache
-func newConfigCache(refreshPeriod time.Duration) *configCache {
-	return &configCache{
-		chainCaches:   make(map[cciptypes.ChainSelector]*chainCache),
-		refreshPeriod: refreshPeriod,
-	}
-}
-
-// getOrCreateChainCache safely gets or creates a cache for a specific chain
-func (c *configCache) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *chainCache {
-	c.Lock()
-	defer c.Unlock()
-
-	if cache, exists := c.chainCaches[chainSel]; exists {
-		return cache
-	}
-
-	cache := &chainCache{}
-	c.chainCaches[chainSel] = cache
-	return cache
-}
-
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
 // can be generated.
 type ccipChainReader struct {
@@ -121,17 +85,10 @@ func newCCIPChainReaderInternal(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	extraDataCodec cciptypes.ExtraDataCodec,
-	refreshPeriod ...time.Duration, // Optional refresh period
 ) *ccipChainReader {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
-	}
-
-	// Use provided refresh period or default
-	period := defaultRefreshPeriod
-	if len(refreshPeriod) > 0 {
-		period = refreshPeriod[0]
 	}
 
 	reader := &ccipChainReader{
@@ -141,7 +98,7 @@ func newCCIPChainReaderInternal(
 		destChain:       destChain,
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
 		extraDataCodec:  extraDataCodec,
-		cache:           newConfigCache(period),
+		cache:           newConfigCache(defaultRefreshPeriod),
 	}
 
 	contracts := ContractAddresses{
@@ -217,66 +174,6 @@ type ConfigInfo struct {
 }
 
 // ---------------------------------------------------
-// The following functions are used for the config cache
-
-// getChainConfig returns the cached chain configuration for a specific chain
-func (r *ccipChainReader) getChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
-	chainCache := r.cache.getOrCreateChainCache(chainSel)
-
-	chainCache.RLock()
-	timeSinceLastRefresh := time.Since(chainCache.lastRefresh)
-	if timeSinceLastRefresh < r.cache.refreshPeriod {
-		defer chainCache.RUnlock()
-		r.lggr.Infow("Cache hit",
-			"chain", chainSel,
-			"timeSinceLastRefresh", timeSinceLastRefresh,
-			"refreshPeriod", r.cache.refreshPeriod)
-		return chainCache.data, nil
-	}
-	chainCache.RUnlock()
-
-	return r.refreshChainCache(ctx, chainSel)
-}
-
-func (r *ccipChainReader) refreshChainCache(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
-	chainCache := r.cache.getOrCreateChainCache(chainSel)
-
-	chainCache.Lock()
-	defer chainCache.Unlock()
-
-	timeSinceLastRefresh := time.Since(chainCache.lastRefresh)
-	if timeSinceLastRefresh < r.cache.refreshPeriod {
-		r.lggr.Infow("Cache was refreshed by another goroutine",
-			"chain", chainSel,
-			"timeSinceLastRefresh", timeSinceLastRefresh)
-		return chainCache.data, nil
-	}
-
-	startTime := time.Now()
-	newData, err := r.fetchChainConfig(ctx, chainSel)
-	refreshDuration := time.Since(startTime)
-
-	if err != nil {
-		if !chainCache.lastRefresh.IsZero() {
-			r.lggr.Warnw("Failed to refresh cache, using old data",
-				"chain", chainSel,
-				"error", err,
-				"lastRefresh", chainCache.lastRefresh,
-				"refreshDuration", refreshDuration)
-			return chainCache.data, nil
-		}
-		r.lggr.Errorw("Failed to refresh cache, no old data available",
-			"chain", chainSel,
-			"error", err,
-			"refreshDuration", refreshDuration)
-		return ChainConfigSnapshot{}, fmt.Errorf("failed to refresh cache for chain %d: %w", chainSel, err)
-	}
-
-	chainCache.data = newData
-	chainCache.lastRefresh = time.Now()
-
-	return newData, nil
-}
 
 // prepareBatchRequests creates the batch request for all configurations
 func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
@@ -350,7 +247,9 @@ func (r *ccipChainReader) prepareBatchRequests() contractreader.ExtendedBatchGet
 }
 
 // fetchChainConfig fetches the latest configuration for a specific chain
-func (r *ccipChainReader) fetchChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
+func (r *ccipChainReader) fetchChainConfig(
+	ctx context.Context,
+	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
 	reader, exists := r.contractReaders[chainSel]
 	if !exists {
 		return ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
@@ -409,54 +308,76 @@ func (r *ccipChainReader) updateFromResults(batchResult types.BatchGetLatestValu
 	return config, nil
 }
 
-func (r *ccipChainReader) processOfframpResults(results []types.BatchReadResult) (OfframpConfig, error) {
-	config := OfframpConfig{}
+// resultProcessor defines a function type for processing individual results
+type resultProcessor func(interface{}) error
+
+func (r *ccipChainReader) processOfframpResults(
+	results []types.BatchReadResult) (OfframpConfig, error) {
 
 	if len(results) != 5 {
 		return OfframpConfig{}, fmt.Errorf("expected 5 offramp results, got %d", len(results))
 	}
 
+	config := OfframpConfig{}
+
+	// Define processors for each expected result
+	processors := []resultProcessor{
+		// CommitLatestOCRConfig
+		func(val interface{}) error {
+			typed, ok := val.(*OCRConfigResponse)
+			if !ok {
+				return fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
+			}
+			config.CommitLatestOCRConfig = *typed
+			return nil
+		},
+		// ExecLatestOCRConfig
+		func(val interface{}) error {
+			typed, ok := val.(*OCRConfigResponse)
+			if !ok {
+				return fmt.Errorf("invalid type for ExecLatestOCRConfig: %T", val)
+			}
+			config.ExecLatestOCRConfig = *typed
+			return nil
+		},
+		// StaticConfig
+		func(val interface{}) error {
+			typed, ok := val.(*offRampStaticChainConfig)
+			if !ok {
+				return fmt.Errorf("invalid type for StaticConfig: %T", val)
+			}
+			config.StaticConfig = *typed
+			return nil
+		},
+		// DynamicConfig
+		func(val interface{}) error {
+			typed, ok := val.(*offRampDynamicChainConfig)
+			if !ok {
+				return fmt.Errorf("invalid type for DynamicConfig: %T", val)
+			}
+			config.DynamicConfig = *typed
+			return nil
+		},
+		// SelectorsAndConf
+		func(val interface{}) error {
+			typed, ok := val.(*selectorsAndConfigs)
+			if !ok {
+				return fmt.Errorf("invalid type for SelectorsAndConf: %T", val)
+			}
+			config.SelectorsAndConf = *typed
+			return nil
+		},
+	}
+
+	// Process each result with its corresponding processor
 	for i, result := range results {
 		val, err := result.GetResult()
 		if err != nil {
 			return OfframpConfig{}, fmt.Errorf("get offramp result %d: %w", i, err)
 		}
 
-		switch i {
-		case 0: // CommitLatestOCRConfig
-			if typed, ok := val.(*OCRConfigResponse); ok {
-				config.CommitLatestOCRConfig = *typed
-			} else {
-				return OfframpConfig{}, fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
-			}
-
-		case 1: // ExecLatestOCRConfig
-			if typed, ok := val.(*OCRConfigResponse); ok {
-				config.ExecLatestOCRConfig = *typed
-			} else {
-				return OfframpConfig{}, fmt.Errorf("invalid type for ExecLatestOCRConfig: %T", val)
-			}
-
-		case 2: // StaticConfig
-			if typed, ok := val.(*offRampStaticChainConfig); ok {
-				config.StaticConfig = *typed
-			} else {
-				return OfframpConfig{}, fmt.Errorf("invalid type for StaticConfig: %T", val)
-			}
-
-		case 3: // DynamicConfig
-			if typed, ok := val.(*offRampDynamicChainConfig); ok {
-				config.DynamicConfig = *typed
-			} else {
-				return OfframpConfig{}, fmt.Errorf("invalid type for DynamicConfig: %T", val)
-			}
-
-		case 4: // SelectorsAndConf
-			if typed, ok := val.(*selectorsAndConfigs); ok {
-				config.SelectorsAndConf = *typed
-			} else {
-				return OfframpConfig{}, fmt.Errorf("invalid type for SelectorsAndConf: %T", val)
-			}
+		if err := processors[i](val); err != nil {
+			return OfframpConfig{}, fmt.Errorf("process result %d: %w", i, err)
 		}
 	}
 
@@ -494,22 +415,24 @@ func (r *ccipChainReader) processRMNRemoteResults(results []types.BatchReadResul
 	if err != nil {
 		return RMNRemoteConfig{}, fmt.Errorf("get RMN remote digest header result: %w", err)
 	}
-	if typed, ok := val.(*rmnDigestHeader); ok {
-		config.DigestHeader = *typed
-	} else {
+
+	typed, ok := val.(*rmnDigestHeader)
+	if !ok {
 		return RMNRemoteConfig{}, fmt.Errorf("invalid type for RMN remote digest header: %T", val)
 	}
+	config.DigestHeader = *typed
 
 	// Process VersionedConfig
 	val, err = results[1].GetResult()
 	if err != nil {
 		return RMNRemoteConfig{}, fmt.Errorf("get RMN remote versioned config result: %w", err)
 	}
-	if typed, ok := val.(*versionedConfig); ok {
-		config.VersionedConfig = *typed
-	} else {
+
+	vconf, ok := val.(*versionedConfig)
+	if !ok {
 		return RMNRemoteConfig{}, fmt.Errorf("invalid type for RMN remote versioned config: %T", val)
 	}
+	config.VersionedConfig = *vconf
 
 	return config, nil
 }
@@ -1551,42 +1474,6 @@ type selectorsAndConfigs struct {
 	SourceChainConfigs []sourceChainConfig `mapstructure:"F1"`
 }
 
-// getAllOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for dest chain
-func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
-	ctx context.Context,
-	lggr logger.Logger,
-) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
-	config, err := r.getChainConfig(ctx, r.destChain)
-	if err != nil {
-		return nil, fmt.Errorf("get chain config: %w", err)
-	}
-
-	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
-
-	if len(config.Offramp.SelectorsAndConf.SourceChainConfigs) != len(config.Offramp.SelectorsAndConf.Selectors) {
-		return nil, fmt.Errorf("selectors and source chain configs length mismatch")
-	}
-
-	// Populate the map
-	for i := range config.Offramp.SelectorsAndConf.Selectors {
-		chainSel := cciptypes.ChainSelector(config.Offramp.SelectorsAndConf.Selectors[i])
-		cfg := config.Offramp.SelectorsAndConf.SourceChainConfigs[i]
-
-		enabled, err := cfg.check()
-		if err != nil {
-			return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
-		}
-		if !enabled {
-			lggr.Debugw("source chain is disabled", "chain", chainSel)
-			continue
-		}
-
-		configs[chainSel] = cfg
-	}
-
-	return configs, nil
-}
-
 // offRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
 // See: <chainlink repo>/contracts/src/v0.8/ccip/offRamp/OffRamp.sol:StaticConfig
 type offRampStaticChainConfig struct {
@@ -1603,32 +1490,6 @@ type offRampDynamicChainConfig struct {
 	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
 	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
 	MessageInterceptor                      []byte `json:"messageInterceptor"`
-}
-
-// getData returns data for a single reader.
-func (r *ccipChainReader) getDestinationData(
-	ctx context.Context,
-	destChain cciptypes.ChainSelector,
-	contract string,
-	method string,
-	returnVal any,
-) error {
-	if err := validateExtendedReaderExistence(r.contractReaders, destChain); err != nil {
-		return err
-	}
-
-	if destChain != r.destChain {
-		return fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChain)
-	}
-
-	return r.contractReaders[destChain].ExtendedGetLatestValue(
-		ctx,
-		contract,
-		method,
-		primitives.Unconfirmed,
-		map[string]any{},
-		returnVal,
-	)
 }
 
 // See DynamicChainConfig in OnRamp.sol
