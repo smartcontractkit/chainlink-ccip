@@ -281,10 +281,11 @@ func (p *Plugin) checkReportCursed(
 	lggr logger.Logger,
 	decodedReport cciptypes.CommitPluginReport,
 ) (bool, error) {
-	sourceChains := slicelib.Map(decodedReport.BlessedMerkleRoots,
-		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector {
-			return r.ChainSel
-		})
+	allRoots := append(decodedReport.BlessedMerkleRoots, decodedReport.UnblessedMerkleRoots...)
+
+	sourceChains := slicelib.Map(allRoots,
+		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector { return r.ChainSel })
+
 	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
 	if err != nil {
 		lggr.Errorw("report not accepted due to curse checking error", "err", err)
