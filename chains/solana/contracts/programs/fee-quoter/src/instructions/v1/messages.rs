@@ -107,15 +107,29 @@ pub fn process_extra_args(
     extra_args: &[u8],
     message_contains_tokens: bool,
 ) -> Result<ProcessedExtraArgs> {
-    require_gte!(extra_args.len(), 4, FeeQuoterError::InvalidInputs);
-
-    let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
-    let mut data = &extra_args[4..];
-
     match u32::from_be_bytes(dest_config.chain_family_selector) {
-        CHAIN_FAMILY_SELECTOR_EVM => parse_and_validate_evm_extra_args(dest_config, tag, &mut data),
+        CHAIN_FAMILY_SELECTOR_EVM => {
+            // Extra args are optional for EVM destination. If the tag
+            // is missing, or the tag is present but there's no further data,
+            // the configured defaults are serialized.
+            let Some(tag) = extra_args.get(..4) else {
+                return Ok(ProcessedExtraArgs::defaults(dest_config));
+            };
+
+            let mut data = &extra_args[4..];
+            parse_and_validate_evm_extra_args(dest_config, tag.try_into().unwrap(), &mut data)
+        }
         CHAIN_FAMILY_SELECTOR_SVM => {
-            parse_and_validate_svm_extra_args(dest_config, tag, &mut data, message_contains_tokens)
+            // Extra args are mandatory for a SVM destination, so the tag must exist.
+            require_gte!(extra_args.len(), 4, FeeQuoterError::InvalidInputs);
+            let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
+            let mut data = &extra_args[4..];
+            Ok(parse_and_validate_svm_extra_args(
+                dest_config,
+                tag,
+                &mut data,
+                message_contains_tokens,
+            )?)
         }
 
         _ => Err(FeeQuoterError::InvalidChainFamilySelector.into()),
@@ -129,16 +143,16 @@ fn parse_and_validate_evm_extra_args(
 ) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(tag) {
         EVM_EXTRA_ARGS_V2_TAG => {
-            let args = if data.is_empty() {
-                EVMExtraArgsV2::default_config(cfg)
+            if data.is_empty() {
+                Ok(ProcessedExtraArgs::defaults(cfg))
             } else {
-                EVMExtraArgsV2::deserialize(data)?
-            };
-            Ok(ProcessedExtraArgs {
-                bytes: args.serialize_with_tag(),
-                gas_limit: args.gas_limit,
-                allow_out_of_order_execution: args.allow_out_of_order_execution,
-            })
+                let args = EVMExtraArgsV2::deserialize(data)?;
+                Ok(ProcessedExtraArgs {
+                    bytes: args.serialize_with_tag(),
+                    gas_limit: args.gas_limit,
+                    allow_out_of_order_execution: args.allow_out_of_order_execution,
+                })
+            }
         }
         _ => Err(FeeQuoterError::InvalidExtraArgsTag.into()),
     }
@@ -339,12 +353,21 @@ pub mod tests {
         );
         assert_eq!(
             process_extra_args(&none_dest_chain.config, &[0; 0], false).unwrap_err(),
-            FeeQuoterError::InvalidInputs.into()
+            FeeQuoterError::InvalidChainFamilySelector.into()
         );
 
         // evm - default case
         let extra_args =
             process_extra_args(&evm_dest_chain.config, &evm_extra_args, false).unwrap();
+        assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(
+            extra_args.gas_limit,
+            evm_dest_chain.config.default_tx_gas_limit as u128
+        );
+        assert!(!extra_args.allow_out_of_order_execution);
+
+        // evm - empty tag (no data)
+        let extra_args = process_extra_args(&evm_dest_chain.config, &[], false).unwrap();
         assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
         assert_eq!(
             extra_args.gas_limit,
@@ -382,6 +405,12 @@ pub mod tests {
             svm_dest_chain.config.default_tx_gas_limit as u128
         );
         assert!(!extra_args.allow_out_of_order_execution);
+
+        // svm - empty tag (no data) fails
+        assert_eq!(
+            process_extra_args(&svm_dest_chain.config, &[], false).unwrap_err(),
+            FeeQuoterError::InvalidInputs.into()
+        );
 
         // svm - contains tokens but no receiver address
         assert_eq!(
