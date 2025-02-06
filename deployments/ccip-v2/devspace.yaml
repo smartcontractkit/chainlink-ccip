@@ -178,6 +178,8 @@ profiles:
             profiles:
               - version-from-env
               - network-generated
+              # Uncomment this to enable overrides from overrides.ccip-v2.yaml file
+              # - overrides-ccip-v2
   - name: load-tests
     patches:
       - op: add
@@ -229,7 +231,7 @@ commands:
     description: Run the ccip v2 pipeline.
     appendArgs: true
   ccip-v2-load-tests-aws:
-    command: devspace run-pipeline ccip-v2 -p load-tests
+    command: devspace run-pipeline ccip-v2 -p load-tests-aws
     description: Run the ccip v2 pipeline.
     appendArgs: true
   ccip-v2-infra:

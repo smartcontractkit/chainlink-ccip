@@ -1,0 +1,8 @@
+---
+# chainlink toml config
+common:
+  chainlink:
+    v2Config:
+      99-override: |
+        [Log]
+        Level = 'debug'

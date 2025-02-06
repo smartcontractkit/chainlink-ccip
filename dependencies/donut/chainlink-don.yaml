@@ -242,6 +242,12 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/overrides.yaml
+  # overrides
+  - name: overrides-ccip-v2
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/overrides.ccip-v2.yaml
   - name: ccip-v2-scripts
     activation:
       - vars:
