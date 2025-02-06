@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
@@ -17,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 )
 
 func Test_Observation_CacheUpdate(t *testing.T) {
@@ -39,6 +40,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 		lggr:                 mocks.NullLogger,
 		homeChain:            homeChain,
 		inflightMessageCache: cache.NewInflightMessageCache(10 * time.Minute),
+		ocrTypeCodec:         jsonOcrTypeCodec,
 	}
 
 	outcome := exectypes.Outcome{
@@ -66,7 +68,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 
 	// No state, report only generated in Filter state so cache is not updated.
 	{
-		enc, err := outcome.Encode()
+		enc, err := plugin.ocrTypeCodec.EncodeOutcome(outcome)
 		require.NoError(t, err)
 
 		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
@@ -84,7 +86,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 	// Filter state, cache is updated.
 	{
 		outcome.State = exectypes.Filter
-		enc, err := outcome.Encode()
+		enc, err := plugin.ocrTypeCodec.EncodeOutcome(outcome)
 		require.NoError(t, err)
 
 		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
@@ -119,6 +121,7 @@ func Test_getMessagesObservation(t *testing.T) {
 		msgHasher:             msgHasher,
 		tokenDataObserver:     &tokenDataObserver,
 		costlyMessageObserver: &costlyMessageObserver,
+		ocrTypeCodec:          jsonOcrTypeCodec,
 	}
 
 	tests := []struct {

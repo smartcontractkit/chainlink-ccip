@@ -32,6 +32,8 @@ import (
 // report.
 //
 // Phase 3: observe nonce for each unique source/sender pair.
+//
+//nolint:gocyclo
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
@@ -42,7 +44,7 @@ func (p *Plugin) Observation(
 	var err error
 	var previousOutcome exectypes.Outcome
 
-	previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
+	previousOutcome, err = p.ocrTypeCodec.DecodeOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
@@ -73,7 +75,7 @@ func (p *Plugin) Observation(
 		if !p.contractsInitialized {
 			lggr.Infow("contracts not initialized, only making discovery observations",
 				"discoveryObs", discoveryObs)
-			return exectypes.Observation{Contracts: discoveryObs, FChain: fChain}.Encode()
+			return p.ocrTypeCodec.EncodeObservation(exectypes.Observation{Contracts: discoveryObs, FChain: fChain})
 		}
 	}
 
@@ -111,7 +113,7 @@ func (p *Plugin) Observation(
 	p.observer.TrackObservation(observation, state)
 	lggr.Infow("execute plugin got observation", "observation", observation)
 
-	return observation.Encode()
+	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
 func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.CurseInfo, error) {
@@ -324,7 +326,9 @@ func (p *Plugin) getMessagesObservation(
 	// Make sure encoded observation fits within the maximum observation size.
 	observationOptimizer := optimizers.NewObservationOptimizer(
 		lggr,
-		maxObservationLength)
+		maxObservationLength,
+		p.ocrTypeCodec,
+	)
 	observation, err = observationOptimizer.TruncateObservation(observation)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
