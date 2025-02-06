@@ -14,6 +14,12 @@ import (
 )
 
 func Test_validateMerkleRootsState(t *testing.T) {
+	sourceChainConfig := map[cciptypes.ChainSelector]reader2.SourceChainConfig{
+		10: {IsRMNVerificationDisabled: false},
+		20: {IsRMNVerificationDisabled: false},
+		30: {IsRMNVerificationDisabled: true},
+	}
+
 	testCases := []struct {
 		name                 string
 		onRampNextSeqNum     []plugintypes.SeqNumChain
@@ -68,6 +74,16 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			readerErr:            fmt.Errorf("reader error"),
 			expErr:               true,
 		},
+		{
+			name: "happy path one root unblessed",
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
+				plugintypes.NewSeqNumChain(30, 300),
+			},
+			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200, 30: 300},
+			expErr:               false,
+		},
 	}
 
 	ctx := tests.Context(t)
@@ -77,19 +93,22 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			rep := cciptypes.CommitPluginReport{}
 			chains := make([]cciptypes.ChainSelector, 0, len(tc.onRampNextSeqNum))
 			for _, snc := range tc.onRampNextSeqNum {
-				rep.BlessedMerkleRoots = append(rep.BlessedMerkleRoots, cciptypes.MerkleRootChain{
-					ChainSel:     snc.ChainSel,
-					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-				})
+				if sourceChainConfig[snc.ChainSel].IsRMNVerificationDisabled {
+					rep.UnblessedMerkleRoots = append(rep.UnblessedMerkleRoots, cciptypes.MerkleRootChain{
+						ChainSel:     snc.ChainSel,
+						SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+					})
+				} else {
+					rep.BlessedMerkleRoots = append(rep.BlessedMerkleRoots, cciptypes.MerkleRootChain{
+						ChainSel:     snc.ChainSel,
+						SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+					})
+				}
 				chains = append(chains, snc.ChainSel)
 			}
 			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
 
-			reader.EXPECT().GetOffRampSourceChainsConfig(ctx).
-				Return(map[cciptypes.ChainSelector]reader2.SourceChainConfig{
-					10: {IsRMNVerificationDisabled: false},
-					20: {IsRMNVerificationDisabled: false},
-				}, nil).Maybe()
+			reader.EXPECT().GetOffRampSourceChainsConfig(ctx).Return(sourceChainConfig, nil).Maybe()
 
 			err := ValidateMerkleRootsState(ctx, rep.BlessedMerkleRoots, rep.UnblessedMerkleRoots, reader)
 			if tc.expErr {
