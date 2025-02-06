@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -25,16 +26,18 @@ import (
 func TestTokenPool(t *testing.T) {
 	token_pool.SetProgramID(config.CcipTokenPoolProgram)
 	ccip_router.SetProgramID(config.CcipRouterProgram)
+	ccip_offramp.SetProgramID(config.CcipOfframpProgram)
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	anotherAdmin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
-	offramp, err := solana.NewRandomPrivateKey()
+
+	user, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	ctx := tests.Context(t)
 
-	allowedOfframpPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, offramp.PublicKey(), config.CcipRouterProgram)
+	allowedOfframpPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, config.CcipOfframpProgram, config.CcipRouterProgram)
 	require.NoError(t, err)
 
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
@@ -48,7 +51,7 @@ func TestTokenPool(t *testing.T) {
 	remoteToken := token_pool.RemoteAddress{Address: []byte{4, 5, 6}}
 
 	t.Run("setup:funding", func(t *testing.T) {
-		testutils.FundAccounts(ctx, []solana.PrivateKey{admin, anotherAdmin, offramp}, solanaGoClient, t)
+		testutils.FundAccounts(ctx, []solana.PrivateKey{admin, anotherAdmin, user}, solanaGoClient, t)
 	})
 
 	t.Run("setup:router", func(t *testing.T) {
@@ -87,7 +90,7 @@ func TestTokenPool(t *testing.T) {
 	t.Run("setup:allowed offramp", func(t *testing.T) {
 		ix, err := ccip_router.NewAddOfframpInstruction(
 			config.EvmChainSelector,
-			offramp.PublicKey(),
+			user.PublicKey(),
 			allowedOfframpPDA,
 			config.RouterConfigPDA,
 			admin.PublicKey(),
@@ -287,10 +290,10 @@ func TestTokenPool(t *testing.T) {
 							Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
 							Receiver:            admin.PublicKey(),
 							RemoteChainSelector: config.EvmChainSelector,
-						}, offramp.PublicKey(), allowedOfframpPDA, poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+						}, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), allowedOfframpPDA, poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, offramp, config.DefaultCommitment)
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment)
 						require.NotNil(t, res)
 
 						event := tokens.EventMintRelease{}
@@ -373,9 +376,9 @@ func TestTokenPool(t *testing.T) {
 								Amount:              tokens.ToLittleEndianU256(amount * amount * 1e9),
 								Receiver:            admin.PublicKey(),
 								RemoteChainSelector: config.EvmChainSelector,
-							}, offramp.PublicKey(), allowedOfframpPDA, poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+							}, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), allowedOfframpPDA, poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, offramp, config.DefaultCommitment, []string{"max capacity exceeded"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment, []string{"max capacity exceeded"})
 
 							// exceed rate limit of transfer
 							// request two release/mint of max capacity
@@ -397,9 +400,9 @@ func TestTokenPool(t *testing.T) {
 								Amount:              tokens.ToLittleEndianU256(amount * 1e9),
 								Receiver:            admin.PublicKey(),
 								RemoteChainSelector: config.EvmChainSelector,
-							}, offramp.PublicKey(), allowedOfframpPDA, poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+							}, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), allowedOfframpPDA, poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI, rmI}, offramp, config.DefaultCommitment, []string{"rate limit reached"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI, rmI}, user, config.DefaultCommitment, []string{"rate limit reached"})
 
 							// pool should refill automatically, but slowly
 							// small amount should pass
@@ -410,9 +413,9 @@ func TestTokenPool(t *testing.T) {
 								Amount:              tokens.ToLittleEndianU256(1e9),
 								Receiver:            admin.PublicKey(),
 								RemoteChainSelector: config.EvmChainSelector,
-							}, offramp.PublicKey(), allowedOfframpPDA, poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+							}, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), allowedOfframpPDA, poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, offramp, config.DefaultCommitment)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment)
 						})
 					})
 
@@ -508,12 +511,12 @@ func TestTokenPool(t *testing.T) {
 				Receiver:            p.PoolSigner,
 				RemoteChainSelector: config.EvmChainSelector,
 				Amount:              tokens.ToLittleEndianU256(1),
-			}, offramp.PublicKey(), allowedOfframpPDA, p.PoolConfig, solana.TokenProgramID, mint, p.PoolSigner, p.PoolTokenAccount, p.Chain[config.EvmChainSelector], p.PoolTokenAccount)
+			}, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), allowedOfframpPDA, p.PoolConfig, solana.TokenProgramID, mint, p.PoolSigner, p.PoolTokenAccount, p.Chain[config.EvmChainSelector], p.PoolTokenAccount)
 			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipLogicReceiver, false, false))
 			rmI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, offramp, config.DefaultCommitment)
+			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment)
 			require.NotNil(t, res)
 			require.Contains(t, strings.Join(res.Meta.LogMessages, "\n"), "Called `ccip_token_release_mint`")
 		})

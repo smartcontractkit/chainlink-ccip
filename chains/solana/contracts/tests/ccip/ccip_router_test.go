@@ -419,6 +419,7 @@ func TestCCIPRouter(t *testing.T) {
 				lookupTableAddr: lookupEntries,
 			}
 		})
+
 	})
 
 	//////////////////////////
@@ -569,6 +570,18 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
 			require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
 			require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router)
+		})
+
+		t.Run("Offramp permissions", func(t *testing.T) {
+			allowedOfframpPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, config.CcipOfframpProgram, config.CcipRouterProgram)
+			require.NoError(t, err)
+
+			instruction, err := ccip_router.NewAddOfframpInstruction(
+				config.EvmChainSelector, config.CcipOfframpProgram, allowedOfframpPDA, config.RouterConfigPDA, legacyAdmin.PublicKey(), solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
 		})
 
 		t.Run("When admin updates the solana chain selector it's updated", func(t *testing.T) {

@@ -13,6 +13,7 @@ const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
 const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
 pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
 pub const CCIP_TOKENPOOL_CHAINCONFIG: &[u8] = b"ccip_tokenpool_chainconfig";
+pub const EXTERNAL_TOKENPOOL_SIGNER: &[u8] = b"external_token_pools_signer";
 pub const RELEASE_MINT: [u8; 8] = [0x14, 0x94, 0x71, 0xc6, 0xe5, 0xaa, 0x47, 0x30];
 pub const LOCK_BURN: [u8; 8] = [0xc8, 0x0e, 0x32, 0x09, 0x2c, 0x5b, 0x79, 0x25];
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
@@ -74,6 +75,21 @@ pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
     pub authority: Signer<'info>,
 
+    /// CHECK offramp program: exists only to derive the allowed offramp PDA
+    /// and the signer PDA. This constraint verifies that the authority is
+    /// correctly derived from the offramp program.
+    #[account(
+        constraint = {
+            let (pda, _) = Pubkey::find_program_address(
+                &[
+                    EXTERNAL_TOKENPOOL_SIGNER,
+                ],
+                &offramp_program.key()
+            );
+            pda == authority.key() && authority.owner == &offramp_program.key() } @ CcipTokenPoolError::InvalidPoolCaller
+    )]
+    pub offramp_program: UncheckedAccount<'info>,
+
     /// CHECK PDA of the router program verifying the signer is an allowed offramp.
     /// If PDA does not exist, the router doesn't allow this offramp
     #[account(
@@ -82,7 +98,7 @@ pub struct TokenOfframp<'info> {
             &[
                 ALLOWED_OFFRAMP,
                 release_or_mint.remote_chain_selector.to_le_bytes().as_ref(),
-                authority.key().as_ref(),
+                offramp_program.key().as_ref(),
             ],
             &config.ccip_router,
         );
