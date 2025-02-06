@@ -169,9 +169,14 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		lggr.Debugw("processing commit report", "report", ev, "item", item)
 
-		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
-		blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots))
+		isBlessed := make(map[cciptypes.Bytes32]bool, len(ev.BlessedMerkleRoots))
 		for _, mr := range ev.BlessedMerkleRoots {
+			isBlessed[mr.MerkleRoot] = true
+		}
+		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
+		blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.BlessedMerkleRoots))
+		unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.UnblessedMerkleRoots))
+		for _, mr := range allMerkleRoots {
 			onRampAddress, err := r.GetContractAddress(
 				consts.ContractNameOnRamp,
 				cciptypes.ChainSelector(mr.SourceChainSelector),
@@ -181,7 +186,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				continue
 			}
 
-			blessedMerkleRoots = append(blessedMerkleRoots, cciptypes.MerkleRootChain{
+			mrc := cciptypes.MerkleRootChain{
 				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
 				OnRampAddress: onRampAddress,
 				SeqNumsRange: cciptypes.NewSeqNumRange(
@@ -189,32 +194,14 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 					cciptypes.SeqNum(mr.MaxSeqNr),
 				),
 				MerkleRoot: mr.MerkleRoot,
-			})
-		}
-
-		// -------------------------------------------
-		unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots))
-		for _, mr := range ev.UnblessedMerkleRoots { // todo: dup code
-			onRampAddress, err := r.GetContractAddress(
-				consts.ContractNameOnRamp,
-				cciptypes.ChainSelector(mr.SourceChainSelector),
-			)
-			if err != nil {
-				r.lggr.Errorw("get onRamp address for selector %d: %w", mr.SourceChainSelector, err)
-				continue
 			}
 
-			unblessedMerkleRoots = append(unblessedMerkleRoots, cciptypes.MerkleRootChain{
-				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
-				OnRampAddress: onRampAddress,
-				SeqNumsRange: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(mr.MinSeqNr),
-					cciptypes.SeqNum(mr.MaxSeqNr),
-				),
-				MerkleRoot: mr.MerkleRoot,
-			})
+			if isBlessed[mr.MerkleRoot] {
+				blessedMerkleRoots = append(blessedMerkleRoots, mrc)
+			} else {
+				unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
+			}
 		}
-		// -------------------------------------------
 
 		priceUpdates := cciptypes.PriceUpdates{
 			TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
@@ -1664,7 +1651,7 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 //
 //nolint:revive // todo
 func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.
-	Context) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+Context) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	return r.getAllOffRampSourceChainsConfig(ctx, r.lggr, false)
 }
 
