@@ -163,6 +163,8 @@ func reportRangesOutcome(
 
 // buildMerkleRootsOutcome is given a set of agreed observed merkle roots and RMN signatures
 // and construct a merkleRoots outcome.
+//
+//nolint:gocyclo // todo
 func buildMerkleRootsOutcome(
 	q Query,
 	rmnEnabled bool,
@@ -218,11 +220,11 @@ func buildMerkleRootsOutcome(
 		}
 
 		if signedRoots.Cardinality() > 0 {
-			parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+			var err error
+			sigs, err = rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 			if err != nil {
 				return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
 			}
-			sigs = parsedSigs
 		}
 
 		// Only report roots that are RMN-enabled and have RMN signatures or are RMN-disabled.
@@ -235,14 +237,18 @@ func buildMerkleRootsOutcome(
 				OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
 			}
 
-			switch {
-			case signedRoots.Contains(rk):
-				lggr.Infow("Root is signed, appending to the report", "root", rk)
+			rootIsSigned := signedRoots.Contains(rk)
+
+			rootNotSignedButRmnDisabled := !signedRoots.Contains(rk) &&
+				!consensusObservation.RMNEnabledChains[root.ChainSel]
+
+			if rootIsSigned || rootNotSignedButRmnDisabled {
+				lggr.Infow("Adding root to the report",
+					"root", rk,
+					"rootIsSigned", rootIsSigned,
+					"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled)
 				rootsToReport = append(rootsToReport, root)
-			case !consensusObservation.RMNEnabledChains[root.ChainSel]:
-				lggr.Infow("Root is not signed, but RMN is disabled for the chain, appending to the report", "root", rk)
-				rootsToReport = append(rootsToReport, root)
-			default:
+			} else {
 				lggr.Infow("Root not signed, skipping from the report", "root", rk)
 			}
 		}

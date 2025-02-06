@@ -80,7 +80,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 			"rmnEnabledChains", rmnEnabledChains)
 		return Query{
 			RMNSignatures: &rmn.ReportSignatures{
-				Signatures:  []*rmnpb.EcdsaSignature{{R: []byte{}, S: []byte{}}},
+				Signatures:  []*rmnpb.EcdsaSignature{},
 				LaneUpdates: []*rmnpb.FixedDestLaneUpdate{},
 			},
 		}, nil
