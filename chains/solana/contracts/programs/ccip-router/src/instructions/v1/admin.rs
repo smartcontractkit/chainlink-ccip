@@ -6,6 +6,7 @@ use crate::{
     AcceptOwnership, AddChainSelector, CcipRouterError, DestChainConfig, DestChainState,
     TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, WithdrawBilledFunds,
 };
+use crate::{AddOfframp, RemoveOfframp};
 
 use super::fees::do_billing_transfer;
 
@@ -76,6 +77,30 @@ pub fn update_dest_chain_config(
     emit!(events::DestChainConfigUpdated {
         dest_chain_selector,
         dest_chain_config,
+    });
+    Ok(())
+}
+
+pub fn add_offramp(
+    _ctx: Context<AddOfframp>,
+    source_chain_selector: u64,
+    offramp: Pubkey,
+) -> Result<()> {
+    emit!(events::OfframpAdded {
+        source_chain_selector,
+        offramp,
+    });
+    Ok(())
+}
+
+pub fn remove_offramp(
+    _ctx: Context<RemoveOfframp>,
+    source_chain_selector: u64,
+    offramp: Pubkey,
+) -> Result<()> {
+    emit!(events::OfframpRemoved {
+        source_chain_selector,
+        offramp,
     });
     Ok(())
 }

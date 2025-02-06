@@ -103,6 +103,28 @@ var (
 	// * `dest_chain_config` - The new configuration for the destination chain.
 	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
 
+	// Add an offramp address to the list of offramps allowed by the router, for a
+	// particular source chain. External users will check this list before accepting
+	// a `ccip_receive` CPI.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for this operation.
+	// * `source_chain_selector` - The source chain for the offramp's lane.
+	// * `offramp` - The offramp's address.
+	Instruction_AddOfframp = ag_binary.TypeID([8]byte{164, 255, 154, 96, 204, 239, 24, 2})
+
+	// Remove an offramp address from the list of offramps allowed by the router, for a
+	// particular source chain. External users will check this list before accepting
+	// a `ccip_receive` CPI.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for this operation.
+	// * `source_chain_selector` - The source chain for the offramp's lane.
+	// * `offramp` - The offramp's address.
+	Instruction_RemoveOfframp = ag_binary.TypeID([8]byte{252, 152, 51, 170, 241, 13, 199, 8})
+
 	// Updates the SVM chain selector in the router configuration.
 	//
 	// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
@@ -224,6 +246,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AddChainSelector"
 	case Instruction_UpdateDestChainConfig:
 		return "UpdateDestChainConfig"
+	case Instruction_AddOfframp:
+		return "AddOfframp"
+	case Instruction_RemoveOfframp:
+		return "RemoveOfframp"
 	case Instruction_UpdateSvmChainSelector:
 		return "UpdateSvmChainSelector"
 	case Instruction_CcipAdminProposeAdministrator:
@@ -281,6 +307,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"update_dest_chain_config", (*UpdateDestChainConfig)(nil),
+		},
+		{
+			"add_offramp", (*AddOfframp)(nil),
+		},
+		{
+			"remove_offramp", (*RemoveOfframp)(nil),
 		},
 		{
 			"update_svm_chain_selector", (*UpdateSvmChainSelector)(nil),

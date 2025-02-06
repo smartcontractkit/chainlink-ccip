@@ -64,6 +64,18 @@ pub mod events {
             pub from: Pubkey,
             pub to: Pubkey,
         }
+
+        #[event]
+        pub struct OfframpAdded {
+            pub source_chain_selector: u64,
+            pub offramp: Pubkey,
+        }
+
+        #[event]
+        pub struct OfframpRemoved {
+            pub source_chain_selector: u64,
+            pub offramp: Pubkey,
+        }
     }
 
     pub mod token_admin_registry {
