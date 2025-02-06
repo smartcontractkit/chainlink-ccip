@@ -261,13 +261,13 @@ func filterRootsBasedOnRmnSigs(
 		if rootIsSignedAndRmnEnabled || rootNotSignedButRmnDisabled {
 			lggr.Infow("Adding root to the report",
 				"root", rk,
-				"rootIsSigned", rootIsSignedAndRmnEnabled,
+				"rootIsSignedAndRmnEnabled", rootIsSignedAndRmnEnabled,
 				"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled)
 			validRoots = append(validRoots, root)
 		} else {
 			lggr.Infow("Root invalid, skipping from the report",
 				"root", rk,
-				"rootIsSigned", rootIsSignedAndRmnEnabled,
+				"rootIsSignedAndRmnEnabled", rootIsSignedAndRmnEnabled,
 				"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled,
 			)
 		}
