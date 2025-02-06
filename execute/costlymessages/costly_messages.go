@@ -167,18 +167,18 @@ func calculateETA(currentFee, targetFee plugintypes.USD18, boostRate float64) *t
 	}
 
 	// Convert the USD18 values to big.Float for calculation
-	// We use SetPrec(100) to maintain high precision during division
 	currentFloat := new(big.Float).SetPrec(100).SetInt(currentFee)
 	targetFloat := new(big.Float).SetPrec(100).SetInt(targetFee)
 
-	// Calculate target/current ratio
+	// For target = current * (1 + hours * boostRate)
+	// Solving for hours: hours = (target/current - 1) / boostRate
 	ratio := new(big.Float).SetPrec(100)
 	ratio.Quo(targetFloat, currentFloat)
-
-	// Convert to float64 for final calculation
 	ratioFloat64, _ := ratio.Float64()
 
 	// Calculate hours needed: (target/current - 1) / boost_rate
+	// This is correct for linear boost because we're solving:
+	// target = current * (1 + hours * boostRate)
 	hoursNeeded := (ratioFloat64 - 1.0) / boostRate
 	if hoursNeeded <= 0 {
 		return nil
@@ -200,10 +200,10 @@ func formatETA(eta *time.Duration) string {
 		return fmt.Sprintf("~%.0f minutes", minutes)
 	} else if hours < 24 {
 		return fmt.Sprintf("~%.1f hours", hours)
-	} else {
-		days := hours / 24
-		return fmt.Sprintf("~%.1f days", days)
 	}
+
+	days := hours / 24
+	return fmt.Sprintf("~%.1f days", days)
 }
 
 var _ Observer = &observer{}

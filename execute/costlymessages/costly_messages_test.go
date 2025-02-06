@@ -621,3 +621,144 @@ func TestValidatePositive(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateETA(t *testing.T) {
+	tests := []struct {
+		name       string
+		currentFee *big.Int
+		targetFee  *big.Int
+		boostRate  float64
+		wantETA    *time.Duration
+	}{
+		{
+			name:       "zero boost rate returns nil",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(200),
+			boostRate:  0,
+			wantETA:    nil,
+		},
+		{
+			name:       "negative boost rate returns nil",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(200),
+			boostRate:  -0.5,
+			wantETA:    nil,
+		},
+		{
+			name:       "target less than current returns nil",
+			currentFee: big.NewInt(200),
+			targetFee:  big.NewInt(100),
+			boostRate:  0.5,
+			wantETA:    nil,
+		},
+		{
+			name:       "simple doubling with 0.5 boost rate",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(200),
+			boostRate:  0.5,
+			wantETA:    durationPtr(2 * time.Hour),
+		},
+		{
+			name:       "50% increase with 0.25 boost rate",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(150),
+			boostRate:  0.25,
+			wantETA:    durationPtr(2 * time.Hour),
+		},
+		{
+			name:       "large numbers - 2x with 0.5 boost",
+			currentFee: new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil), // 10^30
+			targetFee: new(big.Int).Mul(
+				big.NewInt(2),
+				new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil),
+			), // 2 * 10^30
+			boostRate: 0.5,
+			wantETA:   durationPtr(2 * time.Hour),
+		},
+		{
+			name:       "fractional increase - 10% with 0.1 boost",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(110),
+			boostRate:  0.1,
+			wantETA:    durationPtr(1 * time.Hour),
+		},
+		{
+			name:       "many days ETA",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(1000),
+			boostRate:  0.1,
+			wantETA:    durationPtr(90 * time.Hour),
+		},
+		{
+			name:       "very small boost rate",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(150),
+			boostRate:  0.01,
+			wantETA:    durationPtr(50 * time.Hour),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotETA := calculateETA(tt.currentFee, tt.targetFee, tt.boostRate)
+
+			if tt.wantETA == nil {
+				assert.Nil(t, gotETA)
+			} else {
+				assert.NotNil(t, gotETA)
+				// Allow for small floating point differences
+				assert.InDelta(t, tt.wantETA.Hours(), gotETA.Hours(), 0.001)
+			}
+		})
+	}
+}
+
+func TestFormatETA(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration *time.Duration
+		want     string
+	}{
+		{
+			name:     "nil duration",
+			duration: nil,
+			want:     "boost rate is zero or already at target",
+		},
+		{
+			name:     "less than one hour",
+			duration: durationPtr(30 * time.Minute),
+			want:     "~30 minutes",
+		},
+		{
+			name:     "exactly one hour",
+			duration: durationPtr(1 * time.Hour),
+			want:     "~1.0 hours",
+		},
+		{
+			name:     "multiple hours",
+			duration: durationPtr(5*time.Hour + 30*time.Minute),
+			want:     "~5.5 hours",
+		},
+		{
+			name:     "exactly one day",
+			duration: durationPtr(24 * time.Hour),
+			want:     "~1.0 days",
+		},
+		{
+			name:     "multiple days",
+			duration: durationPtr(72*time.Hour + 12*time.Hour),
+			want:     "~3.5 days",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatETA(tt.duration)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
+}
