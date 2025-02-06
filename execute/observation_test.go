@@ -39,6 +39,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 	plugin := &Plugin{
 		lggr:                 mocks.NullLogger,
 		homeChain:            homeChain,
+		ocrTypeCodec:         ocrTypeCodec,
 		inflightMessageCache: cache.NewInflightMessageCache(10 * time.Minute),
 	}
 
