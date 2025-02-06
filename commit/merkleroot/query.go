@@ -47,6 +47,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, fmt.Errorf("get RMN enabled chains %s: %w",
 			prevOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
 	}
+	lggr.Debugw("fetched RMN-enabled chains from rmnHome", "rmnEnabledChains", rmnEnabledChains)
 
 	reqUpdates := make([]*rmnpb.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {

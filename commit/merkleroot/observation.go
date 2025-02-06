@@ -71,7 +71,7 @@ func (p *Processor) Observation(
 	}
 
 	tStart := time.Now()
-	observation, nextState, err := p.getObservation(ctx, q, prevOutcome)
+	observation, nextState, err := p.getObservation(ctx, lggr, q, prevOutcome)
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
@@ -228,7 +228,7 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 }
 
 func (p *Processor) getObservation(
-	ctx context.Context, q Query, previousOutcome Outcome) (Observation, processorState, error) {
+	ctx context.Context, lggr logger.Logger, q Query, previousOutcome Outcome) (Observation, processorState, error) {
 	nextState := previousOutcome.nextState()
 	switch nextState {
 	case selectingRangesForReport:
@@ -281,6 +281,7 @@ func (p *Processor) getObservation(
 				return Observation{}, nextState, fmt.Errorf("failed to get RMN enabled source chains for %s: %w",
 					previousOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
 			}
+			lggr.Debugw("fetched RMN-enabled chains from rmnHome", "rmnEnabledChains", rmnEnabledChains)
 		}
 
 		return Observation{

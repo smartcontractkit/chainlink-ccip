@@ -133,7 +133,7 @@ func (r *rmnHome) GetRMNEnabledSourceChains(configDigest cciptypes.Bytes32) (map
 		enabledChains[chain] = true
 	}
 
-	return map[cciptypes.ChainSelector]bool{}, nil
+	return enabledChains, nil
 }
 
 func (r *rmnHome) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {

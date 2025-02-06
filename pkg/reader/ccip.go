@@ -1651,7 +1651,7 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 //
 //nolint:revive // todo
 func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.
-Context) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+	Context) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	return r.getAllOffRampSourceChainsConfig(ctx, r.lggr, false)
 }
 
