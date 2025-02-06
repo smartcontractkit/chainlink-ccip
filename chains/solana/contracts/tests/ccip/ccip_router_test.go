@@ -155,9 +155,8 @@ func TestCCIPRouter(t *testing.T) {
 	// Small enough to fit in u160, big enough to not fall in the precompile space.
 	validReceiverAddress := [32]byte{}
 	validReceiverAddress[12] = 1
-	// Either of those are valid with an EVM destination chain: Either tag + no data, or nothing at all.
-	emptyEVMExtraArgsV2 := testutils.MustSerializeExtraArgs(t, struct{}{}, ccip.EVMExtraArgsV2Tag)
-	emptyTaglessExtraArgsV2 := []byte{}
+
+	emptyEVMExtraArgsV2 := []byte{}
 
 	var ccipSendLookupTable map[solana.PublicKey]solana.PublicKeySlice
 	var offrampLookupTable map[solana.PublicKey]solana.PublicKeySlice
@@ -2476,7 +2475,7 @@ func TestCCIPRouter(t *testing.T) {
 			message := fee_quoter.SVM2AnyMessage{
 				Receiver:  validReceiverAddress[:],
 				FeeToken:  wsol.mint,
-				ExtraArgs: emptyTaglessExtraArgsV2,
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
@@ -2622,7 +2621,7 @@ func TestCCIPRouter(t *testing.T) {
 				FeeToken:  wsol.mint,
 				Receiver:  validReceiverAddress[:],
 				Data:      []byte{4, 5, 6},
-				ExtraArgs: emptyTaglessExtraArgsV2,
+				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
 			raw := ccip_router.NewCcipSendInstruction(
@@ -3142,7 +3141,7 @@ func TestCCIPRouter(t *testing.T) {
 												FeeToken:  messageMint,
 												Receiver:  validReceiverAddress[:],
 												Data:      []byte{4, 5, 6},
-												ExtraArgs: emptyTaglessExtraArgsV2,
+												ExtraArgs: emptyEVMExtraArgsV2,
 											},
 											[]byte{},
 											config.RouterConfigPDA,
