@@ -124,6 +124,8 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 }
 
 func TestWaitBoostedFee(t *testing.T) {
+	lggr := logger.Test(t)
+
 	tests := []struct {
 		name                     string
 		sendTimeDiff             time.Duration
@@ -219,7 +221,7 @@ func TestWaitBoostedFee(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			boosted := waitBoostedFee(tc.sendTimeDiff, tc.fee, tc.relativeBoostPerWaitHour)
+			boosted := waitBoostedFee(lggr, tc.sendTimeDiff, tc.fee, tc.relativeBoostPerWaitHour)
 			diff := big.NewInt(0).Sub(boosted, tc.fee)
 			assert.Equal(t, diff, tc.diff)
 		})
