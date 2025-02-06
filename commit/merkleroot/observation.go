@@ -64,8 +64,11 @@ func (p *Processor) Observation(
 
 	if err := p.verifyQuery(ctx, prevOutcome, q); err != nil {
 		if errors.Is(err, ErrSignaturesNotProvidedByLeader) {
-			p.lggr.Infow("RMN signatures not available, returning an empty observation", "err", err)
-			return Observation{}, nil
+			lggr.Warnw("RMN signatures not available, returning only fChain", "err", err)
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nil
 		}
 		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
@@ -268,8 +271,13 @@ func (p *Processor) getObservation(
 	case buildingReport:
 		if q.RetryRMNSignatures {
 			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
-			// So there's nothing to observe, i.e. we don't want to build the report yet.
-			return Observation{}, nextState, nil
+			// So there's nothing to observe except for fChain, i.e. we don't want to build the report yet.
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				// We check q.RetryRMNSignatures there and return the appropriate state and outcome
+				// in order to retry.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nextState, nil
 		}
 
 		rmnEnabledChains := make(map[cciptypes.ChainSelector]bool)

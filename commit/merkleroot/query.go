@@ -96,8 +96,8 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	if err != nil {
 		p.metricsReporter.TrackRmnReport(float64(time.Since(rmnReportStart).Milliseconds()), false)
 		if errors.Is(err, rmn.ErrTimeout) {
-			lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
-				len(reqUpdates), dstChainInfo)
+			lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %d offramp %x",
+				len(reqUpdates), dstChainInfo.DestChainSelector, dstChainInfo.OfframpAddress)
 			return Query{RetryRMNSignatures: true}, nil
 		}
 

@@ -149,9 +149,11 @@ func TestObservation(t *testing.T) {
 				RetryRMNSignatures: true,
 			},
 			setupMocks: func() {
-				// No mocks needed for this case
+				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
-			expectedObs: Observation{},
+			expectedObs: Observation{
+				FChain: map[cciptypes.ChainSelector]int{1: 3},
+			},
 		},
 	}
 
