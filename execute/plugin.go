@@ -132,7 +132,7 @@ func NewPlugin(
 			offchainCfg.MessageVisibilityInterval.Duration(),
 			time.Minute*5),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
-		ocrTypeCodec: ocrtypecodec.NewExecCodecJSON(),
+		ocrTypeCodec:         ocrtypecodec.NewExecCodecJSON(),
 	}
 }
 

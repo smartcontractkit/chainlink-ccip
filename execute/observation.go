@@ -32,6 +32,8 @@ import (
 // report.
 //
 // Phase 3: observe nonce for each unique source/sender pair.
+//
+//nolint:gocyclo
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
