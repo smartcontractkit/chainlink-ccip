@@ -1692,7 +1692,14 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 }
 
 func validateMerkleRoots(merkleRoots []MerkleRoot) error {
+	seenRoots := mapset.NewSet[cciptypes.Bytes32]()
+
 	for _, mr := range merkleRoots {
+		if seenRoots.Contains(mr.MerkleRoot) {
+			return fmt.Errorf("duplicate merkle root: %s", mr.MerkleRoot.String())
+		}
+		seenRoots.Add(mr.MerkleRoot)
+
 		if mr.SourceChainSelector == 0 {
 			return fmt.Errorf("source chain is zero")
 		}

@@ -120,6 +120,8 @@ func (r *rmnHome) GetFObserve(configDigest cciptypes.Bytes32) (map[cciptypes.Cha
 	return state.rmnHomeConfig[configDigest].SourceChainF, nil
 }
 
+// GetRMNEnabledSourceChains returns the source chains that are RMN-enabled. A chain is considered RMN-enabled if
+// F is present in RMNHome config.
 func (r *rmnHome) GetRMNEnabledSourceChains(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]bool, error) {
 	state := r.bgPoller.getRMNHomeState()
 	homeCfg, ok := state.rmnHomeConfig[configDigest]

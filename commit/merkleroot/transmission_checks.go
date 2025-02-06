@@ -13,8 +13,6 @@ import (
 
 // ValidateMerkleRootsState validates the proposed merkle roots against the current on-chain state.
 // This function is not-pure as it reads from the chain by making one network/reader call.
-//
-//nolint:gocyclo //todo
 func ValidateMerkleRootsState(
 	ctx context.Context,
 	proposedBlessedMerkleRoots []cciptypes.MerkleRootChain,
@@ -60,12 +58,17 @@ func ValidateMerkleRootsState(
 		}
 	}
 
-	sourceChainsConfig, err := reader.GetOffRampSourceChainsConfig(ctx)
+	return validateRootBlessings(ctx, reader, proposedBlessedMerkleRoots, proposedUnblessedMerkleRoots)
+}
+
+func validateRootBlessings(
+	ctx context.Context, ccipReader reader.CCIPReader, blessedRoots, unblessedRoots []cciptypes.MerkleRootChain) error {
+	sourceChainsConfig, err := ccipReader.GetOffRampSourceChainsConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get offRamp source chains config: %w", err)
 	}
 
-	for _, r := range proposedBlessedMerkleRoots {
+	for _, r := range blessedRoots {
 		sourceChainCfg, ok := sourceChainsConfig[r.ChainSel]
 		if !ok {
 			return fmt.Errorf("chain %d is not in the offRampSourceChainsConfig", r.ChainSel)
@@ -75,7 +78,7 @@ func ValidateMerkleRootsState(
 		}
 	}
 
-	for _, r := range proposedUnblessedMerkleRoots {
+	for _, r := range unblessedRoots {
 		sourceChainCfg, ok := sourceChainsConfig[r.ChainSel]
 		if !ok {
 			return fmt.Errorf("chain %d is not in the offRampSourceChainsConfig", r.ChainSel)
