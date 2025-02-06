@@ -209,10 +209,6 @@ pub mod example_lockrelease_token_pool {
 
     // withdraw liquidity can be used to transfer liquidity from one pool to another by setting the `rebalancer` to the calling pool
     pub fn withdraw_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
-        require!(
-            ctx.accounts.state.config.can_accept_liquidity,
-            CcipTokenPoolError::LiquidityNotAccepted
-        );
         transfer_tokens(
             ctx.accounts.token_program.key(),
             ctx.accounts.remote_token_account.to_account_info(), // to

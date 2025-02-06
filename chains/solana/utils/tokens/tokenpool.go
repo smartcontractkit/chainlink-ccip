@@ -57,7 +57,7 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 }
 
 // NewTokenPool returns token + pool addresses. however, the token still needs to be deployed
-func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
+func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey) (TokenPool, error) {
 	mint, err := solana.NewRandomPrivateKey()
 	if err != nil {
 		return TokenPool{}, err
@@ -67,7 +67,7 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 		return TokenPool{}, err
 	}
 	// preload with defined config.EvmChainSelector
-	chainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipTokenPoolProgram)
+	chainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -81,11 +81,11 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 
 	p := TokenPool{
-		Program:          program,
+		Program:          tokenProgram,
 		Mint:             mint,
 		FeeTokenConfig:   tokenConfigPda,
 		AdminRegistryPDA: tokenAdminRegistryPDA,
-		PoolProgram:      config.CcipTokenPoolProgram,
+		PoolProgram:      poolProgram,
 		PoolLookupTable:  solana.PublicKey{},
 		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
 		User:             map[solana.PublicKey]solana.PublicKey{},
@@ -94,11 +94,11 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 	p.Chain[config.EvmChainSelector] = chainPDA
 	p.Billing[config.EvmChainSelector] = billingPDA
-	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
+	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
+	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}

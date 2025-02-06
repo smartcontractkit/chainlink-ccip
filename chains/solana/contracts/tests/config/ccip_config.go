@@ -36,10 +36,12 @@ var (
 	EvmChainSelector uint64 = 21
 	EvmChainLE              = common.Uint64ToLE(EvmChainSelector)
 
-	// router/onramp PDAs
 	// example programs
-	CcipBaseReceiver = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+	CcipBaseReceiver        = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+	CcipBasePoolBurnMint    = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111111BurnMint")
+	CcipBasePoolLockRelease = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111LockReLease")
 
+	// router/onramp PDAs
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	RouterStatePDA, _, _                     = state.FindStatePDA(CcipRouterProgram)
 	ExternalExecutionConfigPDA, _, _         = state.FindExternalExecutionConfigPDA(CcipRouterProgram)

@@ -89,9 +89,9 @@ func TestCCIPRouter(t *testing.T) {
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, legacyAdmin)
 
 	// token addresses
-	token0, gerr := tokens.NewTokenPool(config.Token2022Program)
+	token0, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram)
 	require.NoError(t, gerr)
-	token1, gerr := tokens.NewTokenPool(config.Token2022Program)
+	token1, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram)
 	require.NoError(t, gerr)
 
 	signers, transmitters, getTransmitter := testutils.GenerateSignersAndTransmitters(t, config.MaxOracles)
