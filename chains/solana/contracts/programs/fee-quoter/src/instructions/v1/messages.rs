@@ -109,9 +109,7 @@ pub fn process_extra_args(
 ) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(dest_config.chain_family_selector) {
         CHAIN_FAMILY_SELECTOR_EVM => {
-            // Extra args are optional for EVM destination. If the tag
-            // is missing, or the tag is present but there's no further data,
-            // the configured defaults are serialized.
+            // Extra args are optional for EVM destination.
             let Some(tag) = extra_args.get(..4) else {
                 return Ok(ProcessedExtraArgs::defaults(dest_config));
             };
