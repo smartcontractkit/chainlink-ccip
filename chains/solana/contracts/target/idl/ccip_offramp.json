@@ -586,6 +586,20 @@
           "isSigner": false
         },
         {
+          "name": "offramp",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
+        },
+        {
           "name": "externalExecutionConfig",
           "isMut": false,
           "isSigner": false
@@ -670,6 +684,20 @@
           "name": "commitReport",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "offramp",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
         },
         {
           "name": "externalExecutionConfig",

@@ -419,7 +419,6 @@ func TestCCIPRouter(t *testing.T) {
 				lookupTableAddr: lookupEntries,
 			}
 		})
-
 	})
 
 	//////////////////////////
@@ -573,11 +572,8 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Offramp permissions", func(t *testing.T) {
-			allowedOfframpPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, config.CcipOfframpProgram, config.CcipRouterProgram)
-			require.NoError(t, err)
-
 			instruction, err := ccip_router.NewAddOfframpInstruction(
-				config.EvmChainSelector, config.CcipOfframpProgram, allowedOfframpPDA, config.RouterConfigPDA, legacyAdmin.PublicKey(), solana.SystemProgramID,
+				config.EvmChainSelector, config.CcipOfframpProgram, config.AllowedOfframpEvmPDA, config.RouterConfigPDA, legacyAdmin.PublicKey(), solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -5241,6 +5237,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5337,6 +5335,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5431,6 +5431,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					unsupportedSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5513,6 +5515,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5553,6 +5557,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5600,6 +5606,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5687,6 +5695,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5721,6 +5731,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5822,6 +5834,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5907,6 +5921,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -5929,31 +5945,6 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("token happy path", func(t *testing.T) {
-				// TODO this is a throw-away setup stage until we implement the offramp authorization logic in the pool
-				t.Run("Setup: set offramp as token pool ramp authority", func(t *testing.T) {
-					poolCases := []struct {
-						Name       string
-						PoolConfig solana.PublicKey
-						Admin      solana.PrivateKey
-					}{
-						{"Token0", token0.PoolConfig, token0PoolAdmin},
-						{"Token1", token1.PoolConfig, token1PoolAdmin},
-					}
-
-					for _, p := range poolCases {
-						t.Run(p.Name, func(t *testing.T) {
-							ix, err := token_pool.NewSetRampAuthorityInstruction(
-								config.OfframpTokenPoolsSignerPDA,
-								p.PoolConfig,
-								p.Admin.PublicKey(),
-							).ValidateAndBuild()
-							require.NoError(t, err)
-
-							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, p.Admin, config.DefaultCommitment)
-						})
-					}
-				})
-
 				t.Run("single token", func(t *testing.T) {
 					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint.PublicKey(), config.DefaultCommitment)
 					require.NoError(t, err)
@@ -6028,6 +6019,8 @@ func TestCCIPRouter(t *testing.T) {
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpEvmSourceChainPDA,
 						rootPDA,
+						config.CcipOfframpProgram,
+						config.AllowedOfframpEvmPDA,
 						config.OfframpExternalExecutionConfigPDA,
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
@@ -6147,6 +6140,8 @@ func TestCCIPRouter(t *testing.T) {
 						config.OfframpReferenceAddressesPDA,
 						config.OfframpEvmSourceChainPDA,
 						rootPDA,
+						config.CcipOfframpProgram,
+						config.AllowedOfframpEvmPDA,
 						config.OfframpExternalExecutionConfigPDA,
 						transmitter.PublicKey(),
 						solana.SystemProgramID,
@@ -6197,6 +6192,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					user.PublicKey(),
 					solana.SystemProgramID,
@@ -6283,6 +6280,8 @@ func TestCCIPRouter(t *testing.T) {
 							config.OfframpReferenceAddressesPDA,
 							config.OfframpEvmSourceChainPDA,
 							rootPDA,
+							config.CcipOfframpProgram,
+							config.AllowedOfframpEvmPDA,
 							config.OfframpExternalExecutionConfigPDA,
 							user.PublicKey(),
 							solana.SystemProgramID,
@@ -6320,6 +6319,8 @@ func TestCCIPRouter(t *testing.T) {
 							config.OfframpReferenceAddressesPDA,
 							config.OfframpEvmSourceChainPDA,
 							rootPDA,
+							config.CcipOfframpProgram,
+							config.AllowedOfframpEvmPDA,
 							config.OfframpExternalExecutionConfigPDA,
 							transmitter.PublicKey(),
 							solana.SystemProgramID,
@@ -6365,6 +6366,8 @@ func TestCCIPRouter(t *testing.T) {
 							config.OfframpReferenceAddressesPDA,
 							config.OfframpEvmSourceChainPDA,
 							rootPDA,
+							config.CcipOfframpProgram,
+							config.AllowedOfframpEvmPDA,
 							config.OfframpExternalExecutionConfigPDA,
 							user.PublicKey(),
 							solana.SystemProgramID,
@@ -6417,6 +6420,8 @@ func TestCCIPRouter(t *testing.T) {
 							config.OfframpReferenceAddressesPDA,
 							config.OfframpEvmSourceChainPDA,
 							rootPDA,
+							config.CcipOfframpProgram,
+							config.AllowedOfframpEvmPDA,
 							config.OfframpExternalExecutionConfigPDA,
 							transmitter.PublicKey(),
 							solana.SystemProgramID,
@@ -6455,115 +6460,6 @@ func TestCCIPRouter(t *testing.T) {
 					})
 				})
 			})
-
-			// TODO: With the split of the offramp, it should be supported to run Offramp.execute -> Receiver.ccipReceive -> Router.ccipSend
-			// solana re-entry is limited by a simple self-recursion and a limited depth
-			// https://defisec.info/solana_top_vulnerabilities
-			// note: simple recursion execute -> ccipSend is currently not possible as the router does not implement the ccipReceive method signature
-			// t.Run("failed reentrancy A (execute) -> B (ccipReceive) -> A (ccipSend)", func(t *testing.T) {
-			// 	transmitter := getTransmitter()
-			// 	receiverContractEvmPDA, err := state.FindNoncePDA(config.EvmChainSelector, config.ReceiverExternalExecutionConfigPDA, config.CcipRouterProgram)
-			// 	require.NoError(t, err)
-
-			// 	msgAccounts := []solana.PublicKey{
-			// 		config.CcipLogicReceiver,
-			// 		config.ReceiverExternalExecutionConfigPDA,
-			// 		config.ReceiverTargetAccountPDA,
-			// 		solana.SystemProgramID,
-			// 		config.CcipRouterProgram,
-			// 		config.RouterConfigPDA,
-			// 		config.ReceiverExternalExecutionConfigPDA,
-			// 		config.EvmSourceChainStatePDA,
-			// 		receiverContractEvmPDA,
-			// 		solana.SystemProgramID}
-
-			// 	message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
-
-			// 	// To make the message go through the validations we need to specify the correct bitmap in the order
-			// 	// of the remaining accounts (writable accounts at positions 1, 5, 6 and 7, i.e. ReceiverTargetAccountPDA,
-			// 	// ReceiverExternalExecutionConfigPDA, EVMSourceChainStatePDA and receiverContractEVMPDA)
-			// 	message.ExtraArgs.IsWritableBitmap = ccip.GenerateBitMapForIndexes([]int{0, 1, 5, 6, 7})
-			// 	hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
-			// 	require.NoError(t, err)
-			// 	root := [32]byte(hash)
-
-			// 	sourceChainSelector := config.EvmChainSelector
-			// 	commitReport := ccip_offramp.CommitInput{
-			// 		MerkleRoot: ccip_offramp.MerkleRoot{
-			// 			SourceChainSelector: sourceChainSelector,
-			// 			OnRampAddress:       config.OnRampAddress,
-			// 			MinSeqNr:            message.Header.SequenceNumber,
-			// 			MaxSeqNr:            message.Header.SequenceNumber,
-			// 			MerkleRoot:          root,
-			// 		},
-			// 	}
-			// 	sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
-			// 	require.NoError(t, err)
-			// 	rootPDA, _ := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
-
-			// 	instruction, err := ccip_offramp.NewCommitInstruction(
-			// 		reportContext,
-			// 		testutils.MustMarshalBorsh(t, commitReport),
-			// 		sigs.Rs,
-			// 		sigs.Ss,
-			// 		sigs.RawVs,
-			// 		config.OfframpConfigPDA,
-			// 		config.OfframpReferenceAddressesPDA,
-			// 		config.OfframpEvmSourceChainPDA,
-			// 		rootPDA,
-			// 		transmitter.PublicKey(),
-			// 		solana.SystemProgramID,
-			// 		solana.SysVarInstructionsPubkey,
-			// 		config.BillingSignerPDA,
-			// 		config.FeeQuoterProgram,
-			// 		config.FqConfigPDA,
-			// 	).ValidateAndBuild()
-			// 	require.NoError(t, err)
-			// 	tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-			// 	event := ccip.EventCommitReportAccepted{}
-			// 	require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
-
-			// 	executionReport := ccip_offramp.ExecutionReportSingleChain{
-			// 		SourceChainSelector: sourceChainSelector,
-			// 		Message:             message,
-			// 		Root:                root,
-			// 		Proofs:              [][32]uint8{}, // single leaf merkle tree
-			// 	}
-			// 	raw := ccip_offramp.NewExecuteInstruction(
-			// 		testutils.MustMarshalBorsh(t, executionReport),
-			// 		reportContext,
-			// 		[]byte{},
-			// 		config.OfframpConfigPDA,
-			// 		config.OfframpReferenceAddressesPDA,
-			// 		config.OfframpEvmSourceChainPDA,
-			// 		rootPDA,
-			// 		config.OfframpExternalExecutionConfigPDA,
-			// 		transmitter.PublicKey(),
-			// 		solana.SystemProgramID,
-			// 		solana.SysVarInstructionsPubkey,
-			// 		config.OfframpTokenPoolsSignerPDA,
-			// 	)
-			// 	raw.AccountMetaSlice = append(
-			// 		raw.AccountMetaSlice,
-			// 		solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
-			// 		// accounts for base CPI call
-			// 		solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
-			// 		solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
-			// 		solana.NewAccountMeta(solana.SystemProgramID, false, false),
-
-			// 		// accounts for receiver -> router re-entrant CPI call
-			// 		solana.NewAccountMeta(config.CcipRouterProgram, false, false),
-			// 		solana.NewAccountMeta(config.RouterConfigPDA, false, false),
-			// 		solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
-			// 		solana.NewAccountMeta(config.EvmSourceChainStatePDA, true, false),
-			// 		solana.NewAccountMeta(receiverContractEvmPDA, true, false),
-			// 		solana.NewAccountMeta(solana.SystemProgramID, false, false),
-			// 	)
-			// 	instruction, err = raw.ValidateAndBuild()
-			// 	require.NoError(t, err)
-
-			// 	testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Cross-program invocation reentrancy not allowed for this instruction"})
-			// })
 
 			t.Run("uninitialized token account can be manually executed", func(t *testing.T) {
 				// create new token receiver + find address (does not actually create account, just instruction)
@@ -6641,6 +6537,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					transmitter.PublicKey(),
 					solana.SystemProgramID,
@@ -6672,6 +6570,8 @@ func TestCCIPRouter(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.OfframpEvmSourceChainPDA,
 					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
 					config.OfframpExternalExecutionConfigPDA,
 					legacyAdmin.PublicKey(),
 					solana.SystemProgramID,

@@ -342,6 +342,8 @@ pub struct CommitReportContext<'info> {
     // [...chainConfig accounts] fee quoter accounts used to store gas prices
 }
 
+const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
+
 #[derive(Accounts)]
 #[instruction(raw_report: Vec<u8>)]
 pub struct ExecuteReportContext<'info> {
@@ -373,6 +375,25 @@ pub struct ExecuteReportContext<'info> {
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidInputs,
     )]
     pub commit_report: Account<'info, CommitReport>,
+
+    pub offramp: Program<'info, CcipOfframp>,
+
+    /// CHECK PDA of the router program verifying the signer is an allowed offramp.
+    /// If PDA does not exist, the router doesn't allow this offramp
+    #[account(
+        constraint = {
+        let (pda, _) = Pubkey::find_program_address(
+            &[
+                ALLOWED_OFFRAMP,
+                source_chain.chain_selector.to_le_bytes().as_ref(),
+                offramp.key().as_ref(),
+            ],
+            &reference_addresses.router,
+        );
+        allowed_offramp.key() == pda && allowed_offramp.owner.key() == reference_addresses.router
+        } @ CcipOfframpError::InvalidInputs
+    )]
+    pub allowed_offramp: UncheckedAccount<'info>,
 
     /// CHECK: Using this to sign
     #[account(seeds = [seed::EXTERNAL_EXECUTION_CONFIG], bump)]
