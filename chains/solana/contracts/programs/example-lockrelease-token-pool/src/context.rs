@@ -252,3 +252,32 @@ pub struct DeleteChainConfig<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+pub struct TokenTransfer<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        bump,
+    )]
+    pub state: Account<'info, State>,
+    #[account(address = *mint.to_account_info().owner)]
+    /// CHECK: CPI to token program
+    pub token_program: AccountInfo<'info>,
+    #[account(mut)]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        seeds = [POOL_SIGNER_SEED, state.config.mint.key().as_ref()],
+        bump,
+        address = state.config.pool_signer,
+    )]
+    /// CHECK: unchecked CPI signer
+    pub pool_signer: UncheckedAccount<'info>,
+    #[account(mut, address = get_associated_token_address_with_program_id(&pool_signer.key(), &mint.key(), &token_program.key()))]
+    pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(mut, token::mint = mint, token::token_program = token_program)]
+    pub remote_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(constraint = authority.key() == state.config.owner || authority.key() == state.config.rebalancer @ CcipTokenPoolError::Unauthorized)]
+    pub authority: Signer<'info>,
+}

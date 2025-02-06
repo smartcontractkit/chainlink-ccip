@@ -550,6 +550,14 @@
             "type": "publicKey"
           },
           {
+            "name": "rebalancer",
+            "type": "publicKey"
+          },
+          {
+            "name": "canAcceptLiquidity",
+            "type": "bool"
+          },
+          {
             "name": "listEnabled",
             "type": "bool"
           },
@@ -1041,6 +1049,11 @@
       "code": 6012,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
+    },
+    {
+      "code": 6013,
+      "name": "LiquidityNotAccepted",
+      "msg": "Liquidity not accepted"
     }
   ]
 }

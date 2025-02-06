@@ -20,10 +20,7 @@ use crate::common::*;
 pub mod example_burnmint_token_pool {
     use super::*;
 
-    pub fn initialize<'info>(
-        ctx: Context<InitializeTokenPool>,
-        ramp_authority: Pubkey,
-    ) -> Result<()> {
+    pub fn initialize(ctx: Context<InitializeTokenPool>, ramp_authority: Pubkey) -> Result<()> {
         ctx.accounts.state.config.init(
             &ctx.accounts.mint,
             ctx.program_id.key(),
@@ -122,7 +119,7 @@ pub mod example_burnmint_token_pool {
             .update_allow_list(None, vec![], remove)
     }
 
-    pub fn release_or_mint_tokens<'info>(
+    pub fn release_or_mint_tokens(
         ctx: Context<TokenOfframp>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
@@ -161,7 +158,7 @@ pub mod example_burnmint_token_pool {
         })
     }
 
-    pub fn lock_or_burn_tokens<'info>(
+    pub fn lock_or_burn_tokens(
         ctx: Context<TokenOnramp>,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<LockOrBurnOutV1> {

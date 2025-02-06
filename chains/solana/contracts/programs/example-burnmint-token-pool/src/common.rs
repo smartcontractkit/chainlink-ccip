@@ -1,9 +1,9 @@
-use std::ops::Deref;
-
+use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::Mint,
 };
 use spl_math::uint::U256;
+use std::ops::Deref;
 
 use crate::{validate_token_bucket_config, RateLimitConfig, RateLimitTokenBucket};
 
@@ -32,6 +32,10 @@ pub struct Config {
     pub proposed_owner: Pubkey,
     pub rate_limit_admin: Pubkey,
     pub ramp_authority: Pubkey, // signer for CCIP calls
+
+    // rebalancing - only used for lock/release pools
+    pub rebalancer: Pubkey,
+    pub can_accept_liquidity: bool,
 
     // lockOrBurn allow list
     pub list_enabled: bool,
@@ -110,23 +114,27 @@ impl Config {
         };
 
         for k in remove {
-            match self.allow_list.binary_search(&k) {
-                Ok(v) => {
-                    self.allow_list.remove(v);
-                }
-                Err(_) => {}
+            if let Ok(v) = self.allow_list.binary_search(&k) {
+                self.allow_list.remove(v);
             }
         }
 
         for k in add {
-            match self.allow_list.binary_search(&k) {
-                Ok(_) => {}
-                Err(v) => {
-                    self.allow_list.insert(v, k);
-                }
+            if let Err(v) = self.allow_list.binary_search(&k) {
+                self.allow_list.insert(v, k);
             }
         }
 
+        Ok(())
+    }
+
+    pub fn set_rebalancer(&mut self, address: Pubkey) -> Result<()> {
+        self.rebalancer = address;
+        Ok(())
+    }
+
+    pub fn set_can_accept_liquidity(&mut self, allow: bool) -> Result<()> {
+        self.can_accept_liquidity = allow;
         Ok(())
     }
 }
@@ -368,6 +376,10 @@ pub enum CcipTokenPoolError {
     RLInvalidRateLimitRate,
     #[msg("RateLimit: disabled non-zero rate limit")]
     RLDisabledNonZeroRateLimit,
+
+    // Lock/Release errors
+    #[msg("Liquidity not accepted")]
+    LiquidityNotAccepted,
 }
 
 // validate_lock_or_burn checks for correctness on inputs

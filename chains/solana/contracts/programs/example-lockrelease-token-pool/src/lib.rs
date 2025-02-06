@@ -13,10 +13,7 @@ pub mod example_lockrelease_token_pool {
 
     use super::*;
 
-    pub fn initialize<'info>(
-        ctx: Context<InitializeTokenPool>,
-        ramp_authority: Pubkey,
-    ) -> Result<()> {
+    pub fn initialize(ctx: Context<InitializeTokenPool>, ramp_authority: Pubkey) -> Result<()> {
         ctx.accounts.state.config.init(
             &ctx.accounts.mint,
             ctx.program_id.key(),
@@ -115,7 +112,7 @@ pub mod example_lockrelease_token_pool {
             .update_allow_list(None, vec![], remove)
     }
 
-    pub fn release_or_mint_tokens<'info>(
+    pub fn release_or_mint_tokens(
         ctx: Context<TokenOfframp>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
@@ -156,7 +153,7 @@ pub mod example_lockrelease_token_pool {
         })
     }
 
-    pub fn lock_or_burn_tokens<'info>(
+    pub fn lock_or_burn_tokens(
         ctx: Context<TokenOnramp>,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<LockOrBurnOutV1> {
@@ -174,9 +171,52 @@ pub mod example_lockrelease_token_pool {
             dest_pool_data: RemoteAddress::ZERO,
         })
     }
+
+    pub fn set_rebalancer(ctx: Context<SetConfig>, rebalancer: Pubkey) -> Result<()> {
+        ctx.accounts.state.config.set_rebalancer(rebalancer)
+    }
+
+    pub fn set_can_accept_liquidity(ctx: Context<SetConfig>, allow: bool) -> Result<()> {
+        ctx.accounts.state.config.set_can_accept_liquidity(allow)
+    }
+
+    pub fn provide_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
+        require!(
+            ctx.accounts.state.config.can_accept_liquidity,
+            CcipTokenPoolError::LiquidityNotAccepted
+        );
+        transfer_tokens(
+            ctx.accounts.token_program.key(),
+            ctx.accounts.pool_token_account.to_account_info(), // to
+            ctx.accounts.remote_token_account.to_account_info(), // from
+            ctx.accounts.mint.to_account_info(),
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.bumps.pool_signer,
+            amount,
+            ctx.accounts.mint.decimals,
+        )
+    }
+
+    // withdraw liquidity can be used to transfer liquidity from one pool to another by setting the `rebalancer` to the calling pool
+    pub fn withdraw_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
+        require!(
+            ctx.accounts.state.config.can_accept_liquidity,
+            CcipTokenPoolError::LiquidityNotAccepted
+        );
+        transfer_tokens(
+            ctx.accounts.token_program.key(),
+            ctx.accounts.remote_token_account.to_account_info(), // to
+            ctx.accounts.pool_token_account.to_account_info(),   // from
+            ctx.accounts.mint.to_account_info(),
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.bumps.pool_signer,
+            amount,
+            ctx.accounts.mint.decimals,
+        )
+    }
 }
 
-pub fn lock_tokens<'a>(sender: Pubkey, lock_or_burn: LockOrBurnInV1) -> Result<()> {
+pub fn lock_tokens(sender: Pubkey, lock_or_burn: LockOrBurnInV1) -> Result<()> {
     // receiver -> token pool (occurs outside pool)
     // hold tokens
     emit!(Locked {
@@ -187,11 +227,11 @@ pub fn lock_tokens<'a>(sender: Pubkey, lock_or_burn: LockOrBurnInV1) -> Result<(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn release_tokens<'a>(
     token_program: Pubkey,
     receiver_token_account: AccountInfo<'a>,
     pool_token_account: AccountInfo<'a>,
-
     mint: AccountInfo<'a>,
     pool_signer: AccountInfo<'a>,
     pool_signer_bump: u8,
@@ -200,12 +240,43 @@ pub fn release_tokens<'a>(
     decimals: u8,
 ) -> Result<()> {
     // transfer from pool -> receiver
+    transfer_tokens(
+        token_program,
+        receiver_token_account,
+        pool_token_account,
+        mint,
+        pool_signer.clone(),
+        pool_signer_bump,
+        parsed_amount,
+        decimals,
+    )?;
+
+    emit!(Released {
+        sender: pool_signer.key(),
+        recipient: release_or_mint.receiver,
+        amount: parsed_amount,
+    });
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn transfer_tokens<'a>(
+    token_program: Pubkey,
+    to: AccountInfo<'a>,
+    from: AccountInfo<'a>,
+    mint: AccountInfo<'a>,
+    pool_signer: AccountInfo<'a>,
+    pool_signer_bump: u8,
+    parsed_amount: u64,
+    decimals: u8,
+) -> Result<()> {
     // https://docs.rs/spl-token-2022/latest/spl_token_2022/instruction/fn.transfer.html
     let mut ix = transfer_checked(
         &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
-        &pool_token_account.key(),
+        &from.key(),
         &mint.key(),
-        &receiver_token_account.key(),
+        &to.key(),
         &pool_signer.key(),
         &[],
         parsed_amount,
@@ -218,22 +289,5 @@ pub fn release_tokens<'a>(
         &mint.key().to_bytes(),
         &[pool_signer_bump],
     ];
-    invoke_signed(
-        &ix,
-        &[
-            pool_token_account,
-            mint,
-            receiver_token_account,
-            pool_signer.clone(),
-        ],
-        &[&seeds[..]],
-    )?;
-
-    emit!(Released {
-        sender: pool_signer.key(),
-        recipient: release_or_mint.receiver,
-        amount: parsed_amount,
-    });
-
-    Ok(())
+    invoke_signed(&ix, &[from, mint, to, pool_signer.clone()], &[&seeds[..]]).map_err(|e| e.into())
 }

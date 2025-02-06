@@ -8,17 +8,19 @@ import (
 )
 
 type Config struct {
-	TokenProgram     ag_solanago.PublicKey
-	Mint             ag_solanago.PublicKey
-	Decimals         uint8
-	PoolSigner       ag_solanago.PublicKey
-	PoolTokenAccount ag_solanago.PublicKey
-	Owner            ag_solanago.PublicKey
-	ProposedOwner    ag_solanago.PublicKey
-	RateLimitAdmin   ag_solanago.PublicKey
-	RampAuthority    ag_solanago.PublicKey
-	ListEnabled      bool
-	AllowList        []ag_solanago.PublicKey
+	TokenProgram       ag_solanago.PublicKey
+	Mint               ag_solanago.PublicKey
+	Decimals           uint8
+	PoolSigner         ag_solanago.PublicKey
+	PoolTokenAccount   ag_solanago.PublicKey
+	Owner              ag_solanago.PublicKey
+	ProposedOwner      ag_solanago.PublicKey
+	RateLimitAdmin     ag_solanago.PublicKey
+	RampAuthority      ag_solanago.PublicKey
+	Rebalancer         ag_solanago.PublicKey
+	CanAcceptLiquidity bool
+	ListEnabled        bool
+	AllowList          []ag_solanago.PublicKey
 }
 
 func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -64,6 +66,16 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `RampAuthority` param:
 	err = encoder.Encode(obj.RampAuthority)
+	if err != nil {
+		return err
+	}
+	// Serialize `Rebalancer` param:
+	err = encoder.Encode(obj.Rebalancer)
+	if err != nil {
+		return err
+	}
+	// Serialize `CanAcceptLiquidity` param:
+	err = encoder.Encode(obj.CanAcceptLiquidity)
 	if err != nil {
 		return err
 	}
@@ -123,6 +135,16 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `RampAuthority`:
 	err = decoder.Decode(&obj.RampAuthority)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Rebalancer`:
+	err = decoder.Decode(&obj.Rebalancer)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CanAcceptLiquidity`:
+	err = decoder.Decode(&obj.CanAcceptLiquidity)
 	if err != nil {
 		return err
 	}
