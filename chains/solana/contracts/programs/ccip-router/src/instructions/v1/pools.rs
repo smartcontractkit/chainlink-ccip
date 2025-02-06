@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint};
-use anchor_spl::token_interface::TokenAccount;
 use solana_program::{
     address_lookup_table::state::AddressLookupTable, instruction::Instruction,
     program::invoke_signed,
@@ -10,7 +9,6 @@ use solana_program::{program::get_return_data, program_pack::Pack};
 
 use crate::{seed, CcipRouterError, ExternalExecutionConfig, TokenAdminRegistry};
 
-pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
 const MIN_TOKEN_POOL_ACCOUNTS: usize = 12; // see TokenAccounts struct for all required accounts
 
@@ -325,12 +323,6 @@ pub fn interact_with_pool<D: ToTxData>(
     // https://github.com/coral-xyz/anchor/blob/0109f4a3cf4117570f627e3ae465b6247d504f69/lang/syn/src/codegen/program/cpi.rs#L83
     let (_, data) = get_return_data().unwrap();
     Ok(data)
-}
-
-pub fn get_balance<'a>(token_account: &'a AccountInfo<'a>) -> Result<u64> {
-    let mut acc: InterfaceAccount<TokenAccount> = InterfaceAccount::try_from(token_account)?;
-    acc.reload()?; // reload state to ensure latest balance
-    Ok(acc.amount)
 }
 
 pub mod token_admin_registry_writable {
