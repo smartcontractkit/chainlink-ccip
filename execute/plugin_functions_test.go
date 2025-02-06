@@ -628,7 +628,7 @@ func Test_combineReportsAndMessages(t *testing.T) {
 
 func Test_decodeAttributedObservations(t *testing.T) {
 	mustEncode := func(obs exectypes.Observation) []byte {
-		enc, err := obs.Encode()
+		enc, err := jsonOcrTypeCodec.EncodeObservation(obs)
 		if err != nil {
 			t.Fatal("Unable to encode")
 		}
@@ -724,7 +724,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := decodeAttributedObservations(tt.args)
+			got, err := decodeAttributedObservations(tt.args, jsonOcrTypeCodec)
 			if !tt.wantErr(t, err, fmt.Sprintf("decodeAttributedObservations(%v)", tt.args)) {
 				return
 			}

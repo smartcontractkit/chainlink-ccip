@@ -33,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -61,6 +62,7 @@ type Plugin struct {
 	costlyMessageObserver costlymessages.Observer
 	estimateProvider      cciptypes.EstimateProvider
 	lggr                  logger.Logger
+	ocrTypeCodec          ocrtypecodec.ExecCodec
 
 	// state
 	contractsInitialized bool
@@ -120,6 +122,7 @@ func NewPlugin(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
 			offchainCfg.RootSnoozeTime.Duration()),
+		ocrTypeCodec: ocrtypecodec.NewExecCodecJSON(),
 	}
 }
 
@@ -218,14 +221,14 @@ func getPendingExecutedReports(
 func (p *Plugin) ValidateObservation(
 	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
-	decodedObservation, err := exectypes.DecodeObservation(ao.Observation)
+	decodedObservation, err := p.ocrTypeCodec.DecodeObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("unable to decode observation: %w", err)
 	}
 
 	var previousOutcome exectypes.Outcome
 
-	previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
+	previousOutcome, err = p.ocrTypeCodec.DecodeOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
@@ -435,7 +438,7 @@ func (p *Plugin) Reports(
 		return nil, nil
 	}
 
-	decodedOutcome, err := exectypes.DecodeOutcome(outcome)
+	decodedOutcome, err := p.ocrTypeCodec.DecodeOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
