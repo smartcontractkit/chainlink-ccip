@@ -105,6 +105,12 @@ type extendedContractReader struct {
 	mu               *sync.RWMutex
 }
 
+// BatchGetLatestValuesGracefulResult is the result of ExtendedBatchGetLatestValuesGraceful.
+type BatchGetLatestValuesGracefulResult struct {
+	Results        types.BatchGetLatestValuesResult
+	SkippedNoBinds []string // List of contract names that were skipped due to no bindings
+}
+
 func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended {
 	// avoid double wrapping
 	if ecr, ok := baseContractReader.(Extended); ok {
