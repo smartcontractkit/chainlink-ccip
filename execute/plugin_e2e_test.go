@@ -116,6 +116,7 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100})
 
 	// Second message execution cost drops, it should be included in the outcome
+	// the first message is excluded by the inflight message cache.
 	// Message1 cost=40000,  fee=50000   boosted original_fee * (1 + 4*1.0),
 	// Message2 cost=40000,  fee=100000
 	// Message3 cost=200000, fee=150000
@@ -124,9 +125,10 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	}
 	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100, 101})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{101})
 
 	// 3 hours in the future, we agree to pay higher fee for the third message (7 hours since the message was sent)
+	// the first and second message are excluded by the inflight message cache.
 	// Message1 cost=40000,  fee=80000  boosted 10000 * (1 + 7*1.0),
 	// Message2 cost=40000,  fee=160000
 	// Message3 cost=200000, fee=240000
@@ -135,7 +137,7 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	}
 	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100, 101, 102})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102})
 }
 
 // TestExceedSizeObservation tests the case where the observation size exceeds the maximum size.

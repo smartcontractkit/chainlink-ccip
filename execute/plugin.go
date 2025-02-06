@@ -41,6 +41,12 @@ import (
 
 type ContractDiscoveryInterface plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
 
+type inflightMessageCache interface {
+	IsInflight(src cciptypes.ChainSelector, msgID cciptypes.Bytes32) bool
+	MarkInflight(src cciptypes.ChainSelector, msgID cciptypes.Bytes32)
+	Delete(src cciptypes.ChainSelector, msgID cciptypes.Bytes32)
+}
+
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
 	donID        plugintypes.DonID
@@ -65,9 +71,12 @@ type Plugin struct {
 	ocrTypeCodec          ocrtypecodec.ExecCodec
 
 	// state
+
 	contractsInitialized bool
-	// this cache remembers commit root details to optimize DB lookups.
+	// commitRootsCache remembers commit root details to optimize DB lookups.
 	commitRootsCache cache.CommitsRootsCache
+	// inflightMessageCache prevents duplicate reports from being sent for the same message.
+	inflightMessageCache inflightMessageCache
 }
 
 func NewPlugin(
@@ -122,7 +131,8 @@ func NewPlugin(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
 			offchainCfg.RootSnoozeTime.Duration()),
-		ocrTypeCodec: ocrtypecodec.NewExecCodecJSON(),
+		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
+		ocrTypeCodec:         ocrtypecodec.NewExecCodecJSON(),
 	}
 }
 
