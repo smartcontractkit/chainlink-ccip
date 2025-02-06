@@ -14,19 +14,19 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-// ConfigCache defines the interface for caching chain configuration data
-type ConfigCache interface {
+// ConfigPoller defines the interface for caching chain configuration data
+type ConfigPoller interface {
 	// GetChainConfig retrieves the cached configuration for a chain
 	GetChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error)
 	// RefreshChainConfig forces a refresh of the chain configuration
 	RefreshChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error)
 }
 
-// configCache handles caching of chain configuration data for multiple chains.
+// configPoller handles caching of chain configuration data for multiple chains.
 // It is used by the ccipChainReader to store and retrieve configuration data,
 // avoiding unnecessary contract calls and improving performance.
-// configCache handles caching of chain configuration data for multiple chains
-type configCache struct {
+// configPoller handles caching of chain configuration data for multiple chains
+type configPoller struct {
 	sync.RWMutex
 	chainCaches   map[cciptypes.ChainSelector]*chainCache
 	refreshPeriod time.Duration
@@ -43,13 +43,13 @@ type chainCache struct {
 	lastRefresh time.Time
 }
 
-// newConfigCache creates a new config cache instance
-func newConfigCache(
+// newConfigPoller creates a new config cache instance
+func newConfigPoller(
 	lggr logger.Logger,
 	readers map[cciptypes.ChainSelector]contractreader.Extended,
 	refreshPeriod time.Duration,
-) *configCache {
-	return &configCache{
+) *configPoller {
+	return &configPoller{
 		chainCaches:   make(map[cciptypes.ChainSelector]*chainCache),
 		refreshPeriod: refreshPeriod,
 		readers:       readers,
@@ -58,7 +58,7 @@ func newConfigCache(
 }
 
 // getOrCreateChainCache safely retrieves or creates a cache for a specific chain
-func (c *configCache) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *chainCache {
+func (c *configPoller) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *chainCache {
 	c.Lock()
 	defer c.Unlock()
 
@@ -78,7 +78,7 @@ func (c *configCache) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *c
 }
 
 // GetChainConfig retrieves the cached configuration for a chain
-func (c *configCache) GetChainConfig(
+func (c *configPoller) GetChainConfig(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
 ) (ChainConfigSnapshot, error) {
@@ -107,7 +107,7 @@ func (c *configCache) GetChainConfig(
 }
 
 // RefreshChainConfig forces a refresh of the chain configuration
-func (c *configCache) RefreshChainConfig(
+func (c *configPoller) RefreshChainConfig(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
 ) (ChainConfigSnapshot, error) {
@@ -156,7 +156,7 @@ func (c *configCache) RefreshChainConfig(
 }
 
 // prepareBatchRequests creates the batch request for all configurations
-func (c *configCache) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
+func (c *configPoller) prepareBatchRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
 	var (
 		commitLatestOCRConfig OCRConfigResponse
 		execLatestOCRConfig   OCRConfigResponse
@@ -227,7 +227,7 @@ func (c *configCache) prepareBatchRequests() contractreader.ExtendedBatchGetLate
 }
 
 // fetchChainConfig fetches the latest configuration for a specific chain
-func (c *configCache) fetchChainConfig(
+func (c *configPoller) fetchChainConfig(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
 	reader, exists := c.readers[chainSel]
@@ -250,7 +250,7 @@ func (c *configCache) fetchChainConfig(
 	return c.updateFromResults(batchResult)
 }
 
-func (c *configCache) updateFromResults(batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error) {
+func (c *configPoller) updateFromResults(batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error) {
 	config := ChainConfigSnapshot{}
 
 	for contract, results := range batchResult {
@@ -291,7 +291,7 @@ func (c *configCache) updateFromResults(batchResult types.BatchGetLatestValuesRe
 // resultProcessor defines a function type for processing individual results
 type resultProcessor func(interface{}) error
 
-func (c *configCache) processOfframpResults(
+func (c *configPoller) processOfframpResults(
 	results []types.BatchReadResult) (OfframpConfig, error) {
 
 	if len(results) != 5 {
@@ -364,7 +364,7 @@ func (c *configCache) processOfframpResults(
 	return config, nil
 }
 
-func (c *configCache) processRMNProxyResults(results []types.BatchReadResult) (RMNProxyConfig, error) {
+func (c *configPoller) processRMNProxyResults(results []types.BatchReadResult) (RMNProxyConfig, error) {
 	if len(results) != 1 {
 		return RMNProxyConfig{}, fmt.Errorf("expected 1 RMN proxy result, got %d", len(results))
 	}
@@ -383,7 +383,7 @@ func (c *configCache) processRMNProxyResults(results []types.BatchReadResult) (R
 	return RMNProxyConfig{}, fmt.Errorf("invalid type for RMN proxy remote address: %T", val)
 }
 
-func (c *configCache) processRMNRemoteResults(results []types.BatchReadResult) (RMNRemoteConfig, error) {
+func (c *configPoller) processRMNRemoteResults(results []types.BatchReadResult) (RMNRemoteConfig, error) {
 	config := RMNRemoteConfig{}
 
 	if len(results) != 2 {
@@ -417,7 +417,7 @@ func (c *configCache) processRMNRemoteResults(results []types.BatchReadResult) (
 	return config, nil
 }
 
-func (c *configCache) processFeeQuoterResults(results []types.BatchReadResult) (FeeQuoterConfig, error) {
+func (c *configPoller) processFeeQuoterResults(results []types.BatchReadResult) (FeeQuoterConfig, error) {
 	if len(results) != 1 {
 		return FeeQuoterConfig{}, fmt.Errorf("expected 1 fee quoter result, got %d", len(results))
 	}
@@ -437,4 +437,4 @@ func (c *configCache) processFeeQuoterResults(results []types.BatchReadResult) (
 }
 
 // Ensure configCache implements ConfigCache
-var _ ConfigCache = (*configCache)(nil)
+var _ ConfigPoller = (*configPoller)(nil)

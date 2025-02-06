@@ -487,7 +487,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		destChain:       destChain,
 		contractReaders: castToExtended,
 		lggr:            lggr,
-		cache:           mockCache,
+		configPoller:    mockCache,
 	}
 
 	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
@@ -641,7 +641,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		destChain:       destChain,
 		contractReaders: castToExtended,
 		lggr:            logger.Test(t),
-		cache:           mockCache,
+		configPoller:    mockCache,
 	}
 
 	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
@@ -672,8 +672,8 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 			sourceChain1: reader_mocks.NewMockExtended(t),
 			sourceChain2: reader_mocks.NewMockExtended(t),
 		},
-		lggr:  logger.Test(t),
-		cache: mockCache,
+		lggr:         logger.Test(t),
+		configPoller: mockCache,
 	}
 
 	_, err := ccipChainReader.DiscoverContracts(ctx)
@@ -704,8 +704,8 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 			sourceChain1: reader_mocks.NewMockExtended(t),
 			sourceChain2: reader_mocks.NewMockExtended(t),
 		},
-		lggr:  logger.Test(t),
-		cache: mockCache,
+		lggr:         logger.Test(t),
+		configPoller: mockCache,
 	}
 
 	_, err := ccipChainReader.DiscoverContracts(ctx)
@@ -755,7 +755,7 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	ccipReader := &ccipChainReader{
 		lggr:           logger.Test(t),
 		destChain:      chainC,
-		cache:          mockCache,
+		configPoller:   mockCache,
 		offrampAddress: typeconv.AddressBytesToString(offrampAddress, uint64(chainC)),
 	}
 
@@ -910,7 +910,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	ccipReader := &ccipChainReader{
 		lggr:           logger.Test(t),
 		destChain:      chainC,
-		cache:          mockCache,
+		configPoller:   mockCache,
 		offrampAddress: typeconv.AddressBytesToString(offrampAddress, uint64(chainC)),
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 			chainC: destCR,

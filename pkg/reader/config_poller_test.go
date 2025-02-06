@@ -19,12 +19,12 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func setupBasicCache(t *testing.T) (*configCache, *reader_mocks.MockExtended) {
+func setupBasicCache(t *testing.T) (*configPoller, *reader_mocks.MockExtended) {
 	reader := reader_mocks.NewMockExtended(t)
 	readers := map[cciptypes.ChainSelector]contractreader.Extended{
 		chainA: reader,
 	}
-	cache := newConfigCache(logger.Test(t), readers, 1*time.Second)
+	cache := newConfigPoller(logger.Test(t), readers, 1*time.Second)
 	return cache, reader
 }
 
@@ -347,7 +347,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 			lggr := logger.Test(t)
 			ctx := tests.Context(t)
 
-			cache := newConfigCache(lggr, tc.readers, tc.refreshPeriod)
+			cache := newConfigPoller(lggr, tc.readers, tc.refreshPeriod)
 			require.NotNil(t, cache, "cache should never be nil after initialization")
 
 			// Verify the cache's internal state
@@ -473,7 +473,7 @@ func TestConfigCache_MultipleChains(t *testing.T) {
 		chainA: readerA,
 		chainB: readerB,
 	}
-	cache := newConfigCache(logger.Test(t), readers, 1*time.Second)
+	cache := newConfigPoller(logger.Test(t), readers, 1*time.Second)
 	ctx := tests.Context(t)
 
 	// Setup mock response for both chains
@@ -556,7 +556,7 @@ func TestConfigCache_RefreshPeriod(t *testing.T) {
 			readers := map[cciptypes.ChainSelector]contractreader.Extended{
 				chainA: reader,
 			}
-			cache := newConfigCache(logger.Test(t), readers, tc.refreshPeriod)
+			cache := newConfigPoller(logger.Test(t), readers, tc.refreshPeriod)
 			ctx := tests.Context(t)
 
 			mockConfig := OCRConfigResponse{

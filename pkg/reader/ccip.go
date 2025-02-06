@@ -45,7 +45,7 @@ type ccipChainReader struct {
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
 	extraDataCodec  cciptypes.ExtraDataCodec
-	cache           ConfigCache
+	configPoller    ConfigPoller
 }
 
 func newCCIPChainReaderInternal(
@@ -72,7 +72,7 @@ func newCCIPChainReaderInternal(
 	}
 
 	// Initialize cache with readers
-	reader.cache = newConfigCache(lggr, crs, defaultRefreshPeriod)
+	reader.configPoller = newConfigPoller(lggr, crs, defaultRefreshPeriod)
 
 	contracts := ContractAddresses{
 		consts.ContractNameOffRamp: {
@@ -755,7 +755,7 @@ func (r *ccipChainReader) buildSigners(signers []signer) []rmntypes.RemoteSigner
 func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	config, err := r.cache.GetChainConfig(ctx, r.destChain)
+	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)
 	}
@@ -856,7 +856,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	// Get from cache
-	config, err := r.cache.GetChainConfig(ctx, r.destChain)
+	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
@@ -1035,7 +1035,7 @@ type feeQuoterStaticConfig struct {
 // getDestFeeQuoterStaticConfig returns the destination chain's Fee Quoter's StaticConfig
 func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (feeQuoterStaticConfig, error) {
 	// Get from cache
-	config, err := r.cache.GetChainConfig(ctx, r.destChain)
+	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return feeQuoterStaticConfig{}, fmt.Errorf("get chain config: %w", err)
 	}
@@ -1381,7 +1381,7 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	}
 
 	// Get the address from cache instead of making a contract call
-	config, err := r.cache.GetChainConfig(ctx, chain)
+	config, err := r.configPoller.GetChainConfig(ctx, chain)
 	if err != nil {
 		return nil, fmt.Errorf("get chain config: %w", err)
 	}
@@ -1480,7 +1480,7 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 }
 
 func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
-	config, err := r.cache.GetChainConfig(ctx, r.destChain)
+	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("get chain config: %w", err)
 	}
