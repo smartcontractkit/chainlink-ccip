@@ -57,7 +57,7 @@ func TestTokenPool(t *testing.T) {
 			amount := uint64(1000)
 
 			for _, poolType := range []test_token_pool.PoolType{test_token_pool.LockAndRelease_PoolType, test_token_pool.BurnAndMint_PoolType} {
-				p, err := tokens.NewTokenPool(v.tokenProgram)
+				p, err := tokens.NewTokenPool(v.tokenProgram, config.CcipTokenPoolProgram)
 				require.NoError(t, err)
 				mint := p.Mint.PublicKey()
 
@@ -372,7 +372,7 @@ func TestTokenPool(t *testing.T) {
 	// test functionality with arbitrary wrapped program
 	t.Run("Wrapped", func(t *testing.T) {
 		t.Parallel()
-		p, err := tokens.NewTokenPool(solana.TokenProgramID)
+		p, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram)
 		require.NoError(t, err)
 		mint := p.Mint.PublicKey()
 

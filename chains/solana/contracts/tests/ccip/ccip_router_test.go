@@ -5925,7 +5925,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					for _, p := range poolCases {
 						t.Run(p.Name, func(t *testing.T) {
-							ix, err := token_pool.NewSetRampAuthorityInstruction(
+							ix, err := test_token_pool.NewSetRampAuthorityInstruction(
 								config.OfframpTokenPoolsSignerPDA,
 								p.PoolConfig,
 								p.Admin.PublicKey(),
