@@ -5,32 +5,18 @@ package test_token_pool
 import (
 	"fmt"
 	ag_binary "github.com/gagliardetto/binary"
-	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Config struct {
-	Version          uint8
-	PoolType         PoolType
-	TokenProgram     ag_solanago.PublicKey
-	Mint             ag_solanago.PublicKey
-	Decimals         uint8
-	PoolSigner       ag_solanago.PublicKey
-	PoolTokenAccount ag_solanago.PublicKey
-	Owner            ag_solanago.PublicKey
-	ProposedOwner    ag_solanago.PublicKey
-	RampAuthority    ag_solanago.PublicKey
+type State struct {
+	PoolType PoolType
+	Config   BaseConfig
 }
 
-var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
+var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
 
-func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
+	err = encoder.WriteBytes(StateDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -39,150 +25,43 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `TokenProgram` param:
-	err = encoder.Encode(obj.TokenProgram)
-	if err != nil {
-		return err
-	}
-	// Serialize `Mint` param:
-	err = encoder.Encode(obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Serialize `Decimals` param:
-	err = encoder.Encode(obj.Decimals)
-	if err != nil {
-		return err
-	}
-	// Serialize `PoolSigner` param:
-	err = encoder.Encode(obj.PoolSigner)
-	if err != nil {
-		return err
-	}
-	// Serialize `PoolTokenAccount` param:
-	err = encoder.Encode(obj.PoolTokenAccount)
-	if err != nil {
-		return err
-	}
-	// Serialize `Owner` param:
-	err = encoder.Encode(obj.Owner)
-	if err != nil {
-		return err
-	}
-	// Serialize `ProposedOwner` param:
-	err = encoder.Encode(obj.ProposedOwner)
-	if err != nil {
-		return err
-	}
-	// Serialize `RampAuthority` param:
-	err = encoder.Encode(obj.RampAuthority)
+	// Serialize `Config` param:
+	err = encoder.Encode(obj.Config)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ConfigDiscriminator[:]) {
+		if !discriminator.Equal(StateDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[155 12 170 224 30 250 204 130]",
+				"[216 146 107 94 104 75 182 177]",
 				fmt.Sprint(discriminator[:]))
 		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
 	}
 	// Deserialize `PoolType`:
 	err = decoder.Decode(&obj.PoolType)
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenProgram`:
-	err = decoder.Decode(&obj.TokenProgram)
+	// Deserialize `Config`:
+	err = decoder.Decode(&obj.Config)
 	if err != nil {
 		return err
-	}
-	// Deserialize `Mint`:
-	err = decoder.Decode(&obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Decimals`:
-	err = decoder.Decode(&obj.Decimals)
-	if err != nil {
-		return err
-	}
-	// Deserialize `PoolSigner`:
-	err = decoder.Decode(&obj.PoolSigner)
-	if err != nil {
-		return err
-	}
-	// Deserialize `PoolTokenAccount`:
-	err = decoder.Decode(&obj.PoolTokenAccount)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Owner`:
-	err = decoder.Decode(&obj.Owner)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ProposedOwner`:
-	err = decoder.Decode(&obj.ProposedOwner)
-	if err != nil {
-		return err
-	}
-	// Deserialize `RampAuthority`:
-	err = decoder.Decode(&obj.RampAuthority)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type ExternalExecutionConfig struct{}
-
-var ExternalExecutionConfigDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
-
-func (obj ExternalExecutionConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(ExternalExecutionConfigDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(ExternalExecutionConfigDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[159 157 150 212 168 103 117 39]",
-				fmt.Sprint(discriminator[:]))
-		}
 	}
 	return nil
 }
 
 type ChainConfig struct {
-	Remote            RemoteConfig
-	InboundRateLimit  RateLimitTokenBucket
-	OutboundRateLimit RateLimitTokenBucket
+	Base BaseChain
 }
 
 var ChainConfigDiscriminator = [8]byte{13, 177, 233, 141, 212, 29, 148, 56}
@@ -193,18 +72,8 @@ func (obj ChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	if err != nil {
 		return err
 	}
-	// Serialize `Remote` param:
-	err = encoder.Encode(obj.Remote)
-	if err != nil {
-		return err
-	}
-	// Serialize `InboundRateLimit` param:
-	err = encoder.Encode(obj.InboundRateLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `OutboundRateLimit` param:
-	err = encoder.Encode(obj.OutboundRateLimit)
+	// Serialize `Base` param:
+	err = encoder.Encode(obj.Base)
 	if err != nil {
 		return err
 	}
@@ -225,18 +94,8 @@ func (obj *ChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 				fmt.Sprint(discriminator[:]))
 		}
 	}
-	// Deserialize `Remote`:
-	err = decoder.Decode(&obj.Remote)
-	if err != nil {
-		return err
-	}
-	// Deserialize `InboundRateLimit`:
-	err = decoder.Decode(&obj.InboundRateLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OutboundRateLimit`:
-	err = decoder.Decode(&obj.OutboundRateLimit)
+	// Deserialize `Base`:
+	err = decoder.Decode(&obj.Base)
 	if err != nil {
 		return err
 	}

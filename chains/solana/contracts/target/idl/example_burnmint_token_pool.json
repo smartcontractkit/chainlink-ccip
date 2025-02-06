@@ -463,7 +463,7 @@
   ],
   "accounts": [
     {
-      "name": "ChainConfig",
+      "name": "BaseChain",
       "type": {
         "kind": "struct",
         "fields": [
@@ -500,7 +500,21 @@
           {
             "name": "config",
             "type": {
-              "defined": "Config"
+              "defined": "BaseConfig"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base",
+            "type": {
+              "defined": "BaseChain"
             }
           }
         ]
@@ -509,7 +523,7 @@
   ],
   "types": [
     {
-      "name": "Config",
+      "name": "BaseConfig",
       "type": {
         "kind": "struct",
         "fields": [

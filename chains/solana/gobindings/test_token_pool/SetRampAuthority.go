@@ -14,7 +14,7 @@ import (
 type SetRampAuthority struct {
 	NewAuthority *ag_solanago.PublicKey
 
-	// [0] = [WRITE] config
+	// [0] = [WRITE] state
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -34,14 +34,14 @@ func (inst *SetRampAuthority) SetNewAuthority(newAuthority ag_solanago.PublicKey
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *SetRampAuthority) SetConfigAccount(config ag_solanago.PublicKey) *SetRampAuthority {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
+// SetStateAccount sets the "state" account.
+func (inst *SetRampAuthority) SetStateAccount(state ag_solanago.PublicKey) *SetRampAuthority {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *SetRampAuthority) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetStateAccount gets the "state" account.
+func (inst *SetRampAuthority) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -84,7 +84,7 @@ func (inst *SetRampAuthority) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -108,7 +108,7 @@ func (inst *SetRampAuthority) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
@@ -137,10 +137,10 @@ func NewSetRampAuthorityInstruction(
 	// Parameters:
 	newAuthority ag_solanago.PublicKey,
 	// Accounts:
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetRampAuthority {
 	return NewSetRampAuthorityInstructionBuilder().
 		SetNewAuthority(newAuthority).
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetAuthorityAccount(authority)
 }

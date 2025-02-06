@@ -16,7 +16,7 @@ type InitChainRemoteConfig struct {
 	Mint                *ag_solanago.PublicKey
 	Cfg                 *RemoteConfig
 
-	// [0] = [] config
+	// [0] = [] state
 	//
 	// [1] = [WRITE] chainConfig
 	//
@@ -52,14 +52,14 @@ func (inst *InitChainRemoteConfig) SetCfg(cfg RemoteConfig) *InitChainRemoteConf
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *InitChainRemoteConfig) SetConfigAccount(config ag_solanago.PublicKey) *InitChainRemoteConfig {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
+// SetStateAccount sets the "state" account.
+func (inst *InitChainRemoteConfig) SetStateAccount(state ag_solanago.PublicKey) *InitChainRemoteConfig {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state)
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *InitChainRemoteConfig) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetStateAccount gets the "state" account.
+func (inst *InitChainRemoteConfig) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -130,7 +130,7 @@ func (inst *InitChainRemoteConfig) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.ChainConfig is not set")
@@ -162,7 +162,7 @@ func (inst *InitChainRemoteConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
@@ -215,7 +215,7 @@ func NewInitChainRemoteConfigInstruction(
 	mint ag_solanago.PublicKey,
 	cfg RemoteConfig,
 	// Accounts:
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *InitChainRemoteConfig {
@@ -223,7 +223,7 @@ func NewInitChainRemoteConfigInstruction(
 		SetRemoteChainSelector(remoteChainSelector).
 		SetMint(mint).
 		SetCfg(cfg).
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

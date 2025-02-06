@@ -7,17 +7,17 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 )
 
-type ChainConfig struct {
+type BaseChain struct {
 	Remote            RemoteConfig
 	InboundRateLimit  RateLimitTokenBucket
 	OutboundRateLimit RateLimitTokenBucket
 }
 
-var ChainConfigDiscriminator = [8]byte{13, 177, 233, 141, 212, 29, 148, 56}
+var BaseChainDiscriminator = [8]byte{42, 3, 25, 254, 150, 57, 252, 244}
 
-func (obj ChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj BaseChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ChainConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(BaseChainDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -39,17 +39,17 @@ func (obj ChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	return nil
 }
 
-func (obj *ChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *BaseChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ChainConfigDiscriminator[:]) {
+		if !discriminator.Equal(BaseChainDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[13 177 233 141 212 29 148 56]",
+				"[42 3 25 254 150 57 252 244]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}
@@ -73,7 +73,7 @@ func (obj *ChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 
 type State struct {
 	Version uint8
-	Config  Config
+	Config  BaseConfig
 }
 
 var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
@@ -118,6 +118,48 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	// Deserialize `Config`:
 	err = decoder.Decode(&obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ChainConfig struct {
+	Base BaseChain
+}
+
+var ChainConfigDiscriminator = [8]byte{13, 177, 233, 141, 212, 29, 148, 56}
+
+func (obj ChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ChainConfigDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Base` param:
+	err = encoder.Encode(obj.Base)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ChainConfigDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[13 177 233 141 212 29 148 56]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Base`:
+	err = decoder.Decode(&obj.Base)
 	if err != nil {
 		return err
 	}

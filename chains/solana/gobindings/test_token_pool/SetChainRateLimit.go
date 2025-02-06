@@ -17,7 +17,7 @@ type SetChainRateLimit struct {
 	Inbound             *RateLimitConfig
 	Outbound            *RateLimitConfig
 
-	// [0] = [] config
+	// [0] = [] state
 	//
 	// [1] = [WRITE] chainConfig
 	//
@@ -59,14 +59,14 @@ func (inst *SetChainRateLimit) SetOutbound(outbound RateLimitConfig) *SetChainRa
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *SetChainRateLimit) SetConfigAccount(config ag_solanago.PublicKey) *SetChainRateLimit {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
+// SetStateAccount sets the "state" account.
+func (inst *SetChainRateLimit) SetStateAccount(state ag_solanago.PublicKey) *SetChainRateLimit {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state)
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *SetChainRateLimit) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetStateAccount gets the "state" account.
+func (inst *SetChainRateLimit) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -140,7 +140,7 @@ func (inst *SetChainRateLimit) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.ChainConfig is not set")
@@ -173,7 +173,7 @@ func (inst *SetChainRateLimit) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
@@ -237,7 +237,7 @@ func NewSetChainRateLimitInstruction(
 	inbound RateLimitConfig,
 	outbound RateLimitConfig,
 	// Accounts:
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *SetChainRateLimit {
@@ -246,7 +246,7 @@ func NewSetChainRateLimitInstruction(
 		SetMint(mint).
 		SetInbound(inbound).
 		SetOutbound(outbound).
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

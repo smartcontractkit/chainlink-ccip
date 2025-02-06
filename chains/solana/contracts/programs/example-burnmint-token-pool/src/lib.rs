@@ -51,7 +51,10 @@ pub mod example_burnmint_token_pool {
         _mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
-        ctx.accounts.chain_config.set(remote_chain_selector, cfg)
+        ctx.accounts
+            .chain_config
+            .base
+            .set(remote_chain_selector, cfg)
     }
 
     // edit remote config
@@ -61,7 +64,10 @@ pub mod example_burnmint_token_pool {
         _mint: Pubkey,
         cfg: RemoteConfig,
     ) -> Result<()> {
-        ctx.accounts.chain_config.set(remote_chain_selector, cfg)
+        ctx.accounts
+            .chain_config
+            .base
+            .set(remote_chain_selector, cfg)
     }
 
     // Add remote pool addresses
@@ -73,6 +79,7 @@ pub mod example_burnmint_token_pool {
     ) -> Result<()> {
         ctx.accounts
             .chain_config
+            .base
             .append_remote_pool_addresses(remote_chain_selector, addresses)
     }
 
@@ -84,9 +91,11 @@ pub mod example_burnmint_token_pool {
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
-        ctx.accounts
-            .chain_config
-            .set_chain_rate_limit(remote_chain_selector, inbound, outbound)
+        ctx.accounts.chain_config.base.set_chain_rate_limit(
+            remote_chain_selector,
+            inbound,
+            outbound,
+        )
     }
 
     // delete chain config
@@ -125,15 +134,15 @@ pub mod example_burnmint_token_pool {
     ) -> Result<ReleaseOrMintOutV1> {
         let parsed_amount = to_svm_token_amount(
             release_or_mint.amount,
-            ctx.accounts.chain_config.remote.decimals,
+            ctx.accounts.chain_config.base.remote.decimals,
             ctx.accounts.state.config.decimals,
         )?;
 
-        let ChainConfig {
+        let BaseChain {
             remote,
             inbound_rate_limit,
             ..
-        } = &mut *ctx.accounts.chain_config;
+        } = &mut ctx.accounts.chain_config.base;
 
         validate_release_or_mint(
             &release_or_mint,
@@ -165,7 +174,8 @@ pub mod example_burnmint_token_pool {
         validate_lock_or_burn(
             &lock_or_burn,
             ctx.accounts.state.config.mint,
-            &mut ctx.accounts.chain_config.outbound_rate_limit,
+            &mut ctx.accounts.chain_config.base.outbound_rate_limit,
+            ctx.accounts.state.config.list_enabled,
             &ctx.accounts.state.config.allow_list,
         )?;
 
@@ -180,17 +190,25 @@ pub mod example_burnmint_token_pool {
         )?;
 
         Ok(LockOrBurnOutV1 {
-            dest_token_address: ctx.accounts.chain_config.remote.token_address.clone(),
+            dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
             dest_pool_data: RemoteAddress::ZERO,
         })
     }
 }
 
+// NOTE: accounts derivations must be native to program - will cause ownership check issues if imported
+// wraps functionality from shared Config and Chain types
 #[account]
 #[derive(InitSpace)]
 pub struct State {
     pub version: u8,
-    pub config: Config,
+    pub config: BaseConfig,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct ChainConfig {
+    pub base: BaseChain,
 }
 
 pub fn burn_tokens<'a>(

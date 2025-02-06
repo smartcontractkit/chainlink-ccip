@@ -16,7 +16,7 @@ type ReleaseOrMintTokens struct {
 
 	// [0] = [SIGNER] authority
 	//
-	// [1] = [WRITE] config
+	// [1] = [WRITE] state
 	//
 	// [2] = [] tokenProgram
 	//
@@ -57,14 +57,14 @@ func (inst *ReleaseOrMintTokens) GetAuthorityAccount() *ag_solanago.AccountMeta 
 	return inst.AccountMetaSlice[0]
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *ReleaseOrMintTokens) SetConfigAccount(config ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(config).WRITE()
+// SetStateAccount sets the "state" account.
+func (inst *ReleaseOrMintTokens) SetStateAccount(state ag_solanago.PublicKey) *ReleaseOrMintTokens {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *ReleaseOrMintTokens) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetStateAccount gets the "state" account.
+func (inst *ReleaseOrMintTokens) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
@@ -165,7 +165,7 @@ func (inst *ReleaseOrMintTokens) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.TokenProgram is not set")
@@ -205,7 +205,7 @@ func (inst *ReleaseOrMintTokens) EncodeToTree(parent ag_treeout.Branches) {
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta(" tokenProgram", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("   poolSigner", inst.AccountMetaSlice[4]))
@@ -240,7 +240,7 @@ func NewReleaseOrMintTokensInstruction(
 	releaseOrMint ReleaseOrMintInV1,
 	// Accounts:
 	authority ag_solanago.PublicKey,
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	tokenProgram ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
 	poolSigner ag_solanago.PublicKey,
@@ -250,7 +250,7 @@ func NewReleaseOrMintTokensInstruction(
 	return NewReleaseOrMintTokensInstructionBuilder().
 		SetReleaseOrMint(releaseOrMint).
 		SetAuthorityAccount(authority).
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetTokenProgramAccount(tokenProgram).
 		SetMintAccount(mint).
 		SetPoolSignerAccount(poolSigner).

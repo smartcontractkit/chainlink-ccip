@@ -3,14 +3,12 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
     token_interface::{Mint, TokenAccount},
 };
-use example_burnmint_token_pool::{
-    common::{
-        CcipTokenPoolError, ChainConfig, LockOrBurnInV1, ReleaseOrMintInV1, RemoteAddress,
-        RemoteConfig, ANCHOR_DISCRIMINATOR, POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED,
-        POOL_STATE_SEED,
-    },
-    State,
+use example_burnmint_token_pool::common::{
+    CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1, RemoteAddress, RemoteConfig,
+    ANCHOR_DISCRIMINATOR, POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
 };
+
+use crate::{ChainConfig, State};
 
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {
@@ -222,7 +220,7 @@ pub struct AppendRemotePoolAddresses<'info> {
         seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
-            + chain_config.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
+            + chain_config.base.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
             + addresses.iter().map(RemoteAddress::space).sum::<usize>(),
         realloc::payer = authority,
         realloc::zero = false

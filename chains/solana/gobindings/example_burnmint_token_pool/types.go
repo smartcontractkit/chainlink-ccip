@@ -7,7 +7,7 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Config struct {
+type BaseConfig struct {
 	TokenProgram       ag_solanago.PublicKey
 	Mint               ag_solanago.PublicKey
 	Decimals           uint8
@@ -23,7 +23,7 @@ type Config struct {
 	AllowList          []ag_solanago.PublicKey
 }
 
-func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj BaseConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `TokenProgram` param:
 	err = encoder.Encode(obj.TokenProgram)
 	if err != nil {
@@ -92,7 +92,7 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *BaseConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TokenProgram`:
 	err = decoder.Decode(&obj.TokenProgram)
 	if err != nil {

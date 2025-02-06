@@ -226,7 +226,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 				token0.PoolConfig,
 				token0.Mint.PublicKey(),
-				token0.PoolSigner,
 				token0PoolAdmin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -237,7 +236,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 				token1.PoolConfig,
 				token1.Mint.PublicKey(),
-				token1.PoolSigner,
 				token1PoolAdmin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()

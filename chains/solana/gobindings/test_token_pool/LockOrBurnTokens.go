@@ -16,7 +16,7 @@ type LockOrBurnTokens struct {
 
 	// [0] = [SIGNER] authority
 	//
-	// [1] = [WRITE] config
+	// [1] = [WRITE] state
 	//
 	// [2] = [] tokenProgram
 	//
@@ -55,14 +55,14 @@ func (inst *LockOrBurnTokens) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *LockOrBurnTokens) SetConfigAccount(config ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(config).WRITE()
+// SetStateAccount sets the "state" account.
+func (inst *LockOrBurnTokens) SetStateAccount(state ag_solanago.PublicKey) *LockOrBurnTokens {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *LockOrBurnTokens) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetStateAccount gets the "state" account.
+func (inst *LockOrBurnTokens) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
@@ -152,7 +152,7 @@ func (inst *LockOrBurnTokens) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.TokenProgram is not set")
@@ -189,7 +189,7 @@ func (inst *LockOrBurnTokens) EncodeToTree(parent ag_treeout.Branches) {
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("      config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("       state", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("tokenProgram", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("        mint", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("  poolSigner", inst.AccountMetaSlice[4]))
@@ -223,7 +223,7 @@ func NewLockOrBurnTokensInstruction(
 	lockOrBurn LockOrBurnInV1,
 	// Accounts:
 	authority ag_solanago.PublicKey,
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	tokenProgram ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
 	poolSigner ag_solanago.PublicKey,
@@ -232,7 +232,7 @@ func NewLockOrBurnTokensInstruction(
 	return NewLockOrBurnTokensInstructionBuilder().
 		SetLockOrBurn(lockOrBurn).
 		SetAuthorityAccount(authority).
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetTokenProgramAccount(tokenProgram).
 		SetMintAccount(mint).
 		SetPoolSignerAccount(poolSigner).

@@ -6,18 +6,13 @@
       "name": "initialize",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": true,
           "isSigner": false
         },
         {
           "name": "mint",
           "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "poolSigner",
-          "isMut": true,
           "isSigner": false
         },
         {
@@ -48,7 +43,7 @@
       "name": "transferOwnership",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": true,
           "isSigner": false
         },
@@ -69,7 +64,7 @@
       "name": "acceptOwnership",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": true,
           "isSigner": false
         },
@@ -85,7 +80,7 @@
       "name": "setRampAuthority",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": true,
           "isSigner": false
         },
@@ -106,7 +101,7 @@
       "name": "initChainRemoteConfig",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": false,
           "isSigner": false
         },
@@ -147,7 +142,7 @@
       "name": "editChainRemoteConfig",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": false,
           "isSigner": false
         },
@@ -188,7 +183,7 @@
       "name": "appendRemotePoolAddresses",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": false,
           "isSigner": false
         },
@@ -231,7 +226,7 @@
       "name": "setChainRateLimit",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": false,
           "isSigner": false
         },
@@ -278,7 +273,7 @@
       "name": "deleteChainConfig",
       "accounts": [
         {
-          "name": "config",
+          "name": "state",
           "isMut": false,
           "isSigner": false
         },
@@ -318,7 +313,7 @@
           "isSigner": true
         },
         {
-          "name": "config",
+          "name": "state",
           "isMut": true,
           "isSigner": false
         },
@@ -374,7 +369,7 @@
           "isSigner": true
         },
         {
-          "name": "config",
+          "name": "state",
           "isMut": true,
           "isSigner": false
         },
@@ -419,14 +414,10 @@
   ],
   "accounts": [
     {
-      "name": "Config",
+      "name": "State",
       "type": {
         "kind": "struct",
         "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
           {
             "name": "poolType",
             "type": {
@@ -434,45 +425,12 @@
             }
           },
           {
-            "name": "tokenProgram",
-            "type": "publicKey"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "decimals",
-            "type": "u8"
-          },
-          {
-            "name": "poolSigner",
-            "type": "publicKey"
-          },
-          {
-            "name": "poolTokenAccount",
-            "type": "publicKey"
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "proposedOwner",
-            "type": "publicKey"
-          },
-          {
-            "name": "rampAuthority",
-            "type": "publicKey"
+            "name": "config",
+            "type": {
+              "defined": "BaseConfig"
+            }
           }
         ]
-      }
-    },
-    {
-      "name": "ExternalExecutionConfig",
-      "type": {
-        "kind": "struct",
-        "fields": []
       }
     },
     {
@@ -481,21 +439,9 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "remote",
+            "name": "base",
             "type": {
-              "defined": "RemoteConfig"
-            }
-          },
-          {
-            "name": "inboundRateLimit",
-            "type": {
-              "defined": "RateLimitTokenBucket"
-            }
-          },
-          {
-            "name": "outboundRateLimit",
-            "type": {
-              "defined": "RateLimitTokenBucket"
+              "defined": "BaseChain"
             }
           }
         ]
@@ -503,206 +449,6 @@
     }
   ],
   "types": [
-    {
-      "name": "RateLimitTokenBucket",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "tokens",
-            "type": "u64"
-          },
-          {
-            "name": "lastUpdated",
-            "type": "u64"
-          },
-          {
-            "name": "cfg",
-            "type": {
-              "defined": "RateLimitConfig"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "RateLimitConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "enabled",
-            "type": "bool"
-          },
-          {
-            "name": "capacity",
-            "type": "u64"
-          },
-          {
-            "name": "rate",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "LockOrBurnInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "receiver",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "originalSender",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "LockOrBurnOutV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destTokenAddress",
-            "type": {
-              "defined": "RemoteAddress"
-            }
-          },
-          {
-            "name": "destPoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReleaseOrMintInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalSender",
-            "type": {
-              "defined": "RemoteAddress"
-            }
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "receiver",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          },
-          {
-            "name": "sourcePoolAddress",
-            "docs": [
-              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
-              "expected pool address for the given remoteChainSelector."
-            ],
-            "type": {
-              "defined": "RemoteAddress"
-            }
-          },
-          {
-            "name": "sourcePoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
-          },
-          {
-            "name": "offchainTokenData",
-            "docs": [
-              "@dev WARNING: offchainTokenData is untrusted data."
-            ],
-            "type": {
-              "defined": "RemoteAddress"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReleaseOrMintOutV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destinationAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "RemoteConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "poolAddresses",
-            "type": {
-              "vec": {
-                "defined": "RemoteAddress"
-              }
-            }
-          },
-          {
-            "name": "tokenAddress",
-            "type": {
-              "defined": "RemoteAddress"
-            }
-          },
-          {
-            "name": "decimals",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "RemoteAddress",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "address",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
     {
       "name": "PoolType",
       "type": {
@@ -719,281 +465,6 @@
           }
         ]
       }
-    }
-  ],
-  "events": [
-    {
-      "name": "Burned",
-      "fields": [
-        {
-          "name": "sender",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "Minted",
-      "fields": [
-        {
-          "name": "sender",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "recipient",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "Locked",
-      "fields": [
-        {
-          "name": "sender",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "Released",
-      "fields": [
-        {
-          "name": "sender",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "recipient",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "amount",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RemoteChainConfigured",
-      "fields": [
-        {
-          "name": "chainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "token",
-          "type": {
-            "defined": "RemoteAddress"
-          },
-          "index": false
-        },
-        {
-          "name": "previousToken",
-          "type": {
-            "defined": "RemoteAddress"
-          },
-          "index": false
-        },
-        {
-          "name": "poolAddresses",
-          "type": {
-            "vec": {
-              "defined": "RemoteAddress"
-            }
-          },
-          "index": false
-        },
-        {
-          "name": "previousPoolAddresses",
-          "type": {
-            "vec": {
-              "defined": "RemoteAddress"
-            }
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RateLimitConfigured",
-      "fields": [
-        {
-          "name": "chainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "outboundRateLimit",
-          "type": {
-            "defined": "RateLimitConfig"
-          },
-          "index": false
-        },
-        {
-          "name": "inboundRateLimit",
-          "type": {
-            "defined": "RateLimitConfig"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RemotePoolsAppended",
-      "fields": [
-        {
-          "name": "chainSelector",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "poolAddresses",
-          "type": {
-            "vec": {
-              "defined": "RemoteAddress"
-            }
-          },
-          "index": false
-        },
-        {
-          "name": "previousPoolAddresses",
-          "type": {
-            "vec": {
-              "defined": "RemoteAddress"
-            }
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RemoteChainRemoved",
-      "fields": [
-        {
-          "name": "chainSelector",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "RouterUpdated",
-      "fields": [
-        {
-          "name": "oldAuthority",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "newAuthority",
-          "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "TokensConsumed",
-      "fields": [
-        {
-          "name": "tokens",
-          "type": "u64",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ConfigChanged",
-      "fields": [
-        {
-          "name": "config",
-          "type": {
-            "defined": "RateLimitConfig"
-          },
-          "index": false
-        }
-      ]
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "InvalidInitPoolPermissions",
-      "msg": "Pool authority does not match token mint owner"
-    },
-    {
-      "code": 6001,
-      "name": "Unauthorized",
-      "msg": "Unauthorized"
-    },
-    {
-      "code": 6002,
-      "name": "InvalidInputs",
-      "msg": "Invalid inputs"
-    },
-    {
-      "code": 6003,
-      "name": "InvalidPoolCaller",
-      "msg": "Caller is not ramp on router"
-    },
-    {
-      "code": 6004,
-      "name": "InvalidSourcePoolAddress",
-      "msg": "Invalid source pool address"
-    },
-    {
-      "code": 6005,
-      "name": "InvalidToken",
-      "msg": "Invalid token"
-    },
-    {
-      "code": 6006,
-      "name": "InvalidTokenAmountConversion",
-      "msg": "Invalid token amount conversion"
-    },
-    {
-      "code": 6007,
-      "name": "RLBucketOverfilled",
-      "msg": "RateLimit: bucket overfilled"
-    },
-    {
-      "code": 6008,
-      "name": "RLMaxCapacityExceeded",
-      "msg": "RateLimit: max capacity exceeded"
-    },
-    {
-      "code": 6009,
-      "name": "RLRateLimitReached",
-      "msg": "RateLimit: rate limit reached"
-    },
-    {
-      "code": 6010,
-      "name": "RLInvalidRateLimitRate",
-      "msg": "RateLimit: invalid rate limit rate"
-    },
-    {
-      "code": 6011,
-      "name": "RLDisabledNonZeroRateLimit",
-      "msg": "RateLimit: disabled non-zero rate limit"
     }
   ]
 }

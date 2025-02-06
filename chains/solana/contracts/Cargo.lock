@@ -2410,6 +2410,8 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "example-burnmint-token-pool",
+ "example-lockrelease-token-pool",
  "solana-program",
  "spl-math",
 ]

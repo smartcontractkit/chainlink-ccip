@@ -220,7 +220,7 @@ pub struct AppendRemotePoolAddresses<'info> {
         seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
-            + chain_config.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
+            + chain_config.base.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
             + addresses.iter().map(RemoteAddress::space).sum::<usize>(),
         realloc::payer = authority,
         realloc::zero = false

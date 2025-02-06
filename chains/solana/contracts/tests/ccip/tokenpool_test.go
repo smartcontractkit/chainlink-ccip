@@ -101,7 +101,7 @@ func TestTokenPool(t *testing.T) {
 					releaseOrMint := poolMethodName[1]
 
 					t.Run("setup", func(t *testing.T) {
-						poolInitI, err := test_token_pool.NewInitializeInstruction(poolType, admin.PublicKey(), poolConfig, mint, poolSigner, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						poolInitI, err := test_token_pool.NewInitializeInstruction(poolType, admin.PublicKey(), poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)
@@ -135,9 +135,9 @@ func TestTokenPool(t *testing.T) {
 						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, createI, authI, ixConfigure, ixAppend, ixRates}, admin, config.DefaultCommitment)
 						require.NotNil(t, res)
 
-						var configAccount test_token_pool.Config
+						var configAccount test_token_pool.State
 						require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, poolConfig, config.DefaultCommitment, &configAccount))
-						require.Equal(t, poolTokenAccount, configAccount.PoolTokenAccount)
+						require.Equal(t, poolTokenAccount, configAccount.Config.PoolTokenAccount)
 
 						eventConfigured := tokens.EventChainConfigured{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainConfigured", &eventConfigured, config.PrintEvents))
@@ -388,7 +388,7 @@ func TestTokenPool(t *testing.T) {
 			require.NoError(t, err)
 
 			// create pool
-			poolInitI, err := test_token_pool.NewInitializeInstruction(test_token_pool.Wrapped_PoolType, admin.PublicKey(), p.PoolConfig, mint, p.PoolSigner, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			poolInitI, err := test_token_pool.NewInitializeInstruction(test_token_pool.Wrapped_PoolType, admin.PublicKey(), p.PoolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 
 			// create pool token account

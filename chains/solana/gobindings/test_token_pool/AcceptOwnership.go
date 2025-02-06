@@ -13,7 +13,7 @@ import (
 // AcceptOwnership is the `acceptOwnership` instruction.
 type AcceptOwnership struct {
 
-	// [0] = [WRITE] config
+	// [0] = [WRITE] state
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -27,14 +27,14 @@ func NewAcceptOwnershipInstructionBuilder() *AcceptOwnership {
 	return nd
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *AcceptOwnership) SetConfigAccount(config ag_solanago.PublicKey) *AcceptOwnership {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
+// SetStateAccount sets the "state" account.
+func (inst *AcceptOwnership) SetStateAccount(state ag_solanago.PublicKey) *AcceptOwnership {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *AcceptOwnership) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetStateAccount gets the "state" account.
+func (inst *AcceptOwnership) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -70,7 +70,7 @@ func (inst *AcceptOwnership) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -92,7 +92,7 @@ func (inst *AcceptOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
@@ -109,9 +109,9 @@ func (obj *AcceptOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewAcceptOwnershipInstruction declares a new AcceptOwnership instruction with the provided parameters and accounts.
 func NewAcceptOwnershipInstruction(
 	// Accounts:
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AcceptOwnership {
 	return NewAcceptOwnershipInstructionBuilder().
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetAuthorityAccount(authority)
 }

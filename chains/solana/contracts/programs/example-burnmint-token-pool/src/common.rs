@@ -19,7 +19,7 @@ pub const RELEASE_MINT: [u8; 8] = [0x14, 0x94, 0x71, 0xc6, 0xe5, 0xaa, 0x47, 0x3
 pub const LOCK_BURN: [u8; 8] = [0xc8, 0x0e, 0x32, 0x09, 0x2c, 0x5b, 0x79, 0x25];
 
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Config {
+pub struct BaseConfig {
     // token config
     pub token_program: Pubkey,
     pub mint: Pubkey,
@@ -43,7 +43,7 @@ pub struct Config {
     pub allow_list: Vec<Pubkey>,
 }
 
-impl Config {
+impl BaseConfig {
     pub fn init(
         &mut self,
         mint: &InterfaceAccount<Mint>,
@@ -109,8 +109,8 @@ impl Config {
         add: Vec<Pubkey>,
         remove: Vec<Pubkey>,
     ) -> Result<()> {
-        if enabled.is_some() {
-            self.list_enabled = enabled.unwrap();
+        if let Some(enabled_val) = enabled {
+            self.list_enabled = enabled_val;
         };
 
         for k in remove {
@@ -141,13 +141,13 @@ impl Config {
 
 #[account]
 #[derive(InitSpace)]
-pub struct ChainConfig {
+pub struct BaseChain {
     pub remote: RemoteConfig,
     pub inbound_rate_limit: RateLimitTokenBucket,
     pub outbound_rate_limit: RateLimitTokenBucket,
 }
 
-impl ChainConfig {
+impl BaseChain {
     pub fn set(&mut self, remote_chain_selector: u64, new_cfg: RemoteConfig) -> Result<()> {
         let old_mint = self.remote.token_address.clone();
         let old_pools = self.remote.pool_addresses.clone();
@@ -389,6 +389,7 @@ pub fn validate_lock_or_burn(
     lock_or_burn_in: &LockOrBurnInV1,
     config_mint: Pubkey,
     outbound_rate_limit: &mut RateLimitTokenBucket,
+    allow_list_enabled: bool,
     allow_list: &[Pubkey],
 ) -> Result<()> {
     // validate token matches configured pool token
@@ -398,7 +399,7 @@ pub fn validate_lock_or_burn(
     );
 
     require!(
-        allow_list.contains(&lock_or_burn_in.original_sender),
+        !allow_list_enabled || allow_list.contains(&lock_or_burn_in.original_sender),
         CcipTokenPoolError::InvalidSender
     );
 

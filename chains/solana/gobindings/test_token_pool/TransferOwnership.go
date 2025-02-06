@@ -14,7 +14,7 @@ import (
 type TransferOwnership struct {
 	ProposedOwner *ag_solanago.PublicKey
 
-	// [0] = [WRITE] config
+	// [0] = [WRITE] state
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -34,14 +34,14 @@ func (inst *TransferOwnership) SetProposedOwner(proposedOwner ag_solanago.Public
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *TransferOwnership) SetConfigAccount(config ag_solanago.PublicKey) *TransferOwnership {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
+// SetStateAccount sets the "state" account.
+func (inst *TransferOwnership) SetStateAccount(state ag_solanago.PublicKey) *TransferOwnership {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *TransferOwnership) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetStateAccount gets the "state" account.
+func (inst *TransferOwnership) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -84,7 +84,7 @@ func (inst *TransferOwnership) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -108,7 +108,7 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
@@ -137,10 +137,10 @@ func NewTransferOwnershipInstruction(
 	// Parameters:
 	proposedOwner ag_solanago.PublicKey,
 	// Accounts:
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *TransferOwnership {
 	return NewTransferOwnershipInstructionBuilder().
 		SetProposedOwner(proposedOwner).
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetAuthorityAccount(authority)
 }

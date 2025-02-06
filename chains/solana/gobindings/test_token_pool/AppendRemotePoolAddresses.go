@@ -16,7 +16,7 @@ type AppendRemotePoolAddresses struct {
 	Mint                *ag_solanago.PublicKey
 	Addresses           *[]RemoteAddress
 
-	// [0] = [] config
+	// [0] = [] state
 	//
 	// [1] = [WRITE] chainConfig
 	//
@@ -52,14 +52,14 @@ func (inst *AppendRemotePoolAddresses) SetAddresses(addresses []RemoteAddress) *
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *AppendRemotePoolAddresses) SetConfigAccount(config ag_solanago.PublicKey) *AppendRemotePoolAddresses {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
+// SetStateAccount sets the "state" account.
+func (inst *AppendRemotePoolAddresses) SetStateAccount(state ag_solanago.PublicKey) *AppendRemotePoolAddresses {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state)
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *AppendRemotePoolAddresses) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetStateAccount gets the "state" account.
+func (inst *AppendRemotePoolAddresses) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -130,7 +130,7 @@ func (inst *AppendRemotePoolAddresses) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.ChainConfig is not set")
@@ -162,7 +162,7 @@ func (inst *AppendRemotePoolAddresses) EncodeToTree(parent ag_treeout.Branches) 
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
@@ -215,7 +215,7 @@ func NewAppendRemotePoolAddressesInstruction(
 	mint ag_solanago.PublicKey,
 	addresses []RemoteAddress,
 	// Accounts:
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AppendRemotePoolAddresses {
@@ -223,7 +223,7 @@ func NewAppendRemotePoolAddressesInstruction(
 		SetRemoteChainSelector(remoteChainSelector).
 		SetMint(mint).
 		SetAddresses(addresses).
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)
