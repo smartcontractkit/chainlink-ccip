@@ -237,19 +237,24 @@ func buildMerkleRootsOutcome(
 				OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
 			}
 
-			rootIsSigned := signedRoots.Contains(rk)
+			rootIsSignedAndRmnEnabled := signedRoots.Contains(rk) &&
+				consensusObservation.RMNEnabledChains[root.ChainSel]
 
 			rootNotSignedButRmnDisabled := !signedRoots.Contains(rk) &&
 				!consensusObservation.RMNEnabledChains[root.ChainSel]
 
-			if rootIsSigned || rootNotSignedButRmnDisabled {
+			if rootIsSignedAndRmnEnabled || rootNotSignedButRmnDisabled {
 				lggr.Infow("Adding root to the report",
 					"root", rk,
-					"rootIsSigned", rootIsSigned,
+					"rootIsSigned", rootIsSignedAndRmnEnabled,
 					"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled)
 				rootsToReport = append(rootsToReport, root)
 			} else {
-				lggr.Infow("Root not signed, skipping from the report", "root", rk)
+				lggr.Infow("Root invalid, skipping from the report",
+					"root", rk,
+					"rootIsSigned", rootIsSignedAndRmnEnabled,
+					"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled,
+				)
 			}
 		}
 		roots = rootsToReport
