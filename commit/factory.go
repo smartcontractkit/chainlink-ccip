@@ -112,39 +112,6 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 	}
 }
 
-// NewPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by the
-// factory. It is safe to assume that a factory instance will create exactly one plugin instance.
-// deprecated: use NewCommitPluginFactory instead
-func NewPluginFactory(
-	lggr logger.Logger,
-	donID plugintypes.DonID,
-	ocrConfig reader.OCR3ConfigWithMeta,
-	commitCodec cciptypes.CommitPluginCodec,
-	msgHasher cciptypes.MessageHasher,
-	extraDataCodec cciptypes.ExtraDataCodec,
-	homeChainReader reader.HomeChain,
-	homeChainSelector cciptypes.ChainSelector,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
-	rmnPeerClient rmn.PeerClient,
-	rmnCrypto cciptypes.RMNCrypto,
-) *PluginFactory {
-	return &PluginFactory{
-		baseLggr:          lggr,
-		donID:             donID,
-		ocrConfig:         ocrConfig,
-		commitCodec:       commitCodec,
-		msgHasher:         msgHasher,
-		extraDataCodec:    extraDataCodec,
-		homeChainReader:   homeChainReader,
-		homeChainSelector: homeChainSelector,
-		contractReaders:   contractReaders,
-		chainWriters:      chainWriters,
-		rmnPeerClient:     rmnPeerClient,
-		rmnCrypto:         rmnCrypto,
-	}
-}
-
 //nolint:gocyclo
 func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {

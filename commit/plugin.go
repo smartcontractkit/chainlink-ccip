@@ -40,13 +40,14 @@ type attributedTokenPricesObservation = plugincommon.AttributedObservation[token
 type attributedChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
 type Plugin struct {
-	donID               plugintypes.DonID
-	oracleID            commontypes.OracleID
-	oracleIDToP2PID     map[commontypes.OracleID]libocrtypes.PeerID
-	offchainCfg         pluginconfig.CommitOffchainConfig
-	ccipReader          readerpkg.CCIPReader
-	tokenPricesReader   readerpkg.PriceReader
-	reportCodec         cciptypes.CommitPluginCodec
+	donID             plugintypes.DonID
+	oracleID          commontypes.OracleID
+	oracleIDToP2PID   map[commontypes.OracleID]libocrtypes.PeerID
+	offchainCfg       pluginconfig.CommitOffchainConfig
+	ccipReader        readerpkg.CCIPReader
+	tokenPricesReader readerpkg.PriceReader
+	reportCodec       cciptypes.CommitPluginCodec
+	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
 	rmnHomeReader       readerpkg.RMNHome
@@ -182,6 +183,10 @@ func NewPlugin(
 // Query returns the query for the next round.
 // NOTE: In most cases the Query phase should not return an error based on outCtx to prevent infinite retries.
 func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
+	// Ensure that sequence number is in the context for consumption by all
+	// downstream processors and the ccip reader.
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outCtx.SeqNr, logutil.PhaseQuery)
+
 	var err error
 	var q committypes.Query
 
@@ -192,17 +197,17 @@ func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (ty
 
 	q.MerkleRootQuery, err = p.merkleRootProcessor.Query(ctx, prevOutcome.MerkleRootOutcome)
 	if err != nil {
-		p.lggr.Errorw("get merkle roots query", "err", err)
+		lggr.Errorw("get merkle roots query", "err", err)
 	}
 
 	q.TokenPriceQuery, err = p.tokenPriceProcessor.Query(ctx, prevOutcome.TokenPriceOutcome)
 	if err != nil {
-		p.lggr.Errorw("get token prices query", "err", err)
+		lggr.Errorw("get token prices query", "err", err)
 	}
 
 	q.ChainFeeQuery, err = p.chainFeeProcessor.Query(ctx, prevOutcome.ChainFeeOutcome)
 	if err != nil {
-		p.lggr.Errorw("get chain fee query", "err", err)
+		lggr.Errorw("get chain fee query", "err", err)
 	}
 
 	return p.ocrTypeCodec.EncodeQuery(q)
@@ -411,7 +416,7 @@ func (p *Plugin) Outcome(
 		// we ignore the outcome of the discovery processor.
 		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
-			p.lggr.Errorw("failed to get discovery processor outcome", "err", err)
+			lggr.Errorw("failed to get discovery processor outcome", "err", err)
 			return nil, nil
 		}
 		p.contractsInitialized.Store(true)

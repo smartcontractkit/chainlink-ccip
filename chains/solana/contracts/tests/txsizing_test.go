@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
@@ -55,12 +56,25 @@ func TestTransactionSizing(t *testing.T) {
 		"routerBillingSigner":   mustRandomPubkey(),
 		"routerTokenPoolSigner": mustRandomPubkey(),
 		"sysVarInstruction":     solana.SysVarInstructionsPubkey,
-		"originChainConfig":     mustRandomPubkey(),
-		"arbMessagingSigner":    mustRandomPubkey(),
 		"fqBillingSinger":       mustRandomPubkey(),
 		"feeQuoterProgram":      mustRandomPubkey(),
 		"fqConfigPDA":           mustRandomPubkey(),
 		"fqLinkConfig":          mustRandomPubkey(),
+	}
+
+	offrampTable := map[string]solana.PublicKey{
+		"config":             mustRandomPubkey(),
+		"referenceAddresses": mustRandomPubkey(),
+		"originChainConfig":  mustRandomPubkey(),
+		"sysVarInstruction":  solana.SysVarInstructionsPubkey,
+		"systemProgram":      solana.SystemProgramID,
+		"billingSinger":      mustRandomPubkey(),
+		"feeQuoterProgram":   mustRandomPubkey(),
+		"fqConfigPDA":        mustRandomPubkey(),
+		"billingTokenConfig": mustRandomPubkey(),
+		"destChainConfig":    mustRandomPubkey(),
+		"arbMessagingSigner": mustRandomPubkey(),
+		"tokenPoolSigner":    mustRandomPubkey(),
 	}
 
 	tokenTable := map[string]solana.PublicKey{
@@ -151,8 +165,8 @@ func TestTransactionSizing(t *testing.T) {
 	}
 
 	// ccip commit test messages + instruction ------------------------
-	commitNoPrices := ccip_router.CommitInput{
-		MerkleRoot: ccip_router.MerkleRoot{
+	commitNoPrices := ccip_offramp.CommitInput{
+		MerkleRoot: ccip_offramp.MerkleRoot{
 			SourceChainSelector: 0,
 			OnRampAddress:       make([]byte, 20), // EVM onramp
 			MinSeqNr:            0,
@@ -160,12 +174,12 @@ func TestTransactionSizing(t *testing.T) {
 			MerkleRoot:          [32]uint8{},
 		},
 	}
-	commitWithPrices := ccip_router.CommitInput{
-		PriceUpdates: ccip_router.PriceUpdates{
-			TokenPriceUpdates: make([]ccip_router.TokenPriceUpdate, 1),
-			GasPriceUpdates:   make([]ccip_router.GasPriceUpdate, 1),
+	commitWithPrices := ccip_offramp.CommitInput{
+		PriceUpdates: ccip_offramp.PriceUpdates{
+			TokenPriceUpdates: make([]ccip_offramp.TokenPriceUpdate, 1),
+			GasPriceUpdates:   make([]ccip_offramp.GasPriceUpdate, 1),
 		},
-		MerkleRoot: ccip_router.MerkleRoot{
+		MerkleRoot: ccip_offramp.MerkleRoot{
 			SourceChainSelector: 0,
 			OnRampAddress:       make([]byte, 20),
 			MinSeqNr:            0,
@@ -173,22 +187,23 @@ func TestTransactionSizing(t *testing.T) {
 			MerkleRoot:          [32]uint8{},
 		},
 	}
-	ixCommit := func(input ccip_router.CommitInput, addAccounts solana.PublicKeySlice) solana.Instruction {
-		base := ccip_router.NewCommitInstruction(
+	ixCommit := func(input ccip_offramp.CommitInput, addAccounts solana.PublicKeySlice) solana.Instruction {
+		base := ccip_offramp.NewCommitInstruction(
 			[2][32]byte{}, // report context
 			testutils.MustMarshalBorsh(t, input),
 			make([][32]byte, 6), // f = 5, estimating f+1 signatures
 			make([][32]byte, 6), // f = 5, estimating f+1 signatures
 			[32]byte{},          // f = 5, estimating f+1 signatures
-			routerTable["routerConfig"],
-			routerTable["originChainConfig"],
+			offrampTable["config"],
+			offrampTable["referenceAddresses"],
+			offrampTable["originChainConfig"],
 			mustRandomPubkey(), // commit report PDA
 			auth.PublicKey(),
-			routerTable["systemProgram"],
-			routerTable["sysVarInstruction"],
-			routerTable["fqBillingSinger"],
-			routerTable["feeQuoterProgram"],
-			routerTable["fqConfigPDA"],
+			offrampTable["systemProgram"],
+			offrampTable["sysVarInstruction"],
+			offrampTable["billingSinger"],
+			offrampTable["feeQuoterProgram"],
+			offrampTable["fqConfigPDA"],
 		)
 
 		for _, v := range addAccounts {
@@ -200,10 +215,10 @@ func TestTransactionSizing(t *testing.T) {
 	}
 
 	// ccip execute test messages + instruction -----------------------
-	executeEmpty := ccip_router.ExecutionReportSingleChain{
+	executeEmpty := ccip_offramp.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
-		Message: ccip_router.Any2SVMRampMessage{
-			Header: ccip_router.RampMessageHeader{
+		Message: ccip_offramp.Any2SVMRampMessage{
+			Header: ccip_offramp.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 0,
 				DestChainSelector:   0,
@@ -213,8 +228,8 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:        make([]byte, 20), // EVM sender
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
-			TokenAmounts:  []ccip_router.Any2SVMTokenTransfer{},
-			ExtraArgs: ccip_router.Any2SVMRampExtraArgs{
+			TokenAmounts:  []ccip_offramp.Any2SVMTokenTransfer{},
+			ExtraArgs: ccip_offramp.Any2SVMRampExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
 			},
@@ -223,10 +238,10 @@ func TestTransactionSizing(t *testing.T) {
 		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
 	}
-	executeSingleToken := ccip_router.ExecutionReportSingleChain{
+	executeSingleToken := ccip_offramp.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
-		Message: ccip_router.Any2SVMRampMessage{
-			Header: ccip_router.RampMessageHeader{
+		Message: ccip_offramp.Any2SVMRampMessage{
+			Header: ccip_offramp.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 0,
 				DestChainSelector:   0,
@@ -236,14 +251,14 @@ func TestTransactionSizing(t *testing.T) {
 			Sender:        make([]byte, 20), // EVM sender
 			Data:          []byte{},
 			TokenReceiver: [32]byte{},
-			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{{
+			TokenAmounts: []ccip_offramp.Any2SVMTokenTransfer{{
 				SourcePoolAddress: make([]byte, 20), // EVM origin token pool
 				DestTokenAddress:  [32]byte{},
 				DestGasAmount:     0,
 				ExtraData:         []byte{},
-				Amount:            ccip_router.CrossChainAmount{LeBytes: [32]uint8{}},
+				Amount:            ccip_offramp.CrossChainAmount{LeBytes: [32]uint8{}},
 			}},
-			ExtraArgs: ccip_router.Any2SVMRampExtraArgs{
+			ExtraArgs: ccip_offramp.Any2SVMRampExtraArgs{
 				ComputeUnits:     0,
 				IsWritableBitmap: 0,
 			},
@@ -253,19 +268,20 @@ func TestTransactionSizing(t *testing.T) {
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
 	}
 
-	ixExecute := func(report ccip_router.ExecutionReportSingleChain, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
-		base := ccip_router.NewExecuteInstruction(
+	ixExecute := func(report ccip_offramp.ExecutionReportSingleChain, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
+		base := ccip_offramp.NewExecuteInstruction(
 			testutils.MustMarshalBorsh(t, report),
 			[2][32]byte{}, // report context
 			tokenIndexes,
-			routerTable["routerConfig"],
-			routerTable["originChainConfig"],
+			offrampTable["config"],
+			offrampTable["referenceAddresses"],
+			offrampTable["originChainConfig"],
 			mustRandomPubkey(), // commit report PDA
-			routerTable["arbMessagingSigner"],
+			offrampTable["arbMessagingSigner"],
 			auth.PublicKey(),
-			routerTable["systemProgram"],
-			routerTable["sysVarInstruction"],
-			routerTable["routerTokenPoolSigner"],
+			offrampTable["systemProgram"],
+			offrampTable["sysVarInstruction"],
+			offrampTable["tokenPoolSigner"],
 		)
 
 		for _, v := range addAccounts {
@@ -308,18 +324,18 @@ func TestTransactionSizing(t *testing.T) {
 			"commit:noPrices",
 			ixCommit(commitNoPrices, nil),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey(): maps.Values(routerTable),
+				mustRandomPubkey(): maps.Values(offrampTable),
 			},
 			failOnExcessAlways,
 		},
 		{
 			"commit:withPrices",
 			ixCommit(commitWithPrices, solana.PublicKeySlice{
-				routerTable["billingTokenConfig"], // token price update
-				routerTable["destChainConfig"],    // gas price update
+				offrampTable["billingTokenConfig"], // token price update
+				offrampTable["destChainConfig"],    // gas price update
 			}),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey(): maps.Values(routerTable),
+				mustRandomPubkey(): maps.Values(offrampTable),
 			},
 			failOnExcessOnlyWithTables, // without lookup tables, we already know it exceeds the max tx size
 		},
@@ -327,7 +343,7 @@ func TestTransactionSizing(t *testing.T) {
 			"execute:noToken",
 			ixExecute(executeEmpty, []byte{}, nil),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey(): maps.Values(routerTable),
+				mustRandomPubkey(): maps.Values(offrampTable),
 			},
 			failOnExcessAlways,
 		},
@@ -339,7 +355,7 @@ func TestTransactionSizing(t *testing.T) {
 				mustRandomPubkey(), // token pool chain config
 			}, maps.Values(tokenTable)...)),
 			map[solana.PublicKey]solana.PublicKeySlice{
-				mustRandomPubkey():            maps.Values(routerTable),
+				mustRandomPubkey():            maps.Values(offrampTable),
 				tokenTable["poolLookupTable"]: maps.Values(tokenTable),
 			},
 			failOnExcessAlways,

@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::{extra_args::EVMExtraArgsV2, DestChainConfig};
+
 // https://github.com/smartcontractkit/chainlink/blob/ff8a597fd9df653f8967427498eaa5a04b19febb/contracts/src/v0.8/ccip/libraries/Internal.sol#L276
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
 pub const CHAIN_FAMILY_SELECTOR_SVM: u32 = 0x1e10bdc4;
@@ -39,4 +41,16 @@ pub struct ProcessedExtraArgs {
     pub bytes: Vec<u8>,
     pub gas_limit: u128,
     pub allow_out_of_order_execution: bool,
+}
+
+impl ProcessedExtraArgs {
+    pub fn defaults(config: &DestChainConfig) -> Self {
+        let args = EVMExtraArgsV2::default_config(config);
+
+        ProcessedExtraArgs {
+            bytes: args.serialize_with_tag(),
+            gas_limit: args.gas_limit,
+            allow_out_of_order_execution: args.allow_out_of_order_execution,
+        }
+    }
 }
