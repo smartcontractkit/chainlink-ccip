@@ -13,7 +13,7 @@ func FetchCCIPRouterIDL() string {
 //go:embed contracts/target/idl/ccip_offramp.json
 var ccipOfframpIdl string
 
-// FetchCCIPRouterIDL returns
+// FetchCCIPOfframpIDL returns
 func FetchCCIPOfframpIDL() string {
 	return ccipOfframpIdl
 }
