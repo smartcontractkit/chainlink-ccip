@@ -2,19 +2,106 @@ package execute
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
+
+func Test_Observation_CacheUpdate(t *testing.T) {
+
+	getID := func(id string) cciptypes.Bytes32 {
+		var b cciptypes.Bytes32
+		copy(b[:], id)
+		return b
+	}
+	msgWithID := func(id string) cciptypes.Message {
+		var msg cciptypes.Message
+		msg.Header.MessageID = getID(id)
+		return msg
+	}
+
+	homeChain := reader.NewMockHomeChain(t)
+	homeChain.EXPECT().GetFChain().Return(nil, fmt.Errorf("early return"))
+	plugin := &Plugin{
+		lggr:                 mocks.NullLogger,
+		homeChain:            homeChain,
+		ocrTypeCodec:         ocrTypeCodec,
+		inflightMessageCache: cache.NewInflightMessageCache(10 * time.Minute),
+	}
+
+	outcome := exectypes.Outcome{
+		Report: cciptypes.ExecutePluginReport{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{
+					SourceChainSelector: 1,
+					Messages: []cciptypes.Message{
+						msgWithID("1"),
+						msgWithID("2"),
+						msgWithID("3"),
+					},
+				},
+				{
+					SourceChainSelector: 2,
+					Messages: []cciptypes.Message{
+						msgWithID("1"),
+						msgWithID("2"),
+						msgWithID("3"),
+					},
+				},
+			},
+		},
+	}
+
+	// No state, report only generated in Filter state so cache is not updated.
+	{
+		enc, err := jsonOcrTypeCodec.EncodeOutcome(outcome)
+		require.NoError(t, err)
+
+		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
+		_, err = plugin.Observation(context.Background(), outCtx, nil)
+		require.Error(t, err) // home reader error
+
+		require.False(t, plugin.inflightMessageCache.IsInflight(1, getID("1")))
+		require.False(t, plugin.inflightMessageCache.IsInflight(1, getID("2")))
+		require.False(t, plugin.inflightMessageCache.IsInflight(1, getID("3")))
+		require.False(t, plugin.inflightMessageCache.IsInflight(2, getID("1")))
+		require.False(t, plugin.inflightMessageCache.IsInflight(2, getID("2")))
+		require.False(t, plugin.inflightMessageCache.IsInflight(2, getID("3")))
+	}
+
+	// Filter state, cache is updated.
+	{
+		outcome.State = exectypes.Filter
+		enc, err := jsonOcrTypeCodec.EncodeOutcome(outcome)
+		require.NoError(t, err)
+
+		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
+		_, err = plugin.Observation(context.Background(), outCtx, nil)
+		require.Error(t, err)
+
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("1")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("2")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(1, getID("3")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("1")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("2")))
+		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("3")))
+	}
+
+}
 
 func Test_getMessagesObservation(t *testing.T) {
 	ctx := context.Background()
