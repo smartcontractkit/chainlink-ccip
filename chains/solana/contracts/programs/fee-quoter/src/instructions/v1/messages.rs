@@ -101,7 +101,6 @@ fn validate_svm_dest_address(address: &[u8]) -> Result<()> {
 
 // process_extra_args returns serialized extraArgs, gas_limit, allow_out_of_order_execution
 // it calls the chain-specific extra args validation logic
-// TODO move to public?
 pub fn process_extra_args(
     dest_config: &DestChainConfig,
     extra_args: &[u8],
@@ -109,7 +108,9 @@ pub fn process_extra_args(
 ) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(dest_config.chain_family_selector) {
         CHAIN_FAMILY_SELECTOR_EVM => {
-            // Extra args are optional for EVM destination.
+            // Extra args are optional for EVM destination. In case there
+            // are extra args, they must be prefixed by a four byte tag
+            // -> bytes4(keccak256("CCIP EVMExtraArgsV2"));
             let Some(tag) = extra_args.get(..4) else {
                 return Ok(ProcessedExtraArgs::defaults(dest_config));
             };
