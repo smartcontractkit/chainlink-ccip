@@ -9,3 +9,11 @@ var ccipRouterIdl string
 func FetchCCIPRouterIDL() string {
 	return ccipRouterIdl
 }
+
+//go:embed contracts/target/idl/ccip_offramp.json
+var ccipOfframpIdl string
+
+// FetchCCIPRouterIDL returns
+func FetchCCIPOfframpIDL() string {
+	return ccipOfframpIdl
+}
