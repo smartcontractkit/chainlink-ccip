@@ -130,6 +130,7 @@ func (o *observer) Observe(
 		if err := validatePositive(execCost); err != nil {
 			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
 		}
+		lggr.Debugw("Comparing fee and exec cost", "fee", fee, "execCost", execCost)
 		if fee.Cmp(execCost) < 0 {
 			lggr.Warnw("Message is too costly to execute", "messageID",
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
@@ -338,7 +339,7 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
 		} else {
 			// TODO: What's the blockchain timestamp? Should we use now().UTC instead?
-			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
+			feeUSD18 = waitBoostedFee(c.lggr, c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
 		messageFees[msg.Header.MessageID] = feeUSD18
@@ -354,13 +355,17 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 //
 // wait_boosted_fee(m) = (1 + (now - m.send_time).hours * RELATIVE_BOOST_PER_WAIT_HOUR) * fee(m)
 func waitBoostedFee(
+	lggr logger.Logger,
 	waitTime time.Duration,
 	fee *big.Int,
-	relativeBoostPerWaitHour float64) *big.Int {
+	relativeBoostPerWaitHour float64,
+) *big.Int {
 	k := 1.0 + waitTime.Hours()*relativeBoostPerWaitHour
 
 	boostedFee := big.NewFloat(0).Mul(big.NewFloat(k), new(big.Float).SetInt(fee))
 	res, _ := boostedFee.Int(nil)
+
+	lggr.Debugw("Boosting happening", "waitTime", waitTime, "fee", fee, "boostedFee", res)
 
 	return res
 }
@@ -452,6 +457,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) computeExecutionCostUSD18(
 	message cciptypes.Message,
 ) plugintypes.USD18 {
 	messageGas := new(big.Int).SetUint64(c.estimateProvider.CalculateMessageMaxGas(message))
+	c.lggr.Debugw("Execution cost calculation", "messageGas", messageGas, "executionFee", executionFee)
 	return new(big.Int).Mul(messageGas, executionFee)
 }
 
@@ -466,6 +472,9 @@ func (c *CCIPMessageExecCostUSD18Calculator) computeDataAvailabilityCostUSD18(
 	}
 
 	messageGas := calculateMessageMaxDAGas(message, daConfig)
+	c.lggr.Debugw("Data availability cost calculation",
+		"messageGas", messageGas,
+		"dataAvailabilityFee", dataAvailabilityFee)
 	return big.NewInt(0).Mul(messageGas, dataAvailabilityFee)
 }
 
