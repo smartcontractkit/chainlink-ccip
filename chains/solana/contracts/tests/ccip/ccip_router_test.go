@@ -773,11 +773,9 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("When admin adds another chain selector it's also added on the list", func(t *testing.T) {
 			// Using another chain, solana as an example (which allows SVM -> SVM messages)
-			// Regardless of whether we allow SVM -> SVM in mainnet, it's easy to use for tests here
 
 			// the router is the SVM onramp
-			var paddedCcipRouterProgram [64]byte
-			copy(paddedCcipRouterProgram[:], config.CcipRouterProgram[:])
+			paddedCcipRouterProgram := common.ToPadded64Bytes(config.CcipRouterProgram.Bytes())
 			onRampConfig := [2][64]byte{paddedCcipRouterProgram, emptyAddress}
 
 			t.Run("CCIP Router", func(t *testing.T) {
@@ -2431,24 +2429,29 @@ func TestCCIPRouter(t *testing.T) {
 	/////////////////////////////
 	t.Run("Token Pool Configuration", func(t *testing.T) {
 		t.Run("RemoteConfig", func(t *testing.T) {
-			ix0, err := token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), token_pool.RemoteConfig{
-				// PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
-				TokenAddress: token_pool.RemoteAddress{Address: []byte{1, 2, 3}},
-			}, token0.PoolConfig, token0.Chain[config.EvmChainSelector], token0PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
-			require.NoError(t, err)
-			ix1, err := token_pool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, token1.Mint.PublicKey(), token_pool.RemoteConfig{
-				PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
-				TokenAddress:  token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
-			}, token1.PoolConfig, token1.Chain[config.EvmChainSelector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
-			require.NoError(t, err)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin))
+			for _, selector := range []uint64{config.EvmChainSelector, config.SvmChainSelector} {
+				ix0, err := token_pool.NewInitChainRemoteConfigInstruction(selector, token0.Mint.PublicKey(), token_pool.RemoteConfig{
+					// PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
+					TokenAddress: token_pool.RemoteAddress{Address: []byte{1, 2, 3}},
+				}, token0.PoolConfig, token0.Chain[selector], token0PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				ix1, err := token_pool.NewInitChainRemoteConfigInstruction(selector, token1.Mint.PublicKey(), token_pool.RemoteConfig{
+					PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
+					TokenAddress:  token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
+				}, token1.PoolConfig, token1.Chain[selector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin))
+			}
 		})
 
 		t.Run("AppendRemotePools", func(t *testing.T) {
-			ix, err := token_pool.NewAppendRemotePoolAddressesInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
+			ixEvm, err := token_pool.NewAppendRemotePoolAddressesInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
 				token0.PoolConfig, token0.Chain[config.EvmChainSelector], token0PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, token0PoolAdmin, config.DefaultCommitment)
+			ixSvm, err := token_pool.NewAppendRemotePoolAddressesInstruction(config.SvmChainSelector, token0.Mint.PublicKey(), []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
+				token0.PoolConfig, token0.Chain[config.SvmChainSelector], token0PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixEvm, ixSvm}, token0PoolAdmin, config.DefaultCommitment)
 		})
 
 		t.Run("RateLimit", func(t *testing.T) {
@@ -6170,6 +6173,174 @@ func TestCCIPRouter(t *testing.T) {
 					_, finalBal1, err := tokens.TokenBalance(ctx, solanaGoClient, token1.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, 2, finalBal1-initBal1)
+				})
+			})
+
+			t.Run("tokens other cases", func(t *testing.T) {
+				type setupArgs struct {
+					sourceChainSelector   uint64
+					offrampSourceChainPDA solana.PublicKey
+					onramp                []byte
+					sequenceNumber        uint64 // use 0 if not overriding the default (which only tracks EVM seq num)
+				}
+				type setupResult struct {
+					initSupply  int
+					initBal     int
+					message     ccip_offramp.Any2SVMRampMessage
+					root        [32]byte
+					rootPDA     solana.PublicKey
+					transmitter solana.PrivateKey
+				}
+				testSetup := func(t *testing.T, args setupArgs) setupResult {
+					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint.PublicKey(), config.DefaultCommitment)
+					require.NoError(t, err)
+					_, initBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
+					require.NoError(t, err)
+
+					transmitter := getTransmitter()
+
+					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
+					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
+					message.Header.SourceChainSelector = args.sourceChainSelector
+					message.OnRampAddress = args.onramp
+					if args.sequenceNumber != 0 {
+						message.Header.SequenceNumber = args.sequenceNumber
+					}
+					require.NoError(t, err)
+					message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
+					message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{{
+						SourcePoolAddress: []byte{1, 2, 3},
+						DestTokenAddress:  token0.Mint.PublicKey(),
+						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
+					}}
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, args.onramp, msgAccounts)
+					require.NoError(t, err)
+
+					fmt.Printf("message: %+v\n", message) // TODO remove
+
+					root := [32]byte(rootBytes)
+					sequenceNumber := message.Header.SequenceNumber
+
+					commitReport := ccip_offramp.CommitInput{
+						MerkleRoot: ccip_offramp.MerkleRoot{
+							SourceChainSelector: args.sourceChainSelector,
+							OnRampAddress:       args.onramp,
+							MinSeqNr:            sequenceNumber,
+							MaxSeqNr:            sequenceNumber,
+							MerkleRoot:          root,
+						},
+					}
+					sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+					require.NoError(t, err)
+					rootPDA, err := state.FindOfframpCommitReportPDA(args.sourceChainSelector, root, config.CcipOfframpProgram)
+					require.NoError(t, err)
+
+					instruction, err := ccip_offramp.NewCommitInstruction(
+						reportContext,
+						testutils.MustMarshalBorsh(t, commitReport),
+						sigs.Rs,
+						sigs.Ss,
+						sigs.RawVs,
+						config.OfframpConfigPDA,
+						config.OfframpReferenceAddressesPDA,
+						args.offrampSourceChainPDA,
+						rootPDA,
+						transmitter.PublicKey(),
+						solana.SystemProgramID,
+						solana.SysVarInstructionsPubkey,
+						config.OfframpBillingSignerPDA,
+						config.FeeQuoterProgram,
+						config.FqConfigPDA,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+					event := ccip.EventCommitReportAccepted{}
+					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+
+					return setupResult{
+						initSupply,
+						initBal,
+						message,
+						root,
+						rootPDA,
+						transmitter,
+					}
+				}
+
+				t.Run("Router authorization of offramp for lanes", func(t *testing.T) {
+					// Check SVM is an accepted source chain
+					svmOnramp := common.ToPadded64Bytes(config.CcipRouterProgram[:])
+					var sourceChain ccip_offramp.SourceChain
+					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChain))
+					require.Contains(t, sourceChain.Config.OnRamp, svmOnramp)
+					fmt.Printf("sourceChain: %+v\n", sourceChain) // TODO remove
+
+					// Check offramp program is not registered in router as valid offramp for SVM<>SVM lane
+					testutils.AssertClosedAccount(ctx, t, solanaGoClient, config.AllowedOfframpSvmPDA, config.DefaultCommitment)
+
+					setup := testSetup(t, setupArgs{
+						sourceChainSelector:   config.SvmChainSelector,
+						offrampSourceChainPDA: config.OfframpSvmSourceChainPDA,
+						onramp:                config.CcipRouterProgram.Bytes(),
+						sequenceNumber:        1, // most utils assume EVM, but this is the first message from SVM
+					})
+
+					executionReport := ccip_offramp.ExecutionReportSingleChain{
+						SourceChainSelector: config.SvmChainSelector,
+						Message:             setup.message,
+						OffchainTokenData:   [][]byte{{}},
+						Root:                setup.root,
+						Proofs:              [][32]uint8{},
+					}
+					raw := ccip_offramp.NewExecuteInstruction(
+						testutils.MustMarshalBorsh(t, executionReport),
+						reportContext,
+						[]byte{4},
+						config.OfframpConfigPDA,
+						config.OfframpReferenceAddressesPDA,
+						config.OfframpSvmSourceChainPDA,
+						setup.rootPDA,
+						config.CcipOfframpProgram,
+						config.AllowedOfframpSvmPDA,
+						config.OfframpExternalExecutionConfigPDA,
+						setup.transmitter.PublicKey(),
+						solana.SystemProgramID,
+						solana.SysVarInstructionsPubkey,
+						config.OfframpTokenPoolsSignerPDA,
+					)
+					raw.AccountMetaSlice = append(
+						raw.AccountMetaSlice,
+						solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+						solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+						solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+						solana.NewAccountMeta(solana.SystemProgramID, false, false),
+					)
+
+					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
+					require.NoError(t, err)
+					tokenMetas[1] = solana.Meta(token0.Billing[config.SvmChainSelector])       // overwrite field that our TokenPool utils assume will be for EVM
+					tokenMetas[2] = solana.Meta(token0.Chain[config.SvmChainSelector]).WRITE() // overwrite field that our TokenPool utils assume will be for EVM
+					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
+					executeIx, err := raw.ValidateAndBuild()
+					require.NoError(t, err)
+
+					// It fails here as the offramp isn't registered in the router for that lane
+					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, setup.transmitter, config.DefaultCommitment, addressTables, []string{ccip_offramp.InvalidInputs_CcipOfframpError.String()})
+
+					// Allow that offramp for SVM
+					allowIx, err := ccip_router.NewAddOfframpInstruction(
+						config.SvmChainSelector,
+						config.CcipOfframpProgram,
+						config.AllowedOfframpSvmPDA,
+						config.RouterConfigPDA,
+						ccipAdmin.PublicKey(),
+						solana.SystemProgramID,
+					).ValidateAndBuild()
+					require.NoError(t, err)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{allowIx}, ccipAdmin, config.DefaultCommitment)
+
+					// Now the execute should succeed
+					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, setup.transmitter, config.DefaultCommitment, addressTables)
 				})
 			})
 

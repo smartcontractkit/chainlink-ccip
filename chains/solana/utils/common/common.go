@@ -27,6 +27,14 @@ func Uint64ToLE(chain uint64) []byte {
 	return chainLE
 }
 
+func ToPadded64Bytes(input []byte) (result [64]byte) {
+	if len(input) > 64 {
+		panic("input is too long")
+	}
+	copy(result[:], input[:])
+	return result
+}
+
 func To28BytesLE(value uint64) [28]byte {
 	le := make([]byte, 28)
 	binary.LittleEndian.PutUint64(le, value)
