@@ -1,6 +1,7 @@
 use anchor_lang::AnchorSerialize;
 
-use crate::{CommitInput, ExecutionReportSingleChain};
+use crate::context::CommitInput;
+use crate::messages::ExecutionReportSingleChain;
 
 use super::ocr3base::{Ocr3Report, ReportContext};
 

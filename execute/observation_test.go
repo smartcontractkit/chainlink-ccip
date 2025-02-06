@@ -119,6 +119,7 @@ func Test_getMessagesObservation(t *testing.T) {
 		msgHasher:             msgHasher,
 		tokenDataObserver:     &tokenDataObserver,
 		costlyMessageObserver: &costlyMessageObserver,
+		ocrTypeCodec:          jsonOcrTypeCodec,
 	}
 
 	tests := []struct {
