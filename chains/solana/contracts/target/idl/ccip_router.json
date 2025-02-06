@@ -270,6 +270,98 @@
       ]
     },
     {
+      "name": "addOfframp",
+      "docs": [
+        "Add an offramp address to the list of offramps allowed by the router, for a",
+        "particular source chain. External users will check this list before accepting",
+        "a `ccip_receive` CPI.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `source_chain_selector` - The source chain for the offramp's lane.",
+        "* `offramp` - The offramp's address."
+      ],
+      "accounts": [
+        {
+          "name": "allowedOfframp",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "offramp",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "removeOfframp",
+      "docs": [
+        "Remove an offramp address from the list of offramps allowed by the router, for a",
+        "particular source chain. External users will check this list before accepting",
+        "a `ccip_receive` CPI.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `source_chain_selector` - The source chain for the offramp's lane.",
+        "* `offramp` - The offramp's address."
+      ],
+      "accounts": [
+        {
+          "name": "allowedOfframp",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "offramp",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "updateSvmChainSelector",
       "docs": [
         "Updates the SVM chain selector in the router configuration.",
@@ -796,6 +888,13 @@
     }
   ],
   "accounts": [
+    {
+      "name": "AllowedOfframp",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
     {
       "name": "Config",
       "type": {
@@ -1422,6 +1521,36 @@
         },
         {
           "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OfframpAdded",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "offramp",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OfframpRemoved",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "offramp",
           "type": "publicKey",
           "index": false
         }

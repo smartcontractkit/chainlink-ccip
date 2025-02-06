@@ -6,6 +6,7 @@ declare_id!("CcipReceiver1111111111111111111111111111111");
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 pub const APPROVED_SENDER_SEED: &[u8] = b"approved_ccip_sender";
 pub const TOKEN_ADMIN_SEED: &[u8] = b"receiver_token_admin";
+pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
@@ -23,7 +24,7 @@ pub mod example_ccip_receiver {
             .init(ctx.accounts.authority.key(), router)
     }
 
-    /// This function is called by the CCIP Router to execute the CCIP message.
+    /// This function is called by the CCIP Offramp to execute the CCIP message.
     /// The method name needs to be ccip_receive with Anchor encoding,
     /// if not using Anchor the discriminator needs to be [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]
     /// You can send as many accounts as you need, specifying if mutable or not.
@@ -132,11 +133,27 @@ pub struct Initialize<'info> {
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]
 pub struct CcipReceive<'info> {
-    // router CPI signer must be first
-    #[account(
-        constraint = state.is_router(authority.key()) @ CcipReceiverError::OnlyRouter,
-    )]
+    // Offramp CPI signer must be first
+    #[account(mut)]
     pub authority: Signer<'info>,
+
+    /// CHECK PDA of the router program verifying the signer is an allowed offramp.
+    /// If PDA does not exist, the router doesn't allow this offramp
+    #[account(
+        constraint = {
+        let (pda, _) = Pubkey::find_program_address(
+            &[
+                ALLOWED_OFFRAMP,
+                message.source_chain_selector.to_le_bytes().as_ref(),
+                authority.key().as_ref(),
+            ],
+            &state.router.key(),
+        );
+        allowed_offramp.key() == pda && allowed_offramp.owner == &state.router.key()
+        } @ CcipReceiverError::InvalidCaller
+    )]
+    pub allowed_offramp: UncheckedAccount<'info>,
+
     #[account(
         seeds = [
             APPROVED_SENDER_SEED,
@@ -147,6 +164,10 @@ pub struct CcipReceive<'info> {
         bump,
     )]
     pub approved_sender: Account<'info, ApprovedSender>, // if PDA does not exist, the message sender and/or source chain are not approved
+    #[account(
+        seeds = [b"state"],
+        bump,
+    )]
     pub state: Account<'info, BaseState>,
 }
 
@@ -351,6 +372,8 @@ pub enum CcipReceiverError {
     OnlyOwner,
     #[msg("Address is not proposed_owner")]
     OnlyProposedOwner,
+    #[msg("Caller is not allowed")]
+    InvalidCaller,
 }
 
 #[event]

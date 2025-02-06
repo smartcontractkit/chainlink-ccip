@@ -8,6 +8,36 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type AllowedOfframp struct{}
+
+var AllowedOfframpDiscriminator = [8]byte{247, 97, 179, 16, 207, 36, 236, 132}
+
+func (obj AllowedOfframp) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(AllowedOfframpDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AllowedOfframp) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(AllowedOfframpDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[247 97 179 16 207 36 236 132]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	return nil
+}
+
 type Config struct {
 	Version          uint8
 	Padding0         [7]uint8

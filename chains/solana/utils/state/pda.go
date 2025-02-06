@@ -40,6 +40,12 @@ func FindApprovedSender(chainSelector uint64, sourceSender []byte, receiverProgr
 	return p, err
 }
 
+func FindAllowedOfframpPDA(chainSelector uint64, offramp solana.PublicKey, ccipRouterProgram solana.PublicKey) (solana.PublicKey, error) {
+	chainSelectorLE := common.Uint64ToLE(chainSelector)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("allowed_offramp"), chainSelectorLE, offramp.Bytes()}, ccipRouterProgram)
+	return p, err
+}
+
 //////////////////////////////////////////
 // PDAs with same seeds across programs //
 //////////////////////////////////////////
