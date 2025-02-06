@@ -12,9 +12,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -181,16 +181,16 @@ func buildMerkleRootsOutcome(
 		return Outcome{}, fmt.Errorf("RMN signatures are nil while RMN is enabled")
 	}
 
+	lggr.Debugw("building merkle roots outcome",
+		"rmnEnabled", rmnEnabled,
+		"rmnEnabledChains", consensusObservation.RMNEnabledChains,
+		"roots", roots,
+		"rmnSignatures", q.RMNSignatures)
+
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
 	sigs := make([]cciptypes.RMNECDSASignature, 0)
 	if rmnEnabled && q.RMNSignatures != nil {
-		parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
-		if err != nil {
-			return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
-		}
-		sigs = parsedSigs
-
 		type rootKey struct {
 			ChainSel      cciptypes.ChainSelector
 			SeqNumsRange  cciptypes.SeqNumRange
@@ -217,7 +217,15 @@ func buildMerkleRootsOutcome(
 			signedRoots.Add(rk)
 		}
 
-		// Only report roots that are present in RMN signatures.
+		if signedRoots.Cardinality() > 0 {
+			parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+			if err != nil {
+				return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
+			}
+			sigs = parsedSigs
+		}
+
+		// Only report roots that are RMN-enabled and have RMN signatures or are RMN-disabled.
 		rootsToReport := make([]cciptypes.MerkleRootChain, 0)
 		for _, root := range roots {
 			rk := rootKey{
