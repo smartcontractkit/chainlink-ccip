@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
@@ -163,8 +164,6 @@ func reportRangesOutcome(
 
 // buildMerkleRootsOutcome is given a set of agreed observed merkle roots and RMN signatures
 // and construct a merkleRoots outcome.
-//
-//nolint:gocyclo // todo
 func buildMerkleRootsOutcome(
 	q Query,
 	rmnEnabled bool,
@@ -179,10 +178,6 @@ func buildMerkleRootsOutcome(
 		outcomeType = ReportEmpty
 	}
 
-	if len(roots) > 0 && rmnEnabled && q.RMNSignatures == nil {
-		return Outcome{}, fmt.Errorf("RMN signatures are nil while RMN is enabled")
-	}
-
 	lggr.Debugw("building merkle roots outcome",
 		"rmnEnabled", rmnEnabled,
 		"rmnEnabledChains", consensusObservation.RMNEnabledChains,
@@ -192,72 +187,20 @@ func buildMerkleRootsOutcome(
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
 	sigs := make([]cciptypes.RMNECDSASignature, 0)
-	if rmnEnabled && q.RMNSignatures != nil {
-		type rootKey struct {
-			ChainSel      cciptypes.ChainSelector
-			SeqNumsRange  cciptypes.SeqNumRange
-			MerkleRoot    cciptypes.Bytes32
-			OnRampAddress string
+	var err error
+
+	if len(roots) > 0 && rmnEnabled {
+		if q.RMNSignatures == nil {
+			return Outcome{}, fmt.Errorf("RMN signatures are nil while RMN is enabled")
 		}
 
-		signedRoots := mapset.NewSet[rootKey]()
-		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
-			rk := rootKey{
-				ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
-				SeqNumsRange: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
-					cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
-				),
-				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
-				// NOTE: convert address into a comparable value for mapset.
-				OnRampAddress: typconv.AddressBytesToString(
-					laneUpdate.LaneSource.OnrampAddress,
-					laneUpdate.LaneSource.SourceChainSelector),
-			}
-
-			lggr.Infow("Found signed root", "root", rk)
-			signedRoots.Add(rk)
+		sigs, err = rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+		if err != nil {
+			return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
 		}
 
-		if signedRoots.Cardinality() > 0 {
-			var err error
-			sigs, err = rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
-			if err != nil {
-				return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
-			}
-		}
-
-		// Only report roots that are RMN-enabled and have RMN signatures or are RMN-disabled.
-		rootsToReport := make([]cciptypes.MerkleRootChain, 0)
-		for _, root := range roots {
-			rk := rootKey{
-				ChainSel:      root.ChainSel,
-				SeqNumsRange:  root.SeqNumsRange,
-				MerkleRoot:    root.MerkleRoot,
-				OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
-			}
-
-			rootIsSignedAndRmnEnabled := signedRoots.Contains(rk) &&
-				consensusObservation.RMNEnabledChains[root.ChainSel]
-
-			rootNotSignedButRmnDisabled := !signedRoots.Contains(rk) &&
-				!consensusObservation.RMNEnabledChains[root.ChainSel]
-
-			if rootIsSignedAndRmnEnabled || rootNotSignedButRmnDisabled {
-				lggr.Infow("Adding root to the report",
-					"root", rk,
-					"rootIsSigned", rootIsSignedAndRmnEnabled,
-					"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled)
-				rootsToReport = append(rootsToReport, root)
-			} else {
-				lggr.Infow("Root invalid, skipping from the report",
-					"root", rk,
-					"rootIsSigned", rootIsSignedAndRmnEnabled,
-					"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled,
-				)
-			}
-		}
-		roots = rootsToReport
+		roots = filterRootsBasedOnRmnSigs(
+			lggr, q.RMNSignatures.LaneUpdates, roots, consensusObservation.RMNEnabledChains)
 	}
 
 	outcome := Outcome{
@@ -270,6 +213,74 @@ func buildMerkleRootsOutcome(
 	}
 
 	return outcome, nil
+}
+
+// filterRootsBasedOnRmnSigs filters the roots to only include the ones that are either:
+// 1) RMN-enabled and have RMN signatures
+// 2) RMN-disabled and do not have RMN signatures
+func filterRootsBasedOnRmnSigs(
+	lggr logger.Logger,
+	signedLaneUpdates []*rmnpb.FixedDestLaneUpdate,
+	roots []cciptypes.MerkleRootChain,
+	rmnEnabledChains map[cciptypes.ChainSelector]bool,
+) []cciptypes.MerkleRootChain {
+	// Create a set of signed roots for quick lookup.
+	signedRoots := mapset.NewSet[rootKey]()
+	for _, laneUpdate := range signedLaneUpdates {
+		rk := rootKey{
+			ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
+			SeqNumsRange: cciptypes.NewSeqNumRange(
+				cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
+				cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
+			),
+			MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
+			// NOTE: convert address into a comparable value for mapset.
+			OnRampAddress: typconv.AddressBytesToString(
+				laneUpdate.LaneSource.OnrampAddress,
+				laneUpdate.LaneSource.SourceChainSelector),
+		}
+		lggr.Infow("Found signed root", "root", rk)
+		signedRoots.Add(rk)
+	}
+
+	validRoots := make([]cciptypes.MerkleRootChain, 0)
+	for _, root := range roots {
+		rk := rootKey{
+			ChainSel:      root.ChainSel,
+			SeqNumsRange:  root.SeqNumsRange,
+			MerkleRoot:    root.MerkleRoot,
+			OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
+		}
+
+		rootIsSignedAndRmnEnabled := signedRoots.Contains(rk) &&
+			rmnEnabledChains[root.ChainSel]
+
+		rootNotSignedButRmnDisabled := !signedRoots.Contains(rk) &&
+			!rmnEnabledChains[root.ChainSel]
+
+		if rootIsSignedAndRmnEnabled || rootNotSignedButRmnDisabled {
+			lggr.Infow("Adding root to the report",
+				"root", rk,
+				"rootIsSigned", rootIsSignedAndRmnEnabled,
+				"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled)
+			validRoots = append(validRoots, root)
+		} else {
+			lggr.Infow("Root invalid, skipping from the report",
+				"root", rk,
+				"rootIsSigned", rootIsSignedAndRmnEnabled,
+				"rootNotSignedButRmnDisabled", rootNotSignedButRmnDisabled,
+			)
+		}
+	}
+
+	return validRoots
+}
+
+type rootKey struct {
+	ChainSel      cciptypes.ChainSelector
+	SeqNumsRange  cciptypes.SeqNumRange
+	MerkleRoot    cciptypes.Bytes32
+	OnRampAddress string
 }
 
 // checkForReportTransmission checks if the OffRamp has an updated set of max seq nums compared to the seq nums that
