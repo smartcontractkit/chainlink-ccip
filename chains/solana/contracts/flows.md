@@ -19,12 +19,10 @@ Commit Flow
 ```mermaid
 sequenceDiagram
     participant N as Offchain Node
-    participant R as Router + OnRamp
     participant F as FeeQuoter
     participant O as OffRamp
 
     N->>O: Commit
-    O-->>R: PDA: Get config
     O->>F: CPI: Store Prices
     O-->>O: Store Merkle Root
 ```
@@ -40,8 +38,11 @@ sequenceDiagram
     participant C as CCIP Receiver
 
     N->>O: Execute
-    O-->>R: PDA: Get config
     O->>T: CPI: Transfer Tokens +<br/>Release/Mint
+    T-->>R: PDA: Validate OffRamp Address as signer
+    Note right of T: Token Pool implementation<br/>supports up to 3 CPIs
     O->>C: CPI: CCIP Receive
+    C-->>R: PDA: Validate OffRamp Address as signer
+    Note right of C: CCIP Receiver<br/>supports up to 3 CPIs
 ```
 
