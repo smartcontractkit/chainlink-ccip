@@ -93,7 +93,6 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 		if err != nil {
 			return TokenPool{}, err
 		}
-
 	}
 
 	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
