@@ -348,8 +348,7 @@
           "isSigner": false,
           "docs": [
             "CHECK offramp program: exists only to derive the allowed offramp PDA",
-            "and the signer PDA. This constraint verifies that the authority is",
-            "correctly derived from the offramp program."
+            "and the authority PDA."
           ]
         },
         {

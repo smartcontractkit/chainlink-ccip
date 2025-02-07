@@ -3,6 +3,8 @@ use anchor_spl::{token_interface::Mint, token_interface::TokenAccount};
 use example_ccip_receiver::{
     Any2SVMMessage, BaseState, CcipReceiverError, EXTERNAL_EXECUTION_CONFIG_SEED,
 };
+
+use program::TestCcipReceiver;
 use solana_program::pubkey;
 declare_id!("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH");
 
@@ -12,7 +14,10 @@ declare_id!("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH");
 pub mod test_ccip_receiver {
     const CCIP_ROUTER: Pubkey = pubkey!("offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5");
 
-    use solana_program::{instruction::Instruction, program::invoke_signed};
+    use solana_program::{
+        instruction::Instruction,
+        program::{get_return_data, invoke_signed},
+    };
 
     use super::*;
 
@@ -86,9 +91,100 @@ pub mod test_ccip_receiver {
         msg!("Called `ccip_token_lock_burn` with message {:?}", input);
         Ok(())
     }
+
+    // This is just a dumb proxy towards the test_pool program, but signing the call with a PDA that mimics
+    // what the offramp does
+    pub fn pool_proxy_release_or_mint<'info>(
+        ctx: Context<'_, '_, 'info, 'info, PoolProxyReleaseOrMint<'info>>,
+        release_or_mint: ReleaseOrMintInV1,
+    ) -> Result<Vec<u8>> {
+        let mut acc_infos = vec![
+            ctx.accounts.cpi_signer.to_account_info(),
+            ctx.accounts.offramp_program.to_account_info(),
+            ctx.accounts.allowed_offramp.to_account_info(),
+            ctx.accounts.config.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.mint.to_account_info(),
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.accounts.pool_token_account.to_account_info(),
+            ctx.accounts.chain_config.to_account_info(),
+            ctx.accounts.receiver_token_account.to_account_info(),
+        ];
+
+        acc_infos.extend_from_slice(ctx.remaining_accounts);
+
+        let acc_metas: Vec<AccountMeta> = acc_infos
+            .iter()
+            .flat_map(|acc_info| {
+                // Check signer from PDA External Execution config
+                let is_signer = acc_info.key() == ctx.accounts.cpi_signer.key();
+                acc_info.to_account_metas(Some(is_signer))
+            })
+            .collect();
+
+        let ix = Instruction {
+            program_id: ctx.accounts.test_pool.key(),
+            accounts: acc_metas,
+            data: release_or_mint.to_tx_data(),
+        };
+
+        let seeds: &[&[u8]] = &[b"external_token_pools_signer", &[ctx.bumps.cpi_signer]];
+
+        invoke_signed(&ix, &acc_infos, &[seeds])?;
+
+        let (_, data) = get_return_data().unwrap();
+
+        Ok(data)
+    }
 }
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
+
+#[derive(Accounts)]
+#[instruction(release_or_mint: ReleaseOrMintInV1)]
+pub struct PoolProxyReleaseOrMint<'info> {
+    /// CHECK
+    pub test_pool: UncheckedAccount<'info>,
+
+    /// CHECK
+    #[account(
+        seeds = [b"external_token_pools_signer"],
+        bump,
+    )]
+    pub cpi_signer: UncheckedAccount<'info>,
+
+    ///////////////////////////////////
+    // Accounts required by Pool CPI //
+    ///////////////////////////////////
+    pub offramp_program: Program<'info, TestCcipReceiver>, // this receiver acts as "dumb" offramp here
+
+    /// CHECK
+    pub allowed_offramp: UncheckedAccount<'info>,
+
+    /// CHECK
+    #[account(mut)]
+    pub config: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub token_program: AccountInfo<'info>,
+
+    #[account(mut)]
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    /// CHECK
+    pub pool_signer: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK
+    #[account(mut)]
+    pub chain_config: UncheckedAccount<'info>,
+
+    /// CHECK
+    #[account(mut)]
+    pub receiver_token_account: UncheckedAccount<'info>,
+}
 
 #[derive(Accounts, Debug)]
 pub struct Initialize<'info> {
@@ -184,4 +280,16 @@ pub struct ReleaseOrMintInV1 {
     source_pool_data: Vec<u8>, //          The data received from the source pool to process the release or mint
     /// @dev WARNING: offchainTokenData is untrusted data.
     offchain_token_data: Vec<u8>, //       The offchain data to process the release or mint
+}
+
+pub const TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR: [u8; 8] =
+    [0x5c, 0x64, 0x96, 0xc6, 0xfc, 0x3f, 0xa4, 0xe4]; // release_or_mint_tokens
+
+impl ReleaseOrMintInV1 {
+    pub fn to_tx_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR);
+        data.extend_from_slice(&self.try_to_vec().unwrap());
+        data
+    }
 }

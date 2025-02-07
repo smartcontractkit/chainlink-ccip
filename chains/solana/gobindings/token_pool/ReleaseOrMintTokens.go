@@ -18,8 +18,7 @@ type ReleaseOrMintTokens struct {
 	//
 	// [1] = [] offrampProgram
 	// ··········· CHECK offramp program: exists only to derive the allowed offramp PDA
-	// ··········· and the signer PDA. This constraint verifies that the authority is
-	// ··········· correctly derived from the offramp program.
+	// ··········· and the authority PDA.
 	//
 	// [2] = [] allowedOfframp
 	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
@@ -68,8 +67,7 @@ func (inst *ReleaseOrMintTokens) GetAuthorityAccount() *ag_solanago.AccountMeta 
 
 // SetOfframpProgramAccount sets the "offrampProgram" account.
 // CHECK offramp program: exists only to derive the allowed offramp PDA
-// and the signer PDA. This constraint verifies that the authority is
-// correctly derived from the offramp program.
+// and the authority PDA.
 func (inst *ReleaseOrMintTokens) SetOfframpProgramAccount(offrampProgram ag_solanago.PublicKey) *ReleaseOrMintTokens {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(offrampProgram)
 	return inst
@@ -77,8 +75,7 @@ func (inst *ReleaseOrMintTokens) SetOfframpProgramAccount(offrampProgram ag_sola
 
 // GetOfframpProgramAccount gets the "offrampProgram" account.
 // CHECK offramp program: exists only to derive the allowed offramp PDA
-// and the signer PDA. This constraint verifies that the authority is
-// correctly derived from the offramp program.
+// and the authority PDA.
 func (inst *ReleaseOrMintTokens) GetOfframpProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }

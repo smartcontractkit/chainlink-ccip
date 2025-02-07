@@ -73,37 +73,39 @@ pub struct AcceptOwnership<'info> {
 #[instruction(release_or_mint: ReleaseOrMintInV1)]
 pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
+    #[account(
+        seeds = [EXTERNAL_TOKENPOOL_SIGNER],
+        bump,
+        seeds::program = offramp_program.key(),
+    )]
     pub authority: Signer<'info>,
 
     /// CHECK offramp program: exists only to derive the allowed offramp PDA
-    /// and the signer PDA. This constraint verifies that the authority is
-    /// correctly derived from the offramp program.
-    #[account(
-        constraint = {
-            let (pda, _) = Pubkey::find_program_address(
-                &[
-                    EXTERNAL_TOKENPOOL_SIGNER,
-                ],
-                &offramp_program.key()
-            );
-            pda == authority.key() && authority.owner == &offramp_program.key() } @ CcipTokenPoolError::InvalidPoolCaller
-    )]
+    /// and the authority PDA.
     pub offramp_program: UncheckedAccount<'info>,
 
     /// CHECK PDA of the router program verifying the signer is an allowed offramp.
     /// If PDA does not exist, the router doesn't allow this offramp
     #[account(
-        constraint = {
-        let (pda, _) = Pubkey::find_program_address(
-            &[
-                ALLOWED_OFFRAMP,
-                release_or_mint.remote_chain_selector.to_le_bytes().as_ref(),
-                offramp_program.key().as_ref(),
-            ],
-            &config.ccip_router,
-        );
-        allowed_offramp.key() == pda && allowed_offramp.owner == &config.ccip_router
-        } @ CcipTokenPoolError::InvalidPoolCaller
+        owner = config.ccip_router, // this guarantees that it was initialized
+        seeds = [
+            ALLOWED_OFFRAMP,
+            release_or_mint.remote_chain_selector.to_le_bytes().as_ref(),
+            offramp_program.key().as_ref()
+        ],
+        bump,
+        seeds::program = config.ccip_router,
+        // constraint = {
+        // let (pda, _) = Pubkey::find_program_address(
+        //     &[
+        //         ALLOWED_OFFRAMP,
+        //         release_or_mint.remote_chain_selector.to_le_bytes().as_ref(),
+        //         offramp_program.key().as_ref(),
+        //     ],
+        //     &config.ccip_router,
+        // );
+        // allowed_offramp.key() == pda
+        // } @ CcipTokenPoolError::InvalidPoolCaller
     )]
     pub allowed_offramp: UncheckedAccount<'info>,
 

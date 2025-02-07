@@ -141,6 +141,99 @@
           }
         }
       ]
+    },
+    {
+      "name": "poolProxyReleaseOrMint",
+      "accounts": [
+        {
+          "name": "testPool",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "cpiSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "offrampProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "poolTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "receiverTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": "bytes"
     }
   ],
   "accounts": [
