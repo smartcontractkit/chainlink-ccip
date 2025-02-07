@@ -29,6 +29,7 @@ pub mod seed {
     pub const DEST_CHAIN_STATE: &[u8] = b"dest_chain_state";
     pub const NONCE: &[u8] = b"nonce";
     pub const CONFIG: &[u8] = b"config";
+    pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
     // token pool interaction signer
     pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
@@ -213,6 +214,59 @@ pub struct UpdateConfigCCIPRouter<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+#[instruction(source_chain_selector: u64, offramp: Pubkey)]
+pub struct AddOfframp<'info> {
+    #[account(
+        init,
+        seeds = [seed::ALLOWED_OFFRAMP, source_chain_selector.to_le_bytes().as_ref(), offramp.as_ref()],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + AllowedOfframp::INIT_SPACE,
+    )]
+    pub allowed_offramp: Account<'info, AllowedOfframp>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(source_chain_selector: u64, offramp: Pubkey)]
+pub struct RemoveOfframp<'info> {
+    #[account(
+        mut,
+        seeds = [seed::ALLOWED_OFFRAMP, source_chain_selector.to_le_bytes().as_ref(), offramp.as_ref()],
+        bump,
+        close = authority,
+    )]
+    pub allowed_offramp: Account<'info, AllowedOfframp>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+#[derive(Copy, Debug, InitSpace)]
+pub struct AllowedOfframp {}
 
 #[derive(Accounts)]
 #[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]

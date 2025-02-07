@@ -6,6 +6,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -68,8 +69,12 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		return dt.Observation{}, fmt.Errorf("unable to get fchain: %w, seqNr: %d", err, seqNr)
 	}
 
-	// TODO: discover the full list of source chain selectors and pass it into DiscoverContracts.
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx)
+	chainConfigs, err := cdp.homechain.GetAllChainConfigs()
+	if err != nil {
+		return dt.Observation{}, fmt.Errorf("unable to get chain configs: %w, seqNr: %d", err, seqNr)
+	}
+
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx, maps.Keys(chainConfigs))
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w, seqNr: %d", err, seqNr)
 	}
