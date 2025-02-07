@@ -66,15 +66,6 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
-	// preload with defined config.EvmChainSelector
-	chainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipTokenPoolProgram)
-	if err != nil {
-		return TokenPool{}, err
-	}
-	billingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
-	if err != nil {
-		return TokenPool{}, err
-	}
 	tokenConfigPda, _, err := state.FindFqBillingTokenConfigPDA(mint.PublicKey(), config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
@@ -92,8 +83,19 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 		Chain:            map[uint64]solana.PublicKey{},
 		Billing:          map[uint64]solana.PublicKey{},
 	}
-	p.Chain[config.EvmChainSelector] = chainPDA
-	p.Billing[config.EvmChainSelector] = billingPDA
+	// preload with defined EVM and SVM chain selectors
+	for _, cs := range []uint64{config.EvmChainSelector, config.SvmChainSelector} {
+		p.Chain[cs], _, err = TokenPoolChainConfigPDA(cs, mint.PublicKey(), config.CcipTokenPoolProgram)
+		if err != nil {
+			return TokenPool{}, err
+		}
+		p.Billing[cs], _, err = state.FindFqPerChainPerTokenConfigPDA(cs, mint.PublicKey(), config.FeeQuoterProgram)
+		if err != nil {
+			return TokenPool{}, err
+		}
+
+	}
+
 	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
 	if err != nil {
 		return TokenPool{}, err
@@ -190,8 +192,12 @@ func MethodToEvent(m string) string {
 }
 
 func ParseTokenLookupTable(ctx context.Context, client *rpc.Client, token TokenPool, userTokenAccount solana.PublicKey) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, error) {
-	tokenBillingConfig := token.Billing[config.EvmChainSelector]
-	poolChainConfig := token.Chain[config.EvmChainSelector]
+	return ParseTokenLookupTableWithChain(ctx, client, token, userTokenAccount, config.EvmChainSelector)
+}
+
+func ParseTokenLookupTableWithChain(ctx context.Context, client *rpc.Client, token TokenPool, userTokenAccount solana.PublicKey, chainSelector uint64) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, error) {
+	tokenBillingConfig := token.Billing[chainSelector]
+	poolChainConfig := token.Chain[chainSelector]
 
 	tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
 	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)

@@ -23,13 +23,12 @@ pub const CCIP_SENDER: &[u8] = b"ccip_sender";
 pub const CCIP_SEND_DISCIRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84]; // ccip_send
 pub const CCIP_GET_FEE_DISCRIMINATOR: [u8; 8] = [115, 195, 235, 161, 25, 219, 60, 29]; // get_fee
 
-/// This program an example of a CCIP Receiver Program.
-/// Used to test CCIP Router execute.
+/// This program an example of a CCIP Sender Program.
+/// Used to test CCIP Router ccip_send.
 #[program]
 pub mod example_ccip_sender {
     use super::*;
 
-    /// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
     pub fn initialize(ctx: Context<Initialize>, router: Pubkey) -> Result<()> {
         ctx.accounts
             .state

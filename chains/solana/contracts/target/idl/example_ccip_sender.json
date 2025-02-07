@@ -2,15 +2,12 @@
   "version": "0.1.0-dev",
   "name": "example_ccip_sender",
   "docs": [
-    "This program an example of a CCIP Receiver Program.",
-    "Used to test CCIP Router execute."
+    "This program an example of a CCIP Sender Program.",
+    "Used to test CCIP Router ccip_send."
   ],
   "instructions": [
     {
       "name": "initialize",
-      "docs": [
-        "The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts"
-      ],
       "accounts": [
         {
           "name": "state",

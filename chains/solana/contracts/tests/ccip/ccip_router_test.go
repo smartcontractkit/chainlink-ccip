@@ -147,8 +147,7 @@ func TestCCIPRouter(t *testing.T) {
 		MaxDataBytes:                30000,
 		MaxNumberOfTokensPerMsg:     5,
 		DefaultTokenDestGasOverhead: 50000,
-		// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
-		ChainFamilySelector: [4]uint8{40, 18, 213, 44},
+		ChainFamilySelector:         [4]uint8(config.EvmChainFamilySelector),
 
 		DefaultTokenFeeUsdcents: 50,
 		NetworkFeeUsdcents:      50,
@@ -727,10 +726,12 @@ func TestCCIPRouter(t *testing.T) {
 					fee_quoter.DestChainConfig{
 						IsEnabled: true,
 						// minimal valid config
-						DefaultTxGasLimit:   1,
-						MaxPerMsgGasLimit:   100,
-						ChainFamilySelector: [4]uint8{3, 2, 1, 0},
-						EnforceOutOfOrder:   true,
+						DefaultTxGasLimit:       1,
+						MaxPerMsgGasLimit:       100,
+						ChainFamilySelector:     [4]uint8(config.SvmChainFamilySelector),
+						EnforceOutOfOrder:       true,
+						MaxNumberOfTokensPerMsg: 10,
+						MaxDataBytes:            100,
 					},
 					config.FqConfigPDA,
 					config.FqSvmDestChainPDA,
@@ -2271,7 +2272,17 @@ func TestCCIPRouter(t *testing.T) {
 				TokenAddress:  token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
 			}, token1.PoolConfig, token1.Chain[config.EvmChainSelector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin))
+			ix2, err := token_pool.NewInitChainRemoteConfigInstruction(config.SvmChainSelector, token0.Mint.PublicKey(), token_pool.RemoteConfig{
+				// PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
+				TokenAddress: token_pool.RemoteAddress{Address: []byte{1, 2, 3}},
+			}, token0.PoolConfig, token0.Chain[config.SvmChainSelector], token0PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			ix3, err := token_pool.NewInitChainRemoteConfigInstruction(config.SvmChainSelector, token1.Mint.PublicKey(), token_pool.RemoteConfig{
+				PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
+				TokenAddress:  token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
+			}, token1.PoolConfig, token1.Chain[config.SvmChainSelector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin))
 		})
 
 		t.Run("AppendRemotePools", func(t *testing.T) {
@@ -2294,7 +2305,11 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			ix1, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token1.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token1.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1}, ccipAdmin, config.DefaultCommitment)
+			ix2, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token0.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token0.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			ix3, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token1.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token1.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3}, ccipAdmin, config.DefaultCommitment)
 		})
 
 		// validate permissions for setting config
@@ -3744,13 +3759,17 @@ func TestCCIPRouter(t *testing.T) {
 		require.NoError(t, err)
 		senderPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_sender")}, config.CcipBaseSender)
 		require.NoError(t, err)
-		senderDestChainConfigPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_chain_config"), common.Uint64ToLE(config.EvmChainSelector)}, config.CcipBaseSender)
+		senderEvmDestChainConfigPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_chain_config"), common.Uint64ToLE(config.EvmChainSelector)}, config.CcipBaseSender)
+		require.NoError(t, err)
+		senderSvmDestChainConfigPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("remote_chain_config"), common.Uint64ToLE(config.SvmChainSelector)}, config.CcipBaseSender)
 		require.NoError(t, err)
 		wsolATAIx, wsolSenderATA, err := tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, solana.SolMint, senderPDA, user.PublicKey())
 		require.NoError(t, err)
 		link22ATAIx, link22SenderATA, err := tokens.CreateAssociatedTokenAccount(config.Token2022Program, link22.mint, senderPDA, user.PublicKey())
 		require.NoError(t, err)
-		senderNoncePDA, err := state.FindNoncePDA(config.EvmChainSelector, senderPDA, config.CcipRouterProgram)
+		senderEvmNoncePDA, err := state.FindNoncePDA(config.EvmChainSelector, senderPDA, config.CcipRouterProgram)
+		require.NoError(t, err)
+		senderSvmNoncePDA, err := state.FindNoncePDA(config.SvmChainSelector, senderPDA, config.CcipRouterProgram)
 		require.NoError(t, err)
 
 		token0ATAIx, token0SenderATA, err := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint.PublicKey(), senderPDA, user.PublicKey())
@@ -3762,7 +3781,11 @@ func TestCCIPRouter(t *testing.T) {
 			initIx, err := example_ccip_sender.NewInitializeInstruction(config.CcipRouterProgram, senderState, user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 
-			destChainIx, err := example_ccip_sender.NewInitChainConfigInstruction(config.EvmChainSelector, validReceiverAddress[:], emptyEVMExtraArgsV2, senderState, senderDestChainConfigPDA, user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			evmDestChainIx, err := example_ccip_sender.NewInitChainConfigInstruction(config.EvmChainSelector, validReceiverAddress[:], emptyEVMExtraArgsV2, senderState, senderEvmDestChainConfigPDA, user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			svmDestChainIx, err := example_ccip_sender.NewInitChainConfigInstruction(config.SvmChainSelector, validReceiverAddress[:], testutils.MustSerializeExtraArgs(t, fee_quoter.SVMExtraArgsV1{
+				AllowOutOfOrderExecution: true,
+			}, ccip.SVMExtraArgsV1Tag), senderState, senderSvmDestChainConfigPDA, user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 
 			transferSolIx, err := system.NewTransferInstruction(1_000_000_000, user.PublicKey(), senderPDA).ValidateAndBuild()
@@ -3771,7 +3794,7 @@ func TestCCIPRouter(t *testing.T) {
 			approveLinkIx, err := tokens.TokenApproveChecked(1e9, 9, link22.program, link22.userATA, link22.mint, senderPDA, user.PublicKey(), nil)
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferSolIx, wsolATAIx, approveLinkIx, link22ATAIx, initIx, destChainIx, token0ATAIx, token1ATAIx}, user, rpc.CommitmentConfirmed)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferSolIx, wsolATAIx, approveLinkIx, link22ATAIx, initIx, evmDestChainIx, svmDestChainIx, token0ATAIx, token1ATAIx}, user, rpc.CommitmentConfirmed)
 		})
 
 		feeConfig := []struct {
@@ -3800,108 +3823,146 @@ func TestCCIPRouter(t *testing.T) {
 			},
 		}
 
-		for _, fc := range feeConfig {
-			t.Run(fmt.Sprintf("billling-%s", fc.name), func(t *testing.T) {
-				t.Run("Can send message", func(t *testing.T) {
-					ix, err := example_ccip_sender.NewCcipSendInstruction(
-						config.EvmChainSelector,
-						[]example_ccip_sender.SVMTokenAmount{}, // no tokens
-						[]byte{1, 2, 3},                        // message data
-						fc.feeToken,                            // empty fee token to indicate native SOL
-						[]uint8{},
-						senderState,
-						senderDestChainConfigPDA,
-						senderPDA,
-						fc.userATA,
-						user.PublicKey(),
-						solana.SystemProgramID,
-						config.CcipRouterProgram,
-						config.RouterConfigPDA,
-						config.EvmDestChainStatePDA,
-						senderNoncePDA,
-						fc.feeProgram,
-						fc.feeMint,
-						fc.feeSenderATA,
-						fc.feeBillingATA,
-						config.BillingSignerPDA,
-						config.FeeQuoterProgram,
-						config.FqConfigPDA,
-						config.FqEvmDestChainPDA,
-						fc.feeTokenBillingConfigPDA,
-						link22.fqBillingConfigPDA,
-						config.ExternalTokenPoolsSignerPDA,
-					).ValidateAndBuild()
-					require.NoError(t, err)
-					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
-				})
+		chainConfig := []struct {
+			destName                                               string
+			chainSelector                                          uint64
+			senderChainConfig, senderNonce, destChainPDA, fqConfig solana.PublicKey
+		}{
+			{
+				destName:          "EVM",
+				chainSelector:     config.EvmChainSelector,
+				senderChainConfig: senderEvmDestChainConfigPDA,
+				senderNonce:       senderEvmNoncePDA,
+				destChainPDA:      config.EvmDestChainStatePDA,
+				fqConfig:          config.FqEvmDestChainPDA,
+			},
+			{
+				destName:          "SVM",
+				chainSelector:     config.SvmChainSelector,
+				senderChainConfig: senderSvmDestChainConfigPDA,
+				senderNonce:       senderSvmNoncePDA,
+				destChainPDA:      config.SvmDestChainStatePDA,
+				fqConfig:          config.FqSvmDestChainPDA,
+			},
+		}
 
-				t.Run("Can send message and tokens", func(t *testing.T) {
-					base := example_ccip_sender.NewCcipSendInstruction(
-						config.EvmChainSelector,
-						[]example_ccip_sender.SVMTokenAmount{
-							{
-								Token:  token0.Mint.PublicKey(),
-								Amount: 1,
+		for _, cc := range chainConfig {
+			t.Run(fmt.Sprintf("SVM->%s", cc.destName), func(t *testing.T) {
+				for _, fc := range feeConfig {
+					t.Run(fmt.Sprintf("billling-%s/message_only", fc.name), func(t *testing.T) {
+						ix, err := example_ccip_sender.NewCcipSendInstruction(
+							cc.chainSelector,
+							[]example_ccip_sender.SVMTokenAmount{}, // no tokens
+							[]byte{1, 2, 3},                        // message data
+							fc.feeToken,                            // empty fee token to indicate native SOL
+							[]uint8{},
+							senderState,
+							cc.senderChainConfig,
+							senderPDA,
+							fc.userATA,
+							user.PublicKey(),
+							solana.SystemProgramID,
+							config.CcipRouterProgram,
+							config.RouterConfigPDA,
+							cc.destChainPDA,
+							cc.senderNonce,
+							fc.feeProgram,
+							fc.feeMint,
+							fc.feeSenderATA,
+							fc.feeBillingATA,
+							config.BillingSignerPDA,
+							config.FeeQuoterProgram,
+							config.FqConfigPDA,
+							cc.fqConfig,
+							fc.feeTokenBillingConfigPDA,
+							link22.fqBillingConfigPDA,
+							config.ExternalTokenPoolsSignerPDA,
+						).ValidateAndBuild()
+						require.NoError(t, err)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
+					})
+				}
+
+				// update config before running with tokens
+				// SVM -> SVM with tokens requires different extraArgs than without tokens
+				if cc.destName == "SVM" {
+					svmDestChainWithTokensIx, err := example_ccip_sender.NewUpdateChainConfigInstruction(config.SvmChainSelector, validReceiverAddress[:], testutils.MustSerializeExtraArgs(t, fee_quoter.SVMExtraArgsV1{
+						AllowOutOfOrderExecution: true,
+						TokenReceiver:            validReceiverAddress,
+					}, ccip.SVMExtraArgsV1Tag), senderState, senderSvmDestChainConfigPDA, user.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+					require.NoError(t, err)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{svmDestChainWithTokensIx}, user, config.DefaultCommitment)
+				}
+
+				for _, fc := range feeConfig {
+					t.Run(fmt.Sprintf("billling-%s/with_tokens", fc.name), func(t *testing.T) {
+						base := example_ccip_sender.NewCcipSendInstruction(
+							cc.chainSelector,
+							[]example_ccip_sender.SVMTokenAmount{
+								{
+									Token:  token0.Mint.PublicKey(),
+									Amount: 1,
+								},
+								{
+									Token:  token1.Mint.PublicKey(),
+									Amount: 2,
+								},
 							},
-							{
-								Token:  token1.Mint.PublicKey(),
-								Amount: 2,
-							},
-						},
-						[]byte{1, 2, 3}, // message data
-						fc.feeToken,     // empty fee token to indicate native SOL
-						[]uint8{2, 15},
-						senderState,
-						senderDestChainConfigPDA,
-						senderPDA,
-						fc.userATA,
-						user.PublicKey(),
-						solana.SystemProgramID,
-						config.CcipRouterProgram,
-						config.RouterConfigPDA,
-						config.EvmDestChainStatePDA,
-						senderNoncePDA,
-						fc.feeProgram,
-						fc.feeMint,
-						fc.feeSenderATA,
-						fc.feeBillingATA,
-						config.BillingSignerPDA,
-						config.FeeQuoterProgram,
-						config.FqConfigPDA,
-						config.FqEvmDestChainPDA,
-						fc.feeTokenBillingConfigPDA,
-						link22.fqBillingConfigPDA,
-						config.ExternalTokenPoolsSignerPDA,
-					)
-					// pass user token accounts
-					base.AccountMetaSlice = append(
-						base.AccountMetaSlice,
-						solana.Meta(token0.User[user.PublicKey()]).WRITE(),
-						solana.Meta(token1.User[user.PublicKey()]).WRITE(),
-					)
+							[]byte{1, 2, 3}, // message data
+							fc.feeToken,     // empty fee token to indicate native SOL
+							[]uint8{2, 15},
+							senderState,
+							cc.senderChainConfig,
+							senderPDA,
+							fc.userATA,
+							user.PublicKey(),
+							solana.SystemProgramID,
+							config.CcipRouterProgram,
+							config.RouterConfigPDA,
+							cc.destChainPDA,
+							cc.senderNonce,
+							fc.feeProgram,
+							fc.feeMint,
+							fc.feeSenderATA,
+							fc.feeBillingATA,
+							config.BillingSignerPDA,
+							config.FeeQuoterProgram,
+							config.FqConfigPDA,
+							cc.fqConfig,
+							fc.feeTokenBillingConfigPDA,
+							link22.fqBillingConfigPDA,
+							config.ExternalTokenPoolsSignerPDA,
+						)
+						// pass user token accounts
+						base.AccountMetaSlice = append(
+							base.AccountMetaSlice,
+							solana.Meta(token0.User[user.PublicKey()]).WRITE(),
+							solana.Meta(token1.User[user.PublicKey()]).WRITE(),
+						)
 
-					// pass token pool accounts with the sender program ATA
-					tokenMetas0, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0SenderATA)
-					require.NoError(t, err)
-					base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
-					tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token1, token1SenderATA)
-					require.NoError(t, err)
-					base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
-					addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
-					for k, v := range ccipSendLookupTable {
-						addressTables[k] = v
-					}
+						// pass token pool accounts with the sender program ATA
+						tokenMetas0, addressTables, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, token0, token0SenderATA, cc.chainSelector)
+						require.NoError(t, err)
+						base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
+						tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, token1, token1SenderATA, cc.chainSelector)
+						require.NoError(t, err)
+						base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
+						addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
+						for k, v := range ccipSendLookupTable {
+							addressTables[k] = v
+						}
 
-					ix, err := base.ValidateAndBuild()
-					require.NoError(t, err)
+						ix, err := base.ValidateAndBuild()
+						require.NoError(t, err)
 
-					ixApprove0, err := tokens.TokenApproveChecked(1, 0, token0.Program, token0.User[user.PublicKey()], token0.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
-					require.NoError(t, err)
-					ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, token1.User[user.PublicKey()], token1.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
-					require.NoError(t, err)
+						ixApprove0, err := tokens.TokenApproveChecked(1, 0, token0.Program, token0.User[user.PublicKey()], token0.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
+						require.NoError(t, err)
+						ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, token1.User[user.PublicKey()], token1.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
+						require.NoError(t, err)
 
-					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(1_400_000))
-				})
+						testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(1_400_000))
+					})
+				}
 			})
 		}
 	})
