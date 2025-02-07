@@ -380,7 +380,7 @@ func TestTokenPool(t *testing.T) {
 
 							for _, cfg := range cfgs {
 								t.Run(cfg.name, func(t *testing.T) {
-									// t.Parallel()
+									t.Parallel()
 
 									ixRates, err := token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint.PublicKey(), cfg.c, token_pool.RateLimitConfig{}, poolConfig, p.Chain[config.EvmChainSelector], anotherAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 									require.NoError(t, err)
