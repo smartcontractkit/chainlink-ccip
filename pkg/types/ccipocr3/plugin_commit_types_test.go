@@ -13,6 +13,12 @@ func TestCommitPluginReport(t *testing.T) {
 	t.Run("is empty", func(t *testing.T) {
 		r := CommitPluginReport{}
 		assert.True(t, r.IsEmpty())
+
+		// If a report only contains signatures it is still considered empty.
+		r = CommitPluginReport{
+			RMNSignatures: make([]RMNECDSASignature, 1),
+		}
+		assert.True(t, r.IsEmpty())
 	})
 
 	t.Run("is not empty", func(t *testing.T) {
@@ -26,11 +32,6 @@ func TestCommitPluginReport(t *testing.T) {
 				TokenPriceUpdates: make([]TokenPrice, 1),
 				GasPriceUpdates:   make([]GasPriceChain, 1),
 			},
-		}
-		assert.False(t, r.IsEmpty())
-
-		r = CommitPluginReport{
-			RMNSignatures: make([]RMNECDSASignature, 1),
 		}
 		assert.False(t, r.IsEmpty())
 
