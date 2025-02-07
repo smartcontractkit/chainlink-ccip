@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -109,7 +109,7 @@ func Test_getMessagesObservation(t *testing.T) {
 	// Create mock objects
 	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
 	msgHasher := mocks.NewMessageHasher()
-	tokenDataObserver := tokendata.NoopTokenDataObserver{}
+	tokenDataObserver := observer.NoopTokenDataObserver{}
 	costlyMessageObserver := costlymessages.NoopObserver{}
 
 	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})

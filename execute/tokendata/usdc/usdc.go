@@ -7,9 +7,10 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -116,7 +117,7 @@ func (u *USDCTokenDataObserver) IsTokenSupported(
 	sourceChain cciptypes.ChainSelector,
 	msgToken cciptypes.RampTokenAmount,
 ) bool {
-	return strings.ToLower(u.supportedPoolsBySelector[sourceChain]) == strings.ToLower(msgToken.SourcePoolAddress.String())
+	return strings.EqualFold(u.supportedPoolsBySelector[sourceChain], msgToken.SourcePoolAddress.String())
 }
 
 func (u *USDCTokenDataObserver) Close() error {
@@ -242,10 +243,4 @@ func (u *USDCTokenDataObserver) attestationToTokenData(
 		return exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
 	}
 	return exectypes.NewSuccessTokenData(tokenData)
-}
-
-func sourceTokenIdentifier(chainSelector cciptypes.ChainSelector, sourcePoolAddress string) string {
-	// Lowercase the sourcePoolAddress to make the identifier case-insensitive.
-	// It makes the code immune to the differences between checksum and non-checksum addresses.
-	return fmt.Sprintf("%d-%s", chainSelector, strings.ToLower(sourcePoolAddress))
 }

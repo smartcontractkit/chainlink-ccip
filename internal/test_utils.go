@@ -50,3 +50,11 @@ func CounterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.Histogr
 
 	return int(pb.GetHistogram().GetSampleCount())
 }
+
+func MustDecode(s string) cciptypes.Bytes {
+	b, err := cciptypes.NewBytesFromString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
