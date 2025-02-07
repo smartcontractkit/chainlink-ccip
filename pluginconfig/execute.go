@@ -7,6 +7,8 @@ import (
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // ExecuteOffchainConfig is the OCR offchainConfig for the exec plugin.
@@ -50,6 +52,13 @@ type ExecuteOffchainConfig struct {
 	// MaxSingleChainReports is the maximum number of single chain reports that can be included in a report.
 	// When set to 0, this setting is ignored.
 	MaxSingleChainReports uint64 `json:"maxSingleChainReports"`
+
+	// FeeBoostingDisabled is a flag to enable/disable fee boosting for this destination chain.
+	DisableFeeBoosting bool `json:"disableFeeBoosting"`
+
+	// DisableAvailableFeeUsdCheckByChain is a map of source chain selectors to bools indicating whether or not we
+	// should check if the message has sufficient fees in USD to be executed.
+	DisableAvailableFeeUsdCheckByChain map[ccipocr3.ChainSelector]bool `json:"disableAvailableFeeUsdCheckByChain"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
