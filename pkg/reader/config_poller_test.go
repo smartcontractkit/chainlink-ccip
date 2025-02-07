@@ -20,12 +20,18 @@ import (
 )
 
 func setupBasicCache(t *testing.T) (*configPoller, *reader_mocks.MockExtended) {
-	reader := reader_mocks.NewMockExtended(t)
-	readers := map[cciptypes.ChainSelector]contractreader.Extended{
-		chainA: reader,
+	mockReader := reader_mocks.NewMockExtended(t)
+
+	reader := &ccipChainReader{
+		lggr: logger.Test(t),
+		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			chainA: mockReader,
+		},
+		destChain: chainA,
 	}
-	cache := newConfigPoller(logger.Test(t), readers, 1*time.Second)
-	return cache, reader
+
+	cache := newConfigPoller(logger.Test(t), reader, 1*time.Second)
+	return cache, mockReader
 }
 
 func TestConfigCache_GetChainConfig_CacheHit(t *testing.T) {
@@ -302,29 +308,47 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 func TestConfigCache_Initialization(t *testing.T) {
 	testCases := []struct {
 		name          string
-		readers       map[cciptypes.ChainSelector]contractreader.Extended
+		setupReader   func() *ccipChainReader
 		refreshPeriod time.Duration
 		chainToTest   cciptypes.ChainSelector
 		expectedErr   string
 	}{
 		{
-			name:          "nil readers map",
-			readers:       nil,
+			name: "nil readers map",
+			setupReader: func() *ccipChainReader {
+				return &ccipChainReader{
+					lggr:            logger.Test(t),
+					contractReaders: nil,
+					destChain:       chainA,
+				}
+			},
 			refreshPeriod: time.Second,
 			chainToTest:   chainA,
 			expectedErr:   "no contract reader for chain",
 		},
 		{
-			name:          "empty readers map",
-			readers:       make(map[cciptypes.ChainSelector]contractreader.Extended),
+			name: "empty readers map",
+			setupReader: func() *ccipChainReader {
+				return &ccipChainReader{
+					lggr:            logger.Test(t),
+					contractReaders: make(map[cciptypes.ChainSelector]contractreader.Extended),
+					destChain:       chainA,
+				}
+			},
 			refreshPeriod: time.Second,
 			chainToTest:   chainA,
 			expectedErr:   "no contract reader for chain",
 		},
 		{
 			name: "missing specific chain",
-			readers: map[cciptypes.ChainSelector]contractreader.Extended{
-				chainB: nil, // Different chain than we'll test
+			setupReader: func() *ccipChainReader {
+				return &ccipChainReader{
+					lggr: logger.Test(t),
+					contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+						chainB: nil, // Different chain than we'll test
+					},
+					destChain: chainA,
+				}
 			},
 			refreshPeriod: time.Second,
 			chainToTest:   chainA,
@@ -337,12 +361,14 @@ func TestConfigCache_Initialization(t *testing.T) {
 			lggr := logger.Test(t)
 			ctx := tests.Context(t)
 
-			cache := newConfigPoller(lggr, tc.readers, tc.refreshPeriod)
+			reader := tc.setupReader()
+			cache := newConfigPoller(lggr, reader, tc.refreshPeriod)
 			require.NotNil(t, cache, "cache should never be nil after initialization")
 
 			// Verify the cache's internal state
 			require.NotNil(t, cache.chainCaches, "chainCaches map should never be nil")
 			assert.Equal(t, tc.refreshPeriod, cache.refreshPeriod)
+			assert.Equal(t, reader, cache.reader)
 
 			// Test getting config for a chain
 			_, err := cache.GetChainConfig(ctx, tc.chainToTest)
@@ -395,7 +421,6 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
-	// Test cases for different invalid results
 	testCases := []struct {
 		name        string
 		setupMock   func() types.BatchGetLatestValuesResult
@@ -404,32 +429,59 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 		{
 			name: "missing offramp results",
 			setupMock: func() types.BatchGetLatestValuesResult {
+				// Setup minimum valid responses for other contracts
+				rmnProxyResult := &types.BatchReadResult{ReadName: consts.MethodNameGetARM}
+				rmnProxyResult.SetResult(&[]byte{1, 2, 3}, nil)
+
+				rmnDigestResult := &types.BatchReadResult{ReadName: consts.MethodNameGetReportDigestHeader}
+				rmnDigestResult.SetResult(&rmnDigestHeader{}, nil)
+				rmnConfigResult := &types.BatchReadResult{ReadName: consts.MethodNameGetVersionedConfig}
+				rmnConfigResult.SetResult(&versionedConfig{}, nil)
+
+				feeQuoterResult := &types.BatchReadResult{ReadName: consts.MethodNameFeeQuoterGetStaticConfig}
+				feeQuoterResult.SetResult(&feeQuoterStaticConfig{}, nil)
+
 				return types.BatchGetLatestValuesResult{
-					types.BoundContract{Name: consts.ContractNameOffRamp}: {},
+					types.BoundContract{Name: consts.ContractNameOffRamp}:   {},
+					types.BoundContract{Name: consts.ContractNameRMNProxy}:  {*rmnProxyResult},
+					types.BoundContract{Name: consts.ContractNameRMNRemote}: {*rmnDigestResult, *rmnConfigResult},
+					types.BoundContract{Name: consts.ContractNameFeeQuoter}: {*feeQuoterResult},
 				}
 			},
-			expectedErr: "expected 5 offramp results",
+			expectedErr: "expected 4 offramp results",
 		},
 		{
 			name: "invalid commit config type",
 			setupMock: func() types.BatchGetLatestValuesResult {
-				// Setup all 5 required results, but make the first one invalid
+				// Setup all 4 required offramp results, but make the first one invalid
 				result1 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 				result1.SetResult("invalid type", nil)
-
 				result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
 				result2.SetResult(&OCRConfigResponse{}, nil)
-
 				result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
 				result3.SetResult(&offRampStaticChainConfig{}, nil)
-
 				result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 				result4.SetResult(&offRampDynamicChainConfig{}, nil)
+
+				// Setup valid responses for other contracts
+				rmnProxyResult := &types.BatchReadResult{ReadName: consts.MethodNameGetARM}
+				rmnProxyResult.SetResult(&[]byte{1, 2, 3}, nil)
+
+				rmnDigestResult := &types.BatchReadResult{ReadName: consts.MethodNameGetReportDigestHeader}
+				rmnDigestResult.SetResult(&rmnDigestHeader{}, nil)
+				rmnConfigResult := &types.BatchReadResult{ReadName: consts.MethodNameGetVersionedConfig}
+				rmnConfigResult.SetResult(&versionedConfig{}, nil)
+
+				feeQuoterResult := &types.BatchReadResult{ReadName: consts.MethodNameFeeQuoterGetStaticConfig}
+				feeQuoterResult.SetResult(&feeQuoterStaticConfig{}, nil)
 
 				return types.BatchGetLatestValuesResult{
 					types.BoundContract{Name: consts.ContractNameOffRamp}: {
 						*result1, *result2, *result3, *result4,
 					},
+					types.BoundContract{Name: consts.ContractNameRMNProxy}:  {*rmnProxyResult},
+					types.BoundContract{Name: consts.ContractNameRMNRemote}: {*rmnDigestResult, *rmnConfigResult},
+					types.BoundContract{Name: consts.ContractNameFeeQuoter}: {*feeQuoterResult},
 				}
 			},
 			expectedErr: "invalid type for CommitLatestOCRConfig",
@@ -447,6 +499,8 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 			_, err := cache.GetChainConfig(ctx, chainA)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expectedErr)
+
+			reader.AssertExpectations(t)
 		})
 	}
 }
@@ -454,11 +508,18 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 func TestConfigCache_MultipleChains(t *testing.T) {
 	readerA := reader_mocks.NewMockExtended(t)
 	readerB := reader_mocks.NewMockExtended(t)
-	readers := map[cciptypes.ChainSelector]contractreader.Extended{
-		chainA: readerA,
-		chainB: readerB,
+
+	// Create ccipChainReader with multiple chain readers
+	reader := &ccipChainReader{
+		lggr: logger.Test(t),
+		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			chainA: readerA,
+			chainB: readerB,
+		},
+		destChain: chainA,
 	}
-	cache := newConfigPoller(logger.Test(t), readers, 1*time.Second)
+
+	cache := newConfigPoller(logger.Test(t), reader, 1*time.Second)
 	ctx := tests.Context(t)
 
 	// Setup mock response for both chains
@@ -535,11 +596,18 @@ func TestConfigCache_RefreshPeriod(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reader := reader_mocks.NewMockExtended(t)
-			readers := map[cciptypes.ChainSelector]contractreader.Extended{
-				chainA: reader,
+			mockReader := reader_mocks.NewMockExtended(t)
+
+			// Create ccipChainReader with the mock reader
+			reader := &ccipChainReader{
+				lggr: logger.Test(t),
+				contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+					chainA: mockReader,
+				},
+				destChain: chainA,
 			}
-			cache := newConfigPoller(logger.Test(t), readers, tc.refreshPeriod)
+
+			cache := newConfigPoller(logger.Test(t), reader, tc.refreshPeriod)
 			ctx := tests.Context(t)
 
 			mockConfig := OCRConfigResponse{
@@ -569,7 +637,7 @@ func TestConfigCache_RefreshPeriod(t *testing.T) {
 				expectedCalls = 2
 			}
 
-			reader.On("ExtendedBatchGetLatestValues",
+			mockReader.On("ExtendedBatchGetLatestValues",
 				mock.Anything,
 				mock.Anything,
 				true,
@@ -587,7 +655,7 @@ func TestConfigCache_RefreshPeriod(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify number of calls
-			reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", expectedCalls)
+			mockReader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", expectedCalls)
 		})
 	}
 }

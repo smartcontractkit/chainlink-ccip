@@ -72,7 +72,7 @@ func newCCIPChainReaderInternal(
 	}
 
 	// Initialize cache with readers
-	reader.configPoller = newConfigPoller(lggr, crs, defaultRefreshPeriod)
+	reader.configPoller = newConfigPoller(lggr, reader, defaultRefreshPeriod)
 
 	contracts := ContractAddresses{
 		consts.ContractNameOffRamp: {
@@ -1512,6 +1512,232 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 	}
 
 	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
+}
+
+func (r *ccipChainReader) prepareBatchConfigRequests() contractreader.ExtendedBatchGetLatestValuesRequest {
+	var (
+		commitLatestOCRConfig OCRConfigResponse
+		execLatestOCRConfig   OCRConfigResponse
+		staticConfig          offRampStaticChainConfig
+		dynamicConfig         offRampDynamicChainConfig
+		rmnRemoteAddress      []byte
+		rmnDigestHeader       rmnDigestHeader
+		rmnVersionConfig      versionedConfig
+		feeQuoterConfig       feeQuoterStaticConfig
+	)
+
+	return contractreader.ExtendedBatchGetLatestValuesRequest{
+		consts.ContractNameOffRamp: {
+			{
+				ReadName: consts.MethodNameOffRampLatestConfigDetails,
+				Params: map[string]any{
+					"ocrPluginType": consts.PluginTypeCommit,
+				},
+				ReturnVal: &commitLatestOCRConfig,
+			},
+			{
+				ReadName: consts.MethodNameOffRampLatestConfigDetails,
+				Params: map[string]any{
+					"ocrPluginType": consts.PluginTypeExecute,
+				},
+				ReturnVal: &execLatestOCRConfig,
+			},
+			{
+				ReadName:  consts.MethodNameOffRampGetStaticConfig,
+				Params:    map[string]any{},
+				ReturnVal: &staticConfig,
+			},
+			{
+				ReadName:  consts.MethodNameOffRampGetDynamicConfig,
+				Params:    map[string]any{},
+				ReturnVal: &dynamicConfig,
+			},
+		},
+		consts.ContractNameRMNProxy: {{
+			ReadName:  consts.MethodNameGetARM,
+			Params:    map[string]any{},
+			ReturnVal: &rmnRemoteAddress,
+		}},
+		consts.ContractNameRMNRemote: {
+			{
+				ReadName:  consts.MethodNameGetReportDigestHeader,
+				Params:    map[string]any{},
+				ReturnVal: &rmnDigestHeader,
+			},
+			{
+				ReadName:  consts.MethodNameGetVersionedConfig,
+				Params:    map[string]any{},
+				ReturnVal: &rmnVersionConfig,
+			},
+		},
+		consts.ContractNameFeeQuoter: {{
+			ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
+			Params:    map[string]any{},
+			ReturnVal: &feeQuoterConfig,
+		}},
+	}
+}
+
+func (r *ccipChainReader) processConfigResults(
+	batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error) {
+	config := ChainConfigSnapshot{}
+
+	for contract, results := range batchResult {
+		var err error
+		switch contract.Name {
+		case consts.ContractNameOffRamp:
+			config.Offramp, err = r.processOfframpResults(results)
+		case consts.ContractNameRMNProxy:
+			config.RMNProxy, err = r.processRMNProxyResults(results)
+		case consts.ContractNameRMNRemote:
+			config.RMNRemote, err = r.processRMNRemoteResults(results)
+		case consts.ContractNameFeeQuoter:
+			config.FeeQuoter, err = r.processFeeQuoterResults(results)
+		default:
+			r.lggr.Warnw("Unhandled contract in batch results", "contract", contract.Name)
+		}
+		if err != nil {
+			return ChainConfigSnapshot{}, fmt.Errorf("process %s results: %w", contract.Name, err)
+		}
+	}
+
+	return config, nil
+}
+
+func (r *ccipChainReader) processOfframpResults(
+	results []types.BatchReadResult) (OfframpConfig, error) {
+
+	if len(results) != 4 {
+		return OfframpConfig{}, fmt.Errorf("expected 4 offramp results, got %d", len(results))
+	}
+
+	config := OfframpConfig{}
+
+	// Define processors for each expected result
+	processors := []resultProcessor{
+		// CommitLatestOCRConfig
+		func(val interface{}) error {
+			typed, ok := val.(*OCRConfigResponse)
+			if !ok {
+				return fmt.Errorf("invalid type for CommitLatestOCRConfig: %T", val)
+			}
+			config.CommitLatestOCRConfig = *typed
+			return nil
+		},
+		// ExecLatestOCRConfig
+		func(val interface{}) error {
+			typed, ok := val.(*OCRConfigResponse)
+			if !ok {
+				return fmt.Errorf("invalid type for ExecLatestOCRConfig: %T", val)
+			}
+			config.ExecLatestOCRConfig = *typed
+			return nil
+		},
+		// StaticConfig
+		func(val interface{}) error {
+			typed, ok := val.(*offRampStaticChainConfig)
+			if !ok {
+				return fmt.Errorf("invalid type for StaticConfig: %T", val)
+			}
+			config.StaticConfig = *typed
+			return nil
+		},
+		// DynamicConfig
+		func(val interface{}) error {
+			typed, ok := val.(*offRampDynamicChainConfig)
+			if !ok {
+				return fmt.Errorf("invalid type for DynamicConfig: %T", val)
+			}
+			config.DynamicConfig = *typed
+			return nil
+		},
+	}
+
+	// Process each result with its corresponding processor
+	for i, result := range results {
+		val, err := result.GetResult()
+		if err != nil {
+			return OfframpConfig{}, fmt.Errorf("get offramp result %d: %w", i, err)
+		}
+
+		if err := processors[i](val); err != nil {
+			return OfframpConfig{}, fmt.Errorf("process result %d: %w", i, err)
+		}
+	}
+
+	return config, nil
+}
+
+func (r *ccipChainReader) processRMNProxyResults(results []types.BatchReadResult) (RMNProxyConfig, error) {
+	if len(results) != 1 {
+		return RMNProxyConfig{}, fmt.Errorf("expected 1 RMN proxy result, got %d", len(results))
+	}
+
+	val, err := results[0].GetResult()
+	if err != nil {
+		return RMNProxyConfig{}, fmt.Errorf("get RMN proxy result: %w", err)
+	}
+
+	if bytes, ok := val.(*[]byte); ok {
+		return RMNProxyConfig{
+			RemoteAddress: *bytes,
+		}, nil
+	}
+
+	return RMNProxyConfig{}, fmt.Errorf("invalid type for RMN proxy remote address: %T", val)
+}
+
+func (r *ccipChainReader) processRMNRemoteResults(results []types.BatchReadResult) (RMNRemoteConfig, error) {
+	config := RMNRemoteConfig{}
+
+	if len(results) != 2 {
+		return RMNRemoteConfig{}, fmt.Errorf("expected 2 RMN remote results, got %d", len(results))
+	}
+
+	// Process DigestHeader
+	val, err := results[0].GetResult()
+	if err != nil {
+		return RMNRemoteConfig{}, fmt.Errorf("get RMN remote digest header result: %w", err)
+	}
+
+	typed, ok := val.(*rmnDigestHeader)
+	if !ok {
+		return RMNRemoteConfig{}, fmt.Errorf("invalid type for RMN remote digest header: %T", val)
+	}
+	config.DigestHeader = *typed
+
+	// Process VersionedConfig
+	val, err = results[1].GetResult()
+	if err != nil {
+		return RMNRemoteConfig{}, fmt.Errorf("get RMN remote versioned config result: %w", err)
+	}
+
+	vconf, ok := val.(*versionedConfig)
+	if !ok {
+		return RMNRemoteConfig{}, fmt.Errorf("invalid type for RMN remote versioned config: %T", val)
+	}
+	config.VersionedConfig = *vconf
+
+	return config, nil
+}
+
+func (r *ccipChainReader) processFeeQuoterResults(results []types.BatchReadResult) (FeeQuoterConfig, error) {
+	if len(results) != 1 {
+		return FeeQuoterConfig{}, fmt.Errorf("expected 1 fee quoter result, got %d", len(results))
+	}
+
+	val, err := results[0].GetResult()
+	if err != nil {
+		return FeeQuoterConfig{}, fmt.Errorf("get fee quoter result: %w", err)
+	}
+
+	if typed, ok := val.(*feeQuoterStaticConfig); ok {
+		return FeeQuoterConfig{
+			StaticConfig: *typed,
+		}, nil
+	}
+
+	return FeeQuoterConfig{}, fmt.Errorf("invalid type for fee quoter static config: %T", val)
 }
 
 func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
