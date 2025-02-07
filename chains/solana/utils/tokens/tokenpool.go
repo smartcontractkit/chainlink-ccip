@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
@@ -57,7 +57,7 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 }
 
 // NewTokenPool returns token + pool addresses. however, the token still needs to be deployed
-func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
+func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey) (TokenPool, error) {
 	mint, err := solana.NewRandomPrivateKey()
 	if err != nil {
 		return TokenPool{}, err
@@ -72,11 +72,11 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 
 	p := TokenPool{
-		Program:          program,
+		Program:          tokenProgram,
 		Mint:             mint,
 		FeeTokenConfig:   tokenConfigPda,
 		AdminRegistryPDA: tokenAdminRegistryPDA,
-		PoolProgram:      config.CcipTokenPoolProgram,
+		PoolProgram:      poolProgram,
 		PoolLookupTable:  solana.PublicKey{},
 		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
 		User:             map[solana.PublicKey]solana.PublicKey{},
@@ -85,7 +85,7 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 	// preload with defined EVM and SVM chain selectors
 	for _, cs := range []uint64{config.EvmChainSelector, config.SvmChainSelector} {
-		p.Chain[cs], _, err = TokenPoolChainConfigPDA(cs, mint.PublicKey(), config.CcipTokenPoolProgram)
+		p.Chain[cs], _, err = TokenPoolChainConfigPDA(cs, mint.PublicKey(), poolProgram)
 		if err != nil {
 			return TokenPool{}, err
 		}
@@ -95,11 +95,11 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 		}
 	}
 
-	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
+	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
+	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -149,24 +149,24 @@ type EventMintRelease struct {
 type EventChainConfigured struct {
 	Discriminator         [8]byte
 	ChainSelector         uint64
-	Token                 token_pool.RemoteAddress
-	PreviousToken         token_pool.RemoteAddress
-	PoolAddresses         []token_pool.RemoteAddress
-	PreviousPoolAddresses []token_pool.RemoteAddress
+	Token                 test_token_pool.RemoteAddress
+	PreviousToken         test_token_pool.RemoteAddress
+	PoolAddresses         []test_token_pool.RemoteAddress
+	PreviousPoolAddresses []test_token_pool.RemoteAddress
 }
 
 type EventRemotePoolsAppended struct {
 	Discriminator         [8]byte
 	ChainSelector         uint64
-	PoolAddresses         []token_pool.RemoteAddress
-	PreviousPoolAddresses []token_pool.RemoteAddress
+	PoolAddresses         []test_token_pool.RemoteAddress
+	PreviousPoolAddresses []test_token_pool.RemoteAddress
 }
 
 type EventRateLimitConfigured struct {
 	Discriminator     [8]byte
 	ChainSelector     uint64
-	OutboundRateLimit token_pool.RateLimitConfig
-	InboundRateLimit  token_pool.RateLimitConfig
+	OutboundRateLimit test_token_pool.RateLimitConfig
+	InboundRateLimit  test_token_pool.RateLimitConfig
 }
 
 type EventChainRemoved struct {

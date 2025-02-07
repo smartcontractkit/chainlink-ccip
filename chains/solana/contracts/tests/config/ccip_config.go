@@ -43,11 +43,13 @@ var (
 	// bytes4(keccak256("CCIP SVMExtraArgsV1"));
 	SvmChainFamilySelector, _ = hex.DecodeString("1e10bdc4")
 
-	// router/onramp PDAs
 	// example programs
-	CcipBaseReceiver = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
-	CcipBaseSender   = solana.MustPublicKeyFromBase58("CcipSender111111111111111111111111111111111")
+	CcipBaseSender          = solana.MustPublicKeyFromBase58("CcipSender111111111111111111111111111111111")
+	CcipBaseReceiver        = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+	CcipBasePoolBurnMint    = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111111BurnMint")
+	CcipBasePoolLockRelease = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111LockReLease")
 
+	// router/onramp PDAs
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	ExternalTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipRouterProgram)
 	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipLogicReceiver)
