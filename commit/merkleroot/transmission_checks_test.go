@@ -15,9 +15,9 @@ import (
 
 func Test_validateMerkleRootsState(t *testing.T) {
 	sourceChainConfig := map[cciptypes.ChainSelector]reader2.SourceChainConfig{
-		10: {IsRMNVerificationDisabled: false},
-		20: {IsRMNVerificationDisabled: false},
-		30: {IsRMNVerificationDisabled: true},
+		10: {IsRMNVerificationDisabled: false, IsEnabled: true},
+		20: {IsRMNVerificationDisabled: false, IsEnabled: true},
+		30: {IsRMNVerificationDisabled: true, IsEnabled: true},
 	}
 
 	testCases := []struct {
@@ -108,7 +108,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			}
 			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
 
-			reader.EXPECT().GetOffRampSourceChainsConfig(ctx).Return(sourceChainConfig, nil).Maybe()
+			reader.EXPECT().GetOffRampSourceChainsConfig(ctx, chains).Return(sourceChainConfig, nil).Maybe()
 
 			err := ValidateMerkleRootsState(ctx, rep.BlessedMerkleRoots, rep.UnblessedMerkleRoots, reader)
 			if tc.expErr {

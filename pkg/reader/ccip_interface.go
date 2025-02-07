@@ -150,8 +150,11 @@ type CCIPReader interface {
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
 	GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error)
 
-	// DiscoverContracts reads from all available contract readers to discover contract addresses.
-	DiscoverContracts(ctx context.Context) (ContractAddresses, error)
+	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
+	// contract and source chain selector.
+	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
+	// fetch the source config from the offramp for each of them.
+	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
 	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
 	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
@@ -173,6 +176,8 @@ type CCIPReader interface {
 	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
 	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
 
-	// GetOffRampSourceChainsConfig returns the sourceChains config for all the source chains.
-	GetOffRampSourceChainsConfig(ctx context.Context) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+	// GetOffRampSourceChainsConfig returns the sourceChains config for all the provided source chains.
+	// If a config was not found it will be missing from the returned map.
+	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
+	) (map[cciptypes.ChainSelector]SourceChainConfig, error)
 }

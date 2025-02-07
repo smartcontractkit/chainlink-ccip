@@ -32,6 +32,8 @@ import (
 // report.
 //
 // Phase 3: observe nonce for each unique source/sender pair.
+//
+//nolint:gocyclo
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
@@ -47,6 +49,15 @@ func (p *Plugin) Observation(
 		return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 	lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
+
+	// If the previous outcome was the filter state, and reports were built, mark the messages as inflight.
+	if previousOutcome.State == exectypes.Filter {
+		for _, chainReport := range previousOutcome.Report.ChainReports {
+			for _, message := range chainReport.Messages {
+				p.inflightMessageCache.MarkInflight(chainReport.SourceChainSelector, message.Header.MessageID)
+			}
+		}
+	}
 
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
@@ -172,6 +183,8 @@ func (p *Plugin) getCommitReportsObservation(
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
+
+	// TODO: message from fullyExecutedCommits which are in the inflight messages cache could be cleared here.
 
 	// If fully executed reports are detected, mark them in the cache.
 	// This cache will be re-initialized on each plugin restart.

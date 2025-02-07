@@ -738,7 +738,7 @@ func prepareCcipReaderMock(
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
 	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 		Return(&reader2.CurseInfo{}, nil).Maybe()
-	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything).
+	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
 		Return(sourceChainConfigs, nil).Maybe()
 
 	if mockEmptySeqNrs {
@@ -749,7 +749,7 @@ func prepareCcipReaderMock(
 	}
 
 	if enableDiscovery {
-		ccipReader.EXPECT().DiscoverContracts(mock.Anything).Return(nil, nil)
+		ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
 		ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 	}
 }
@@ -819,8 +819,10 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	}
 
 	homeChainReader.EXPECT().GetFChain().Return(fChain, nil)
-	homeChainReader.EXPECT().
-		GetOCRConfigs(mock.Anything, params.donID, consts.PluginTypeCommit).
+	if params.enableDiscovery {
+		homeChainReader.EXPECT().GetAllChainConfigs().Return(params.chainCfg, nil)
+	}
+	homeChainReader.EXPECT().GetOCRConfigs(mock.Anything, params.donID, consts.PluginTypeCommit).
 		Return(reader.ActiveAndCandidate{
 			ActiveConfig: reader.OCR3ConfigWithMeta{
 				ConfigDigest: params.reportingCfg.ConfigDigest,

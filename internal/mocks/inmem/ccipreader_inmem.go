@@ -162,7 +162,9 @@ func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 	return nil
 }
 
-func (r InMemoryCCIPReader) DiscoverContracts(ctx context.Context) (reader.ContractAddresses, error) {
+func (r InMemoryCCIPReader) DiscoverContracts(
+	ctx context.Context,
+	allChains []cciptypes.ChainSelector) (reader.ContractAddresses, error) {
 	return nil, nil
 }
 
@@ -204,8 +206,8 @@ func (r InMemoryCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginTy
 	return r.ConfigDigest, nil
 }
 
-func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(
-	ctx context.Context) (map[cciptypes.ChainSelector]reader.SourceChainConfig, error) {
+func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]reader.SourceChainConfig, error) {
 	return nil, nil
 }
 

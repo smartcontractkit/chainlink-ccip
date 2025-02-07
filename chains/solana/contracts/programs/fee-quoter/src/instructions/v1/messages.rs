@@ -101,44 +101,53 @@ fn validate_svm_dest_address(address: &[u8]) -> Result<()> {
 
 // process_extra_args returns serialized extraArgs, gas_limit, allow_out_of_order_execution
 // it calls the chain-specific extra args validation logic
-// TODO move to public?
 pub fn process_extra_args(
     dest_config: &DestChainConfig,
     extra_args: &[u8],
     message_contains_tokens: bool,
 ) -> Result<ProcessedExtraArgs> {
-    require_gte!(extra_args.len(), 4, FeeQuoterError::InvalidInputs);
-
-    let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
-    let mut data = &extra_args[4..];
-
     match u32::from_be_bytes(dest_config.chain_family_selector) {
-        CHAIN_FAMILY_SELECTOR_EVM => parse_and_validate_evm_extra_args(dest_config, tag, &mut data),
+        CHAIN_FAMILY_SELECTOR_EVM => {
+            // Extra args are optional for EVM destination. In case there
+            // are extra args, they must be prefixed by a four byte tag
+            // -> bytes4(keccak256("CCIP EVMExtraArgsV2"));
+            let Some(tag) = extra_args.get(..4) else {
+                return Ok(ProcessedExtraArgs::defaults(dest_config));
+            };
+
+            let mut data = &extra_args[4..];
+            parse_and_validate_evm_extra_args(tag.try_into().unwrap(), &mut data)
+        }
         CHAIN_FAMILY_SELECTOR_SVM => {
-            parse_and_validate_svm_extra_args(dest_config, tag, &mut data, message_contains_tokens)
+            // Extra args are mandatory for a SVM destination, so the tag must exist.
+            require_gte!(extra_args.len(), 4, FeeQuoterError::InvalidInputs);
+            let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
+            let mut data = &extra_args[4..];
+            Ok(parse_and_validate_svm_extra_args(
+                dest_config,
+                tag,
+                &mut data,
+                message_contains_tokens,
+            )?)
         }
 
         _ => Err(FeeQuoterError::InvalidChainFamilySelector.into()),
     }
 }
 
-fn parse_and_validate_evm_extra_args(
-    cfg: &DestChainConfig,
-    tag: [u8; 4],
-    data: &mut &[u8],
-) -> Result<ProcessedExtraArgs> {
+fn parse_and_validate_evm_extra_args(tag: [u8; 4], data: &mut &[u8]) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(tag) {
         EVM_EXTRA_ARGS_V2_TAG => {
-            let args = if data.is_empty() {
-                EVMExtraArgsV2::default_config(cfg)
+            if data.is_empty() {
+                Err(FeeQuoterError::InvalidInputs.into())
             } else {
-                EVMExtraArgsV2::deserialize(data)?
-            };
-            Ok(ProcessedExtraArgs {
-                bytes: args.serialize_with_tag(),
-                gas_limit: args.gas_limit,
-                allow_out_of_order_execution: args.allow_out_of_order_execution,
-            })
+                let args = EVMExtraArgsV2::deserialize(data)?;
+                Ok(ProcessedExtraArgs {
+                    bytes: args.serialize_with_tag(),
+                    gas_limit: args.gas_limit,
+                    allow_out_of_order_execution: args.allow_out_of_order_execution,
+                })
+            }
         }
         _ => Err(FeeQuoterError::InvalidExtraArgsTag.into()),
     }
@@ -325,26 +334,29 @@ pub mod tests {
         let evm_dest_chain = sample_dest_chain();
         let mut svm_dest_chain = sample_dest_chain();
         svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
-        let evm_extra_args = EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
-        let svm_extra_args = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
+        let evm_tag_bytes = EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
+        let svm_tag_bytes = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
         let mut none_dest_chain = sample_dest_chain();
         none_dest_chain.config.chain_family_selector = [0; 4];
 
-        // match family
-        process_extra_args(&evm_dest_chain.config, &evm_extra_args, false).unwrap();
-        process_extra_args(&svm_dest_chain.config, &svm_extra_args, false).unwrap();
+        // mismatched family fails
         assert_eq!(
-            process_extra_args(&none_dest_chain.config, &evm_extra_args, false).unwrap_err(),
+            process_extra_args(&none_dest_chain.config, &evm_tag_bytes, false).unwrap_err(),
             FeeQuoterError::InvalidChainFamilySelector.into()
         );
         assert_eq!(
             process_extra_args(&none_dest_chain.config, &[0; 0], false).unwrap_err(),
+            FeeQuoterError::InvalidChainFamilySelector.into()
+        );
+
+        // evm - tag but no data fails
+        assert_eq!(
+            process_extra_args(&evm_dest_chain.config, &evm_tag_bytes, false).unwrap_err(),
             FeeQuoterError::InvalidInputs.into()
         );
 
-        // evm - default case
-        let extra_args =
-            process_extra_args(&evm_dest_chain.config, &evm_extra_args, false).unwrap();
+        // evm - default case: (no data or tag)
+        let extra_args = process_extra_args(&evm_dest_chain.config, &[], false).unwrap();
         assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
         assert_eq!(
             extra_args.gas_limit,
@@ -369,13 +381,12 @@ pub mod tests {
 
         // evm - fail to match
         assert_eq!(
-            process_extra_args(&evm_dest_chain.config, &svm_extra_args, false).unwrap_err(),
+            process_extra_args(&evm_dest_chain.config, &svm_tag_bytes, false).unwrap_err(),
             FeeQuoterError::InvalidExtraArgsTag.into()
         );
 
         // svm - default case
-        let extra_args =
-            process_extra_args(&svm_dest_chain.config, &svm_extra_args, false).unwrap();
+        let extra_args = process_extra_args(&svm_dest_chain.config, &svm_tag_bytes, false).unwrap();
         assert_eq!(extra_args.bytes[..4], SVM_EXTRA_ARGS_V1_TAG.to_be_bytes());
         assert_eq!(
             extra_args.gas_limit,
@@ -383,9 +394,15 @@ pub mod tests {
         );
         assert!(!extra_args.allow_out_of_order_execution);
 
+        // svm - empty tag (no data) fails
+        assert_eq!(
+            process_extra_args(&svm_dest_chain.config, &[], false).unwrap_err(),
+            FeeQuoterError::InvalidInputs.into()
+        );
+
         // svm - contains tokens but no receiver address
         assert_eq!(
-            process_extra_args(&svm_dest_chain.config, &svm_extra_args, true).unwrap_err(),
+            process_extra_args(&svm_dest_chain.config, &svm_tag_bytes, true).unwrap_err(),
             FeeQuoterError::InvalidTokenReceiver.into(),
         );
 
@@ -414,7 +431,7 @@ pub mod tests {
 
         // svm - fail to match
         assert_eq!(
-            process_extra_args(&svm_dest_chain.config, &evm_extra_args, false).unwrap_err(),
+            process_extra_args(&svm_dest_chain.config, &evm_tag_bytes, false).unwrap_err(),
             FeeQuoterError::InvalidExtraArgsTag.into()
         );
     }
@@ -435,7 +452,7 @@ pub mod tests {
             data: vec![],
             token_amounts: vec![],
             fee_token: native_mint::ID,
-            extra_args: EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec(), // empty extraArgs, use defaults
+            extra_args: vec![], // empty extraArgs, use defaults
         }
     }
 
