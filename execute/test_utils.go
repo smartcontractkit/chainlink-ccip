@@ -160,6 +160,7 @@ func (it *IntTest) WithCustomFeeBoosting(
 		it.ccipReader,
 		relativeBoostPerWaitHour,
 		now,
+		false,
 	)
 	it.execCostCalculator = costlymessages.NewStaticMessageExecCostUSD18Calculator(messageCost)
 }
@@ -270,6 +271,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		true,
 		feeCalculator,
 		execCostCalculator,
+		nil,
 	)
 
 	ep := gasmock.NewMockEstimateProvider(it.t)
