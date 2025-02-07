@@ -1,4 +1,4 @@
-use crate::SourceChainConfig;
+use crate::state::SourceChainConfig;
 
 pub fn get_on_ramps(config: &SourceChainConfig) -> Vec<&[u8]> {
     let first_item = trim_trailing_zeros(&config.on_ramp[0]);

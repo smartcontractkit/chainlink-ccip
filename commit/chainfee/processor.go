@@ -14,8 +14,9 @@ import (
 )
 
 type processor struct {
-	oracleID        commontypes.OracleID
-	destChain       cciptypes.ChainSelector
+	oracleID  commontypes.OracleID
+	destChain cciptypes.ChainSelector
+	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
 	lggr            logger.Logger
 	homeChain       reader.HomeChain
 	ccipReader      readerpkg.CCIPReader
