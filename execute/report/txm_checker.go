@@ -66,6 +66,9 @@ func (m *MessageStatusCache) statuses(ctx context.Context, msgID string) (Messag
 			// By code inspection we see that if the status is unknown and err not nil,
 			// it means the transaction was not found. It will be the next txID.
 			break
+		} else if err != nil {
+			// TODO: Why wasn't this case wasn't handled in 1.5?
+			return MessageStatusDetails{}, err
 		}
 		if status == types.Fatal {
 			details.hasFatalStatus = true
