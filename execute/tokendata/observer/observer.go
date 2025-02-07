@@ -1,4 +1,4 @@
-package tokendata
+package observer
 
 import (
 	"context"
@@ -8,9 +8,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/lbtc"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -64,12 +64,12 @@ func NewConfigBasedCompositeObservers(
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observer, err := createUSDCTokenObserver(ctx, lggr, destChainSelector, *c.USDCCCTPObserverConfig, encoder, readers)
+			observer, err := usdc.NewUSDCTokenDataObserver(ctx, lggr, destChainSelector, *c.USDCCCTPObserverConfig, encoder.EncodeUSDC, readers)
 			if err != nil {
 				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
 			}
 
-			if c.USDCCCTPObserverConfig.NumWorkers == 0 {
+			if *c.USDCCCTPObserverConfig.NumWorkers == 0 {
 				lggr.Info("Using foreground observer for USDC/CCTP")
 				observers[i] = observer
 			} else {
@@ -77,10 +77,30 @@ func NewConfigBasedCompositeObservers(
 				observers[i] = NewBackgroundObserver(
 					lggr,
 					observer,
-					c.USDCCCTPObserverConfig.NumWorkers,
+					*c.USDCCCTPObserverConfig.NumWorkers,
 					c.USDCCCTPObserverConfig.CacheExpirationInterval.Duration(),
 					c.USDCCCTPObserverConfig.CacheCleanupInterval.Duration(),
 					c.USDCCCTPObserverConfig.ObserveTimeout.Duration(),
+				)
+			}
+		case c.LBTCObserverConfig != nil:
+			observer, err := lbtc.NewLBTCTokenDataObserver(lggr, destChainSelector, *c.LBTCObserverConfig)
+			if err != nil {
+				return nil, fmt.Errorf("create LBTC token observer: %w", err)
+			}
+
+			if *c.LBTCObserverConfig.NumWorkers == 0 {
+				lggr.Info("Using foreground observer for LBTC")
+				observers[i] = observer
+			} else {
+				lggr.Info("Using background observer for LBTC")
+				observers[i] = NewBackgroundObserver(
+					lggr,
+					observer,
+					*c.LBTCObserverConfig.NumWorkers,
+					c.LBTCObserverConfig.CacheExpirationInterval.Duration(),
+					c.LBTCObserverConfig.CacheCleanupInterval.Duration(),
+					c.LBTCObserverConfig.ObserveTimeout.Duration(),
 				)
 			}
 		default:
@@ -88,39 +108,6 @@ func NewConfigBasedCompositeObservers(
 		}
 	}
 	return NewCompositeObservers(lggr, observers...), nil
-}
-
-func createUSDCTokenObserver(
-	ctx context.Context,
-	lggr logger.Logger,
-	destChainSelector cciptypes.ChainSelector,
-	cctpConfig pluginconfig.USDCCCTPObserverConfig,
-	encoder cciptypes.TokenDataEncoder,
-	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-) (TokenDataObserver, error) {
-	usdcReader, err := reader.NewUSDCMessageReader(
-		ctx,
-		lggr,
-		cctpConfig.Tokens,
-		readers,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := usdc.NewSequentialAttestationClient(lggr, cctpConfig)
-	if err != nil {
-		return nil, fmt.Errorf("create attestation client: %w", err)
-	}
-
-	return usdc.NewTokenDataObserver(
-		lggr,
-		destChainSelector,
-		cctpConfig.Tokens,
-		encoder.EncodeUSDC,
-		usdcReader,
-		client,
-	), nil
 }
 
 // NewCompositeObservers creates a compositeTokenDataObserver based on the provided observers.

@@ -15,6 +15,7 @@ import (
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -181,17 +182,6 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 
 	baseChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector)
 
-	config := map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-		fujiChain: {
-			SourcePoolAddress:            fujiPool,
-			SourceMessageTransmitterAddr: fujiTransmitter,
-		},
-		sepoliaChain: {
-			SourcePoolAddress:            sepoliaPool,
-			SourceMessageTransmitterAddr: sepoliaTransmitter,
-		},
-	}
-
 	fuji := []usdcMessage{m1, m2, m3}
 	sepolia := []usdcMessage{m4, m5, m6, m7}
 	httpMessages := []usdcMessage{m1, m2, m3, m4, m5, m6, m7}
@@ -200,35 +190,36 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	server := mockHTTPServerResponse(t, httpMessages)
 	defer server.Close()
 
-	// Always return events per chain
-	fujiReader := mockReader(t, fujiTransmitter, fuji)
-	sepoliaReader := mockReader(t, sepoliaTransmitter, sepolia)
+	config := pluginconfig.USDCCCTPObserverConfig{
+		AttestationConfig: pluginconfig.AttestationConfig{
+			AttestationAPI:         server.URL,
+			AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Microsecond),
+			AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+		},
+		Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+			fujiChain: {
+				SourcePoolAddress:            fujiPool,
+				SourceMessageTransmitterAddr: fujiTransmitter,
+			},
+			sepoliaChain: {
+				SourcePoolAddress:            sepoliaPool,
+				SourceMessageTransmitterAddr: sepoliaTransmitter,
+			},
+		},
+	}
 
-	usdcReader, err := readerpkg.NewUSDCMessageReader(
+	tkReader, err := usdc.NewUSDCTokenDataObserver(
 		tests.Context(t),
-		logger.Test(t),
-		config,
-		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			fujiChain:    fujiReader,
-			sepoliaChain: sepoliaReader,
-		})
-	require.NoError(t, err)
-
-	attestation, err := usdc.NewSequentialAttestationClient(logger.Test(t), pluginconfig.USDCCCTPObserverConfig{
-		AttestationAPI:         server.URL,
-		AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Microsecond),
-		AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
-	})
-	require.NoError(t, err)
-
-	tkReader := usdc.NewTokenDataObserver(
 		logger.Test(t),
 		baseChain,
 		config,
 		testhelpers.USDCEncoder,
-		usdcReader,
-		attestation,
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			fujiChain:    mockReader(t, fujiTransmitter, fuji),
+			sepoliaChain: mockReader(t, sepoliaTransmitter, sepolia),
+		},
 	)
+	require.NoError(t, err)
 
 	tt := []struct {
 		name     string
@@ -400,24 +391,24 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 						TokenData: []exectypes.TokenData{
 							exectypes.NewSuccessTokenData(m1.tokenData()),
 							exectypes.NotSupportedTokenData(),
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 					2: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 				},
 				sepoliaChain: {
 					10: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 					11: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 				},

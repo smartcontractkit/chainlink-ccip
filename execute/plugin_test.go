@@ -25,11 +25,11 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -432,7 +432,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 }
 
 func TestPlugin_Close(t *testing.T) {
-	p := &Plugin{tokenDataObserver: &tokendata.NoopTokenDataObserver{}}
+	p := &Plugin{tokenDataObserver: &observer.NoopTokenDataObserver{}}
 	require.NoError(t, p.Close())
 }
 
