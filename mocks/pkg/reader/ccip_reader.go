@@ -95,9 +95,9 @@ func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) RunAndReturn(run func(c
 	return _c
 }
 
-// DiscoverContracts provides a mock function with given fields: ctx
-func (_m *MockCCIPReader) DiscoverContracts(ctx context.Context) (reader.ContractAddresses, error) {
-	ret := _m.Called(ctx)
+// DiscoverContracts provides a mock function with given fields: ctx, allChains
+func (_m *MockCCIPReader) DiscoverContracts(ctx context.Context, allChains []ccipocr3.ChainSelector) (reader.ContractAddresses, error) {
+	ret := _m.Called(ctx, allChains)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DiscoverContracts")
@@ -105,19 +105,19 @@ func (_m *MockCCIPReader) DiscoverContracts(ctx context.Context) (reader.Contrac
 
 	var r0 reader.ContractAddresses
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (reader.ContractAddresses, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (reader.ContractAddresses, error)); ok {
+		return rf(ctx, allChains)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) reader.ContractAddresses); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) reader.ContractAddresses); ok {
+		r0 = rf(ctx, allChains)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(reader.ContractAddresses)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, allChains)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -132,13 +132,14 @@ type MockCCIPReader_DiscoverContracts_Call struct {
 
 // DiscoverContracts is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockCCIPReader_Expecter) DiscoverContracts(ctx interface{}) *MockCCIPReader_DiscoverContracts_Call {
-	return &MockCCIPReader_DiscoverContracts_Call{Call: _e.mock.On("DiscoverContracts", ctx)}
+//   - allChains []ccipocr3.ChainSelector
+func (_e *MockCCIPReader_Expecter) DiscoverContracts(ctx interface{}, allChains interface{}) *MockCCIPReader_DiscoverContracts_Call {
+	return &MockCCIPReader_DiscoverContracts_Call{Call: _e.mock.On("DiscoverContracts", ctx, allChains)}
 }
 
-func (_c *MockCCIPReader_DiscoverContracts_Call) Run(run func(ctx context.Context)) *MockCCIPReader_DiscoverContracts_Call {
+func (_c *MockCCIPReader_DiscoverContracts_Call) Run(run func(ctx context.Context, allChains []ccipocr3.ChainSelector)) *MockCCIPReader_DiscoverContracts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
 	})
 	return _c
 }
@@ -148,7 +149,7 @@ func (_c *MockCCIPReader_DiscoverContracts_Call) Return(_a0 reader.ContractAddre
 	return _c
 }
 
-func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.Context) (reader.ContractAddresses, error)) *MockCCIPReader_DiscoverContracts_Call {
+func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (reader.ContractAddresses, error)) *MockCCIPReader_DiscoverContracts_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -650,6 +651,65 @@ func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) Return(_a0 [32]byte, _a1 e
 }
 
 func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) RunAndReturn(run func(context.Context, uint8) ([32]byte, error)) *MockCCIPReader_GetOffRampConfigDigest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetOffRampSourceChainsConfig provides a mock function with given fields: ctx, sourceChains
+func (_m *MockCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error) {
+	ret := _m.Called(ctx, sourceChains)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOffRampSourceChainsConfig")
+	}
+
+	var r0 map[ccipocr3.ChainSelector]reader.SourceChainConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)); ok {
+		return rf(ctx, sourceChains)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]reader.SourceChainConfig); ok {
+		r0 = rf(ctx, sourceChains)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]reader.SourceChainConfig)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, sourceChains)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_GetOffRampSourceChainsConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOffRampSourceChainsConfig'
+type MockCCIPReader_GetOffRampSourceChainsConfig_Call struct {
+	*mock.Call
+}
+
+// GetOffRampSourceChainsConfig is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sourceChains []ccipocr3.ChainSelector
+func (_e *MockCCIPReader_Expecter) GetOffRampSourceChainsConfig(ctx interface{}, sourceChains interface{}) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+	return &MockCCIPReader_GetOffRampSourceChainsConfig_Call{Call: _e.mock.On("GetOffRampSourceChainsConfig", ctx, sourceChains)}
+}
+
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Run(run func(ctx context.Context, sourceChains []ccipocr3.ChainSelector)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Return(_a0 map[ccipocr3.ChainSelector]reader.SourceChainConfig, _a1 error) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

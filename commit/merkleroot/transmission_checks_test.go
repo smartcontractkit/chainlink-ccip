@@ -9,10 +9,17 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func Test_validateMerkleRootsState(t *testing.T) {
+	sourceChainConfig := map[cciptypes.ChainSelector]reader2.SourceChainConfig{
+		10: {IsRMNVerificationDisabled: false, IsEnabled: true},
+		20: {IsRMNVerificationDisabled: false, IsEnabled: true},
+		30: {IsRMNVerificationDisabled: true, IsEnabled: true},
+	}
+
 	testCases := []struct {
 		name                 string
 		onRampNextSeqNum     []plugintypes.SeqNumChain
@@ -67,6 +74,16 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			readerErr:            fmt.Errorf("reader error"),
 			expErr:               true,
 		},
+		{
+			name: "happy path one root unblessed",
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
+				plugintypes.NewSeqNumChain(30, 300),
+			},
+			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200, 30: 300},
+			expErr:               false,
+		},
 	}
 
 	ctx := tests.Context(t)
@@ -76,15 +93,24 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			rep := cciptypes.CommitPluginReport{}
 			chains := make([]cciptypes.ChainSelector, 0, len(tc.onRampNextSeqNum))
 			for _, snc := range tc.onRampNextSeqNum {
-				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
-					ChainSel:     snc.ChainSel,
-					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-				})
+				if sourceChainConfig[snc.ChainSel].IsRMNVerificationDisabled {
+					rep.UnblessedMerkleRoots = append(rep.UnblessedMerkleRoots, cciptypes.MerkleRootChain{
+						ChainSel:     snc.ChainSel,
+						SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+					})
+				} else {
+					rep.BlessedMerkleRoots = append(rep.BlessedMerkleRoots, cciptypes.MerkleRootChain{
+						ChainSel:     snc.ChainSel,
+						SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+					})
+				}
 				chains = append(chains, snc.ChainSel)
 			}
 			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
 
-			err := ValidateMerkleRootsState(ctx, rep.MerkleRoots, reader)
+			reader.EXPECT().GetOffRampSourceChainsConfig(ctx, chains).Return(sourceChainConfig, nil).Maybe()
+
+			err := ValidateMerkleRootsState(ctx, rep.BlessedMerkleRoots, rep.UnblessedMerkleRoots, reader)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
