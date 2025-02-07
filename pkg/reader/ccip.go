@@ -113,8 +113,9 @@ type PriceUpdates struct {
 }
 
 type CommitReportAcceptedEvent struct {
-	MerkleRoots  []MerkleRoot
-	PriceUpdates PriceUpdates
+	BlessedMerkleRoots   []MerkleRoot
+	UnblessedMerkleRoots []MerkleRoot
+	PriceUpdates         PriceUpdates
 }
 
 // ---------------------------------------------------
@@ -166,8 +167,14 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		lggr.Debugw("processing commit report", "report", ev, "item", item)
 
-		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.MerkleRoots))
-		for _, mr := range ev.MerkleRoots {
+		isBlessed := make(map[cciptypes.Bytes32]bool, len(ev.BlessedMerkleRoots))
+		for _, mr := range ev.BlessedMerkleRoots {
+			isBlessed[mr.MerkleRoot] = true
+		}
+		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
+		blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.BlessedMerkleRoots))
+		unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.UnblessedMerkleRoots))
+		for _, mr := range allMerkleRoots {
 			onRampAddress, err := r.GetContractAddress(
 				consts.ContractNameOnRamp,
 				cciptypes.ChainSelector(mr.SourceChainSelector),
@@ -177,7 +184,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				continue
 			}
 
-			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
+			mrc := cciptypes.MerkleRootChain{
 				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
 				OnRampAddress: onRampAddress,
 				SeqNumsRange: cciptypes.NewSeqNumRange(
@@ -185,7 +192,12 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 					cciptypes.SeqNum(mr.MaxSeqNr),
 				),
 				MerkleRoot: mr.MerkleRoot,
-			})
+			}
+			if isBlessed[mr.MerkleRoot] {
+				blessedMerkleRoots = append(blessedMerkleRoots, mrc)
+			} else {
+				unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
+			}
 		}
 
 		priceUpdates := cciptypes.PriceUpdates{
@@ -215,8 +227,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
-				MerkleRoots:  merkleRoots,
-				PriceUpdates: priceUpdates,
+				BlessedMerkleRoots:   blessedMerkleRoots,
+				UnblessedMerkleRoots: unblessedMerkleRoots,
+				PriceUpdates:         priceUpdates,
 			},
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
 			BlockNum:  blockNum,
@@ -443,7 +456,7 @@ func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	cfgs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains)
+	cfgs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains, false)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
@@ -865,7 +878,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
-		sourceConfigs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains)
+		sourceConfigs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains, false)
 
 		if err != nil {
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
@@ -1120,14 +1133,15 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
 //
 //nolint:lll // It's a URL.
-type sourceChainConfig struct {
-	Router    []byte // local router
-	IsEnabled bool
-	MinSeqNr  uint64
-	OnRamp    cciptypes.UnknownAddress
+type SourceChainConfig struct {
+	Router                    []byte // local router
+	IsEnabled                 bool
+	IsRMNVerificationDisabled bool
+	MinSeqNr                  uint64
+	OnRamp                    cciptypes.UnknownAddress
 }
 
-func (scc sourceChainConfig) check() (bool /* enabled */, error) {
+func (scc SourceChainConfig) check() (bool /* enabled */, error) {
 	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
 	if !scc.IsEnabled {
 		return false, nil
@@ -1148,17 +1162,26 @@ func (scc sourceChainConfig) check() (bool /* enabled */, error) {
 	return scc.IsEnabled, nil
 }
 
+// GetOffRampSourceChainsConfig returns all the source chains configs including disabled chains.
+func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+	return r.getOffRampSourceChainsConfig(ctx, r.lggr, chains, true)
+}
+
 // getOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for dest chain
+//
+//nolint:revive
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	ctx context.Context,
 	lggr logger.Logger,
 	chains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
+	includeDisabled bool,
+) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
-	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
+	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
 	contractBatch := make(types.ContractBatch, 0, len(chains))
 	sourceChains := make([]any, 0, len(chains))
 
@@ -1173,7 +1196,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 			Params: map[string]any{
 				"sourceChainSelector": chain,
 			},
-			ReturnVal: new(sourceChainConfig),
+			ReturnVal: new(SourceChainConfig),
 		})
 	}
 
@@ -1201,7 +1224,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chainSel, err)
 			}
 
-			cfg, ok := v.(*sourceChainConfig)
+			cfg, ok := v.(*SourceChainConfig)
 			if !ok {
 				return nil, fmt.Errorf("invalid result type from GetSourceChainConfig for chainSelector=%d: %w", chainSel, err)
 			}
@@ -1210,7 +1233,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 			if err != nil {
 				return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
 			}
-			if !enabled {
+			if !enabled && !includeDisabled {
 				// We don't want to process disabled chains prematurely.
 				lggr.Debugw("source chain is disabled", "chain", chainSel)
 				continue
@@ -1604,7 +1627,7 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 			seq.Timestamp, gteTimestamp.Unix())
 	}
 
-	if err := validateMerkleRoots(ev.MerkleRoots); err != nil {
+	if err := validateMerkleRoots(append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)); err != nil {
 		return nil, fmt.Errorf("merkle roots: %w", err)
 	}
 
@@ -1630,7 +1653,14 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 }
 
 func validateMerkleRoots(merkleRoots []MerkleRoot) error {
+	seenRoots := mapset.NewSet[cciptypes.Bytes32]()
+
 	for _, mr := range merkleRoots {
+		if seenRoots.Contains(mr.MerkleRoot) {
+			return fmt.Errorf("duplicate merkle root: %s", mr.MerkleRoot.String())
+		}
+		seenRoots.Add(mr.MerkleRoot)
+
 		if mr.SourceChainSelector == 0 {
 			return fmt.Errorf("source chain is zero")
 		}

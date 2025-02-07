@@ -14,7 +14,9 @@ type NodeID uint32
 
 // HomeConfig contains the configuration fetched from the RMNHome contract.
 type HomeConfig struct {
-	Nodes          []HomeNodeInfo
+	Nodes []HomeNodeInfo
+	// SourceChainF contains the "fObserve" for RMN interactions for each source chain.
+	// If a chain does not appear in this map, it is assumed that it is not RMN-enabled and signatures are not required.
 	SourceChainF   map[cciptypes.ChainSelector]int
 	ConfigDigest   cciptypes.Bytes32
 	OffchainConfig cciptypes.Bytes // The raw offchain config

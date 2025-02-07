@@ -21,8 +21,9 @@ import (
 // RMNSignatures, if RMN is configured for some lanes involved in the commitment.
 // A report with RMN signatures but without merkle roots is invalid.
 type CommitPluginReport struct {
-	PriceUpdates PriceUpdates      `json:"priceUpdates"`
-	MerkleRoots  []MerkleRootChain `json:"merkleRoots"`
+	PriceUpdates         PriceUpdates      `json:"priceUpdates"`
+	BlessedMerkleRoots   []MerkleRootChain `json:"blessedMerkleRoots"`
+	UnblessedMerkleRoots []MerkleRootChain `json:"unblessedMerkleRoots"`
 
 	// RMNSignatures are the ECDSA signatures from the RMN signing nodes on the RMNReport structure.
 	// For more details see the contract here: https://github.com/smartcontractkit/chainlink/blob/7ba0f37134a618375542079ff1805fe2224d7916/contracts/src/v0.8/ccip/interfaces/IRMNV2.sol#L8-L12
@@ -33,7 +34,8 @@ type CommitPluginReport struct {
 // IsEmpty returns true if the CommitPluginReport is empty.
 // NOTE: A report is considered empty when core fields are missing (MerkleRoots, TokenPrices, GasPriceUpdates).
 func (r CommitPluginReport) IsEmpty() bool {
-	return len(r.MerkleRoots) == 0 &&
+	return len(r.BlessedMerkleRoots) == 0 &&
+		len(r.UnblessedMerkleRoots) == 0 &&
 		len(r.PriceUpdates.TokenPriceUpdates) == 0 &&
 		len(r.PriceUpdates.GasPriceUpdates) == 0
 }
@@ -66,7 +68,7 @@ type PriceUpdates struct {
 	GasPriceUpdates   []GasPriceChain `json:"gasPriceUpdates"`
 }
 
-// ReportInfo is the info data that will be sent with the along with the report
+// CommitReportInfo is the info data that will be sent with the along with the report
 // It will be used to determine if the report should be accepted or not
 type CommitReportInfo struct {
 	// RemoteF Max number of faulty RMN nodes; f+1 signers are required to verify a report.
