@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
@@ -64,7 +64,7 @@ type Plugin struct {
 	observer     metrics.Reporter
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataObserver     tokendata.TokenDataObserver
+	tokenDataObserver     observer.TokenDataObserver
 	costlyMessageObserver costlymessages.Observer
 	estimateProvider      cciptypes.EstimateProvider
 	lggr                  logger.Logger
@@ -89,7 +89,7 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
-	tokenDataObserver tokendata.TokenDataObserver,
+	tokenDataObserver observer.TokenDataObserver,
 	estimateProvider cciptypes.EstimateProvider,
 	lggr logger.Logger,
 	costlyMessageObserver costlymessages.Observer,

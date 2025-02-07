@@ -85,19 +85,23 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 					Type:    "usdc-cctp",
 					Version: "1.0",
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						BackgroundWorkerConfig: BackgroundWorkerConfig{
+							NumWorkers:              Ptr(10),
+							CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+							CacheCleanupInterval:    commonconfig.MustNewDuration(6 * time.Second),
+							ObserveTimeout:          commonconfig.MustNewDuration(7 * time.Second),
+						},
 						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 							1: {
 								SourcePoolAddress:            "0xabc",
 								SourceMessageTransmitterAddr: "0xefg",
 							},
 						},
-						AttestationAPI:          "http://localhost:8080",
-						AttestationAPITimeout:   commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval:  commonconfig.MustNewDuration(500 * time.Millisecond),
-						NumWorkers:              10,
-						CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
-						CacheCleanupInterval:    commonconfig.MustNewDuration(6 * time.Second),
-						ObserveTimeout:          commonconfig.MustNewDuration(7 * time.Second),
 					},
 				},
 			},
@@ -128,6 +132,11 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 					Type:    "usdc-cctp",
 					Version: "1.0",
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
 						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 							1: {
 								SourcePoolAddress:            "0xabc",
@@ -138,9 +147,6 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 								SourceMessageTransmitterAddr: "0x456",
 							},
 						},
-						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 					},
 				},
 			},
@@ -178,19 +184,23 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 
 	withUSDCConfig := func() *USDCCCTPObserverConfig {
 		return &USDCCCTPObserverConfig{
+			AttestationConfig: AttestationConfig{
+				AttestationAPI:         "http://localhost:8080",
+				AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+				AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+			},
+			BackgroundWorkerConfig: BackgroundWorkerConfig{
+				NumWorkers:              Ptr(10),
+				CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+				CacheCleanupInterval:    commonconfig.MustNewDuration(5 * time.Second),
+				ObserveTimeout:          commonconfig.MustNewDuration(5 * time.Second),
+			},
 			Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 				1: {
 					SourcePoolAddress:            "0xabc",
 					SourceMessageTransmitterAddr: "0xefg",
 				},
 			},
-			AttestationAPI:          "http://localhost:8080",
-			AttestationAPITimeout:   commonconfig.MustNewDuration(time.Second),
-			AttestationAPIInterval:  commonconfig.MustNewDuration(500 * time.Millisecond),
-			NumWorkers:              10,
-			CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
-			CacheCleanupInterval:    commonconfig.MustNewDuration(5 * time.Second),
-			ObserveTimeout:          commonconfig.MustNewDuration(5 * time.Second),
 		}
 	}
 
@@ -235,9 +245,11 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					Type:    "usdc-cctp",
 					Version: "1.0",
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
-						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
 					},
 				}),
 			usdcEnabled: true,
@@ -301,4 +313,8 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			require.Equal(t, tt.usdcEnabled, tt.config.IsUSDCEnabled())
 		})
 	}
+}
+
+func Ptr[T any](value T) *T {
+	return &value
 }

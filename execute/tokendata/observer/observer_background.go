@@ -1,4 +1,4 @@
-package tokendata
+package observer
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -215,7 +216,6 @@ func (o *backgroundObserver) worker(id int) {
 			)
 		}
 	}
-
 }
 
 // msgQueue is a simple in-memory FIFO queue that can be used for async message processing.

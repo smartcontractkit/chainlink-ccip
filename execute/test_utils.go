@@ -27,7 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
@@ -175,15 +175,17 @@ func (it *IntTest) WithUSDC(
 			Type:    "usdc-cctp",
 			Version: "1",
 			USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
+				AttestationConfig: pluginconfig.AttestationConfig{
+					AttestationAPI:         it.server.server.URL,
+					AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+					AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+				},
 				Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 					it.srcSelector: {
 						SourcePoolAddress:            sourcePoolAddress,
 						SourceMessageTransmitterAddr: sourcePoolAddress,
 					},
 				},
-				AttestationAPI:         it.server.server.URL,
-				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
-				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
 			},
 		},
 	}
@@ -241,7 +243,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
 
-	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
+	tkObs, err := observer.NewConfigBasedCompositeObservers(
 		ctx,
 		it.lggr,
 		it.dstSelector,
@@ -312,7 +314,7 @@ func (it *IntTest) newNode(
 	cfg pluginconfig.ExecuteOffchainConfig,
 	homeChain reader.HomeChain,
 	ep cciptypes.EstimateProvider,
-	tokenDataObserver tokendata.TokenDataObserver,
+	tokenDataObserver observer.TokenDataObserver,
 	costlyMessageObserver costlymessages.Observer,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
