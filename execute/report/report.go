@@ -344,7 +344,13 @@ func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64) Chec
 type IsInflight func(src ccipocr3.ChainSelector, msgID ccipocr3.Bytes32) bool
 
 func CheckIfInflight(inflight IsInflight) Check {
-	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+	return func(
+		_ context.Context,
+		lggr logger.Logger,
+		msg ccipocr3.Message,
+		idx int,
+		report exectypes.CommitData,
+	) (messageStatus, error) {
 		if inflight(report.SourceChain, msg.Header.MessageID) {
 			lggr.Infow(
 				"message already in flight",
