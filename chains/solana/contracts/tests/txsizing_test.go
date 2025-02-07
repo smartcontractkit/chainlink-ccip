@@ -75,6 +75,7 @@ func TestTransactionSizing(t *testing.T) {
 		"destChainConfig":    mustRandomPubkey(),
 		"arbMessagingSigner": mustRandomPubkey(),
 		"tokenPoolSigner":    mustRandomPubkey(),
+		"offramp":            config.CcipOfframpProgram,
 	}
 
 	tokenTable := map[string]solana.PublicKey{
@@ -105,7 +106,7 @@ func TestTransactionSizing(t *testing.T) {
 		require.NoError(t, err)
 		l := len(bz)
 		if failOnExcessPredicate(tables) {
-			require.LessOrEqual(t, l, MaxSolanaTxSize)
+			require.LessOrEqual(t, l, MaxSolanaTxSize, name)
 		}
 		remaining := MaxSolanaTxSize - l
 		var warning string
@@ -275,6 +276,8 @@ func TestTransactionSizing(t *testing.T) {
 			tokenIndexes,
 			offrampTable["config"],
 			offrampTable["referenceAddresses"],
+			offrampTable["offramp"],
+			mustRandomPubkey(), // router's allowed_offramp (per offramp & per source chain)
 			offrampTable["originChainConfig"],
 			mustRandomPubkey(), // commit report PDA
 			offrampTable["arbMessagingSigner"],
@@ -358,7 +361,7 @@ func TestTransactionSizing(t *testing.T) {
 				mustRandomPubkey():            maps.Values(offrampTable),
 				tokenTable["poolLookupTable"]: maps.Values(tokenTable),
 			},
-			failOnExcessAlways,
+			failOnExcessOnlyWithTables, // without lookup tables, we already know it exceeds the max tx size
 		},
 	}
 
