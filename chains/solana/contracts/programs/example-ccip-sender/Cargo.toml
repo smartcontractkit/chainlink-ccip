@@ -1,12 +1,12 @@
 [package]
-name = "example_ccip_receiver"
+name = "example_ccip_sender"
 version = "0.1.0-dev"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "example_ccip_receiver"
+name = "example_ccip_sender"
 
 [features]
 no-entrypoint = []
@@ -19,3 +19,4 @@ default = []
 solana-program = "1.17.25" # pin solana to 1.17
 anchor-lang = { version = "0.29.0", features = [] }
 anchor-spl = "0.29.0"
+fee_quoter = { version = "0.1.0-dev", path = "../fee-quoter", features = ["no-entrypoint"]}

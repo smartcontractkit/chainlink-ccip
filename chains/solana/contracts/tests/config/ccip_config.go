@@ -1,6 +1,8 @@
 package config
 
 import (
+	"encoding/hex"
+
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
@@ -36,10 +38,15 @@ var (
 	SvmChainSelector uint64 = 15
 	EvmChainSelector uint64 = 21
 	EvmChainLE              = common.Uint64ToLE(EvmChainSelector)
+	// bytes4(keccak256("CCIP EVMExtraArgsV2"));
+	EvmChainFamilySelector, _ = hex.DecodeString("2812d52c")
+	// bytes4(keccak256("CCIP SVMExtraArgsV1"));
+	SvmChainFamilySelector, _ = hex.DecodeString("1e10bdc4")
 
 	// router/onramp PDAs
 	// example programs
 	CcipBaseReceiver = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+	CcipBaseSender   = solana.MustPublicKeyFromBase58("CcipSender111111111111111111111111111111111")
 
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	ExternalTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipRouterProgram)

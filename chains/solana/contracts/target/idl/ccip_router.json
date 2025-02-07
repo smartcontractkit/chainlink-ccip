@@ -882,7 +882,13 @@
           "name": "tokenIndexes",
           "type": "bytes"
         }
-      ]
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
     }
   ],
   "accounts": [

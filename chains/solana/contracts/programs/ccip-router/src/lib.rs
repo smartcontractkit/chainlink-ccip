@@ -357,7 +357,7 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
         token_indexes: Vec<u8>,
-    ) -> Result<()> {
+    ) -> Result<[u8; 32]> {
         v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
 }
