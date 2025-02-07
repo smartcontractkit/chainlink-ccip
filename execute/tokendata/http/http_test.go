@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -33,10 +32,6 @@ var (
 	{
 		"status": "complete",
 		"attestation": "0x720502893578a89a8a87982982ef781c18b193"
-	}`)
-	failedAttestationResponse = []byte(`
-	{
-		"error": "some error"
 	}`)
 )
 
@@ -112,73 +107,6 @@ func Test_HTTPClient_Get(t *testing.T) {
 			expectedStatusCode: http.StatusRequestTimeout,
 		},
 		{
-			name: "200 but attestation response contains error",
-			getTs: func(t *testing.T) *httptest.Server {
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					_, err := w.Write(failedAttestationResponse)
-					require.NoError(t, err)
-				}))
-			},
-			timeout:            time.Hour, // not relevant to the test
-			expectedStatusCode: http.StatusOK,
-			expectedError:      fmt.Errorf("attestation API error: some error"),
-		},
-		{
-			name: "invalid status",
-			getTs: func(t *testing.T) *httptest.Server {
-				attestationResponse := []byte(`
-				{
-					"status": "complete",
-					"attestation": "0"
-				}`)
-
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					_, err := w.Write(attestationResponse)
-					require.NoError(t, err)
-				}))
-			},
-			timeout:            time.Hour, // not relevant to the test
-			expectedStatusCode: http.StatusOK,
-			expectedError: fmt.Errorf(
-				"failed to decode attestation hex: Bytes must be of at least length 2 (i.e, '0x' prefix): 0",
-			),
-		},
-		{
-			name: "invalid attestation",
-			getTs: func(t *testing.T) *httptest.Server {
-				attestationResponse := []byte(`
-				{
-					"status": "",
-					"attestation": "0x720502893578a89a8a87982982ef781c18b193"
-				}`)
-
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					_, err := w.Write(attestationResponse)
-					require.NoError(t, err)
-				}))
-			},
-			timeout:            time.Hour,
-			expectedStatusCode: http.StatusOK,
-			expectedError:      fmt.Errorf("invalid attestation response"),
-		},
-		{
-			name: "malformed response",
-			getTs: func(t *testing.T) *httptest.Server {
-				attestationResponse := []byte(`
-				{
-					"field": 2137
-				}`)
-
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					_, err := w.Write(attestationResponse)
-					require.NoError(t, err)
-				}))
-			},
-			timeout:            time.Hour,
-			expectedStatusCode: http.StatusOK,
-			expectedError:      fmt.Errorf("invalid attestation response"),
-		},
-		{
 			name: "rate limit",
 			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -205,7 +133,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 			name: "success",
 			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.RequestURI == "/v1/attestations/0x0102030400000000000000000000000000000000000000000000000000000000" {
+					if r.RequestURI == "/0x0102030400000000000000000000000000000000000000000000000000000000" {
 						_, err := w.Write(validAttestationResponse)
 						require.NoError(t, err)
 					} else {
@@ -216,7 +144,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 			messageHash:        [32]byte{1, 2, 3, 4},
 			timeout:            time.Hour,
 			expectedStatusCode: http.StatusOK,
-			expectedResponse:   hexutil.MustDecode("0x720502893578a89a8a87982982ef781c18b193"),
+			expectedResponse:   validAttestationResponse,
 		},
 	}
 
@@ -259,7 +187,8 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), 1*time.Millisecond, longTimeout, maxCoolDownDuration)
+	client, err := newHTTPClient(logger.Test(t), attestationURI.String(),
+		1*time.Millisecond, longTimeout, maxCoolDownDuration)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())
@@ -322,7 +251,9 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), 1*time.Millisecond, time.Hour, maxCoolDownDuration)
+	client, err := newHTTPClient(
+		logger.Test(t), attestationURI.String(), 1*time.Millisecond, time.Hour, maxCoolDownDuration,
+	)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), cciptypes.Bytes32{1, 2, 3}.String())
 	require.EqualError(t, err, tokendata.ErrUnknownResponse.Error())

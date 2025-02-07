@@ -1,6 +1,7 @@
 package pluginconfig
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -90,8 +91,8 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 						},
-						BackgroundWorkerConfig: BackgroundWorkerConfig{
-							NumWorkers:              Ptr(10),
+						WorkerConfig: WorkerConfig{
+							NumWorkers:              10,
 							CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
 							CacheCleanupInterval:    commonconfig.MustNewDuration(6 * time.Second),
 							ObserveTimeout:          commonconfig.MustNewDuration(7 * time.Second),
@@ -152,7 +153,7 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 			},
 		},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			finalJSON := fmt.Sprintf(baseJSON, tt.json)
@@ -162,6 +163,8 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 				require.Error(t, err)
 				require.ErrorContains(t, err, tt.errMsg)
 			} else {
+				marshal, err := json.Marshal(e.TokenDataObservers)
+				fmt.Println(string(marshal))
 				require.NoError(t, err)
 				require.Equal(t, tt.want, e.TokenDataObservers)
 			}
@@ -189,8 +192,8 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 				AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 				AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 			},
-			BackgroundWorkerConfig: BackgroundWorkerConfig{
-				NumWorkers:              Ptr(10),
+			WorkerConfig: WorkerConfig{
+				NumWorkers:              10,
 				CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
 				CacheCleanupInterval:    commonconfig.MustNewDuration(5 * time.Second),
 				ObserveTimeout:          commonconfig.MustNewDuration(5 * time.Second),
@@ -313,8 +316,4 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			require.Equal(t, tt.usdcEnabled, tt.config.IsUSDCEnabled())
 		})
 	}
-}
-
-func Ptr[T any](value T) *T {
-	return &value
 }
