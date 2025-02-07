@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
+// Initialize is the `initialize` instruction.
 type Initialize struct {
 	Router *ag_solanago.PublicKey
 

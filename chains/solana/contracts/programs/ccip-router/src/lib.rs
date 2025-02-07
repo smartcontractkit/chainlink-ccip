@@ -13,8 +13,6 @@ use crate::state::*;
 mod event;
 use crate::event::*;
 
-mod ocr3base;
-
 mod messages;
 use crate::messages::*;
 
@@ -22,11 +20,8 @@ mod instructions;
 use crate::instructions::*;
 
 // Anchor discriminators for CPI calls
-const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
     [0x72, 0xa1, 0x5e, 0x1d, 0x93, 0x19, 0xe8, 0xbf]; // lock_or_burn_tokens
-const TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR: [u8; 8] =
-    [0x5c, 0x64, 0x96, 0xc6, 0xfc, 0x3f, 0xa4, 0xe4]; // release_or_mint_tokens
 
 declare_id!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
 
@@ -61,32 +56,21 @@ pub mod ccip_router {
     pub fn initialize(
         ctx: Context<InitializeCCIPRouter>,
         svm_chain_selector: u64,
-        enable_execution_after: i64,
         fee_aggregator: Pubkey,
         fee_quoter: Pubkey,
         link_token_mint: Pubkey,
-        max_fee_juels_per_msg: u128,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
         config.version = 1;
         config.svm_chain_selector = svm_chain_selector;
-        config.enable_manual_execution_after = enable_execution_after;
         config.link_token_mint = link_token_mint;
-        config.max_fee_juels_per_msg = max_fee_juels_per_msg;
 
         config.fee_quoter = fee_quoter;
 
         config.owner = ctx.accounts.authority.key();
 
         config.fee_aggregator = fee_aggregator;
-
-        config.ocr3 = [
-            Ocr3Config::new(OcrPluginType::Commit as u8),
-            Ocr3Config::new(OcrPluginType::Execution as u8),
-        ];
-
-        ctx.accounts.state.latest_price_sequence_number = 0;
 
         Ok(())
     }
@@ -151,47 +135,9 @@ pub mod ccip_router {
     pub fn add_chain_selector(
         ctx: Context<AddChainSelector>,
         new_chain_selector: u64,
-        source_chain_config: SourceChainConfig,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::add_chain_selector(
-            ctx,
-            new_chain_selector,
-            source_chain_config,
-            dest_chain_config,
-        )
-    }
-
-    /// Disables the source chain selector.
-    ///
-    /// The Admin is the only one able to disable the chain selector as source. This method is thought of as an emergency kill-switch.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for disabling the chain selector.
-    /// * `source_chain_selector` - The source chain selector to be disabled.
-    pub fn disable_source_chain_selector(
-        ctx: Context<UpdateSourceChainSelectorConfig>,
-        source_chain_selector: u64,
-    ) -> Result<()> {
-        v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
-    }
-
-    /// Updates the configuration of the source chain selector.
-    ///
-    /// The Admin is the only one able to update the source chain config.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for updating the chain selector.
-    /// * `source_chain_selector` - The source chain selector to be updated.
-    /// * `source_chain_config` - The new configuration for the source chain.
-    pub fn update_source_chain_config(
-        ctx: Context<UpdateSourceChainSelectorConfig>,
-        source_chain_selector: u64,
-        source_chain_config: SourceChainConfig,
-    ) -> Result<()> {
-        v1::admin::update_source_chain_config(ctx, source_chain_selector, source_chain_config)
+        v1::admin::add_chain_selector(ctx, new_chain_selector, dest_chain_config)
     }
 
     /// Updates the configuration of the destination chain selector.
@@ -211,6 +157,40 @@ pub mod ccip_router {
         v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
     }
 
+    /// Add an offramp address to the list of offramps allowed by the router, for a
+    /// particular source chain. External users will check this list before accepting
+    /// a `ccip_receive` CPI.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for this operation.
+    /// * `source_chain_selector` - The source chain for the offramp's lane.
+    /// * `offramp` - The offramp's address.
+    pub fn add_offramp(
+        ctx: Context<AddOfframp>,
+        source_chain_selector: u64,
+        offramp: Pubkey,
+    ) -> Result<()> {
+        v1::admin::add_offramp(ctx, source_chain_selector, offramp)
+    }
+
+    /// Remove an offramp address from the list of offramps allowed by the router, for a
+    /// particular source chain. External users will check this list before accepting
+    /// a `ccip_receive` CPI.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for this operation.
+    /// * `source_chain_selector` - The source chain for the offramp's lane.
+    /// * `offramp` - The offramp's address.
+    pub fn remove_offramp(
+        ctx: Context<RemoveOfframp>,
+        source_chain_selector: u64,
+        offramp: Pubkey,
+    ) -> Result<()> {
+        v1::admin::remove_offramp(ctx, source_chain_selector, offramp)
+    }
+
     /// Updates the SVM chain selector in the router configuration.
     ///
     /// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
@@ -224,42 +204,6 @@ pub mod ccip_router {
         new_chain_selector: u64,
     ) -> Result<()> {
         v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
-    }
-
-    /// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
-    ///
-    /// This is part of the OffRamp Configuration for SVM.
-    /// The Admin is the only one able to update this config.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for updating the configuration.
-    /// * `new_enable_manual_execution_after` - The new minimum amount of time required.
-    pub fn update_enable_manual_execution_after(
-        ctx: Context<UpdateConfigCCIPRouter>,
-        new_enable_manual_execution_after: i64,
-    ) -> Result<()> {
-        v1::admin::update_enable_manual_execution_after(ctx, new_enable_manual_execution_after)
-    }
-
-    /// Sets the OCR configuration.
-    /// Only CCIP Admin can set the OCR configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for setting the OCR configuration.
-    /// * `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].
-    /// * `config_info` - The OCR configuration information.
-    /// * `signers` - The list of signers.
-    /// * `transmitters` - The list of transmitters.
-    pub fn set_ocr_config(
-        ctx: Context<SetOcrConfig>,
-        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
-        config_info: Ocr3ConfigInfo,
-        signers: Vec<[u8; 20]>,
-        transmitters: Vec<Pubkey>,
-    ) -> Result<()> {
-        v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
     }
 
     ///////////////////////////
@@ -418,96 +362,14 @@ pub mod ccip_router {
     ) -> Result<[u8; 32]> {
         v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
+}
 
-    ////////////////////
-    /// Off Ramp Flow //
-    ////////////////////
-
-    /// Commits a report to the router.
-    ///
-    /// The method name needs to be commit with Anchor encoding.
-    ///
-    /// This function is called by the OffChain when committing one Report to the SVM Router.
-    /// In this Flow only one report is sent, the Commit Report. This is different as EVM does,
-    /// this is because here all the chain state is stored in one account per Merkle Tree Root.
-    /// So, to avoid having to send a dynamic size array of accounts, in this message only one Commit Report Account is sent.
-    /// This message validates the signatures of the report and stores the Merkle Root in the Commit Report Account.
-    /// The Report must contain an interval of messages, and the min of them must be the next sequence number expected.
-    /// The max size of the interval is 64.
-    /// This message emits two events: CommitReportAccepted and Transmitted.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for the commit.
-    /// * `report_context_byte_words` - consists of:
-    ///     * report_context_byte_words[0]: ConfigDigest
-    ///     * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-    /// * `raw_report` - The serialized commit input report, single merkle root with RMN signatures and price updates
-    /// * `rs` - slice of R components of signatures
-    /// * `ss` - slice of S components of signatures
-    /// * `raw_vs` - array of V components of signatures
-    pub fn commit<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
-        report_context_byte_words: [[u8; 32]; 2],
-        raw_report: Vec<u8>,
-        rs: Vec<[u8; 32]>,
-        ss: Vec<[u8; 32]>,
-        raw_vs: [u8; 32],
-    ) -> Result<()> {
-        v1::offramp::commit(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
-    }
-
-    /// Executes a message on the destination chain.
-    ///
-    /// The method name needs to be execute with Anchor encoding.
-    ///
-    /// This function is called by the OffChain when executing one Report to the SVM Router.
-    /// In this Flow only one message is sent, the Execution Report. This is different as EVM does,
-    /// this is because there is no try/catch mechanism to allow batch execution.
-    /// This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.
-    /// The message must be untouched to be executed.
-    /// This message emits the event ExecutionStateChanged with the new state of the message.
-    /// Finally, executes the CPI instruction to the receiver program in the ccip_receive message.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for the execute.
-    /// * `raw_execution_report` - the serialized execution report containing only one message and proofs
-    /// * `report_context_byte_words` - report_context after execution_report to match context for manually execute (proper decoding order)
-    /// *  consists of:
-    ///     * report_context_byte_words[0]: ConfigDigest
-    ///     * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
-    pub fn execute<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-        raw_execution_report: Vec<u8>,
-        report_context_byte_words: [[u8; 32]; 2],
-        token_indexes: Vec<u8>,
-    ) -> Result<()> {
-        v1::offramp::execute(
-            ctx,
-            raw_execution_report,
-            report_context_byte_words,
-            &token_indexes,
-        )
-    }
-
-    /// Manually executes a report to the router.
-    ///
-    /// When a message is not being executed, then the user can trigger the execution manually.
-    /// No verification over the transmitter, but the message needs to be in some commit report.
-    /// It validates that the required time has passed since the commit and then executes the report.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for the execution.
-    /// * `raw_execution_report` - The serialized execution report containing the message and proofs.
-    pub fn manually_execute<'info>(
-        ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-        raw_execution_report: Vec<u8>,
-        token_indexes: Vec<u8>,
-    ) -> Result<()> {
-        v1::offramp::manually_execute(ctx, raw_execution_report, &token_indexes)
-    }
+// TODO this is a hack because Anchor + Anchor-Go fail to include all errors in the IDL and the gobindings.
+// By having this first (though unused) error enum here, it does pick up the actual (second) error enum
+#[error_code]
+pub enum AnchorErrorHack {
+    Something,
+    Else,
 }
 
 #[error_code]

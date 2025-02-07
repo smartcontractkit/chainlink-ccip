@@ -64,14 +64,17 @@ func (p *Processor) Observation(
 
 	if err := p.verifyQuery(ctx, prevOutcome, q); err != nil {
 		if errors.Is(err, ErrSignaturesNotProvidedByLeader) {
-			p.lggr.Infow("RMN signatures not available, returning an empty observation", "err", err)
-			return Observation{}, nil
+			lggr.Warnw("RMN signatures not available, returning only fChain", "err", err)
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nil
 		}
 		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
 
 	tStart := time.Now()
-	observation, nextState, err := p.getObservation(ctx, q, prevOutcome)
+	observation, nextState, err := p.getObservation(ctx, lggr, q, prevOutcome)
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
@@ -228,7 +231,7 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 }
 
 func (p *Processor) getObservation(
-	ctx context.Context, q Query, previousOutcome Outcome) (Observation, processorState, error) {
+	ctx context.Context, lggr logger.Logger, q Query, previousOutcome Outcome) (Observation, processorState, error) {
 	nextState := previousOutcome.nextState()
 	switch nextState {
 	case selectingRangesForReport:
@@ -268,12 +271,31 @@ func (p *Processor) getObservation(
 	case buildingReport:
 		if q.RetryRMNSignatures {
 			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
-			// So there's nothing to observe, i.e. we don't want to build the report yet.
-			return Observation{}, nextState, nil
+			// So there's nothing to observe except for fChain, i.e. we don't want to build the report yet.
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				// We check q.RetryRMNSignatures there and return the appropriate state and outcome
+				// in order to retry.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nextState, nil
 		}
+
+		rmnEnabledChains := make(map[cciptypes.ChainSelector]bool)
+
+		if p.offchainCfg.RMNEnabled {
+			var err error
+			rmnEnabledChains, err = p.rmnHomeReader.GetRMNEnabledSourceChains(previousOutcome.RMNRemoteCfg.ConfigDigest)
+			if err != nil {
+				return Observation{}, nextState, fmt.Errorf("failed to get RMN enabled source chains for %s: %w",
+					previousOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
+			}
+			lggr.Debugw("fetched RMN-enabled chains from rmnHome", "rmnEnabledChains", rmnEnabledChains)
+		}
+
 		return Observation{
-			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			FChain:      p.observer.ObserveFChain(ctx),
+			MerkleRoots:      p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
+			FChain:           p.observer.ObserveFChain(ctx),
+			RMNEnabledChains: rmnEnabledChains,
 		}, nextState, nil
 	case waitingForReportTransmission:
 		return Observation{

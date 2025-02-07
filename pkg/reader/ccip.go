@@ -13,13 +13,11 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/maps"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
@@ -115,8 +113,9 @@ type PriceUpdates struct {
 }
 
 type CommitReportAcceptedEvent struct {
-	MerkleRoots  []MerkleRoot
-	PriceUpdates PriceUpdates
+	BlessedMerkleRoots   []MerkleRoot
+	UnblessedMerkleRoots []MerkleRoot
+	PriceUpdates         PriceUpdates
 }
 
 // ---------------------------------------------------
@@ -168,8 +167,14 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		lggr.Debugw("processing commit report", "report", ev, "item", item)
 
-		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.MerkleRoots))
-		for _, mr := range ev.MerkleRoots {
+		isBlessed := make(map[cciptypes.Bytes32]bool, len(ev.BlessedMerkleRoots))
+		for _, mr := range ev.BlessedMerkleRoots {
+			isBlessed[mr.MerkleRoot] = true
+		}
+		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
+		blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.BlessedMerkleRoots))
+		unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.UnblessedMerkleRoots))
+		for _, mr := range allMerkleRoots {
 			onRampAddress, err := r.GetContractAddress(
 				consts.ContractNameOnRamp,
 				cciptypes.ChainSelector(mr.SourceChainSelector),
@@ -179,7 +184,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				continue
 			}
 
-			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
+			mrc := cciptypes.MerkleRootChain{
 				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
 				OnRampAddress: onRampAddress,
 				SeqNumsRange: cciptypes.NewSeqNumRange(
@@ -187,7 +192,12 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 					cciptypes.SeqNum(mr.MaxSeqNr),
 				),
 				MerkleRoot: mr.MerkleRoot,
-			})
+			}
+			if isBlessed[mr.MerkleRoot] {
+				blessedMerkleRoots = append(blessedMerkleRoots, mrc)
+			} else {
+				unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
+			}
 		}
 
 		priceUpdates := cciptypes.PriceUpdates{
@@ -217,8 +227,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
-				MerkleRoots:  merkleRoots,
-				PriceUpdates: priceUpdates,
+				BlessedMerkleRoots:   blessedMerkleRoots,
+				UnblessedMerkleRoots: unblessedMerkleRoots,
+				PriceUpdates:         priceUpdates,
 			},
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
 			BlockNum:  blockNum,
@@ -445,7 +456,7 @@ func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	cfgs, err := r.getOffRampSourceChainsConfig(ctx, chains)
+	cfgs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains, false)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
@@ -855,6 +866,7 @@ func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
 func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
 	lggr logger.Logger,
+	chains []cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
 	// Exit without an error if we cannot read the destination.
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
@@ -866,7 +878,8 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
-		sourceConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, lggr)
+		sourceConfigs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains, false)
+
 		if err != nil {
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
@@ -923,13 +936,15 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	return resp, nil
 }
 
-func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddresses, error) {
+func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
+	chains []cciptypes.ChainSelector,
+) (ContractAddresses, error) {
+	var resp ContractAddresses
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	resp := make(ContractAddresses)
 
 	// Discover destination contracts if the dest chain is supported.
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err == nil {
-		resp, err = r.discoverOffRampContracts(ctx, lggr)
+		resp, err = r.discoverOffRampContracts(ctx, lggr, chains)
 		// Can't continue with discovery if the destination chain is not available.
 		// We read source chains OnRamps from there, and onRamps are essential for feeQuoter and Router discovery.
 		if err != nil {
@@ -1118,14 +1133,15 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
 //
 //nolint:lll // It's a URL.
-type sourceChainConfig struct {
-	Router    []byte // local router
-	IsEnabled bool
-	MinSeqNr  uint64
-	OnRamp    cciptypes.UnknownAddress
+type SourceChainConfig struct {
+	Router                    []byte // local router
+	IsEnabled                 bool
+	IsRMNVerificationDisabled bool
+	MinSeqNr                  uint64
+	OnRamp                    cciptypes.UnknownAddress
 }
 
-func (scc sourceChainConfig) check() (bool /* enabled */, error) {
+func (scc SourceChainConfig) check() (bool /* enabled */, error) {
 	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
 	if !scc.IsEnabled {
 		return false, nil
@@ -1146,117 +1162,85 @@ func (scc sourceChainConfig) check() (bool /* enabled */, error) {
 	return scc.IsEnabled, nil
 }
 
-// getOffRampSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source
-// chain. If some chain is disabled it is not included in the response.
+// GetOffRampSourceChainsConfig returns all the source chains configs including disabled chains.
+func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+	return r.getOffRampSourceChainsConfig(ctx, r.lggr, chains, true)
+}
+
+// getOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for dest chain
+//
+//nolint:revive
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
-	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, err
-	}
-
-	res := make(map[cciptypes.ChainSelector]sourceChainConfig)
-	mu := new(sync.Mutex)
-
-	eg := new(errgroup.Group)
-	for _, chainSel := range chains {
-		if chainSel == r.destChain {
-			continue
-		}
-
-		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
-		eg.Go(func() error {
-			resp := sourceChainConfig{}
-			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
-				ctx,
-				consts.ContractNameOffRamp,
-				consts.MethodNameGetSourceChainConfig,
-				primitives.Unconfirmed,
-				map[string]any{
-					"sourceChainSelector": chainSel,
-				},
-				&resp,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to get source chain config for source chain %d: %w",
-					chainSel, err)
-			}
-
-			enabled, err := resp.check()
-			if err != nil {
-				return fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
-			}
-			if !enabled {
-				// We don't want to process disabled chains prematurely.
-				r.lggr.Debugw("source chain is disabled", "chain", chainSel)
-				return nil
-			}
-
-			mu.Lock()
-			res[chainSel] = resp
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
-	return res, nil
-}
-
-// selectorsAndConfigs wraps the return values from getAllSourceChainConfigs.
-type selectorsAndConfigs struct {
-	Selectors          []uint64            `mapstructure:"F0"`
-	SourceChainConfigs []sourceChainConfig `mapstructure:"F1"`
-}
-
-// getAllOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for dest chain
-func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	ctx context.Context,
 	lggr logger.Logger,
-) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
+	chains []cciptypes.ChainSelector,
+	includeDisabled bool,
+) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
-	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
+	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
+	contractBatch := make(types.ContractBatch, 0, len(chains))
+	sourceChains := make([]any, 0, len(chains))
 
-	var resp selectorsAndConfigs
-	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
-		&resp,
+	for _, chain := range chains {
+		if chain == r.destChain {
+			continue
+		}
+		sourceChains = append(sourceChains, chain)
+
+		contractBatch = append(contractBatch, types.BatchRead{
+			ReadName: consts.MethodNameGetSourceChainConfig,
+			Params: map[string]any{
+				"sourceChainSelector": chain,
+			},
+			ReturnVal: new(SourceChainConfig),
+		})
+	}
+
+	results, _, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(
+		ctx, contractreader.ExtendedBatchGetLatestValuesRequest{consts.ContractNameOffRamp: contractBatch},
+		false,
 	)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs for source chain %d: %w",
+		return nil, fmt.Errorf("failed to get source chain configs for dest chain %d: %w",
 			r.destChain, err)
 	}
 
-	if len(resp.SourceChainConfigs) != len(resp.Selectors) {
-		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
-	}
-
-	lggr.Debugw("got source chain configs", "configs", resp)
+	lggr.Debugw("got source chain configs", "configs", results)
 
 	// Populate the map.
-	for i := range resp.Selectors {
-		chainSel := cciptypes.ChainSelector(resp.Selectors[i])
-		cfg := resp.SourceChainConfigs[i]
-
-		enabled, err := cfg.check()
-		if err != nil {
-			return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
+	for _, readResult := range results {
+		if len(readResult) != len(sourceChains) {
+			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, configs=%v",
+				sourceChains, results)
 		}
-		if !enabled {
-			// We don't want to process disabled chains prematurely.
-			lggr.Debugw("source chain is disabled", "chain", chainSel)
-			continue
-		}
+		for i, chainSel := range sourceChains {
+			v, err := readResult[i].GetResult()
+			if err != nil {
+				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chainSel, err)
+			}
 
-		configs[chainSel] = cfg
+			cfg, ok := v.(*SourceChainConfig)
+			if !ok {
+				return nil, fmt.Errorf("invalid result type from GetSourceChainConfig for chainSelector=%d: %w", chainSel, err)
+			}
+
+			enabled, err := cfg.check()
+			if err != nil {
+				return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
+			}
+			if !enabled && !includeDisabled {
+				// We don't want to process disabled chains prematurely.
+				lggr.Debugw("source chain is disabled", "chain", chainSel)
+				continue
+			}
+
+			configs[chainSel.(cciptypes.ChainSelector)] = *cfg
+		}
 	}
 
 	return configs, nil
@@ -1643,7 +1627,7 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 			seq.Timestamp, gteTimestamp.Unix())
 	}
 
-	if err := validateMerkleRoots(ev.MerkleRoots); err != nil {
+	if err := validateMerkleRoots(append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)); err != nil {
 		return nil, fmt.Errorf("merkle roots: %w", err)
 	}
 
@@ -1669,7 +1653,14 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 }
 
 func validateMerkleRoots(merkleRoots []MerkleRoot) error {
+	seenRoots := mapset.NewSet[cciptypes.Bytes32]()
+
 	for _, mr := range merkleRoots {
+		if seenRoots.Contains(mr.MerkleRoot) {
+			return fmt.Errorf("duplicate merkle root: %s", mr.MerkleRoot.String())
+		}
+		seenRoots.Add(mr.MerkleRoot)
+
 		if mr.SourceChainSelector == 0 {
 			return fmt.Errorf("source chain is zero")
 		}
