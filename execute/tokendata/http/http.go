@@ -14,8 +14,9 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -129,7 +130,11 @@ func (h *httpClient) Get(ctx context.Context, requestPath string) (cciptypes.Byt
 	return response, httpStatus, err
 }
 
-func (h *httpClient) Post(ctx context.Context, requestPath string, requestData cciptypes.Bytes) (cciptypes.Bytes, HTTPStatus, error) {
+func (h *httpClient) Post(
+	ctx context.Context,
+	requestPath string,
+	requestData cciptypes.Bytes,
+) (cciptypes.Bytes, HTTPStatus, error) {
 	lggr := logutil.WithContextValues(ctx, h.lggr)
 
 	requestURL := *h.apiURL
@@ -146,7 +151,13 @@ func (h *httpClient) Post(ctx context.Context, requestPath string, requestData c
 	return response, httpStatus, err
 }
 
-func (h *httpClient) callAPI(ctx context.Context, lggr logger.Logger, method string, url url.URL, body io.Reader) (cciptypes.Bytes, HTTPStatus, error) {
+func (h *httpClient) callAPI(
+	ctx context.Context,
+	lggr logger.Logger,
+	method string,
+	url url.URL,
+	body io.Reader,
+) (cciptypes.Bytes, HTTPStatus, error) {
 	// Terminate immediately when rate limited
 	if coolDown, duration := h.inCoolDownPeriod(); coolDown {
 		lggr.Errorw(

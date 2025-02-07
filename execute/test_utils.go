@@ -3,8 +3,11 @@ package execute
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -53,7 +56,8 @@ type IntTest struct {
 
 	msgHasher           cciptypes.MessageHasher
 	ccipReader          *inmem.InMemoryCCIPReader
-	server              *ConfigurableAttestationServer
+	usdcServer          *ConfigurableAttestationServer
+	lbtcServer          *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
 	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
 }
@@ -150,26 +154,24 @@ func (it *IntTest) WithUSDC(
 	attestations map[string]string,
 	events []*readerpkg.MessageSentEvent,
 ) {
-	it.server = newConfigurableAttestationServer(attestations)
-	it.tokenObserverConfig = []pluginconfig.TokenDataObserverConfig{
-		{
-			Type:    "usdc-cctp",
-			Version: "1",
-			USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
-				AttestationConfig: pluginconfig.AttestationConfig{
-					AttestationAPI:         it.server.server.URL,
-					AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
-					AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
-				},
-				Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-					it.srcSelector: {
-						SourcePoolAddress:            sourcePoolAddress,
-						SourceMessageTransmitterAddr: sourcePoolAddress,
-					},
+	it.usdcServer = newConfigurableAttestationServer(attestations)
+	it.tokenObserverConfig = append(it.tokenObserverConfig, pluginconfig.TokenDataObserverConfig{
+		Type:    "usdc-cctp",
+		Version: "1",
+		USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
+			AttestationConfig: pluginconfig.AttestationConfig{
+				AttestationAPI:         it.usdcServer.server.URL,
+				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+			},
+			Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+				it.srcSelector: {
+					SourcePoolAddress:            sourcePoolAddress,
+					SourceMessageTransmitterAddr: sourcePoolAddress,
 				},
 			},
 		},
-	}
+	})
 
 	usdcEvents := make([]types.Sequence, len(events))
 	for i, e := range events {
@@ -190,6 +192,28 @@ func (it *IntTest) WithUSDC(
 		it.srcSelector: r,
 		it.dstSelector: r,
 	}
+}
+
+func (it *IntTest) WithLBTC(
+	sourcePoolAddress string,
+	attestations map[string]string,
+) {
+	it.lbtcServer = newConfigurableAttestationServer(attestations)
+	it.tokenObserverConfig = append(it.tokenObserverConfig, pluginconfig.TokenDataObserverConfig{
+		Type:    "lbtc",
+		Version: "1",
+		LBTCObserverConfig: &pluginconfig.LBTCObserverConfig{
+			AttestationConfig: pluginconfig.AttestationConfig{
+				AttestationAPI:         it.lbtcServer.server.URL,
+				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+			},
+			AttestationAPIBatchSize: 1,
+			SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
+				it.srcSelector: sourcePoolAddress,
+			},
+		},
+	})
 }
 
 func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
@@ -261,8 +285,11 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 }
 
 func (it *IntTest) Close() {
-	if it.server != nil {
-		it.server.Close()
+	if it.usdcServer != nil {
+		it.usdcServer.Close()
+	}
+	if it.lbtcServer != nil {
+		it.lbtcServer.Close()
 	}
 }
 
@@ -332,13 +359,43 @@ func newConfigurableAttestationServer(responses map[string]string) *Configurable
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		for url, response := range c.responses {
-			if strings.Contains(r.RequestURI, url) {
-				_, err := w.Write([]byte(response))
-				if err != nil {
-					panic(err)
+		if r.Method == http.MethodGet {
+			for url, response := range c.responses {
+				if strings.Contains(r.RequestURI, url) {
+					_, err := w.Write([]byte(response))
+					if err != nil {
+						panic(err)
+					}
+					return
 				}
-				return
+			}
+		}
+		if r.Method == http.MethodPost {
+			var request map[string]interface{}
+			bodyRaw, err := io.ReadAll(r.Body)
+			if err != nil {
+				panic(err)
+			}
+			err = json.Unmarshal(bodyRaw, &request)
+			if err != nil {
+				panic(err)
+			}
+			payloadHashesUntyped := request["messageHash"].([]interface{})
+			if len(payloadHashesUntyped) == 0 {
+				w.WriteHeader(http.StatusBadRequest)
+			}
+			payloadHashes := make([]string, len(payloadHashesUntyped))
+			for i, hash := range payloadHashesUntyped {
+				payloadHashes[i] = hash.(string)
+			}
+			attestationResponse := attestationBatchByMessageHashes(payloadHashes, c.responses)
+			responseBytes, err := json.Marshal(attestationResponse)
+			if err != nil {
+				panic(err)
+			}
+			_, err = w.Write(responseBytes)
+			if err != nil {
+				panic(err)
 			}
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -347,8 +404,25 @@ func newConfigurableAttestationServer(responses map[string]string) *Configurable
 	return c
 }
 
-func (c *ConfigurableAttestationServer) AddResponse(url, response string) {
-	c.responses[url] = response
+func attestationBatchByMessageHashes(payloadHashes []string, responses map[string]string) map[string]interface{} {
+	attestations := make([]interface{}, 0, len(responses))
+	for payloadHash, attestationRaw := range responses {
+		if slices.Contains(payloadHashes, payloadHash) {
+			var attestation map[string]interface{}
+			err := json.Unmarshal([]byte(attestationRaw), &attestation)
+			if err != nil {
+				panic(err)
+			}
+			attestations = append(attestations, attestation)
+		}
+	}
+	attestationResponse := make(map[string]interface{})
+	attestationResponse["attestations"] = attestations
+	return attestationResponse
+}
+
+func (c *ConfigurableAttestationServer) AddResponse(key, response string) {
+	c.responses[key] = response
 }
 
 func (c *ConfigurableAttestationServer) Close() {

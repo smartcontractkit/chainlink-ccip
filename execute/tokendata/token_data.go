@@ -2,17 +2,18 @@ package tokendata
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 const (
@@ -116,9 +117,9 @@ func (o *ObservedAttestationClient) Attestations(
 	}
 	duration := time.Since(start)
 
-	for _, msgIdToAttestation := range attestations {
-		for _, attestation := range msgIdToAttestation {
-			o.trackTimeToAttestation(start, hexutil.Encode(attestation.ID), attestation.Error)
+	for _, msgIDToAttestation := range attestations {
+		for _, attestation := range msgIDToAttestation {
+			o.trackTimeToAttestation(start, hex.EncodeToString(attestation.ID), attestation.Error)
 			promAttestationDurations.
 				WithLabelValues(o.Token()).
 				Observe(float64(duration))
@@ -146,7 +147,7 @@ func (o *ObservedAttestationClient) trackTimeToAttestation(start time.Time, id s
 		// and we don't need to track that
 		if seen {
 			duration := time.Since(messageSeenFirst.(time.Time))
-			promAttestationDurations.WithLabelValues(o.Token()).Observe(float64(duration))
+			promTimeToAttestation.WithLabelValues(o.Token()).Observe(float64(duration))
 			o.lggr.Infow("Observed time to attestation for a message",
 				"token", o.Token(),
 				"hash", id,

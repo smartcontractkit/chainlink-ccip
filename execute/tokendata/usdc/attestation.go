@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/http"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/http"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
