@@ -5,7 +5,7 @@ use anchor_spl::{
 use spl_math::uint::U256;
 use std::ops::Deref;
 
-use crate::{validate_token_bucket_config, RateLimitConfig, RateLimitTokenBucket};
+use crate::rate_limiter::{validate_token_bucket_config, RateLimitConfig, RateLimitTokenBucket};
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
 pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed used by CCIP to provide correct chain config to pool
@@ -40,6 +40,7 @@ pub struct BaseConfig {
     // lockOrBurn allow list
     pub list_enabled: bool,
     #[max_len(0)]
+    // max_len = 0 for InitSpace calculation, the actual length is calculated using the length of the allow_list. `realloc` should be used to handle the increase in account size accordingly
     pub allow_list: Vec<Pubkey>,
 }
 
@@ -78,12 +79,23 @@ impl BaseConfig {
             CcipTokenPoolError::InvalidInputs
         );
         self.proposed_owner = proposed_owner;
+
+        emit!(OwnershipTransferRequested {
+            from: self.owner,
+            to: self.proposed_owner,
+        });
         Ok(())
     }
 
     pub fn accept_ownership(&mut self) -> Result<()> {
+        let old_owner = self.owner;
         self.owner = std::mem::take(&mut self.proposed_owner);
         self.proposed_owner = Pubkey::default();
+
+        emit!(OwnershipTransferred {
+            from: old_owner,
+            to: self.owner,
+        });
 
         Ok(())
     }
@@ -139,8 +151,7 @@ impl BaseConfig {
     }
 }
 
-#[account]
-#[derive(InitSpace)]
+#[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct BaseChain {
     pub remote: RemoteConfig,
     pub inbound_rate_limit: RateLimitTokenBucket,
@@ -344,6 +355,18 @@ pub struct RemoteChainRemoved {
 pub struct RouterUpdated {
     pub old_authority: Pubkey,
     pub new_authority: Pubkey,
+}
+
+#[event]
+pub struct OwnershipTransferRequested {
+    pub from: Pubkey,
+    pub to: Pubkey,
+}
+
+#[event]
+pub struct OwnershipTransferred {
+    pub from: Pubkey,
+    pub to: Pubkey,
 }
 
 #[error_code]

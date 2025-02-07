@@ -3,7 +3,7 @@ use std::cmp::min;
 use anchor_lang::prelude::*;
 use solana_program::log::sol_log;
 
-use crate::CcipTokenPoolError;
+use crate::common::CcipTokenPoolError;
 
 // NOTE: spl-token or spl-token-2022 use u64 for amounts
 

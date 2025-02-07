@@ -1,4 +1,4 @@
-package test_token_pool // revive:disable-line:var-naming
+package example_burnmint_token_pool // revive:disable-line:var-naming
 
 import (
 	base "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"

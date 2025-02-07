@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
-use example_burnmint_token_pool::{common::*, rate_limiter::*};
+use base_token_pool::{common::*, rate_limiter::*};
 
 mod context;
 use crate::context::*;

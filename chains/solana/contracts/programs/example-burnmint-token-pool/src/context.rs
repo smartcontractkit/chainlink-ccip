@@ -3,12 +3,9 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
     token_interface::{Mint, TokenAccount},
 };
+use base_token_pool::common::*;
 
-use crate::{
-    CcipTokenPoolError, ChainConfig, LockOrBurnInV1, ReleaseOrMintInV1, RemoteAddress,
-    RemoteConfig, State, ANCHOR_DISCRIMINATOR, POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED,
-    POOL_STATE_SEED,
-};
+use crate::{ChainConfig, State};
 
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {

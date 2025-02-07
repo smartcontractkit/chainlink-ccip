@@ -4,17 +4,12 @@ use anchor_spl::token_2022::spl_token_2022::{
     self,
     instruction::{burn, mint_to},
 };
+use base_token_pool::{common::*, rate_limiter::*};
 
 declare_id!("TokenPooL11111111111111111111111111BurnMint");
 
 pub mod context;
 use crate::context::*;
-
-pub mod rate_limiter;
-use crate::rate_limiter::*;
-
-pub mod common;
-use crate::common::*;
 
 #[program]
 pub mod example_burnmint_token_pool {

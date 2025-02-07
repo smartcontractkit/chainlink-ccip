@@ -3,7 +3,7 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
     token_interface::{Mint, TokenAccount},
 };
-use example_burnmint_token_pool::common::{
+use base_token_pool::common::{
     CcipTokenPoolError, LockOrBurnInV1, ReleaseOrMintInV1, RemoteAddress, RemoteConfig,
     ANCHOR_DISCRIMINATOR, POOL_CHAINCONFIG_SEED, POOL_SIGNER_SEED, POOL_STATE_SEED,
 };

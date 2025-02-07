@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
-use example_burnmint_token_pool::common::CcipTokenPoolError;
-use example_burnmint_token_pool::{common::*, rate_limiter::RateLimitConfig};
+use base_token_pool::{common::*, rate_limiter::RateLimitConfig};
 
 declare_id!("GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH");
 
