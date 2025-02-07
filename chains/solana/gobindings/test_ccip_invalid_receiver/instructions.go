@@ -29,6 +29,8 @@ func init() {
 
 var (
 	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
+
+	Instruction_PoolProxyReleaseOrMint = ag_binary.TypeID([8]byte{22, 95, 117, 49, 2, 121, 100, 188})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -36,6 +38,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_CcipReceive:
 		return "CcipReceive"
+	case Instruction_PoolProxyReleaseOrMint:
+		return "PoolProxyReleaseOrMint"
 	default:
 		return ""
 	}
@@ -58,6 +62,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"ccip_receive", (*CcipReceive)(nil),
+		},
+		{
+			"pool_proxy_release_or_mint", (*PoolProxyReleaseOrMint)(nil),
 		},
 	},
 )

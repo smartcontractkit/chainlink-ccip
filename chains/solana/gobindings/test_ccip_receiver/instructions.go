@@ -44,8 +44,6 @@ var (
 	Instruction_CcipTokenReleaseMint = ag_binary.TypeID([8]byte{20, 148, 113, 198, 229, 170, 71, 48})
 
 	Instruction_CcipTokenLockBurn = ag_binary.TypeID([8]byte{200, 14, 50, 9, 44, 91, 121, 37})
-
-	Instruction_PoolProxyReleaseOrMint = ag_binary.TypeID([8]byte{22, 95, 117, 49, 2, 121, 100, 188})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -59,8 +57,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "CcipTokenReleaseMint"
 	case Instruction_CcipTokenLockBurn:
 		return "CcipTokenLockBurn"
-	case Instruction_PoolProxyReleaseOrMint:
-		return "PoolProxyReleaseOrMint"
 	default:
 		return ""
 	}
@@ -92,9 +88,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"ccip_token_lock_burn", (*CcipTokenLockBurn)(nil),
-		},
-		{
-			"pool_proxy_release_or_mint", (*PoolProxyReleaseOrMint)(nil),
 		},
 	},
 )

@@ -29,6 +29,99 @@
           }
         }
       ]
+    },
+    {
+      "name": "poolProxyReleaseOrMint",
+      "accounts": [
+        {
+          "name": "testPool",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "cpiSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "offrampProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "poolTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "receiverTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "releaseOrMint",
+          "type": {
+            "defined": "ReleaseOrMintInV1"
+          }
+        }
+      ],
+      "returns": "bytes"
     }
   ],
   "accounts": [
@@ -40,6 +133,60 @@
           {
             "name": "value",
             "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "ReleaseOrMintInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "originalSender",
+            "type": "bytes"
+          },
+          {
+            "name": "remoteChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "receiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "localToken",
+            "type": "publicKey"
+          },
+          {
+            "name": "sourcePoolAddress",
+            "docs": [
+              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
+              "expected pool address for the given remoteChainSelector."
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "sourcePoolData",
+            "type": "bytes"
+          },
+          {
+            "name": "offchainTokenData",
+            "docs": [
+              "@dev WARNING: offchainTokenData is untrusted data."
+            ],
+            "type": "bytes"
           }
         ]
       }
