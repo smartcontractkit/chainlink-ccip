@@ -30,12 +30,12 @@ type CommitPluginReport struct {
 	RMNSignatures []RMNECDSASignature `json:"rmnSignatures"`
 }
 
-// IsEmpty returns true if the CommitPluginReport is empty
+// IsEmpty returns true if the CommitPluginReport is empty.
+// NOTE: A report is considered empty when core fields are missing (MerkleRoots, TokenPrices, GasPriceUpdates).
 func (r CommitPluginReport) IsEmpty() bool {
 	return len(r.MerkleRoots) == 0 &&
 		len(r.PriceUpdates.TokenPriceUpdates) == 0 &&
-		len(r.PriceUpdates.GasPriceUpdates) == 0 &&
-		len(r.RMNSignatures) == 0
+		len(r.PriceUpdates.GasPriceUpdates) == 0
 }
 
 // MerkleRootChain Mirroring https://github.com/smartcontractkit/chainlink/blob/cd5c78959575f593b27fd83d8766086d0c678487/contracts/src/v0.8/ccip/libraries/Internal.sol#L356-L362
