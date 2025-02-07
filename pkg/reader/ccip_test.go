@@ -673,15 +673,24 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 
 func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *testing.T) {
 	ctx := tests.Context(t)
-	destExtended := reader_mocks.NewMockExtended(t)
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
 
-	// Setup mock cache to return an error
-	getLatestValueErr := errors.New("some error")
+	// Setup cache mock and configuration
 	mockCache := new(mockConfigCache)
-	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(ChainConfigSnapshot{}, getLatestValueErr)
+	chainConfig := ChainConfigSnapshot{
+		Offramp: OfframpConfig{
+			// We can leave the configs empty since we just need GetChainConfig to succeed
+			StaticConfig:  offRampStaticChainConfig{},
+			DynamicConfig: offRampDynamicChainConfig{},
+		},
+	}
+	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(chainConfig, nil)
+
+	// Setup mock cache to return an error
+	destExtended := reader_mocks.NewMockExtended(t)
+	getLatestValueErr := errors.New("some error")
 	destExtended.EXPECT().ExtendedBatchGetLatestValues(
 		mock.Anything,
 		mock.Anything,
@@ -692,7 +701,7 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 	ccipChainReader := &ccipChainReader{
 		destChain: destChain,
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-			destChain: reader_mocks.NewMockExtended(t),
+			destChain: destExtended,
 			// these won't be used in this test, but are needed because
 			// we determine the source chain selectors to query from the chains
 			// that we have readers for.
@@ -715,18 +724,7 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
 
-	destExtended := reader_mocks.NewMockExtended(t)
-	// mock the call for source chain configs
-	destExtended.EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
-		"0x1234567890123456789012345678901234567890",
-		[]any{&sourceChainConfig{}, &sourceChainConfig{}}))
-
-	// Setup mock cache to return a config with missing static config data
-	// mock the call to get the static config - failure
+	// Setup mock cache to return error
 	getLatestValueErr := errors.New("some error")
 	mockCache := new(mockConfigCache)
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(ChainConfigSnapshot{}, getLatestValueErr)

@@ -53,12 +53,10 @@ func TestConfigCache_GetChainConfig_CacheHit(t *testing.T) {
 	result3.SetResult(&offRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 	result4.SetResult(&offRampDynamicChainConfig{}, nil)
-	result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-	result5.SetResult(&selectorsAndConfigs{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1, *result2, *result3, *result4, *result5,
+			*result1, *result2, *result3, *result4,
 		},
 	}
 
@@ -103,12 +101,10 @@ func TestConfigCache_GetChainConfig_CacheMiss(t *testing.T) {
 		result3.SetResult(&offRampStaticChainConfig{}, nil)
 		result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 		result4.SetResult(&offRampDynamicChainConfig{}, nil)
-		result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-		result5.SetResult(&selectorsAndConfigs{}, nil)
 
 		return types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameOffRamp}: {
-				*result1, *result2, *result3, *result4, *result5,
+				*result1, *result2, *result3, *result4,
 			},
 		}
 	}
@@ -178,12 +174,10 @@ func TestConfigCache_GetChainConfig_ErrorWithCachedData(t *testing.T) {
 	result3.SetResult(&offRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 	result4.SetResult(&offRampDynamicChainConfig{}, nil)
-	result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-	result5.SetResult(&selectorsAndConfigs{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1, *result2, *result3, *result4, *result5,
+			*result1, *result2, *result3, *result4,
 		},
 	}
 
@@ -232,12 +226,10 @@ func TestConfigCache_RefreshChainConfig(t *testing.T) {
 	result3.SetResult(&offRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 	result4.SetResult(&offRampDynamicChainConfig{}, nil)
-	result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-	result5.SetResult(&selectorsAndConfigs{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1, *result2, *result3, *result4, *result5,
+			*result1, *result2, *result3, *result4,
 		},
 	}
 
@@ -274,12 +266,10 @@ func TestConfigCache_ConcurrentAccess(t *testing.T) {
 	result3.SetResult(&offRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 	result4.SetResult(&offRampDynamicChainConfig{}, nil)
-	result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-	result5.SetResult(&selectorsAndConfigs{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1, *result2, *result3, *result4, *result5,
+			*result1, *result2, *result3, *result4,
 		},
 	}
 
@@ -381,12 +371,10 @@ func TestConfigCache_GetChainConfig_SkippedContracts(t *testing.T) {
 	result3.SetResult(&offRampStaticChainConfig{}, nil)
 	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 	result4.SetResult(&offRampDynamicChainConfig{}, nil)
-	result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-	result5.SetResult(&selectorsAndConfigs{}, nil)
 
 	responses := types.BatchGetLatestValuesResult{
 		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1, *result2, *result3, *result4, *result5,
+			*result1, *result2, *result3, *result4,
 		},
 	}
 	skippedContracts := []string{consts.ContractNameRMNProxy}
@@ -438,12 +426,9 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 				result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 				result4.SetResult(&offRampDynamicChainConfig{}, nil)
 
-				result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-				result5.SetResult(&selectorsAndConfigs{}, nil)
-
 				return types.BatchGetLatestValuesResult{
 					types.BoundContract{Name: consts.ContractNameOffRamp}: {
-						*result1, *result2, *result3, *result4, *result5,
+						*result1, *result2, *result3, *result4,
 					},
 				}
 			},
@@ -492,12 +477,10 @@ func TestConfigCache_MultipleChains(t *testing.T) {
 		result3.SetResult(&offRampStaticChainConfig{}, nil)
 		result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 		result4.SetResult(&offRampDynamicChainConfig{}, nil)
-		result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-		result5.SetResult(&selectorsAndConfigs{}, nil)
 
 		return types.BatchGetLatestValuesResult{
 			types.BoundContract{Name: consts.ContractNameOffRamp}: {
-				*result1, *result2, *result3, *result4, *result5,
+				*result1, *result2, *result3, *result4,
 			},
 		}
 	}
@@ -573,12 +556,10 @@ func TestConfigCache_RefreshPeriod(t *testing.T) {
 			result3.SetResult(&offRampStaticChainConfig{}, nil)
 			result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
 			result4.SetResult(&offRampDynamicChainConfig{}, nil)
-			result5 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetAllSourceChainConfigs}
-			result5.SetResult(&selectorsAndConfigs{}, nil)
 
 			responses := types.BatchGetLatestValuesResult{
 				types.BoundContract{Name: consts.ContractNameOffRamp}: {
-					*result1, *result2, *result3, *result4, *result5,
+					*result1, *result2, *result3, *result4,
 				},
 			}
 

@@ -162,7 +162,6 @@ func (c *configPoller) prepareBatchRequests() contractreader.ExtendedBatchGetLat
 		execLatestOCRConfig   OCRConfigResponse
 		staticConfig          offRampStaticChainConfig
 		dynamicConfig         offRampDynamicChainConfig
-		selectorsAndConf      selectorsAndConfigs
 		rmnRemoteAddress      []byte
 		rmnDigestHeader       rmnDigestHeader
 		rmnVersionConfig      versionedConfig
@@ -194,11 +193,6 @@ func (c *configPoller) prepareBatchRequests() contractreader.ExtendedBatchGetLat
 				ReadName:  consts.MethodNameOffRampGetDynamicConfig,
 				Params:    map[string]any{},
 				ReturnVal: &dynamicConfig,
-			},
-			{
-				ReadName:  consts.MethodNameOffRampGetAllSourceChainConfigs,
-				Params:    map[string]any{},
-				ReturnVal: &selectorsAndConf,
 			},
 		},
 		consts.ContractNameRMNProxy: {{
@@ -336,15 +330,6 @@ func (c *configPoller) processOfframpResults(
 				return fmt.Errorf("invalid type for DynamicConfig: %T", val)
 			}
 			config.DynamicConfig = *typed
-			return nil
-		},
-		// SelectorsAndConf
-		func(val interface{}) error {
-			typed, ok := val.(*selectorsAndConfigs)
-			if !ok {
-				return fmt.Errorf("invalid type for SelectorsAndConf: %T", val)
-			}
-			config.SelectorsAndConf = *typed
 			return nil
 		},
 	}

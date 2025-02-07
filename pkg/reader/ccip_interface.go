@@ -47,7 +47,6 @@ type OfframpConfig struct {
 	ExecLatestOCRConfig   OCRConfigResponse
 	StaticConfig          offRampStaticChainConfig
 	DynamicConfig         offRampDynamicChainConfig
-	SelectorsAndConf      selectorsAndConfigs
 }
 
 type RMNProxyConfig struct {
