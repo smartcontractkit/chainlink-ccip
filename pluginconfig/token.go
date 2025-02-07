@@ -2,12 +2,16 @@ package pluginconfig
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+)
+
+const (
+	USDCCCTPHandlerType = "usdc-cctp"
+	LBTCHandlerType     = "lbtc"
 )
 
 // TokenDataObserverConfig is the base struct for token data observers. Every token data observer
@@ -48,11 +52,18 @@ type TokenDataObserverConfig struct {
 	Version string `json:"version"`
 
 	*USDCCCTPObserverConfig
+	*LBTCObserverConfig
 }
 
 // WellFormed checks that the observer's config is syntactically correct - proper struct is initialized based on type
 func (t TokenDataObserverConfig) WellFormed() error {
 	if t.IsUSDC() {
+		if t.USDCCCTPObserverConfig == nil {
+			return errors.New("USDCCCTPObserverConfig is empty")
+		}
+		return nil
+	}
+	if t.IsLBTC() {
 		if t.USDCCCTPObserverConfig == nil {
 			return errors.New("USDCCCTPObserverConfig is empty")
 		}
@@ -67,6 +78,9 @@ func (t TokenDataObserverConfig) Validate() error {
 	if t.IsUSDC() {
 		return t.USDCCCTPObserverConfig.Validate()
 	}
+	if t.IsLBTC() {
+		return t.LBTCObserverConfig.Validate()
+	}
 	return errors.New("unknown token data observer type " + t.Type)
 }
 
@@ -74,72 +88,20 @@ func (t TokenDataObserverConfig) IsUSDC() bool {
 	return t.Type == USDCCCTPHandlerType
 }
 
-const USDCCCTPHandlerType = "usdc-cctp"
+func (t TokenDataObserverConfig) IsLBTC() bool {
+	return t.Type == LBTCHandlerType
+}
 
-type USDCCCTPObserverConfig struct {
-	Tokens         map[cciptypes.ChainSelector]USDCCCTPTokenConfig `json:"tokens"`
-	AttestationAPI string                                          `json:"attestationAPI"`
+type AttestationConfig struct {
+	AttestationAPI string `json:"attestationAPI"`
 	// AttestationAPITimeout defines the timeout for the attestation API.
 	AttestationAPITimeout *commonconfig.Duration `json:"attestationAPITimeout"`
 	// AttestationAPIInterval defines the rate in requests per second that the attestation API can be called.
 	// Default set according to the APIs documentated 10 requests per second rate limit.
 	AttestationAPIInterval *commonconfig.Duration `json:"attestationAPIInterval"`
-
-	// NumWorkers is the number of concurrent workers.
-	NumWorkers int `json:"numWorkers"`
-	// CacheExpirationInterval is the interval after which the cached token data will expire.
-	CacheExpirationInterval *commonconfig.Duration `json:"cacheExpirationInterval"`
-	// CacheCleanupInterval is the interval after which the cache expired data will be cleaned up.
-	CacheCleanupInterval *commonconfig.Duration `json:"cacheCleanupInterval"`
-	// ObserveTimeout is the timeout for the actual synchronous Observe calls.
-	ObserveTimeout *commonconfig.Duration `json:"observeTimeout"`
 }
 
-func (p *USDCCCTPObserverConfig) Validate() error {
-	p.setDefaults()
-
-	if p.AttestationAPI == "" {
-		return errors.New("AttestationAPI not set")
-	}
-	if len(p.Tokens) == 0 {
-		return errors.New("Tokens not set")
-	}
-	if p.AttestationAPIInterval == nil || p.AttestationAPIInterval.Duration() == 0 {
-		return errors.New("AttestationAPIInterval not set")
-	}
-	if p.AttestationAPITimeout == nil || p.AttestationAPITimeout.Duration() == 0 {
-		return errors.New("AttestationAPITimeout not set")
-	}
-	for _, token := range p.Tokens {
-		if err := token.Validate(); err != nil {
-			return err
-		}
-	}
-
-	if err := p.validateBackgroundWorkerConfig(); err != nil {
-		return fmt.Errorf("background worker config validation failed: %w", err)
-	}
-
-	return nil
-}
-
-func (p *USDCCCTPObserverConfig) validateBackgroundWorkerConfig() error {
-	if p.NumWorkers == 0 {
-		return errors.New("NumWorkers not set")
-	}
-	if p.CacheExpirationInterval == nil || p.CacheExpirationInterval.Duration() == 0 {
-		return errors.New("CacheExpirationInterval not set")
-	}
-	if p.CacheCleanupInterval == nil || p.CacheCleanupInterval.Duration() == 0 {
-		return errors.New("CacheCleanupInterval not set")
-	}
-	if p.ObserveTimeout == nil || p.ObserveTimeout.Duration() == 0 {
-		return errors.New("ObserveTimeout not set")
-	}
-	return nil
-}
-
-func (p *USDCCCTPObserverConfig) setDefaults() {
+func (p *AttestationConfig) setDefaults() {
 	// Default to 1 second if AttestationAPITimeout is not set
 	if p.AttestationAPITimeout == nil {
 		p.AttestationAPITimeout = commonconfig.MustNewDuration(5 * time.Second)
@@ -150,26 +112,98 @@ func (p *USDCCCTPObserverConfig) setDefaults() {
 	if p.AttestationAPIInterval == nil {
 		p.AttestationAPIInterval = commonconfig.MustNewDuration(100 * time.Millisecond)
 	}
+}
 
+func (p *AttestationConfig) Validate() error {
+	p.setDefaults()
+	if p.AttestationAPI == "" {
+		return errors.New("AttestationAPI not set")
+	}
+	if p.AttestationAPIInterval == nil || p.AttestationAPIInterval.Duration() == 0 {
+		return errors.New("AttestationAPIInterval not set")
+	}
+	if p.AttestationAPITimeout == nil || p.AttestationAPITimeout.Duration() == 0 {
+		return errors.New("AttestationAPITimeout not set")
+	}
+	return nil
+}
+
+type BackgroundWorkerConfig struct {
+	// NumWorkers is the number of concurrent workers.
+	NumWorkers *int `json:"numWorkers"`
+	// CacheExpirationInterval is the interval after which the cached token data will expire.
+	CacheExpirationInterval *commonconfig.Duration `json:"cacheExpirationInterval"`
+	// CacheCleanupInterval is the interval after which the cache expired data will be cleaned up.
+	CacheCleanupInterval *commonconfig.Duration `json:"cacheCleanupInterval"`
+	// ObserveTimeout is the timeout for the actual synchronous Observe calls.
+	ObserveTimeout *commonconfig.Duration `json:"observeTimeout"`
+}
+
+func (c *BackgroundWorkerConfig) setDefaults() {
 	// Default to 10 workers if NumWorkers is not set
-	if p.NumWorkers == 0 {
-		p.NumWorkers = 10
+	if c.NumWorkers == nil {
+		n := 10
+		c.NumWorkers = &n
 	}
 
 	// Default to 10 minutes if CacheExpirationInterval is not set
-	if p.CacheExpirationInterval == nil {
-		p.CacheExpirationInterval = commonconfig.MustNewDuration(10 * time.Minute)
+	if c.CacheExpirationInterval == nil {
+		c.CacheExpirationInterval = commonconfig.MustNewDuration(10 * time.Minute)
 	}
 
 	// Default to 15 minutes if CacheCleanupInterval is not set
-	if p.CacheCleanupInterval == nil {
-		p.CacheCleanupInterval = commonconfig.MustNewDuration(15 * time.Minute)
+	if c.CacheCleanupInterval == nil {
+		c.CacheCleanupInterval = commonconfig.MustNewDuration(15 * time.Minute)
 	}
 
 	// Default to 5 seconds if ObserveTimeout is not set
-	if p.ObserveTimeout == nil {
-		p.ObserveTimeout = commonconfig.MustNewDuration(5 * time.Second)
+	if c.ObserveTimeout == nil {
+		c.ObserveTimeout = commonconfig.MustNewDuration(5 * time.Second)
 	}
+}
+
+func (c *BackgroundWorkerConfig) Validate() error {
+	c.setDefaults()
+	if c.NumWorkers == nil {
+		return errors.New("NumWorkers not set")
+	}
+	if c.CacheExpirationInterval == nil || c.CacheExpirationInterval.Duration() == 0 {
+		return errors.New("CacheExpirationInterval not set")
+	}
+	if c.CacheCleanupInterval == nil || c.CacheCleanupInterval.Duration() == 0 {
+		return errors.New("CacheCleanupInterval not set")
+	}
+	if c.ObserveTimeout == nil || c.ObserveTimeout.Duration() == 0 {
+		return errors.New("ObserveTimeout not set")
+	}
+	return nil
+}
+
+type USDCCCTPObserverConfig struct {
+	AttestationConfig
+	BackgroundWorkerConfig
+	Tokens map[cciptypes.ChainSelector]USDCCCTPTokenConfig `json:"tokens"`
+}
+
+func (p *USDCCCTPObserverConfig) Validate() error {
+	err := p.AttestationConfig.Validate()
+	if err != nil {
+		return err
+	}
+	err = p.BackgroundWorkerConfig.Validate()
+	if err != nil {
+		return err
+	}
+
+	if len(p.Tokens) == 0 {
+		return errors.New("tokens not set")
+	}
+	for _, token := range p.Tokens {
+		if err := token.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 //nolint:lll // CCTP link
@@ -187,6 +221,43 @@ func (t USDCCCTPTokenConfig) Validate() error {
 	}
 	if t.SourceMessageTransmitterAddr == "" {
 		return errors.New("SourceMessageTransmitterAddress not set")
+	}
+	return nil
+}
+
+type LBTCObserverConfig struct {
+	AttestationConfig
+	BackgroundWorkerConfig
+	SourcePoolAddressByChain map[cciptypes.ChainSelector]string `json:"sourcePoolAddressByChain"`
+	AttestationAPIBatchSize  int                                `json:"attestationAPIBatchSize"`
+}
+
+func (c *LBTCObserverConfig) setDefaults() {
+	if c.AttestationAPIBatchSize == 0 {
+		c.AttestationAPIBatchSize = 50
+	}
+}
+
+func (c *LBTCObserverConfig) Validate() error {
+	err := c.AttestationConfig.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.BackgroundWorkerConfig.Validate()
+	if err != nil {
+		return err
+	}
+	c.setDefaults()
+	if c.AttestationAPIBatchSize == 0 {
+		return errors.New("AttestationAPIBatchSize is not set")
+	}
+	if len(c.SourcePoolAddressByChain) == 0 {
+		return errors.New("SourcePoolAddressByChain is not set")
+	}
+	for _, sourcePoolAddress := range c.SourcePoolAddressByChain {
+		if sourcePoolAddress == "" {
+			return errors.New("SourcePoolAddressByChain is empty")
+		}
 	}
 	return nil
 }

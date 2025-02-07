@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -49,12 +51,12 @@ func Test_AttestationClient(t *testing.T) {
 		success  []string
 		pending  []string
 		input    map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes
-		expected map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus
+		expected map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus
 	}{
 		{
 			name:     "empty input",
 			input:    map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{},
-			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{},
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{},
 		},
 		{
 			name:    "single success",
@@ -64,9 +66,9 @@ func Test_AttestationClient(t *testing.T) {
 					reader.NewMessageTokenID(1, 1): messageA.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
+					reader.NewMessageTokenID(1, 1): tokendata.SuccessAttestationStatus(messageA.hash, hexutil.MustDecode(messageA.keccak)),
 				},
 			},
 		},
@@ -78,9 +80,9 @@ func Test_AttestationClient(t *testing.T) {
 					reader.NewMessageTokenID(1, 1): messageA.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): ErrorAttestationStatus(ErrNotReady),
+					reader.NewMessageTokenID(1, 1): tokendata.ErrorAttestationStatus(tokendata.ErrNotReady),
 				},
 			},
 		},
@@ -96,13 +98,13 @@ func Test_AttestationClient(t *testing.T) {
 					reader.NewMessageTokenID(2, 1): messageC.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
-					reader.NewMessageTokenID(1, 2): SuccessAttestationStatus(messageB.hash, mustDecode(messageB.keccak)),
+					reader.NewMessageTokenID(1, 1): tokendata.SuccessAttestationStatus(messageA.hash, hexutil.MustDecode(messageA.keccak)),
+					reader.NewMessageTokenID(1, 2): tokendata.SuccessAttestationStatus(messageB.hash, hexutil.MustDecode(messageB.keccak)),
 				},
 				cciptypes.ChainSelector(2): {
-					reader.NewMessageTokenID(2, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keccak)),
+					reader.NewMessageTokenID(2, 1): tokendata.SuccessAttestationStatus(messageC.hash, hexutil.MustDecode(messageC.keccak)),
 				},
 			},
 		},
@@ -118,13 +120,13 @@ func Test_AttestationClient(t *testing.T) {
 					reader.NewMessageTokenID(2, 1): messageC.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): ErrorAttestationStatus(ErrNotReady),
-					reader.NewMessageTokenID(1, 2): ErrorAttestationStatus(ErrUnknownResponse),
+					reader.NewMessageTokenID(1, 1): tokendata.ErrorAttestationStatus(tokendata.ErrNotReady),
+					reader.NewMessageTokenID(1, 2): tokendata.ErrorAttestationStatus(tokendata.ErrUnknownResponse),
 				},
 				cciptypes.ChainSelector(2): {
-					reader.NewMessageTokenID(2, 1): ErrorAttestationStatus(ErrNotReady),
+					reader.NewMessageTokenID(2, 1): tokendata.ErrorAttestationStatus(tokendata.ErrNotReady),
 				},
 			},
 		},
@@ -143,15 +145,15 @@ func Test_AttestationClient(t *testing.T) {
 					reader.NewMessageTokenID(3, 1): messageC.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
+					reader.NewMessageTokenID(1, 1): tokendata.SuccessAttestationStatus(messageA.hash, hexutil.MustDecode(messageA.keccak)),
 				},
 				cciptypes.ChainSelector(2): {
-					reader.NewMessageTokenID(2, 1): ErrorAttestationStatus(ErrNotReady),
+					reader.NewMessageTokenID(2, 1): tokendata.ErrorAttestationStatus(tokendata.ErrNotReady),
 				},
 				cciptypes.ChainSelector(3): {
-					reader.NewMessageTokenID(3, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keccak)),
+					reader.NewMessageTokenID(3, 1): tokendata.SuccessAttestationStatus(messageC.hash, hexutil.MustDecode(messageC.keccak)),
 				},
 			},
 		},
@@ -162,14 +164,68 @@ func Test_AttestationClient(t *testing.T) {
 			handler.updateURIs(tc.success, tc.pending)
 
 			client, err := NewSequentialAttestationClient(mocks.NullLogger, pluginconfig.USDCCCTPObserverConfig{
-				AttestationAPI:         server.URL,
-				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
-				AttestationAPITimeout:  commonconfig.MustNewDuration(5 * time.Second),
+				AttestationConfig: pluginconfig.AttestationConfig{
+					AttestationAPI:         server.URL,
+					AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+					AttestationAPITimeout:  commonconfig.MustNewDuration(5 * time.Second),
+				},
 			})
 			require.NoError(t, err)
 			attestations, err := client.Attestations(tests.Context(t), tc.input)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, attestations)
+		})
+	}
+}
+
+func Test_httpResponse(t *testing.T) {
+	tt := []struct {
+		name                string
+		response            httpResponse
+		expectedError       error
+		expectedAttestation cciptypes.Bytes
+	}{
+		{
+			name: "success",
+			response: httpResponse{
+				Status:      attestationStatusSuccess,
+				Attestation: "0x720502893578a89a8a87982982ef781c18b193",
+			},
+			expectedAttestation: hexutil.MustDecode("0x720502893578a89a8a87982982ef781c18b193"),
+		},
+		{
+			name: "pending",
+			response: httpResponse{
+				Status: attestationStatusPending,
+			},
+			expectedError: tokendata.ErrNotReady,
+		},
+		{
+			name: "error",
+			response: httpResponse{
+				Error: "some error",
+			},
+			expectedError: fmt.Errorf("attestation API error: some error"),
+		},
+		{
+			name:          "empty",
+			response:      httpResponse{},
+			expectedError: fmt.Errorf("invalid attestation response"),
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.response.validate()
+			if tc.expectedError != nil {
+				require.EqualError(t, err, tc.expectedError.Error())
+				return
+			}
+
+			require.NoError(t, err)
+			attestation, err1 := tc.response.attestationToBytes()
+			require.NoError(t, err1)
+			require.Equal(t, tc.expectedAttestation, attestation)
 		})
 	}
 }
