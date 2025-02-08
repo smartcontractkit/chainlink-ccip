@@ -182,6 +182,7 @@ func TestCCIPRouter(t *testing.T) {
 
 		t.Run("receiver", func(t *testing.T) {
 			instruction, ixErr := test_ccip_receiver.NewInitializeInstruction(
+				config.CcipRouterProgram,
 				config.ReceiverTargetAccountPDA,
 				config.ReceiverExternalExecutionConfigPDA,
 				user.PublicKey(),
@@ -6266,7 +6267,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
-					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables)
+					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
 					executionEvent := ccip.EventExecutionStateChanged{}
 					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
 					require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)

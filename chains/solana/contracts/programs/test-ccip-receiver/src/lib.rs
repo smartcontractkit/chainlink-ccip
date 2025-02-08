@@ -1,31 +1,28 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{token_interface::Mint, token_interface::TokenAccount};
+use anchor_spl::token_interface::{Mint, TokenAccount};
 use example_ccip_receiver::{
-    Any2SVMMessage, BaseState, CcipReceiverError, EXTERNAL_EXECUTION_CONFIG_SEED,
+    Any2SVMMessage, BaseState, CcipReceiverError, ALLOWED_OFFRAMP, EXTERNAL_EXECUTION_CONFIG_SEED,
 };
 
-use solana_program::pubkey;
 declare_id!("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH");
 
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
 #[program]
 pub mod test_ccip_receiver {
-    const CCIP_ROUTER: Pubkey = pubkey!("offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5");
-
     use solana_program::instruction::Instruction;
     use solana_program::program::invoke_signed;
 
     use super::*;
 
     /// The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, router: Pubkey) -> Result<()> {
         msg!("Called `initialize` {:?}", ctx);
         ctx.accounts.counter.value = 0;
         ctx.accounts
             .counter
             .state
-            .init(ctx.accounts.authority.key(), CCIP_ROUTER)
+            .init(ctx.accounts.authority.key(), router)
     }
 
     /// This function is called by the CCIP Router to execute the CCIP message.
@@ -34,7 +31,7 @@ pub mod test_ccip_receiver {
     /// You can send as many accounts as you need, specifying if mutable or not.
     /// But none of them could be an init, realloc or close.
     /// In this case, it increments the counter value by 1 and logs the parsed message.
-    pub fn ccip_receive(ctx: Context<SetData>, message: Any2SVMMessage) -> Result<()> {
+    pub fn ccip_receive(ctx: Context<CcipReceive>, message: Any2SVMMessage) -> Result<()> {
         msg!("Called `ccip_receive` with message {:?}", message);
 
         let counter = &mut ctx.accounts.counter;
@@ -120,12 +117,37 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]
-pub struct SetData<'info> {
-    // router CPI signer must be first
+pub struct CcipReceive<'info> {
+    // Offramp CPI signer PDA must be first
+    // It is not mutable, and thus cannot be used as payer of init/realloc of other PDAs.
     #[account(
-        constraint = counter.state.is_router(authority.key()) @ CcipReceiverError::OnlyRouter,
+        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED],
+        bump,
+        seeds::program = offramp_program.key(),
     )]
     pub authority: Signer<'info>,
+
+    /// CHECK offramp program: exists only to derive the allowed offramp PDA
+    /// and the authority PDA. Must be second.
+    pub offramp_program: UncheckedAccount<'info>,
+
+    // PDA to verify that calling offramp is valid. Must be third. It is left up to the implementer to decide
+    // how they want to persist the router address to verify that this is the correct account (e.g. in the top level of
+    // a global config/state account for the receiver, which is what this example does, or hard-coded,
+    // or stored in any other way in any other account).
+    /// CHECK PDA of the router program verifying the signer is an allowed offramp.
+    /// If PDA does not exist, the router doesn't allow this offramp
+    #[account(
+        owner = counter.state.router @ CcipReceiverError::InvalidCaller, // this guarantees that it was initialized
+        seeds = [
+            ALLOWED_OFFRAMP,
+            message.source_chain_selector.to_le_bytes().as_ref(),
+            offramp_program.key().as_ref()
+        ],
+        bump,
+        seeds::program = counter.state.router,
+    )]
+    pub allowed_offramp: UncheckedAccount<'info>,
     // ccip router expects "receiver" to be second
     /// CHECK: Using this to sign
     #[account(mut, seeds = [EXTERNAL_EXECUTION_CONFIG_SEED], bump)]

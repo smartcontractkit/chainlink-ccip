@@ -229,7 +229,11 @@ fn internal_execute<'info>(
         // The accounts of the user that will be used in the CPI instruction, none of them are signers
         // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
         // note: CPI signer is always first account
-        let mut acc_infos = external_execution_config.to_account_infos();
+        let mut acc_infos = vec![
+            external_execution_config.to_account_info(),
+            ctx.accounts.offramp.to_account_info(),
+            ctx.accounts.allowed_offramp.to_account_info(),
+        ];
         acc_infos.extend_from_slice(msg_accounts);
 
         let acc_metas: Vec<AccountMeta> = acc_infos

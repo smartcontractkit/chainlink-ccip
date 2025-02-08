@@ -6,6 +6,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 use example_ccip_receiver::Any2SVMMessage;
 use program::TestCcipInvalidReceiver;
+use solana_program::pubkey;
 
 declare_id!("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8");
 
@@ -128,11 +129,36 @@ pub mod test_ccip_invalid_receiver {
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
+const TEST_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
+
 #[derive(Accounts, Debug)]
+#[instruction(message: Any2SVMMessage)]
 pub struct Initialize<'info> {
     // router CPI signer must be first
     #[account(mut)]
     pub authority: Signer<'info>,
+
+    /// CHECK offramp program: exists only to derive the allowed offramp PDA
+    /// and the authority PDA. Must be second.
+    pub offramp_program: UncheckedAccount<'info>,
+
+    // PDA to verify that calling offramp is valid. Must be third. It is left up to the implementer to decide
+    // how they want to persist the router address to verify that this is the correct account (e.g. in the top level of
+    // a global config/state account for the receiver, which is what this example does, or hard-coded,
+    // or stored in any other way in any other account).
+    /// CHECK PDA of the router program verifying the signer is an allowed offramp.
+    /// If PDA does not exist, the router doesn't allow this offramp
+    #[account(
+        owner = TEST_ROUTER, // this guarantees that it was initialized
+        seeds = [
+            ALLOWED_OFFRAMP,
+            message.source_chain_selector.to_le_bytes().as_ref(),
+            offramp_program.key().as_ref()
+        ],
+        bump,
+        seeds::program = TEST_ROUTER,
+    )]
+    pub allowed_offramp: UncheckedAccount<'info>,
 
     #[account(
         init,
