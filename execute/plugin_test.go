@@ -69,7 +69,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
 					Report: cciptypes.CommitPluginReport{
-						MerkleRoots: []cciptypes.MerkleRootChain{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
@@ -100,7 +100,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
 					Report: cciptypes.CommitPluginReport{
-						MerkleRoots: []cciptypes.MerkleRootChain{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
@@ -150,7 +150,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
 					Report: cciptypes.CommitPluginReport{
-						MerkleRoots: []cciptypes.MerkleRootChain{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
@@ -182,7 +182,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
 					Report: cciptypes.CommitPluginReport{
-						MerkleRoots: []cciptypes.MerkleRootChain{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 							{
 								ChainSel:     1,
 								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
