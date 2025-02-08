@@ -16,12 +16,25 @@ pub mod test_ccip_invalid_receiver {
 
     use super::*;
 
+    // Actual invalid receiver method
     pub fn ccip_receive(ctx: Context<Initialize>, _message: Any2SVMMessage) -> Result<()> {
         msg!("Not reachable due to uninitialized accounts");
 
         let counter = &mut ctx.accounts.counter;
         counter.value = 1;
 
+        Ok(())
+    }
+
+    ///////////////////////////////////////
+    // Mocks of router, onramp & offramp //
+    ///////////////////////////////////////
+    pub fn add_offramp(
+        _ctx: Context<AddOfframp>,
+        _source_chain_selector: u64,
+        _offramp: Pubkey,
+    ) -> Result<()> {
+        msg!("Registering offramp as allowed for source chain. This is a mock of the router functionality.");
         Ok(())
     }
 
@@ -35,7 +48,7 @@ pub mod test_ccip_invalid_receiver {
             ctx.accounts.cpi_signer.to_account_info(),
             ctx.accounts.offramp_program.to_account_info(),
             ctx.accounts.allowed_offramp.to_account_info(),
-            ctx.accounts.config.to_account_info(),
+            ctx.accounts.state.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
             ctx.accounts.mint.to_account_info(),
             ctx.accounts.pool_signer.to_account_info(),
@@ -69,6 +82,48 @@ pub mod test_ccip_invalid_receiver {
 
         Ok(data)
     }
+
+    // This is just a dumb proxy towards the test_pool program, but signing the call with a PDA that mimics
+    // what the offramp does
+    pub fn pool_proxy_lock_or_burn<'info>(
+        ctx: Context<'_, '_, 'info, 'info, PoolProxyLockOrBurn<'info>>,
+        lock_or_burn: LockOrBurnInV1,
+    ) -> Result<Vec<u8>> {
+        let mut acc_infos = vec![
+            ctx.accounts.cpi_signer.to_account_info(),
+            ctx.accounts.state.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.mint.to_account_info(),
+            ctx.accounts.pool_signer.to_account_info(),
+            ctx.accounts.pool_token_account.to_account_info(),
+            ctx.accounts.chain_config.to_account_info(),
+        ];
+
+        acc_infos.extend_from_slice(ctx.remaining_accounts);
+
+        let acc_metas: Vec<AccountMeta> = acc_infos
+            .iter()
+            .flat_map(|acc_info| {
+                // Check signer from PDA External Execution config
+                let is_signer = acc_info.key() == ctx.accounts.cpi_signer.key();
+                acc_info.to_account_metas(Some(is_signer))
+            })
+            .collect();
+
+        let ix = Instruction {
+            program_id: ctx.accounts.test_pool.key(),
+            accounts: acc_metas,
+            data: lock_or_burn.to_tx_data(),
+        };
+
+        let seeds: &[&[u8]] = &[b"external_token_pools_signer", &[ctx.bumps.cpi_signer]];
+
+        invoke_signed(&ix, &acc_infos, &[seeds])?;
+
+        let (_, data) = get_return_data().unwrap();
+
+        Ok(data)
+    }
 }
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -87,6 +142,30 @@ pub struct Initialize<'info> {
         space = ANCHOR_DISCRIMINATOR + Counter::INIT_SPACE,
     )]
     pub counter: Account<'info, Counter>,
+
+    pub system_program: Program<'info, System>,
+}
+
+pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
+
+#[account]
+#[derive(Copy, Debug, InitSpace)]
+pub struct AllowedOfframp {}
+
+#[derive(Accounts)]
+#[instruction(source_chain_selector: u64, offramp: Pubkey)]
+pub struct AddOfframp<'info> {
+    #[account(
+        init,
+        seeds = [ALLOWED_OFFRAMP, source_chain_selector.to_le_bytes().as_ref(), offramp.as_ref()],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + AllowedOfframp::INIT_SPACE,
+    )]
+    pub allowed_offramp: Account<'info, AllowedOfframp>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -120,7 +199,7 @@ pub struct PoolProxyReleaseOrMint<'info> {
 
     /// CHECK
     #[account(mut)]
-    pub config: UncheckedAccount<'info>,
+    pub state: UncheckedAccount<'info>,
 
     /// CHECK
     pub token_program: AccountInfo<'info>,
@@ -141,6 +220,43 @@ pub struct PoolProxyReleaseOrMint<'info> {
     /// CHECK
     #[account(mut)]
     pub receiver_token_account: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(lock_or_burn: LockOrBurnInV1)]
+pub struct PoolProxyLockOrBurn<'info> {
+    /// CHECK
+    pub test_pool: UncheckedAccount<'info>,
+
+    /// CHECK
+    #[account(
+        seeds = [b"external_token_pools_signer"],
+        bump,
+    )]
+    pub cpi_signer: UncheckedAccount<'info>,
+
+    ///////////////////////////////////
+    // Accounts required by Pool CPI //
+    ///////////////////////////////////
+    /// CHECK
+    #[account(mut)]
+    pub state: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub token_program: AccountInfo<'info>,
+
+    #[account(mut)]
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    /// CHECK
+    pub pool_signer: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK
+    #[account(mut)]
+    pub chain_config: UncheckedAccount<'info>,
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
@@ -165,6 +281,26 @@ impl ReleaseOrMintInV1 {
     pub fn to_tx_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.extend_from_slice(&TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR);
+        data.extend_from_slice(&self.try_to_vec().unwrap());
+        data
+    }
+}
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct LockOrBurnInV1 {
+    pub receiver: Vec<u8>, //  The recipient of the tokens on the destination chain
+    pub remote_chain_selector: u64, // The chain ID of the destination chain
+    pub original_sender: Pubkey, // The original sender of the tx on the source chain
+    pub amount: u64, // local solana amount to lock/burn,  The amount of tokens to lock or burn, denominated in the source token's decimals
+    pub local_token: Pubkey, //  The address on this chain of the token to lock or burn
+}
+const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
+    [0x72, 0xa1, 0x5e, 0x1d, 0x93, 0x19, 0xe8, 0xbf]; // lock_or_burn_tokens
+
+impl LockOrBurnInV1 {
+    fn to_tx_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR);
         data.extend_from_slice(&self.try_to_vec().unwrap());
         data
     }

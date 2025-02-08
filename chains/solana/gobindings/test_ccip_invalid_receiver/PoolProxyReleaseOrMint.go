@@ -25,7 +25,7 @@ type PoolProxyReleaseOrMint struct {
 	// [3] = [] allowedOfframp
 	// ··········· CHECK
 	//
-	// [4] = [WRITE] config
+	// [4] = [WRITE] state
 	// ··········· CHECK
 	//
 	// [5] = [] tokenProgram
@@ -110,16 +110,16 @@ func (inst *PoolProxyReleaseOrMint) GetAllowedOfframpAccount() *ag_solanago.Acco
 	return inst.AccountMetaSlice[3]
 }
 
-// SetConfigAccount sets the "config" account.
+// SetStateAccount sets the "state" account.
 // CHECK
-func (inst *PoolProxyReleaseOrMint) SetConfigAccount(config ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(config).WRITE()
+func (inst *PoolProxyReleaseOrMint) SetStateAccount(state ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
+// GetStateAccount gets the "state" account.
 // CHECK
-func (inst *PoolProxyReleaseOrMint) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *PoolProxyReleaseOrMint) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
@@ -237,7 +237,7 @@ func (inst *PoolProxyReleaseOrMint) Validate() error {
 			return errors.New("accounts.AllowedOfframp is not set")
 		}
 		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
 			return errors.New("accounts.TokenProgram is not set")
@@ -280,7 +280,7 @@ func (inst *PoolProxyReleaseOrMint) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("     cpiSigner", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("offrampProgram", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[4]))
 						accountsBranch.Child(ag_format.Meta("  tokenProgram", inst.AccountMetaSlice[5]))
 						accountsBranch.Child(ag_format.Meta("          mint", inst.AccountMetaSlice[6]))
 						accountsBranch.Child(ag_format.Meta("    poolSigner", inst.AccountMetaSlice[7]))
@@ -318,7 +318,7 @@ func NewPoolProxyReleaseOrMintInstruction(
 	cpiSigner ag_solanago.PublicKey,
 	offrampProgram ag_solanago.PublicKey,
 	allowedOfframp ag_solanago.PublicKey,
-	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	tokenProgram ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
 	poolSigner ag_solanago.PublicKey,
@@ -331,7 +331,7 @@ func NewPoolProxyReleaseOrMintInstruction(
 		SetCpiSignerAccount(cpiSigner).
 		SetOfframpProgramAccount(offrampProgram).
 		SetAllowedOfframpAccount(allowedOfframp).
-		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetTokenProgramAccount(tokenProgram).
 		SetMintAccount(mint).
 		SetPoolSignerAccount(poolSigner).

@@ -307,9 +307,7 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for setting the pool.
-    /// * `mint` - The public key of the token mint.
-    /// * `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.
-    /// * `is_writable` - index of account in lookup table that is writable
+    /// * `writable_indexes` - a bit map of the indexes of the accounts in lookup table that are writable
     pub fn set_pool(
         ctx: Context<SetPoolTokenAdminRegistry>,
         writable_indexes: Vec<u8>,
@@ -359,7 +357,7 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
         token_indexes: Vec<u8>,
-    ) -> Result<()> {
+    ) -> Result<[u8; 32]> {
         v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
 }

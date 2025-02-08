@@ -49,15 +49,15 @@ const (
 
 	// maxObservationLength is set to the maximum size of an observation
 	// check factory_test for the calculation
-	maxObservationLength = 1_047_202
+	maxObservationLength = 1_047_206
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 1_167_836
+	maxOutcomeLength = 1_167_845
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
-	maxReportLength = 128_2900
+	maxReportLength = 128_2933
 
 	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
 	maxReportCount = 1
@@ -109,39 +109,6 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		chainWriters:      params.ContractWriters,
 		rmnPeerClient:     params.RmnPeerClient,
 		rmnCrypto:         params.RmnCrypto,
-	}
-}
-
-// NewPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by the
-// factory. It is safe to assume that a factory instance will create exactly one plugin instance.
-// deprecated: use NewCommitPluginFactory instead
-func NewPluginFactory(
-	lggr logger.Logger,
-	donID plugintypes.DonID,
-	ocrConfig reader.OCR3ConfigWithMeta,
-	commitCodec cciptypes.CommitPluginCodec,
-	msgHasher cciptypes.MessageHasher,
-	extraDataCodec cciptypes.ExtraDataCodec,
-	homeChainReader reader.HomeChain,
-	homeChainSelector cciptypes.ChainSelector,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
-	rmnPeerClient rmn.PeerClient,
-	rmnCrypto cciptypes.RMNCrypto,
-) *PluginFactory {
-	return &PluginFactory{
-		baseLggr:          lggr,
-		donID:             donID,
-		ocrConfig:         ocrConfig,
-		commitCodec:       commitCodec,
-		msgHasher:         msgHasher,
-		extraDataCodec:    extraDataCodec,
-		homeChainReader:   homeChainReader,
-		homeChainSelector: homeChainSelector,
-		contractReaders:   contractReaders,
-		chainWriters:      chainWriters,
-		rmnPeerClient:     rmnPeerClient,
-		rmnCrypto:         rmnCrypto,
 	}
 }
 

@@ -110,3 +110,69 @@ func (obj *ReleaseOrMintInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	}
 	return nil
 }
+
+type LockOrBurnInV1 struct {
+	Receiver            []byte
+	RemoteChainSelector uint64
+	OriginalSender      ag_solanago.PublicKey
+	Amount              uint64
+	LocalToken          ag_solanago.PublicKey
+}
+
+func (obj LockOrBurnInV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Receiver` param:
+	err = encoder.Encode(obj.Receiver)
+	if err != nil {
+		return err
+	}
+	// Serialize `RemoteChainSelector` param:
+	err = encoder.Encode(obj.RemoteChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `OriginalSender` param:
+	err = encoder.Encode(obj.OriginalSender)
+	if err != nil {
+		return err
+	}
+	// Serialize `Amount` param:
+	err = encoder.Encode(obj.Amount)
+	if err != nil {
+		return err
+	}
+	// Serialize `LocalToken` param:
+	err = encoder.Encode(obj.LocalToken)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *LockOrBurnInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Receiver`:
+	err = decoder.Decode(&obj.Receiver)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RemoteChainSelector`:
+	err = decoder.Decode(&obj.RemoteChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OriginalSender`:
+	err = decoder.Decode(&obj.OriginalSender)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LocalToken`:
+	err = decoder.Decode(&obj.LocalToken)
+	if err != nil {
+		return err
+	}
+	return nil
+}

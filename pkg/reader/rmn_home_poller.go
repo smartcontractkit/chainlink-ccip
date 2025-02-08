@@ -317,15 +317,15 @@ func convertOnChainConfigToRMNHomeChainConfig(
 	}
 
 	rmnHomeConfigs := make(map[cciptypes.Bytes32]rmntypes.HomeConfig)
-	for _, versionedConfig := range versionedConfigWithDigests {
-		err := validate(versionedConfig)
+	for _, cfg := range versionedConfigWithDigests {
+		err := validate(cfg)
 		if err != nil {
 			lggr.Warnw("invalid on chain RMNHomeConfig", "err", err)
 			continue
 		}
 
-		nodes := make([]rmntypes.HomeNodeInfo, len(versionedConfig.StaticConfig.Nodes))
-		for i, node := range versionedConfig.StaticConfig.Nodes {
+		nodes := make([]rmntypes.HomeNodeInfo, len(cfg.StaticConfig.Nodes))
+		for i, node := range cfg.StaticConfig.Nodes {
 			pubKey := ed25519.PublicKey(node.OffchainPublicKey[:])
 
 			nodes[i] = rmntypes.HomeNodeInfo{
@@ -337,9 +337,9 @@ func convertOnChainConfigToRMNHomeChainConfig(
 			}
 		}
 
-		homeFMap := make(map[cciptypes.ChainSelector]int)
+		homeFMap := make(map[cciptypes.ChainSelector]int, len(cfg.DynamicConfig.SourceChains))
 
-		for _, chain := range versionedConfig.DynamicConfig.SourceChains {
+		for _, chain := range cfg.DynamicConfig.SourceChains {
 			homeFMap[chain.ChainSelector] = int(chain.FObserve)
 			for j := 0; j < len(nodes); j++ {
 				isObserver, err := isNodeObserver(chain, j, len(nodes))
@@ -353,11 +353,11 @@ func convertOnChainConfigToRMNHomeChainConfig(
 			}
 		}
 
-		rmnHomeConfigs[versionedConfig.ConfigDigest] = rmntypes.HomeConfig{
+		rmnHomeConfigs[cfg.ConfigDigest] = rmntypes.HomeConfig{
 			Nodes:          nodes,
 			SourceChainF:   homeFMap,
-			ConfigDigest:   versionedConfig.ConfigDigest,
-			OffchainConfig: versionedConfig.DynamicConfig.OffchainConfig,
+			ConfigDigest:   cfg.ConfigDigest,
+			OffchainConfig: cfg.DynamicConfig.OffchainConfig,
 		}
 	}
 	return rmnHomeConfigs

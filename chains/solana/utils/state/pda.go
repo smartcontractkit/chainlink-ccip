@@ -109,10 +109,6 @@ func FindOfframpStatePDA(offrampProgram solana.PublicKey) (solana.PublicKey, uin
 	return solana.FindProgramAddress([][]byte{[]byte("state")}, offrampProgram)
 }
 
-func FindOfframpExternalPoolSignerPDA(offrampProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, offrampProgram)
-}
-
 func FindOfframpCommitReportPDA(chainSelector uint64, root [32]byte, offrampProgram solana.PublicKey) (solana.PublicKey, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	p, _, err := solana.FindProgramAddress([][]byte{[]byte("commit_report"), chainSelectorLE, root[:]}, offrampProgram)
