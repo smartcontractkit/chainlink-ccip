@@ -125,6 +125,41 @@ pub mod test_ccip_invalid_receiver {
 
         Ok(data)
     }
+
+    pub fn receiver_proxy_execute<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ReceiverProxyExecute<'info>>,
+        message: Any2SVMMessage,
+    ) -> Result<()> {
+        let acc_infos = vec![
+            ctx.accounts.cpi_signer.to_account_info(),
+            ctx.accounts.offramp_program.to_account_info(),
+            ctx.accounts.allowed_offramp.to_account_info(),
+            // example-receiver specific accounts
+            ctx.accounts.approved_sender.to_account_info(),
+            ctx.accounts.state.to_account_info(),
+        ];
+
+        let acc_metas: Vec<AccountMeta> = acc_infos
+            .iter()
+            .flat_map(|acc_info| {
+                // Check signer from PDA External Execution config
+                let is_signer = acc_info.key() == ctx.accounts.cpi_signer.key();
+                acc_info.to_account_metas(Some(is_signer))
+            })
+            .collect();
+
+        let ix = Instruction {
+            program_id: ctx.accounts.test_receiver.key(),
+            accounts: acc_metas,
+            data: build_receiver_discriminator_and_data(&message)?,
+        };
+
+        let seeds: &[&[u8]] = &[b"external_execution_config", &[ctx.bumps.cpi_signer]];
+
+        invoke_signed(&ix, &acc_infos, &[seeds])?;
+
+        Ok(())
+    }
 }
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -200,6 +235,32 @@ pub struct AddOfframp<'info> {
 #[derive(InitSpace, Debug)]
 pub struct Counter {
     pub value: u8,
+}
+
+#[derive(Accounts)]
+pub struct ReceiverProxyExecute<'info> {
+    /// CHECK
+    pub test_receiver: UncheckedAccount<'info>,
+
+    /// CHECK
+    #[account(
+        seeds = [b"external_execution_config"],
+        bump,
+    )]
+    pub cpi_signer: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub offramp_program: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub allowed_offramp: UncheckedAccount<'info>,
+
+    // -- Example-receiver specific PDAs
+    /// CHECK
+    pub approved_sender: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub state: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -330,4 +391,16 @@ impl LockOrBurnInV1 {
         data.extend_from_slice(&self.try_to_vec().unwrap());
         data
     }
+}
+
+pub const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
+
+pub fn build_receiver_discriminator_and_data(msg: &Any2SVMMessage) -> Result<Vec<u8>> {
+    let message = msg.try_to_vec()?;
+
+    let mut data = Vec::with_capacity(8);
+    data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
+    data.extend_from_slice(&message);
+
+    Ok(data)
 }

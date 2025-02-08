@@ -35,6 +35,8 @@ var (
 	Instruction_PoolProxyReleaseOrMint = ag_binary.TypeID([8]byte{22, 95, 117, 49, 2, 121, 100, 188})
 
 	Instruction_PoolProxyLockOrBurn = ag_binary.TypeID([8]byte{123, 20, 147, 83, 195, 25, 120, 101})
+
+	Instruction_ReceiverProxyExecute = ag_binary.TypeID([8]byte{99, 169, 76, 14, 44, 89, 147, 67})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -48,6 +50,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "PoolProxyReleaseOrMint"
 	case Instruction_PoolProxyLockOrBurn:
 		return "PoolProxyLockOrBurn"
+	case Instruction_ReceiverProxyExecute:
+		return "ReceiverProxyExecute"
 	default:
 		return ""
 	}
@@ -79,6 +83,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"pool_proxy_lock_or_burn", (*PoolProxyLockOrBurn)(nil),
+		},
+		{
+			"receiver_proxy_execute", (*ReceiverProxyExecute)(nil),
 		},
 	},
 )
