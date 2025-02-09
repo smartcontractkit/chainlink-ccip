@@ -56,10 +56,6 @@
         {
           "name": "onramp",
           "type": "publicKey"
-        },
-        {
-          "name": "offrampSigner",
-          "type": "publicKey"
         }
       ]
     },
@@ -408,6 +404,85 @@
       ]
     },
     {
+      "name": "addPriceUpdater",
+      "docs": [
+        "Add a price updater address to the list of allowed price updaters.",
+        "On price updates, the fee quoter will check the that caller is allowed.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `price_updater` - The price updater address."
+      ],
+      "accounts": [
+        {
+          "name": "allowedPriceUpdater",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "removePriceUpdater",
+      "docs": [
+        "Remove a price updater address from the list of allowed price updaters.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `price_updater` - The price updater address."
+      ],
+      "accounts": [
+        {
+          "name": "allowedPriceUpdater",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "getFee",
       "docs": [
         "Calculates the fee for sending a message to the destination chain.",
@@ -478,16 +553,40 @@
     },
     {
       "name": "updatePrices",
+      "docs": [
+        "Updates prices for tokens and gas. This method may only be called by an allowed price updater.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts always required for the price updates",
+        "* `token_updates` - Vector of token price updates",
+        "* `gas_updates` - Vector of gas price updates",
+        "",
+        "# Additional accounts",
+        "",
+        "In addition to the fixed amount of accounts defined in the `UpdatePrices` context,",
+        "the following accounts must be provided:",
+        "",
+        "* First, the billing token config accounts for each token whose price is being updated, in the same order",
+        "as the token_updates vector.",
+        "* Then, the dest chain accounts of every chain whose gas price is being updated, in the same order as the",
+        "gas_updates vector."
+      ],
       "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
         {
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "allowedPriceUpdater",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -538,10 +637,6 @@
           },
           {
             "name": "onramp",
-            "type": "publicKey"
-          },
-          {
-            "name": "offrampSigner",
             "type": "publicKey"
           }
         ]
@@ -617,6 +712,13 @@
             }
           }
         ]
+      }
+    },
+    {
+      "name": "AllowedPriceUpdater",
+      "type": {
+        "kind": "struct",
+        "fields": []
       }
     }
   ],
@@ -1161,6 +1263,9 @@
           },
           {
             "name": "InvalidSVMAddress"
+          },
+          {
+            "name": "UnauthorizedPriceUpdater"
           }
         ]
       }
@@ -1344,6 +1449,26 @@
           "type": {
             "defined": "TokenTransferFeeConfig"
           },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PriceUpdaterAdded",
+      "fields": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PriceUpdaterRemoved",
+      "fields": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey",
           "index": false
         }
       ]

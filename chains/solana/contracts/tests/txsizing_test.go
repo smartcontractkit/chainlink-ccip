@@ -63,19 +63,20 @@ func TestTransactionSizing(t *testing.T) {
 	}
 
 	offrampTable := map[string]solana.PublicKey{
-		"config":             mustRandomPubkey(),
-		"referenceAddresses": mustRandomPubkey(),
-		"originChainConfig":  mustRandomPubkey(),
-		"sysVarInstruction":  solana.SysVarInstructionsPubkey,
-		"systemProgram":      solana.SystemProgramID,
-		"billingSinger":      mustRandomPubkey(),
-		"feeQuoterProgram":   mustRandomPubkey(),
-		"fqConfigPDA":        mustRandomPubkey(),
-		"billingTokenConfig": mustRandomPubkey(),
-		"destChainConfig":    mustRandomPubkey(),
-		"arbMessagingSigner": mustRandomPubkey(),
-		"tokenPoolSigner":    mustRandomPubkey(),
-		"offramp":            config.CcipOfframpProgram,
+		"config":                mustRandomPubkey(),
+		"referenceAddresses":    mustRandomPubkey(),
+		"originChainConfig":     mustRandomPubkey(),
+		"sysVarInstruction":     solana.SysVarInstructionsPubkey,
+		"systemProgram":         solana.SystemProgramID,
+		"billingSinger":         mustRandomPubkey(),
+		"feeQuoterProgram":      mustRandomPubkey(),
+		"fqConfigPDA":           mustRandomPubkey(),
+		"billingTokenConfig":    mustRandomPubkey(),
+		"destChainConfig":       mustRandomPubkey(),
+		"arbMessagingSigner":    mustRandomPubkey(),
+		"tokenPoolSigner":       mustRandomPubkey(),
+		"offramp":               config.CcipOfframpProgram,
+		"fqAllowedPriceUpdater": mustRandomPubkey(),
 	}
 
 	tokenTable := map[string]solana.PublicKey{
@@ -204,6 +205,7 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable["sysVarInstruction"],
 			offrampTable["billingSinger"],
 			offrampTable["feeQuoterProgram"],
+			offrampTable["fqAllowedPriceUpdater"],
 			offrampTable["fqConfigPDA"],
 		)
 

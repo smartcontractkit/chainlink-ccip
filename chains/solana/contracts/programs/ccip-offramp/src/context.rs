@@ -329,6 +329,15 @@ pub struct CommitReportContext<'info> {
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
+    /// CHECK: fee quoter allowed price updater account, used to invoke fee quoter with price updates
+    /// so that it can authorize the call made by this offramp
+    #[account(
+        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
+        bump,
+        seeds::program = fee_quoter.key(),
+    )]
+    pub fee_quoter_allowed_price_updater: UncheckedAccount<'info>,
+
     /// CHECK: fee quoter config account, used to invoke fee quoter with price updates
     #[account(
         seeds = [fee_quoter::context::seed::CONFIG],

@@ -869,6 +869,7 @@ const (
 	InvalidChainFamilySelector_FeeQuoterError
 	InvalidTokenReceiver_FeeQuoterError
 	InvalidSVMAddress_FeeQuoterError
+	UnauthorizedPriceUpdater_FeeQuoterError
 )
 
 func (value FeeQuoterError) String() string {
@@ -963,6 +964,8 @@ func (value FeeQuoterError) String() string {
 		return "InvalidTokenReceiver"
 	case InvalidSVMAddress_FeeQuoterError:
 		return "InvalidSVMAddress"
+	case UnauthorizedPriceUpdater_FeeQuoterError:
+		return "UnauthorizedPriceUpdater"
 	default:
 		return ""
 	}

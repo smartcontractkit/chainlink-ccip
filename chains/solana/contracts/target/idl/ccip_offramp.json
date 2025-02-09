@@ -483,6 +483,14 @@
           "isSigner": false
         },
         {
+          "name": "feeQuoterAllowedPriceUpdater",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "so that it can authorize the call made by this offramp"
+          ]
+        },
+        {
           "name": "feeQuoterConfig",
           "isMut": false,
           "isSigner": false

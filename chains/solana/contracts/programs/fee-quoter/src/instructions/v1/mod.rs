@@ -2,7 +2,7 @@
 // Public modules, to be exposed in lib.rs as program entrypoints //
 ////////////////////////////////////////////////////////////////////
 pub mod admin; // to be invoked by admin only
-pub mod prices; // to be invoked by offramp only
+pub mod prices; // to be invoked by price updaters (e.g. offramp) only
 pub mod public; // to be invoked by users directly & onramp
 
 ////////////////////////////////////////////////////////////////////////

@@ -2,11 +2,13 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use seed::ALLOWED_PRICE_UPDATER;
 
 use crate::messages::SVM2AnyMessage;
 use crate::program::FeeQuoter;
 use crate::state::{
-    BillingTokenConfig, BillingTokenConfigWrapper, Config, DestChain, PerChainPerTokenConfig,
+    AllowedPriceUpdater, BillingTokenConfig, BillingTokenConfigWrapper, Config, DestChain,
+    PerChainPerTokenConfig,
 };
 use crate::FeeQuoterError;
 
@@ -15,6 +17,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8; // size in bytes
 // Fixed seeds - different contexts must use different PDA seeds
 pub mod seed {
     pub const CONFIG: &[u8] = b"config";
+    pub const ALLOWED_PRICE_UPDATER: &[u8] = b"allowed_price_updater";
     pub const DEST_CHAIN: &[u8] = b"dest_chain";
     pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer"; // signer for billing fee token transfer
     pub const FEE_BILLING_TOKEN_CONFIG: &[u8] = b"fee_billing_token_config";
@@ -287,7 +290,17 @@ pub struct SetTokenTransferFeeConfig<'info> {
 }
 
 #[derive(Accounts)]
-pub struct UpdatePrices<'info> {
+#[instruction(price_updater: Pubkey)]
+pub struct AddPriceUpdater<'info> {
+    #[account(
+        init,
+        seeds = [seed::ALLOWED_PRICE_UPDATER,  price_updater.as_ref()],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + AllowedPriceUpdater::INIT_SPACE,
+    )]
+    pub allowed_price_updater: Account<'info, AllowedPriceUpdater>,
+
     #[account(
         seeds = [seed::CONFIG],
         bump,
@@ -295,9 +308,61 @@ pub struct UpdatePrices<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    // Only the offramp can update prices
-    #[account(address = config.offramp_signer @ FeeQuoterError::Unauthorized)] // TODO change
+    #[account(mut, address = config.owner @ FeeQuoterError::Unauthorized)]
     pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(price_updater: Pubkey)]
+pub struct RemovePriceUpdater<'info> {
+    #[account(
+        mut,
+        seeds = [seed::ALLOWED_PRICE_UPDATER,  price_updater.as_ref()],
+        bump,
+        close = authority,
+    )]
+    pub allowed_price_updater: Account<'info, AllowedPriceUpdater>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut, address = config.owner @ FeeQuoterError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdatePrices<'info> {
+    pub authority: Signer<'info>,
+
+    #[account(
+        owner = crate::ID @ FeeQuoterError::UnauthorizedPriceUpdater, // this guarantees that it was initialized
+        seeds = [ALLOWED_PRICE_UPDATER, authority.key().as_ref()],
+        bump,
+    )]
+    pub allowed_price_updater: Account<'info, AllowedPriceUpdater>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+    )]
+    pub config: Account<'info, Config>,
+    // Remaining accounts represent:
+    // - the accounts to update BillingTokenConfig for token prices
+    // - the accounts to update DestChain for gas prices
+    // They must be in order:
+    // 1. token_accounts[]
+    // 2. gas_accounts[]
+    // matching the order of the price updates.
+    // They must also all be writable so they can be updated.
 }
 
 // Token price in USD.

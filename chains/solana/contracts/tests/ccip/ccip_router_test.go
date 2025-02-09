@@ -488,7 +488,6 @@ func TestCCIPRouter(t *testing.T) {
 				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
-				config.OfframpBillingSignerPDA,
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
 				legacyAdmin.PublicKey(),
@@ -510,7 +509,24 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, legacyAdmin.PublicKey(), fqConfig.Owner)
 			require.True(t, fqConfig.ProposedOwner.IsZero())
 			require.Equal(t, config.CcipRouterProgram, fqConfig.Onramp)
-			require.Equal(t, config.OfframpBillingSignerPDA, fqConfig.OfframpSigner)
+		})
+
+		t.Run("FeeQuoter: Add offramp as price updater", func(t *testing.T) {
+			testutils.AssertClosedAccount(ctx, t, solanaGoClient, config.FqAllowedPriceUpdaterOfframpPDA, config.DefaultCommitment)
+
+			ix, err := fee_quoter.NewAddPriceUpdaterInstruction(
+				config.OfframpBillingSignerPDA,
+				config.FqAllowedPriceUpdaterOfframpPDA,
+				config.FqConfigPDA,
+				legacyAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+
+			isClosed := common.IsClosedAccount(ctx, solanaGoClient, config.FqAllowedPriceUpdaterOfframpPDA, config.DefaultCommitment)
+			require.False(t, isClosed)
 		})
 
 		t.Run("Offramp is initialized", func(t *testing.T) {
@@ -4588,6 +4604,7 @@ func TestCCIPRouter(t *testing.T) {
 							solana.SysVarInstructionsPubkey,
 							config.OfframpBillingSignerPDA,
 							config.FeeQuoterProgram,
+							config.FqAllowedPriceUpdaterOfframpPDA,
 							config.FqConfigPDA,
 						)
 
@@ -4684,6 +4701,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -4728,6 +4746,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -4771,6 +4790,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -4814,6 +4834,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -4858,6 +4879,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -4903,6 +4925,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -5029,6 +5052,7 @@ func TestCCIPRouter(t *testing.T) {
 								solana.SysVarInstructionsPubkey,
 								config.OfframpBillingSignerPDA,
 								config.FeeQuoterProgram,
+								config.FqAllowedPriceUpdaterOfframpPDA,
 								config.FqConfigPDA,
 							)
 
@@ -5084,6 +5108,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -5156,6 +5181,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -5199,6 +5225,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -5246,6 +5273,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -5288,6 +5316,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -5342,6 +5371,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -5389,6 +5419,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -5442,6 +5473,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -5538,6 +5570,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -5618,6 +5651,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -5720,6 +5754,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -5900,6 +5935,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -6039,6 +6075,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -6126,6 +6163,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -6223,6 +6261,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -6344,6 +6383,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -6473,6 +6513,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SysVarInstructionsPubkey,
 						config.OfframpBillingSignerPDA,
 						config.FeeQuoterProgram,
+						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -6651,6 +6692,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -6907,6 +6949,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 					config.OfframpBillingSignerPDA,
 					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)

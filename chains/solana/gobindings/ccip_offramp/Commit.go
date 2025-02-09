@@ -59,14 +59,17 @@ type Commit struct {
 	//
 	// [8] = [] feeQuoter
 	//
-	// [9] = [] feeQuoterConfig
+	// [9] = [] feeQuoterAllowedPriceUpdater
+	// ··········· so that it can authorize the call made by this offramp
+	//
+	// [10] = [] feeQuoterConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCommitInstructionBuilder creates a new `Commit` instruction builder.
 func NewCommitInstructionBuilder() *Commit {
 	nd := &Commit{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 11),
 	}
 	return nd
 }
@@ -200,15 +203,28 @@ func (inst *Commit) GetFeeQuoterAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[8]
 }
 
+// SetFeeQuoterAllowedPriceUpdaterAccount sets the "feeQuoterAllowedPriceUpdater" account.
+// so that it can authorize the call made by this offramp
+func (inst *Commit) SetFeeQuoterAllowedPriceUpdaterAccount(feeQuoterAllowedPriceUpdater ag_solanago.PublicKey) *Commit {
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(feeQuoterAllowedPriceUpdater)
+	return inst
+}
+
+// GetFeeQuoterAllowedPriceUpdaterAccount gets the "feeQuoterAllowedPriceUpdater" account.
+// so that it can authorize the call made by this offramp
+func (inst *Commit) GetFeeQuoterAllowedPriceUpdaterAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[9]
+}
+
 // SetFeeQuoterConfigAccount sets the "feeQuoterConfig" account.
 func (inst *Commit) SetFeeQuoterConfigAccount(feeQuoterConfig ag_solanago.PublicKey) *Commit {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(feeQuoterConfig)
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(feeQuoterConfig)
 	return inst
 }
 
 // GetFeeQuoterConfigAccount gets the "feeQuoterConfig" account.
 func (inst *Commit) GetFeeQuoterConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice[10]
 }
 
 func (inst Commit) Build() *Instruction {
@@ -278,6 +294,9 @@ func (inst *Commit) Validate() error {
 			return errors.New("accounts.FeeQuoter is not set")
 		}
 		if inst.AccountMetaSlice[9] == nil {
+			return errors.New("accounts.FeeQuoterAllowedPriceUpdater is not set")
+		}
+		if inst.AccountMetaSlice[10] == nil {
 			return errors.New("accounts.FeeQuoterConfig is not set")
 		}
 	}
@@ -302,17 +321,18 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("referenceAddresses", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("       sourceChain", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("      commitReport", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("sysvarInstructions", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("  feeBillingSigner", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("         feeQuoter", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("   feeQuoterConfig", inst.AccountMetaSlice[9]))
+					instructionBranch.Child("Accounts[len=11]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("                      config", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("          referenceAddresses", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("                 sourceChain", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("                commitReport", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("                   authority", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("               systemProgram", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("          sysvarInstructions", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("            feeBillingSigner", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("                   feeQuoter", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("feeQuoterAllowedPriceUpdater", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("             feeQuoterConfig", inst.AccountMetaSlice[10]))
 					})
 				})
 		})
@@ -393,6 +413,7 @@ func NewCommitInstruction(
 	sysvarInstructions ag_solanago.PublicKey,
 	feeBillingSigner ag_solanago.PublicKey,
 	feeQuoter ag_solanago.PublicKey,
+	feeQuoterAllowedPriceUpdater ag_solanago.PublicKey,
 	feeQuoterConfig ag_solanago.PublicKey) *Commit {
 	return NewCommitInstructionBuilder().
 		SetReportContextByteWords(reportContextByteWords).
@@ -409,5 +430,6 @@ func NewCommitInstruction(
 		SetSysvarInstructionsAccount(sysvarInstructions).
 		SetFeeBillingSignerAccount(feeBillingSigner).
 		SetFeeQuoterAccount(feeQuoter).
+		SetFeeQuoterAllowedPriceUpdaterAccount(feeQuoterAllowedPriceUpdater).
 		SetFeeQuoterConfigAccount(feeQuoterConfig)
 }
