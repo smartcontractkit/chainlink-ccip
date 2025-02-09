@@ -36,7 +36,9 @@ type ManuallyExecute struct {
 	//
 	// [5] = [] allowedOfframp
 	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
-	// ··········· If PDA does not exist, the router doesn't allow this offramp
+	// ··········· If PDA does not exist, the router doesn't allow this offramp. This is just used
+	// ··········· so that token pools and receivers can then check that the caller is an actual offramp that
+	// ··········· has been registered in the router as such for that source chain.
 	//
 	// [6] = [] externalExecutionConfig
 	//
@@ -127,7 +129,9 @@ func (inst *ManuallyExecute) GetOfframpAccount() *ag_solanago.AccountMeta {
 
 // SetAllowedOfframpAccount sets the "allowedOfframp" account.
 // CHECK PDA of the router program verifying the signer is an allowed offramp.
-// If PDA does not exist, the router doesn't allow this offramp
+// If PDA does not exist, the router doesn't allow this offramp. This is just used
+// so that token pools and receivers can then check that the caller is an actual offramp that
+// has been registered in the router as such for that source chain.
 func (inst *ManuallyExecute) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *ManuallyExecute {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(allowedOfframp)
 	return inst
@@ -135,7 +139,9 @@ func (inst *ManuallyExecute) SetAllowedOfframpAccount(allowedOfframp ag_solanago
 
 // GetAllowedOfframpAccount gets the "allowedOfframp" account.
 // CHECK PDA of the router program verifying the signer is an allowed offramp.
-// If PDA does not exist, the router doesn't allow this offramp
+// If PDA does not exist, the router doesn't allow this offramp. This is just used
+// so that token pools and receivers can then check that the caller is an actual offramp that
+// has been registered in the router as such for that source chain.
 func (inst *ManuallyExecute) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[5]
 }

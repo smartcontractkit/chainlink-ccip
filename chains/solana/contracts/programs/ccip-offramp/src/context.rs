@@ -388,7 +388,9 @@ pub struct ExecuteReportContext<'info> {
     pub offramp: Program<'info, CcipOfframp>,
 
     /// CHECK PDA of the router program verifying the signer is an allowed offramp.
-    /// If PDA does not exist, the router doesn't allow this offramp
+    /// If PDA does not exist, the router doesn't allow this offramp. This is just used
+    /// so that token pools and receivers can then check that the caller is an actual offramp that
+    /// has been registered in the router as such for that source chain.
     #[account(
         owner = reference_addresses.router @ CcipOfframpError::InvalidInputs, // this guarantees that it was initialized
         seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), offramp.key().as_ref()],
