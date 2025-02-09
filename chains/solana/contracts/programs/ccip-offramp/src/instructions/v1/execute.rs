@@ -165,8 +165,10 @@ fn internal_execute<'info>(
             source_pool_data: token_amount.extra_data.clone(),
             offchain_token_data: execution_report.offchain_token_data[i].clone(),
         };
-        let mut acc_infos = router_token_pool_signer.to_account_infos();
-        acc_infos.extend_from_slice(&[
+        let mut acc_infos = vec![
+            router_token_pool_signer.to_account_info(),
+            ctx.accounts.offramp.to_account_info(),
+            ctx.accounts.allowed_offramp.to_account_info(),
             accs.pool_config.to_account_info(),
             accs.token_program.to_account_info(),
             accs.mint.to_account_info(),
@@ -174,7 +176,7 @@ fn internal_execute<'info>(
             accs.pool_token_account.to_account_info(),
             accs.pool_chain_config.to_account_info(),
             accs.user_token_account.to_account_info(),
-        ]);
+        ];
         acc_infos.extend_from_slice(accs.remaining_accounts);
         let return_data = interact_with_pool(
             accs.pool_program.key(),
@@ -227,7 +229,11 @@ fn internal_execute<'info>(
         // The accounts of the user that will be used in the CPI instruction, none of them are signers
         // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
         // note: CPI signer is always first account
-        let mut acc_infos = external_execution_config.to_account_infos();
+        let mut acc_infos = vec![
+            external_execution_config.to_account_info(),
+            ctx.accounts.offramp.to_account_info(),
+            ctx.accounts.allowed_offramp.to_account_info(),
+        ];
         acc_infos.extend_from_slice(msg_accounts);
 
         let acc_metas: Vec<AccountMeta> = acc_infos

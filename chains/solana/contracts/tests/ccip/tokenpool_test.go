@@ -13,8 +13,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
@@ -23,11 +26,27 @@ func TestTokenPool(t *testing.T) {
 
 	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
 
+	// acting as program wrapped by a token pool
+	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
+
+	// acting as "dumb" offramp that just proxies the pool,
+	// required for authnz in the pool but we don't want to test offramp internals here
+	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
+
+	dumbRamp := config.CcipInvalidReceiverProgram
+	dumbRampPoolSigner, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, dumbRamp)
+
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	anotherAdmin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
+
+	user, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
 	ctx := tests.Context(t)
+
+	allowedOfframpPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
+	require.NoError(t, err)
 
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 	getBalance := func(account solana.PublicKey) string {
@@ -40,7 +59,20 @@ func TestTokenPool(t *testing.T) {
 	remoteToken := test_token_pool.RemoteAddress{Address: []byte{4, 5, 6}}
 
 	t.Run("setup:funding", func(t *testing.T) {
-		testutils.FundAccounts(ctx, []solana.PrivateKey{admin, anotherAdmin}, solanaGoClient, t)
+		testutils.FundAccounts(ctx, []solana.PrivateKey{admin, anotherAdmin, user}, solanaGoClient, t)
+	})
+
+	t.Run("setup:allowed offramp", func(t *testing.T) {
+		ix, err := test_ccip_invalid_receiver.NewAddOfframpInstruction(
+			config.EvmChainSelector,
+			dumbRamp,
+			allowedOfframpPDA,
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 	})
 
 	// test functionality with token & token-2022 standards
@@ -101,7 +133,13 @@ func TestTokenPool(t *testing.T) {
 					releaseOrMint := poolMethodName[1]
 
 					t.Run("setup", func(t *testing.T) {
-						poolInitI, err := test_token_pool.NewInitializeInstruction(poolType, admin.PublicKey(), poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						poolInitI, err := test_token_pool.NewInitializeInstruction(
+							poolType,
+							dumbRamp,
+							poolConfig,
+							mint,
+							admin.PublicKey(),
+							solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)
@@ -192,11 +230,21 @@ func TestTokenPool(t *testing.T) {
 						transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
-						lbI, err := test_token_pool.NewLockOrBurnTokensInstruction(test_token_pool.LockOrBurnInV1{
-							LocalToken:          mint,
-							Amount:              amount,
-							RemoteChainSelector: config.EvmChainSelector,
-						}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector]).ValidateAndBuild()
+						lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+							test_ccip_invalid_receiver.LockOrBurnInV1{
+								LocalToken:          mint,
+								Amount:              amount,
+								RemoteChainSelector: config.EvmChainSelector,
+							},
+							p.PoolProgram,
+							dumbRampPoolSigner,
+							poolConfig,
+							v.tokenProgram,
+							mint,
+							poolSigner,
+							poolTokenAccount,
+							p.Chain[config.EvmChainSelector],
+						).ValidateAndBuild()
 						require.NoError(t, err)
 
 						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, lbI}, admin, config.DefaultCommitment)
@@ -204,7 +252,7 @@ func TestTokenPool(t *testing.T) {
 
 						event := tokens.EventBurnLock{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, tokens.MethodToEvent(lockOrBurn), &event))
-						require.Equal(t, admin.PublicKey(), event.Sender)
+						require.Equal(t, dumbRampPoolSigner, event.Sender)
 						require.Equal(t, amount, event.Amount)
 
 						// validate balances
@@ -219,16 +267,30 @@ func TestTokenPool(t *testing.T) {
 					t.Run(releaseOrMint, func(t *testing.T) {
 						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
 
-						rmI, err := test_token_pool.NewReleaseOrMintTokensInstruction(test_token_pool.ReleaseOrMintInV1{
-							LocalToken:          mint,
-							SourcePoolAddress:   remotePool,
-							Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
-							Receiver:            admin.PublicKey(),
-							RemoteChainSelector: config.EvmChainSelector,
-						}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+						rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+							test_ccip_invalid_receiver.ReleaseOrMintInV1{
+								LocalToken:          mint,
+								SourcePoolAddress:   remotePool.Address,
+								Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
+								Receiver:            admin.PublicKey(),
+								RemoteChainSelector: config.EvmChainSelector,
+							},
+							config.CcipTokenPoolProgram,
+							dumbRampPoolSigner,
+							dumbRamp,
+							allowedOfframpPDA,
+							poolConfig,
+							v.tokenProgram,
+							mint,
+							poolSigner,
+							poolTokenAccount,
+							p.Chain[config.EvmChainSelector],
+							p.User[admin.PublicKey()],
+						).ValidateAndBuild()
+
 						require.NoError(t, err)
 
-						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment)
 						require.NotNil(t, res)
 
 						event := tokens.EventMintRelease{}
@@ -305,43 +367,91 @@ func TestTokenPool(t *testing.T) {
 							t.Parallel()
 
 							// exceed capacity of bucket
-							rmI, err := test_token_pool.NewReleaseOrMintTokensInstruction(test_token_pool.ReleaseOrMintInV1{
-								LocalToken:          mint,
-								SourcePoolAddress:   remotePool,
-								Amount:              tokens.ToLittleEndianU256(amount * amount * 1e9),
-								Receiver:            admin.PublicKey(),
-								RemoteChainSelector: config.EvmChainSelector,
-							}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+							rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+								test_ccip_invalid_receiver.ReleaseOrMintInV1{
+									LocalToken:          mint,
+									SourcePoolAddress:   remotePool.Address,
+									Amount:              tokens.ToLittleEndianU256(amount * amount * 1e9),
+									Receiver:            admin.PublicKey(),
+									RemoteChainSelector: config.EvmChainSelector,
+								},
+								config.CcipTokenPoolProgram,
+								dumbRampPoolSigner,
+								dumbRamp,
+								allowedOfframpPDA,
+								poolConfig,
+								v.tokenProgram,
+								mint,
+								poolSigner,
+								poolTokenAccount,
+								p.Chain[config.EvmChainSelector],
+								p.User[admin.PublicKey()],
+							).ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"max capacity exceeded"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment, []string{"max capacity exceeded"})
 
 							// exceed rate limit of transfer
 							// request two release/mint of max capacity
 							// if first does not exceed limit, the second one should
-							transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{}) // ensure pool is funded
+							transferI, err := tokens.TokenTransferChecked(amount,
+								decimals,
+								v.tokenProgram,
+								p.User[admin.PublicKey()],
+								mint,
+								poolTokenAccount,
+								admin.PublicKey(),
+								solana.PublicKeySlice{}) // ensure pool is funded
+
 							require.NoError(t, err)
-							rmI, err = test_token_pool.NewReleaseOrMintTokensInstruction(test_token_pool.ReleaseOrMintInV1{
-								LocalToken:          mint,
-								SourcePoolAddress:   remotePool,
-								Amount:              tokens.ToLittleEndianU256(amount * 1e9),
-								Receiver:            admin.PublicKey(),
-								RemoteChainSelector: config.EvmChainSelector,
-							}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI}, admin, config.DefaultCommitment)
+							rmI, err = test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+								test_ccip_invalid_receiver.ReleaseOrMintInV1{
+									LocalToken:          mint,
+									SourcePoolAddress:   remotePool.Address,
+									Amount:              tokens.ToLittleEndianU256(amount * 1e9),
+									Receiver:            admin.PublicKey(),
+									RemoteChainSelector: config.EvmChainSelector,
+								},
+								config.CcipTokenPoolProgram,
+								dumbRampPoolSigner,
+								dumbRamp,
+								allowedOfframpPDA,
+								poolConfig,
+								v.tokenProgram,
+								mint,
+								poolSigner,
+								poolTokenAccount,
+								p.Chain[config.EvmChainSelector],
+								p.User[admin.PublicKey()],
+							).ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{transferI, rmI, rmI}, admin, config.DefaultCommitment, []string{"rate limit reached"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI, rmI}, user, config.DefaultCommitment, []string{"rate limit reached"})
 
 							// pool should refill automatically, but slowly
 							// small amount should pass
 							time.Sleep(time.Second) // wait for refill
-							rmI, err = test_token_pool.NewReleaseOrMintTokensInstruction(test_token_pool.ReleaseOrMintInV1{
-								LocalToken:          mint,
-								SourcePoolAddress:   remotePool,
-								Amount:              tokens.ToLittleEndianU256(1e9),
-								Receiver:            admin.PublicKey(),
-								RemoteChainSelector: config.EvmChainSelector,
-							}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+							rmI, err = test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+								test_ccip_invalid_receiver.ReleaseOrMintInV1{
+									LocalToken:          mint,
+									SourcePoolAddress:   remotePool.Address,
+									Amount:              tokens.ToLittleEndianU256(1e9),
+									Receiver:            admin.PublicKey(),
+									RemoteChainSelector: config.EvmChainSelector,
+								},
+								config.CcipTokenPoolProgram,
+								dumbRampPoolSigner,
+								dumbRamp,
+								allowedOfframpPDA,
+								poolConfig,
+								v.tokenProgram,
+								mint,
+								poolSigner,
+								poolTokenAccount,
+								p.Chain[config.EvmChainSelector],
+								p.User[admin.PublicKey()],
+							).ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, rmI}, admin, config.DefaultCommitment)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment)
 						})
 					})
 
@@ -349,7 +459,7 @@ func TestTokenPool(t *testing.T) {
 						ixDelete, err := test_token_pool.NewDeleteChainConfigInstruction(config.EvmChainSelector, mint, poolConfig, p.Chain[config.EvmChainSelector], anotherAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
-						ixRouterChange, err := test_token_pool.NewSetRampAuthorityInstruction(config.ExternalTokenPoolsSignerPDA, poolConfig, anotherAdmin.PublicKey()).ValidateAndBuild()
+						ixRouterChange, err := test_token_pool.NewSetRouterInstruction(config.CcipRouterProgram, poolConfig, anotherAdmin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixDelete, ixRouterChange}, anotherAdmin, config.DefaultCommitment)
@@ -361,8 +471,8 @@ func TestTokenPool(t *testing.T) {
 
 						eventRouter := tokens.EventRouterUpdated{}
 						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RouterUpdated", &eventRouter, config.PrintEvents))
-						require.Equal(t, config.ExternalTokenPoolsSignerPDA, eventRouter.NewAuthority)
-						require.Equal(t, admin.PublicKey(), eventRouter.OldAuthority)
+						require.Equal(t, config.CcipRouterProgram, eventRouter.NewRouter)
+						require.Equal(t, dumbRamp, eventRouter.OldRouter)
 					})
 				})
 			}
@@ -388,12 +498,24 @@ func TestTokenPool(t *testing.T) {
 			require.NoError(t, err)
 
 			// create pool
-			poolInitI, err := test_token_pool.NewInitializeInstruction(test_token_pool.Wrapped_PoolType, admin.PublicKey(), p.PoolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			poolInitI, err := test_token_pool.NewInitializeInstruction(
+				test_token_pool.Wrapped_PoolType,
+				dumbRamp,
+				p.PoolConfig,
+				mint,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			// create admin receiver token account
+			var createR solana.Instruction
+			createR, p.User[admin.PublicKey()], err = tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, mint, admin.PublicKey(), admin.PublicKey())
 			require.NoError(t, err)
 
 			// create pool token account
-			var createI solana.Instruction
-			createI, p.PoolTokenAccount, err = tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, mint, p.PoolSigner, admin.PublicKey())
+			var createP solana.Instruction
+			createP, p.PoolTokenAccount, err = tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, mint, p.PoolSigner, admin.PublicKey())
 			require.NoError(t, err)
 
 			// initialize pool config
@@ -408,12 +530,22 @@ func TestTokenPool(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, append(instructions, poolInitI, createI, configureI, appendI), admin, config.DefaultCommitment, common.AddSigners(p.Mint))
+			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, append(instructions, poolInitI, createR, createP, configureI, appendI), admin, config.DefaultCommitment, common.AddSigners(p.Mint))
 			require.NotNil(t, res)
 		})
 
 		t.Run("burnOrLock", func(t *testing.T) {
-			raw := test_token_pool.NewLockOrBurnTokensInstruction(test_token_pool.LockOrBurnInV1{LocalToken: mint, RemoteChainSelector: config.EvmChainSelector}, admin.PublicKey(), p.PoolConfig, solana.TokenProgramID, mint, p.PoolSigner, p.PoolTokenAccount, p.Chain[config.EvmChainSelector])
+			raw := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+				test_ccip_invalid_receiver.LockOrBurnInV1{LocalToken: mint, RemoteChainSelector: config.EvmChainSelector},
+				p.PoolProgram,
+				dumbRampPoolSigner,
+				p.PoolConfig,
+				solana.TokenProgramID,
+				mint,
+				p.PoolSigner,
+				p.PoolTokenAccount,
+				p.Chain[config.EvmChainSelector],
+			)
 			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipLogicReceiver, false, false))
 			lbI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
@@ -424,18 +556,32 @@ func TestTokenPool(t *testing.T) {
 		})
 
 		t.Run("mintOrRelease", func(t *testing.T) {
-			raw := test_token_pool.NewReleaseOrMintTokensInstruction(test_token_pool.ReleaseOrMintInV1{
-				LocalToken:          mint,
-				SourcePoolAddress:   remotePool,
-				Receiver:            p.PoolSigner,
-				RemoteChainSelector: config.EvmChainSelector,
-				Amount:              tokens.ToLittleEndianU256(1),
-			}, admin.PublicKey(), p.PoolConfig, solana.TokenProgramID, mint, p.PoolSigner, p.PoolTokenAccount, p.Chain[config.EvmChainSelector], p.PoolTokenAccount)
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipLogicReceiver, false, false))
+			raw := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+				test_ccip_invalid_receiver.ReleaseOrMintInV1{
+					LocalToken:          mint,
+					SourcePoolAddress:   remotePool.Address,
+					Receiver:            admin.PublicKey(),
+					RemoteChainSelector: config.EvmChainSelector,
+					Amount:              tokens.ToLittleEndianU256(1),
+				},
+				config.CcipTokenPoolProgram,
+				dumbRampPoolSigner,
+				dumbRamp,
+				allowedOfframpPDA,
+				p.PoolConfig,
+				solana.TokenProgramID,
+				mint,
+				p.PoolSigner,
+				p.PoolTokenAccount,
+				p.Chain[config.EvmChainSelector],
+				p.User[admin.PublicKey()],
+			)
+
+			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(config.CcipLogicReceiver))
 			rmI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
+			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, user, config.DefaultCommitment)
 			require.NotNil(t, res)
 			require.Contains(t, strings.Join(res.Meta.LogMessages, "\n"), "Called `ccip_token_release_mint`")
 		})

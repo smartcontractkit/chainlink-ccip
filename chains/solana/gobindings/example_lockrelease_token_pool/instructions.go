@@ -34,7 +34,7 @@ var (
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
-	Instruction_SetRampAuthority = ag_binary.TypeID([8]byte{181, 180, 204, 162, 156, 188, 239, 153})
+	Instruction_SetRouter = ag_binary.TypeID([8]byte{236, 248, 107, 200, 151, 160, 44, 250})
 
 	Instruction_InitChainRemoteConfig = ag_binary.TypeID([8]byte{21, 150, 133, 36, 2, 116, 199, 129})
 
@@ -72,8 +72,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_SetRampAuthority:
-		return "SetRampAuthority"
+	case Instruction_SetRouter:
+		return "SetRouter"
 	case Instruction_InitChainRemoteConfig:
 		return "InitChainRemoteConfig"
 	case Instruction_EditChainRemoteConfig:
@@ -130,7 +130,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"accept_ownership", (*AcceptOwnership)(nil),
 		},
 		{
-			"set_ramp_authority", (*SetRampAuthority)(nil),
+			"set_router", (*SetRouter)(nil),
 		},
 		{
 			"init_chain_remote_config", (*InitChainRemoteConfig)(nil),

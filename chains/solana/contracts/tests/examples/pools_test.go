@@ -12,7 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_lockrelease_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
@@ -20,6 +22,12 @@ import (
 // more detailed token pool tests are handled by the test-token-pool which is used in the tokenpool_test.go and ccip_router_test.go
 func TestBaseTokenPoolHappyPath(t *testing.T) {
 	t.Parallel()
+
+	// acting as "dumb" onramp & offramp, proxying calls to the pool that are signed by PDA
+	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
+	dumbRamp := config.CcipInvalidReceiverProgram
+	allowedOfframpPDA, _ := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
+	rampPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(dumbRamp)
 
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -35,8 +43,22 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 	remotePool := tokenpool.RemoteAddress{Address: []byte{1, 2, 3}}
 	remoteToken := tokenpool.RemoteAddress{Address: []byte{4, 5, 6}}
 
-	t.Run("setup:funding", func(t *testing.T) {
-		testutils.FundAccounts(ctx, []solana.PrivateKey{admin}, solanaGoClient, t)
+	t.Run("setup", func(t *testing.T) {
+		t.Run("funding", func(t *testing.T) {
+			testutils.FundAccounts(ctx, []solana.PrivateKey{admin}, solanaGoClient, t)
+		})
+
+		t.Run("register offramp", func(t *testing.T) {
+			ix, err := test_ccip_invalid_receiver.NewAddOfframpInstruction(
+				config.EvmChainSelector,
+				dumbRamp,
+				allowedOfframpPDA,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		})
 	})
 
 	// test functionality with token & token-2022 standards
@@ -91,7 +113,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("setup", func(t *testing.T) {
-						poolInitI, err := tokenpool.NewInitializeInstruction(admin.PublicKey(), poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)
@@ -99,10 +121,18 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.NoError(t, err)
 
 						// set pool config
-						ixConfigure, err := tokenpool.NewInitChainRemoteConfigInstruction(config.EvmChainSelector, p.Mint.PublicKey(), tokenpool.RemoteConfig{
-							TokenAddress: remoteToken,
-							Decimals:     9,
-						}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						ixConfigure, err := tokenpool.NewInitChainRemoteConfigInstruction(
+							config.EvmChainSelector,
+							p.Mint.PublicKey(),
+							tokenpool.RemoteConfig{
+								TokenAddress: remoteToken,
+								Decimals:     9,
+							},
+							poolConfig,
+							p.Chain[config.EvmChainSelector],
+							admin.PublicKey(),
+							solana.SystemProgramID,
+						).ValidateAndBuild()
 						require.NoError(t, err)
 
 						ixAppend, err := tokenpool.NewAppendRemotePoolAddressesInstruction(
@@ -125,14 +155,24 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
-						lbI, err := tokenpool.NewLockOrBurnTokensInstruction(tokenpool.LockOrBurnInV1{
-							LocalToken:          mint,
-							Amount:              amount,
-							RemoteChainSelector: config.EvmChainSelector,
-						}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector]).ValidateAndBuild()
+						lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+							test_ccip_invalid_receiver.LockOrBurnInV1{
+								LocalToken:          mint,
+								Amount:              amount,
+								RemoteChainSelector: config.EvmChainSelector,
+							},
+							poolProgram,
+							rampPoolSignerPDA,
+							poolConfig,
+							v.tokenProgram,
+							mint,
+							poolSigner,
+							poolTokenAccount,
+							p.Chain[config.EvmChainSelector],
+						).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, &tokens.TokenInstruction{Instruction: lbI, Program: poolProgram}}, admin, config.DefaultCommitment)
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, lbI}, admin, config.DefaultCommitment)
 						require.NotNil(t, res)
 
 						// validate balances
@@ -147,16 +187,29 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					t.Run("releaseOrMint", func(t *testing.T) {
 						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
 
-						rmI, err := tokenpool.NewReleaseOrMintTokensInstruction(tokenpool.ReleaseOrMintInV1{
-							LocalToken:          mint,
-							SourcePoolAddress:   remotePool,
-							Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
-							Receiver:            admin.PublicKey(),
-							RemoteChainSelector: config.EvmChainSelector,
-						}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
+						rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+							test_ccip_invalid_receiver.ReleaseOrMintInV1{
+								LocalToken:          mint,
+								SourcePoolAddress:   remotePool.Address,
+								Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
+								Receiver:            admin.PublicKey(),
+								RemoteChainSelector: config.EvmChainSelector,
+							},
+							poolProgram,
+							rampPoolSignerPDA,
+							dumbRamp,
+							allowedOfframpPDA,
+							poolConfig,
+							v.tokenProgram,
+							mint,
+							poolSigner,
+							poolTokenAccount,
+							p.Chain[config.EvmChainSelector],
+							p.User[admin.PublicKey()],
+						).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{&tokens.TokenInstruction{Instruction: rmI, Program: poolProgram}}, admin, config.DefaultCommitment)
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
 						require.NotNil(t, res)
 
 						// validate balances
@@ -205,11 +258,9 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
 						require.Equal(t, "0", getBalance(poolTokenAccount))
-
 					})
 				})
 			}
 		})
 	}
-
 }

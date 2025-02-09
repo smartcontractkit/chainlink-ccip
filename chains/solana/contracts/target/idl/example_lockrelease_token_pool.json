@@ -28,7 +28,7 @@
       ],
       "args": [
         {
-          "name": "rampAuthority",
+          "name": "router",
           "type": "publicKey"
         }
       ]
@@ -71,7 +71,7 @@
       "args": []
     },
     {
-      "name": "setRampAuthority",
+      "name": "setRouter",
       "accounts": [
         {
           "name": "state",
@@ -86,7 +86,7 @@
       ],
       "args": [
         {
-          "name": "newAuthority",
+          "name": "newRouter",
           "type": "publicKey"
         }
       ]
@@ -360,6 +360,24 @@
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "offrampProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK offramp program: exists only to derive the allowed offramp PDA",
+            "and the authority PDA."
+          ]
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
         },
         {
           "name": "state",

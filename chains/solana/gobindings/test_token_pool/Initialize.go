@@ -12,8 +12,8 @@ import (
 
 // Initialize is the `initialize` instruction.
 type Initialize struct {
-	PoolType      *PoolType
-	RampAuthority *ag_solanago.PublicKey
+	PoolType *PoolType
+	Router   *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
@@ -39,9 +39,9 @@ func (inst *Initialize) SetPoolType(poolType PoolType) *Initialize {
 	return inst
 }
 
-// SetRampAuthority sets the "rampAuthority" parameter.
-func (inst *Initialize) SetRampAuthority(rampAuthority ag_solanago.PublicKey) *Initialize {
-	inst.RampAuthority = &rampAuthority
+// SetRouter sets the "router" parameter.
+func (inst *Initialize) SetRouter(router ag_solanago.PublicKey) *Initialize {
+	inst.Router = &router
 	return inst
 }
 
@@ -112,8 +112,8 @@ func (inst *Initialize) Validate() error {
 		if inst.PoolType == nil {
 			return errors.New("PoolType parameter is not set")
 		}
-		if inst.RampAuthority == nil {
-			return errors.New("RampAuthority parameter is not set")
+		if inst.Router == nil {
+			return errors.New("Router parameter is not set")
 		}
 	}
 
@@ -145,8 +145,8 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("     PoolType", *inst.PoolType))
-						paramsBranch.Child(ag_format.Param("RampAuthority", *inst.RampAuthority))
+						paramsBranch.Child(ag_format.Param("PoolType", *inst.PoolType))
+						paramsBranch.Child(ag_format.Param("  Router", *inst.Router))
 					})
 
 					// Accounts of the instruction:
@@ -166,8 +166,8 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `RampAuthority` param:
-	err = encoder.Encode(obj.RampAuthority)
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
 	if err != nil {
 		return err
 	}
@@ -179,8 +179,8 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `RampAuthority`:
-	err = decoder.Decode(&obj.RampAuthority)
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 func NewInitializeInstruction(
 	// Parameters:
 	poolType PoolType,
-	rampAuthority ag_solanago.PublicKey,
+	router ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
@@ -199,7 +199,7 @@ func NewInitializeInstruction(
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetPoolType(poolType).
-		SetRampAuthority(rampAuthority).
+		SetRouter(router).
 		SetStateAccount(state).
 		SetMintAccount(mint).
 		SetAuthorityAccount(authority).

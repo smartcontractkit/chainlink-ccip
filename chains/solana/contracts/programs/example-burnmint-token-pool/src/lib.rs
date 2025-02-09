@@ -15,12 +15,12 @@ use crate::context::*;
 pub mod example_burnmint_token_pool {
     use super::*;
 
-    pub fn initialize(ctx: Context<InitializeTokenPool>, ramp_authority: Pubkey) -> Result<()> {
+    pub fn initialize(ctx: Context<InitializeTokenPool>, router: Pubkey) -> Result<()> {
         ctx.accounts.state.config.init(
             &ctx.accounts.mint,
             ctx.program_id.key(),
             ctx.accounts.authority.key(),
-            ramp_authority,
+            router,
         )
     }
 
@@ -33,10 +33,10 @@ pub mod example_burnmint_token_pool {
         ctx.accounts.state.config.accept_ownership()
     }
 
-    // set_ramp_authority changes the expected signer for mint/release + burn/lock method calls
+    // set_router changes the expected signers for mint/release + burn/lock method calls
     // this is used to update the router address
-    pub fn set_ramp_authority(ctx: Context<SetConfig>, new_authority: Pubkey) -> Result<()> {
-        ctx.accounts.state.config.set_ramp_authority(new_authority)
+    pub fn set_router(ctx: Context<SetConfig>, new_router: Pubkey) -> Result<()> {
+        ctx.accounts.state.config.set_router(new_router)
     }
 
     // initialize remote config (with no remote pools as it must be zero sized)

@@ -10,9 +10,9 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetRampAuthority is the `setRampAuthority` instruction.
-type SetRampAuthority struct {
-	NewAuthority *ag_solanago.PublicKey
+// SetRouter is the `setRouter` instruction.
+type SetRouter struct {
+	NewRouter *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
@@ -20,64 +20,64 @@ type SetRampAuthority struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewSetRampAuthorityInstructionBuilder creates a new `SetRampAuthority` instruction builder.
-func NewSetRampAuthorityInstructionBuilder() *SetRampAuthority {
-	nd := &SetRampAuthority{
+// NewSetRouterInstructionBuilder creates a new `SetRouter` instruction builder.
+func NewSetRouterInstructionBuilder() *SetRouter {
+	nd := &SetRouter{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
-// SetNewAuthority sets the "newAuthority" parameter.
-func (inst *SetRampAuthority) SetNewAuthority(newAuthority ag_solanago.PublicKey) *SetRampAuthority {
-	inst.NewAuthority = &newAuthority
+// SetNewRouter sets the "newRouter" parameter.
+func (inst *SetRouter) SetNewRouter(newRouter ag_solanago.PublicKey) *SetRouter {
+	inst.NewRouter = &newRouter
 	return inst
 }
 
 // SetStateAccount sets the "state" account.
-func (inst *SetRampAuthority) SetStateAccount(state ag_solanago.PublicKey) *SetRampAuthority {
+func (inst *SetRouter) SetStateAccount(state ag_solanago.PublicKey) *SetRouter {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
 // GetStateAccount gets the "state" account.
-func (inst *SetRampAuthority) GetStateAccount() *ag_solanago.AccountMeta {
+func (inst *SetRouter) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *SetRampAuthority) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetRampAuthority {
+func (inst *SetRouter) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetRouter {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *SetRampAuthority) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *SetRouter) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-func (inst SetRampAuthority) Build() *Instruction {
+func (inst SetRouter) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_SetRampAuthority,
+		TypeID: Instruction_SetRouter,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst SetRampAuthority) ValidateAndBuild() (*Instruction, error) {
+func (inst SetRouter) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *SetRampAuthority) Validate() error {
+func (inst *SetRouter) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.NewAuthority == nil {
-			return errors.New("NewAuthority parameter is not set")
+		if inst.NewRouter == nil {
+			return errors.New("NewRouter parameter is not set")
 		}
 	}
 
@@ -93,17 +93,17 @@ func (inst *SetRampAuthority) Validate() error {
 	return nil
 }
 
-func (inst *SetRampAuthority) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *SetRouter) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("SetRampAuthority")).
+			programBranch.Child(ag_format.Instruction("SetRouter")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("NewAuthority", *inst.NewAuthority))
+						paramsBranch.Child(ag_format.Param("NewRouter", *inst.NewRouter))
 					})
 
 					// Accounts of the instruction:
@@ -115,32 +115,32 @@ func (inst *SetRampAuthority) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj SetRampAuthority) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `NewAuthority` param:
-	err = encoder.Encode(obj.NewAuthority)
+func (obj SetRouter) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `NewRouter` param:
+	err = encoder.Encode(obj.NewRouter)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *SetRampAuthority) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `NewAuthority`:
-	err = decoder.Decode(&obj.NewAuthority)
+func (obj *SetRouter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `NewRouter`:
+	err = decoder.Decode(&obj.NewRouter)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewSetRampAuthorityInstruction declares a new SetRampAuthority instruction with the provided parameters and accounts.
-func NewSetRampAuthorityInstruction(
+// NewSetRouterInstruction declares a new SetRouter instruction with the provided parameters and accounts.
+func NewSetRouterInstruction(
 	// Parameters:
-	newAuthority ag_solanago.PublicKey,
+	newRouter ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *SetRampAuthority {
-	return NewSetRampAuthorityInstructionBuilder().
-		SetNewAuthority(newAuthority).
+	authority ag_solanago.PublicKey) *SetRouter {
+	return NewSetRouterInstructionBuilder().
+		SetNewRouter(newRouter).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority)
 }

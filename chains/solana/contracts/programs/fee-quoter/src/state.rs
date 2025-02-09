@@ -14,7 +14,6 @@ pub struct Config {
     // TODO The following field is unused until the day we integrate with feeds to fetch fresh values
     // pub token_price_staleness_threshold: u32,
     pub onramp: Pubkey,
-    pub offramp_signer: Pubkey, // TODO see if this has to become a list of offramps
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
@@ -102,3 +101,7 @@ pub struct TokenTransferFeeConfig {
     pub dest_bytes_overhead: u32, // to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
     pub is_enabled: bool,         // Whether this token has custom transfer fees
 }
+
+#[account]
+#[derive(Copy, Debug, InitSpace)]
+pub struct AllowedPriceUpdater {}

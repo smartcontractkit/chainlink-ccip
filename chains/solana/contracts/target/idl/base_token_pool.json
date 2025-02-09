@@ -41,7 +41,11 @@
             "type": "publicKey"
           },
           {
-            "name": "rampAuthority",
+            "name": "routerOnrampAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "router",
             "type": "publicKey"
           },
           {
@@ -471,12 +475,12 @@
       "name": "RouterUpdated",
       "fields": [
         {
-          "name": "oldAuthority",
+          "name": "oldRouter",
           "type": "publicKey",
           "index": false
         },
         {
-          "name": "newAuthority",
+          "name": "newRouter",
           "type": "publicKey",
           "index": false
         }

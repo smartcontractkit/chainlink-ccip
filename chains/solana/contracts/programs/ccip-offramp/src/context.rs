@@ -329,6 +329,15 @@ pub struct CommitReportContext<'info> {
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
+    /// CHECK: fee quoter allowed price updater account, used to invoke fee quoter with price updates
+    /// so that it can authorize the call made by this offramp
+    #[account(
+        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
+        bump,
+        seeds::program = fee_quoter.key(),
+    )]
+    pub fee_quoter_allowed_price_updater: UncheckedAccount<'info>,
+
     /// CHECK: fee quoter config account, used to invoke fee quoter with price updates
     #[account(
         seeds = [fee_quoter::context::seed::CONFIG],
@@ -341,6 +350,8 @@ pub struct CommitReportContext<'info> {
     // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
     // [...chainConfig accounts] fee quoter accounts used to store gas prices
 }
+
+const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
 
 #[derive(Accounts)]
 #[instruction(raw_report: Vec<u8>)]
@@ -373,6 +384,20 @@ pub struct ExecuteReportContext<'info> {
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidInputs,
     )]
     pub commit_report: Account<'info, CommitReport>,
+
+    pub offramp: Program<'info, CcipOfframp>,
+
+    /// CHECK PDA of the router program verifying the signer is an allowed offramp.
+    /// If PDA does not exist, the router doesn't allow this offramp. This is just used
+    /// so that token pools and receivers can then check that the caller is an actual offramp that
+    /// has been registered in the router as such for that source chain.
+    #[account(
+        owner = reference_addresses.router @ CcipOfframpError::InvalidInputs, // this guarantees that it was initialized
+        seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), offramp.key().as_ref()],
+        bump,
+        seeds::program = reference_addresses.router,
+    )]
+    pub allowed_offramp: UncheckedAccount<'info>,
 
     /// CHECK: Using this to sign
     #[account(seeds = [seed::EXTERNAL_EXECUTION_CONFIG], bump)]
