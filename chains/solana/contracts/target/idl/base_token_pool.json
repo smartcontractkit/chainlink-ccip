@@ -41,7 +41,7 @@
             "type": "publicKey"
           },
           {
-            "name": "onrampAuthority",
+            "name": "routerOnrampAuthority",
             "type": "publicKey"
           },
           {

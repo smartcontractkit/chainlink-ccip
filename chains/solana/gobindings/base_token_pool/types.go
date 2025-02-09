@@ -8,20 +8,20 @@ import (
 )
 
 type BaseConfig struct {
-	TokenProgram       ag_solanago.PublicKey
-	Mint               ag_solanago.PublicKey
-	Decimals           uint8
-	PoolSigner         ag_solanago.PublicKey
-	PoolTokenAccount   ag_solanago.PublicKey
-	Owner              ag_solanago.PublicKey
-	ProposedOwner      ag_solanago.PublicKey
-	RateLimitAdmin     ag_solanago.PublicKey
-	OnrampAuthority    ag_solanago.PublicKey
-	Router             ag_solanago.PublicKey
-	Rebalancer         ag_solanago.PublicKey
-	CanAcceptLiquidity bool
-	ListEnabled        bool
-	AllowList          []ag_solanago.PublicKey
+	TokenProgram          ag_solanago.PublicKey
+	Mint                  ag_solanago.PublicKey
+	Decimals              uint8
+	PoolSigner            ag_solanago.PublicKey
+	PoolTokenAccount      ag_solanago.PublicKey
+	Owner                 ag_solanago.PublicKey
+	ProposedOwner         ag_solanago.PublicKey
+	RateLimitAdmin        ag_solanago.PublicKey
+	RouterOnrampAuthority ag_solanago.PublicKey
+	Router                ag_solanago.PublicKey
+	Rebalancer            ag_solanago.PublicKey
+	CanAcceptLiquidity    bool
+	ListEnabled           bool
+	AllowList             []ag_solanago.PublicKey
 }
 
 func (obj BaseConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -65,8 +65,8 @@ func (obj BaseConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `OnrampAuthority` param:
-	err = encoder.Encode(obj.OnrampAuthority)
+	// Serialize `RouterOnrampAuthority` param:
+	err = encoder.Encode(obj.RouterOnrampAuthority)
 	if err != nil {
 		return err
 	}
@@ -139,8 +139,8 @@ func (obj *BaseConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `OnrampAuthority`:
-	err = decoder.Decode(&obj.OnrampAuthority)
+	// Deserialize `RouterOnrampAuthority`:
+	err = decoder.Decode(&obj.RouterOnrampAuthority)
 	if err != nil {
 		return err
 	}

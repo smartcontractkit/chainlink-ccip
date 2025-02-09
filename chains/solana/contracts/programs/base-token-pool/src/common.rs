@@ -34,8 +34,8 @@ pub struct BaseConfig {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub rate_limit_admin: Pubkey,
-    pub onramp_authority: Pubkey, // signer for CCIP onramp calls
-    pub router: Pubkey,           // router address
+    pub router_onramp_authority: Pubkey, // signer PDA for CCIP onramp calls
+    pub router: Pubkey,                  // router address
 
     // rebalancing - only used for lock/release pools
     pub rebalancer: Pubkey,
@@ -73,7 +73,7 @@ impl BaseConfig {
         self.owner = owner;
         self.rate_limit_admin = owner;
         self.router = router;
-        (self.onramp_authority, _) =
+        (self.router_onramp_authority, _) =
             Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &router);
 
         Ok(())
@@ -115,7 +115,8 @@ impl BaseConfig {
 
         let old_router = self.router;
         self.router = new_router;
-        (self.onramp_authority, _) = Pubkey::find_program_address(&[POOL_SIGNER_SEED], &new_router);
+        (self.router_onramp_authority, _) =
+            Pubkey::find_program_address(&[POOL_SIGNER_SEED], &new_router);
         emit!(RouterUpdated {
             old_router,
             new_router,

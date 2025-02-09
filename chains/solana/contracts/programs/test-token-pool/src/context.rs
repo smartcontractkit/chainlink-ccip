@@ -117,7 +117,7 @@ pub struct TokenOfframp<'info> {
 #[instruction(lock_or_burn: LockOrBurnInV1)]
 pub struct TokenOnramp<'info> {
     // CCIP accounts ------------------------
-    #[account(address = state.config.onramp_authority @ CcipTokenPoolError::InvalidPoolCaller)]
+    #[account(address = state.config.router_onramp_authority @ CcipTokenPoolError::InvalidPoolCaller)]
     pub authority: Signer<'info>,
 
     // Token pool accounts ------------------
