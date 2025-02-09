@@ -267,8 +267,7 @@ func groupByChainSelector(
 	reports []plugintypes2.CommitPluginReportWithMeta) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for _, report := range reports {
-		merkleRoots := append(report.Report.BlessedMerkleRoots, report.Report.UnblessedMerkleRoots...)
-		for _, singleReport := range merkleRoots {
+		for _, singleReport := range report.Report.MerkleRoots {
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
 				exectypes.CommitData{
 					SourceChain:         singleReport.ChainSel,

@@ -23,7 +23,7 @@ func TestCommitPluginReport(t *testing.T) {
 
 	t.Run("is not empty", func(t *testing.T) {
 		r := CommitPluginReport{
-			BlessedMerkleRoots: make([]MerkleRootChain, 1),
+			MerkleRoots: make([]MerkleRootChain, 1),
 		}
 		assert.False(t, r.IsEmpty())
 
@@ -36,7 +36,7 @@ func TestCommitPluginReport(t *testing.T) {
 		assert.False(t, r.IsEmpty())
 
 		r = CommitPluginReport{
-			BlessedMerkleRoots: make([]MerkleRootChain, 1),
+			MerkleRoots: make([]MerkleRootChain, 1),
 			PriceUpdates: PriceUpdates{
 				TokenPriceUpdates: make([]TokenPrice, 1),
 				GasPriceUpdates:   make([]GasPriceChain, 1),

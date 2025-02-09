@@ -297,18 +297,10 @@ func TestProcessor_Query(t *testing.T) {
 				}
 			}
 
-			rmnHomeReader := reader.NewMockRMNHome(t)
-			rmnHomeReader.EXPECT().GetRMNEnabledSourceChains(
-				tc.prevOutcome.RMNRemoteCfg.ConfigDigest).Return(map[ccipocr3.ChainSelector]bool{
-				srcChain1: true,
-				srcChain2: true,
-			}, nil).Maybe()
-
 			w := Processor{
 				offchainCfg:     tc.cfg,
 				destChain:       tc.destChain,
 				ccipReader:      ccipReader,
-				rmnHomeReader:   rmnHomeReader,
 				rmnController:   tc.rmnClient(t),
 				lggr:            logger.Test(t),
 				metricsReporter: NoopMetrics{},

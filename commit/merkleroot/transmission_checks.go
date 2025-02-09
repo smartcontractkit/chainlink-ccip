@@ -7,7 +7,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -16,15 +15,12 @@ import (
 // This function is not-pure as it reads from the chain by making one network/reader call.
 func ValidateMerkleRootsState(
 	ctx context.Context,
-	proposedBlessedMerkleRoots []cciptypes.MerkleRootChain,
-	proposedUnblessedMerkleRoots []cciptypes.MerkleRootChain,
+	proposedMerkleRoots []cciptypes.MerkleRootChain,
 	reader reader.CCIPReader,
 ) error {
-	if len(proposedBlessedMerkleRoots) == 0 && len(proposedUnblessedMerkleRoots) == 0 {
+	if len(proposedMerkleRoots) == 0 {
 		return nil
 	}
-
-	proposedMerkleRoots := append(proposedBlessedMerkleRoots, proposedUnblessedMerkleRoots...)
 
 	chainSet := mapset.NewSet[cciptypes.ChainSelector]()
 	newNextOnRampSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
@@ -56,50 +52,6 @@ func ValidateMerkleRootsState(
 		if newNextOnRampSeqNum != offRampExpNextSeqNum {
 			return fmt.Errorf("unexpected seq nums offRampNext=%d newOnRampNext=%d",
 				offRampExpNextSeqNum, newNextOnRampSeqNum)
-		}
-	}
-
-	return validateRootBlessings(ctx, reader, proposedBlessedMerkleRoots, proposedUnblessedMerkleRoots)
-}
-
-func validateRootBlessings(
-	ctx context.Context, ccipReader reader.CCIPReader, blessedRoots, unblessedRoots []cciptypes.MerkleRootChain) error {
-	allSourceChains := make([]cciptypes.ChainSelector, 0, len(blessedRoots)+len(unblessedRoots))
-	for _, r := range append(blessedRoots, unblessedRoots...) {
-		allSourceChains = append(allSourceChains, r.ChainSel)
-	}
-	if slicelib.CountUnique(allSourceChains) != len(allSourceChains) {
-		return fmt.Errorf("duplicate chain in blessed and unblessed roots")
-	}
-
-	sourceChainsConfig, err := ccipReader.GetOffRampSourceChainsConfig(ctx, allSourceChains)
-	if err != nil {
-		return fmt.Errorf("get offRamp source chains config: %w", err)
-	}
-
-	for _, r := range blessedRoots {
-		sourceChainCfg, ok := sourceChainsConfig[r.ChainSel]
-		if !ok {
-			return fmt.Errorf("chain %d is not in the offRampSourceChainsConfig", r.ChainSel)
-		}
-		if sourceChainCfg.IsRMNVerificationDisabled {
-			return fmt.Errorf("chain %d is RMN-disabled but root is blessed", r.ChainSel)
-		}
-		if !sourceChainCfg.IsEnabled {
-			return fmt.Errorf("chain %d is disabled but root is blessed", r.ChainSel)
-		}
-	}
-
-	for _, r := range unblessedRoots {
-		sourceChainCfg, ok := sourceChainsConfig[r.ChainSel]
-		if !ok {
-			return fmt.Errorf("chain %d is not in the offRampSourceChainsConfig", r.ChainSel)
-		}
-		if !sourceChainCfg.IsRMNVerificationDisabled {
-			return fmt.Errorf("chain %d is RMN-enabled but root is unblessed", r.ChainSel)
-		}
-		if !sourceChainCfg.IsEnabled {
-			return fmt.Errorf("chain %d is disabled but root is reported", r.ChainSel)
 		}
 	}
 

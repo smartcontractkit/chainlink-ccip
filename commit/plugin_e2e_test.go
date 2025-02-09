@@ -85,11 +85,6 @@ var (
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
 		Decimals:          decimals18,
 	}
-
-	sourceChainConfigs = map[ccipocr3.ChainSelector]reader2.SourceChainConfig{
-		sourceChain1: {IsEnabled: true, IsRMNVerificationDisabled: true},
-		sourceChain2: {IsEnabled: true, IsRMNVerificationDisabled: true},
-	}
 )
 
 func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
@@ -126,7 +121,6 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
-			RMNEnabledChains:    map[ccipocr3.ChainSelector]bool{},
 			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
 			RMNRemoteCfg:        params.rmnReportCfg,
 		},
@@ -163,7 +157,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			expOutcome:  outcomeReportGenerated,
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
-					UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
+					MerkleRoots: []ccipocr3.MerkleRootChain{
 						{
 							ChainSel:      sourceChain1,
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(0xa, 0xa),
@@ -171,9 +165,8 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 							MerkleRoot:    merkleRoot1,
 						},
 					},
-					BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
-					PriceUpdates:       ccipocr3.PriceUpdates{},
-					RMNSignatures:      []ccipocr3.RMNECDSASignature{},
+					PriceUpdates:  ccipocr3.PriceUpdates{},
+					RMNSignatures: []ccipocr3.RMNECDSASignature{},
 				},
 			},
 		},
@@ -320,8 +313,6 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 							},
 						},
 					},
-					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
-					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
 				},
 			},
 		},
@@ -421,8 +412,6 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 							},
 						},
 					},
-					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
-					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
 				},
 			},
 		},
@@ -738,8 +727,6 @@ func prepareCcipReaderMock(
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
 	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 		Return(&reader2.CurseInfo{}, nil).Maybe()
-	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
-		Return(sourceChainConfigs, nil).Maybe()
 
 	if mockEmptySeqNrs {
 		ccipReader.EXPECT().NextSeqNum(mock.Anything, mock.Anything).Unset()
@@ -799,11 +786,6 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(params.t)
 	rmnHomeReader := readerpkg_mock.NewMockRMNHome(params.t)
-
-	rmnHomeReader.EXPECT().GetRMNEnabledSourceChains(mock.Anything).Return(map[ccipocr3.ChainSelector]bool{
-		sourceChain1: false,
-		sourceChain2: false,
-	}, nil).Maybe()
 
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])
@@ -1021,7 +1003,6 @@ func noReportMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
 		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
 		RMNReportSignatures:     []ccipocr3.RMNECDSASignature{},
 		RMNRemoteCfg:            r,
-		RMNEnabledChains:        map[ccipocr3.ChainSelector]bool{},
 	}
 }
 

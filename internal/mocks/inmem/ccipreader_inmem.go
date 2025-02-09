@@ -206,10 +206,5 @@ func (r InMemoryCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginTy
 	return r.ConfigDigest, nil
 }
 
-func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]reader.SourceChainConfig, error) {
-	return nil, nil
-}
-
 // Interface compatibility check.
 var _ reader.CCIPReader = InMemoryCCIPReader{}

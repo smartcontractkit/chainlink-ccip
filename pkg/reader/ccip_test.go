@@ -63,7 +63,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 				}
 				params := readReq.Params.(map[string]any)
 				sourceChain := params["sourceChainSelector"].(cciptypes.ChainSelector)
-				v := readReq.ReturnVal.(*SourceChainConfig)
+				v := readReq.ReturnVal.(*sourceChainConfig)
 
 				fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
 					"0x%d000000000000000000000000000000000000000", sourceChain),
@@ -100,8 +100,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			Address: typeconv.AddressBytesToString(offrampAddress, 111_111)}}))
 
 	ctx := context.Background()
-	cfgs, err := ccipReader.getOffRampSourceChainsConfig(
-		ctx, logger.Test(t), []cciptypes.ChainSelector{chainA, chainB}, false)
+	cfgs, err := ccipReader.getOffRampSourceChainsConfig(ctx, logger.Test(t), []cciptypes.ChainSelector{chainA, chainB})
 	assert.NoError(t, err)
 	assert.Len(t, cfgs, 2)
 	assert.Equal(t, "0x1000000000000000000000000000000000000000", cfgs[chainA].OnRamp.String())
@@ -443,9 +442,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	srcRouters := [][]byte{{0x7}, {0x8}}
 	//srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
 
-	sourceChainConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig, len(sourceChain))
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]sourceChainConfig, len(sourceChain))
 	for i, chain := range sourceChain {
-		sourceChainConfigs[chain] = SourceChainConfig{
+		sourceChainConfigs[chain] = sourceChainConfig{
 			Router:    srcRouters[i],
 			IsEnabled: true,
 			MinSeqNr:  0,
@@ -476,11 +475,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		mock.Anything,
 	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
 		"0x1234567890123456789012345678901234567890",
-		[]any{&SourceChainConfig{
+		[]any{&sourceChainConfig{
 			OnRamp:    onramps[0],
 			Router:    destRouter,
 			IsEnabled: true,
-		}, &SourceChainConfig{
+		}, &sourceChainConfig{
 			OnRamp:    onramps[1],
 			Router:    destRouter,
 			IsEnabled: true,
@@ -612,12 +611,12 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		mock.Anything,
 	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
 		"0x1234567890123456789012345678901234567890",
-		[]any{&SourceChainConfig{
+		[]any{&sourceChainConfig{
 			OnRamp:    onramps[0],
 			Router:    destRouter[0],
 			IsEnabled: true,
 		},
-			&SourceChainConfig{
+			&sourceChainConfig{
 				OnRamp:    onramps[1],
 				Router:    destRouter[1],
 				IsEnabled: true,
@@ -723,7 +722,7 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		mock.Anything,
 	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
 		"0x1234567890123456789012345678901234567890",
-		[]any{&SourceChainConfig{}, &SourceChainConfig{}}))
+		[]any{&sourceChainConfig{}, &sourceChainConfig{}}))
 
 	// mock the call to get the static config - failure
 	getLatestValueErr := errors.New("some error")
@@ -787,7 +786,7 @@ func withBatchGetLatestValuesRetValues(
 		ctx context.Context, req contractreader.ExtendedBatchGetLatestValuesRequest, graceful bool,
 	) (types.BatchGetLatestValuesResult, []string, error) {
 		require.GreaterOrEqual(t, len(retVals), 1)
-		_, ok := retVals[0].(*SourceChainConfig)
+		_, ok := retVals[0].(*sourceChainConfig)
 		require.True(t, ok)
 		require.Len(t, req, 1)
 		contract := maps.Keys(req)[0]

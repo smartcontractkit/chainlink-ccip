@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -45,21 +44,9 @@ func (p *Plugin) Reports(
 		repInfo cciptypes.CommitReportInfo
 	)
 
-	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
-	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
-
-	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
-		if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
-			blessedMerkleRoots = append(blessedMerkleRoots, r)
-		} else {
-			unblessedMerkleRoots = append(unblessedMerkleRoots, r)
-		}
-	}
-
 	// MerkleRoots and RMNSignatures will be empty arrays if there is nothing to report
 	rep = cciptypes.CommitPluginReport{
-		BlessedMerkleRoots:   blessedMerkleRoots,
-		UnblessedMerkleRoots: unblessedMerkleRoots,
+		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
 		PriceUpdates: cciptypes.PriceUpdates{
 			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
@@ -68,17 +55,14 @@ func (p *Plugin) Reports(
 	}
 
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportEmpty {
-		rep.BlessedMerkleRoots = []cciptypes.MerkleRootChain{}
-		rep.UnblessedMerkleRoots = []cciptypes.MerkleRootChain{}
+		rep.MerkleRoots = []cciptypes.MerkleRootChain{}
 		rep.RMNSignatures = []cciptypes.RMNECDSASignature{}
 	}
 
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
-		allRoots := append(blessedMerkleRoots, unblessedMerkleRoots...)
-		sort.Slice(allRoots, func(i, j int) bool { return allRoots[i].ChainSel < allRoots[j].ChainSel })
 		repInfo = cciptypes.CommitReportInfo{
 			RemoteF:     outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
-			MerkleRoots: allRoots,
+			MerkleRoots: rep.MerkleRoots,
 			TokenPrices: rep.PriceUpdates.TokenPriceUpdates,
 		}
 	}
@@ -155,7 +139,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if p.offchainCfg.RMNEnabled &&
-		len(decodedReport.BlessedMerkleRoots) > 0 &&
+		len(decodedReport.MerkleRoots) > 0 &&
 		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
 		lggr.Infof("report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
@@ -195,17 +179,10 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
-	err = merkleroot.ValidateMerkleRootsState(
-		ctx,
-		decodedReport.BlessedMerkleRoots,
-		decodedReport.UnblessedMerkleRoots,
-		p.ccipReader,
-	)
+	err = merkleroot.ValidateMerkleRootsState(ctx, decodedReport.MerkleRoots, p.ccipReader)
 	if err != nil {
 		lggr.Infow("report reached transmission protocol but not transmitted, invalid merkle roots state",
-			"err", err,
-			"blessedMerkleRoots", decodedReport.BlessedMerkleRoots,
-			"unblessedMerkleRoots", decodedReport.UnblessedMerkleRoots)
+			"err", err, "merkleRoots", decodedReport.MerkleRoots)
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
@@ -235,8 +212,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	lggr.Infow("ShouldAcceptedAttestedReport passed checks",
 		"timestamp", time.Now().UTC(),
-		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),
-		"unblessedRootsLen", len(decodedReport.UnblessedMerkleRoots),
+		"rootsLen", len(decodedReport.MerkleRoots),
 		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
 		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
@@ -265,9 +241,7 @@ func (p *Plugin) isStaleReport(
 	latestPriceSeqNr uint64,
 	decodedReport cciptypes.CommitPluginReport,
 ) bool {
-	if seqNr <= latestPriceSeqNr &&
-		len(decodedReport.BlessedMerkleRoots) == 0 &&
-		len(decodedReport.UnblessedMerkleRoots) == 0 {
+	if seqNr <= latestPriceSeqNr && len(decodedReport.MerkleRoots) == 0 {
 		lggr.Infow(
 			"skipping stale report due to stale price seq nr and no merkle roots",
 			"latestPriceSeqNr", latestPriceSeqNr)
@@ -281,11 +255,10 @@ func (p *Plugin) checkReportCursed(
 	lggr logger.Logger,
 	decodedReport cciptypes.CommitPluginReport,
 ) (bool, error) {
-	allRoots := append(decodedReport.BlessedMerkleRoots, decodedReport.UnblessedMerkleRoots...)
-
-	sourceChains := slicelib.Map(allRoots,
-		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector { return r.ChainSel })
-
+	sourceChains := slicelib.Map(decodedReport.MerkleRoots,
+		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector {
+			return r.ChainSel
+		})
 	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
 	if err != nil {
 		lggr.Errorw("report not accepted due to curse checking error", "err", err)
@@ -312,8 +285,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	lggr.Infow("ShouldTransmitAcceptedReport passed checks",
 		"seqNr", seqNr,
 		"timestamp", time.Now().UTC(),
-		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),
-		"unblessedRootsLen", len(decodedReport.UnblessedMerkleRoots),
+		"rootsLen", len(decodedReport.MerkleRoots),
 		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
 		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)

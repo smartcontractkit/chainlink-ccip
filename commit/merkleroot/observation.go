@@ -74,7 +74,7 @@ func (p *Processor) Observation(
 	}
 
 	tStart := time.Now()
-	observation, nextState, err := p.getObservation(ctx, lggr, q, prevOutcome)
+	observation, nextState, err := p.getObservation(ctx, q, prevOutcome)
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
@@ -231,7 +231,7 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 }
 
 func (p *Processor) getObservation(
-	ctx context.Context, lggr logger.Logger, q Query, previousOutcome Outcome) (Observation, processorState, error) {
+	ctx context.Context, q Query, previousOutcome Outcome) (Observation, processorState, error) {
 	nextState := previousOutcome.nextState()
 	switch nextState {
 	case selectingRangesForReport:
@@ -279,23 +279,9 @@ func (p *Processor) getObservation(
 				FChain: p.observer.ObserveFChain(ctx),
 			}, nextState, nil
 		}
-
-		rmnEnabledChains := make(map[cciptypes.ChainSelector]bool)
-
-		if p.offchainCfg.RMNEnabled {
-			var err error
-			rmnEnabledChains, err = p.rmnHomeReader.GetRMNEnabledSourceChains(previousOutcome.RMNRemoteCfg.ConfigDigest)
-			if err != nil {
-				return Observation{}, nextState, fmt.Errorf("failed to get RMN enabled source chains for %s: %w",
-					previousOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
-			}
-			lggr.Debugw("fetched RMN-enabled chains from rmnHome", "rmnEnabledChains", rmnEnabledChains)
-		}
-
 		return Observation{
-			MerkleRoots:      p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			FChain:           p.observer.ObserveFChain(ctx),
-			RMNEnabledChains: rmnEnabledChains,
+			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
+			FChain:      p.observer.ObserveFChain(ctx),
 		}, nextState, nil
 	case waitingForReportTransmission:
 		return Observation{

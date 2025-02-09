@@ -16,12 +16,11 @@ type Query struct {
 }
 
 type Observation struct {
-	MerkleRoots        []cciptypes.MerkleRootChain      `json:"merkleRoots"`
-	RMNEnabledChains   map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
-	OnRampMaxSeqNums   []plugintypes.SeqNumChain        `json:"onRampMaxSeqNums"`
-	OffRampNextSeqNums []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
-	RMNRemoteConfig    rmntypes.RemoteConfig            `json:"rmnRemoteConfig"`
-	FChain             map[cciptypes.ChainSelector]int  `json:"fChain"`
+	MerkleRoots        []cciptypes.MerkleRootChain     `json:"merkleRoots"`
+	OnRampMaxSeqNums   []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
+	OffRampNextSeqNums []plugintypes.SeqNumChain       `json:"offRampNextSeqNums"`
+	RMNRemoteConfig    rmntypes.RemoteConfig           `json:"rmnRemoteConfig"`
+	FChain             map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
 func (o Observation) IsEmpty() bool {
@@ -36,9 +35,6 @@ func (o Observation) IsEmpty() bool {
 type aggregatedObservation struct {
 	// A map from chain selectors to the list of merkle roots observed for each chain
 	MerkleRoots map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain
-
-	// RMNEnabledChains is a map of the RMN-enabled source chains.
-	RMNEnabledChains map[cciptypes.ChainSelector][]bool
 
 	// A map from chain selectors to the list of OnRamp max sequence numbers observed for each chain
 	OnRampMaxSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
@@ -57,7 +53,6 @@ type aggregatedObservation struct {
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) aggregatedObservation {
 	aggObs := aggregatedObservation{
 		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
-		RMNEnabledChains:   make(map[cciptypes.ChainSelector][]bool),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		RMNRemoteConfigs:   make([]rmntypes.RemoteConfig, 0),
@@ -70,11 +65,6 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		for _, merkleRoot := range obs.MerkleRoots {
 			aggObs.MerkleRoots[merkleRoot.ChainSel] =
 				append(aggObs.MerkleRoots[merkleRoot.ChainSel], merkleRoot)
-		}
-
-		// RMNEnabledChains
-		for chainSel, enabled := range obs.RMNEnabledChains {
-			aggObs.RMNEnabledChains[chainSel] = append(aggObs.RMNEnabledChains[chainSel], enabled)
 		}
 
 		// OnRampMaxSeqNums
@@ -109,9 +99,6 @@ type consensusObservation struct {
 	// A map from chain selectors to each chain's consensus merkle root
 	MerkleRoots map[cciptypes.ChainSelector]cciptypes.MerkleRootChain
 
-	// RMNEnabledChains holds the consensus of RMNEnabledChains
-	RMNEnabledChains map[cciptypes.ChainSelector]bool
-
 	// A map from chain selectors to each chain's consensus OnRamp max sequence number
 	OnRampMaxSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
 
@@ -137,14 +124,13 @@ const (
 )
 
 type Outcome struct {
-	OutcomeType                     OutcomeType                      `json:"outcomeType"`
-	RangesSelectedForReport         []plugintypes.ChainRange         `json:"rangesSelectedForReport"`
-	RootsToReport                   []cciptypes.MerkleRootChain      `json:"rootsToReport"`
-	RMNEnabledChains                map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
-	OffRampNextSeqNums              []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
-	ReportTransmissionCheckAttempts uint                             `json:"reportTransmissionCheckAttempts"`
-	RMNReportSignatures             []cciptypes.RMNECDSASignature    `json:"rmnReportSignatures"`
-	RMNRemoteCfg                    rmntypes.RemoteConfig            `json:"rmnRemoteCfg"`
+	OutcomeType                     OutcomeType                   `json:"outcomeType"`
+	RangesSelectedForReport         []plugintypes.ChainRange      `json:"rangesSelectedForReport"`
+	RootsToReport                   []cciptypes.MerkleRootChain   `json:"rootsToReport"`
+	OffRampNextSeqNums              []plugintypes.SeqNumChain     `json:"offRampNextSeqNums"`
+	ReportTransmissionCheckAttempts uint                          `json:"reportTransmissionCheckAttempts"`
+	RMNReportSignatures             []cciptypes.RMNECDSASignature `json:"rmnReportSignatures"`
+	RMNRemoteCfg                    rmntypes.RemoteConfig         `json:"rmnRemoteCfg"`
 }
 
 // Sort all fields of the given Outcome

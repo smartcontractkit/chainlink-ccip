@@ -77,9 +77,7 @@ func TestPluginReports(t *testing.T) {
 							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
 						},
 					},
-					RMNSignatures:        nil,
-					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
-					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
+					RMNSignatures: nil,
 				},
 			},
 			expReportInfo: ccipocr3.CommitReportInfo{},
@@ -101,9 +99,7 @@ func TestPluginReports(t *testing.T) {
 							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
 						},
 					},
-					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
-					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
-					RMNSignatures:        nil,
+					RMNSignatures: nil,
 				},
 			},
 			expReportInfo: ccipocr3.CommitReportInfo{},
@@ -121,15 +117,8 @@ func TestPluginReports(t *testing.T) {
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
 						},
-						{
-							ChainSel:      2,
-							OnRampAddress: []byte{1, 2, 3},
-							SeqNumsRange:  ccipocr3.NewSeqNumRange(110, 210),
-							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
-						},
 					},
-					RMNRemoteCfg:     rmntypes.RemoteConfig{FSign: 123},
-					RMNEnabledChains: map[ccipocr3.ChainSelector]bool{3: true, 2: false},
+					RMNRemoteCfg: rmntypes.RemoteConfig{FSign: 123},
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: ccipocr3.TokenPriceMap{
@@ -144,20 +133,12 @@ func TestPluginReports(t *testing.T) {
 			},
 			expReports: []ccipocr3.CommitPluginReport{
 				{
-					BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
+					MerkleRoots: []ccipocr3.MerkleRootChain{
 						{
 							ChainSel:      3,
 							OnRampAddress: []byte{1, 2, 3},
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
-						},
-					},
-					UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
-						{
-							ChainSel:      2,
-							OnRampAddress: []byte{1, 2, 3},
-							SeqNumsRange:  ccipocr3.NewSeqNumRange(110, 210),
-							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
 						},
 					},
 					PriceUpdates: ccipocr3.PriceUpdates{
@@ -174,12 +155,6 @@ func TestPluginReports(t *testing.T) {
 			expReportInfo: ccipocr3.CommitReportInfo{
 				RemoteF: 123,
 				MerkleRoots: []ccipocr3.MerkleRootChain{
-					{
-						ChainSel:      2,
-						OnRampAddress: []byte{1, 2, 3},
-						SeqNumsRange:  ccipocr3.NewSeqNumRange(110, 210),
-						MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
-					},
 					{
 						ChainSel:      3,
 						OnRampAddress: []byte{1, 2, 3},
@@ -290,7 +265,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 				lggr: logger.Test(t),
 			}
 			report := ccipocr3.CommitPluginReport{
-				BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
+				MerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
 			}
 			stale := p.isStaleReport(p.lggr, tc.reportSeqNum, tc.onChainSeqNum, report)
 			require.Equal(t, tc.shouldBeStale, stale)

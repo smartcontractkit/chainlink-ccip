@@ -655,65 +655,6 @@ func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// GetOffRampSourceChainsConfig provides a mock function with given fields: ctx, sourceChains
-func (_m *MockCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error) {
-	ret := _m.Called(ctx, sourceChains)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetOffRampSourceChainsConfig")
-	}
-
-	var r0 map[ccipocr3.ChainSelector]reader.SourceChainConfig
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)); ok {
-		return rf(ctx, sourceChains)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]reader.SourceChainConfig); ok {
-		r0 = rf(ctx, sourceChains)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]reader.SourceChainConfig)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.ChainSelector) error); ok {
-		r1 = rf(ctx, sourceChains)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockCCIPReader_GetOffRampSourceChainsConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOffRampSourceChainsConfig'
-type MockCCIPReader_GetOffRampSourceChainsConfig_Call struct {
-	*mock.Call
-}
-
-// GetOffRampSourceChainsConfig is a helper method to define mock.On call
-//   - ctx context.Context
-//   - sourceChains []ccipocr3.ChainSelector
-func (_e *MockCCIPReader_Expecter) GetOffRampSourceChainsConfig(ctx interface{}, sourceChains interface{}) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
-	return &MockCCIPReader_GetOffRampSourceChainsConfig_Call{Call: _e.mock.On("GetOffRampSourceChainsConfig", ctx, sourceChains)}
-}
-
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Run(run func(ctx context.Context, sourceChains []ccipocr3.ChainSelector)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
-	})
-	return _c
-}
-
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Return(_a0 map[ccipocr3.ChainSelector]reader.SourceChainConfig, _a1 error) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetRMNRemoteConfig provides a mock function with given fields: ctx
 func (_m *MockCCIPReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
 	ret := _m.Called(ctx)

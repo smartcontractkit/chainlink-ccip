@@ -158,7 +158,6 @@ func TestAggregateObservations(t *testing.T) {
 				OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 				RMNRemoteConfigs:   make([]rmntypes.RemoteConfig, 0),
 				FChain:             make(map[cciptypes.ChainSelector][]int),
-				RMNEnabledChains:   map[cciptypes.ChainSelector][]bool{},
 			},
 		},
 		{
@@ -180,7 +179,6 @@ func TestAggregateObservations(t *testing.T) {
 				OffRampNextSeqNums: map[cciptypes.ChainSelector][]cciptypes.SeqNum{1: {1}},
 				RMNRemoteConfigs:   []rmntypes.RemoteConfig{{ContractAddress: cciptypes.UnknownAddress("address")}},
 				FChain:             map[cciptypes.ChainSelector][]int{1: {1}},
-				RMNEnabledChains:   map[cciptypes.ChainSelector][]bool{},
 			},
 		},
 		{
@@ -213,8 +211,7 @@ func TestAggregateObservations(t *testing.T) {
 					{ContractAddress: cciptypes.UnknownAddress("address1")},
 					{ContractAddress: cciptypes.UnknownAddress("address2")},
 				},
-				RMNEnabledChains: map[cciptypes.ChainSelector][]bool{},
-				FChain:           map[cciptypes.ChainSelector][]int{1: {1}, 2: {2}},
+				FChain: map[cciptypes.ChainSelector][]int{1: {1}, 2: {2}},
 			},
 		},
 	}

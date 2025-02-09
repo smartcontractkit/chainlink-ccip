@@ -377,14 +377,6 @@ func Test_Processor_Outcome(t *testing.T) {
 								MerkleRoot:    bytes32a,
 							},
 						},
-						RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-							chainA: true,
-							chainB: true,
-							chainC: true,
-							chainD: true,
-							chainE: true,
-							chainF: true,
-						},
 						FChain: map[cciptypes.ChainSelector]int{
 							chainA: 1,
 							chainB: 1,
@@ -423,14 +415,6 @@ func Test_Processor_Outcome(t *testing.T) {
 						SeqNumsRange:  cciptypes.NewSeqNumRange(10, 15),
 						MerkleRoot:    cciptypes.Bytes32{0xa},
 					},
-				},
-				RMNEnabledChains: map[cciptypes.ChainSelector]bool{
-					chainA: true,
-					chainB: true,
-					chainC: true,
-					chainD: true,
-					chainE: true,
-					chainF: true,
 				},
 				RMNReportSignatures: []cciptypes.RMNECDSASignature{
 					{R: bytes32a, S: bytes32b},

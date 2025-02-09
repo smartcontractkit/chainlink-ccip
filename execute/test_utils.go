@@ -131,7 +131,7 @@ func (it *IntTest) WithMessages(
 
 		it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
-				BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+				MerkleRoots: []cciptypes.MerkleRootChain{
 					{
 						ChainSel:     reportData.SourceChain,
 						SeqNumsRange: reportData.SequenceNumberRange,
