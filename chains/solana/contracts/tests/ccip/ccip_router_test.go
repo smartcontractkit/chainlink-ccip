@@ -393,7 +393,7 @@ func TestCCIPRouter(t *testing.T) {
 			// Create it early in the test suite (a "setup" step) to let it warm up with more than enough time,
 			// as otherwise it can slow down tests  for ~20 seconds.
 
-			lookupEntries := []solana.PublicKey{ // TODO update
+			lookupEntries := []solana.PublicKey{
 				config.CcipOfframpProgram,
 				config.OfframpConfigPDA,
 				config.OfframpReferenceAddressesPDA,
@@ -688,7 +688,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SystemProgramID,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()}) // TODO change error type
+					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.InvalidInputs_FeeQuoterError.String()})
 					require.NotNil(t, result)
 				})
 			}
@@ -705,7 +705,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.Unauthorized_FeeQuoterError.String()})
 				require.NotNil(t, result)
 			})
 
@@ -719,7 +719,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()}) // TODO fix error type to fee_quoter
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.Unauthorized_FeeQuoterError.String()})
 				require.NotNil(t, result)
 			})
 		})
@@ -1197,7 +1197,7 @@ func TestCCIPRouter(t *testing.T) {
 				ccipAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()}) // TODO change error type to FQ
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.InvalidInputs_FeeQuoterError.String()})
 			require.NotNil(t, result)
 
 			// Validate proposed set to 0-address
@@ -1217,7 +1217,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.Unauthorized_CcipOfframpError.String()})
 			require.NotNil(t, result)
 
 			// successfully transfer ownership
@@ -1241,7 +1241,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.Unauthorized_CcipOfframpError.String()})
 			require.NotNil(t, result)
 
 			// Successfully accept ownership
@@ -1265,7 +1265,7 @@ func TestCCIPRouter(t *testing.T) {
 				ccipAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.InvalidInputs_CcipRouterError.String()}) // TODO change error type to FQ
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.InvalidInputs_CcipOfframpError.String()})
 			require.NotNil(t, result)
 
 			// Validate proposed set to 0-address
@@ -6620,8 +6620,6 @@ func TestCCIPRouter(t *testing.T) {
 					rootBytes, err := ccip.HashAnyToSVMMessage(message, args.onramp, msgAccounts)
 					require.NoError(t, err)
 
-					fmt.Printf("message: %+v\n", message) // TODO remove
-
 					root := [32]byte(rootBytes)
 					sequenceNumber := message.Header.SequenceNumber
 
@@ -6678,7 +6676,6 @@ func TestCCIPRouter(t *testing.T) {
 					var sourceChain ccip_offramp.SourceChain
 					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChain))
 					require.Contains(t, sourceChain.Config.OnRamp, svmOnramp)
-					fmt.Printf("sourceChain: %+v\n", sourceChain) // TODO remove
 
 					// Check offramp program is not registered in router as valid offramp for SVM<>SVM lane
 					testutils.AssertClosedAccount(ctx, t, solanaGoClient, config.AllowedOfframpSvmPDA, config.DefaultCommitment)
