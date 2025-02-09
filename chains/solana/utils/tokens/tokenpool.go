@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
@@ -57,21 +57,12 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 }
 
 // NewTokenPool returns token + pool addresses. however, the token still needs to be deployed
-func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
+func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey) (TokenPool, error) {
 	mint, err := solana.NewRandomPrivateKey()
 	if err != nil {
 		return TokenPool{}, err
 	}
 	tokenAdminRegistryPDA, _, err := state.FindTokenAdminRegistryPDA(mint.PublicKey(), config.CcipRouterProgram)
-	if err != nil {
-		return TokenPool{}, err
-	}
-	// preload with defined config.EvmChainSelector
-	chainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.CcipTokenPoolProgram)
-	if err != nil {
-		return TokenPool{}, err
-	}
-	billingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -81,24 +72,34 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 
 	p := TokenPool{
-		Program:          program,
+		Program:          tokenProgram,
 		Mint:             mint,
 		FeeTokenConfig:   tokenConfigPda,
 		AdminRegistryPDA: tokenAdminRegistryPDA,
-		PoolProgram:      config.CcipTokenPoolProgram,
+		PoolProgram:      poolProgram,
 		PoolLookupTable:  solana.PublicKey{},
 		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
 		User:             map[solana.PublicKey]solana.PublicKey{},
 		Chain:            map[uint64]solana.PublicKey{},
 		Billing:          map[uint64]solana.PublicKey{},
 	}
-	p.Chain[config.EvmChainSelector] = chainPDA
-	p.Billing[config.EvmChainSelector] = billingPDA
-	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
+	// preload with defined EVM and SVM chain selectors
+	for _, cs := range []uint64{config.EvmChainSelector, config.SvmChainSelector} {
+		p.Chain[cs], _, err = TokenPoolChainConfigPDA(cs, mint.PublicKey(), poolProgram)
+		if err != nil {
+			return TokenPool{}, err
+		}
+		p.Billing[cs], _, err = state.FindFqPerChainPerTokenConfigPDA(cs, mint.PublicKey(), config.FeeQuoterProgram)
+		if err != nil {
+			return TokenPool{}, err
+		}
+	}
+
+	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), config.CcipTokenPoolProgram)
+	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -148,24 +149,24 @@ type EventMintRelease struct {
 type EventChainConfigured struct {
 	Discriminator         [8]byte
 	ChainSelector         uint64
-	Token                 token_pool.RemoteAddress
-	PreviousToken         token_pool.RemoteAddress
-	PoolAddresses         []token_pool.RemoteAddress
-	PreviousPoolAddresses []token_pool.RemoteAddress
+	Token                 test_token_pool.RemoteAddress
+	PreviousToken         test_token_pool.RemoteAddress
+	PoolAddresses         []test_token_pool.RemoteAddress
+	PreviousPoolAddresses []test_token_pool.RemoteAddress
 }
 
 type EventRemotePoolsAppended struct {
 	Discriminator         [8]byte
 	ChainSelector         uint64
-	PoolAddresses         []token_pool.RemoteAddress
-	PreviousPoolAddresses []token_pool.RemoteAddress
+	PoolAddresses         []test_token_pool.RemoteAddress
+	PreviousPoolAddresses []test_token_pool.RemoteAddress
 }
 
 type EventRateLimitConfigured struct {
 	Discriminator     [8]byte
 	ChainSelector     uint64
-	OutboundRateLimit token_pool.RateLimitConfig
-	InboundRateLimit  token_pool.RateLimitConfig
+	OutboundRateLimit test_token_pool.RateLimitConfig
+	InboundRateLimit  test_token_pool.RateLimitConfig
 }
 
 type EventChainRemoved struct {
@@ -190,8 +191,12 @@ func MethodToEvent(m string) string {
 }
 
 func ParseTokenLookupTable(ctx context.Context, client *rpc.Client, token TokenPool, userTokenAccount solana.PublicKey) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, error) {
-	tokenBillingConfig := token.Billing[config.EvmChainSelector]
-	poolChainConfig := token.Chain[config.EvmChainSelector]
+	return ParseTokenLookupTableWithChain(ctx, client, token, userTokenAccount, config.EvmChainSelector)
+}
+
+func ParseTokenLookupTableWithChain(ctx context.Context, client *rpc.Client, token TokenPool, userTokenAccount solana.PublicKey, chainSelector uint64) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, error) {
+	tokenBillingConfig := token.Billing[chainSelector]
+	poolChainConfig := token.Chain[chainSelector]
 
 	tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
 	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
