@@ -342,12 +342,15 @@ pub struct RemovePriceUpdater<'info> {
 pub struct UpdatePrices<'info> {
     pub authority: Signer<'info>,
 
+    /// CHECK: This is the AllowedPriceUpdater account for the calling authority. It is used to verify that the caller
+    /// was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA
+    /// and that it was initialized.
     #[account(
         owner = crate::ID @ FeeQuoterError::UnauthorizedPriceUpdater, // this guarantees that it was initialized
         seeds = [ALLOWED_PRICE_UPDATER, authority.key().as_ref()],
         bump,
     )]
-    pub allowed_price_updater: Account<'info, AllowedPriceUpdater>,
+    pub allowed_price_updater: UncheckedAccount<'info>,
 
     #[account(
         seeds = [seed::CONFIG],

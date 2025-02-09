@@ -4149,7 +4149,7 @@ func TestCCIPRouter(t *testing.T) {
 
 	///////////////////////////
 	// Withdraw billed funds //
-	////////////////////.......
+	///////////////////////////
 	t.Run("Withdraw billed funds", func(t *testing.T) {
 		t.Run("Preconditions", func(t *testing.T) {
 			require.Greater(t, getBalance(wsol.billingATA), uint64(0))
@@ -4311,6 +4311,147 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 
 			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.InsufficientFunds_CcipRouterError.String()})
+		})
+	})
+
+	/////////////////////////////
+	// FeeQuoter price updates //
+	/////////////////////////////
+	// These tests interact with FeeQuoter directly to try to update prices and the AllowedPriceUpdater list.
+	// Later on, the offramp commit tests will further test the e2e commit including different cases of price updates.
+	t.Run("FeeQuoter price updates", func(t *testing.T) {
+		// re-using the legacy admin just in this suite because it has funds to submit transactions,
+		// it is removed as a valid updater later in this same suite.
+		testPriceUpdater := legacyAdmin
+		testAllowedPriceUpdaterPDA, _, err := state.FindFqAllowedPriceUpdaterPDA(testPriceUpdater.PublicKey(), config.FeeQuoterProgram)
+		require.NoError(t, err)
+
+		t.Run("When a non-admin tries to add a price updater, it fails", func(t *testing.T) {
+			ix, err := fee_quoter.NewAddPriceUpdaterInstruction(
+				testPriceUpdater.PublicKey(),
+				testAllowedPriceUpdaterPDA,
+				config.FqConfigPDA,
+				user.PublicKey(), // not admin
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{fee_quoter.Unauthorized_FeeQuoterError.String()})
+		})
+
+		t.Run("When an admin adds a price updater, it succeeds", func(t *testing.T) {
+			ix, err := fee_quoter.NewAddPriceUpdaterInstruction(
+				testPriceUpdater.PublicKey(),
+				testAllowedPriceUpdaterPDA,
+				config.FqConfigPDA,
+				ccipAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
+		})
+
+		t.Run("When the caller is not allowed to update the price, it fails", func(t *testing.T) {
+			userAllowedPriceUpdaterPDA, _, err := state.FindFqAllowedPriceUpdaterPDA(user.PublicKey(), config.FeeQuoterProgram)
+			require.NoError(t, err)
+
+			ix, err := fee_quoter.NewUpdatePricesInstruction(
+				[]fee_quoter.TokenPriceUpdate{},
+				[]fee_quoter.GasPriceUpdate{},
+				user.PublicKey(), // not allowed
+				userAllowedPriceUpdaterPDA,
+				config.FqConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{fee_quoter.UnauthorizedPriceUpdater_FeeQuoterError.String()})
+		})
+
+		t.Run("When the caller is not allowed to update the price but tries to trick fee quoter to check an allowed caller, it fails", func(t *testing.T) {
+			ix, err := fee_quoter.NewUpdatePricesInstruction(
+				[]fee_quoter.TokenPriceUpdate{},
+				[]fee_quoter.GasPriceUpdate{},
+				user.PublicKey(),           // not allowed
+				testAllowedPriceUpdaterPDA, // tricking the fee quoter to check the allowed price updater
+				config.FqConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"AnchorError caused by account: allowed_price_updater. Error Code: ConstraintSeeds. Error Number: 2006. Error Message: A seeds constraint was violated."})
+		})
+
+		t.Run("When the caller is allowed to update the price, it succeeds", func(t *testing.T) {
+			// Check that initial onchain prices don't match the new ones
+			tokenPrice := common.To28BytesBE(123)
+			gasPrice := common.To28BytesBE(321)
+
+			var tokenPriceAccount fee_quoter.BillingTokenConfigWrapper
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
+			require.NotEqual(t, tokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
+
+			var gasPriceAccount fee_quoter.DestChain
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &gasPriceAccount))
+			require.NotEqual(t, gasPrice, gasPriceAccount.State.UsdPerUnitGas.Value)
+
+			// Update prices
+			raw := fee_quoter.NewUpdatePricesInstruction(
+				[]fee_quoter.TokenPriceUpdate{
+					{
+						SourceToken: wsol.mint,
+						UsdPerToken: tokenPrice,
+					},
+				},
+				[]fee_quoter.GasPriceUpdate{
+					{
+						DestChainSelector: config.EvmChainSelector,
+						UsdPerUnitGas:     gasPrice,
+					},
+				},
+				testPriceUpdater.PublicKey(),
+				testAllowedPriceUpdaterPDA,
+				config.FqConfigPDA,
+			)
+			raw.AccountMetaSlice.Append(solana.Meta(wsol.fqBillingConfigPDA).WRITE())
+			raw.AccountMetaSlice.Append(solana.Meta(config.FqEvmDestChainPDA).WRITE())
+
+			ix, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, testPriceUpdater, config.DefaultCommitment)
+
+			// Check that final onchain prices match the new ones
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
+			require.Equal(t, tokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
+
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &gasPriceAccount))
+			require.Equal(t, gasPrice, gasPriceAccount.State.UsdPerUnitGas.Value)
+		})
+
+		t.Run("When a non-admin tries to remove a price updater, it fails", func(t *testing.T) {
+			ix, err := fee_quoter.NewRemovePriceUpdaterInstruction(
+				testPriceUpdater.PublicKey(),
+				testAllowedPriceUpdaterPDA,
+				config.FqConfigPDA,
+				user.PublicKey(), // not admin
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{fee_quoter.Unauthorized_FeeQuoterError.String()})
+		})
+
+		t.Run("When an admin removes a price updater, it succeeds and the caller can no longer update prices", func(t *testing.T) {
+			ix, err := fee_quoter.NewRemovePriceUpdaterInstruction(
+				testPriceUpdater.PublicKey(),
+				testAllowedPriceUpdaterPDA,
+				config.FqConfigPDA,
+				ccipAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 		})
 	})
 

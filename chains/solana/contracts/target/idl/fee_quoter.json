@@ -581,7 +581,11 @@
         {
           "name": "allowedPriceUpdater",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA",
+            "and that it was initialized."
+          ]
         },
         {
           "name": "config",

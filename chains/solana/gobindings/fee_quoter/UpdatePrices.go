@@ -34,6 +34,8 @@ type UpdatePrices struct {
 	// [0] = [SIGNER] authority
 	//
 	// [1] = [] allowedPriceUpdater
+	// ··········· was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA
+	// ··········· and that it was initialized.
 	//
 	// [2] = [] config
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -71,12 +73,16 @@ func (inst *UpdatePrices) GetAuthorityAccount() *ag_solanago.AccountMeta {
 }
 
 // SetAllowedPriceUpdaterAccount sets the "allowedPriceUpdater" account.
+// was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA
+// and that it was initialized.
 func (inst *UpdatePrices) SetAllowedPriceUpdaterAccount(allowedPriceUpdater ag_solanago.PublicKey) *UpdatePrices {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(allowedPriceUpdater)
 	return inst
 }
 
 // GetAllowedPriceUpdaterAccount gets the "allowedPriceUpdater" account.
+// was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA
+// and that it was initialized.
 func (inst *UpdatePrices) GetAllowedPriceUpdaterAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }

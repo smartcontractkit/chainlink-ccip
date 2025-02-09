@@ -390,17 +390,10 @@ pub struct ExecuteReportContext<'info> {
     /// CHECK PDA of the router program verifying the signer is an allowed offramp.
     /// If PDA does not exist, the router doesn't allow this offramp
     #[account(
-        constraint = {
-        let (pda, _) = Pubkey::find_program_address(
-            &[
-                ALLOWED_OFFRAMP,
-                source_chain.chain_selector.to_le_bytes().as_ref(),
-                offramp.key().as_ref(),
-            ],
-            &reference_addresses.router,
-        );
-        allowed_offramp.key() == pda && allowed_offramp.owner.key() == reference_addresses.router
-        } @ CcipOfframpError::InvalidInputs
+        owner = reference_addresses.router @ CcipOfframpError::InvalidInputs, // this guarantees that it was initialized
+        seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), offramp.key().as_ref()],
+        bump,
+        seeds::program = reference_addresses.router,
     )]
     pub allowed_offramp: UncheckedAccount<'info>,
 
