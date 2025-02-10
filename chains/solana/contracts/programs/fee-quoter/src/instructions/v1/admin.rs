@@ -1,17 +1,19 @@
+use anchor_lang::prelude::*;
+
 use crate::context::{
-    AcceptOwnership, AddBillingTokenConfig, AddDestChain, SetTokenTransferFeeConfig,
-    UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
+    AcceptOwnership, AddBillingTokenConfig, AddDestChain, AddPriceUpdater, RemovePriceUpdater,
+    SetTokenTransferFeeConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
 };
 use crate::event::{
     DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled,
-    OwnershipTransferRequested, OwnershipTransferred, TokenTransferFeeConfigUpdated,
+    OwnershipTransferRequested, OwnershipTransferred, PriceUpdaterAdded, PriceUpdaterRemoved,
+    TokenTransferFeeConfigUpdated,
 };
 use crate::state::{
     BillingTokenConfig, DestChain, DestChainConfig, DestChainState, PerChainPerTokenConfig,
     TimestampedPackedU224, TokenTransferFeeConfig,
 };
 use crate::FeeQuoterError;
-use anchor_lang::prelude::*;
 
 pub fn transfer_ownership(ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
     let config = &mut ctx.accounts.config;
@@ -117,6 +119,19 @@ pub fn update_dest_chain_config(
         dest_chain_selector: chain_selector,
         dest_chain_config,
     });
+    Ok(())
+}
+
+pub fn add_price_updater(_ctx: Context<AddPriceUpdater>, price_updater: Pubkey) -> Result<()> {
+    emit!(PriceUpdaterAdded { price_updater });
+    Ok(())
+}
+
+pub fn remove_price_updater(
+    _ctx: Context<RemovePriceUpdater>,
+    price_updater: Pubkey,
+) -> Result<()> {
+    emit!(PriceUpdaterRemoved { price_updater });
     Ok(())
 }
 

@@ -33,7 +33,12 @@
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "router",
+          "type": "publicKey"
+        }
+      ]
     },
     {
       "name": "ccipReceive",
@@ -50,6 +55,24 @@
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "offrampProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK offramp program: exists only to derive the allowed offramp PDA",
+            "and the authority PDA. Must be second."
+          ]
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp"
+          ]
         },
         {
           "name": "externalExecutionConfig",

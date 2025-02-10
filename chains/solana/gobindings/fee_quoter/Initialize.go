@@ -25,7 +25,6 @@ type Initialize struct {
 	LinkTokenMint     *ag_solanago.PublicKey
 	MaxFeeJuelsPerMsg *ag_binary.Uint128
 	Onramp            *ag_solanago.PublicKey
-	OfframpSigner     *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
 	//
@@ -62,12 +61,6 @@ func (inst *Initialize) SetMaxFeeJuelsPerMsg(maxFeeJuelsPerMsg ag_binary.Uint128
 // SetOnramp sets the "onramp" parameter.
 func (inst *Initialize) SetOnramp(onramp ag_solanago.PublicKey) *Initialize {
 	inst.Onramp = &onramp
-	return inst
-}
-
-// SetOfframpSigner sets the "offrampSigner" parameter.
-func (inst *Initialize) SetOfframpSigner(offrampSigner ag_solanago.PublicKey) *Initialize {
-	inst.OfframpSigner = &offrampSigner
 	return inst
 }
 
@@ -155,9 +148,6 @@ func (inst *Initialize) Validate() error {
 		if inst.Onramp == nil {
 			return errors.New("Onramp parameter is not set")
 		}
-		if inst.OfframpSigner == nil {
-			return errors.New("OfframpSigner parameter is not set")
-		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -190,11 +180,10 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("    LinkTokenMint", *inst.LinkTokenMint))
 						paramsBranch.Child(ag_format.Param("MaxFeeJuelsPerMsg", *inst.MaxFeeJuelsPerMsg))
 						paramsBranch.Child(ag_format.Param("           Onramp", *inst.Onramp))
-						paramsBranch.Child(ag_format.Param("    OfframpSigner", *inst.OfframpSigner))
 					})
 
 					// Accounts of the instruction:
@@ -225,11 +214,6 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `OfframpSigner` param:
-	err = encoder.Encode(obj.OfframpSigner)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -248,11 +232,6 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `OfframpSigner`:
-	err = decoder.Decode(&obj.OfframpSigner)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -262,7 +241,6 @@ func NewInitializeInstruction(
 	linkTokenMint ag_solanago.PublicKey,
 	maxFeeJuelsPerMsg ag_binary.Uint128,
 	onramp ag_solanago.PublicKey,
-	offrampSigner ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -273,7 +251,6 @@ func NewInitializeInstruction(
 		SetLinkTokenMint(linkTokenMint).
 		SetMaxFeeJuelsPerMsg(maxFeeJuelsPerMsg).
 		SetOnramp(onramp).
-		SetOfframpSigner(offrampSigner).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

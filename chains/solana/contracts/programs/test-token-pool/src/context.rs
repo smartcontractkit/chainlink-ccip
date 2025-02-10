@@ -51,9 +51,30 @@ pub struct AcceptOwnership<'info> {
 #[instruction(release_or_mint: ReleaseOrMintInV1)]
 pub struct TokenOfframp<'info> {
     // CCIP accounts ------------------------
-    #[account(address = state.config.ramp_authority @ CcipTokenPoolError::InvalidPoolCaller)]
+    #[account(
+        seeds = [EXTERNAL_TOKENPOOL_SIGNER],
+        bump,
+        seeds::program = offramp_program.key(),
+    )]
     pub authority: Signer<'info>,
 
+    /// CHECK offramp program: exists only to derive the allowed offramp PDA
+    /// and the authority PDA.
+    pub offramp_program: UncheckedAccount<'info>,
+
+    /// CHECK PDA of the router program verifying the signer is an allowed offramp.
+    /// If PDA does not exist, the router doesn't allow this offramp
+    #[account(
+        owner = state.config.router @ CcipTokenPoolError::InvalidPoolCaller, // this guarantees that it was initialized
+        seeds = [
+            ALLOWED_OFFRAMP,
+            release_or_mint.remote_chain_selector.to_le_bytes().as_ref(),
+            offramp_program.key().as_ref()
+        ],
+        bump,
+        seeds::program = state.config.router,
+    )]
+    pub allowed_offramp: UncheckedAccount<'info>,
     // Token pool accounts ------------------
     // consistent set + token pool program
     #[account(
@@ -96,7 +117,7 @@ pub struct TokenOfframp<'info> {
 #[instruction(lock_or_burn: LockOrBurnInV1)]
 pub struct TokenOnramp<'info> {
     // CCIP accounts ------------------------
-    #[account(address = state.config.ramp_authority @ CcipTokenPoolError::InvalidPoolCaller)]
+    #[account(address = state.config.router_onramp_authority @ CcipTokenPoolError::InvalidPoolCaller)]
     pub authority: Signer<'info>,
 
     // Token pool accounts ------------------

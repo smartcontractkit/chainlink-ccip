@@ -483,6 +483,14 @@
           "isSigner": false
         },
         {
+          "name": "feeQuoterAllowedPriceUpdater",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "so that it can authorize the call made by this offramp"
+          ]
+        },
+        {
           "name": "feeQuoterConfig",
           "isMut": false,
           "isSigner": false
@@ -586,6 +594,22 @@
           "isSigner": false
         },
         {
+          "name": "offramp",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp. This is just used",
+            "so that token pools and receivers can then check that the caller is an actual offramp that",
+            "has been registered in the router as such for that source chain."
+          ]
+        },
+        {
           "name": "externalExecutionConfig",
           "isMut": false,
           "isSigner": false
@@ -670,6 +694,22 @@
           "name": "commitReport",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "offramp",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "allowedOfframp",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK PDA of the router program verifying the signer is an allowed offramp.",
+            "If PDA does not exist, the router doesn't allow this offramp. This is just used",
+            "so that token pools and receivers can then check that the caller is an actual offramp that",
+            "has been registered in the router as such for that source chain."
+          ]
         },
         {
           "name": "externalExecutionConfig",

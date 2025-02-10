@@ -57,12 +57,8 @@ var (
 	BillingSignerPDA, _, _                   = state.FindFeeBillingSignerPDA(CcipRouterProgram)
 	SvmDestChainStatePDA, _                  = state.FindDestChainStatePDA(SvmChainSelector, CcipRouterProgram)
 	EvmDestChainStatePDA, _                  = state.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
-
-	// fee quoter PDAs
-	FqConfigPDA, _, _        = state.FindFqConfigPDA(FeeQuoterProgram)
-	FqEvmDestChainPDA, _, _  = state.FindFqDestChainPDA(EvmChainSelector, FeeQuoterProgram)
-	FqSvmDestChainPDA, _, _  = state.FindFqDestChainPDA(SvmChainSelector, FeeQuoterProgram)
-	FqBillingSignerPDA, _, _ = state.FindFqBillingSignerPDA(FeeQuoterProgram)
+	AllowedOfframpEvmPDA, _                  = state.FindAllowedOfframpPDA(EvmChainSelector, CcipOfframpProgram, CcipRouterProgram)
+	AllowedOfframpSvmPDA, _                  = state.FindAllowedOfframpPDA(SvmChainSelector, CcipOfframpProgram, CcipRouterProgram)
 
 	// Offramp PDAs
 	OfframpConfigPDA, _, _                  = state.FindOfframpConfigPDA(CcipOfframpProgram)
@@ -73,4 +69,10 @@ var (
 	OfframpStatePDA, _, _                   = state.FindOfframpStatePDA(CcipOfframpProgram)
 	OfframpExternalExecutionConfigPDA, _, _ = state.FindExternalExecutionConfigPDA(CcipOfframpProgram)
 	OfframpTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipOfframpProgram)
+
+	// fee quoter PDAs
+	FqConfigPDA, _, _                     = state.FindFqConfigPDA(FeeQuoterProgram)
+	FqEvmDestChainPDA, _, _               = state.FindFqDestChainPDA(EvmChainSelector, FeeQuoterProgram)
+	FqSvmDestChainPDA, _, _               = state.FindFqDestChainPDA(SvmChainSelector, FeeQuoterProgram)
+	FqAllowedPriceUpdaterOfframpPDA, _, _ = state.FindFqAllowedPriceUpdaterPDA(OfframpBillingSignerPDA, FeeQuoterProgram)
 )

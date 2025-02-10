@@ -75,13 +75,13 @@ func FindFqBillingTokenConfigPDA(mint solana.PublicKey, feeQuoterProgram solana.
 	return solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), mint.Bytes()}, feeQuoterProgram)
 }
 
-func FindFqBillingSignerPDA(feeQuoterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("fee_billing_signer")}, feeQuoterProgram)
-}
-
 func FindFqPerChainPerTokenConfigPDA(chainSelector uint64, mint solana.PublicKey, feeQuoterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
 	chainSelectorLE := common.Uint64ToLE(chainSelector)
 	return solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), chainSelectorLE, mint.Bytes()}, feeQuoterProgram)
+}
+
+func FindFqAllowedPriceUpdaterPDA(priceUpdater solana.PublicKey, feeQuoterProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("allowed_price_updater"), priceUpdater.Bytes()}, feeQuoterProgram)
 }
 
 //////////////////
@@ -107,10 +107,6 @@ func FindOfframpBillingSignerPDA(offrampProgram solana.PublicKey) (solana.Public
 
 func FindOfframpStatePDA(offrampProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
 	return solana.FindProgramAddress([][]byte{[]byte("state")}, offrampProgram)
-}
-
-func FindOfframpExternalPoolSignerPDA(offrampProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, offrampProgram)
 }
 
 func FindOfframpCommitReportPDA(chainSelector uint64, root [32]byte, offrampProgram solana.PublicKey) (solana.PublicKey, error) {

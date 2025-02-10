@@ -16,16 +16,24 @@ type CcipReceive struct {
 
 	// [0] = [WRITE, SIGNER] authority
 	//
-	// [1] = [WRITE] counter
+	// [1] = [] offrampProgram
+	// ··········· CHECK offramp program: exists only to derive the allowed offramp PDA
+	// ··········· and the authority PDA. Must be second.
 	//
-	// [2] = [] systemProgram
+	// [2] = [] allowedOfframp
+	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
+	// ··········· If PDA does not exist, the router doesn't allow this offramp
+	//
+	// [3] = [WRITE] counter
+	//
+	// [4] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCcipReceiveInstructionBuilder creates a new `CcipReceive` instruction builder.
 func NewCcipReceiveInstructionBuilder() *CcipReceive {
 	nd := &CcipReceive{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -47,26 +55,56 @@ func (inst *CcipReceive) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetOfframpProgramAccount sets the "offrampProgram" account.
+// CHECK offramp program: exists only to derive the allowed offramp PDA
+// and the authority PDA. Must be second.
+func (inst *CcipReceive) SetOfframpProgramAccount(offrampProgram ag_solanago.PublicKey) *CcipReceive {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(offrampProgram)
+	return inst
+}
+
+// GetOfframpProgramAccount gets the "offrampProgram" account.
+// CHECK offramp program: exists only to derive the allowed offramp PDA
+// and the authority PDA. Must be second.
+func (inst *CcipReceive) GetOfframpProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
+// SetAllowedOfframpAccount sets the "allowedOfframp" account.
+// CHECK PDA of the router program verifying the signer is an allowed offramp.
+// If PDA does not exist, the router doesn't allow this offramp
+func (inst *CcipReceive) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *CcipReceive {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(allowedOfframp)
+	return inst
+}
+
+// GetAllowedOfframpAccount gets the "allowedOfframp" account.
+// CHECK PDA of the router program verifying the signer is an allowed offramp.
+// If PDA does not exist, the router doesn't allow this offramp
+func (inst *CcipReceive) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
 // SetCounterAccount sets the "counter" account.
 func (inst *CcipReceive) SetCounterAccount(counter ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(counter).WRITE()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(counter).WRITE()
 	return inst
 }
 
 // GetCounterAccount gets the "counter" account.
 func (inst *CcipReceive) GetCounterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *CcipReceive) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *CcipReceive) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst CcipReceive) Build() *Instruction {
@@ -100,9 +138,15 @@ func (inst *CcipReceive) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Counter is not set")
+			return errors.New("accounts.OfframpProgram is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.AllowedOfframp is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.Counter is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -123,10 +167,12 @@ func (inst *CcipReceive) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("      counter", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("offrampProgram", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("       counter", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta(" systemProgram", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -155,11 +201,15 @@ func NewCcipReceiveInstruction(
 	message Any2SVMMessage,
 	// Accounts:
 	authority ag_solanago.PublicKey,
+	offrampProgram ag_solanago.PublicKey,
+	allowedOfframp ag_solanago.PublicKey,
 	counter ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *CcipReceive {
 	return NewCcipReceiveInstructionBuilder().
 		SetMessage(message).
 		SetAuthorityAccount(authority).
+		SetOfframpProgramAccount(offrampProgram).
+		SetAllowedOfframpAccount(allowedOfframp).
 		SetCounterAccount(counter).
 		SetSystemProgramAccount(systemProgram)
 }
