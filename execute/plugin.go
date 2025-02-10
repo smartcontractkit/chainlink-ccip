@@ -62,6 +62,7 @@ type Plugin struct {
 	discovery    ContractDiscoveryInterface
 	chainSupport plugincommon.ChainSupport
 	observer     metrics.Reporter
+	statusGetter report.StatusGetter
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
@@ -94,6 +95,7 @@ func NewPlugin(
 	lggr logger.Logger,
 	costlyMessageObserver costlymessages.Observer,
 	metricsReporter metrics.Reporter,
+	getter report.StatusGetter,
 ) *Plugin {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
@@ -111,6 +113,7 @@ func NewPlugin(
 		estimateProvider:      estimateProvider,
 		lggr:                  logutil.WithComponent(lggr, "ExecutePlugin"),
 		costlyMessageObserver: costlyMessageObserver,
+		statusGetter:          getter,
 		discovery: discovery.NewContractDiscoveryProcessor(
 			logutil.WithComponent(lggr, "Discovery"),
 			&ccipReader,

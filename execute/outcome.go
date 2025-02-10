@@ -124,6 +124,10 @@ func (p *Plugin) getMessagesOutcome(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) exectypes.Outcome {
+
+	statusCache := report.NewMessageStatusCache(p.statusGetter)
+	txmStatusChecker := report.NewTXMCheck(statusCache, p.offchainCfg.MaxTxAttempts)
+
 	commitReports := make([]exectypes.CommitData, 0)
 	costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
 	for _, msgID := range observation.CostlyMessages {
@@ -180,6 +184,7 @@ func (p *Plugin) getFilterOutcome(
 	commitReports := previousOutcome.CommitReports
 
 	// TODO: This can't actually go here. We need to observe the Txm statuses...
+	//       it needs to go in GetMessages phase to avoid observing the message.
 	//statusCache := NewMessageStatusCache(p.ccipReader.)
 	//txmStatusChecker := NewTXMCheck(p.statuses, p.offchainCfg.MaxTxAttempts)
 

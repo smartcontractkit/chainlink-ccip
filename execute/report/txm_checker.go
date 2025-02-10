@@ -83,7 +83,7 @@ func (m *MessageStatusCache) statuses(ctx context.Context, msgID string) (Messag
 // NewTXMCheck creates a new check that queries the TXM for the status of a transaction.
 //
 // Algorithm ported from OCR2 version: chainlink/core/services/relay/evm/statuschecker/txm_status_checker.go#L31
-func NewTXMCheck(statuses MessageStatusCache, maxAttempts uint64) Check {
+func NewTXMCheck(statuses *MessageStatusCache, maxAttempts uint64) Check {
 	return func(
 		ctx context.Context,
 		lggr logger.Logger,
