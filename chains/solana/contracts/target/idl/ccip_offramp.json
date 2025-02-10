@@ -15,22 +15,16 @@
       "name": "initialize",
       "docs": [
         "Initialization Flow //",
-        "Initializes the CCIP Offramp.",
+        "Initializes the CCIP Offramp, except for the config account (due to stack size limitations).",
         "",
-        "The initialization of the Offramp is responsibility of Admin, nothing more than calling this method should be done first.",
+        "The initialization of the Offramp is responsibility of Admin, nothing more than calling these",
+        "initialization methods should be done first.",
         "",
         "# Arguments",
         "",
-        "* `ctx` - The context containing the accounts required for initialization.",
-        "* `svm_chain_selector` - The chain selector for SVM.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+        "* `ctx` - The context containing the accounts required for initialization."
       ],
       "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
         {
           "name": "referenceAddresses",
           "isMut": true,
@@ -63,6 +57,49 @@
         },
         {
           "name": "tokenPoolsSigner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initializeConfig",
+      "docs": [
+        "Initializes the CCIP Offramp Config account.",
+        "",
+        "The initialization of the Offramp is responsibility of Admin, nothing more than calling these",
+        "initialization methods should be done first.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for initialization of the config.",
+        "* `svm_chain_selector` - The chain selector for SVM.",
+        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+      ],
+      "accounts": [
+        {
+          "name": "config",
           "isMut": true,
           "isSigner": false
         },

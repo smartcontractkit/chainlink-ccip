@@ -545,10 +545,39 @@ func TestCCIPRouter(t *testing.T) {
 				lookupTableAddr = k
 			}
 
-			ix, err := ccip_offramp.NewInitializeInstruction(
+			// Check that a user who isn't the upgrade authority cannot call this
+			badInitIx, err := ccip_offramp.NewInitializeInstruction(
+				config.OfframpReferenceAddressesPDA,
+				config.CcipRouterProgram,
+				config.FeeQuoterProgram,
+				lookupTableAddr,
+				config.OfframpStatePDA,
+				config.OfframpExternalExecutionConfigPDA,
+				config.OfframpTokenPoolsSignerPDA,
+				user.PublicKey(), // not the upgrade authority
+				solana.SystemProgramID,
+				config.CcipOfframpProgram,
+				programData.Address,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{badInitIx}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+
+			badInitConfigIx, err := ccip_offramp.NewInitializeConfigInstruction(
 				invalidSVMChainSelector,
 				config.EnableExecutionAfter,
 				config.OfframpConfigPDA,
+				ccipAdmin.PublicKey(), // not the upgrade authority
+				solana.SystemProgramID,
+				config.CcipOfframpProgram,
+				programData.Address,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{badInitConfigIx}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+
+			// Now, actually initialize the offramp
+			initIx, err := ccip_offramp.NewInitializeInstruction(
 				config.OfframpReferenceAddressesPDA,
 				config.CcipRouterProgram,
 				config.FeeQuoterProgram,
@@ -563,7 +592,18 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			initConfigIx, err := ccip_offramp.NewInitializeConfigInstruction(
+				invalidSVMChainSelector,
+				config.EnableExecutionAfter,
+				config.OfframpConfigPDA,
+				legacyAdmin.PublicKey(),
+				solana.SystemProgramID,
+				config.CcipOfframpProgram,
+				programData.Address,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx, initConfigIx}, legacyAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			// Fetch account data
