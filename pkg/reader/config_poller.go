@@ -92,7 +92,7 @@ func (c *configPoller) GetChainConfig(
 	timeSinceLastRefresh := time.Since(chainCache.lastRefresh)
 	if timeSinceLastRefresh < c.refreshPeriod {
 		defer chainCache.RUnlock()
-		c.lggr.Infow("Cache hit",
+		c.lggr.Debugw("Cache hit",
 			"chain", chainSel,
 			"timeSinceLastRefresh", timeSinceLastRefresh,
 			"refreshPeriod", c.refreshPeriod)
@@ -116,7 +116,7 @@ func (c *configPoller) RefreshChainConfig(
 	// Double check if another goroutine has already refreshed
 	timeSinceLastRefresh := time.Since(chainCache.lastRefresh)
 	if timeSinceLastRefresh < c.refreshPeriod {
-		c.lggr.Infow("Cache was refreshed by another goroutine",
+		c.lggr.Debugw("Cache was refreshed by another goroutine",
 			"chain", chainSel,
 			"timeSinceLastRefresh", timeSinceLastRefresh)
 		return chainCache.data, nil
@@ -124,7 +124,7 @@ func (c *configPoller) RefreshChainConfig(
 
 	startTime := time.Now()
 	newData, err := c.fetchChainConfig(ctx, chainSel)
-	refreshDuration := time.Since(startTime)
+	fetchConfigLatency := time.Since(startTime)
 
 	if err != nil {
 		if !chainCache.lastRefresh.IsZero() {
@@ -132,22 +132,22 @@ func (c *configPoller) RefreshChainConfig(
 				"chain", chainSel,
 				"error", err,
 				"lastRefresh", chainCache.lastRefresh,
-				"refreshDuration", refreshDuration)
+				"fetchConfigLatency", fetchConfigLatency)
 			return chainCache.data, nil
 		}
 		c.lggr.Errorw("Failed to refresh cache, no old data available",
 			"chain", chainSel,
 			"error", err,
-			"refreshDuration", refreshDuration)
+			"fetchConfigLatency", fetchConfigLatency)
 		return ChainConfigSnapshot{}, fmt.Errorf("failed to refresh cache for chain %d: %w", chainSel, err)
 	}
 
 	chainCache.data = newData
 	chainCache.lastRefresh = time.Now()
 
-	c.lggr.Infow("Successfully refreshed cache",
+	c.lggr.Debugw("Successfully refreshed cache",
 		"chain", chainSel,
-		"refreshDuration", refreshDuration)
+		"fetchConfigLatency", fetchConfigLatency)
 
 	return newData, nil
 }
