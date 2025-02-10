@@ -32,7 +32,7 @@ pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         init,
-        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, &mint.key().to_bytes()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
@@ -56,7 +56,7 @@ pub struct OverridePendingTokenAdminRegistryByCCIPAdmin<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, &mint.key().to_bytes()],
         bump,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
@@ -78,7 +78,7 @@ pub struct RegisterTokenAdminRegistryByOwner<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         init,
-        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, &mint.key().to_bytes()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
@@ -88,10 +88,7 @@ pub struct RegisterTokenAdminRegistryByOwner<'info> {
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     // The following validation is the only difference between the two contexts
     // Only the mint authority can propose an owner for the token admin registry
-    #[account(
-        mut,
-        address = mint.mint_authority.unwrap() @ CcipRouterError::Unauthorized,
-    )]
+    #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -105,17 +102,14 @@ pub struct OverridePendingTokenAdminRegistryByOwner<'info> {
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
-        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, &mint.key().to_bytes()],
         bump,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     // The following validation is the only difference between the two contexts
     // Only the mint authority can propose an owner for the token admin registry
-    #[account(
-        mut,
-        address = mint.mint_authority.unwrap() @ CcipRouterError::Unauthorized,
-    )]
+    #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -130,7 +124,7 @@ pub struct ModifyTokenAdminRegistry<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, &mint.key().to_bytes()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
@@ -150,7 +144,7 @@ pub struct SetPoolTokenAdminRegistry<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, &mint.key().to_bytes()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
@@ -172,7 +166,7 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, &mint.key().to_bytes()],
         bump,
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]

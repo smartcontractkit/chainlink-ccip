@@ -288,7 +288,7 @@ pub struct CcipSend<'info> {
 
     #[account(
         init_if_needed,
-        seeds = [seed::NONCE, destination_chain_selector.to_le_bytes().as_ref(), authority.key().as_ref()],
+        seeds = [seed::NONCE, destination_chain_selector.to_le_bytes().as_ref(), &authority.key().to_bytes()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Nonce::INIT_SPACE,
@@ -386,7 +386,7 @@ pub struct CcipSend<'info> {
     /// CHECK: This account is just used in the CPI to the Fee Quoter program
     #[account(
         seeds = [fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
-            config.load()?.link_token_mint.key().as_ref(),
+            &config.load()?.link_token_mint.key().to_bytes(),
         ],
         bump,
         seeds::program = config.load()?.fee_quoter,

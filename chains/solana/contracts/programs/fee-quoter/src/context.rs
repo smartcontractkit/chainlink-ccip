@@ -143,7 +143,7 @@ pub struct AddBillingTokenConfig<'info> {
 
     #[account(
         init,
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, &token_config.mint.key().to_bytes()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + BillingTokenConfigWrapper::INIT_SPACE,
@@ -200,7 +200,7 @@ pub struct UpdateBillingTokenConfig<'info> {
 
     #[account(
         mut,
-        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, token_config.mint.key().as_ref()],
+        seeds = [seed::FEE_BILLING_TOKEN_CONFIG, &token_config.mint.key().to_bytes()],
         bump,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
@@ -347,7 +347,7 @@ pub struct UpdatePrices<'info> {
     /// and that it was initialized.
     #[account(
         owner = crate::ID @ FeeQuoterError::UnauthorizedPriceUpdater, // this guarantees that it was initialized
-        seeds = [ALLOWED_PRICE_UPDATER, authority.key().as_ref()],
+        seeds = [ALLOWED_PRICE_UPDATER, &authority.key().to_bytes()],
         bump,
     )]
     pub allowed_price_updater: UncheckedAccount<'info>,

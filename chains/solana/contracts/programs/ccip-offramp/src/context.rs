@@ -332,7 +332,7 @@ pub struct CommitReportContext<'info> {
     /// CHECK: fee quoter allowed price updater account, used to invoke fee quoter with price updates
     /// so that it can authorize the call made by this offramp
     #[account(
-        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
+        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, &fee_billing_signer.key().to_bytes()],
         bump,
         seeds::program = fee_quoter.key(),
     )]
@@ -393,7 +393,7 @@ pub struct ExecuteReportContext<'info> {
     /// has been registered in the router as such for that source chain.
     #[account(
         owner = reference_addresses.router @ CcipOfframpError::InvalidInputs, // this guarantees that it was initialized
-        seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), offramp.key().as_ref()],
+        seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), &offramp.key().to_bytes()],
         bump,
         seeds::program = reference_addresses.router,
     )]

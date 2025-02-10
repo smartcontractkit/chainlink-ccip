@@ -77,7 +77,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     {
         // Check Token Admin Registry
         let (expected_token_admin_registry, _) = Pubkey::find_program_address(
-            &[seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+            &[seed::TOKEN_ADMIN_REGISTRY, &mint.key().to_bytes()],
             &router,
         );
         require_eq!(
@@ -88,11 +88,11 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
 
         // check pool program + pool config + pool signer
         let (expected_pool_config, _) = Pubkey::find_program_address(
-            &[seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
+            &[seed::CCIP_TOKENPOOL_CONFIG, &mint.key().to_bytes()],
             &pool_program.key(),
         );
         let (expected_pool_signer, _) = Pubkey::find_program_address(
-            &[seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
+            &[seed::CCIP_TOKENPOOL_SIGNER, &mint.key().to_bytes()],
             &pool_program.key(),
         );
         require_eq!(
@@ -156,7 +156,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             &[
                 fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
                 chain_selector.to_le_bytes().as_ref(),
-                mint.key().as_ref(),
+                &mint.key().to_bytes(),
             ],
             &fee_quoter::ID,
         );
@@ -164,7 +164,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             &[
                 seed::TOKEN_POOL_CONFIG,
                 chain_selector.to_le_bytes().as_ref(),
-                mint.key().as_ref(),
+                &mint.key().to_bytes(),
             ],
             &pool_program.key(),
         );

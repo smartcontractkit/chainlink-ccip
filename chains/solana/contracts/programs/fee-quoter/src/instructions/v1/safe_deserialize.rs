@@ -14,7 +14,7 @@ pub fn per_chain_per_token_config<'info>(
         &[
             PER_CHAIN_PER_TOKEN_CONFIG,
             dest_chain_selector.to_le_bytes().as_ref(),
-            token.key().as_ref(),
+            &token.key().to_bytes(),
         ],
         &crate::ID,
     );

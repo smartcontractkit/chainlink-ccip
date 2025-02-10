@@ -142,7 +142,7 @@ pub struct CcipReceive<'info> {
         seeds = [
             ALLOWED_OFFRAMP,
             message.source_chain_selector.to_le_bytes().as_ref(),
-            offramp_program.key().as_ref()
+            &offramp_program.key().to_bytes()
         ],
         bump,
         seeds::program = counter.state.router,

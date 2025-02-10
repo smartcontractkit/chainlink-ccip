@@ -158,7 +158,7 @@ pub struct CcipReceive<'info> {
         seeds = [
             ALLOWED_OFFRAMP,
             message.source_chain_selector.to_le_bytes().as_ref(),
-            offramp_program.key().as_ref()
+            &offramp_program.key().to_bytes()
         ],
         bump,
         seeds::program = state.router,
@@ -292,7 +292,8 @@ pub struct WithdrawTokens<'info> {
     )]
     pub to_token_account: InterfaceAccount<'info, TokenAccount>,
     pub mint: InterfaceAccount<'info, Mint>,
-    #[account(address = *mint.to_account_info().owner)]
+    // todo: removing temporary fix for the issue with the anchor account constraint
+    // #[account(address = *mint.to_account_info().owner)]
     /// CHECK: CPI to token program
     pub token_program: AccountInfo<'info>,
     #[account(

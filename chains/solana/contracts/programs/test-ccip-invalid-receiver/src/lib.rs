@@ -188,7 +188,7 @@ pub struct Initialize<'info> {
         seeds = [
             ALLOWED_OFFRAMP,
             message.source_chain_selector.to_le_bytes().as_ref(),
-            offramp_program.key().as_ref()
+            &offramp_program.key().to_bytes()
         ],
         bump,
         seeds::program = TEST_ROUTER,
@@ -218,7 +218,7 @@ pub struct AllowedOfframp {}
 pub struct AddOfframp<'info> {
     #[account(
         init,
-        seeds = [ALLOWED_OFFRAMP, source_chain_selector.to_le_bytes().as_ref(), offramp.as_ref()],
+        seeds = [ALLOWED_OFFRAMP, source_chain_selector.to_le_bytes().as_ref(), &offramp.to_bytes()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + AllowedOfframp::INIT_SPACE,
@@ -350,7 +350,7 @@ pub struct PoolProxyLockOrBurn<'info> {
 pub struct ReleaseOrMintInV1 {
     original_sender: Vec<u8>, //          The original sender of the tx on the source chain
     remote_chain_selector: u64, // ─╮ The chain ID of the source chain
-    receiver: Pubkey,         // ───────────╯ The recipient of the tokens on the destination chain.
+    receiver: Vec<u8>,        // ───────────╯ The recipient of the tokens on the destination chain.
     amount: [u8; 32], // u256, incoming cross-chain amount - The amount of tokens to release or mint, denominated in the source token's decimals
     local_token: Pubkey, //            The address on this chain of the token to release or mint
     /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
@@ -377,7 +377,7 @@ impl ReleaseOrMintInV1 {
 pub struct LockOrBurnInV1 {
     pub receiver: Vec<u8>, //  The recipient of the tokens on the destination chain
     pub remote_chain_selector: u64, // The chain ID of the destination chain
-    pub original_sender: Pubkey, // The original sender of the tx on the source chain
+    pub original_sender: Vec<u8>, // The original sender of the tx on the source chain
     pub amount: u64, // local solana amount to lock/burn,  The amount of tokens to lock or burn, denominated in the source token's decimals
     pub local_token: Pubkey, //  The address on this chain of the token to lock or burn
 }

@@ -11,7 +11,7 @@ use crate::{ChainConfig, State};
 pub struct InitializeTokenPool<'info> {
     #[account(
         init,
-        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &mint.key().to_bytes()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + State::INIT_SPACE,
@@ -27,7 +27,7 @@ pub struct InitializeTokenPool<'info> {
 pub struct SetConfig<'info> {
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -40,7 +40,7 @@ pub struct SetConfig<'info> {
 pub struct AddToAllowList<'info> {
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len() + add.len()),
         realloc::payer = authority,
@@ -56,7 +56,7 @@ pub struct AddToAllowList<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -86,7 +86,7 @@ pub struct TokenOfframp<'info> {
         seeds = [
             ALLOWED_OFFRAMP,
             release_or_mint.remote_chain_selector.to_le_bytes().as_ref(),
-            offramp_program.key().as_ref()
+            &offramp_program.key().to_bytes()
         ],
         bump,
         seeds::program = state.config.router,
@@ -97,7 +97,7 @@ pub struct TokenOfframp<'info> {
     // consistent set + token pool program
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -107,7 +107,7 @@ pub struct TokenOfframp<'info> {
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
-        seeds = [POOL_SIGNER_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_SIGNER_SEED, &state.config.mint.key().to_bytes()],
         bump,
         address = state.config.pool_signer,
     )]
@@ -117,7 +117,7 @@ pub struct TokenOfframp<'info> {
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
-        seeds = [POOL_CHAINCONFIG_SEED, release_or_mint.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [POOL_CHAINCONFIG_SEED, release_or_mint.remote_chain_selector.to_le_bytes().as_ref(), &mint.key().to_bytes()],
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
@@ -138,7 +138,7 @@ pub struct TokenOnramp<'info> {
     // consistent set + token pool program
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -148,7 +148,7 @@ pub struct TokenOnramp<'info> {
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
-        seeds = [POOL_SIGNER_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_SIGNER_SEED, &state.config.mint.key().to_bytes()],
         bump,
         address = state.config.pool_signer,
     )]
@@ -158,7 +158,7 @@ pub struct TokenOnramp<'info> {
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
-        seeds = [POOL_CHAINCONFIG_SEED, lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [POOL_CHAINCONFIG_SEED, lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(), &mint.key().to_bytes()],
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
@@ -168,13 +168,13 @@ pub struct TokenOnramp<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct InitializeChainConfig<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
     #[account(
         init,
-        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), &mint.key().to_bytes()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
@@ -189,13 +189,13 @@ pub struct InitializeChainConfig<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct SetChainRateLimit<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
     #[account(
         mut,
-        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), &mint.key().to_bytes()],
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
@@ -208,13 +208,13 @@ pub struct SetChainRateLimit<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey, cfg: RemoteConfig)]
 pub struct EditChainConfigDynamicSize<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
     #[account(
         mut,
-        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), &mint.key().to_bytes()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE + cfg.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>(),
         realloc::payer = authority,
@@ -230,13 +230,13 @@ pub struct EditChainConfigDynamicSize<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey, addresses: Vec<RemoteAddress>)]
 pub struct AppendRemotePoolAddresses<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
     #[account(
         mut,
-        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), &mint.key().to_bytes()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + ChainConfig::INIT_SPACE
             + chain_config.base.remote.pool_addresses.iter().map(RemoteAddress::space).sum::<usize>()
@@ -254,13 +254,13 @@ pub struct AppendRemotePoolAddresses<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct DeleteChainConfig<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, &state.config.mint.key().to_bytes()],
         bump,
     )]
     pub state: Account<'info, State>,
     #[account(
         mut,
-        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        seeds = [POOL_CHAINCONFIG_SEED, remote_chain_selector.to_le_bytes().as_ref(), &mint.key().to_bytes()],
         bump,
         close = authority,
     )]

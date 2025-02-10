@@ -62,7 +62,7 @@ impl BaseConfig {
         self.mint = mint.key();
         self.decimals = mint.decimals;
         (self.pool_signer, _) = Pubkey::find_program_address(
-            &[POOL_SIGNER_SEED, self.mint.key().as_ref()],
+            &[POOL_SIGNER_SEED, &self.mint.key().to_bytes()],
             &pool_program,
         );
         self.pool_token_account = get_associated_token_address_with_program_id(
