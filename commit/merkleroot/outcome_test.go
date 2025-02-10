@@ -11,13 +11,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 )
 
 var rmnRemoteCfg = testhelpers.CreateRMNRemoteCfg()

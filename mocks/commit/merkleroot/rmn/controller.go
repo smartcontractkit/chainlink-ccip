@@ -13,7 +13,7 @@ import (
 
 	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 
-	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+	serialization "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	types "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
@@ -77,7 +77,7 @@ func (_c *MockController_Close_Call) RunAndReturn(run func() error) *MockControl
 }
 
 // ComputeReportSignatures provides a mock function with given fields: ctx, destChain, requestedUpdates, rmnRemoteCfg
-func (_m *MockController) ComputeReportSignatures(ctx context.Context, destChain *rmnpb.LaneDest, requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest, rmnRemoteCfg types.RemoteConfig) (*rmn.ReportSignatures, error) {
+func (_m *MockController) ComputeReportSignatures(ctx context.Context, destChain *serialization.LaneDest, requestedUpdates []*serialization.FixedDestLaneUpdateRequest, rmnRemoteCfg types.RemoteConfig) (*rmn.ReportSignatures, error) {
 	ret := _m.Called(ctx, destChain, requestedUpdates, rmnRemoteCfg)
 
 	if len(ret) == 0 {
@@ -86,10 +86,10 @@ func (_m *MockController) ComputeReportSignatures(ctx context.Context, destChain
 
 	var r0 *rmn.ReportSignatures
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *rmnpb.LaneDest, []*rmnpb.FixedDestLaneUpdateRequest, types.RemoteConfig) (*rmn.ReportSignatures, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *serialization.LaneDest, []*serialization.FixedDestLaneUpdateRequest, types.RemoteConfig) (*rmn.ReportSignatures, error)); ok {
 		return rf(ctx, destChain, requestedUpdates, rmnRemoteCfg)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *rmnpb.LaneDest, []*rmnpb.FixedDestLaneUpdateRequest, types.RemoteConfig) *rmn.ReportSignatures); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *serialization.LaneDest, []*serialization.FixedDestLaneUpdateRequest, types.RemoteConfig) *rmn.ReportSignatures); ok {
 		r0 = rf(ctx, destChain, requestedUpdates, rmnRemoteCfg)
 	} else {
 		if ret.Get(0) != nil {
@@ -97,7 +97,7 @@ func (_m *MockController) ComputeReportSignatures(ctx context.Context, destChain
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *rmnpb.LaneDest, []*rmnpb.FixedDestLaneUpdateRequest, types.RemoteConfig) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *serialization.LaneDest, []*serialization.FixedDestLaneUpdateRequest, types.RemoteConfig) error); ok {
 		r1 = rf(ctx, destChain, requestedUpdates, rmnRemoteCfg)
 	} else {
 		r1 = ret.Error(1)
@@ -113,16 +113,16 @@ type MockController_ComputeReportSignatures_Call struct {
 
 // ComputeReportSignatures is a helper method to define mock.On call
 //   - ctx context.Context
-//   - destChain *rmnpb.LaneDest
-//   - requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest
+//   - destChain *serialization.LaneDest
+//   - requestedUpdates []*serialization.FixedDestLaneUpdateRequest
 //   - rmnRemoteCfg types.RemoteConfig
 func (_e *MockController_Expecter) ComputeReportSignatures(ctx interface{}, destChain interface{}, requestedUpdates interface{}, rmnRemoteCfg interface{}) *MockController_ComputeReportSignatures_Call {
 	return &MockController_ComputeReportSignatures_Call{Call: _e.mock.On("ComputeReportSignatures", ctx, destChain, requestedUpdates, rmnRemoteCfg)}
 }
 
-func (_c *MockController_ComputeReportSignatures_Call) Run(run func(ctx context.Context, destChain *rmnpb.LaneDest, requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest, rmnRemoteCfg types.RemoteConfig)) *MockController_ComputeReportSignatures_Call {
+func (_c *MockController_ComputeReportSignatures_Call) Run(run func(ctx context.Context, destChain *serialization.LaneDest, requestedUpdates []*serialization.FixedDestLaneUpdateRequest, rmnRemoteCfg types.RemoteConfig)) *MockController_ComputeReportSignatures_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*rmnpb.LaneDest), args[2].([]*rmnpb.FixedDestLaneUpdateRequest), args[3].(types.RemoteConfig))
+		run(args[0].(context.Context), args[1].(*serialization.LaneDest), args[2].([]*serialization.FixedDestLaneUpdateRequest), args[3].(types.RemoteConfig))
 	})
 	return _c
 }
@@ -132,7 +132,7 @@ func (_c *MockController_ComputeReportSignatures_Call) Return(_a0 *rmn.ReportSig
 	return _c
 }
 
-func (_c *MockController_ComputeReportSignatures_Call) RunAndReturn(run func(context.Context, *rmnpb.LaneDest, []*rmnpb.FixedDestLaneUpdateRequest, types.RemoteConfig) (*rmn.ReportSignatures, error)) *MockController_ComputeReportSignatures_Call {
+func (_c *MockController_ComputeReportSignatures_Call) RunAndReturn(run func(context.Context, *serialization.LaneDest, []*serialization.FixedDestLaneUpdateRequest, types.RemoteConfig) (*rmn.ReportSignatures, error)) *MockController_ComputeReportSignatures_Call {
 	_c.Call.Return(run)
 	return _c
 }
