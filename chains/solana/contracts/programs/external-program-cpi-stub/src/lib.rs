@@ -46,6 +46,15 @@ pub mod external_program_cpi_stub {
         u8_value.value += 1;
         Ok(())
     }
+
+    ///instruction that accepts arbitrarily large instruction data.
+    pub fn big_instruction_data(_ctx: Context<Empty>, data: Vec<u8>) -> Result<()> {
+        msg!(
+            "Called `big_instruction_data` with data length: {}",
+            data.len()
+        );
+        Ok(())
+    }
 }
 
 const VALUE_SEED: &[u8] = b"u8_value";

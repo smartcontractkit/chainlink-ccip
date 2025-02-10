@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// FinalizeBypasserOperation is the `finalizeBypasserOperation` instruction.
+// Finalize a bypasser operation.
+//
+// Marks the bypasser operation as finalized, ready for execution.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the bypasser operation account.
+// - `_timelock_id`: The timelock identifier.
+// - `_id`: The operation identifier.
 type FinalizeBypasserOperation struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

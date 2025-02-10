@@ -10,7 +10,17 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeBypasserOperation is the `initializeBypasserOperation` instruction.
+// Initialize a bypasser operation.
+//
+// Bypasser operations have no predecessor and can be executed without delay.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the bypasser operation account.
+// - `_timelock_id`: The timelock identifier.
+// - `id`: The operation identifier.
+// - `salt`: A salt value for PDA derivation.
+// - `instruction_count`: The number of instructions to be added.
 type InitializeBypasserOperation struct {
 	TimelockId       *[32]uint8
 	Id               *[32]uint8

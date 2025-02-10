@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_AppendInstructions(t *testing.T) {
+func TestEncodeDecode_AppendInstructionData(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("AppendInstructions"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("AppendInstructionData"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(AppendInstructions)
+				params := new(AppendInstructionData)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(AppendInstructions)
+				got := new(AppendInstructionData)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

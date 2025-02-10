@@ -9,8 +9,8 @@ use crate::state::{Config, Role};
 /// This is used as an attribute macro with #[access_control] to guard program instructions.
 ///
 /// # Arguments
-/// * `$ctx` - The context containing program accounts
-/// * `$role` - One or more roles that are allowed to execute the instruction
+/// - `$ctx` - The context containing program accounts
+/// - `$role` - One or more roles that are allowed to execute the instruction
 ///
 #[macro_export]
 macro_rules! require_role_or_admin {
@@ -28,16 +28,15 @@ macro_rules! require_role_or_admin {
 /// Returns Ok(()) if the authority is either the admin or has at least one of the roles.
 ///
 /// # Arguments
-/// * `config` - Account containing program configuration including owner
-/// * `role_controller` - Account managing role-based access control
-/// * `authority` - The signer attempting to execute the instruction
-/// * `roles` - Array of roles being checked for authorization
+/// - `config` - Account containing program configuration including owner
+/// - `role_controller` - Account managing role-based access control
+/// - `authority` - The signer attempting to execute the instruction
+/// - `roles` - Array of roles being checked for authorization
 ///
 /// # Returns
-/// * `Result<()>` - Ok if authorized
-/// * `Err(TimelockError::InvalidAccessController)` - If provided controller isn't configured for any roles
-/// * `Err(AuthError::Unauthorized)` - If authority lacks admin rights and required roles
-
+/// - `Result<()>` - Ok if authorized
+/// - `Err(TimelockError::InvalidAccessController)` - If provided controller isn't configured for any roles
+/// - `Err(AuthError::Unauthorized)` - If authority lacks admin rights and required roles
 pub fn only_role_or_admin(
     config: &Account<Config>,
     role_controller: &AccountLoader<AccessController>,
@@ -80,11 +79,11 @@ macro_rules! require_only_admin {
 /// Returns Ok(()) if the authority is the admin, Err otherwise.
 ///
 /// # Arguments
-/// * `config` - Account containing program configuration including owner
-/// * `authority` - The signer attempting to execute the instruction
+/// - `config` - Account containing program configuration including owner
+/// - `authority` - The signer attempting to execute the instruction
 ///
 /// # Returns
-/// * `Result<()>` - Ok if authorized, Err with AuthError::Unauthorized otherwise
+/// - `Result<()>` - Ok if authorized, Err with AuthError::Unauthorized otherwise
 pub fn only_admin(config: &Account<Config>, authority: &Signer) -> Result<()> {
     require_keys_eq!(authority.key(), config.owner, AuthError::Unauthorized);
     Ok(())
