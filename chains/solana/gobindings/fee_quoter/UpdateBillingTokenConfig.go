@@ -22,10 +22,10 @@ type UpdateBillingTokenConfig struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] billingTokenConfig
+	// [1] = [WRITE] billing_token_config
 	//
 	// [2] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUpdateBillingTokenConfigInstructionBuilder creates a new `UpdateBillingTokenConfig` instruction builder.
@@ -50,18 +50,18 @@ func (inst *UpdateBillingTokenConfig) SetConfigAccount(config ag_solanago.Public
 
 // GetConfigAccount gets the "config" account.
 func (inst *UpdateBillingTokenConfig) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetBillingTokenConfigAccount sets the "billingTokenConfig" account.
+// SetBillingTokenConfigAccount sets the "billing_token_config" account.
 func (inst *UpdateBillingTokenConfig) SetBillingTokenConfigAccount(billingTokenConfig ag_solanago.PublicKey) *UpdateBillingTokenConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(billingTokenConfig).WRITE()
 	return inst
 }
 
-// GetBillingTokenConfigAccount gets the "billingTokenConfig" account.
+// GetBillingTokenConfigAccount gets the "billing_token_config" account.
 func (inst *UpdateBillingTokenConfig) GetBillingTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -72,7 +72,7 @@ func (inst *UpdateBillingTokenConfig) SetAuthorityAccount(authority ag_solanago.
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UpdateBillingTokenConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst UpdateBillingTokenConfig) Build() *Instruction {
@@ -130,9 +130,9 @@ func (inst *UpdateBillingTokenConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("billingTokenConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("billing_token_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})

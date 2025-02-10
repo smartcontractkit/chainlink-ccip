@@ -8,17 +8,17 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type ConfigSigners struct {
+type ConfigSignersAccount struct {
 	SignerAddresses [][20]uint8
 	TotalSigners    uint8
 	IsFinalized     bool
 }
 
-var ConfigSignersDiscriminator = [8]byte{147, 137, 80, 98, 50, 225, 190, 163}
+var ConfigSignersAccountDiscriminator = [8]byte{147, 137, 80, 98, 50, 225, 190, 163}
 
-func (obj ConfigSigners) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ConfigSignersAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ConfigSignersDiscriminator[:], false)
+	err = encoder.WriteBytes(ConfigSignersAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -40,14 +40,14 @@ func (obj ConfigSigners) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	return nil
 }
 
-func (obj *ConfigSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ConfigSignersAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ConfigSignersDiscriminator[:]) {
+		if !discriminator.Equal(ConfigSignersAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[147 137 80 98 50 225 190 163]",
@@ -72,7 +72,71 @@ func (obj *ConfigSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	return nil
 }
 
-type MultisigConfig struct {
+type ExpiringRootAndOpCountAccount struct {
+	Root       [32]uint8
+	ValidUntil uint32
+	OpCount    uint64
+}
+
+var ExpiringRootAndOpCountAccountDiscriminator = [8]byte{196, 176, 71, 210, 134, 228, 202, 75}
+
+func (obj ExpiringRootAndOpCountAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ExpiringRootAndOpCountAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Root` param:
+	err = encoder.Encode(obj.Root)
+	if err != nil {
+		return err
+	}
+	// Serialize `ValidUntil` param:
+	err = encoder.Encode(obj.ValidUntil)
+	if err != nil {
+		return err
+	}
+	// Serialize `OpCount` param:
+	err = encoder.Encode(obj.OpCount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ExpiringRootAndOpCountAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ExpiringRootAndOpCountAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[196 176 71 210 134 228 202 75]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Root`:
+	err = decoder.Decode(&obj.Root)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ValidUntil`:
+	err = decoder.Decode(&obj.ValidUntil)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OpCount`:
+	err = decoder.Decode(&obj.OpCount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MultisigConfigAccount struct {
 	ChainId       uint64
 	MultisigId    [32]uint8
 	Owner         ag_solanago.PublicKey
@@ -82,11 +146,11 @@ type MultisigConfig struct {
 	Signers       []McmSigner
 }
 
-var MultisigConfigDiscriminator = [8]byte{44, 62, 172, 225, 246, 3, 178, 33}
+var MultisigConfigAccountDiscriminator = [8]byte{44, 62, 172, 225, 246, 3, 178, 33}
 
-func (obj MultisigConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj MultisigConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(MultisigConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(MultisigConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -128,14 +192,14 @@ func (obj MultisigConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	return nil
 }
 
-func (obj *MultisigConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *MultisigConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(MultisigConfigDiscriminator[:]) {
+		if !discriminator.Equal(MultisigConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[44 62 172 225 246 3 178 33]",
@@ -180,71 +244,7 @@ func (obj *MultisigConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
-type RootSignatures struct {
-	TotalSignatures uint8
-	Signatures      []Signature
-	IsFinalized     bool
-}
-
-var RootSignaturesDiscriminator = [8]byte{21, 186, 10, 33, 117, 215, 246, 76}
-
-func (obj RootSignatures) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(RootSignaturesDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `TotalSignatures` param:
-	err = encoder.Encode(obj.TotalSignatures)
-	if err != nil {
-		return err
-	}
-	// Serialize `Signatures` param:
-	err = encoder.Encode(obj.Signatures)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsFinalized` param:
-	err = encoder.Encode(obj.IsFinalized)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *RootSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(RootSignaturesDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[21 186 10 33 117 215 246 76]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `TotalSignatures`:
-	err = decoder.Decode(&obj.TotalSignatures)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Signatures`:
-	err = decoder.Decode(&obj.Signatures)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsFinalized`:
-	err = decoder.Decode(&obj.IsFinalized)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type RootMetadata struct {
+type RootMetadataAccount struct {
 	ChainId              uint64
 	Multisig             ag_solanago.PublicKey
 	PreOpCount           uint64
@@ -252,11 +252,11 @@ type RootMetadata struct {
 	OverridePreviousRoot bool
 }
 
-var RootMetadataDiscriminator = [8]byte{125, 211, 89, 150, 221, 6, 141, 205}
+var RootMetadataAccountDiscriminator = [8]byte{125, 211, 89, 150, 221, 6, 141, 205}
 
-func (obj RootMetadata) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj RootMetadataAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(RootMetadataDiscriminator[:], false)
+	err = encoder.WriteBytes(RootMetadataAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -288,14 +288,14 @@ func (obj RootMetadata) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 
-func (obj *RootMetadata) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *RootMetadataAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(RootMetadataDiscriminator[:]) {
+		if !discriminator.Equal(RootMetadataAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[125 211 89 150 221 6 141 205]",
@@ -330,79 +330,79 @@ func (obj *RootMetadata) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	return nil
 }
 
-type ExpiringRootAndOpCount struct {
-	Root       [32]uint8
-	ValidUntil uint32
-	OpCount    uint64
+type RootSignaturesAccount struct {
+	TotalSignatures uint8
+	Signatures      []Signature
+	IsFinalized     bool
 }
 
-var ExpiringRootAndOpCountDiscriminator = [8]byte{196, 176, 71, 210, 134, 228, 202, 75}
+var RootSignaturesAccountDiscriminator = [8]byte{21, 186, 10, 33, 117, 215, 246, 76}
 
-func (obj ExpiringRootAndOpCount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj RootSignaturesAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ExpiringRootAndOpCountDiscriminator[:], false)
+	err = encoder.WriteBytes(RootSignaturesAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
-	// Serialize `Root` param:
-	err = encoder.Encode(obj.Root)
+	// Serialize `TotalSignatures` param:
+	err = encoder.Encode(obj.TotalSignatures)
 	if err != nil {
 		return err
 	}
-	// Serialize `ValidUntil` param:
-	err = encoder.Encode(obj.ValidUntil)
+	// Serialize `Signatures` param:
+	err = encoder.Encode(obj.Signatures)
 	if err != nil {
 		return err
 	}
-	// Serialize `OpCount` param:
-	err = encoder.Encode(obj.OpCount)
+	// Serialize `IsFinalized` param:
+	err = encoder.Encode(obj.IsFinalized)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *ExpiringRootAndOpCount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *RootSignaturesAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ExpiringRootAndOpCountDiscriminator[:]) {
+		if !discriminator.Equal(RootSignaturesAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[196 176 71 210 134 228 202 75]",
+				"[21 186 10 33 117 215 246 76]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}
-	// Deserialize `Root`:
-	err = decoder.Decode(&obj.Root)
+	// Deserialize `TotalSignatures`:
+	err = decoder.Decode(&obj.TotalSignatures)
 	if err != nil {
 		return err
 	}
-	// Deserialize `ValidUntil`:
-	err = decoder.Decode(&obj.ValidUntil)
+	// Deserialize `Signatures`:
+	err = decoder.Decode(&obj.Signatures)
 	if err != nil {
 		return err
 	}
-	// Deserialize `OpCount`:
-	err = decoder.Decode(&obj.OpCount)
+	// Deserialize `IsFinalized`:
+	err = decoder.Decode(&obj.IsFinalized)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-type SeenSignedHash struct {
+type SeenSignedHashAccount struct {
 	Seen bool
 }
 
-var SeenSignedHashDiscriminator = [8]byte{229, 115, 10, 185, 39, 100, 210, 151}
+var SeenSignedHashAccountDiscriminator = [8]byte{229, 115, 10, 185, 39, 100, 210, 151}
 
-func (obj SeenSignedHash) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SeenSignedHashAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(SeenSignedHashDiscriminator[:], false)
+	err = encoder.WriteBytes(SeenSignedHashAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -414,14 +414,14 @@ func (obj SeenSignedHash) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	return nil
 }
 
-func (obj *SeenSignedHash) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SeenSignedHashAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(SeenSignedHashDiscriminator[:]) {
+		if !discriminator.Equal(SeenSignedHashAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[229 115 10 185 39 100 210 151]",

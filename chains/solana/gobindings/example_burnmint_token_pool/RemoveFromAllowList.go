@@ -10,14 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// RemoveFromAllowList is the `removeFromAllowList` instruction.
+// RemoveFromAllowList is the `remove_from_allow_list` instruction.
 type RemoveFromAllowList struct {
 	Remove *[]ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewRemoveFromAllowListInstructionBuilder creates a new `RemoveFromAllowList` instruction builder.
@@ -42,7 +42,7 @@ func (inst *RemoveFromAllowList) SetStateAccount(state ag_solanago.PublicKey) *R
 
 // GetStateAccount gets the "state" account.
 func (inst *RemoveFromAllowList) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -53,7 +53,7 @@ func (inst *RemoveFromAllowList) SetAuthorityAccount(authority ag_solanago.Publi
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *RemoveFromAllowList) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst RemoveFromAllowList) Build() *Instruction {
@@ -108,8 +108,8 @@ func (inst *RemoveFromAllowList) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})

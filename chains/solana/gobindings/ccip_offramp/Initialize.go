@@ -26,28 +26,28 @@ type Initialize struct {
 
 	// [0] = [WRITE] config
 	//
-	// [1] = [WRITE] referenceAddresses
+	// [1] = [WRITE] reference_addresses
 	//
 	// [2] = [] router
 	//
-	// [3] = [] feeQuoter
+	// [3] = [] fee_quoter
 	//
-	// [4] = [] offrampLookupTable
+	// [4] = [] offramp_lookup_table
 	//
 	// [5] = [WRITE] state
 	//
-	// [6] = [WRITE] externalExecutionConfig
+	// [6] = [WRITE] external_execution_config
 	//
-	// [7] = [WRITE] tokenPoolsSigner
+	// [7] = [WRITE] token_pools_signer
 	//
 	// [8] = [WRITE, SIGNER] authority
 	//
-	// [9] = [] systemProgram
+	// [9] = [] system_program
 	//
 	// [10] = [] program
 	//
-	// [11] = [] programData
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [11] = [] program_data
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
@@ -58,15 +58,15 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetSvmChainSelector sets the "svmChainSelector" parameter.
-func (inst *Initialize) SetSvmChainSelector(svmChainSelector uint64) *Initialize {
-	inst.SvmChainSelector = &svmChainSelector
+// SetSvmChainSelector sets the "svm_chain_selector" parameter.
+func (inst *Initialize) SetSvmChainSelector(svm_chain_selector uint64) *Initialize {
+	inst.SvmChainSelector = &svm_chain_selector
 	return inst
 }
 
-// SetEnableExecutionAfter sets the "enableExecutionAfter" parameter.
-func (inst *Initialize) SetEnableExecutionAfter(enableExecutionAfter int64) *Initialize {
-	inst.EnableExecutionAfter = &enableExecutionAfter
+// SetEnableExecutionAfter sets the "enable_execution_after" parameter.
+func (inst *Initialize) SetEnableExecutionAfter(enable_execution_after int64) *Initialize {
+	inst.EnableExecutionAfter = &enable_execution_after
 	return inst
 }
 
@@ -78,18 +78,18 @@ func (inst *Initialize) SetConfigAccount(config ag_solanago.PublicKey) *Initiali
 
 // GetConfigAccount gets the "config" account.
 func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetReferenceAddressesAccount sets the "referenceAddresses" account.
+// SetReferenceAddressesAccount sets the "reference_addresses" account.
 func (inst *Initialize) SetReferenceAddressesAccount(referenceAddresses ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(referenceAddresses).WRITE()
 	return inst
 }
 
-// GetReferenceAddressesAccount gets the "referenceAddresses" account.
+// GetReferenceAddressesAccount gets the "reference_addresses" account.
 func (inst *Initialize) GetReferenceAddressesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetRouterAccount sets the "router" account.
@@ -100,29 +100,29 @@ func (inst *Initialize) SetRouterAccount(router ag_solanago.PublicKey) *Initiali
 
 // GetRouterAccount gets the "router" account.
 func (inst *Initialize) GetRouterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetFeeQuoterAccount sets the "feeQuoter" account.
+// SetFeeQuoterAccount sets the "fee_quoter" account.
 func (inst *Initialize) SetFeeQuoterAccount(feeQuoter ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(feeQuoter)
 	return inst
 }
 
-// GetFeeQuoterAccount gets the "feeQuoter" account.
+// GetFeeQuoterAccount gets the "fee_quoter" account.
 func (inst *Initialize) GetFeeQuoterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetOfframpLookupTableAccount sets the "offrampLookupTable" account.
+// SetOfframpLookupTableAccount sets the "offramp_lookup_table" account.
 func (inst *Initialize) SetOfframpLookupTableAccount(offrampLookupTable ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(offrampLookupTable)
 	return inst
 }
 
-// GetOfframpLookupTableAccount gets the "offrampLookupTable" account.
+// GetOfframpLookupTableAccount gets the "offramp_lookup_table" account.
 func (inst *Initialize) GetOfframpLookupTableAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 // SetStateAccount sets the "state" account.
@@ -133,29 +133,29 @@ func (inst *Initialize) SetStateAccount(state ag_solanago.PublicKey) *Initialize
 
 // GetStateAccount gets the "state" account.
 func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetExternalExecutionConfigAccount sets the "externalExecutionConfig" account.
+// SetExternalExecutionConfigAccount sets the "external_execution_config" account.
 func (inst *Initialize) SetExternalExecutionConfigAccount(externalExecutionConfig ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(externalExecutionConfig).WRITE()
 	return inst
 }
 
-// GetExternalExecutionConfigAccount gets the "externalExecutionConfig" account.
+// GetExternalExecutionConfigAccount gets the "external_execution_config" account.
 func (inst *Initialize) GetExternalExecutionConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
+// SetTokenPoolsSignerAccount sets the "token_pools_signer" account.
 func (inst *Initialize) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
+// GetTokenPoolsSignerAccount gets the "token_pools_signer" account.
 func (inst *Initialize) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -166,18 +166,18 @@ func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *In
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice.Get(8)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[9] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice.Get(9)
 }
 
 // SetProgramAccount sets the "program" account.
@@ -188,18 +188,18 @@ func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initia
 
 // GetProgramAccount gets the "program" account.
 func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
+	return inst.AccountMetaSlice.Get(10)
 }
 
-// SetProgramDataAccount sets the "programData" account.
+// SetProgramDataAccount sets the "program_data" account.
 func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[11] = ag_solanago.Meta(programData)
 	return inst
 }
 
-// GetProgramDataAccount gets the "programData" account.
+// GetProgramDataAccount gets the "program_data" account.
 func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
+	return inst.AccountMetaSlice.Get(11)
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -282,24 +282,24 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("    SvmChainSelector", *inst.SvmChainSelector))
-						paramsBranch.Child(ag_format.Param("EnableExecutionAfter", *inst.EnableExecutionAfter))
+						paramsBranch.Child(ag_format.Param("      SvmChainSelector", *inst.SvmChainSelector))
+						paramsBranch.Child(ag_format.Param("  EnableExecutionAfter", *inst.EnableExecutionAfter))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=12]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                 config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     referenceAddresses", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("                 router", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("              feeQuoter", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     offrampLookupTable", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("                  state", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("                program", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("            programData", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("                   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("      reference_addresses", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                   router", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("               fee_quoter", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("     offramp_lookup_table", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("                    state", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("external_execution_config", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("       token_pools_signer", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("                authority", inst.AccountMetaSlice.Get(8)))
+						accountsBranch.Child(ag_format.Meta("           system_program", inst.AccountMetaSlice.Get(9)))
+						accountsBranch.Child(ag_format.Meta("                  program", inst.AccountMetaSlice.Get(10)))
+						accountsBranch.Child(ag_format.Meta("             program_data", inst.AccountMetaSlice.Get(11)))
 					})
 				})
 		})
@@ -335,8 +335,8 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	svmChainSelector uint64,
-	enableExecutionAfter int64,
+	svm_chain_selector uint64,
+	enable_execution_after int64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	referenceAddresses ag_solanago.PublicKey,
@@ -351,8 +351,8 @@ func NewInitializeInstruction(
 	program ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetSvmChainSelector(svmChainSelector).
-		SetEnableExecutionAfter(enableExecutionAfter).
+		SetSvmChainSelector(svm_chain_selector).
+		SetEnableExecutionAfter(enable_execution_after).
 		SetConfigAccount(config).
 		SetReferenceAddressesAccount(referenceAddresses).
 		SetRouterAccount(router).

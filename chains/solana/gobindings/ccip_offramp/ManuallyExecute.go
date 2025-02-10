@@ -26,30 +26,30 @@ type ManuallyExecute struct {
 
 	// [0] = [] config
 	//
-	// [1] = [] referenceAddresses
+	// [1] = [] reference_addresses
 	//
-	// [2] = [] sourceChain
+	// [2] = [] source_chain
 	//
-	// [3] = [WRITE] commitReport
+	// [3] = [WRITE] commit_report
 	//
 	// [4] = [] offramp
 	//
-	// [5] = [] allowedOfframp
+	// [5] = [] allowed_offramp
 	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
 	// ··········· If PDA does not exist, the router doesn't allow this offramp. This is just used
 	// ··········· so that token pools and receivers can then check that the caller is an actual offramp that
 	// ··········· has been registered in the router as such for that source chain.
 	//
-	// [6] = [] externalExecutionConfig
+	// [6] = [] external_execution_config
 	//
 	// [7] = [WRITE, SIGNER] authority
 	//
-	// [8] = [] systemProgram
+	// [8] = [] system_program
 	//
-	// [9] = [] sysvarInstructions
+	// [9] = [] sysvar_instructions
 	//
-	// [10] = [] tokenPoolsSigner
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [10] = [] token_pools_signer
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewManuallyExecuteInstructionBuilder creates a new `ManuallyExecute` instruction builder.
@@ -60,15 +60,15 @@ func NewManuallyExecuteInstructionBuilder() *ManuallyExecute {
 	return nd
 }
 
-// SetRawExecutionReport sets the "rawExecutionReport" parameter.
-func (inst *ManuallyExecute) SetRawExecutionReport(rawExecutionReport []byte) *ManuallyExecute {
-	inst.RawExecutionReport = &rawExecutionReport
+// SetRawExecutionReport sets the "raw_execution_report" parameter.
+func (inst *ManuallyExecute) SetRawExecutionReport(raw_execution_report []byte) *ManuallyExecute {
+	inst.RawExecutionReport = &raw_execution_report
 	return inst
 }
 
-// SetTokenIndexes sets the "tokenIndexes" parameter.
-func (inst *ManuallyExecute) SetTokenIndexes(tokenIndexes []byte) *ManuallyExecute {
-	inst.TokenIndexes = &tokenIndexes
+// SetTokenIndexes sets the "token_indexes" parameter.
+func (inst *ManuallyExecute) SetTokenIndexes(token_indexes []byte) *ManuallyExecute {
+	inst.TokenIndexes = &token_indexes
 	return inst
 }
 
@@ -80,40 +80,40 @@ func (inst *ManuallyExecute) SetConfigAccount(config ag_solanago.PublicKey) *Man
 
 // GetConfigAccount gets the "config" account.
 func (inst *ManuallyExecute) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetReferenceAddressesAccount sets the "referenceAddresses" account.
+// SetReferenceAddressesAccount sets the "reference_addresses" account.
 func (inst *ManuallyExecute) SetReferenceAddressesAccount(referenceAddresses ag_solanago.PublicKey) *ManuallyExecute {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(referenceAddresses)
 	return inst
 }
 
-// GetReferenceAddressesAccount gets the "referenceAddresses" account.
+// GetReferenceAddressesAccount gets the "reference_addresses" account.
 func (inst *ManuallyExecute) GetReferenceAddressesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSourceChainAccount sets the "sourceChain" account.
+// SetSourceChainAccount sets the "source_chain" account.
 func (inst *ManuallyExecute) SetSourceChainAccount(sourceChain ag_solanago.PublicKey) *ManuallyExecute {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(sourceChain)
 	return inst
 }
 
-// GetSourceChainAccount gets the "sourceChain" account.
+// GetSourceChainAccount gets the "source_chain" account.
 func (inst *ManuallyExecute) GetSourceChainAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetCommitReportAccount sets the "commitReport" account.
+// SetCommitReportAccount sets the "commit_report" account.
 func (inst *ManuallyExecute) SetCommitReportAccount(commitReport ag_solanago.PublicKey) *ManuallyExecute {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(commitReport).WRITE()
 	return inst
 }
 
-// GetCommitReportAccount gets the "commitReport" account.
+// GetCommitReportAccount gets the "commit_report" account.
 func (inst *ManuallyExecute) GetCommitReportAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetOfframpAccount sets the "offramp" account.
@@ -124,10 +124,10 @@ func (inst *ManuallyExecute) SetOfframpAccount(offramp ag_solanago.PublicKey) *M
 
 // GetOfframpAccount gets the "offramp" account.
 func (inst *ManuallyExecute) GetOfframpAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetAllowedOfframpAccount sets the "allowedOfframp" account.
+// SetAllowedOfframpAccount sets the "allowed_offramp" account.
 // CHECK PDA of the router program verifying the signer is an allowed offramp.
 // If PDA does not exist, the router doesn't allow this offramp. This is just used
 // so that token pools and receivers can then check that the caller is an actual offramp that
@@ -137,24 +137,24 @@ func (inst *ManuallyExecute) SetAllowedOfframpAccount(allowedOfframp ag_solanago
 	return inst
 }
 
-// GetAllowedOfframpAccount gets the "allowedOfframp" account.
+// GetAllowedOfframpAccount gets the "allowed_offramp" account.
 // CHECK PDA of the router program verifying the signer is an allowed offramp.
 // If PDA does not exist, the router doesn't allow this offramp. This is just used
 // so that token pools and receivers can then check that the caller is an actual offramp that
 // has been registered in the router as such for that source chain.
 func (inst *ManuallyExecute) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetExternalExecutionConfigAccount sets the "externalExecutionConfig" account.
+// SetExternalExecutionConfigAccount sets the "external_execution_config" account.
 func (inst *ManuallyExecute) SetExternalExecutionConfigAccount(externalExecutionConfig ag_solanago.PublicKey) *ManuallyExecute {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(externalExecutionConfig)
 	return inst
 }
 
-// GetExternalExecutionConfigAccount gets the "externalExecutionConfig" account.
+// GetExternalExecutionConfigAccount gets the "external_execution_config" account.
 func (inst *ManuallyExecute) GetExternalExecutionConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -165,40 +165,40 @@ func (inst *ManuallyExecute) SetAuthorityAccount(authority ag_solanago.PublicKey
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ManuallyExecute) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *ManuallyExecute) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *ManuallyExecute {
 	inst.AccountMetaSlice[8] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *ManuallyExecute) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice.Get(8)
 }
 
-// SetSysvarInstructionsAccount sets the "sysvarInstructions" account.
+// SetSysvarInstructionsAccount sets the "sysvar_instructions" account.
 func (inst *ManuallyExecute) SetSysvarInstructionsAccount(sysvarInstructions ag_solanago.PublicKey) *ManuallyExecute {
 	inst.AccountMetaSlice[9] = ag_solanago.Meta(sysvarInstructions)
 	return inst
 }
 
-// GetSysvarInstructionsAccount gets the "sysvarInstructions" account.
+// GetSysvarInstructionsAccount gets the "sysvar_instructions" account.
 func (inst *ManuallyExecute) GetSysvarInstructionsAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice.Get(9)
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
+// SetTokenPoolsSignerAccount sets the "token_pools_signer" account.
 func (inst *ManuallyExecute) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *ManuallyExecute {
 	inst.AccountMetaSlice[10] = ag_solanago.Meta(tokenPoolsSigner)
 	return inst
 }
 
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
+// GetTokenPoolsSignerAccount gets the "token_pools_signer" account.
 func (inst *ManuallyExecute) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
+	return inst.AccountMetaSlice.Get(10)
 }
 
 func (inst ManuallyExecute) Build() *Instruction {
@@ -278,23 +278,23 @@ func (inst *ManuallyExecute) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("RawExecutionReport", *inst.RawExecutionReport))
-						paramsBranch.Child(ag_format.Param("      TokenIndexes", *inst.TokenIndexes))
+						paramsBranch.Child(ag_format.Param("  RawExecutionReport", *inst.RawExecutionReport))
+						paramsBranch.Child(ag_format.Param("        TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=11]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                 config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     referenceAddresses", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("            sourceChain", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           commitReport", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("                offramp", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("         allowedOfframp", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("     sysvarInstructions", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("                   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("      reference_addresses", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("             source_chain", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("            commit_report", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("                  offramp", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("          allowed_offramp", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("external_execution_config", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("                authority", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("           system_program", inst.AccountMetaSlice.Get(8)))
+						accountsBranch.Child(ag_format.Meta("      sysvar_instructions", inst.AccountMetaSlice.Get(9)))
+						accountsBranch.Child(ag_format.Meta("       token_pools_signer", inst.AccountMetaSlice.Get(10)))
 					})
 				})
 		})
@@ -330,8 +330,8 @@ func (obj *ManuallyExecute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewManuallyExecuteInstruction declares a new ManuallyExecute instruction with the provided parameters and accounts.
 func NewManuallyExecuteInstruction(
 	// Parameters:
-	rawExecutionReport []byte,
-	tokenIndexes []byte,
+	raw_execution_report []byte,
+	token_indexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	referenceAddresses ag_solanago.PublicKey,
@@ -345,8 +345,8 @@ func NewManuallyExecuteInstruction(
 	sysvarInstructions ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *ManuallyExecute {
 	return NewManuallyExecuteInstructionBuilder().
-		SetRawExecutionReport(rawExecutionReport).
-		SetTokenIndexes(tokenIndexes).
+		SetRawExecutionReport(raw_execution_report).
+		SetTokenIndexes(token_indexes).
 		SetConfigAccount(config).
 		SetReferenceAddressesAccount(referenceAddresses).
 		SetSourceChainAccount(sourceChain).

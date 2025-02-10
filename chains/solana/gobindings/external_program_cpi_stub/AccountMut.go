@@ -10,15 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AccountMut is the `accountMut` instruction.
+// AccountMut is the `account_mut` instruction.
 type AccountMut struct {
 
-	// [0] = [WRITE] u8Value
+	// [0] = [WRITE] u8_value
 	//
-	// [1] = [SIGNER] stubCaller
+	// [1] = [SIGNER] stub_caller
 	//
-	// [2] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [2] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAccountMutInstructionBuilder creates a new `AccountMut` instruction builder.
@@ -29,37 +29,37 @@ func NewAccountMutInstructionBuilder() *AccountMut {
 	return nd
 }
 
-// SetU8ValueAccount sets the "u8Value" account.
+// SetU8ValueAccount sets the "u8_value" account.
 func (inst *AccountMut) SetU8ValueAccount(u8Value ag_solanago.PublicKey) *AccountMut {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(u8Value).WRITE()
 	return inst
 }
 
-// GetU8ValueAccount gets the "u8Value" account.
+// GetU8ValueAccount gets the "u8_value" account.
 func (inst *AccountMut) GetU8ValueAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetStubCallerAccount sets the "stubCaller" account.
+// SetStubCallerAccount sets the "stub_caller" account.
 func (inst *AccountMut) SetStubCallerAccount(stubCaller ag_solanago.PublicKey) *AccountMut {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(stubCaller).SIGNER()
 	return inst
 }
 
-// GetStubCallerAccount gets the "stubCaller" account.
+// GetStubCallerAccount gets the "stub_caller" account.
 func (inst *AccountMut) GetStubCallerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *AccountMut) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AccountMut {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *AccountMut) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst AccountMut) Build() *Instruction {
@@ -108,9 +108,9 @@ func (inst *AccountMut) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("      u8Value", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   stubCaller", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("      u8_value", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("   stub_caller", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})

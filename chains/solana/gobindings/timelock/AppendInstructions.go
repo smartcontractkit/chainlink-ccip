@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendInstructions is the `appendInstructions` instruction.
+// AppendInstructions is the `append_instructions` instruction.
 type AppendInstructions struct {
 	TimelockId        *[32]uint8
 	Id                *[32]uint8
@@ -20,12 +20,12 @@ type AppendInstructions struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [] roleAccessController
+	// [2] = [] role_access_controller
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
-	// [4] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [4] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAppendInstructionsInstructionBuilder creates a new `AppendInstructions` instruction builder.
@@ -36,9 +36,9 @@ func NewAppendInstructionsInstructionBuilder() *AppendInstructions {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *AppendInstructions) SetTimelockId(timelockId [32]uint8) *AppendInstructions {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "timelock_id" parameter.
+func (inst *AppendInstructions) SetTimelockId(timelock_id [32]uint8) *AppendInstructions {
+	inst.TimelockId = &timelock_id
 	return inst
 }
 
@@ -48,9 +48,9 @@ func (inst *AppendInstructions) SetId(id [32]uint8) *AppendInstructions {
 	return inst
 }
 
-// SetInstructionsBatch sets the "instructionsBatch" parameter.
-func (inst *AppendInstructions) SetInstructionsBatch(instructionsBatch []InstructionData) *AppendInstructions {
-	inst.InstructionsBatch = &instructionsBatch
+// SetInstructionsBatch sets the "instructions_batch" parameter.
+func (inst *AppendInstructions) SetInstructionsBatch(instructions_batch []InstructionData) *AppendInstructions {
+	inst.InstructionsBatch = &instructions_batch
 	return inst
 }
 
@@ -62,7 +62,7 @@ func (inst *AppendInstructions) SetOperationAccount(operation ag_solanago.Public
 
 // GetOperationAccount gets the "operation" account.
 func (inst *AppendInstructions) GetOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -73,18 +73,18 @@ func (inst *AppendInstructions) SetConfigAccount(config ag_solanago.PublicKey) *
 
 // GetConfigAccount gets the "config" account.
 func (inst *AppendInstructions) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+// SetRoleAccessControllerAccount sets the "role_access_controller" account.
 func (inst *AppendInstructions) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *AppendInstructions {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
-// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+// GetRoleAccessControllerAccount gets the "role_access_controller" account.
 func (inst *AppendInstructions) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -95,18 +95,18 @@ func (inst *AppendInstructions) SetAuthorityAccount(authority ag_solanago.Public
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AppendInstructions) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *AppendInstructions) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AppendInstructions {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *AppendInstructions) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 func (inst AppendInstructions) Build() *Instruction {
@@ -171,18 +171,18 @@ func (inst *AppendInstructions) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("       TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("               Id", *inst.Id))
-						paramsBranch.Child(ag_format.Param("InstructionsBatch", *inst.InstructionsBatch))
+						paramsBranch.Child(ag_format.Param("        TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("                Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param(" InstructionsBatch", *inst.InstructionsBatch))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("       systemProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("             operation", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("role_access_controller", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("        system_program", inst.AccountMetaSlice.Get(4)))
 					})
 				})
 		})
@@ -228,9 +228,9 @@ func (obj *AppendInstructions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 // NewAppendInstructionsInstruction declares a new AppendInstructions instruction with the provided parameters and accounts.
 func NewAppendInstructionsInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	timelock_id [32]uint8,
 	id [32]uint8,
-	instructionsBatch []InstructionData,
+	instructions_batch []InstructionData,
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
@@ -238,9 +238,9 @@ func NewAppendInstructionsInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AppendInstructions {
 	return NewAppendInstructionsInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(timelock_id).
 		SetId(id).
-		SetInstructionsBatch(instructionsBatch).
+		SetInstructionsBatch(instructions_batch).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).
 		SetRoleAccessControllerAccount(roleAccessController).

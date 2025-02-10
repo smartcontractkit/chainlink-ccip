@@ -33,12 +33,12 @@ type UpdatePrices struct {
 
 	// [0] = [SIGNER] authority
 	//
-	// [1] = [] allowedPriceUpdater
+	// [1] = [] allowed_price_updater
 	// ··········· was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA
 	// ··········· and that it was initialized.
 	//
 	// [2] = [] config
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUpdatePricesInstructionBuilder creates a new `UpdatePrices` instruction builder.
@@ -49,15 +49,15 @@ func NewUpdatePricesInstructionBuilder() *UpdatePrices {
 	return nd
 }
 
-// SetTokenUpdates sets the "tokenUpdates" parameter.
-func (inst *UpdatePrices) SetTokenUpdates(tokenUpdates []TokenPriceUpdate) *UpdatePrices {
-	inst.TokenUpdates = &tokenUpdates
+// SetTokenUpdates sets the "token_updates" parameter.
+func (inst *UpdatePrices) SetTokenUpdates(token_updates []TokenPriceUpdate) *UpdatePrices {
+	inst.TokenUpdates = &token_updates
 	return inst
 }
 
-// SetGasUpdates sets the "gasUpdates" parameter.
-func (inst *UpdatePrices) SetGasUpdates(gasUpdates []GasPriceUpdate) *UpdatePrices {
-	inst.GasUpdates = &gasUpdates
+// SetGasUpdates sets the "gas_updates" parameter.
+func (inst *UpdatePrices) SetGasUpdates(gas_updates []GasPriceUpdate) *UpdatePrices {
+	inst.GasUpdates = &gas_updates
 	return inst
 }
 
@@ -69,10 +69,10 @@ func (inst *UpdatePrices) SetAuthorityAccount(authority ag_solanago.PublicKey) *
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UpdatePrices) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetAllowedPriceUpdaterAccount sets the "allowedPriceUpdater" account.
+// SetAllowedPriceUpdaterAccount sets the "allowed_price_updater" account.
 // was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA
 // and that it was initialized.
 func (inst *UpdatePrices) SetAllowedPriceUpdaterAccount(allowedPriceUpdater ag_solanago.PublicKey) *UpdatePrices {
@@ -80,11 +80,11 @@ func (inst *UpdatePrices) SetAllowedPriceUpdaterAccount(allowedPriceUpdater ag_s
 	return inst
 }
 
-// GetAllowedPriceUpdaterAccount gets the "allowedPriceUpdater" account.
+// GetAllowedPriceUpdaterAccount gets the "allowed_price_updater" account.
 // was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA
 // and that it was initialized.
 func (inst *UpdatePrices) GetAllowedPriceUpdaterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -95,7 +95,7 @@ func (inst *UpdatePrices) SetConfigAccount(config ag_solanago.PublicKey) *Update
 
 // GetConfigAccount gets the "config" account.
 func (inst *UpdatePrices) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst UpdatePrices) Build() *Instruction {
@@ -151,15 +151,15 @@ func (inst *UpdatePrices) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TokenUpdates", *inst.TokenUpdates))
-						paramsBranch.Child(ag_format.Param("  GasUpdates", *inst.GasUpdates))
+						paramsBranch.Child(ag_format.Param(" TokenUpdates", *inst.TokenUpdates))
+						paramsBranch.Child(ag_format.Param("   GasUpdates", *inst.GasUpdates))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("          authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("allowedPriceUpdater", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("             config", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("            authority", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("allowed_price_updater", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("               config", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -195,15 +195,15 @@ func (obj *UpdatePrices) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 // NewUpdatePricesInstruction declares a new UpdatePrices instruction with the provided parameters and accounts.
 func NewUpdatePricesInstruction(
 	// Parameters:
-	tokenUpdates []TokenPriceUpdate,
-	gasUpdates []GasPriceUpdate,
+	token_updates []TokenPriceUpdate,
+	gas_updates []GasPriceUpdate,
 	// Accounts:
 	authority ag_solanago.PublicKey,
 	allowedPriceUpdater ag_solanago.PublicKey,
 	config ag_solanago.PublicKey) *UpdatePrices {
 	return NewUpdatePricesInstructionBuilder().
-		SetTokenUpdates(tokenUpdates).
-		SetGasUpdates(gasUpdates).
+		SetTokenUpdates(token_updates).
+		SetGasUpdates(gas_updates).
 		SetAuthorityAccount(authority).
 		SetAllowedPriceUpdaterAccount(allowedPriceUpdater).
 		SetConfigAccount(config)

@@ -22,12 +22,12 @@ type AcceptAdminRoleTokenAdminRegistry struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] tokenAdminRegistry
+	// [1] = [WRITE] token_admin_registry
 	//
 	// [2] = [] mint
 	//
 	// [3] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAcceptAdminRoleTokenAdminRegistryInstructionBuilder creates a new `AcceptAdminRoleTokenAdminRegistry` instruction builder.
@@ -46,18 +46,18 @@ func (inst *AcceptAdminRoleTokenAdminRegistry) SetConfigAccount(config ag_solana
 
 // GetConfigAccount gets the "config" account.
 func (inst *AcceptAdminRoleTokenAdminRegistry) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
+// SetTokenAdminRegistryAccount sets the "token_admin_registry" account.
 func (inst *AcceptAdminRoleTokenAdminRegistry) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *AcceptAdminRoleTokenAdminRegistry {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
 	return inst
 }
 
-// GetTokenAdminRegistryAccount gets the "tokenAdminRegistry" account.
+// GetTokenAdminRegistryAccount gets the "token_admin_registry" account.
 func (inst *AcceptAdminRoleTokenAdminRegistry) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -68,7 +68,7 @@ func (inst *AcceptAdminRoleTokenAdminRegistry) SetMintAccount(mint ag_solanago.P
 
 // GetMintAccount gets the "mint" account.
 func (inst *AcceptAdminRoleTokenAdminRegistry) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -79,7 +79,7 @@ func (inst *AcceptAdminRoleTokenAdminRegistry) SetAuthorityAccount(authority ag_
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AcceptAdminRoleTokenAdminRegistry) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst AcceptAdminRoleTokenAdminRegistry) Build() *Instruction {
@@ -131,10 +131,10 @@ func (inst *AcceptAdminRoleTokenAdminRegistry) EncodeToTree(parent ag_treeout.Br
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("              mint", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("token_admin_registry", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                mint", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})

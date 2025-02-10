@@ -978,248 +978,83 @@
   "errors": [
     {
       "code": 6000,
-      "name": "InvalidSequenceInterval",
-      "msg": "The given sequence interval is invalid"
+      "name": "InvalidConfigFMustBePositive",
+      "msg": "Invalid config: F must be positive"
     },
     {
       "code": 6001,
-      "name": "RootNotCommitted",
-      "msg": "The given Merkle Root is missing"
+      "name": "InvalidConfigTooManyTransmitters",
+      "msg": "Invalid config: Too many transmitters"
     },
     {
       "code": 6002,
-      "name": "ExistingMerkleRoot",
-      "msg": "The given Merkle Root is already committed"
+      "name": "InvalidConfigTooManySigners",
+      "msg": "Invalid config: Too many signers"
     },
     {
       "code": 6003,
-      "name": "Unauthorized",
-      "msg": "The signer is unauthorized"
+      "name": "InvalidConfigFIsTooHigh",
+      "msg": "Invalid config: F is too high"
     },
     {
       "code": 6004,
-      "name": "InvalidInputs",
-      "msg": "Invalid inputs"
+      "name": "InvalidConfigRepeatedOracle",
+      "msg": "Invalid config: Repeated oracle address"
     },
     {
       "code": 6005,
-      "name": "UnsupportedSourceChainSelector",
-      "msg": "Source chain selector not supported"
+      "name": "WrongMessageLength",
+      "msg": "Wrong message length"
     },
     {
       "code": 6006,
-      "name": "UnsupportedDestinationChainSelector",
-      "msg": "Destination chain selector not supported"
+      "name": "ConfigDigestMismatch",
+      "msg": "Config digest mismatch"
     },
     {
       "code": 6007,
-      "name": "InvalidProof",
-      "msg": "Invalid Proof for Merkle Root"
+      "name": "WrongNumberOfSignatures",
+      "msg": "Wrong number signatures"
     },
     {
       "code": 6008,
-      "name": "InvalidMessage",
-      "msg": "Invalid message format"
+      "name": "UnauthorizedTransmitter",
+      "msg": "Unauthorized transmitter"
     },
     {
       "code": 6009,
-      "name": "ReachedMaxSequenceNumber",
-      "msg": "Reached max sequence number"
+      "name": "UnauthorizedSigner",
+      "msg": "Unauthorized signer"
     },
     {
       "code": 6010,
-      "name": "ManualExecutionNotAllowed",
-      "msg": "Manual execution not allowed"
+      "name": "NonUniqueSignatures",
+      "msg": "Non unique signatures"
     },
     {
       "code": 6011,
-      "name": "InvalidInputsTokenIndices",
-      "msg": "Invalid pool account account indices"
+      "name": "OracleCannotBeZeroAddress",
+      "msg": "Oracle cannot be zero address"
     },
     {
       "code": 6012,
-      "name": "InvalidInputsPoolAccounts",
-      "msg": "Invalid pool accounts"
+      "name": "StaticConfigCannotBeChanged",
+      "msg": "Static config cannot be changed"
     },
     {
       "code": 6013,
-      "name": "InvalidInputsTokenAccounts",
-      "msg": "Invalid token accounts"
+      "name": "InvalidPluginType",
+      "msg": "Incorrect plugin type"
     },
     {
       "code": 6014,
-      "name": "InvalidInputsConfigAccounts",
-      "msg": "Invalid config account"
+      "name": "InvalidSignature",
+      "msg": "Invalid signature"
     },
     {
       "code": 6015,
-      "name": "InvalidInputsTokenAdminRegistryAccounts",
-      "msg": "Invalid Token Admin Registry account"
-    },
-    {
-      "code": 6016,
-      "name": "InvalidInputsLookupTableAccounts",
-      "msg": "Invalid LookupTable account"
-    },
-    {
-      "code": 6017,
-      "name": "InvalidInputsLookupTableAccountWritable",
-      "msg": "Invalid LookupTable account writable access"
-    },
-    {
-      "code": 6018,
-      "name": "InvalidInputsTokenAmount",
-      "msg": "Cannot send zero tokens"
-    },
-    {
-      "code": 6019,
-      "name": "OfframpReleaseMintBalanceMismatch",
-      "msg": "Release or mint balance mismatch"
-    },
-    {
-      "code": 6020,
-      "name": "OfframpInvalidDataLength",
-      "msg": "Invalid data length"
-    },
-    {
-      "code": 6021,
-      "name": "StaleCommitReport",
-      "msg": "Stale commit report"
-    },
-    {
-      "code": 6022,
-      "name": "DestinationChainDisabled",
-      "msg": "Destination chain disabled"
-    },
-    {
-      "code": 6023,
-      "name": "FeeTokenDisabled",
-      "msg": "Fee token disabled"
-    },
-    {
-      "code": 6024,
-      "name": "MessageTooLarge",
-      "msg": "Message exceeds maximum data size"
-    },
-    {
-      "code": 6025,
-      "name": "UnsupportedNumberOfTokens",
-      "msg": "Message contains an unsupported number of tokens"
-    },
-    {
-      "code": 6026,
-      "name": "UnsupportedChainFamilySelector",
-      "msg": "Chain family selector not supported"
-    },
-    {
-      "code": 6027,
-      "name": "InvalidEVMAddress",
-      "msg": "Invalid EVM address"
-    },
-    {
-      "code": 6028,
-      "name": "InvalidEncoding",
-      "msg": "Invalid encoding"
-    },
-    {
-      "code": 6029,
-      "name": "InvalidInputsAtaAddress",
-      "msg": "Invalid Associated Token Account address"
-    },
-    {
-      "code": 6030,
-      "name": "InvalidInputsAtaWritable",
-      "msg": "Invalid Associated Token Account writable flag"
-    },
-    {
-      "code": 6031,
-      "name": "InvalidTokenPrice",
-      "msg": "Invalid token price"
-    },
-    {
-      "code": 6032,
-      "name": "StaleGasPrice",
-      "msg": "Stale gas price"
-    },
-    {
-      "code": 6033,
-      "name": "InsufficientLamports",
-      "msg": "Insufficient lamports"
-    },
-    {
-      "code": 6034,
-      "name": "InsufficientFunds",
-      "msg": "Insufficient funds"
-    },
-    {
-      "code": 6035,
-      "name": "UnsupportedToken",
-      "msg": "Unsupported token"
-    },
-    {
-      "code": 6036,
-      "name": "InvalidInputsMissingTokenConfig",
-      "msg": "Inputs are missing token configuration"
-    },
-    {
-      "code": 6037,
-      "name": "MessageFeeTooHigh",
-      "msg": "Message fee is too high"
-    },
-    {
-      "code": 6038,
-      "name": "SourceTokenDataTooLarge",
-      "msg": "Source token data is too large"
-    },
-    {
-      "code": 6039,
-      "name": "MessageGasLimitTooHigh",
-      "msg": "Message gas limit too high"
-    },
-    {
-      "code": 6040,
-      "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
-      "msg": "Extra arg out of order execution must be true"
-    },
-    {
-      "code": 6041,
-      "name": "InvalidTokenAdminRegistryInputsZeroAddress",
-      "msg": "New Admin can not be zero address"
-    },
-    {
-      "code": 6042,
-      "name": "InvalidTokenAdminRegistryProposedAdmin",
-      "msg": "An already owned registry can not be proposed"
-    },
-    {
-      "code": 6043,
-      "name": "InvalidWritabilityBitmap",
-      "msg": "Invalid writability bitmap"
-    },
-    {
-      "code": 6044,
-      "name": "InvalidExtraArgsTag",
-      "msg": "Invalid extra args tag"
-    },
-    {
-      "code": 6045,
-      "name": "InvalidChainFamilySelector",
-      "msg": "Invalid chain family selector"
-    },
-    {
-      "code": 6046,
-      "name": "InvalidTokenReceiver",
-      "msg": "Invalid token receiver"
-    },
-    {
-      "code": 6047,
-      "name": "InvalidSVMAddress",
-      "msg": "Invalid SVM address"
-    },
-    {
-      "code": 6048,
-      "name": "SenderNotAllowed",
-      "msg": "Sender not allowed for that destination chain"
+      "name": "SignaturesOutOfRegistration",
+      "msg": "Signatures out of registration"
     }
   ],
   "types": [

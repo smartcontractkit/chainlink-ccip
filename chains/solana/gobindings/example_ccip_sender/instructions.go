@@ -16,8 +16,8 @@ import (
 
 var ProgramID ag_solanago.PublicKey
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -30,46 +30,46 @@ func init() {
 }
 
 var (
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
 	Instruction_CcipSend = ag_binary.TypeID([8]byte{108, 216, 134, 191, 249, 234, 33, 84})
 
-	Instruction_UpdateRouter = ag_binary.TypeID([8]byte{32, 109, 12, 153, 101, 129, 64, 70})
+	Instruction_InitChainConfig = ag_binary.TypeID([8]byte{21, 94, 4, 115, 130, 211, 10, 229})
+
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	Instruction_RemoveChainConfig = ag_binary.TypeID([8]byte{212, 220, 209, 147, 118, 171, 38, 48})
 
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
-	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
-
-	Instruction_WithdrawTokens = ag_binary.TypeID([8]byte{2, 4, 225, 61, 19, 182, 106, 170})
-
-	Instruction_InitChainConfig = ag_binary.TypeID([8]byte{21, 94, 4, 115, 130, 211, 10, 229})
-
 	Instruction_UpdateChainConfig = ag_binary.TypeID([8]byte{192, 127, 91, 206, 38, 245, 41, 121})
 
-	Instruction_RemoveChainConfig = ag_binary.TypeID([8]byte{212, 220, 209, 147, 118, 171, 38, 48})
+	Instruction_UpdateRouter = ag_binary.TypeID([8]byte{32, 109, 12, 153, 101, 129, 64, 70})
+
+	Instruction_WithdrawTokens = ag_binary.TypeID([8]byte{2, 4, 225, 61, 19, 182, 106, 170})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_CcipSend:
-		return "CcipSend"
-	case Instruction_UpdateRouter:
-		return "UpdateRouter"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_WithdrawTokens:
-		return "WithdrawTokens"
+	case Instruction_CcipSend:
+		return "CcipSend"
 	case Instruction_InitChainConfig:
 		return "InitChainConfig"
-	case Instruction_UpdateChainConfig:
-		return "UpdateChainConfig"
+	case Instruction_Initialize:
+		return "Initialize"
 	case Instruction_RemoveChainConfig:
 		return "RemoveChainConfig"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_UpdateChainConfig:
+		return "UpdateChainConfig"
+	case Instruction_UpdateRouter:
+		return "UpdateRouter"
+	case Instruction_WithdrawTokens:
+		return "WithdrawTokens"
 	default:
 		return ""
 	}
@@ -91,31 +91,31 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnership)(nil),
 		},
 		{
-			"ccip_send", (*CcipSend)(nil),
+			Name: "ccip_send", Type: (*CcipSend)(nil),
 		},
 		{
-			"update_router", (*UpdateRouter)(nil),
+			Name: "init_chain_config", Type: (*InitChainConfig)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "initialize", Type: (*Initialize)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "remove_chain_config", Type: (*RemoveChainConfig)(nil),
 		},
 		{
-			"withdraw_tokens", (*WithdrawTokens)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnership)(nil),
 		},
 		{
-			"init_chain_config", (*InitChainConfig)(nil),
+			Name: "update_chain_config", Type: (*UpdateChainConfig)(nil),
 		},
 		{
-			"update_chain_config", (*UpdateChainConfig)(nil),
+			Name: "update_router", Type: (*UpdateRouter)(nil),
 		},
 		{
-			"remove_chain_config", (*RemoveChainConfig)(nil),
+			Name: "withdraw_tokens", Type: (*WithdrawTokens)(nil),
 		},
 	},
 )
@@ -153,14 +153,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -172,4 +172,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

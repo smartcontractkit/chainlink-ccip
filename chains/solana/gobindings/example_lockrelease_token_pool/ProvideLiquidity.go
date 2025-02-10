@@ -10,24 +10,24 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ProvideLiquidity is the `provideLiquidity` instruction.
+// ProvideLiquidity is the `provide_liquidity` instruction.
 type ProvideLiquidity struct {
 	Amount *uint64
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [] tokenProgram
+	// [1] = [] token_program
 	//
 	// [2] = [WRITE] mint
 	//
-	// [3] = [] poolSigner
+	// [3] = [] pool_signer
 	//
-	// [4] = [WRITE] poolTokenAccount
+	// [4] = [WRITE] pool_token_account
 	//
-	// [5] = [WRITE] remoteTokenAccount
+	// [5] = [WRITE] remote_token_account
 	//
 	// [6] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewProvideLiquidityInstructionBuilder creates a new `ProvideLiquidity` instruction builder.
@@ -52,18 +52,18 @@ func (inst *ProvideLiquidity) SetStateAccount(state ag_solanago.PublicKey) *Prov
 
 // GetStateAccount gets the "state" account.
 func (inst *ProvideLiquidity) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 func (inst *ProvideLiquidity) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *ProvideLiquidity {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 func (inst *ProvideLiquidity) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -74,40 +74,40 @@ func (inst *ProvideLiquidity) SetMintAccount(mint ag_solanago.PublicKey) *Provid
 
 // GetMintAccount gets the "mint" account.
 func (inst *ProvideLiquidity) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetPoolSignerAccount sets the "poolSigner" account.
+// SetPoolSignerAccount sets the "pool_signer" account.
 func (inst *ProvideLiquidity) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *ProvideLiquidity {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(poolSigner)
 	return inst
 }
 
-// GetPoolSignerAccount gets the "poolSigner" account.
+// GetPoolSignerAccount gets the "pool_signer" account.
 func (inst *ProvideLiquidity) GetPoolSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetPoolTokenAccountAccount sets the "poolTokenAccount" account.
+// SetPoolTokenAccountAccount sets the "pool_token_account" account.
 func (inst *ProvideLiquidity) SetPoolTokenAccountAccount(poolTokenAccount ag_solanago.PublicKey) *ProvideLiquidity {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(poolTokenAccount).WRITE()
 	return inst
 }
 
-// GetPoolTokenAccountAccount gets the "poolTokenAccount" account.
+// GetPoolTokenAccountAccount gets the "pool_token_account" account.
 func (inst *ProvideLiquidity) GetPoolTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetRemoteTokenAccountAccount sets the "remoteTokenAccount" account.
+// SetRemoteTokenAccountAccount sets the "remote_token_account" account.
 func (inst *ProvideLiquidity) SetRemoteTokenAccountAccount(remoteTokenAccount ag_solanago.PublicKey) *ProvideLiquidity {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(remoteTokenAccount).WRITE()
 	return inst
 }
 
-// GetRemoteTokenAccountAccount gets the "remoteTokenAccount" account.
+// GetRemoteTokenAccountAccount gets the "remote_token_account" account.
 func (inst *ProvideLiquidity) GetRemoteTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -118,7 +118,7 @@ func (inst *ProvideLiquidity) SetAuthorityAccount(authority ag_solanago.PublicKe
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ProvideLiquidity) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
 func (inst ProvideLiquidity) Build() *Instruction {
@@ -188,13 +188,13 @@ func (inst *ProvideLiquidity) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("tokenProgram", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("        mint", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("  poolSigner", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("   poolToken", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta(" remoteToken", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("token_program", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("  pool_signer", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("  pool_token_", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("remote_token_", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice.Get(6)))
 					})
 				})
 		})

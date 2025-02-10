@@ -21,14 +21,14 @@ type OwnerOverridePendingAdministrator struct {
 
 	// [0] = [] config
 	//
-	// [1] = [] tokenAdminRegistry
+	// [1] = [] token_admin_registry
 	//
 	// [2] = [] mint
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
-	// [4] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [4] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewOwnerOverridePendingAdministratorInstructionBuilder creates a new `OwnerOverridePendingAdministrator` instruction builder.
@@ -39,9 +39,9 @@ func NewOwnerOverridePendingAdministratorInstructionBuilder() *OwnerOverridePend
 	return nd
 }
 
-// SetTokenAdminRegistryAdmin sets the "tokenAdminRegistryAdmin" parameter.
-func (inst *OwnerOverridePendingAdministrator) SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
-	inst.TokenAdminRegistryAdmin = &tokenAdminRegistryAdmin
+// SetTokenAdminRegistryAdmin sets the "token_admin_registry_admin" parameter.
+func (inst *OwnerOverridePendingAdministrator) SetTokenAdminRegistryAdmin(token_admin_registry_admin ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
+	inst.TokenAdminRegistryAdmin = &token_admin_registry_admin
 	return inst
 }
 
@@ -53,18 +53,18 @@ func (inst *OwnerOverridePendingAdministrator) SetConfigAccount(config ag_solana
 
 // GetConfigAccount gets the "config" account.
 func (inst *OwnerOverridePendingAdministrator) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
+// SetTokenAdminRegistryAccount sets the "token_admin_registry" account.
 func (inst *OwnerOverridePendingAdministrator) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry)
 	return inst
 }
 
-// GetTokenAdminRegistryAccount gets the "tokenAdminRegistry" account.
+// GetTokenAdminRegistryAccount gets the "token_admin_registry" account.
 func (inst *OwnerOverridePendingAdministrator) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -75,7 +75,7 @@ func (inst *OwnerOverridePendingAdministrator) SetMintAccount(mint ag_solanago.P
 
 // GetMintAccount gets the "mint" account.
 func (inst *OwnerOverridePendingAdministrator) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -86,18 +86,18 @@ func (inst *OwnerOverridePendingAdministrator) SetAuthorityAccount(authority ag_
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *OwnerOverridePendingAdministrator) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *OwnerOverridePendingAdministrator) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *OwnerOverridePendingAdministrator) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 func (inst OwnerOverridePendingAdministrator) Build() *Instruction {
@@ -156,16 +156,16 @@ func (inst *OwnerOverridePendingAdministrator) EncodeToTree(parent ag_treeout.Br
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TokenAdminRegistryAdmin", *inst.TokenAdminRegistryAdmin))
+						paramsBranch.Child(ag_format.Param("   TokenAdminRegistryAdmin", *inst.TokenAdminRegistryAdmin))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("              mint", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("token_admin_registry", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                mint", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("      system_program", inst.AccountMetaSlice.Get(4)))
 					})
 				})
 		})
@@ -191,7 +191,7 @@ func (obj *OwnerOverridePendingAdministrator) UnmarshalWithDecoder(decoder *ag_b
 // NewOwnerOverridePendingAdministratorInstruction declares a new OwnerOverridePendingAdministrator instruction with the provided parameters and accounts.
 func NewOwnerOverridePendingAdministratorInstruction(
 	// Parameters:
-	tokenAdminRegistryAdmin ag_solanago.PublicKey,
+	token_admin_registry_admin ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	tokenAdminRegistry ag_solanago.PublicKey,
@@ -199,7 +199,7 @@ func NewOwnerOverridePendingAdministratorInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
 	return NewOwnerOverridePendingAdministratorInstructionBuilder().
-		SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin).
+		SetTokenAdminRegistryAdmin(token_admin_registry_admin).
 		SetConfigAccount(config).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
 		SetMintAccount(mint).

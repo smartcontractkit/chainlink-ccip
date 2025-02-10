@@ -21,7 +21,7 @@ type AddSourceChain struct {
 	NewChainSelector  *uint64
 	SourceChainConfig *SourceChainConfig
 
-	// [0] = [WRITE] sourceChain
+	// [0] = [WRITE] source_chain
 	// ··········· Adding a chain selector implies initializing the state for a new chain,
 	// ··········· hence the need to initialize two accounts.
 	//
@@ -29,8 +29,8 @@ type AddSourceChain struct {
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAddSourceChainInstructionBuilder creates a new `AddSourceChain` instruction builder.
@@ -41,19 +41,19 @@ func NewAddSourceChainInstructionBuilder() *AddSourceChain {
 	return nd
 }
 
-// SetNewChainSelector sets the "newChainSelector" parameter.
-func (inst *AddSourceChain) SetNewChainSelector(newChainSelector uint64) *AddSourceChain {
-	inst.NewChainSelector = &newChainSelector
+// SetNewChainSelector sets the "new_chain_selector" parameter.
+func (inst *AddSourceChain) SetNewChainSelector(new_chain_selector uint64) *AddSourceChain {
+	inst.NewChainSelector = &new_chain_selector
 	return inst
 }
 
-// SetSourceChainConfig sets the "sourceChainConfig" parameter.
-func (inst *AddSourceChain) SetSourceChainConfig(sourceChainConfig SourceChainConfig) *AddSourceChain {
-	inst.SourceChainConfig = &sourceChainConfig
+// SetSourceChainConfig sets the "source_chain_config" parameter.
+func (inst *AddSourceChain) SetSourceChainConfig(source_chain_config SourceChainConfig) *AddSourceChain {
+	inst.SourceChainConfig = &source_chain_config
 	return inst
 }
 
-// SetSourceChainAccount sets the "sourceChain" account.
+// SetSourceChainAccount sets the "source_chain" account.
 // Adding a chain selector implies initializing the state for a new chain,
 // hence the need to initialize two accounts.
 func (inst *AddSourceChain) SetSourceChainAccount(sourceChain ag_solanago.PublicKey) *AddSourceChain {
@@ -61,11 +61,11 @@ func (inst *AddSourceChain) SetSourceChainAccount(sourceChain ag_solanago.Public
 	return inst
 }
 
-// GetSourceChainAccount gets the "sourceChain" account.
+// GetSourceChainAccount gets the "source_chain" account.
 // Adding a chain selector implies initializing the state for a new chain,
 // hence the need to initialize two accounts.
 func (inst *AddSourceChain) GetSourceChainAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -76,7 +76,7 @@ func (inst *AddSourceChain) SetConfigAccount(config ag_solanago.PublicKey) *AddS
 
 // GetConfigAccount gets the "config" account.
 func (inst *AddSourceChain) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -87,18 +87,18 @@ func (inst *AddSourceChain) SetAuthorityAccount(authority ag_solanago.PublicKey)
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AddSourceChain) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *AddSourceChain) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AddSourceChain {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *AddSourceChain) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst AddSourceChain) Build() *Instruction {
@@ -157,16 +157,16 @@ func (inst *AddSourceChain) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param(" NewChainSelector", *inst.NewChainSelector))
-						paramsBranch.Child(ag_format.Param("SourceChainConfig", *inst.SourceChainConfig))
+						paramsBranch.Child(ag_format.Param("   NewChainSelector", *inst.NewChainSelector))
+						paramsBranch.Child(ag_format.Param("  SourceChainConfig", *inst.SourceChainConfig))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("  sourceChain", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("  source_chain", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -202,16 +202,16 @@ func (obj *AddSourceChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 // NewAddSourceChainInstruction declares a new AddSourceChain instruction with the provided parameters and accounts.
 func NewAddSourceChainInstruction(
 	// Parameters:
-	newChainSelector uint64,
-	sourceChainConfig SourceChainConfig,
+	new_chain_selector uint64,
+	source_chain_config SourceChainConfig,
 	// Accounts:
 	sourceChain ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AddSourceChain {
 	return NewAddSourceChainInstructionBuilder().
-		SetNewChainSelector(newChainSelector).
-		SetSourceChainConfig(sourceChainConfig).
+		SetNewChainSelector(new_chain_selector).
+		SetSourceChainConfig(source_chain_config).
 		SetSourceChainAccount(sourceChain).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).

@@ -10,18 +10,18 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// CcipTokenReleaseMint is the `ccipTokenReleaseMint` instruction.
+// CcipTokenReleaseMint is the `ccip_token_release_mint` instruction.
 type CcipTokenReleaseMint struct {
 	Input *ReleaseOrMintInV1
 
 	// [0] = [SIGNER] authority
 	//
-	// [1] = [WRITE] poolTokenAccount
+	// [1] = [WRITE] pool_token_account
 	//
 	// [2] = [] mint
 	//
-	// [3] = [] tokenProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] token_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewCcipTokenReleaseMintInstructionBuilder creates a new `CcipTokenReleaseMint` instruction builder.
@@ -46,18 +46,18 @@ func (inst *CcipTokenReleaseMint) SetAuthorityAccount(authority ag_solanago.Publ
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *CcipTokenReleaseMint) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetPoolTokenAccountAccount sets the "poolTokenAccount" account.
+// SetPoolTokenAccountAccount sets the "pool_token_account" account.
 func (inst *CcipTokenReleaseMint) SetPoolTokenAccountAccount(poolTokenAccount ag_solanago.PublicKey) *CcipTokenReleaseMint {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(poolTokenAccount).WRITE()
 	return inst
 }
 
-// GetPoolTokenAccountAccount gets the "poolTokenAccount" account.
+// GetPoolTokenAccountAccount gets the "pool_token_account" account.
 func (inst *CcipTokenReleaseMint) GetPoolTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -68,18 +68,18 @@ func (inst *CcipTokenReleaseMint) SetMintAccount(mint ag_solanago.PublicKey) *Cc
 
 // GetMintAccount gets the "mint" account.
 func (inst *CcipTokenReleaseMint) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 func (inst *CcipTokenReleaseMint) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *CcipTokenReleaseMint {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 func (inst *CcipTokenReleaseMint) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst CcipTokenReleaseMint) Build() *Instruction {
@@ -140,10 +140,10 @@ func (inst *CcipTokenReleaseMint) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   poolToken", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("        mint", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("tokenProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("  pool_token_", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("token_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})

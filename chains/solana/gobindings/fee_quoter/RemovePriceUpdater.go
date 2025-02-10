@@ -19,14 +19,14 @@ import (
 type RemovePriceUpdater struct {
 	PriceUpdater *ag_solanago.PublicKey
 
-	// [0] = [WRITE] allowedPriceUpdater
+	// [0] = [WRITE] allowed_price_updater
 	//
 	// [1] = [] config
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewRemovePriceUpdaterInstructionBuilder creates a new `RemovePriceUpdater` instruction builder.
@@ -37,21 +37,21 @@ func NewRemovePriceUpdaterInstructionBuilder() *RemovePriceUpdater {
 	return nd
 }
 
-// SetPriceUpdater sets the "priceUpdater" parameter.
-func (inst *RemovePriceUpdater) SetPriceUpdater(priceUpdater ag_solanago.PublicKey) *RemovePriceUpdater {
-	inst.PriceUpdater = &priceUpdater
+// SetPriceUpdater sets the "price_updater" parameter.
+func (inst *RemovePriceUpdater) SetPriceUpdater(price_updater ag_solanago.PublicKey) *RemovePriceUpdater {
+	inst.PriceUpdater = &price_updater
 	return inst
 }
 
-// SetAllowedPriceUpdaterAccount sets the "allowedPriceUpdater" account.
+// SetAllowedPriceUpdaterAccount sets the "allowed_price_updater" account.
 func (inst *RemovePriceUpdater) SetAllowedPriceUpdaterAccount(allowedPriceUpdater ag_solanago.PublicKey) *RemovePriceUpdater {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(allowedPriceUpdater).WRITE()
 	return inst
 }
 
-// GetAllowedPriceUpdaterAccount gets the "allowedPriceUpdater" account.
+// GetAllowedPriceUpdaterAccount gets the "allowed_price_updater" account.
 func (inst *RemovePriceUpdater) GetAllowedPriceUpdaterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -62,7 +62,7 @@ func (inst *RemovePriceUpdater) SetConfigAccount(config ag_solanago.PublicKey) *
 
 // GetConfigAccount gets the "config" account.
 func (inst *RemovePriceUpdater) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -73,18 +73,18 @@ func (inst *RemovePriceUpdater) SetAuthorityAccount(authority ag_solanago.Public
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *RemovePriceUpdater) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *RemovePriceUpdater) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *RemovePriceUpdater {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *RemovePriceUpdater) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst RemovePriceUpdater) Build() *Instruction {
@@ -140,15 +140,15 @@ func (inst *RemovePriceUpdater) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("PriceUpdater", *inst.PriceUpdater))
+						paramsBranch.Child(ag_format.Param(" PriceUpdater", *inst.PriceUpdater))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("allowedPriceUpdater", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("             config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("          authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("      systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("allowed_price_updater", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("               config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("            authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("       system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -174,14 +174,14 @@ func (obj *RemovePriceUpdater) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 // NewRemovePriceUpdaterInstruction declares a new RemovePriceUpdater instruction with the provided parameters and accounts.
 func NewRemovePriceUpdaterInstruction(
 	// Parameters:
-	priceUpdater ag_solanago.PublicKey,
+	price_updater ag_solanago.PublicKey,
 	// Accounts:
 	allowedPriceUpdater ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *RemovePriceUpdater {
 	return NewRemovePriceUpdaterInstructionBuilder().
-		SetPriceUpdater(priceUpdater).
+		SetPriceUpdater(price_updater).
 		SetAllowedPriceUpdaterAccount(allowedPriceUpdater).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).

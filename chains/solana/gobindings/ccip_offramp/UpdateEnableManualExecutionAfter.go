@@ -25,7 +25,7 @@ type UpdateEnableManualExecutionAfter struct {
 	// [0] = [WRITE] config
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUpdateEnableManualExecutionAfterInstructionBuilder creates a new `UpdateEnableManualExecutionAfter` instruction builder.
@@ -36,9 +36,9 @@ func NewUpdateEnableManualExecutionAfterInstructionBuilder() *UpdateEnableManual
 	return nd
 }
 
-// SetNewEnableManualExecutionAfter sets the "newEnableManualExecutionAfter" parameter.
-func (inst *UpdateEnableManualExecutionAfter) SetNewEnableManualExecutionAfter(newEnableManualExecutionAfter int64) *UpdateEnableManualExecutionAfter {
-	inst.NewEnableManualExecutionAfter = &newEnableManualExecutionAfter
+// SetNewEnableManualExecutionAfter sets the "new_enable_manual_execution_after" parameter.
+func (inst *UpdateEnableManualExecutionAfter) SetNewEnableManualExecutionAfter(new_enable_manual_execution_after int64) *UpdateEnableManualExecutionAfter {
+	inst.NewEnableManualExecutionAfter = &new_enable_manual_execution_after
 	return inst
 }
 
@@ -50,7 +50,7 @@ func (inst *UpdateEnableManualExecutionAfter) SetConfigAccount(config ag_solanag
 
 // GetConfigAccount gets the "config" account.
 func (inst *UpdateEnableManualExecutionAfter) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -61,7 +61,7 @@ func (inst *UpdateEnableManualExecutionAfter) SetAuthorityAccount(authority ag_s
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UpdateEnableManualExecutionAfter) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst UpdateEnableManualExecutionAfter) Build() *Instruction {
@@ -111,13 +111,13 @@ func (inst *UpdateEnableManualExecutionAfter) EncodeToTree(parent ag_treeout.Bra
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("NewEnableManualExecutionAfter", *inst.NewEnableManualExecutionAfter))
+						paramsBranch.Child(ag_format.Param("    NewEnableManualExecutionAfter", *inst.NewEnableManualExecutionAfter))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
@@ -143,12 +143,12 @@ func (obj *UpdateEnableManualExecutionAfter) UnmarshalWithDecoder(decoder *ag_bi
 // NewUpdateEnableManualExecutionAfterInstruction declares a new UpdateEnableManualExecutionAfter instruction with the provided parameters and accounts.
 func NewUpdateEnableManualExecutionAfterInstruction(
 	// Parameters:
-	newEnableManualExecutionAfter int64,
+	new_enable_manual_execution_after int64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *UpdateEnableManualExecutionAfter {
 	return NewUpdateEnableManualExecutionAfterInstructionBuilder().
-		SetNewEnableManualExecutionAfter(newEnableManualExecutionAfter).
+		SetNewEnableManualExecutionAfter(new_enable_manual_execution_after).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }

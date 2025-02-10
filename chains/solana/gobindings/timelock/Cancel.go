@@ -19,10 +19,10 @@ type Cancel struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [] roleAccessController
+	// [2] = [] role_access_controller
 	//
 	// [3] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewCancelInstructionBuilder creates a new `Cancel` instruction builder.
@@ -33,9 +33,9 @@ func NewCancelInstructionBuilder() *Cancel {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *Cancel) SetTimelockId(timelockId [32]uint8) *Cancel {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "timelock_id" parameter.
+func (inst *Cancel) SetTimelockId(timelock_id [32]uint8) *Cancel {
+	inst.TimelockId = &timelock_id
 	return inst
 }
 
@@ -53,7 +53,7 @@ func (inst *Cancel) SetOperationAccount(operation ag_solanago.PublicKey) *Cancel
 
 // GetOperationAccount gets the "operation" account.
 func (inst *Cancel) GetOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -64,18 +64,18 @@ func (inst *Cancel) SetConfigAccount(config ag_solanago.PublicKey) *Cancel {
 
 // GetConfigAccount gets the "config" account.
 func (inst *Cancel) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+// SetRoleAccessControllerAccount sets the "role_access_controller" account.
 func (inst *Cancel) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *Cancel {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
-// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+// GetRoleAccessControllerAccount gets the "role_access_controller" account.
 func (inst *Cancel) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -86,7 +86,7 @@ func (inst *Cancel) SetAuthorityAccount(authority ag_solanago.PublicKey) *Cancel
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Cancel) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst Cancel) Build() *Instruction {
@@ -145,16 +145,16 @@ func (inst *Cancel) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param(" TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("         Id", *inst.Id))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("             operation", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("role_access_controller", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -190,7 +190,7 @@ func (obj *Cancel) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 // NewCancelInstruction declares a new Cancel instruction with the provided parameters and accounts.
 func NewCancelInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	timelock_id [32]uint8,
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
@@ -198,7 +198,7 @@ func NewCancelInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *Cancel {
 	return NewCancelInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(timelock_id).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).

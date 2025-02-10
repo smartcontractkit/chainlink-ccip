@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendSignatures is the `appendSignatures` instruction.
+// AppendSignatures is the `append_signatures` instruction.
 type AppendSignatures struct {
 	MultisigId      *[32]uint8
 	Root            *[32]uint8
@@ -20,7 +20,7 @@ type AppendSignatures struct {
 	// [0] = [WRITE] signatures
 	//
 	// [1] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAppendSignaturesInstructionBuilder creates a new `AppendSignatures` instruction builder.
@@ -31,9 +31,9 @@ func NewAppendSignaturesInstructionBuilder() *AppendSignatures {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *AppendSignatures) SetMultisigId(multisigId [32]uint8) *AppendSignatures {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *AppendSignatures) SetMultisigId(multisig_id [32]uint8) *AppendSignatures {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
@@ -43,15 +43,15 @@ func (inst *AppendSignatures) SetRoot(root [32]uint8) *AppendSignatures {
 	return inst
 }
 
-// SetValidUntil sets the "validUntil" parameter.
-func (inst *AppendSignatures) SetValidUntil(validUntil uint32) *AppendSignatures {
-	inst.ValidUntil = &validUntil
+// SetValidUntil sets the "valid_until" parameter.
+func (inst *AppendSignatures) SetValidUntil(valid_until uint32) *AppendSignatures {
+	inst.ValidUntil = &valid_until
 	return inst
 }
 
-// SetSignaturesBatch sets the "signaturesBatch" parameter.
-func (inst *AppendSignatures) SetSignaturesBatch(signaturesBatch []Signature) *AppendSignatures {
-	inst.SignaturesBatch = &signaturesBatch
+// SetSignaturesBatch sets the "signatures_batch" parameter.
+func (inst *AppendSignatures) SetSignaturesBatch(signatures_batch []Signature) *AppendSignatures {
+	inst.SignaturesBatch = &signatures_batch
 	return inst
 }
 
@@ -63,7 +63,7 @@ func (inst *AppendSignatures) SetSignaturesAccount(signatures ag_solanago.Public
 
 // GetSignaturesAccount gets the "signatures" account.
 func (inst *AppendSignatures) GetSignaturesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -74,7 +74,7 @@ func (inst *AppendSignatures) SetAuthorityAccount(authority ag_solanago.PublicKe
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AppendSignatures) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst AppendSignatures) Build() *Instruction {
@@ -133,16 +133,16 @@ func (inst *AppendSignatures) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("     MultisigId", *inst.MultisigId))
-						paramsBranch.Child(ag_format.Param("           Root", *inst.Root))
-						paramsBranch.Child(ag_format.Param("     ValidUntil", *inst.ValidUntil))
-						paramsBranch.Child(ag_format.Param("SignaturesBatch", *inst.SignaturesBatch))
+						paramsBranch.Child(ag_format.Param("      MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param("            Root", *inst.Root))
+						paramsBranch.Child(ag_format.Param("      ValidUntil", *inst.ValidUntil))
+						paramsBranch.Child(ag_format.Param(" SignaturesBatch", *inst.SignaturesBatch))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("signatures", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta(" authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("signatures", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta(" authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
@@ -198,18 +198,18 @@ func (obj *AppendSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 // NewAppendSignaturesInstruction declares a new AppendSignatures instruction with the provided parameters and accounts.
 func NewAppendSignaturesInstruction(
 	// Parameters:
-	multisigId [32]uint8,
+	multisig_id [32]uint8,
 	root [32]uint8,
-	validUntil uint32,
-	signaturesBatch []Signature,
+	valid_until uint32,
+	signatures_batch []Signature,
 	// Accounts:
 	signatures ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AppendSignatures {
 	return NewAppendSignaturesInstructionBuilder().
-		SetMultisigId(multisigId).
+		SetMultisigId(multisig_id).
 		SetRoot(root).
-		SetValidUntil(validUntil).
-		SetSignaturesBatch(signaturesBatch).
+		SetValidUntil(valid_until).
+		SetSignaturesBatch(signatures_batch).
 		SetSignaturesAccount(signatures).
 		SetAuthorityAccount(authority)
 }

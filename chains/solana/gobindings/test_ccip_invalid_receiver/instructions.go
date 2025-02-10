@@ -14,8 +14,8 @@ import (
 
 var ProgramID ag_solanago.PublicKey
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,13 +28,13 @@ func init() {
 }
 
 var (
-	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
-
 	Instruction_AddOfframp = ag_binary.TypeID([8]byte{164, 255, 154, 96, 204, 239, 24, 2})
 
-	Instruction_PoolProxyReleaseOrMint = ag_binary.TypeID([8]byte{22, 95, 117, 49, 2, 121, 100, 188})
+	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
 
 	Instruction_PoolProxyLockOrBurn = ag_binary.TypeID([8]byte{123, 20, 147, 83, 195, 25, 120, 101})
+
+	Instruction_PoolProxyReleaseOrMint = ag_binary.TypeID([8]byte{22, 95, 117, 49, 2, 121, 100, 188})
 
 	Instruction_ReceiverProxyExecute = ag_binary.TypeID([8]byte{99, 169, 76, 14, 44, 89, 147, 67})
 )
@@ -42,14 +42,14 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_CcipReceive:
-		return "CcipReceive"
 	case Instruction_AddOfframp:
 		return "AddOfframp"
-	case Instruction_PoolProxyReleaseOrMint:
-		return "PoolProxyReleaseOrMint"
+	case Instruction_CcipReceive:
+		return "CcipReceive"
 	case Instruction_PoolProxyLockOrBurn:
 		return "PoolProxyLockOrBurn"
+	case Instruction_PoolProxyReleaseOrMint:
+		return "PoolProxyReleaseOrMint"
 	case Instruction_ReceiverProxyExecute:
 		return "ReceiverProxyExecute"
 	default:
@@ -73,19 +73,19 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"ccip_receive", (*CcipReceive)(nil),
+			Name: "add_offramp", Type: (*AddOfframp)(nil),
 		},
 		{
-			"add_offramp", (*AddOfframp)(nil),
+			Name: "ccip_receive", Type: (*CcipReceive)(nil),
 		},
 		{
-			"pool_proxy_release_or_mint", (*PoolProxyReleaseOrMint)(nil),
+			Name: "pool_proxy_lock_or_burn", Type: (*PoolProxyLockOrBurn)(nil),
 		},
 		{
-			"pool_proxy_lock_or_burn", (*PoolProxyLockOrBurn)(nil),
+			Name: "pool_proxy_release_or_mint", Type: (*PoolProxyReleaseOrMint)(nil),
 		},
 		{
-			"receiver_proxy_execute", (*ReceiverProxyExecute)(nil),
+			Name: "receiver_proxy_execute", Type: (*ReceiverProxyExecute)(nil),
 		},
 	},
 )
@@ -123,14 +123,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -142,4 +142,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

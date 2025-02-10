@@ -23,14 +23,14 @@ type SetPool struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] tokenAdminRegistry
+	// [1] = [WRITE] token_admin_registry
 	//
 	// [2] = [] mint
 	//
-	// [3] = [] poolLookuptable
+	// [3] = [] pool_lookuptable
 	//
 	// [4] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetPoolInstructionBuilder creates a new `SetPool` instruction builder.
@@ -41,9 +41,9 @@ func NewSetPoolInstructionBuilder() *SetPool {
 	return nd
 }
 
-// SetWritableIndexes sets the "writableIndexes" parameter.
-func (inst *SetPool) SetWritableIndexes(writableIndexes []byte) *SetPool {
-	inst.WritableIndexes = &writableIndexes
+// SetWritableIndexes sets the "writable_indexes" parameter.
+func (inst *SetPool) SetWritableIndexes(writable_indexes []byte) *SetPool {
+	inst.WritableIndexes = &writable_indexes
 	return inst
 }
 
@@ -55,18 +55,18 @@ func (inst *SetPool) SetConfigAccount(config ag_solanago.PublicKey) *SetPool {
 
 // GetConfigAccount gets the "config" account.
 func (inst *SetPool) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
+// SetTokenAdminRegistryAccount sets the "token_admin_registry" account.
 func (inst *SetPool) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *SetPool {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
 	return inst
 }
 
-// GetTokenAdminRegistryAccount gets the "tokenAdminRegistry" account.
+// GetTokenAdminRegistryAccount gets the "token_admin_registry" account.
 func (inst *SetPool) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -77,18 +77,18 @@ func (inst *SetPool) SetMintAccount(mint ag_solanago.PublicKey) *SetPool {
 
 // GetMintAccount gets the "mint" account.
 func (inst *SetPool) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetPoolLookuptableAccount sets the "poolLookuptable" account.
+// SetPoolLookuptableAccount sets the "pool_lookuptable" account.
 func (inst *SetPool) SetPoolLookuptableAccount(poolLookuptable ag_solanago.PublicKey) *SetPool {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(poolLookuptable)
 	return inst
 }
 
-// GetPoolLookuptableAccount gets the "poolLookuptable" account.
+// GetPoolLookuptableAccount gets the "pool_lookuptable" account.
 func (inst *SetPool) GetPoolLookuptableAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -99,7 +99,7 @@ func (inst *SetPool) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetPo
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetPool) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 func (inst SetPool) Build() *Instruction {
@@ -158,16 +158,16 @@ func (inst *SetPool) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("WritableIndexes", *inst.WritableIndexes))
+						paramsBranch.Child(ag_format.Param(" WritableIndexes", *inst.WritableIndexes))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("              mint", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("   poolLookuptable", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("token_admin_registry", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                mint", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("    pool_lookuptable", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice.Get(4)))
 					})
 				})
 		})
@@ -193,7 +193,7 @@ func (obj *SetPool) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 // NewSetPoolInstruction declares a new SetPool instruction with the provided parameters and accounts.
 func NewSetPoolInstruction(
 	// Parameters:
-	writableIndexes []byte,
+	writable_indexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	tokenAdminRegistry ag_solanago.PublicKey,
@@ -201,7 +201,7 @@ func NewSetPoolInstruction(
 	poolLookuptable ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetPool {
 	return NewSetPoolInstructionBuilder().
-		SetWritableIndexes(writableIndexes).
+		SetWritableIndexes(writable_indexes).
 		SetConfigAccount(config).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
 		SetMintAccount(mint).

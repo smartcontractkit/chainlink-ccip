@@ -23,12 +23,12 @@ type UpdateSourceChainConfig struct {
 	SourceChainSelector *uint64
 	SourceChainConfig   *SourceChainConfig
 
-	// [0] = [WRITE] sourceChain
+	// [0] = [WRITE] source_chain
 	//
 	// [1] = [] config
 	//
 	// [2] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUpdateSourceChainConfigInstructionBuilder creates a new `UpdateSourceChainConfig` instruction builder.
@@ -39,27 +39,27 @@ func NewUpdateSourceChainConfigInstructionBuilder() *UpdateSourceChainConfig {
 	return nd
 }
 
-// SetSourceChainSelector sets the "sourceChainSelector" parameter.
-func (inst *UpdateSourceChainConfig) SetSourceChainSelector(sourceChainSelector uint64) *UpdateSourceChainConfig {
-	inst.SourceChainSelector = &sourceChainSelector
+// SetSourceChainSelector sets the "source_chain_selector" parameter.
+func (inst *UpdateSourceChainConfig) SetSourceChainSelector(source_chain_selector uint64) *UpdateSourceChainConfig {
+	inst.SourceChainSelector = &source_chain_selector
 	return inst
 }
 
-// SetSourceChainConfig sets the "sourceChainConfig" parameter.
-func (inst *UpdateSourceChainConfig) SetSourceChainConfig(sourceChainConfig SourceChainConfig) *UpdateSourceChainConfig {
-	inst.SourceChainConfig = &sourceChainConfig
+// SetSourceChainConfig sets the "source_chain_config" parameter.
+func (inst *UpdateSourceChainConfig) SetSourceChainConfig(source_chain_config SourceChainConfig) *UpdateSourceChainConfig {
+	inst.SourceChainConfig = &source_chain_config
 	return inst
 }
 
-// SetSourceChainAccount sets the "sourceChain" account.
+// SetSourceChainAccount sets the "source_chain" account.
 func (inst *UpdateSourceChainConfig) SetSourceChainAccount(sourceChain ag_solanago.PublicKey) *UpdateSourceChainConfig {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChain).WRITE()
 	return inst
 }
 
-// GetSourceChainAccount gets the "sourceChain" account.
+// GetSourceChainAccount gets the "source_chain" account.
 func (inst *UpdateSourceChainConfig) GetSourceChainAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -70,7 +70,7 @@ func (inst *UpdateSourceChainConfig) SetConfigAccount(config ag_solanago.PublicK
 
 // GetConfigAccount gets the "config" account.
 func (inst *UpdateSourceChainConfig) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -81,7 +81,7 @@ func (inst *UpdateSourceChainConfig) SetAuthorityAccount(authority ag_solanago.P
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UpdateSourceChainConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst UpdateSourceChainConfig) Build() *Instruction {
@@ -137,15 +137,15 @@ func (inst *UpdateSourceChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("SourceChainSelector", *inst.SourceChainSelector))
-						paramsBranch.Child(ag_format.Param("  SourceChainConfig", *inst.SourceChainConfig))
+						paramsBranch.Child(ag_format.Param("  SourceChainSelector", *inst.SourceChainSelector))
+						paramsBranch.Child(ag_format.Param("    SourceChainConfig", *inst.SourceChainConfig))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("sourceChain", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("  authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("source_chain", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("      config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -181,15 +181,15 @@ func (obj *UpdateSourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Deco
 // NewUpdateSourceChainConfigInstruction declares a new UpdateSourceChainConfig instruction with the provided parameters and accounts.
 func NewUpdateSourceChainConfigInstruction(
 	// Parameters:
-	sourceChainSelector uint64,
-	sourceChainConfig SourceChainConfig,
+	source_chain_selector uint64,
+	source_chain_config SourceChainConfig,
 	// Accounts:
 	sourceChain ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *UpdateSourceChainConfig {
 	return NewUpdateSourceChainConfigInstructionBuilder().
-		SetSourceChainSelector(sourceChainSelector).
-		SetSourceChainConfig(sourceChainConfig).
+		SetSourceChainSelector(source_chain_selector).
+		SetSourceChainConfig(source_chain_config).
 		SetSourceChainAccount(sourceChain).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)

@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitChainConfig is the `initChainConfig` instruction.
+// InitChainConfig is the `init_chain_config` instruction.
 type InitChainConfig struct {
 	ChainSelector  *uint64
 	Recipient      *[]byte
@@ -18,12 +18,12 @@ type InitChainConfig struct {
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [WRITE] chainConfig
+	// [1] = [WRITE] chain_config
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitChainConfigInstructionBuilder creates a new `InitChainConfig` instruction builder.
@@ -34,9 +34,9 @@ func NewInitChainConfigInstructionBuilder() *InitChainConfig {
 	return nd
 }
 
-// SetChainSelector sets the "chainSelector" parameter.
-func (inst *InitChainConfig) SetChainSelector(chainSelector uint64) *InitChainConfig {
-	inst.ChainSelector = &chainSelector
+// SetChainSelector sets the "_chain_selector" parameter.
+func (inst *InitChainConfig) SetChainSelector(_chain_selector uint64) *InitChainConfig {
+	inst.ChainSelector = &_chain_selector
 	return inst
 }
 
@@ -46,9 +46,9 @@ func (inst *InitChainConfig) SetRecipient(recipient []byte) *InitChainConfig {
 	return inst
 }
 
-// SetExtraArgsBytes sets the "extraArgsBytes" parameter.
-func (inst *InitChainConfig) SetExtraArgsBytes(extraArgsBytes []byte) *InitChainConfig {
-	inst.ExtraArgsBytes = &extraArgsBytes
+// SetExtraArgsBytes sets the "extra_args_bytes" parameter.
+func (inst *InitChainConfig) SetExtraArgsBytes(extra_args_bytes []byte) *InitChainConfig {
+	inst.ExtraArgsBytes = &extra_args_bytes
 	return inst
 }
 
@@ -60,18 +60,18 @@ func (inst *InitChainConfig) SetStateAccount(state ag_solanago.PublicKey) *InitC
 
 // GetStateAccount gets the "state" account.
 func (inst *InitChainConfig) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 func (inst *InitChainConfig) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *InitChainConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 func (inst *InitChainConfig) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -82,18 +82,18 @@ func (inst *InitChainConfig) SetAuthorityAccount(authority ag_solanago.PublicKey
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *InitChainConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *InitChainConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitChainConfig {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *InitChainConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst InitChainConfig) Build() *Instruction {
@@ -155,17 +155,17 @@ func (inst *InitChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param(" ChainSelector", *inst.ChainSelector))
-						paramsBranch.Child(ag_format.Param("     Recipient", *inst.Recipient))
-						paramsBranch.Child(ag_format.Param("ExtraArgsBytes", *inst.ExtraArgsBytes))
+						paramsBranch.Child(ag_format.Param("   ChainSelector", *inst.ChainSelector))
+						paramsBranch.Child(ag_format.Param("       Recipient", *inst.Recipient))
+						paramsBranch.Child(ag_format.Param("  ExtraArgsBytes", *inst.ExtraArgsBytes))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("  chain_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -211,18 +211,18 @@ func (obj *InitChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewInitChainConfigInstruction declares a new InitChainConfig instruction with the provided parameters and accounts.
 func NewInitChainConfigInstruction(
 	// Parameters:
-	chainSelector uint64,
+	_chain_selector uint64,
 	recipient []byte,
-	extraArgsBytes []byte,
+	extra_args_bytes []byte,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *InitChainConfig {
 	return NewInitChainConfigInstructionBuilder().
-		SetChainSelector(chainSelector).
+		SetChainSelector(_chain_selector).
 		SetRecipient(recipient).
-		SetExtraArgsBytes(extraArgsBytes).
+		SetExtraArgsBytes(extra_args_bytes).
 		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
 		SetAuthorityAccount(authority).

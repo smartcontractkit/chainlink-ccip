@@ -16,8 +16,8 @@ import (
 
 var ProgramID ag_solanago.PublicKey
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -30,68 +30,68 @@ func init() {
 }
 
 var (
-	// initialize a new multisig configuration, store the chain_id and multisig_id
-	// multisig_id is a unique identifier for the multisig configuration(32 bytes, left-padded)
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
-	Instruction_SetConfig = ag_binary.TypeID([8]byte{108, 158, 154, 175, 212, 98, 52, 66})
-
-	Instruction_SetRoot = ag_binary.TypeID([8]byte{183, 49, 10, 206, 168, 183, 131, 67})
-
-	Instruction_Execute = ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
-
-	Instruction_InitSigners = ag_binary.TypeID([8]byte{102, 182, 129, 16, 138, 142, 223, 196})
+	Instruction_AppendSignatures = ag_binary.TypeID([8]byte{195, 112, 164, 69, 37, 137, 198, 54})
 
 	Instruction_AppendSigners = ag_binary.TypeID([8]byte{238, 209, 251, 39, 41, 241, 146, 25})
 
+	Instruction_ClearSignatures = ag_binary.TypeID([8]byte{80, 0, 39, 255, 46, 165, 193, 109})
+
 	Instruction_ClearSigners = ag_binary.TypeID([8]byte{90, 140, 170, 146, 128, 75, 100, 175})
+
+	Instruction_Execute = ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
+
+	Instruction_FinalizeSignatures = ag_binary.TypeID([8]byte{77, 138, 152, 199, 37, 141, 189, 159})
 
 	Instruction_FinalizeSigners = ag_binary.TypeID([8]byte{49, 254, 154, 226, 137, 199, 120, 63})
 
 	Instruction_InitSignatures = ag_binary.TypeID([8]byte{190, 120, 207, 36, 26, 58, 196, 13})
 
-	Instruction_AppendSignatures = ag_binary.TypeID([8]byte{195, 112, 164, 69, 37, 137, 198, 54})
+	Instruction_InitSigners = ag_binary.TypeID([8]byte{102, 182, 129, 16, 138, 142, 223, 196})
 
-	Instruction_ClearSignatures = ag_binary.TypeID([8]byte{80, 0, 39, 255, 46, 165, 193, 109})
+	// initialize a new multisig configuration, store the chain_id and multisig_id
+	// multisig_id is a unique identifier for the multisig configuration(32 bytes, left-padded)
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
-	Instruction_FinalizeSignatures = ag_binary.TypeID([8]byte{77, 138, 152, 199, 37, 141, 189, 159})
+	Instruction_SetConfig = ag_binary.TypeID([8]byte{108, 158, 154, 175, 212, 98, 52, 66})
+
+	Instruction_SetRoot = ag_binary.TypeID([8]byte{183, 49, 10, 206, 168, 183, 131, 67})
+
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_SetConfig:
-		return "SetConfig"
-	case Instruction_SetRoot:
-		return "SetRoot"
-	case Instruction_Execute:
-		return "Execute"
-	case Instruction_InitSigners:
-		return "InitSigners"
+	case Instruction_AppendSignatures:
+		return "AppendSignatures"
 	case Instruction_AppendSigners:
 		return "AppendSigners"
+	case Instruction_ClearSignatures:
+		return "ClearSignatures"
 	case Instruction_ClearSigners:
 		return "ClearSigners"
+	case Instruction_Execute:
+		return "Execute"
+	case Instruction_FinalizeSignatures:
+		return "FinalizeSignatures"
 	case Instruction_FinalizeSigners:
 		return "FinalizeSigners"
 	case Instruction_InitSignatures:
 		return "InitSignatures"
-	case Instruction_AppendSignatures:
-		return "AppendSignatures"
-	case Instruction_ClearSignatures:
-		return "ClearSignatures"
-	case Instruction_FinalizeSignatures:
-		return "FinalizeSignatures"
+	case Instruction_InitSigners:
+		return "InitSigners"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_SetConfig:
+		return "SetConfig"
+	case Instruction_SetRoot:
+		return "SetRoot"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
 	default:
 		return ""
 	}
@@ -113,46 +113,46 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnership)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "append_signatures", Type: (*AppendSignatures)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "append_signers", Type: (*AppendSigners)(nil),
 		},
 		{
-			"set_config", (*SetConfig)(nil),
+			Name: "clear_signatures", Type: (*ClearSignatures)(nil),
 		},
 		{
-			"set_root", (*SetRoot)(nil),
+			Name: "clear_signers", Type: (*ClearSigners)(nil),
 		},
 		{
-			"execute", (*Execute)(nil),
+			Name: "execute", Type: (*Execute)(nil),
 		},
 		{
-			"init_signers", (*InitSigners)(nil),
+			Name: "finalize_signatures", Type: (*FinalizeSignatures)(nil),
 		},
 		{
-			"append_signers", (*AppendSigners)(nil),
+			Name: "finalize_signers", Type: (*FinalizeSigners)(nil),
 		},
 		{
-			"clear_signers", (*ClearSigners)(nil),
+			Name: "init_signatures", Type: (*InitSignatures)(nil),
 		},
 		{
-			"finalize_signers", (*FinalizeSigners)(nil),
+			Name: "init_signers", Type: (*InitSigners)(nil),
 		},
 		{
-			"init_signatures", (*InitSignatures)(nil),
+			Name: "initialize", Type: (*Initialize)(nil),
 		},
 		{
-			"append_signatures", (*AppendSignatures)(nil),
+			Name: "set_config", Type: (*SetConfig)(nil),
 		},
 		{
-			"clear_signatures", (*ClearSignatures)(nil),
+			Name: "set_root", Type: (*SetRoot)(nil),
 		},
 		{
-			"finalize_signatures", (*FinalizeSignatures)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnership)(nil),
 		},
 	},
 )
@@ -190,14 +190,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -209,4 +209,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

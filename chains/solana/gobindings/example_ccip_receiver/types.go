@@ -73,6 +73,82 @@ func (obj *Any2SVMMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	return nil
 }
 
+type ApprovedSender struct{}
+
+func (obj ApprovedSender) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	return nil
+}
+
+func (obj *ApprovedSender) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	return nil
+}
+
+type BaseState struct {
+	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
+	Router        ag_solanago.PublicKey
+}
+
+func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MessageReceived struct {
+	MessageId [32]uint8
+}
+
+func (obj MessageReceived) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `MessageId` param:
+	err = encoder.Encode(obj.MessageId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MessageReceived) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `MessageId`:
+	err = decoder.Decode(&obj.MessageId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type SVMTokenAmount struct {
 	Token  ag_solanago.PublicKey
 	Amount uint64

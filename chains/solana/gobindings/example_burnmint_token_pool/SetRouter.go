@@ -10,14 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetRouter is the `setRouter` instruction.
+// SetRouter is the `set_router` instruction.
 type SetRouter struct {
 	NewRouter *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetRouterInstructionBuilder creates a new `SetRouter` instruction builder.
@@ -28,9 +28,9 @@ func NewSetRouterInstructionBuilder() *SetRouter {
 	return nd
 }
 
-// SetNewRouter sets the "newRouter" parameter.
-func (inst *SetRouter) SetNewRouter(newRouter ag_solanago.PublicKey) *SetRouter {
-	inst.NewRouter = &newRouter
+// SetNewRouter sets the "new_router" parameter.
+func (inst *SetRouter) SetNewRouter(new_router ag_solanago.PublicKey) *SetRouter {
+	inst.NewRouter = &new_router
 	return inst
 }
 
@@ -42,7 +42,7 @@ func (inst *SetRouter) SetStateAccount(state ag_solanago.PublicKey) *SetRouter {
 
 // GetStateAccount gets the "state" account.
 func (inst *SetRouter) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -53,7 +53,7 @@ func (inst *SetRouter) SetAuthorityAccount(authority ag_solanago.PublicKey) *Set
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetRouter) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst SetRouter) Build() *Instruction {
@@ -103,13 +103,13 @@ func (inst *SetRouter) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("NewRouter", *inst.NewRouter))
+						paramsBranch.Child(ag_format.Param(" NewRouter", *inst.NewRouter))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
@@ -135,12 +135,12 @@ func (obj *SetRouter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 // NewSetRouterInstruction declares a new SetRouter instruction with the provided parameters and accounts.
 func NewSetRouterInstruction(
 	// Parameters:
-	newRouter ag_solanago.PublicKey,
+	new_router ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetRouter {
 	return NewSetRouterInstructionBuilder().
-		SetNewRouter(newRouter).
+		SetNewRouter(new_router).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority)
 }

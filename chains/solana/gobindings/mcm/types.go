@@ -7,44 +7,143 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Signature struct {
-	V uint8
-	R [32]uint8
-	S [32]uint8
+type ConfigSet struct {
+	GroupParents  [32]uint8
+	GroupQuorums  [32]uint8
+	IsRootCleared bool
+	Signers       []McmSigner
 }
 
-func (obj Signature) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `V` param:
-	err = encoder.Encode(obj.V)
+func (obj ConfigSet) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `GroupParents` param:
+	err = encoder.Encode(obj.GroupParents)
 	if err != nil {
 		return err
 	}
-	// Serialize `R` param:
-	err = encoder.Encode(obj.R)
+	// Serialize `GroupQuorums` param:
+	err = encoder.Encode(obj.GroupQuorums)
 	if err != nil {
 		return err
 	}
-	// Serialize `S` param:
-	err = encoder.Encode(obj.S)
+	// Serialize `IsRootCleared` param:
+	err = encoder.Encode(obj.IsRootCleared)
+	if err != nil {
+		return err
+	}
+	// Serialize `Signers` param:
+	err = encoder.Encode(obj.Signers)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *Signature) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `V`:
-	err = decoder.Decode(&obj.V)
+func (obj *ConfigSet) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `GroupParents`:
+	err = decoder.Decode(&obj.GroupParents)
 	if err != nil {
 		return err
 	}
-	// Deserialize `R`:
-	err = decoder.Decode(&obj.R)
+	// Deserialize `GroupQuorums`:
+	err = decoder.Decode(&obj.GroupQuorums)
 	if err != nil {
 		return err
 	}
-	// Deserialize `S`:
-	err = decoder.Decode(&obj.S)
+	// Deserialize `IsRootCleared`:
+	err = decoder.Decode(&obj.IsRootCleared)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Signers`:
+	err = decoder.Decode(&obj.Signers)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigSigners struct {
+	SignerAddresses [][20]uint8
+	TotalSigners    uint8
+	IsFinalized     bool
+}
+
+func (obj ConfigSigners) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SignerAddresses` param:
+	err = encoder.Encode(obj.SignerAddresses)
+	if err != nil {
+		return err
+	}
+	// Serialize `TotalSigners` param:
+	err = encoder.Encode(obj.TotalSigners)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsFinalized` param:
+	err = encoder.Encode(obj.IsFinalized)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SignerAddresses`:
+	err = decoder.Decode(&obj.SignerAddresses)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TotalSigners`:
+	err = decoder.Decode(&obj.TotalSigners)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsFinalized`:
+	err = decoder.Decode(&obj.IsFinalized)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ExpiringRootAndOpCount struct {
+	Root       [32]uint8
+	ValidUntil uint32
+	OpCount    uint64
+}
+
+func (obj ExpiringRootAndOpCount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Root` param:
+	err = encoder.Encode(obj.Root)
+	if err != nil {
+		return err
+	}
+	// Serialize `ValidUntil` param:
+	err = encoder.Encode(obj.ValidUntil)
+	if err != nil {
+		return err
+	}
+	// Serialize `OpCount` param:
+	err = encoder.Encode(obj.OpCount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ExpiringRootAndOpCount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Root`:
+	err = decoder.Decode(&obj.Root)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ValidUntil`:
+	err = decoder.Decode(&obj.ValidUntil)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OpCount`:
+	err = decoder.Decode(&obj.OpCount)
 	if err != nil {
 		return err
 	}
@@ -89,6 +188,292 @@ func (obj *McmSigner) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	}
 	// Deserialize `Group`:
 	err = decoder.Decode(&obj.Group)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MultisigConfig struct {
+	ChainId       uint64
+	MultisigId    [32]uint8
+	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
+	GroupQuorums  [32]uint8
+	GroupParents  [32]uint8
+	Signers       []McmSigner
+}
+
+func (obj MultisigConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ChainId` param:
+	err = encoder.Encode(obj.ChainId)
+	if err != nil {
+		return err
+	}
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `GroupQuorums` param:
+	err = encoder.Encode(obj.GroupQuorums)
+	if err != nil {
+		return err
+	}
+	// Serialize `GroupParents` param:
+	err = encoder.Encode(obj.GroupParents)
+	if err != nil {
+		return err
+	}
+	// Serialize `Signers` param:
+	err = encoder.Encode(obj.Signers)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MultisigConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ChainId`:
+	err = decoder.Decode(&obj.ChainId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `GroupQuorums`:
+	err = decoder.Decode(&obj.GroupQuorums)
+	if err != nil {
+		return err
+	}
+	// Deserialize `GroupParents`:
+	err = decoder.Decode(&obj.GroupParents)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Signers`:
+	err = decoder.Decode(&obj.Signers)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type NewRoot struct {
+	Root                         [32]uint8
+	ValidUntil                   uint32
+	MetadataChainId              uint64
+	MetadataMultisig             ag_solanago.PublicKey
+	MetadataPreOpCount           uint64
+	MetadataPostOpCount          uint64
+	MetadataOverridePreviousRoot bool
+}
+
+func (obj NewRoot) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Root` param:
+	err = encoder.Encode(obj.Root)
+	if err != nil {
+		return err
+	}
+	// Serialize `ValidUntil` param:
+	err = encoder.Encode(obj.ValidUntil)
+	if err != nil {
+		return err
+	}
+	// Serialize `MetadataChainId` param:
+	err = encoder.Encode(obj.MetadataChainId)
+	if err != nil {
+		return err
+	}
+	// Serialize `MetadataMultisig` param:
+	err = encoder.Encode(obj.MetadataMultisig)
+	if err != nil {
+		return err
+	}
+	// Serialize `MetadataPreOpCount` param:
+	err = encoder.Encode(obj.MetadataPreOpCount)
+	if err != nil {
+		return err
+	}
+	// Serialize `MetadataPostOpCount` param:
+	err = encoder.Encode(obj.MetadataPostOpCount)
+	if err != nil {
+		return err
+	}
+	// Serialize `MetadataOverridePreviousRoot` param:
+	err = encoder.Encode(obj.MetadataOverridePreviousRoot)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *NewRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Root`:
+	err = decoder.Decode(&obj.Root)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ValidUntil`:
+	err = decoder.Decode(&obj.ValidUntil)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MetadataChainId`:
+	err = decoder.Decode(&obj.MetadataChainId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MetadataMultisig`:
+	err = decoder.Decode(&obj.MetadataMultisig)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MetadataPreOpCount`:
+	err = decoder.Decode(&obj.MetadataPreOpCount)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MetadataPostOpCount`:
+	err = decoder.Decode(&obj.MetadataPostOpCount)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MetadataOverridePreviousRoot`:
+	err = decoder.Decode(&obj.MetadataOverridePreviousRoot)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OpExecuted struct {
+	Nonce uint64
+	To    ag_solanago.PublicKey
+	Data  []byte
+}
+
+func (obj OpExecuted) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Nonce` param:
+	err = encoder.Encode(obj.Nonce)
+	if err != nil {
+		return err
+	}
+	// Serialize `To` param:
+	err = encoder.Encode(obj.To)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OpExecuted) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Nonce`:
+	err = decoder.Decode(&obj.Nonce)
+	if err != nil {
+		return err
+	}
+	// Deserialize `To`:
+	err = decoder.Decode(&obj.To)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type RootMetadata struct {
+	ChainId              uint64
+	Multisig             ag_solanago.PublicKey
+	PreOpCount           uint64
+	PostOpCount          uint64
+	OverridePreviousRoot bool
+}
+
+func (obj RootMetadata) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ChainId` param:
+	err = encoder.Encode(obj.ChainId)
+	if err != nil {
+		return err
+	}
+	// Serialize `Multisig` param:
+	err = encoder.Encode(obj.Multisig)
+	if err != nil {
+		return err
+	}
+	// Serialize `PreOpCount` param:
+	err = encoder.Encode(obj.PreOpCount)
+	if err != nil {
+		return err
+	}
+	// Serialize `PostOpCount` param:
+	err = encoder.Encode(obj.PostOpCount)
+	if err != nil {
+		return err
+	}
+	// Serialize `OverridePreviousRoot` param:
+	err = encoder.Encode(obj.OverridePreviousRoot)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RootMetadata) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ChainId`:
+	err = decoder.Decode(&obj.ChainId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Multisig`:
+	err = decoder.Decode(&obj.Multisig)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PreOpCount`:
+	err = decoder.Decode(&obj.PreOpCount)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PostOpCount`:
+	err = decoder.Decode(&obj.PostOpCount)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OverridePreviousRoot`:
+	err = decoder.Decode(&obj.OverridePreviousRoot)
 	if err != nil {
 		return err
 	}
@@ -161,116 +546,112 @@ func (obj *RootMetadataInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-type McmError ag_binary.BorshEnum
+type RootSignatures struct {
+	TotalSignatures uint8
+	Signatures      []Signature
+	IsFinalized     bool
+}
 
-const (
-	InvalidInputs_McmError McmError = iota
-	Overflow_McmError
-	WrongMultiSig_McmError
-	WrongChainId_McmError
-	InvalidSignature_McmError
-	FailedEcdsaRecover_McmError
-	InvalidRootLen_McmError
-	SignersNotFinalized_McmError
-	SignersAlreadyFinalized_McmError
-	SignaturesAlreadyFinalized_McmError
-	SignatureCountMismatch_McmError
-	TooManySignatures_McmError
-	SignaturesNotFinalized_McmError
-	SignaturesRootMismatch_McmError
-	SignaturesValidUntilMismatch_McmError
-	MismatchedInputSignerVectorsLength_McmError
-	OutOfBoundsNumOfSigners_McmError
-	MismatchedInputGroupArraysLength_McmError
-	GroupTreeNotWellFormed_McmError
-	SignerInDisabledGroup_McmError
-	OutOfBoundsGroupQuorum_McmError
-	SignersAddressesMustBeStrictlyIncreasing_McmError
-	SignedHashAlreadySeen_McmError
-	InvalidSigner_McmError
-	MissingConfig_McmError
-	InsufficientSigners_McmError
-	ValidUntilHasAlreadyPassed_McmError
-	ProofCannotBeVerified_McmError
-	PendingOps_McmError
-	WrongPreOpCount_McmError
-	WrongPostOpCount_McmError
-	PostOpCountReached_McmError
-	RootExpired_McmError
-	WrongNonce_McmError
-)
-
-func (value McmError) String() string {
-	switch value {
-	case InvalidInputs_McmError:
-		return "InvalidInputs"
-	case Overflow_McmError:
-		return "Overflow"
-	case WrongMultiSig_McmError:
-		return "WrongMultiSig"
-	case WrongChainId_McmError:
-		return "WrongChainId"
-	case InvalidSignature_McmError:
-		return "InvalidSignature"
-	case FailedEcdsaRecover_McmError:
-		return "FailedEcdsaRecover"
-	case InvalidRootLen_McmError:
-		return "InvalidRootLen"
-	case SignersNotFinalized_McmError:
-		return "SignersNotFinalized"
-	case SignersAlreadyFinalized_McmError:
-		return "SignersAlreadyFinalized"
-	case SignaturesAlreadyFinalized_McmError:
-		return "SignaturesAlreadyFinalized"
-	case SignatureCountMismatch_McmError:
-		return "SignatureCountMismatch"
-	case TooManySignatures_McmError:
-		return "TooManySignatures"
-	case SignaturesNotFinalized_McmError:
-		return "SignaturesNotFinalized"
-	case SignaturesRootMismatch_McmError:
-		return "SignaturesRootMismatch"
-	case SignaturesValidUntilMismatch_McmError:
-		return "SignaturesValidUntilMismatch"
-	case MismatchedInputSignerVectorsLength_McmError:
-		return "MismatchedInputSignerVectorsLength"
-	case OutOfBoundsNumOfSigners_McmError:
-		return "OutOfBoundsNumOfSigners"
-	case MismatchedInputGroupArraysLength_McmError:
-		return "MismatchedInputGroupArraysLength"
-	case GroupTreeNotWellFormed_McmError:
-		return "GroupTreeNotWellFormed"
-	case SignerInDisabledGroup_McmError:
-		return "SignerInDisabledGroup"
-	case OutOfBoundsGroupQuorum_McmError:
-		return "OutOfBoundsGroupQuorum"
-	case SignersAddressesMustBeStrictlyIncreasing_McmError:
-		return "SignersAddressesMustBeStrictlyIncreasing"
-	case SignedHashAlreadySeen_McmError:
-		return "SignedHashAlreadySeen"
-	case InvalidSigner_McmError:
-		return "InvalidSigner"
-	case MissingConfig_McmError:
-		return "MissingConfig"
-	case InsufficientSigners_McmError:
-		return "InsufficientSigners"
-	case ValidUntilHasAlreadyPassed_McmError:
-		return "ValidUntilHasAlreadyPassed"
-	case ProofCannotBeVerified_McmError:
-		return "ProofCannotBeVerified"
-	case PendingOps_McmError:
-		return "PendingOps"
-	case WrongPreOpCount_McmError:
-		return "WrongPreOpCount"
-	case WrongPostOpCount_McmError:
-		return "WrongPostOpCount"
-	case PostOpCountReached_McmError:
-		return "PostOpCountReached"
-	case RootExpired_McmError:
-		return "RootExpired"
-	case WrongNonce_McmError:
-		return "WrongNonce"
-	default:
-		return ""
+func (obj RootSignatures) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TotalSignatures` param:
+	err = encoder.Encode(obj.TotalSignatures)
+	if err != nil {
+		return err
 	}
+	// Serialize `Signatures` param:
+	err = encoder.Encode(obj.Signatures)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsFinalized` param:
+	err = encoder.Encode(obj.IsFinalized)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *RootSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TotalSignatures`:
+	err = decoder.Decode(&obj.TotalSignatures)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Signatures`:
+	err = decoder.Decode(&obj.Signatures)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsFinalized`:
+	err = decoder.Decode(&obj.IsFinalized)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SeenSignedHash struct {
+	Seen bool
+}
+
+func (obj SeenSignedHash) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Seen` param:
+	err = encoder.Encode(obj.Seen)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SeenSignedHash) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Seen`:
+	err = decoder.Decode(&obj.Seen)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Signature struct {
+	V uint8
+	R [32]uint8
+	S [32]uint8
+}
+
+func (obj Signature) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `V` param:
+	err = encoder.Encode(obj.V)
+	if err != nil {
+		return err
+	}
+	// Serialize `R` param:
+	err = encoder.Encode(obj.R)
+	if err != nil {
+		return err
+	}
+	// Serialize `S` param:
+	err = encoder.Encode(obj.S)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Signature) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `V`:
+	err = decoder.Decode(&obj.V)
+	if err != nil {
+		return err
+	}
+	// Deserialize `R`:
+	err = decoder.Decode(&obj.R)
+	if err != nil {
+		return err
+	}
+	// Deserialize `S`:
+	err = decoder.Decode(&obj.S)
+	if err != nil {
+		return err
+	}
+	return nil
 }

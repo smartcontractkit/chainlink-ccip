@@ -8,17 +8,47 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type BaseState struct {
+type ApprovedSenderAccount struct{}
+
+var ApprovedSenderAccountDiscriminator = [8]byte{141, 66, 47, 213, 85, 194, 71, 166}
+
+func (obj ApprovedSenderAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ApprovedSenderAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ApprovedSenderAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ApprovedSenderAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[141 66 47 213 85 194 71 166]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	return nil
+}
+
+type BaseStateAccount struct {
 	Owner         ag_solanago.PublicKey
 	ProposedOwner ag_solanago.PublicKey
 	Router        ag_solanago.PublicKey
 }
 
-var BaseStateDiscriminator = [8]byte{46, 139, 13, 192, 80, 181, 96, 46}
+var BaseStateAccountDiscriminator = [8]byte{46, 139, 13, 192, 80, 181, 96, 46}
 
-func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj BaseStateAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(BaseStateDiscriminator[:], false)
+	err = encoder.WriteBytes(BaseStateAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -40,14 +70,14 @@ func (obj BaseState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 
-func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *BaseStateAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(BaseStateDiscriminator[:]) {
+		if !discriminator.Equal(BaseStateAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[46 139 13 192 80 181 96 46]",
@@ -68,36 +98,6 @@ func (obj *BaseState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	err = decoder.Decode(&obj.Router)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-type ApprovedSender struct{}
-
-var ApprovedSenderDiscriminator = [8]byte{141, 66, 47, 213, 85, 194, 71, 166}
-
-func (obj ApprovedSender) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(ApprovedSenderDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *ApprovedSender) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(ApprovedSenderDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[141 66 47 213 85 194 71 166]",
-				fmt.Sprint(discriminator[:]))
-		}
 	}
 	return nil
 }

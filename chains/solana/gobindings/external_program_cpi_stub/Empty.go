@@ -11,7 +11,7 @@ import (
 
 // Empty is the `empty` instruction.
 type Empty struct {
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewEmptyInstructionBuilder creates a new `Empty` instruction builder.

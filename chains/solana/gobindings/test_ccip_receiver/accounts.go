@@ -7,16 +7,16 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 )
 
-type Counter struct {
+type CounterAccount struct {
 	Value uint8
 	State BaseState
 }
 
-var CounterDiscriminator = [8]byte{255, 176, 4, 245, 188, 253, 124, 25}
+var CounterAccountDiscriminator = [8]byte{255, 176, 4, 245, 188, 253, 124, 25}
 
-func (obj Counter) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj CounterAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(CounterDiscriminator[:], false)
+	err = encoder.WriteBytes(CounterAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -33,14 +33,14 @@ func (obj Counter) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Counter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *CounterAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(CounterDiscriminator[:]) {
+		if !discriminator.Equal(CounterAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[255 176 4 245 188 253 124 25]",
@@ -60,27 +60,27 @@ func (obj *Counter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 	return nil
 }
 
-type ExternalExecutionConfig struct{}
+type ExternalExecutionConfigAccount struct{}
 
-var ExternalExecutionConfigDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
+var ExternalExecutionConfigAccountDiscriminator = [8]byte{159, 157, 150, 212, 168, 103, 117, 39}
 
-func (obj ExternalExecutionConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ExternalExecutionConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ExternalExecutionConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(ExternalExecutionConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ExternalExecutionConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ExternalExecutionConfigDiscriminator[:]) {
+		if !discriminator.Equal(ExternalExecutionConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[159 157 150 212 168 103 117 39]",

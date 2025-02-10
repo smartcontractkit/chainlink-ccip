@@ -14,8 +14,8 @@ import (
 
 var ProgramID ag_solanago.PublicKey
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,28 +28,6 @@ func init() {
 }
 
 var (
-	// Initialization Flow //
-	// Initializes the CCIP Offramp.
-	//
-	// The initialization of the Offramp is responsibility of Admin, nothing more than calling this method should be done first.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for initialization.
-	// * `svm_chain_selector` - The chain selector for SVM.
-	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	// Transfers the ownership of the router to a new proposed owner.
-	//
-	// Shared func signature with other programs
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for the transfer.
-	// * `proposed_owner` - The public key of the new proposed owner.
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
 	// Accepts the ownership of the router by the proposed owner.
 	//
 	// Shared func signature with other programs
@@ -68,60 +46,6 @@ var (
 	//
 	// # Arguments
 	Instruction_AddSourceChain = ag_binary.TypeID([8]byte{26, 58, 148, 88, 190, 27, 2, 144})
-
-	// Disables the source chain selector.
-	//
-	// The Admin is the only one able to disable the chain selector as source. This method is thought of as an emergency kill-switch.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for disabling the chain selector.
-	// * `source_chain_selector` - The source chain selector to be disabled.
-	Instruction_DisableSourceChainSelector = ag_binary.TypeID([8]byte{58, 101, 54, 252, 248, 31, 226, 121})
-
-	// Updates the configuration of the source chain selector.
-	//
-	// The Admin is the only one able to update the source chain config.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the chain selector.
-	// * `source_chain_selector` - The source chain selector to be updated.
-	// * `source_chain_config` - The new configuration for the source chain.
-	Instruction_UpdateSourceChainConfig = ag_binary.TypeID([8]byte{52, 85, 37, 124, 209, 140, 181, 104})
-
-	// Updates the SVM chain selector in the offramp configuration.
-	//
-	// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `new_chain_selector` - The new chain selector for SVM.
-	Instruction_UpdateSvmChainSelector = ag_binary.TypeID([8]byte{164, 212, 71, 101, 166, 113, 26, 93})
-
-	// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
-	//
-	// This is part of the OffRamp Configuration for SVM.
-	// The Admin is the only one able to update this config.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `new_enable_manual_execution_after` - The new minimum amount of time required.
-	Instruction_UpdateEnableManualExecutionAfter = ag_binary.TypeID([8]byte{157, 236, 73, 92, 84, 197, 152, 105})
-
-	// Sets the OCR configuration.
-	// Only CCIP Admin can set the OCR configuration.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for setting the OCR configuration.
-	// * `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].
-	// * `config_info` - The OCR configuration information.
-	// * `signers` - The list of signers.
-	// * `transmitters` - The list of transmitters.
-	Instruction_SetOcrConfig = ag_binary.TypeID([8]byte{4, 131, 107, 110, 250, 158, 244, 200})
 
 	// Off Ramp Flow //
 	// Commits a report to the router.
@@ -149,6 +73,16 @@ var (
 	// * `raw_vs` - array of V components of signatures
 	Instruction_Commit = ag_binary.TypeID([8]byte{223, 140, 142, 165, 229, 208, 156, 74})
 
+	// Disables the source chain selector.
+	//
+	// The Admin is the only one able to disable the chain selector as source. This method is thought of as an emergency kill-switch.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for disabling the chain selector.
+	// * `source_chain_selector` - The source chain selector to be disabled.
+	Instruction_DisableSourceChainSelector = ag_binary.TypeID([8]byte{58, 101, 54, 252, 248, 31, 226, 121})
+
 	// Executes a message on the destination chain.
 	//
 	// The method name needs to be execute with Anchor encoding.
@@ -171,6 +105,18 @@ var (
 	// * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
 	Instruction_Execute = ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
 
+	// Initialization Flow //
+	// Initializes the CCIP Offramp.
+	//
+	// The initialization of the Offramp is responsibility of Admin, nothing more than calling this method should be done first.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for initialization.
+	// * `svm_chain_selector` - The chain selector for SVM.
+	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
 	// Manually executes a report to the router.
 	//
 	// When a message is not being executed, then the user can trigger the execution manually.
@@ -182,35 +128,89 @@ var (
 	// * `ctx` - The context containing the accounts required for the execution.
 	// * `raw_execution_report` - The serialized execution report containing the message and proofs.
 	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
+
+	// Sets the OCR configuration.
+	// Only CCIP Admin can set the OCR configuration.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for setting the OCR configuration.
+	// * `plugin_type` - The type of OCR plugin [0: Commit, 1: Execution].
+	// * `config_info` - The OCR configuration information.
+	// * `signers` - The list of signers.
+	// * `transmitters` - The list of transmitters.
+	Instruction_SetOcrConfig = ag_binary.TypeID([8]byte{4, 131, 107, 110, 250, 158, 244, 200})
+
+	// Transfers the ownership of the router to a new proposed owner.
+	//
+	// Shared func signature with other programs
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for the transfer.
+	// * `proposed_owner` - The public key of the new proposed owner.
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
+
+	// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
+	//
+	// This is part of the OffRamp Configuration for SVM.
+	// The Admin is the only one able to update this config.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `new_enable_manual_execution_after` - The new minimum amount of time required.
+	Instruction_UpdateEnableManualExecutionAfter = ag_binary.TypeID([8]byte{157, 236, 73, 92, 84, 197, 152, 105})
+
+	// Updates the configuration of the source chain selector.
+	//
+	// The Admin is the only one able to update the source chain config.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the chain selector.
+	// * `source_chain_selector` - The source chain selector to be updated.
+	// * `source_chain_config` - The new configuration for the source chain.
+	Instruction_UpdateSourceChainConfig = ag_binary.TypeID([8]byte{52, 85, 37, 124, 209, 140, 181, 104})
+
+	// Updates the SVM chain selector in the offramp configuration.
+	//
+	// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `new_chain_selector` - The new chain selector for SVM.
+	Instruction_UpdateSvmChainSelector = ag_binary.TypeID([8]byte{164, 212, 71, 101, 166, 113, 26, 93})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
 	case Instruction_AddSourceChain:
 		return "AddSourceChain"
+	case Instruction_Commit:
+		return "Commit"
 	case Instruction_DisableSourceChainSelector:
 		return "DisableSourceChainSelector"
+	case Instruction_Execute:
+		return "Execute"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_ManuallyExecute:
+		return "ManuallyExecute"
+	case Instruction_SetOcrConfig:
+		return "SetOcrConfig"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_UpdateEnableManualExecutionAfter:
+		return "UpdateEnableManualExecutionAfter"
 	case Instruction_UpdateSourceChainConfig:
 		return "UpdateSourceChainConfig"
 	case Instruction_UpdateSvmChainSelector:
 		return "UpdateSvmChainSelector"
-	case Instruction_UpdateEnableManualExecutionAfter:
-		return "UpdateEnableManualExecutionAfter"
-	case Instruction_SetOcrConfig:
-		return "SetOcrConfig"
-	case Instruction_Commit:
-		return "Commit"
-	case Instruction_Execute:
-		return "Execute"
-	case Instruction_ManuallyExecute:
-		return "ManuallyExecute"
 	default:
 		return ""
 	}
@@ -232,40 +232,40 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnership)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "add_source_chain", Type: (*AddSourceChain)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "commit", Type: (*Commit)(nil),
 		},
 		{
-			"add_source_chain", (*AddSourceChain)(nil),
+			Name: "disable_source_chain_selector", Type: (*DisableSourceChainSelector)(nil),
 		},
 		{
-			"disable_source_chain_selector", (*DisableSourceChainSelector)(nil),
+			Name: "execute", Type: (*Execute)(nil),
 		},
 		{
-			"update_source_chain_config", (*UpdateSourceChainConfig)(nil),
+			Name: "initialize", Type: (*Initialize)(nil),
 		},
 		{
-			"update_svm_chain_selector", (*UpdateSvmChainSelector)(nil),
+			Name: "manually_execute", Type: (*ManuallyExecute)(nil),
 		},
 		{
-			"update_enable_manual_execution_after", (*UpdateEnableManualExecutionAfter)(nil),
+			Name: "set_ocr_config", Type: (*SetOcrConfig)(nil),
 		},
 		{
-			"set_ocr_config", (*SetOcrConfig)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnership)(nil),
 		},
 		{
-			"commit", (*Commit)(nil),
+			Name: "update_enable_manual_execution_after", Type: (*UpdateEnableManualExecutionAfter)(nil),
 		},
 		{
-			"execute", (*Execute)(nil),
+			Name: "update_source_chain_config", Type: (*UpdateSourceChainConfig)(nil),
 		},
 		{
-			"manually_execute", (*ManuallyExecute)(nil),
+			Name: "update_svm_chain_selector", Type: (*UpdateSvmChainSelector)(nil),
 		},
 	},
 )
@@ -303,14 +303,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -322,4 +322,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

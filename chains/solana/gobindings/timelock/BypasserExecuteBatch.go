@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// BypasserExecuteBatch is the `bypasserExecuteBatch` instruction.
+// BypasserExecuteBatch is the `bypasser_execute_batch` instruction.
 type BypasserExecuteBatch struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8
@@ -19,12 +19,12 @@ type BypasserExecuteBatch struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [] timelockSigner
+	// [2] = [] timelock_signer
 	//
-	// [3] = [] roleAccessController
+	// [3] = [] role_access_controller
 	//
 	// [4] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewBypasserExecuteBatchInstructionBuilder creates a new `BypasserExecuteBatch` instruction builder.
@@ -35,9 +35,9 @@ func NewBypasserExecuteBatchInstructionBuilder() *BypasserExecuteBatch {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *BypasserExecuteBatch) SetTimelockId(timelockId [32]uint8) *BypasserExecuteBatch {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "timelock_id" parameter.
+func (inst *BypasserExecuteBatch) SetTimelockId(timelock_id [32]uint8) *BypasserExecuteBatch {
+	inst.TimelockId = &timelock_id
 	return inst
 }
 
@@ -55,7 +55,7 @@ func (inst *BypasserExecuteBatch) SetOperationAccount(operation ag_solanago.Publ
 
 // GetOperationAccount gets the "operation" account.
 func (inst *BypasserExecuteBatch) GetOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -66,29 +66,29 @@ func (inst *BypasserExecuteBatch) SetConfigAccount(config ag_solanago.PublicKey)
 
 // GetConfigAccount gets the "config" account.
 func (inst *BypasserExecuteBatch) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetTimelockSignerAccount sets the "timelockSigner" account.
+// SetTimelockSignerAccount sets the "timelock_signer" account.
 func (inst *BypasserExecuteBatch) SetTimelockSignerAccount(timelockSigner ag_solanago.PublicKey) *BypasserExecuteBatch {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(timelockSigner)
 	return inst
 }
 
-// GetTimelockSignerAccount gets the "timelockSigner" account.
+// GetTimelockSignerAccount gets the "timelock_signer" account.
 func (inst *BypasserExecuteBatch) GetTimelockSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+// SetRoleAccessControllerAccount sets the "role_access_controller" account.
 func (inst *BypasserExecuteBatch) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *BypasserExecuteBatch {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
-// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+// GetRoleAccessControllerAccount gets the "role_access_controller" account.
 func (inst *BypasserExecuteBatch) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -99,7 +99,7 @@ func (inst *BypasserExecuteBatch) SetAuthorityAccount(authority ag_solanago.Publ
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *BypasserExecuteBatch) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 func (inst BypasserExecuteBatch) Build() *Instruction {
@@ -161,17 +161,17 @@ func (inst *BypasserExecuteBatch) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param(" TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("         Id", *inst.Id))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("      timelockSigner", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("             operation", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("       timelock_signer", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("role_access_controller", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice.Get(4)))
 					})
 				})
 		})
@@ -207,7 +207,7 @@ func (obj *BypasserExecuteBatch) UnmarshalWithDecoder(decoder *ag_binary.Decoder
 // NewBypasserExecuteBatchInstruction declares a new BypasserExecuteBatch instruction with the provided parameters and accounts.
 func NewBypasserExecuteBatchInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	timelock_id [32]uint8,
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
@@ -216,7 +216,7 @@ func NewBypasserExecuteBatchInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *BypasserExecuteBatch {
 	return NewBypasserExecuteBatchInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(timelock_id).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).

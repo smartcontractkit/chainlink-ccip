@@ -22,22 +22,22 @@ type AddBillingTokenConfig struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] billingTokenConfig
+	// [1] = [WRITE] billing_token_config
 	//
-	// [2] = [] tokenProgram
+	// [2] = [] token_program
 	//
-	// [3] = [] feeTokenMint
+	// [3] = [] fee_token_mint
 	//
-	// [4] = [WRITE] feeTokenReceiver
+	// [4] = [WRITE] fee_token_receiver
 	//
 	// [5] = [WRITE, SIGNER] authority
 	//
-	// [6] = [] feeBillingSigner
+	// [6] = [] fee_billing_signer
 	//
-	// [7] = [] associatedTokenProgram
+	// [7] = [] associated_token_program
 	//
-	// [8] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [8] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAddBillingTokenConfigInstructionBuilder creates a new `AddBillingTokenConfig` instruction builder.
@@ -62,51 +62,51 @@ func (inst *AddBillingTokenConfig) SetConfigAccount(config ag_solanago.PublicKey
 
 // GetConfigAccount gets the "config" account.
 func (inst *AddBillingTokenConfig) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetBillingTokenConfigAccount sets the "billingTokenConfig" account.
+// SetBillingTokenConfigAccount sets the "billing_token_config" account.
 func (inst *AddBillingTokenConfig) SetBillingTokenConfigAccount(billingTokenConfig ag_solanago.PublicKey) *AddBillingTokenConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(billingTokenConfig).WRITE()
 	return inst
 }
 
-// GetBillingTokenConfigAccount gets the "billingTokenConfig" account.
+// GetBillingTokenConfigAccount gets the "billing_token_config" account.
 func (inst *AddBillingTokenConfig) GetBillingTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 func (inst *AddBillingTokenConfig) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *AddBillingTokenConfig {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 func (inst *AddBillingTokenConfig) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetFeeTokenMintAccount sets the "feeTokenMint" account.
+// SetFeeTokenMintAccount sets the "fee_token_mint" account.
 func (inst *AddBillingTokenConfig) SetFeeTokenMintAccount(feeTokenMint ag_solanago.PublicKey) *AddBillingTokenConfig {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(feeTokenMint)
 	return inst
 }
 
-// GetFeeTokenMintAccount gets the "feeTokenMint" account.
+// GetFeeTokenMintAccount gets the "fee_token_mint" account.
 func (inst *AddBillingTokenConfig) GetFeeTokenMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetFeeTokenReceiverAccount sets the "feeTokenReceiver" account.
+// SetFeeTokenReceiverAccount sets the "fee_token_receiver" account.
 func (inst *AddBillingTokenConfig) SetFeeTokenReceiverAccount(feeTokenReceiver ag_solanago.PublicKey) *AddBillingTokenConfig {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(feeTokenReceiver).WRITE()
 	return inst
 }
 
-// GetFeeTokenReceiverAccount gets the "feeTokenReceiver" account.
+// GetFeeTokenReceiverAccount gets the "fee_token_receiver" account.
 func (inst *AddBillingTokenConfig) GetFeeTokenReceiverAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -117,40 +117,40 @@ func (inst *AddBillingTokenConfig) SetAuthorityAccount(authority ag_solanago.Pub
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AddBillingTokenConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetFeeBillingSignerAccount sets the "feeBillingSigner" account.
+// SetFeeBillingSignerAccount sets the "fee_billing_signer" account.
 func (inst *AddBillingTokenConfig) SetFeeBillingSignerAccount(feeBillingSigner ag_solanago.PublicKey) *AddBillingTokenConfig {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(feeBillingSigner)
 	return inst
 }
 
-// GetFeeBillingSignerAccount gets the "feeBillingSigner" account.
+// GetFeeBillingSignerAccount gets the "fee_billing_signer" account.
 func (inst *AddBillingTokenConfig) GetFeeBillingSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetAssociatedTokenProgramAccount sets the "associatedTokenProgram" account.
+// SetAssociatedTokenProgramAccount sets the "associated_token_program" account.
 func (inst *AddBillingTokenConfig) SetAssociatedTokenProgramAccount(associatedTokenProgram ag_solanago.PublicKey) *AddBillingTokenConfig {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(associatedTokenProgram)
 	return inst
 }
 
-// GetAssociatedTokenProgramAccount gets the "associatedTokenProgram" account.
+// GetAssociatedTokenProgramAccount gets the "associated_token_program" account.
 func (inst *AddBillingTokenConfig) GetAssociatedTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *AddBillingTokenConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AddBillingTokenConfig {
 	inst.AccountMetaSlice[8] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *AddBillingTokenConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice.Get(8)
 }
 
 func (inst AddBillingTokenConfig) Build() *Instruction {
@@ -226,15 +226,15 @@ func (inst *AddBillingTokenConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=9]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    billingTokenConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("          tokenProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("          feeTokenMint", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("      feeTokenReceiver", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("      feeBillingSigner", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("associatedTokenProgram", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("                  config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("    billing_token_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("           token_program", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("          fee_token_mint", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("      fee_token_receiver", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("               authority", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("      fee_billing_signer", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("associated_token_program", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("          system_program", inst.AccountMetaSlice.Get(8)))
 					})
 				})
 		})

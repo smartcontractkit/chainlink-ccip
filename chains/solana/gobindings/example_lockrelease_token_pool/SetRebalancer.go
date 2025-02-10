@@ -10,14 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetRebalancer is the `setRebalancer` instruction.
+// SetRebalancer is the `set_rebalancer` instruction.
 type SetRebalancer struct {
 	Rebalancer *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetRebalancerInstructionBuilder creates a new `SetRebalancer` instruction builder.
@@ -42,7 +42,7 @@ func (inst *SetRebalancer) SetStateAccount(state ag_solanago.PublicKey) *SetReba
 
 // GetStateAccount gets the "state" account.
 func (inst *SetRebalancer) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -53,7 +53,7 @@ func (inst *SetRebalancer) SetAuthorityAccount(authority ag_solanago.PublicKey) 
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetRebalancer) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst SetRebalancer) Build() *Instruction {
@@ -108,8 +108,8 @@ func (inst *SetRebalancer) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})

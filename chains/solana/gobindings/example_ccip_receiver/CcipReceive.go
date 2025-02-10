@@ -20,18 +20,18 @@ type CcipReceive struct {
 
 	// [0] = [SIGNER] authority
 	//
-	// [1] = [] offrampProgram
+	// [1] = [] offramp_program
 	// ··········· CHECK offramp program: exists only to derive the allowed offramp PDA
 	// ··········· and the authority PDA. Must be second.
 	//
-	// [2] = [] allowedOfframp
+	// [2] = [] allowed_offramp
 	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
 	// ··········· If PDA does not exist, the router doesn't allow this offramp
 	//
-	// [3] = [] approvedSender
+	// [3] = [] approved_sender
 	//
 	// [4] = [] state
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewCcipReceiveInstructionBuilder creates a new `CcipReceive` instruction builder.
@@ -56,10 +56,10 @@ func (inst *CcipReceive) SetAuthorityAccount(authority ag_solanago.PublicKey) *C
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *CcipReceive) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetOfframpProgramAccount sets the "offrampProgram" account.
+// SetOfframpProgramAccount sets the "offramp_program" account.
 // CHECK offramp program: exists only to derive the allowed offramp PDA
 // and the authority PDA. Must be second.
 func (inst *CcipReceive) SetOfframpProgramAccount(offrampProgram ag_solanago.PublicKey) *CcipReceive {
@@ -67,14 +67,14 @@ func (inst *CcipReceive) SetOfframpProgramAccount(offrampProgram ag_solanago.Pub
 	return inst
 }
 
-// GetOfframpProgramAccount gets the "offrampProgram" account.
+// GetOfframpProgramAccount gets the "offramp_program" account.
 // CHECK offramp program: exists only to derive the allowed offramp PDA
 // and the authority PDA. Must be second.
 func (inst *CcipReceive) GetOfframpProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetAllowedOfframpAccount sets the "allowedOfframp" account.
+// SetAllowedOfframpAccount sets the "allowed_offramp" account.
 // CHECK PDA of the router program verifying the signer is an allowed offramp.
 // If PDA does not exist, the router doesn't allow this offramp
 func (inst *CcipReceive) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *CcipReceive {
@@ -82,22 +82,22 @@ func (inst *CcipReceive) SetAllowedOfframpAccount(allowedOfframp ag_solanago.Pub
 	return inst
 }
 
-// GetAllowedOfframpAccount gets the "allowedOfframp" account.
+// GetAllowedOfframpAccount gets the "allowed_offramp" account.
 // CHECK PDA of the router program verifying the signer is an allowed offramp.
 // If PDA does not exist, the router doesn't allow this offramp
 func (inst *CcipReceive) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetApprovedSenderAccount sets the "approvedSender" account.
+// SetApprovedSenderAccount sets the "approved_sender" account.
 func (inst *CcipReceive) SetApprovedSenderAccount(approvedSender ag_solanago.PublicKey) *CcipReceive {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(approvedSender)
 	return inst
 }
 
-// GetApprovedSenderAccount gets the "approvedSender" account.
+// GetApprovedSenderAccount gets the "approved_sender" account.
 func (inst *CcipReceive) GetApprovedSenderAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetStateAccount sets the "state" account.
@@ -108,7 +108,7 @@ func (inst *CcipReceive) SetStateAccount(state ag_solanago.PublicKey) *CcipRecei
 
 // GetStateAccount gets the "state" account.
 func (inst *CcipReceive) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 func (inst CcipReceive) Build() *Instruction {
@@ -172,11 +172,11 @@ func (inst *CcipReceive) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("offrampProgram", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("approvedSender", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("offramp_program", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("allowed_offramp", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("approved_sender", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("          state", inst.AccountMetaSlice.Get(4)))
 					})
 				})
 		})

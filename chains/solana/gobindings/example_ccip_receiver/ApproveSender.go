@@ -10,19 +10,19 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ApproveSender is the `approveSender` instruction.
+// ApproveSender is the `approve_sender` instruction.
 type ApproveSender struct {
 	ChainSelector *uint64
 	RemoteAddress *[]byte
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [WRITE] approvedSender
+	// [1] = [WRITE] approved_sender
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewApproveSenderInstructionBuilder creates a new `ApproveSender` instruction builder.
@@ -33,15 +33,15 @@ func NewApproveSenderInstructionBuilder() *ApproveSender {
 	return nd
 }
 
-// SetChainSelector sets the "chainSelector" parameter.
-func (inst *ApproveSender) SetChainSelector(chainSelector uint64) *ApproveSender {
-	inst.ChainSelector = &chainSelector
+// SetChainSelector sets the "_chain_selector" parameter.
+func (inst *ApproveSender) SetChainSelector(_chain_selector uint64) *ApproveSender {
+	inst.ChainSelector = &_chain_selector
 	return inst
 }
 
-// SetRemoteAddress sets the "remoteAddress" parameter.
-func (inst *ApproveSender) SetRemoteAddress(remoteAddress []byte) *ApproveSender {
-	inst.RemoteAddress = &remoteAddress
+// SetRemoteAddress sets the "_remote_address" parameter.
+func (inst *ApproveSender) SetRemoteAddress(_remote_address []byte) *ApproveSender {
+	inst.RemoteAddress = &_remote_address
 	return inst
 }
 
@@ -53,18 +53,18 @@ func (inst *ApproveSender) SetStateAccount(state ag_solanago.PublicKey) *Approve
 
 // GetStateAccount gets the "state" account.
 func (inst *ApproveSender) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetApprovedSenderAccount sets the "approvedSender" account.
+// SetApprovedSenderAccount sets the "approved_sender" account.
 func (inst *ApproveSender) SetApprovedSenderAccount(approvedSender ag_solanago.PublicKey) *ApproveSender {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(approvedSender).WRITE()
 	return inst
 }
 
-// GetApprovedSenderAccount gets the "approvedSender" account.
+// GetApprovedSenderAccount gets the "approved_sender" account.
 func (inst *ApproveSender) GetApprovedSenderAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -75,18 +75,18 @@ func (inst *ApproveSender) SetAuthorityAccount(authority ag_solanago.PublicKey) 
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ApproveSender) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *ApproveSender) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *ApproveSender {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *ApproveSender) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst ApproveSender) Build() *Instruction {
@@ -145,16 +145,16 @@ func (inst *ApproveSender) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ChainSelector", *inst.ChainSelector))
-						paramsBranch.Child(ag_format.Param("RemoteAddress", *inst.RemoteAddress))
+						paramsBranch.Child(ag_format.Param("  ChainSelector", *inst.ChainSelector))
+						paramsBranch.Child(ag_format.Param("  RemoteAddress", *inst.RemoteAddress))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("approvedSender", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta(" systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("          state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("approved_sender", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta(" system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -190,16 +190,16 @@ func (obj *ApproveSender) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 // NewApproveSenderInstruction declares a new ApproveSender instruction with the provided parameters and accounts.
 func NewApproveSenderInstruction(
 	// Parameters:
-	chainSelector uint64,
-	remoteAddress []byte,
+	_chain_selector uint64,
+	_remote_address []byte,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	approvedSender ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *ApproveSender {
 	return NewApproveSenderInstructionBuilder().
-		SetChainSelector(chainSelector).
-		SetRemoteAddress(remoteAddress).
+		SetChainSelector(_chain_selector).
+		SetRemoteAddress(_remote_address).
 		SetStateAccount(state).
 		SetApprovedSenderAccount(approvedSender).
 		SetAuthorityAccount(authority).

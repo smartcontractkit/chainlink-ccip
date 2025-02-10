@@ -22,7 +22,7 @@ import (
 // * `transmitters` - The list of transmitters.
 type SetOcrConfig struct {
 	PluginType   *uint8
-	ConfigInfo   *Ocr3ConfigInfo
+	ConfigInfo   *Ocr3ConfigInfoInput
 	Signers      *[][20]uint8
 	Transmitters *[]ag_solanago.PublicKey
 
@@ -31,7 +31,7 @@ type SetOcrConfig struct {
 	// [1] = [WRITE] state
 	//
 	// [2] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetOcrConfigInstructionBuilder creates a new `SetOcrConfig` instruction builder.
@@ -42,15 +42,15 @@ func NewSetOcrConfigInstructionBuilder() *SetOcrConfig {
 	return nd
 }
 
-// SetPluginType sets the "pluginType" parameter.
-func (inst *SetOcrConfig) SetPluginType(pluginType uint8) *SetOcrConfig {
-	inst.PluginType = &pluginType
+// SetPluginType sets the "plugin_type" parameter.
+func (inst *SetOcrConfig) SetPluginType(plugin_type uint8) *SetOcrConfig {
+	inst.PluginType = &plugin_type
 	return inst
 }
 
-// SetConfigInfo sets the "configInfo" parameter.
-func (inst *SetOcrConfig) SetConfigInfo(configInfo Ocr3ConfigInfo) *SetOcrConfig {
-	inst.ConfigInfo = &configInfo
+// SetConfigInfo sets the "config_info" parameter.
+func (inst *SetOcrConfig) SetConfigInfo(config_info Ocr3ConfigInfoInput) *SetOcrConfig {
+	inst.ConfigInfo = &config_info
 	return inst
 }
 
@@ -74,7 +74,7 @@ func (inst *SetOcrConfig) SetConfigAccount(config ag_solanago.PublicKey) *SetOcr
 
 // GetConfigAccount gets the "config" account.
 func (inst *SetOcrConfig) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetStateAccount sets the "state" account.
@@ -85,7 +85,7 @@ func (inst *SetOcrConfig) SetStateAccount(state ag_solanago.PublicKey) *SetOcrCo
 
 // GetStateAccount gets the "state" account.
 func (inst *SetOcrConfig) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -96,7 +96,7 @@ func (inst *SetOcrConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetOcrConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst SetOcrConfig) Build() *Instruction {
@@ -166,9 +166,9 @@ func (inst *SetOcrConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -224,8 +224,8 @@ func (obj *SetOcrConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 // NewSetOcrConfigInstruction declares a new SetOcrConfig instruction with the provided parameters and accounts.
 func NewSetOcrConfigInstruction(
 	// Parameters:
-	pluginType uint8,
-	configInfo Ocr3ConfigInfo,
+	plugin_type uint8,
+	config_info Ocr3ConfigInfoInput,
 	signers [][20]uint8,
 	transmitters []ag_solanago.PublicKey,
 	// Accounts:
@@ -233,8 +233,8 @@ func NewSetOcrConfigInstruction(
 	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetOcrConfig {
 	return NewSetOcrConfigInstructionBuilder().
-		SetPluginType(pluginType).
-		SetConfigInfo(configInfo).
+		SetPluginType(plugin_type).
+		SetConfigInfo(config_info).
 		SetSigners(signers).
 		SetTransmitters(transmitters).
 		SetConfigAccount(config).

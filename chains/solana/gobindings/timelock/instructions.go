@@ -14,8 +14,8 @@ import (
 
 var ProgramID ag_solanago.PublicKey
 
-func SetProgramID(pubkey ag_solanago.PublicKey) {
-	ProgramID = pubkey
+func SetProgramID(PublicKey ag_solanago.PublicKey) {
+	ProgramID = PublicKey
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
@@ -28,86 +28,86 @@ func init() {
 }
 
 var (
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
-	Instruction_BatchAddAccess = ag_binary.TypeID([8]byte{73, 141, 223, 79, 66, 154, 226, 67})
-
-	Instruction_InitializeOperation = ag_binary.TypeID([8]byte{15, 96, 217, 171, 124, 4, 113, 243})
-
-	Instruction_AppendInstructions = ag_binary.TypeID([8]byte{58, 58, 137, 122, 115, 51, 144, 134})
-
-	Instruction_FinalizeOperation = ag_binary.TypeID([8]byte{63, 208, 32, 98, 85, 182, 236, 140})
-
-	Instruction_ClearOperation = ag_binary.TypeID([8]byte{111, 217, 62, 240, 224, 75, 60, 58})
-
-	Instruction_ScheduleBatch = ag_binary.TypeID([8]byte{242, 140, 87, 106, 71, 226, 86, 32})
-
-	Instruction_Cancel = ag_binary.TypeID([8]byte{232, 219, 223, 41, 219, 236, 220, 190})
-
-	Instruction_ExecuteBatch = ag_binary.TypeID([8]byte{112, 159, 211, 51, 238, 70, 212, 60})
-
-	Instruction_InitializeBypasserOperation = ag_binary.TypeID([8]byte{58, 27, 48, 204, 19, 197, 63, 26})
+	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
 	Instruction_AppendBypasserInstructions = ag_binary.TypeID([8]byte{127, 68, 8, 210, 106, 213, 25, 215})
 
-	Instruction_FinalizeBypasserOperation = ag_binary.TypeID([8]byte{45, 55, 198, 51, 124, 24, 169, 250})
+	Instruction_AppendInstructions = ag_binary.TypeID([8]byte{58, 58, 137, 122, 115, 51, 144, 134})
 
-	Instruction_ClearBypasserOperation = ag_binary.TypeID([8]byte{200, 21, 249, 130, 56, 13, 128, 32})
-
-	Instruction_BypasserExecuteBatch = ag_binary.TypeID([8]byte{90, 62, 66, 6, 227, 174, 30, 194})
-
-	Instruction_UpdateDelay = ag_binary.TypeID([8]byte{164, 186, 80, 62, 85, 88, 182, 147})
+	Instruction_BatchAddAccess = ag_binary.TypeID([8]byte{73, 141, 223, 79, 66, 154, 226, 67})
 
 	Instruction_BlockFunctionSelector = ag_binary.TypeID([8]byte{119, 89, 101, 41, 72, 143, 218, 185})
 
-	Instruction_UnblockFunctionSelector = ag_binary.TypeID([8]byte{53, 84, 245, 196, 149, 52, 30, 57})
+	Instruction_BypasserExecuteBatch = ag_binary.TypeID([8]byte{90, 62, 66, 6, 227, 174, 30, 194})
+
+	Instruction_Cancel = ag_binary.TypeID([8]byte{232, 219, 223, 41, 219, 236, 220, 190})
+
+	Instruction_ClearBypasserOperation = ag_binary.TypeID([8]byte{200, 21, 249, 130, 56, 13, 128, 32})
+
+	Instruction_ClearOperation = ag_binary.TypeID([8]byte{111, 217, 62, 240, 224, 75, 60, 58})
+
+	Instruction_ExecuteBatch = ag_binary.TypeID([8]byte{112, 159, 211, 51, 238, 70, 212, 60})
+
+	Instruction_FinalizeBypasserOperation = ag_binary.TypeID([8]byte{45, 55, 198, 51, 124, 24, 169, 250})
+
+	Instruction_FinalizeOperation = ag_binary.TypeID([8]byte{63, 208, 32, 98, 85, 182, 236, 140})
+
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	Instruction_InitializeBypasserOperation = ag_binary.TypeID([8]byte{58, 27, 48, 204, 19, 197, 63, 26})
+
+	Instruction_InitializeOperation = ag_binary.TypeID([8]byte{15, 96, 217, 171, 124, 4, 113, 243})
+
+	Instruction_ScheduleBatch = ag_binary.TypeID([8]byte{242, 140, 87, 106, 71, 226, 86, 32})
 
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
-	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
+	Instruction_UnblockFunctionSelector = ag_binary.TypeID([8]byte{53, 84, 245, 196, 149, 52, 30, 57})
+
+	Instruction_UpdateDelay = ag_binary.TypeID([8]byte{164, 186, 80, 62, 85, 88, 182, 147})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
-	case Instruction_BatchAddAccess:
-		return "BatchAddAccess"
-	case Instruction_InitializeOperation:
-		return "InitializeOperation"
-	case Instruction_AppendInstructions:
-		return "AppendInstructions"
-	case Instruction_FinalizeOperation:
-		return "FinalizeOperation"
-	case Instruction_ClearOperation:
-		return "ClearOperation"
-	case Instruction_ScheduleBatch:
-		return "ScheduleBatch"
-	case Instruction_Cancel:
-		return "Cancel"
-	case Instruction_ExecuteBatch:
-		return "ExecuteBatch"
-	case Instruction_InitializeBypasserOperation:
-		return "InitializeBypasserOperation"
-	case Instruction_AppendBypasserInstructions:
-		return "AppendBypasserInstructions"
-	case Instruction_FinalizeBypasserOperation:
-		return "FinalizeBypasserOperation"
-	case Instruction_ClearBypasserOperation:
-		return "ClearBypasserOperation"
-	case Instruction_BypasserExecuteBatch:
-		return "BypasserExecuteBatch"
-	case Instruction_UpdateDelay:
-		return "UpdateDelay"
-	case Instruction_BlockFunctionSelector:
-		return "BlockFunctionSelector"
-	case Instruction_UnblockFunctionSelector:
-		return "UnblockFunctionSelector"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_AppendBypasserInstructions:
+		return "AppendBypasserInstructions"
+	case Instruction_AppendInstructions:
+		return "AppendInstructions"
+	case Instruction_BatchAddAccess:
+		return "BatchAddAccess"
+	case Instruction_BlockFunctionSelector:
+		return "BlockFunctionSelector"
+	case Instruction_BypasserExecuteBatch:
+		return "BypasserExecuteBatch"
+	case Instruction_Cancel:
+		return "Cancel"
+	case Instruction_ClearBypasserOperation:
+		return "ClearBypasserOperation"
+	case Instruction_ClearOperation:
+		return "ClearOperation"
+	case Instruction_ExecuteBatch:
+		return "ExecuteBatch"
+	case Instruction_FinalizeBypasserOperation:
+		return "FinalizeBypasserOperation"
+	case Instruction_FinalizeOperation:
+		return "FinalizeOperation"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_InitializeBypasserOperation:
+		return "InitializeBypasserOperation"
+	case Instruction_InitializeOperation:
+		return "InitializeOperation"
+	case Instruction_ScheduleBatch:
+		return "ScheduleBatch"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_UnblockFunctionSelector:
+		return "UnblockFunctionSelector"
+	case Instruction_UpdateDelay:
+		return "UpdateDelay"
 	default:
 		return ""
 	}
@@ -129,61 +129,61 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
+			Name: "accept_ownership", Type: (*AcceptOwnership)(nil),
 		},
 		{
-			"batch_add_access", (*BatchAddAccess)(nil),
+			Name: "append_bypasser_instructions", Type: (*AppendBypasserInstructions)(nil),
 		},
 		{
-			"initialize_operation", (*InitializeOperation)(nil),
+			Name: "append_instructions", Type: (*AppendInstructions)(nil),
 		},
 		{
-			"append_instructions", (*AppendInstructions)(nil),
+			Name: "batch_add_access", Type: (*BatchAddAccess)(nil),
 		},
 		{
-			"finalize_operation", (*FinalizeOperation)(nil),
+			Name: "block_function_selector", Type: (*BlockFunctionSelector)(nil),
 		},
 		{
-			"clear_operation", (*ClearOperation)(nil),
+			Name: "bypasser_execute_batch", Type: (*BypasserExecuteBatch)(nil),
 		},
 		{
-			"schedule_batch", (*ScheduleBatch)(nil),
+			Name: "cancel", Type: (*Cancel)(nil),
 		},
 		{
-			"cancel", (*Cancel)(nil),
+			Name: "clear_bypasser_operation", Type: (*ClearBypasserOperation)(nil),
 		},
 		{
-			"execute_batch", (*ExecuteBatch)(nil),
+			Name: "clear_operation", Type: (*ClearOperation)(nil),
 		},
 		{
-			"initialize_bypasser_operation", (*InitializeBypasserOperation)(nil),
+			Name: "execute_batch", Type: (*ExecuteBatch)(nil),
 		},
 		{
-			"append_bypasser_instructions", (*AppendBypasserInstructions)(nil),
+			Name: "finalize_bypasser_operation", Type: (*FinalizeBypasserOperation)(nil),
 		},
 		{
-			"finalize_bypasser_operation", (*FinalizeBypasserOperation)(nil),
+			Name: "finalize_operation", Type: (*FinalizeOperation)(nil),
 		},
 		{
-			"clear_bypasser_operation", (*ClearBypasserOperation)(nil),
+			Name: "initialize", Type: (*Initialize)(nil),
 		},
 		{
-			"bypasser_execute_batch", (*BypasserExecuteBatch)(nil),
+			Name: "initialize_bypasser_operation", Type: (*InitializeBypasserOperation)(nil),
 		},
 		{
-			"update_delay", (*UpdateDelay)(nil),
+			Name: "initialize_operation", Type: (*InitializeOperation)(nil),
 		},
 		{
-			"block_function_selector", (*BlockFunctionSelector)(nil),
+			Name: "schedule_batch", Type: (*ScheduleBatch)(nil),
 		},
 		{
-			"unblock_function_selector", (*UnblockFunctionSelector)(nil),
+			Name: "transfer_ownership", Type: (*TransferOwnership)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
+			Name: "unblock_function_selector", Type: (*UnblockFunctionSelector)(nil),
 		},
 		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			Name: "update_delay", Type: (*UpdateDelay)(nil),
 		},
 	},
 )
@@ -221,14 +221,14 @@ func (inst *Instruction) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 }
 
 func registryDecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (interface{}, error) {
-	inst, err := DecodeInstruction(accounts, data)
+	inst, err := decodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
+func decodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
 	if err := ag_binary.NewBorshDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
@@ -240,4 +240,26 @@ func DecodeInstruction(accounts []*ag_solanago.AccountMeta, data []byte) (*Instr
 		}
 	}
 	return inst, nil
+}
+
+func DecodeInstructions(message *ag_solanago.Message) (instructions []*Instruction, err error) {
+	for _, ins := range message.Instructions {
+		var programID ag_solanago.PublicKey
+		if programID, err = message.Program(ins.ProgramIDIndex); err != nil {
+			return
+		}
+		if !programID.Equals(ProgramID) {
+			continue
+		}
+		var accounts []*ag_solanago.AccountMeta
+		if accounts, err = ins.ResolveInstructionAccounts(message); err != nil {
+			return
+		}
+		var insDecoded *Instruction
+		if insDecoded, err = decodeInstruction(accounts, ins.Data); err != nil {
+			return
+		}
+		instructions = append(instructions, insDecoded)
+	}
+	return
 }

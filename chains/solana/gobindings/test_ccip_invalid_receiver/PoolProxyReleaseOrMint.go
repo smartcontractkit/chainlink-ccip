@@ -10,40 +10,40 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// PoolProxyReleaseOrMint is the `poolProxyReleaseOrMint` instruction.
+// PoolProxyReleaseOrMint is the `pool_proxy_release_or_mint` instruction.
 type PoolProxyReleaseOrMint struct {
 	ReleaseOrMint *ReleaseOrMintInV1
 
-	// [0] = [] testPool
+	// [0] = [] test_pool
 	// ··········· CHECK
 	//
-	// [1] = [] cpiSigner
+	// [1] = [] cpi_signer
 	// ··········· CHECK
 	//
-	// [2] = [] offrampProgram
+	// [2] = [] offramp_program
 	//
-	// [3] = [] allowedOfframp
+	// [3] = [] allowed_offramp
 	// ··········· CHECK
 	//
 	// [4] = [WRITE] state
 	// ··········· CHECK
 	//
-	// [5] = [] tokenProgram
+	// [5] = [] token_program
 	// ··········· CHECK
 	//
 	// [6] = [WRITE] mint
 	//
-	// [7] = [] poolSigner
+	// [7] = [] pool_signer
 	// ··········· CHECK
 	//
-	// [8] = [WRITE] poolTokenAccount
+	// [8] = [WRITE] pool_token_account
 	//
-	// [9] = [WRITE] chainConfig
+	// [9] = [WRITE] chain_config
 	// ··········· CHECK
 	//
-	// [10] = [WRITE] receiverTokenAccount
+	// [10] = [WRITE] receiver_token_account
 	// ··········· CHECK
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewPoolProxyReleaseOrMintInstructionBuilder creates a new `PoolProxyReleaseOrMint` instruction builder.
@@ -54,60 +54,60 @@ func NewPoolProxyReleaseOrMintInstructionBuilder() *PoolProxyReleaseOrMint {
 	return nd
 }
 
-// SetReleaseOrMint sets the "releaseOrMint" parameter.
-func (inst *PoolProxyReleaseOrMint) SetReleaseOrMint(releaseOrMint ReleaseOrMintInV1) *PoolProxyReleaseOrMint {
-	inst.ReleaseOrMint = &releaseOrMint
+// SetReleaseOrMint sets the "release_or_mint" parameter.
+func (inst *PoolProxyReleaseOrMint) SetReleaseOrMint(release_or_mint ReleaseOrMintInV1) *PoolProxyReleaseOrMint {
+	inst.ReleaseOrMint = &release_or_mint
 	return inst
 }
 
-// SetTestPoolAccount sets the "testPool" account.
+// SetTestPoolAccount sets the "test_pool" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) SetTestPoolAccount(testPool ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(testPool)
 	return inst
 }
 
-// GetTestPoolAccount gets the "testPool" account.
+// GetTestPoolAccount gets the "test_pool" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetTestPoolAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetCpiSignerAccount sets the "cpiSigner" account.
+// SetCpiSignerAccount sets the "cpi_signer" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) SetCpiSignerAccount(cpiSigner ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(cpiSigner)
 	return inst
 }
 
-// GetCpiSignerAccount gets the "cpiSigner" account.
+// GetCpiSignerAccount gets the "cpi_signer" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetCpiSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetOfframpProgramAccount sets the "offrampProgram" account.
+// SetOfframpProgramAccount sets the "offramp_program" account.
 func (inst *PoolProxyReleaseOrMint) SetOfframpProgramAccount(offrampProgram ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(offrampProgram)
 	return inst
 }
 
-// GetOfframpProgramAccount gets the "offrampProgram" account.
+// GetOfframpProgramAccount gets the "offramp_program" account.
 func (inst *PoolProxyReleaseOrMint) GetOfframpProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetAllowedOfframpAccount sets the "allowedOfframp" account.
+// SetAllowedOfframpAccount sets the "allowed_offramp" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(allowedOfframp)
 	return inst
 }
 
-// GetAllowedOfframpAccount gets the "allowedOfframp" account.
+// GetAllowedOfframpAccount gets the "allowed_offramp" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetStateAccount sets the "state" account.
@@ -120,20 +120,20 @@ func (inst *PoolProxyReleaseOrMint) SetStateAccount(state ag_solanago.PublicKey)
 // GetStateAccount gets the "state" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -144,57 +144,57 @@ func (inst *PoolProxyReleaseOrMint) SetMintAccount(mint ag_solanago.PublicKey) *
 
 // GetMintAccount gets the "mint" account.
 func (inst *PoolProxyReleaseOrMint) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetPoolSignerAccount sets the "poolSigner" account.
+// SetPoolSignerAccount sets the "pool_signer" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(poolSigner)
 	return inst
 }
 
-// GetPoolSignerAccount gets the "poolSigner" account.
+// GetPoolSignerAccount gets the "pool_signer" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetPoolSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
-// SetPoolTokenAccountAccount sets the "poolTokenAccount" account.
+// SetPoolTokenAccountAccount sets the "pool_token_account" account.
 func (inst *PoolProxyReleaseOrMint) SetPoolTokenAccountAccount(poolTokenAccount ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[8] = ag_solanago.Meta(poolTokenAccount).WRITE()
 	return inst
 }
 
-// GetPoolTokenAccountAccount gets the "poolTokenAccount" account.
+// GetPoolTokenAccountAccount gets the "pool_token_account" account.
 func (inst *PoolProxyReleaseOrMint) GetPoolTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice.Get(8)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[9] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice.Get(9)
 }
 
-// SetReceiverTokenAccountAccount sets the "receiverTokenAccount" account.
+// SetReceiverTokenAccountAccount sets the "receiver_token_account" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) SetReceiverTokenAccountAccount(receiverTokenAccount ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	inst.AccountMetaSlice[10] = ag_solanago.Meta(receiverTokenAccount).WRITE()
 	return inst
 }
 
-// GetReceiverTokenAccountAccount gets the "receiverTokenAccount" account.
+// GetReceiverTokenAccountAccount gets the "receiver_token_account" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetReceiverTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
+	return inst.AccountMetaSlice.Get(10)
 }
 
 func (inst PoolProxyReleaseOrMint) Build() *Instruction {
@@ -271,22 +271,22 @@ func (inst *PoolProxyReleaseOrMint) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ReleaseOrMint", *inst.ReleaseOrMint))
+						paramsBranch.Child(ag_format.Param("  ReleaseOrMint", *inst.ReleaseOrMint))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=11]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("      testPool", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     cpiSigner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("offrampProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("  tokenProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("          mint", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("    poolSigner", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("     poolToken", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("   chainConfig", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta(" receiverToken", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("      test_pool", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("     cpi_signer", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("offramp_program", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("allowed_offramp", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("          state", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("  token_program", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("           mint", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("    pool_signer", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("    pool_token_", inst.AccountMetaSlice.Get(8)))
+						accountsBranch.Child(ag_format.Meta("   chain_config", inst.AccountMetaSlice.Get(9)))
+						accountsBranch.Child(ag_format.Meta("receiver_token_", inst.AccountMetaSlice.Get(10)))
 					})
 				})
 		})
@@ -312,7 +312,7 @@ func (obj *PoolProxyReleaseOrMint) UnmarshalWithDecoder(decoder *ag_binary.Decod
 // NewPoolProxyReleaseOrMintInstruction declares a new PoolProxyReleaseOrMint instruction with the provided parameters and accounts.
 func NewPoolProxyReleaseOrMintInstruction(
 	// Parameters:
-	releaseOrMint ReleaseOrMintInV1,
+	release_or_mint ReleaseOrMintInV1,
 	// Accounts:
 	testPool ag_solanago.PublicKey,
 	cpiSigner ag_solanago.PublicKey,
@@ -326,7 +326,7 @@ func NewPoolProxyReleaseOrMintInstruction(
 	chainConfig ag_solanago.PublicKey,
 	receiverTokenAccount ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	return NewPoolProxyReleaseOrMintInstructionBuilder().
-		SetReleaseOrMint(releaseOrMint).
+		SetReleaseOrMint(release_or_mint).
 		SetTestPoolAccount(testPool).
 		SetCpiSignerAccount(cpiSigner).
 		SetOfframpProgramAccount(offrampProgram).

@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ScheduleBatch is the `scheduleBatch` instruction.
+// ScheduleBatch is the `schedule_batch` instruction.
 type ScheduleBatch struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8
@@ -20,10 +20,10 @@ type ScheduleBatch struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [] roleAccessController
+	// [2] = [] role_access_controller
 	//
 	// [3] = [WRITE, SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewScheduleBatchInstructionBuilder creates a new `ScheduleBatch` instruction builder.
@@ -34,9 +34,9 @@ func NewScheduleBatchInstructionBuilder() *ScheduleBatch {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *ScheduleBatch) SetTimelockId(timelockId [32]uint8) *ScheduleBatch {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "timelock_id" parameter.
+func (inst *ScheduleBatch) SetTimelockId(timelock_id [32]uint8) *ScheduleBatch {
+	inst.TimelockId = &timelock_id
 	return inst
 }
 
@@ -60,7 +60,7 @@ func (inst *ScheduleBatch) SetOperationAccount(operation ag_solanago.PublicKey) 
 
 // GetOperationAccount gets the "operation" account.
 func (inst *ScheduleBatch) GetOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -71,18 +71,18 @@ func (inst *ScheduleBatch) SetConfigAccount(config ag_solanago.PublicKey) *Sched
 
 // GetConfigAccount gets the "config" account.
 func (inst *ScheduleBatch) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetRoleAccessControllerAccount sets the "roleAccessController" account.
+// SetRoleAccessControllerAccount sets the "role_access_controller" account.
 func (inst *ScheduleBatch) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *ScheduleBatch {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
-// GetRoleAccessControllerAccount gets the "roleAccessController" account.
+// GetRoleAccessControllerAccount gets the "role_access_controller" account.
 func (inst *ScheduleBatch) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -93,7 +93,7 @@ func (inst *ScheduleBatch) SetAuthorityAccount(authority ag_solanago.PublicKey) 
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ScheduleBatch) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst ScheduleBatch) Build() *Instruction {
@@ -155,17 +155,17 @@ func (inst *ScheduleBatch) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
-						paramsBranch.Child(ag_format.Param("     Delay", *inst.Delay))
+						paramsBranch.Child(ag_format.Param(" TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("         Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param("      Delay", *inst.Delay))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("             operation", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("role_access_controller", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -211,7 +211,7 @@ func (obj *ScheduleBatch) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 // NewScheduleBatchInstruction declares a new ScheduleBatch instruction with the provided parameters and accounts.
 func NewScheduleBatchInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	timelock_id [32]uint8,
 	id [32]uint8,
 	delay uint64,
 	// Accounts:
@@ -220,7 +220,7 @@ func NewScheduleBatchInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ScheduleBatch {
 	return NewScheduleBatchInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(timelock_id).
 		SetId(id).
 		SetDelay(delay).
 		SetOperationAccount(operation).

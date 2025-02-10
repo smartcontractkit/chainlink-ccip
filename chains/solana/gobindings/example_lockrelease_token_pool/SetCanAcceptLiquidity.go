@@ -10,14 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetCanAcceptLiquidity is the `setCanAcceptLiquidity` instruction.
+// SetCanAcceptLiquidity is the `set_can_accept_liquidity` instruction.
 type SetCanAcceptLiquidity struct {
 	Allow *bool
 
 	// [0] = [WRITE] state
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetCanAcceptLiquidityInstructionBuilder creates a new `SetCanAcceptLiquidity` instruction builder.
@@ -42,7 +42,7 @@ func (inst *SetCanAcceptLiquidity) SetStateAccount(state ag_solanago.PublicKey) 
 
 // GetStateAccount gets the "state" account.
 func (inst *SetCanAcceptLiquidity) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -53,7 +53,7 @@ func (inst *SetCanAcceptLiquidity) SetAuthorityAccount(authority ag_solanago.Pub
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetCanAcceptLiquidity) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst SetCanAcceptLiquidity) Build() *Instruction {
@@ -108,8 +108,8 @@ func (inst *SetCanAcceptLiquidity) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})

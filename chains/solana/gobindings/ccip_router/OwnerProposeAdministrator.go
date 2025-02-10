@@ -23,14 +23,14 @@ type OwnerProposeAdministrator struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] tokenAdminRegistry
+	// [1] = [WRITE] token_admin_registry
 	//
 	// [2] = [] mint
 	//
 	// [3] = [WRITE, SIGNER] authority
 	//
-	// [4] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [4] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewOwnerProposeAdministratorInstructionBuilder creates a new `OwnerProposeAdministrator` instruction builder.
@@ -41,9 +41,9 @@ func NewOwnerProposeAdministratorInstructionBuilder() *OwnerProposeAdministrator
 	return nd
 }
 
-// SetTokenAdminRegistryAdmin sets the "tokenAdminRegistryAdmin" parameter.
-func (inst *OwnerProposeAdministrator) SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin ag_solanago.PublicKey) *OwnerProposeAdministrator {
-	inst.TokenAdminRegistryAdmin = &tokenAdminRegistryAdmin
+// SetTokenAdminRegistryAdmin sets the "token_admin_registry_admin" parameter.
+func (inst *OwnerProposeAdministrator) SetTokenAdminRegistryAdmin(token_admin_registry_admin ag_solanago.PublicKey) *OwnerProposeAdministrator {
+	inst.TokenAdminRegistryAdmin = &token_admin_registry_admin
 	return inst
 }
 
@@ -55,18 +55,18 @@ func (inst *OwnerProposeAdministrator) SetConfigAccount(config ag_solanago.Publi
 
 // GetConfigAccount gets the "config" account.
 func (inst *OwnerProposeAdministrator) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
+// SetTokenAdminRegistryAccount sets the "token_admin_registry" account.
 func (inst *OwnerProposeAdministrator) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *OwnerProposeAdministrator {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
 	return inst
 }
 
-// GetTokenAdminRegistryAccount gets the "tokenAdminRegistry" account.
+// GetTokenAdminRegistryAccount gets the "token_admin_registry" account.
 func (inst *OwnerProposeAdministrator) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -77,7 +77,7 @@ func (inst *OwnerProposeAdministrator) SetMintAccount(mint ag_solanago.PublicKey
 
 // GetMintAccount gets the "mint" account.
 func (inst *OwnerProposeAdministrator) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -88,18 +88,18 @@ func (inst *OwnerProposeAdministrator) SetAuthorityAccount(authority ag_solanago
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *OwnerProposeAdministrator) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *OwnerProposeAdministrator) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *OwnerProposeAdministrator {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *OwnerProposeAdministrator) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 func (inst OwnerProposeAdministrator) Build() *Instruction {
@@ -158,16 +158,16 @@ func (inst *OwnerProposeAdministrator) EncodeToTree(parent ag_treeout.Branches) 
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TokenAdminRegistryAdmin", *inst.TokenAdminRegistryAdmin))
+						paramsBranch.Child(ag_format.Param("   TokenAdminRegistryAdmin", *inst.TokenAdminRegistryAdmin))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("              mint", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("token_admin_registry", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                mint", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("      system_program", inst.AccountMetaSlice.Get(4)))
 					})
 				})
 		})
@@ -193,7 +193,7 @@ func (obj *OwnerProposeAdministrator) UnmarshalWithDecoder(decoder *ag_binary.De
 // NewOwnerProposeAdministratorInstruction declares a new OwnerProposeAdministrator instruction with the provided parameters and accounts.
 func NewOwnerProposeAdministratorInstruction(
 	// Parameters:
-	tokenAdminRegistryAdmin ag_solanago.PublicKey,
+	token_admin_registry_admin ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	tokenAdminRegistry ag_solanago.PublicKey,
@@ -201,7 +201,7 @@ func NewOwnerProposeAdministratorInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *OwnerProposeAdministrator {
 	return NewOwnerProposeAdministratorInstructionBuilder().
-		SetTokenAdminRegistryAdmin(tokenAdminRegistryAdmin).
+		SetTokenAdminRegistryAdmin(token_admin_registry_admin).
 		SetConfigAccount(config).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
 		SetMintAccount(mint).

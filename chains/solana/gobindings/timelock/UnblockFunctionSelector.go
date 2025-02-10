@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// UnblockFunctionSelector is the `unblockFunctionSelector` instruction.
+// UnblockFunctionSelector is the `unblock_function_selector` instruction.
 type UnblockFunctionSelector struct {
 	TimelockId *[32]uint8
 	Selector   *[8]uint8
@@ -18,7 +18,7 @@ type UnblockFunctionSelector struct {
 	// [0] = [WRITE] config
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUnblockFunctionSelectorInstructionBuilder creates a new `UnblockFunctionSelector` instruction builder.
@@ -29,9 +29,9 @@ func NewUnblockFunctionSelectorInstructionBuilder() *UnblockFunctionSelector {
 	return nd
 }
 
-// SetTimelockId sets the "timelockId" parameter.
-func (inst *UnblockFunctionSelector) SetTimelockId(timelockId [32]uint8) *UnblockFunctionSelector {
-	inst.TimelockId = &timelockId
+// SetTimelockId sets the "_timelock_id" parameter.
+func (inst *UnblockFunctionSelector) SetTimelockId(_timelock_id [32]uint8) *UnblockFunctionSelector {
+	inst.TimelockId = &_timelock_id
 	return inst
 }
 
@@ -49,7 +49,7 @@ func (inst *UnblockFunctionSelector) SetConfigAccount(config ag_solanago.PublicK
 
 // GetConfigAccount gets the "config" account.
 func (inst *UnblockFunctionSelector) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -60,7 +60,7 @@ func (inst *UnblockFunctionSelector) SetAuthorityAccount(authority ag_solanago.P
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UnblockFunctionSelector) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst UnblockFunctionSelector) Build() *Instruction {
@@ -113,14 +113,14 @@ func (inst *UnblockFunctionSelector) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("  Selector", *inst.Selector))
+						paramsBranch.Child(ag_format.Param("  TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("    Selector", *inst.Selector))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
@@ -156,13 +156,13 @@ func (obj *UnblockFunctionSelector) UnmarshalWithDecoder(decoder *ag_binary.Deco
 // NewUnblockFunctionSelectorInstruction declares a new UnblockFunctionSelector instruction with the provided parameters and accounts.
 func NewUnblockFunctionSelectorInstruction(
 	// Parameters:
-	timelockId [32]uint8,
+	_timelock_id [32]uint8,
 	selector [8]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *UnblockFunctionSelector {
 	return NewUnblockFunctionSelectorInstructionBuilder().
-		SetTimelockId(timelockId).
+		SetTimelockId(_timelock_id).
 		SetSelector(selector).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)

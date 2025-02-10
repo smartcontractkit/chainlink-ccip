@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitSignatures is the `initSignatures` instruction.
+// InitSignatures is the `init_signatures` instruction.
 type InitSignatures struct {
 	MultisigId      *[32]uint8
 	Root            *[32]uint8
@@ -21,8 +21,8 @@ type InitSignatures struct {
 	//
 	// [1] = [WRITE, SIGNER] authority
 	//
-	// [2] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [2] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitSignaturesInstructionBuilder creates a new `InitSignatures` instruction builder.
@@ -33,9 +33,9 @@ func NewInitSignaturesInstructionBuilder() *InitSignatures {
 	return nd
 }
 
-// SetMultisigId sets the "multisigId" parameter.
-func (inst *InitSignatures) SetMultisigId(multisigId [32]uint8) *InitSignatures {
-	inst.MultisigId = &multisigId
+// SetMultisigId sets the "multisig_id" parameter.
+func (inst *InitSignatures) SetMultisigId(multisig_id [32]uint8) *InitSignatures {
+	inst.MultisigId = &multisig_id
 	return inst
 }
 
@@ -45,15 +45,15 @@ func (inst *InitSignatures) SetRoot(root [32]uint8) *InitSignatures {
 	return inst
 }
 
-// SetValidUntil sets the "validUntil" parameter.
-func (inst *InitSignatures) SetValidUntil(validUntil uint32) *InitSignatures {
-	inst.ValidUntil = &validUntil
+// SetValidUntil sets the "valid_until" parameter.
+func (inst *InitSignatures) SetValidUntil(valid_until uint32) *InitSignatures {
+	inst.ValidUntil = &valid_until
 	return inst
 }
 
-// SetTotalSignatures sets the "totalSignatures" parameter.
-func (inst *InitSignatures) SetTotalSignatures(totalSignatures uint8) *InitSignatures {
-	inst.TotalSignatures = &totalSignatures
+// SetTotalSignatures sets the "total_signatures" parameter.
+func (inst *InitSignatures) SetTotalSignatures(total_signatures uint8) *InitSignatures {
+	inst.TotalSignatures = &total_signatures
 	return inst
 }
 
@@ -65,7 +65,7 @@ func (inst *InitSignatures) SetSignaturesAccount(signatures ag_solanago.PublicKe
 
 // GetSignaturesAccount gets the "signatures" account.
 func (inst *InitSignatures) GetSignaturesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -76,18 +76,18 @@ func (inst *InitSignatures) SetAuthorityAccount(authority ag_solanago.PublicKey)
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *InitSignatures) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *InitSignatures) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitSignatures {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *InitSignatures) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst InitSignatures) Build() *Instruction {
@@ -149,17 +149,17 @@ func (inst *InitSignatures) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("     MultisigId", *inst.MultisigId))
-						paramsBranch.Child(ag_format.Param("           Root", *inst.Root))
-						paramsBranch.Child(ag_format.Param("     ValidUntil", *inst.ValidUntil))
-						paramsBranch.Child(ag_format.Param("TotalSignatures", *inst.TotalSignatures))
+						paramsBranch.Child(ag_format.Param("      MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param("            Root", *inst.Root))
+						paramsBranch.Child(ag_format.Param("      ValidUntil", *inst.ValidUntil))
+						paramsBranch.Child(ag_format.Param(" TotalSignatures", *inst.TotalSignatures))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   signatures", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("    signatures", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -215,19 +215,19 @@ func (obj *InitSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 // NewInitSignaturesInstruction declares a new InitSignatures instruction with the provided parameters and accounts.
 func NewInitSignaturesInstruction(
 	// Parameters:
-	multisigId [32]uint8,
+	multisig_id [32]uint8,
 	root [32]uint8,
-	validUntil uint32,
-	totalSignatures uint8,
+	valid_until uint32,
+	total_signatures uint8,
 	// Accounts:
 	signatures ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *InitSignatures {
 	return NewInitSignaturesInstructionBuilder().
-		SetMultisigId(multisigId).
+		SetMultisigId(multisig_id).
 		SetRoot(root).
-		SetValidUntil(validUntil).
-		SetTotalSignatures(totalSignatures).
+		SetValidUntil(valid_until).
+		SetTotalSignatures(total_signatures).
 		SetSignaturesAccount(signatures).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

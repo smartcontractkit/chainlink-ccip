@@ -25,8 +25,8 @@ type UpdateSvmChainSelector struct {
 	//
 	// [1] = [SIGNER] authority
 	//
-	// [2] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [2] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewUpdateSvmChainSelectorInstructionBuilder creates a new `UpdateSvmChainSelector` instruction builder.
@@ -37,9 +37,9 @@ func NewUpdateSvmChainSelectorInstructionBuilder() *UpdateSvmChainSelector {
 	return nd
 }
 
-// SetNewChainSelector sets the "newChainSelector" parameter.
-func (inst *UpdateSvmChainSelector) SetNewChainSelector(newChainSelector uint64) *UpdateSvmChainSelector {
-	inst.NewChainSelector = &newChainSelector
+// SetNewChainSelector sets the "new_chain_selector" parameter.
+func (inst *UpdateSvmChainSelector) SetNewChainSelector(new_chain_selector uint64) *UpdateSvmChainSelector {
+	inst.NewChainSelector = &new_chain_selector
 	return inst
 }
 
@@ -51,7 +51,7 @@ func (inst *UpdateSvmChainSelector) SetConfigAccount(config ag_solanago.PublicKe
 
 // GetConfigAccount gets the "config" account.
 func (inst *UpdateSvmChainSelector) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -62,18 +62,18 @@ func (inst *UpdateSvmChainSelector) SetAuthorityAccount(authority ag_solanago.Pu
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *UpdateSvmChainSelector) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *UpdateSvmChainSelector) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateSvmChainSelector {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *UpdateSvmChainSelector) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst UpdateSvmChainSelector) Build() *Instruction {
@@ -126,14 +126,14 @@ func (inst *UpdateSvmChainSelector) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("NewChainSelector", *inst.NewChainSelector))
+						paramsBranch.Child(ag_format.Param("  NewChainSelector", *inst.NewChainSelector))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -159,13 +159,13 @@ func (obj *UpdateSvmChainSelector) UnmarshalWithDecoder(decoder *ag_binary.Decod
 // NewUpdateSvmChainSelectorInstruction declares a new UpdateSvmChainSelector instruction with the provided parameters and accounts.
 func NewUpdateSvmChainSelectorInstruction(
 	// Parameters:
-	newChainSelector uint64,
+	new_chain_selector uint64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *UpdateSvmChainSelector {
 	return NewUpdateSvmChainSelectorInstructionBuilder().
-		SetNewChainSelector(newChainSelector).
+		SetNewChainSelector(new_chain_selector).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

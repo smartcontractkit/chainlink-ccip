@@ -30,14 +30,14 @@ type Initialize struct {
 	//
 	// [1] = [WRITE, SIGNER] authority
 	//
-	// [2] = [] systemProgram
+	// [2] = [] system_program
 	//
 	// [3] = [] program
 	//
-	// [4] = [] programData
+	// [4] = [] program_data
 	//
-	// [5] = [WRITE] tokenPoolsSigner
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [5] = [WRITE] token_pools_signer
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
@@ -48,27 +48,27 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetSvmChainSelector sets the "svmChainSelector" parameter.
-func (inst *Initialize) SetSvmChainSelector(svmChainSelector uint64) *Initialize {
-	inst.SvmChainSelector = &svmChainSelector
+// SetSvmChainSelector sets the "svm_chain_selector" parameter.
+func (inst *Initialize) SetSvmChainSelector(svm_chain_selector uint64) *Initialize {
+	inst.SvmChainSelector = &svm_chain_selector
 	return inst
 }
 
-// SetFeeAggregator sets the "feeAggregator" parameter.
-func (inst *Initialize) SetFeeAggregator(feeAggregator ag_solanago.PublicKey) *Initialize {
-	inst.FeeAggregator = &feeAggregator
+// SetFeeAggregator sets the "fee_aggregator" parameter.
+func (inst *Initialize) SetFeeAggregator(fee_aggregator ag_solanago.PublicKey) *Initialize {
+	inst.FeeAggregator = &fee_aggregator
 	return inst
 }
 
-// SetFeeQuoter sets the "feeQuoter" parameter.
-func (inst *Initialize) SetFeeQuoter(feeQuoter ag_solanago.PublicKey) *Initialize {
-	inst.FeeQuoter = &feeQuoter
+// SetFeeQuoter sets the "fee_quoter" parameter.
+func (inst *Initialize) SetFeeQuoter(fee_quoter ag_solanago.PublicKey) *Initialize {
+	inst.FeeQuoter = &fee_quoter
 	return inst
 }
 
-// SetLinkTokenMint sets the "linkTokenMint" parameter.
-func (inst *Initialize) SetLinkTokenMint(linkTokenMint ag_solanago.PublicKey) *Initialize {
-	inst.LinkTokenMint = &linkTokenMint
+// SetLinkTokenMint sets the "link_token_mint" parameter.
+func (inst *Initialize) SetLinkTokenMint(link_token_mint ag_solanago.PublicKey) *Initialize {
+	inst.LinkTokenMint = &link_token_mint
 	return inst
 }
 
@@ -80,7 +80,7 @@ func (inst *Initialize) SetConfigAccount(config ag_solanago.PublicKey) *Initiali
 
 // GetConfigAccount gets the "config" account.
 func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -91,18 +91,18 @@ func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *In
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetProgramAccount sets the "program" account.
@@ -113,29 +113,29 @@ func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initia
 
 // GetProgramAccount gets the "program" account.
 func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetProgramDataAccount sets the "programData" account.
+// SetProgramDataAccount sets the "program_data" account.
 func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(programData)
 	return inst
 }
 
-// GetProgramDataAccount gets the "programData" account.
+// GetProgramDataAccount gets the "program_data" account.
 func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
+// SetTokenPoolsSignerAccount sets the "token_pools_signer" account.
 func (inst *Initialize) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
-// GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
+// GetTokenPoolsSignerAccount gets the "token_pools_signer" account.
 func (inst *Initialize) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -206,20 +206,20 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("SvmChainSelector", *inst.SvmChainSelector))
-						paramsBranch.Child(ag_format.Param("   FeeAggregator", *inst.FeeAggregator))
-						paramsBranch.Child(ag_format.Param("       FeeQuoter", *inst.FeeQuoter))
-						paramsBranch.Child(ag_format.Param("   LinkTokenMint", *inst.LinkTokenMint))
+						paramsBranch.Child(ag_format.Param("  SvmChainSelector", *inst.SvmChainSelector))
+						paramsBranch.Child(ag_format.Param("     FeeAggregator", *inst.FeeAggregator))
+						paramsBranch.Child(ag_format.Param("         FeeQuoter", *inst.FeeQuoter))
+						paramsBranch.Child(ag_format.Param("     LinkTokenMint", *inst.LinkTokenMint))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("   systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         program", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     programData", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("tokenPoolsSigner", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("    system_program", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("           program", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("      program_data", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("token_pools_signer", inst.AccountMetaSlice.Get(5)))
 					})
 				})
 		})
@@ -275,10 +275,10 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	svmChainSelector uint64,
-	feeAggregator ag_solanago.PublicKey,
-	feeQuoter ag_solanago.PublicKey,
-	linkTokenMint ag_solanago.PublicKey,
+	svm_chain_selector uint64,
+	fee_aggregator ag_solanago.PublicKey,
+	fee_quoter ag_solanago.PublicKey,
+	link_token_mint ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -287,10 +287,10 @@ func NewInitializeInstruction(
 	programData ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetSvmChainSelector(svmChainSelector).
-		SetFeeAggregator(feeAggregator).
-		SetFeeQuoter(feeQuoter).
-		SetLinkTokenMint(linkTokenMint).
+		SetSvmChainSelector(svm_chain_selector).
+		SetFeeAggregator(fee_aggregator).
+		SetFeeQuoter(fee_quoter).
+		SetLinkTokenMint(link_token_mint).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

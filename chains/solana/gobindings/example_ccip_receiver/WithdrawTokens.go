@@ -10,25 +10,25 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// WithdrawTokens is the `withdrawTokens` instruction.
+// WithdrawTokens is the `withdraw_tokens` instruction.
 type WithdrawTokens struct {
 	Amount   *uint64
 	Decimals *uint8
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [WRITE] programTokenAccount
+	// [1] = [WRITE] program_token_account
 	//
-	// [2] = [WRITE] toTokenAccount
+	// [2] = [WRITE] to_token_account
 	//
 	// [3] = [] mint
 	//
-	// [4] = [] tokenProgram
+	// [4] = [] token_program
 	//
-	// [5] = [] tokenAdmin
+	// [5] = [] token_admin
 	//
 	// [6] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewWithdrawTokensInstructionBuilder creates a new `WithdrawTokens` instruction builder.
@@ -59,29 +59,29 @@ func (inst *WithdrawTokens) SetStateAccount(state ag_solanago.PublicKey) *Withdr
 
 // GetStateAccount gets the "state" account.
 func (inst *WithdrawTokens) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetProgramTokenAccountAccount sets the "programTokenAccount" account.
+// SetProgramTokenAccountAccount sets the "program_token_account" account.
 func (inst *WithdrawTokens) SetProgramTokenAccountAccount(programTokenAccount ag_solanago.PublicKey) *WithdrawTokens {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(programTokenAccount).WRITE()
 	return inst
 }
 
-// GetProgramTokenAccountAccount gets the "programTokenAccount" account.
+// GetProgramTokenAccountAccount gets the "program_token_account" account.
 func (inst *WithdrawTokens) GetProgramTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetToTokenAccountAccount sets the "toTokenAccount" account.
+// SetToTokenAccountAccount sets the "to_token_account" account.
 func (inst *WithdrawTokens) SetToTokenAccountAccount(toTokenAccount ag_solanago.PublicKey) *WithdrawTokens {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(toTokenAccount).WRITE()
 	return inst
 }
 
-// GetToTokenAccountAccount gets the "toTokenAccount" account.
+// GetToTokenAccountAccount gets the "to_token_account" account.
 func (inst *WithdrawTokens) GetToTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -92,29 +92,29 @@ func (inst *WithdrawTokens) SetMintAccount(mint ag_solanago.PublicKey) *Withdraw
 
 // GetMintAccount gets the "mint" account.
 func (inst *WithdrawTokens) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 func (inst *WithdrawTokens) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *WithdrawTokens {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 func (inst *WithdrawTokens) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetTokenAdminAccount sets the "tokenAdmin" account.
+// SetTokenAdminAccount sets the "token_admin" account.
 func (inst *WithdrawTokens) SetTokenAdminAccount(tokenAdmin ag_solanago.PublicKey) *WithdrawTokens {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenAdmin)
 	return inst
 }
 
-// GetTokenAdminAccount gets the "tokenAdmin" account.
+// GetTokenAdminAccount gets the "token_admin" account.
 func (inst *WithdrawTokens) GetTokenAdminAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -125,7 +125,7 @@ func (inst *WithdrawTokens) SetAuthorityAccount(authority ag_solanago.PublicKey)
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *WithdrawTokens) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
 func (inst WithdrawTokens) Build() *Instruction {
@@ -199,13 +199,13 @@ func (inst *WithdrawTokens) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("programToken", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     toToken", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("        mint", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("tokenProgram", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("  tokenAdmin", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("   authority", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("program_token_", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("     to_token_", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("          mint", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta(" token_program", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("   token_admin", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(6)))
 					})
 				})
 		})

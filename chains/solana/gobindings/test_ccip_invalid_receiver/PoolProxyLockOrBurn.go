@@ -10,32 +10,32 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// PoolProxyLockOrBurn is the `poolProxyLockOrBurn` instruction.
+// PoolProxyLockOrBurn is the `pool_proxy_lock_or_burn` instruction.
 type PoolProxyLockOrBurn struct {
 	LockOrBurn *LockOrBurnInV1
 
-	// [0] = [] testPool
+	// [0] = [] test_pool
 	// ··········· CHECK
 	//
-	// [1] = [] cpiSigner
+	// [1] = [] cpi_signer
 	// ··········· CHECK
 	//
 	// [2] = [WRITE] state
 	// ··········· CHECK
 	//
-	// [3] = [] tokenProgram
+	// [3] = [] token_program
 	// ··········· CHECK
 	//
 	// [4] = [WRITE] mint
 	//
-	// [5] = [] poolSigner
+	// [5] = [] pool_signer
 	// ··········· CHECK
 	//
-	// [6] = [WRITE] poolTokenAccount
+	// [6] = [WRITE] pool_token_account
 	//
-	// [7] = [WRITE] chainConfig
+	// [7] = [WRITE] chain_config
 	// ··········· CHECK
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewPoolProxyLockOrBurnInstructionBuilder creates a new `PoolProxyLockOrBurn` instruction builder.
@@ -46,36 +46,36 @@ func NewPoolProxyLockOrBurnInstructionBuilder() *PoolProxyLockOrBurn {
 	return nd
 }
 
-// SetLockOrBurn sets the "lockOrBurn" parameter.
-func (inst *PoolProxyLockOrBurn) SetLockOrBurn(lockOrBurn LockOrBurnInV1) *PoolProxyLockOrBurn {
-	inst.LockOrBurn = &lockOrBurn
+// SetLockOrBurn sets the "lock_or_burn" parameter.
+func (inst *PoolProxyLockOrBurn) SetLockOrBurn(lock_or_burn LockOrBurnInV1) *PoolProxyLockOrBurn {
+	inst.LockOrBurn = &lock_or_burn
 	return inst
 }
 
-// SetTestPoolAccount sets the "testPool" account.
+// SetTestPoolAccount sets the "test_pool" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) SetTestPoolAccount(testPool ag_solanago.PublicKey) *PoolProxyLockOrBurn {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(testPool)
 	return inst
 }
 
-// GetTestPoolAccount gets the "testPool" account.
+// GetTestPoolAccount gets the "test_pool" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) GetTestPoolAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetCpiSignerAccount sets the "cpiSigner" account.
+// SetCpiSignerAccount sets the "cpi_signer" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) SetCpiSignerAccount(cpiSigner ag_solanago.PublicKey) *PoolProxyLockOrBurn {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(cpiSigner)
 	return inst
 }
 
-// GetCpiSignerAccount gets the "cpiSigner" account.
+// GetCpiSignerAccount gets the "cpi_signer" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) GetCpiSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetStateAccount sets the "state" account.
@@ -88,20 +88,20 @@ func (inst *PoolProxyLockOrBurn) SetStateAccount(state ag_solanago.PublicKey) *P
 // GetStateAccount gets the "state" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetTokenProgramAccount sets the "tokenProgram" account.
+// SetTokenProgramAccount sets the "token_program" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *PoolProxyLockOrBurn {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
-// GetTokenProgramAccount gets the "tokenProgram" account.
+// GetTokenProgramAccount gets the "token_program" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetMintAccount sets the "mint" account.
@@ -112,44 +112,44 @@ func (inst *PoolProxyLockOrBurn) SetMintAccount(mint ag_solanago.PublicKey) *Poo
 
 // GetMintAccount gets the "mint" account.
 func (inst *PoolProxyLockOrBurn) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetPoolSignerAccount sets the "poolSigner" account.
+// SetPoolSignerAccount sets the "pool_signer" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *PoolProxyLockOrBurn {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(poolSigner)
 	return inst
 }
 
-// GetPoolSignerAccount gets the "poolSigner" account.
+// GetPoolSignerAccount gets the "pool_signer" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) GetPoolSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetPoolTokenAccountAccount sets the "poolTokenAccount" account.
+// SetPoolTokenAccountAccount sets the "pool_token_account" account.
 func (inst *PoolProxyLockOrBurn) SetPoolTokenAccountAccount(poolTokenAccount ag_solanago.PublicKey) *PoolProxyLockOrBurn {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(poolTokenAccount).WRITE()
 	return inst
 }
 
-// GetPoolTokenAccountAccount gets the "poolTokenAccount" account.
+// GetPoolTokenAccountAccount gets the "pool_token_account" account.
 func (inst *PoolProxyLockOrBurn) GetPoolTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *PoolProxyLockOrBurn {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 // CHECK
 func (inst *PoolProxyLockOrBurn) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
 func (inst PoolProxyLockOrBurn) Build() *Instruction {
@@ -217,19 +217,19 @@ func (inst *PoolProxyLockOrBurn) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("LockOrBurn", *inst.LockOrBurn))
+						paramsBranch.Child(ag_format.Param("  LockOrBurn", *inst.LockOrBurn))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    testPool", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   cpiSigner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("       state", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("tokenProgram", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("        mint", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("  poolSigner", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("   poolToken", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta(" chainConfig", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("    test_pool", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("   cpi_signer", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("token_program", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("  pool_signer", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("  pool_token_", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta(" chain_config", inst.AccountMetaSlice.Get(7)))
 					})
 				})
 		})
@@ -255,7 +255,7 @@ func (obj *PoolProxyLockOrBurn) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 // NewPoolProxyLockOrBurnInstruction declares a new PoolProxyLockOrBurn instruction with the provided parameters and accounts.
 func NewPoolProxyLockOrBurnInstruction(
 	// Parameters:
-	lockOrBurn LockOrBurnInV1,
+	lock_or_burn LockOrBurnInV1,
 	// Accounts:
 	testPool ag_solanago.PublicKey,
 	cpiSigner ag_solanago.PublicKey,
@@ -266,7 +266,7 @@ func NewPoolProxyLockOrBurnInstruction(
 	poolTokenAccount ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey) *PoolProxyLockOrBurn {
 	return NewPoolProxyLockOrBurnInstructionBuilder().
-		SetLockOrBurn(lockOrBurn).
+		SetLockOrBurn(lock_or_burn).
 		SetTestPoolAccount(testPool).
 		SetCpiSignerAccount(cpiSigner).
 		SetStateAccount(state).

@@ -23,14 +23,14 @@ type AddOfframp struct {
 	SourceChainSelector *uint64
 	Offramp             *ag_solanago.PublicKey
 
-	// [0] = [WRITE] allowedOfframp
+	// [0] = [WRITE] allowed_offramp
 	//
 	// [1] = [] config
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewAddOfframpInstructionBuilder creates a new `AddOfframp` instruction builder.
@@ -41,9 +41,9 @@ func NewAddOfframpInstructionBuilder() *AddOfframp {
 	return nd
 }
 
-// SetSourceChainSelector sets the "sourceChainSelector" parameter.
-func (inst *AddOfframp) SetSourceChainSelector(sourceChainSelector uint64) *AddOfframp {
-	inst.SourceChainSelector = &sourceChainSelector
+// SetSourceChainSelector sets the "source_chain_selector" parameter.
+func (inst *AddOfframp) SetSourceChainSelector(source_chain_selector uint64) *AddOfframp {
+	inst.SourceChainSelector = &source_chain_selector
 	return inst
 }
 
@@ -53,15 +53,15 @@ func (inst *AddOfframp) SetOfframp(offramp ag_solanago.PublicKey) *AddOfframp {
 	return inst
 }
 
-// SetAllowedOfframpAccount sets the "allowedOfframp" account.
+// SetAllowedOfframpAccount sets the "allowed_offramp" account.
 func (inst *AddOfframp) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *AddOfframp {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(allowedOfframp).WRITE()
 	return inst
 }
 
-// GetAllowedOfframpAccount gets the "allowedOfframp" account.
+// GetAllowedOfframpAccount gets the "allowed_offramp" account.
 func (inst *AddOfframp) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigAccount sets the "config" account.
@@ -72,7 +72,7 @@ func (inst *AddOfframp) SetConfigAccount(config ag_solanago.PublicKey) *AddOffra
 
 // GetConfigAccount gets the "config" account.
 func (inst *AddOfframp) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -83,18 +83,18 @@ func (inst *AddOfframp) SetAuthorityAccount(authority ag_solanago.PublicKey) *Ad
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AddOfframp) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *AddOfframp) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AddOfframp {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *AddOfframp) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst AddOfframp) Build() *Instruction {
@@ -153,16 +153,16 @@ func (inst *AddOfframp) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("SourceChainSelector", *inst.SourceChainSelector))
-						paramsBranch.Child(ag_format.Param("            Offramp", *inst.Offramp))
+						paramsBranch.Child(ag_format.Param("  SourceChainSelector", *inst.SourceChainSelector))
+						paramsBranch.Child(ag_format.Param("              Offramp", *inst.Offramp))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta(" systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("allowed_offramp", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("         config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta(" system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -198,7 +198,7 @@ func (obj *AddOfframp) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewAddOfframpInstruction declares a new AddOfframp instruction with the provided parameters and accounts.
 func NewAddOfframpInstruction(
 	// Parameters:
-	sourceChainSelector uint64,
+	source_chain_selector uint64,
 	offramp ag_solanago.PublicKey,
 	// Accounts:
 	allowedOfframp ag_solanago.PublicKey,
@@ -206,7 +206,7 @@ func NewAddOfframpInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AddOfframp {
 	return NewAddOfframpInstructionBuilder().
-		SetSourceChainSelector(sourceChainSelector).
+		SetSourceChainSelector(source_chain_selector).
 		SetOfframp(offramp).
 		SetAllowedOfframpAccount(allowedOfframp).
 		SetConfigAccount(config).

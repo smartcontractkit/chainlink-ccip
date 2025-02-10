@@ -10,28 +10,28 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ReceiverProxyExecute is the `receiverProxyExecute` instruction.
+// ReceiverProxyExecute is the `receiver_proxy_execute` instruction.
 type ReceiverProxyExecute struct {
 	Message *Any2SVMMessage
 
-	// [0] = [] testReceiver
+	// [0] = [] test_receiver
 	// ··········· CHECK
 	//
-	// [1] = [] cpiSigner
+	// [1] = [] cpi_signer
 	// ··········· CHECK
 	//
-	// [2] = [] offrampProgram
+	// [2] = [] offramp_program
 	// ··········· CHECK
 	//
-	// [3] = [] allowedOfframp
+	// [3] = [] allowed_offramp
 	// ··········· CHECK
 	//
-	// [4] = [] approvedSender
+	// [4] = [] approved_sender
 	// ··········· CHECK
 	//
 	// [5] = [] state
 	// ··········· CHECK
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewReceiverProxyExecuteInstructionBuilder creates a new `ReceiverProxyExecute` instruction builder.
@@ -48,69 +48,69 @@ func (inst *ReceiverProxyExecute) SetMessage(message Any2SVMMessage) *ReceiverPr
 	return inst
 }
 
-// SetTestReceiverAccount sets the "testReceiver" account.
+// SetTestReceiverAccount sets the "test_receiver" account.
 // CHECK
 func (inst *ReceiverProxyExecute) SetTestReceiverAccount(testReceiver ag_solanago.PublicKey) *ReceiverProxyExecute {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(testReceiver)
 	return inst
 }
 
-// GetTestReceiverAccount gets the "testReceiver" account.
+// GetTestReceiverAccount gets the "test_receiver" account.
 // CHECK
 func (inst *ReceiverProxyExecute) GetTestReceiverAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetCpiSignerAccount sets the "cpiSigner" account.
+// SetCpiSignerAccount sets the "cpi_signer" account.
 // CHECK
 func (inst *ReceiverProxyExecute) SetCpiSignerAccount(cpiSigner ag_solanago.PublicKey) *ReceiverProxyExecute {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(cpiSigner)
 	return inst
 }
 
-// GetCpiSignerAccount gets the "cpiSigner" account.
+// GetCpiSignerAccount gets the "cpi_signer" account.
 // CHECK
 func (inst *ReceiverProxyExecute) GetCpiSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetOfframpProgramAccount sets the "offrampProgram" account.
+// SetOfframpProgramAccount sets the "offramp_program" account.
 // CHECK
 func (inst *ReceiverProxyExecute) SetOfframpProgramAccount(offrampProgram ag_solanago.PublicKey) *ReceiverProxyExecute {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(offrampProgram)
 	return inst
 }
 
-// GetOfframpProgramAccount gets the "offrampProgram" account.
+// GetOfframpProgramAccount gets the "offramp_program" account.
 // CHECK
 func (inst *ReceiverProxyExecute) GetOfframpProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetAllowedOfframpAccount sets the "allowedOfframp" account.
+// SetAllowedOfframpAccount sets the "allowed_offramp" account.
 // CHECK
 func (inst *ReceiverProxyExecute) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *ReceiverProxyExecute {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(allowedOfframp)
 	return inst
 }
 
-// GetAllowedOfframpAccount gets the "allowedOfframp" account.
+// GetAllowedOfframpAccount gets the "allowed_offramp" account.
 // CHECK
 func (inst *ReceiverProxyExecute) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetApprovedSenderAccount sets the "approvedSender" account.
+// SetApprovedSenderAccount sets the "approved_sender" account.
 // CHECK
 func (inst *ReceiverProxyExecute) SetApprovedSenderAccount(approvedSender ag_solanago.PublicKey) *ReceiverProxyExecute {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(approvedSender)
 	return inst
 }
 
-// GetApprovedSenderAccount gets the "approvedSender" account.
+// GetApprovedSenderAccount gets the "approved_sender" account.
 // CHECK
 func (inst *ReceiverProxyExecute) GetApprovedSenderAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
 // SetStateAccount sets the "state" account.
@@ -123,7 +123,7 @@ func (inst *ReceiverProxyExecute) SetStateAccount(state ag_solanago.PublicKey) *
 // GetStateAccount gets the "state" account.
 // CHECK
 func (inst *ReceiverProxyExecute) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
 func (inst ReceiverProxyExecute) Build() *Instruction {
@@ -190,12 +190,12 @@ func (inst *ReceiverProxyExecute) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("  testReceiver", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     cpiSigner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("offrampProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("approvedSender", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("  test_receiver", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("     cpi_signer", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("offramp_program", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("allowed_offramp", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("approved_sender", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("          state", inst.AccountMetaSlice.Get(5)))
 					})
 				})
 		})

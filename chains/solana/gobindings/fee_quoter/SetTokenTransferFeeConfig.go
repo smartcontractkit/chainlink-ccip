@@ -29,12 +29,12 @@ type SetTokenTransferFeeConfig struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] perChainPerTokenConfig
+	// [1] = [WRITE] per_chain_per_token_config
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetTokenTransferFeeConfigInstructionBuilder creates a new `SetTokenTransferFeeConfig` instruction builder.
@@ -45,9 +45,9 @@ func NewSetTokenTransferFeeConfigInstructionBuilder() *SetTokenTransferFeeConfig
 	return nd
 }
 
-// SetChainSelector sets the "chainSelector" parameter.
-func (inst *SetTokenTransferFeeConfig) SetChainSelector(chainSelector uint64) *SetTokenTransferFeeConfig {
-	inst.ChainSelector = &chainSelector
+// SetChainSelector sets the "chain_selector" parameter.
+func (inst *SetTokenTransferFeeConfig) SetChainSelector(chain_selector uint64) *SetTokenTransferFeeConfig {
+	inst.ChainSelector = &chain_selector
 	return inst
 }
 
@@ -71,18 +71,18 @@ func (inst *SetTokenTransferFeeConfig) SetConfigAccount(config ag_solanago.Publi
 
 // GetConfigAccount gets the "config" account.
 func (inst *SetTokenTransferFeeConfig) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetPerChainPerTokenConfigAccount sets the "perChainPerTokenConfig" account.
+// SetPerChainPerTokenConfigAccount sets the "per_chain_per_token_config" account.
 func (inst *SetTokenTransferFeeConfig) SetPerChainPerTokenConfigAccount(perChainPerTokenConfig ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(perChainPerTokenConfig).WRITE()
 	return inst
 }
 
-// GetPerChainPerTokenConfigAccount gets the "perChainPerTokenConfig" account.
+// GetPerChainPerTokenConfigAccount gets the "per_chain_per_token_config" account.
 func (inst *SetTokenTransferFeeConfig) GetPerChainPerTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -93,18 +93,18 @@ func (inst *SetTokenTransferFeeConfig) SetAuthorityAccount(authority ag_solanago
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetTokenTransferFeeConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *SetTokenTransferFeeConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *SetTokenTransferFeeConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst SetTokenTransferFeeConfig) Build() *Instruction {
@@ -166,17 +166,17 @@ func (inst *SetTokenTransferFeeConfig) EncodeToTree(parent ag_treeout.Branches) 
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ChainSelector", *inst.ChainSelector))
-						paramsBranch.Child(ag_format.Param("         Mint", *inst.Mint))
-						paramsBranch.Child(ag_format.Param("          Cfg", *inst.Cfg))
+						paramsBranch.Child(ag_format.Param(" ChainSelector", *inst.ChainSelector))
+						paramsBranch.Child(ag_format.Param("          Mint", *inst.Mint))
+						paramsBranch.Child(ag_format.Param("           Cfg", *inst.Cfg))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("perChainPerTokenConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("                    config", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("per_chain_per_token_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                 authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("            system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -222,7 +222,7 @@ func (obj *SetTokenTransferFeeConfig) UnmarshalWithDecoder(decoder *ag_binary.De
 // NewSetTokenTransferFeeConfigInstruction declares a new SetTokenTransferFeeConfig instruction with the provided parameters and accounts.
 func NewSetTokenTransferFeeConfigInstruction(
 	// Parameters:
-	chainSelector uint64,
+	chain_selector uint64,
 	mint ag_solanago.PublicKey,
 	cfg TokenTransferFeeConfig,
 	// Accounts:
@@ -231,7 +231,7 @@ func NewSetTokenTransferFeeConfigInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *SetTokenTransferFeeConfig {
 	return NewSetTokenTransferFeeConfigInstructionBuilder().
-		SetChainSelector(chainSelector).
+		SetChainSelector(chain_selector).
 		SetMint(mint).
 		SetCfg(cfg).
 		SetConfigAccount(config).

@@ -8,7 +8,90 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Config struct {
+type AllowedPriceUpdaterAccount struct{}
+
+var AllowedPriceUpdaterAccountDiscriminator = [8]byte{51, 136, 222, 161, 38, 7, 184, 190}
+
+func (obj AllowedPriceUpdaterAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(AllowedPriceUpdaterAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AllowedPriceUpdaterAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(AllowedPriceUpdaterAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[51 136 222 161 38 7 184 190]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	return nil
+}
+
+type BillingTokenConfigWrapperAccount struct {
+	Version uint8
+	Config  BillingTokenConfig
+}
+
+var BillingTokenConfigWrapperAccountDiscriminator = [8]byte{63, 178, 72, 57, 171, 66, 44, 151}
+
+func (obj BillingTokenConfigWrapperAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(BillingTokenConfigWrapperAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `Config` param:
+	err = encoder.Encode(obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *BillingTokenConfigWrapperAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(BillingTokenConfigWrapperAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[63 178 72 57 171 66 44 151]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Config`:
+	err = decoder.Decode(&obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ConfigAccount struct {
 	Version           uint8
 	Owner             ag_solanago.PublicKey
 	ProposedOwner     ag_solanago.PublicKey
@@ -17,11 +100,11 @@ type Config struct {
 	Onramp            ag_solanago.PublicKey
 }
 
-var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
+var ConfigAccountDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
 
-func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(ConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -58,14 +141,14 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ConfigDiscriminator[:]) {
+		if !discriminator.Equal(ConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[155 12 170 224 30 250 204 130]",
@@ -105,18 +188,18 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	return nil
 }
 
-type DestChain struct {
+type DestChainAccount struct {
 	Version       uint8
 	ChainSelector uint64
 	State         DestChainState
 	Config        DestChainConfig
 }
 
-var DestChainDiscriminator = [8]byte{77, 18, 241, 132, 212, 54, 218, 16}
+var DestChainAccountDiscriminator = [8]byte{77, 18, 241, 132, 212, 54, 218, 16}
 
-func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj DestChainAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(DestChainDiscriminator[:], false)
+	err = encoder.WriteBytes(DestChainAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -143,14 +226,14 @@ func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 
-func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *DestChainAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(DestChainDiscriminator[:]) {
+		if !discriminator.Equal(DestChainAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[77 18 241 132 212 54 218 16]",
@@ -180,71 +263,18 @@ func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	return nil
 }
 
-type BillingTokenConfigWrapper struct {
-	Version uint8
-	Config  BillingTokenConfig
-}
-
-var BillingTokenConfigWrapperDiscriminator = [8]byte{63, 178, 72, 57, 171, 66, 44, 151}
-
-func (obj BillingTokenConfigWrapper) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(BillingTokenConfigWrapperDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `Config` param:
-	err = encoder.Encode(obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *BillingTokenConfigWrapper) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(BillingTokenConfigWrapperDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[63 178 72 57 171 66 44 151]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Config`:
-	err = decoder.Decode(&obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type PerChainPerTokenConfig struct {
+type PerChainPerTokenConfigAccount struct {
 	Version             uint8
 	ChainSelector       uint64
 	Mint                ag_solanago.PublicKey
 	TokenTransferConfig TokenTransferFeeConfig
 }
 
-var PerChainPerTokenConfigDiscriminator = [8]byte{183, 88, 20, 99, 246, 46, 51, 230}
+var PerChainPerTokenConfigAccountDiscriminator = [8]byte{183, 88, 20, 99, 246, 46, 51, 230}
 
-func (obj PerChainPerTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj PerChainPerTokenConfigAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(PerChainPerTokenConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(PerChainPerTokenConfigAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -271,14 +301,14 @@ func (obj PerChainPerTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder)
 	return nil
 }
 
-func (obj *PerChainPerTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *PerChainPerTokenConfigAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(PerChainPerTokenConfigDiscriminator[:]) {
+		if !discriminator.Equal(PerChainPerTokenConfigAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[183 88 20 99 246 46 51 230]",
@@ -304,36 +334,6 @@ func (obj *PerChainPerTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	err = decoder.Decode(&obj.TokenTransferConfig)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-type AllowedPriceUpdater struct{}
-
-var AllowedPriceUpdaterDiscriminator = [8]byte{51, 136, 222, 161, 38, 7, 184, 190}
-
-func (obj AllowedPriceUpdater) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(AllowedPriceUpdaterDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *AllowedPriceUpdater) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(AllowedPriceUpdaterDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[51 136 222 161 38 7 184 190]",
-				fmt.Sprint(discriminator[:]))
-		}
 	}
 	return nil
 }

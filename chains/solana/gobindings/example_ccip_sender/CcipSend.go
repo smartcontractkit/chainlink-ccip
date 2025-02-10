@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// CcipSend is the `ccipSend` instruction.
+// CcipSend is the `ccip_send` instruction.
 type CcipSend struct {
 	DestChainSelector *uint64
 	TokenAmounts      *[]SVMTokenAmount
@@ -20,46 +20,46 @@ type CcipSend struct {
 
 	// [0] = [] state
 	//
-	// [1] = [] chainConfig
+	// [1] = [] chain_config
 	//
-	// [2] = [WRITE] ccipSender
+	// [2] = [WRITE] ccip_sender
 	//
-	// [3] = [WRITE] authorityFeeTokenAta
+	// [3] = [WRITE] authority_fee_token_ata
 	//
 	// [4] = [SIGNER] authority
 	//
-	// [5] = [] systemProgram
+	// [5] = [] system_program
 	//
-	// [6] = [] ccipRouter
+	// [6] = [] ccip_router
 	//
-	// [7] = [] ccipConfig
+	// [7] = [] ccip_config
 	//
-	// [8] = [WRITE] ccipDestChainState
+	// [8] = [WRITE] ccip_dest_chain_state
 	//
-	// [9] = [WRITE] ccipSenderNonce
+	// [9] = [WRITE] ccip_sender_nonce
 	//
-	// [10] = [] ccipFeeTokenProgram
+	// [10] = [] ccip_fee_token_program
 	//
-	// [11] = [] ccipFeeTokenMint
+	// [11] = [] ccip_fee_token_mint
 	//
-	// [12] = [WRITE] ccipFeeTokenUserAta
+	// [12] = [WRITE] ccip_fee_token_user_ata
 	//
-	// [13] = [WRITE] ccipFeeTokenReceiver
+	// [13] = [WRITE] ccip_fee_token_receiver
 	//
-	// [14] = [] ccipFeeBillingSigner
+	// [14] = [] ccip_fee_billing_signer
 	//
-	// [15] = [] ccipFeeQuoter
+	// [15] = [] ccip_fee_quoter
 	//
-	// [16] = [] ccipFeeQuoterConfig
+	// [16] = [] ccip_fee_quoter_config
 	//
-	// [17] = [] ccipFeeQuoterDestChain
+	// [17] = [] ccip_fee_quoter_dest_chain
 	//
-	// [18] = [] ccipFeeQuoterBillingTokenConfig
+	// [18] = [] ccip_fee_quoter_billing_token_config
 	//
-	// [19] = [] ccipFeeQuoterLinkTokenConfig
+	// [19] = [] ccip_fee_quoter_link_token_config
 	//
-	// [20] = [WRITE] ccipTokenPoolsSigner
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [20] = [WRITE] ccip_token_pools_signer
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewCcipSendInstructionBuilder creates a new `CcipSend` instruction builder.
@@ -70,15 +70,15 @@ func NewCcipSendInstructionBuilder() *CcipSend {
 	return nd
 }
 
-// SetDestChainSelector sets the "destChainSelector" parameter.
-func (inst *CcipSend) SetDestChainSelector(destChainSelector uint64) *CcipSend {
-	inst.DestChainSelector = &destChainSelector
+// SetDestChainSelector sets the "dest_chain_selector" parameter.
+func (inst *CcipSend) SetDestChainSelector(dest_chain_selector uint64) *CcipSend {
+	inst.DestChainSelector = &dest_chain_selector
 	return inst
 }
 
-// SetTokenAmounts sets the "tokenAmounts" parameter.
-func (inst *CcipSend) SetTokenAmounts(tokenAmounts []SVMTokenAmount) *CcipSend {
-	inst.TokenAmounts = &tokenAmounts
+// SetTokenAmounts sets the "token_amounts" parameter.
+func (inst *CcipSend) SetTokenAmounts(token_amounts []SVMTokenAmount) *CcipSend {
+	inst.TokenAmounts = &token_amounts
 	return inst
 }
 
@@ -88,15 +88,15 @@ func (inst *CcipSend) SetData(data []byte) *CcipSend {
 	return inst
 }
 
-// SetFeeToken sets the "feeToken" parameter.
-func (inst *CcipSend) SetFeeToken(feeToken ag_solanago.PublicKey) *CcipSend {
-	inst.FeeToken = &feeToken
+// SetFeeToken sets the "fee_token" parameter.
+func (inst *CcipSend) SetFeeToken(fee_token ag_solanago.PublicKey) *CcipSend {
+	inst.FeeToken = &fee_token
 	return inst
 }
 
-// SetTokenIndexes sets the "tokenIndexes" parameter.
-func (inst *CcipSend) SetTokenIndexes(tokenIndexes []byte) *CcipSend {
-	inst.TokenIndexes = &tokenIndexes
+// SetTokenIndexes sets the "token_indexes" parameter.
+func (inst *CcipSend) SetTokenIndexes(token_indexes []byte) *CcipSend {
+	inst.TokenIndexes = &token_indexes
 	return inst
 }
 
@@ -108,40 +108,40 @@ func (inst *CcipSend) SetStateAccount(state ag_solanago.PublicKey) *CcipSend {
 
 // GetStateAccount gets the "state" account.
 func (inst *CcipSend) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 func (inst *CcipSend) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainConfig)
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 func (inst *CcipSend) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetCcipSenderAccount sets the "ccipSender" account.
+// SetCcipSenderAccount sets the "ccip_sender" account.
 func (inst *CcipSend) SetCcipSenderAccount(ccipSender ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(ccipSender).WRITE()
 	return inst
 }
 
-// GetCcipSenderAccount gets the "ccipSender" account.
+// GetCcipSenderAccount gets the "ccip_sender" account.
 func (inst *CcipSend) GetCcipSenderAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetAuthorityFeeTokenAtaAccount sets the "authorityFeeTokenAta" account.
+// SetAuthorityFeeTokenAtaAccount sets the "authority_fee_token_ata" account.
 func (inst *CcipSend) SetAuthorityFeeTokenAtaAccount(authorityFeeTokenAta ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(authorityFeeTokenAta).WRITE()
 	return inst
 }
 
-// GetAuthorityFeeTokenAtaAccount gets the "authorityFeeTokenAta" account.
+// GetAuthorityFeeTokenAtaAccount gets the "authority_fee_token_ata" account.
 func (inst *CcipSend) GetAuthorityFeeTokenAtaAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -152,183 +152,183 @@ func (inst *CcipSend) SetAuthorityAccount(authority ag_solanago.PublicKey) *Ccip
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *CcipSend) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice.Get(4)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *CcipSend) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *CcipSend) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice.Get(5)
 }
 
-// SetCcipRouterAccount sets the "ccipRouter" account.
+// SetCcipRouterAccount sets the "ccip_router" account.
 func (inst *CcipSend) SetCcipRouterAccount(ccipRouter ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[6] = ag_solanago.Meta(ccipRouter)
 	return inst
 }
 
-// GetCcipRouterAccount gets the "ccipRouter" account.
+// GetCcipRouterAccount gets the "ccip_router" account.
 func (inst *CcipSend) GetCcipRouterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice.Get(6)
 }
 
-// SetCcipConfigAccount sets the "ccipConfig" account.
+// SetCcipConfigAccount sets the "ccip_config" account.
 func (inst *CcipSend) SetCcipConfigAccount(ccipConfig ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[7] = ag_solanago.Meta(ccipConfig)
 	return inst
 }
 
-// GetCcipConfigAccount gets the "ccipConfig" account.
+// GetCcipConfigAccount gets the "ccip_config" account.
 func (inst *CcipSend) GetCcipConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice.Get(7)
 }
 
-// SetCcipDestChainStateAccount sets the "ccipDestChainState" account.
+// SetCcipDestChainStateAccount sets the "ccip_dest_chain_state" account.
 func (inst *CcipSend) SetCcipDestChainStateAccount(ccipDestChainState ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[8] = ag_solanago.Meta(ccipDestChainState).WRITE()
 	return inst
 }
 
-// GetCcipDestChainStateAccount gets the "ccipDestChainState" account.
+// GetCcipDestChainStateAccount gets the "ccip_dest_chain_state" account.
 func (inst *CcipSend) GetCcipDestChainStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice.Get(8)
 }
 
-// SetCcipSenderNonceAccount sets the "ccipSenderNonce" account.
+// SetCcipSenderNonceAccount sets the "ccip_sender_nonce" account.
 func (inst *CcipSend) SetCcipSenderNonceAccount(ccipSenderNonce ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[9] = ag_solanago.Meta(ccipSenderNonce).WRITE()
 	return inst
 }
 
-// GetCcipSenderNonceAccount gets the "ccipSenderNonce" account.
+// GetCcipSenderNonceAccount gets the "ccip_sender_nonce" account.
 func (inst *CcipSend) GetCcipSenderNonceAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice.Get(9)
 }
 
-// SetCcipFeeTokenProgramAccount sets the "ccipFeeTokenProgram" account.
+// SetCcipFeeTokenProgramAccount sets the "ccip_fee_token_program" account.
 func (inst *CcipSend) SetCcipFeeTokenProgramAccount(ccipFeeTokenProgram ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[10] = ag_solanago.Meta(ccipFeeTokenProgram)
 	return inst
 }
 
-// GetCcipFeeTokenProgramAccount gets the "ccipFeeTokenProgram" account.
+// GetCcipFeeTokenProgramAccount gets the "ccip_fee_token_program" account.
 func (inst *CcipSend) GetCcipFeeTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
+	return inst.AccountMetaSlice.Get(10)
 }
 
-// SetCcipFeeTokenMintAccount sets the "ccipFeeTokenMint" account.
+// SetCcipFeeTokenMintAccount sets the "ccip_fee_token_mint" account.
 func (inst *CcipSend) SetCcipFeeTokenMintAccount(ccipFeeTokenMint ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[11] = ag_solanago.Meta(ccipFeeTokenMint)
 	return inst
 }
 
-// GetCcipFeeTokenMintAccount gets the "ccipFeeTokenMint" account.
+// GetCcipFeeTokenMintAccount gets the "ccip_fee_token_mint" account.
 func (inst *CcipSend) GetCcipFeeTokenMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
+	return inst.AccountMetaSlice.Get(11)
 }
 
-// SetCcipFeeTokenUserAtaAccount sets the "ccipFeeTokenUserAta" account.
+// SetCcipFeeTokenUserAtaAccount sets the "ccip_fee_token_user_ata" account.
 func (inst *CcipSend) SetCcipFeeTokenUserAtaAccount(ccipFeeTokenUserAta ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[12] = ag_solanago.Meta(ccipFeeTokenUserAta).WRITE()
 	return inst
 }
 
-// GetCcipFeeTokenUserAtaAccount gets the "ccipFeeTokenUserAta" account.
+// GetCcipFeeTokenUserAtaAccount gets the "ccip_fee_token_user_ata" account.
 func (inst *CcipSend) GetCcipFeeTokenUserAtaAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[12]
+	return inst.AccountMetaSlice.Get(12)
 }
 
-// SetCcipFeeTokenReceiverAccount sets the "ccipFeeTokenReceiver" account.
+// SetCcipFeeTokenReceiverAccount sets the "ccip_fee_token_receiver" account.
 func (inst *CcipSend) SetCcipFeeTokenReceiverAccount(ccipFeeTokenReceiver ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[13] = ag_solanago.Meta(ccipFeeTokenReceiver).WRITE()
 	return inst
 }
 
-// GetCcipFeeTokenReceiverAccount gets the "ccipFeeTokenReceiver" account.
+// GetCcipFeeTokenReceiverAccount gets the "ccip_fee_token_receiver" account.
 func (inst *CcipSend) GetCcipFeeTokenReceiverAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[13]
+	return inst.AccountMetaSlice.Get(13)
 }
 
-// SetCcipFeeBillingSignerAccount sets the "ccipFeeBillingSigner" account.
+// SetCcipFeeBillingSignerAccount sets the "ccip_fee_billing_signer" account.
 func (inst *CcipSend) SetCcipFeeBillingSignerAccount(ccipFeeBillingSigner ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[14] = ag_solanago.Meta(ccipFeeBillingSigner)
 	return inst
 }
 
-// GetCcipFeeBillingSignerAccount gets the "ccipFeeBillingSigner" account.
+// GetCcipFeeBillingSignerAccount gets the "ccip_fee_billing_signer" account.
 func (inst *CcipSend) GetCcipFeeBillingSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[14]
+	return inst.AccountMetaSlice.Get(14)
 }
 
-// SetCcipFeeQuoterAccount sets the "ccipFeeQuoter" account.
+// SetCcipFeeQuoterAccount sets the "ccip_fee_quoter" account.
 func (inst *CcipSend) SetCcipFeeQuoterAccount(ccipFeeQuoter ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[15] = ag_solanago.Meta(ccipFeeQuoter)
 	return inst
 }
 
-// GetCcipFeeQuoterAccount gets the "ccipFeeQuoter" account.
+// GetCcipFeeQuoterAccount gets the "ccip_fee_quoter" account.
 func (inst *CcipSend) GetCcipFeeQuoterAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[15]
+	return inst.AccountMetaSlice.Get(15)
 }
 
-// SetCcipFeeQuoterConfigAccount sets the "ccipFeeQuoterConfig" account.
+// SetCcipFeeQuoterConfigAccount sets the "ccip_fee_quoter_config" account.
 func (inst *CcipSend) SetCcipFeeQuoterConfigAccount(ccipFeeQuoterConfig ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[16] = ag_solanago.Meta(ccipFeeQuoterConfig)
 	return inst
 }
 
-// GetCcipFeeQuoterConfigAccount gets the "ccipFeeQuoterConfig" account.
+// GetCcipFeeQuoterConfigAccount gets the "ccip_fee_quoter_config" account.
 func (inst *CcipSend) GetCcipFeeQuoterConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[16]
+	return inst.AccountMetaSlice.Get(16)
 }
 
-// SetCcipFeeQuoterDestChainAccount sets the "ccipFeeQuoterDestChain" account.
+// SetCcipFeeQuoterDestChainAccount sets the "ccip_fee_quoter_dest_chain" account.
 func (inst *CcipSend) SetCcipFeeQuoterDestChainAccount(ccipFeeQuoterDestChain ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[17] = ag_solanago.Meta(ccipFeeQuoterDestChain)
 	return inst
 }
 
-// GetCcipFeeQuoterDestChainAccount gets the "ccipFeeQuoterDestChain" account.
+// GetCcipFeeQuoterDestChainAccount gets the "ccip_fee_quoter_dest_chain" account.
 func (inst *CcipSend) GetCcipFeeQuoterDestChainAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[17]
+	return inst.AccountMetaSlice.Get(17)
 }
 
-// SetCcipFeeQuoterBillingTokenConfigAccount sets the "ccipFeeQuoterBillingTokenConfig" account.
+// SetCcipFeeQuoterBillingTokenConfigAccount sets the "ccip_fee_quoter_billing_token_config" account.
 func (inst *CcipSend) SetCcipFeeQuoterBillingTokenConfigAccount(ccipFeeQuoterBillingTokenConfig ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[18] = ag_solanago.Meta(ccipFeeQuoterBillingTokenConfig)
 	return inst
 }
 
-// GetCcipFeeQuoterBillingTokenConfigAccount gets the "ccipFeeQuoterBillingTokenConfig" account.
+// GetCcipFeeQuoterBillingTokenConfigAccount gets the "ccip_fee_quoter_billing_token_config" account.
 func (inst *CcipSend) GetCcipFeeQuoterBillingTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[18]
+	return inst.AccountMetaSlice.Get(18)
 }
 
-// SetCcipFeeQuoterLinkTokenConfigAccount sets the "ccipFeeQuoterLinkTokenConfig" account.
+// SetCcipFeeQuoterLinkTokenConfigAccount sets the "ccip_fee_quoter_link_token_config" account.
 func (inst *CcipSend) SetCcipFeeQuoterLinkTokenConfigAccount(ccipFeeQuoterLinkTokenConfig ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[19] = ag_solanago.Meta(ccipFeeQuoterLinkTokenConfig)
 	return inst
 }
 
-// GetCcipFeeQuoterLinkTokenConfigAccount gets the "ccipFeeQuoterLinkTokenConfig" account.
+// GetCcipFeeQuoterLinkTokenConfigAccount gets the "ccip_fee_quoter_link_token_config" account.
 func (inst *CcipSend) GetCcipFeeQuoterLinkTokenConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[19]
+	return inst.AccountMetaSlice.Get(19)
 }
 
-// SetCcipTokenPoolsSignerAccount sets the "ccipTokenPoolsSigner" account.
+// SetCcipTokenPoolsSignerAccount sets the "ccip_token_pools_signer" account.
 func (inst *CcipSend) SetCcipTokenPoolsSignerAccount(ccipTokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[20] = ag_solanago.Meta(ccipTokenPoolsSigner).WRITE()
 	return inst
 }
 
-// GetCcipTokenPoolsSignerAccount gets the "ccipTokenPoolsSigner" account.
+// GetCcipTokenPoolsSignerAccount gets the "ccip_token_pools_signer" account.
 func (inst *CcipSend) GetCcipTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[20]
+	return inst.AccountMetaSlice.Get(20)
 }
 
 func (inst CcipSend) Build() *Instruction {
@@ -447,36 +447,36 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("DestChainSelector", *inst.DestChainSelector))
-						paramsBranch.Child(ag_format.Param("     TokenAmounts", *inst.TokenAmounts))
-						paramsBranch.Child(ag_format.Param("             Data", *inst.Data))
-						paramsBranch.Child(ag_format.Param("         FeeToken", *inst.FeeToken))
-						paramsBranch.Child(ag_format.Param("     TokenIndexes", *inst.TokenIndexes))
+						paramsBranch.Child(ag_format.Param("  DestChainSelector", *inst.DestChainSelector))
+						paramsBranch.Child(ag_format.Param("       TokenAmounts", *inst.TokenAmounts))
+						paramsBranch.Child(ag_format.Param("               Data", *inst.Data))
+						paramsBranch.Child(ag_format.Param("           FeeToken", *inst.FeeToken))
+						paramsBranch.Child(ag_format.Param("       TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=21]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                          state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("                    chainConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("                     ccipSender", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           authorityFeeTokenAta", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("                      authority", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("                  systemProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("                     ccipRouter", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("                     ccipConfig", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("             ccipDestChainState", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("                ccipSenderNonce", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("            ccipFeeTokenProgram", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("               ccipFeeTokenMint", inst.AccountMetaSlice[11]))
-						accountsBranch.Child(ag_format.Meta("            ccipFeeTokenUserAta", inst.AccountMetaSlice[12]))
-						accountsBranch.Child(ag_format.Meta("           ccipFeeTokenReceiver", inst.AccountMetaSlice[13]))
-						accountsBranch.Child(ag_format.Meta("           ccipFeeBillingSigner", inst.AccountMetaSlice[14]))
-						accountsBranch.Child(ag_format.Meta("                  ccipFeeQuoter", inst.AccountMetaSlice[15]))
-						accountsBranch.Child(ag_format.Meta("            ccipFeeQuoterConfig", inst.AccountMetaSlice[16]))
-						accountsBranch.Child(ag_format.Meta("         ccipFeeQuoterDestChain", inst.AccountMetaSlice[17]))
-						accountsBranch.Child(ag_format.Meta("ccipFeeQuoterBillingTokenConfig", inst.AccountMetaSlice[18]))
-						accountsBranch.Child(ag_format.Meta("   ccipFeeQuoterLinkTokenConfig", inst.AccountMetaSlice[19]))
-						accountsBranch.Child(ag_format.Meta("           ccipTokenPoolsSigner", inst.AccountMetaSlice[20]))
+						accountsBranch.Child(ag_format.Meta("                               state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("                        chain_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                         ccip_sender", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("             authority_fee_token_ata", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("                           authority", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("                      system_program", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("                         ccip_router", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta("                         ccip_config", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("               ccip_dest_chain_state", inst.AccountMetaSlice.Get(8)))
+						accountsBranch.Child(ag_format.Meta("                   ccip_sender_nonce", inst.AccountMetaSlice.Get(9)))
+						accountsBranch.Child(ag_format.Meta("              ccip_fee_token_program", inst.AccountMetaSlice.Get(10)))
+						accountsBranch.Child(ag_format.Meta("                 ccip_fee_token_mint", inst.AccountMetaSlice.Get(11)))
+						accountsBranch.Child(ag_format.Meta("             ccip_fee_token_user_ata", inst.AccountMetaSlice.Get(12)))
+						accountsBranch.Child(ag_format.Meta("             ccip_fee_token_receiver", inst.AccountMetaSlice.Get(13)))
+						accountsBranch.Child(ag_format.Meta("             ccip_fee_billing_signer", inst.AccountMetaSlice.Get(14)))
+						accountsBranch.Child(ag_format.Meta("                     ccip_fee_quoter", inst.AccountMetaSlice.Get(15)))
+						accountsBranch.Child(ag_format.Meta("              ccip_fee_quoter_config", inst.AccountMetaSlice.Get(16)))
+						accountsBranch.Child(ag_format.Meta("          ccip_fee_quoter_dest_chain", inst.AccountMetaSlice.Get(17)))
+						accountsBranch.Child(ag_format.Meta("ccip_fee_quoter_billing_token_config", inst.AccountMetaSlice.Get(18)))
+						accountsBranch.Child(ag_format.Meta("   ccip_fee_quoter_link_token_config", inst.AccountMetaSlice.Get(19)))
+						accountsBranch.Child(ag_format.Meta("             ccip_token_pools_signer", inst.AccountMetaSlice.Get(20)))
 					})
 				})
 		})
@@ -542,11 +542,11 @@ func (obj *CcipSend) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error
 // NewCcipSendInstruction declares a new CcipSend instruction with the provided parameters and accounts.
 func NewCcipSendInstruction(
 	// Parameters:
-	destChainSelector uint64,
-	tokenAmounts []SVMTokenAmount,
+	dest_chain_selector uint64,
+	token_amounts []SVMTokenAmount,
 	data []byte,
-	feeToken ag_solanago.PublicKey,
-	tokenIndexes []byte,
+	fee_token ag_solanago.PublicKey,
+	token_indexes []byte,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
@@ -570,11 +570,11 @@ func NewCcipSendInstruction(
 	ccipFeeQuoterLinkTokenConfig ag_solanago.PublicKey,
 	ccipTokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
 	return NewCcipSendInstructionBuilder().
-		SetDestChainSelector(destChainSelector).
-		SetTokenAmounts(tokenAmounts).
+		SetDestChainSelector(dest_chain_selector).
+		SetTokenAmounts(token_amounts).
 		SetData(data).
-		SetFeeToken(feeToken).
-		SetTokenIndexes(tokenIndexes).
+		SetFeeToken(fee_token).
+		SetTokenIndexes(token_indexes).
 		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
 		SetCcipSenderAccount(ccipSender).

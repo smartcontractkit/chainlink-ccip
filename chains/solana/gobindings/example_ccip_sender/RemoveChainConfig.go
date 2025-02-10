@@ -10,18 +10,18 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// RemoveChainConfig is the `removeChainConfig` instruction.
+// RemoveChainConfig is the `remove_chain_config` instruction.
 type RemoveChainConfig struct {
 	ChainSelector *uint64
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [WRITE] chainConfig
+	// [1] = [WRITE] chain_config
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	// [3] = [] system_program
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewRemoveChainConfigInstructionBuilder creates a new `RemoveChainConfig` instruction builder.
@@ -32,9 +32,9 @@ func NewRemoveChainConfigInstructionBuilder() *RemoveChainConfig {
 	return nd
 }
 
-// SetChainSelector sets the "chainSelector" parameter.
-func (inst *RemoveChainConfig) SetChainSelector(chainSelector uint64) *RemoveChainConfig {
-	inst.ChainSelector = &chainSelector
+// SetChainSelector sets the "_chain_selector" parameter.
+func (inst *RemoveChainConfig) SetChainSelector(_chain_selector uint64) *RemoveChainConfig {
+	inst.ChainSelector = &_chain_selector
 	return inst
 }
 
@@ -46,18 +46,18 @@ func (inst *RemoveChainConfig) SetStateAccount(state ag_solanago.PublicKey) *Rem
 
 // GetStateAccount gets the "state" account.
 func (inst *RemoveChainConfig) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetChainConfigAccount sets the "chainConfig" account.
+// SetChainConfigAccount sets the "chain_config" account.
 func (inst *RemoveChainConfig) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *RemoveChainConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
-// GetChainConfigAccount gets the "chainConfig" account.
+// GetChainConfigAccount gets the "chain_config" account.
 func (inst *RemoveChainConfig) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -68,18 +68,18 @@ func (inst *RemoveChainConfig) SetAuthorityAccount(authority ag_solanago.PublicK
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *RemoveChainConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
+// SetSystemProgramAccount sets the "system_program" account.
 func (inst *RemoveChainConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *RemoveChainConfig {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
-// GetSystemProgramAccount gets the "systemProgram" account.
+// GetSystemProgramAccount gets the "system_program" account.
 func (inst *RemoveChainConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst RemoveChainConfig) Build() *Instruction {
@@ -135,15 +135,15 @@ func (inst *RemoveChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ChainSelector", *inst.ChainSelector))
+						paramsBranch.Child(ag_format.Param("  ChainSelector", *inst.ChainSelector))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("  chain_config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("system_program", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
@@ -169,14 +169,14 @@ func (obj *RemoveChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 // NewRemoveChainConfigInstruction declares a new RemoveChainConfig instruction with the provided parameters and accounts.
 func NewRemoveChainConfigInstruction(
 	// Parameters:
-	chainSelector uint64,
+	_chain_selector uint64,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *RemoveChainConfig {
 	return NewRemoveChainConfigInstructionBuilder().
-		SetChainSelector(chainSelector).
+		SetChainSelector(_chain_selector).
 		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
 		SetAuthorityAccount(authority).

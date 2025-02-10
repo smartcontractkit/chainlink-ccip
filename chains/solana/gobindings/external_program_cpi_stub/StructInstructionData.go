@@ -10,11 +10,11 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// StructInstructionData is the `structInstructionData` instruction.
+// StructInstructionData is the `struct_instruction_data` instruction.
 type StructInstructionData struct {
 	Data *Value
 
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewStructInstructionDataInstructionBuilder creates a new `StructInstructionData` instruction builder.
