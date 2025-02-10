@@ -2452,16 +2452,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_ccip_invalid_receiver"
-version = "0.0.0-dev"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "example_ccip_receiver",
- "solana-program",
-]
-
-[[package]]
 name = "test_ccip_receiver"
 version = "0.1.0-dev"
 dependencies = [

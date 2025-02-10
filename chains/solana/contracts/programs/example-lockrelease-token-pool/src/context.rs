@@ -105,7 +105,6 @@ pub struct TokenOfframp<'info> {
         bump,
     )]
     pub state: Account<'info, State>,
-    #[account(address = *mint.to_account_info().owner)]
     /// CHECK: CPI to token program
     pub token_program: AccountInfo<'info>,
     #[account(mut)]
@@ -117,7 +116,7 @@ pub struct TokenOfframp<'info> {
     )]
     /// CHECK: unchecked CPI signer
     pub pool_signer: UncheckedAccount<'info>,
-    #[account(mut, address = get_associated_token_address_with_program_id(&pool_signer.key(), &mint.key(), &token_program.key()))]
+    #[account(mut)]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
@@ -127,7 +126,7 @@ pub struct TokenOfframp<'info> {
     pub chain_config: Account<'info, ChainConfig>,
 
     // User specific accounts ---------------
-    #[account(mut, address = get_associated_token_address_with_program_id(&release_or_mint.receiver, &mint.key(), &token_program.key()))]
+    #[account(mut)]
     pub receiver_token_account: InterfaceAccount<'info, TokenAccount>,
 }
 
@@ -146,7 +145,6 @@ pub struct TokenOnramp<'info> {
         bump,
     )]
     pub state: Account<'info, State>,
-    #[account(address = *mint.to_account_info().owner)]
     /// CHECK: CPI to underlying token program
     pub token_program: AccountInfo<'info>,
     #[account(mut)]
@@ -158,7 +156,7 @@ pub struct TokenOnramp<'info> {
     )]
     /// CHECK: unchecked CPI signer
     pub pool_signer: UncheckedAccount<'info>,
-    #[account(mut, address = get_associated_token_address_with_program_id(&pool_signer.key(), &mint.key(), &token_program.key()))]
+    #[account(mut)]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
@@ -282,7 +280,6 @@ pub struct TokenTransfer<'info> {
         bump,
     )]
     pub state: Account<'info, State>,
-    #[account(address = *mint.to_account_info().owner)]
     /// CHECK: CPI to token program
     pub token_program: AccountInfo<'info>,
     #[account(mut)]
@@ -294,7 +291,7 @@ pub struct TokenTransfer<'info> {
     )]
     /// CHECK: unchecked CPI signer
     pub pool_signer: UncheckedAccount<'info>,
-    #[account(mut, address = get_associated_token_address_with_program_id(&pool_signer.key(), &mint.key(), &token_program.key()))]
+    #[account(mut)]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(mut, token::mint = mint, token::token_program = token_program)]

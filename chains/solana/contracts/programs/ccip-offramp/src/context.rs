@@ -293,7 +293,7 @@ pub struct CommitReportContext<'info> {
 
     #[account(
         mut,
-        seeds = [seed::SOURCE_CHAIN, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, CommitInput::deserialize(&mut raw_report.as_ref()).unwrap().merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidInputs,
     )]
@@ -301,7 +301,7 @@ pub struct CommitReportContext<'info> {
 
     #[account(
         init,
-        seeds = [seed::COMMIT_REPORT, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref(), CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.merkle_root.as_ref()],
+        seeds = [seed::COMMIT_REPORT, CommitInput::deserialize(&mut raw_report.as_ref()).unwrap().merkle_root.source_chain_selector.to_le_bytes().as_ref(), CommitInput::deserialize(&mut raw_report.as_ref()).unwrap().merkle_root.merkle_root.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + CommitReport::INIT_SPACE,
@@ -371,7 +371,7 @@ pub struct ExecuteReportContext<'info> {
     pub reference_addresses: Account<'info, ReferenceAddresses>,
 
     #[account(
-        seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref()).unwrap().source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidInputs,
     )]
@@ -379,7 +379,7 @@ pub struct ExecuteReportContext<'info> {
 
     #[account(
         mut,
-        seeds = [seed::COMMIT_REPORT, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.root.as_ref()],
+        seeds = [seed::COMMIT_REPORT, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref()).unwrap().source_chain_selector.to_le_bytes().as_ref(), ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref()).unwrap().root.as_ref()],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidInputs,
     )]

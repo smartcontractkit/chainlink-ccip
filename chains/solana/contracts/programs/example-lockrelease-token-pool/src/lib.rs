@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
 use base_token_pool::{common::*, rate_limiter::*};
 
@@ -125,6 +126,34 @@ pub mod example_lockrelease_token_pool {
         ctx: Context<TokenOfframp>,
         release_or_mint: ReleaseOrMintInV1,
     ) -> Result<ReleaseOrMintOutV1> {
+        require_keys_eq!(
+            ctx.accounts.token_program.key(),
+            *ctx.accounts.mint.to_account_info().owner,
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let derived_pool_token_account = get_associated_token_address_with_program_id(
+            &ctx.accounts.pool_signer.key(),
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.token_program.key(),
+        );
+        require_keys_eq!(
+            ctx.accounts.pool_token_account.key(),
+            derived_pool_token_account,
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let derived_receiver_token_account = get_associated_token_address_with_program_id(
+            &release_or_mint.receiver,
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.token_program.key(),
+        );
+        require_keys_eq!(
+            ctx.accounts.receiver_token_account.key(),
+            derived_receiver_token_account,
+            CcipTokenPoolError::InvalidInputs
+        );
+
         let parsed_amount = to_svm_token_amount(
             release_or_mint.amount,
             ctx.accounts.chain_config.base.remote.decimals,
@@ -166,6 +195,23 @@ pub mod example_lockrelease_token_pool {
         ctx: Context<TokenOnramp>,
         lock_or_burn: LockOrBurnInV1,
     ) -> Result<LockOrBurnOutV1> {
+        require_keys_eq!(
+            ctx.accounts.token_program.key(),
+            *ctx.accounts.mint.to_account_info().owner,
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let derived_pool_token_account = get_associated_token_address_with_program_id(
+            &ctx.accounts.pool_signer.key(),
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.token_program.key(),
+        );
+        require_keys_eq!(
+            ctx.accounts.pool_token_account.key(),
+            derived_pool_token_account,
+            CcipTokenPoolError::InvalidInputs
+        );
+
         validate_lock_or_burn(
             &lock_or_burn,
             ctx.accounts.state.config.mint,
@@ -191,6 +237,23 @@ pub mod example_lockrelease_token_pool {
     }
 
     pub fn provide_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.token_program.key(),
+            *ctx.accounts.mint.to_account_info().owner,
+            CcipTokenPoolError::InvalidInputs
+        );
+
+        let derived_pool_token_account = get_associated_token_address_with_program_id(
+            &ctx.accounts.pool_signer.key(),
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.token_program.key(),
+        );
+        require_keys_eq!(
+            ctx.accounts.pool_token_account.key(),
+            derived_pool_token_account,
+            CcipTokenPoolError::InvalidInputs
+        );
+
         require!(
             ctx.accounts.state.config.can_accept_liquidity,
             CcipTokenPoolError::LiquidityNotAccepted
@@ -209,6 +272,21 @@ pub mod example_lockrelease_token_pool {
 
     // withdraw liquidity can be used to transfer liquidity from one pool to another by setting the `rebalancer` to the calling pool
     pub fn withdraw_liquidity(ctx: Context<TokenTransfer>, amount: u64) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.token_program.key(),
+            *ctx.accounts.mint.to_account_info().owner,
+            CcipTokenPoolError::InvalidInputs
+        );
+        let derived_pool_token_account = get_associated_token_address_with_program_id(
+            &ctx.accounts.pool_signer.key(),
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.token_program.key(),
+        );
+        require_keys_eq!(
+            ctx.accounts.pool_token_account.key(),
+            derived_pool_token_account,
+            CcipTokenPoolError::InvalidInputs
+        );
         transfer_tokens(
             ctx.accounts.token_program.key(),
             ctx.accounts.remote_token_account.to_account_info(), // to
