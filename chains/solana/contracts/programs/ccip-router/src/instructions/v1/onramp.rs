@@ -123,7 +123,7 @@ pub fn ccip_send<'info>(
     let token_count = message.token_amounts.len();
     require!(
         token_indexes.len() == token_count,
-        CcipRouterError::InvalidInputs,
+        CcipRouterError::InvalidInputsTokenIndices,
     );
 
     let mut new_message: SVM2AnyRampMessage = SVM2AnyRampMessage {

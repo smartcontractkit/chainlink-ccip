@@ -61,7 +61,7 @@ pub mod ccip_router {
         link_token_mint: Pubkey,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
-        require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
+        require!(config.version == 0, CcipRouterError::InvalidVersion); // assert uninitialized state - AccountLoader doesn't work with constraint
         config.version = 1;
         config.svm_chain_selector = svm_chain_selector;
         config.link_token_mint = link_token_mint;
@@ -374,8 +374,14 @@ pub enum AnchorErrorHack {
 pub enum CcipRouterError {
     #[msg("The signer is unauthorized")]
     Unauthorized,
-    #[msg("Invalid inputs")]
-    InvalidInputs,
+    #[msg("Invalid version of the onchain state")]
+    InvalidInputsMint,
+    #[msg("Mint account input is invalid")]
+    InvalidVersion,
+    #[msg("Fee token doesn't match transfer token")]
+    FeeTokenMismatch,
+    #[msg("Proposed owner is the current owner")]
+    RedundantOwnerProposal,
     #[msg("Reached max sequence number")]
     ReachedMaxSequenceNumber,
     #[msg("Invalid pool account account indices")]
@@ -394,10 +400,14 @@ pub enum CcipRouterError {
     InvalidInputsLookupTableAccountWritable,
     #[msg("Cannot send zero tokens")]
     InvalidInputsTokenAmount,
+    #[msg("Must specify zero amount to send alongside transfer_all")]
+    InvalidInputsTransferAllAmount,
     #[msg("Invalid Associated Token Account address")]
     InvalidInputsAtaAddress,
     #[msg("Invalid Associated Token Account writable flag")]
     InvalidInputsAtaWritable,
+    #[msg("Chain selector is invalid")]
+    InvalidInputsChainSelector,
     #[msg("Insufficient lamports")]
     InsufficientLamports,
     #[msg("Insufficient funds")]
