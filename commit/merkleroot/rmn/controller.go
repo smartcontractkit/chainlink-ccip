@@ -27,8 +27,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"

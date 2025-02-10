@@ -10,8 +10,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 // ED25519Verifier is an interface for verifying ED25519 signatures.

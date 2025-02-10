@@ -3,8 +3,9 @@ package rmn
 import (
 	"fmt"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // NewLaneUpdatesFromPB converts a slice of pb FixedDestLaneUpdate to a slice of RMNLaneUpdate
