@@ -130,9 +130,19 @@ func (o *observer) Observe(
 		if err := validatePositive(execCost); err != nil {
 			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
 		}
+		lggr.Debugw("Comparing fee and exec cost", "fee", fee, "execCost", execCost)
 		if fee.Cmp(execCost) < 0 {
-			lggr.Warnw("Message is too costly to execute", "messageID",
-				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
+			eta := calculateETA(fee, execCost, o.feeCalculator.GetRelativeBoostPerWaitHour())
+
+			lggr.Warnw("Message is too costly to execute",
+				"messageID", msg.Header.MessageID.String(),
+				"fee", fee,
+				"execCost", execCost,
+				"seqNum", msg.Header.SequenceNumber,
+				"estimatedETA", formatETA(eta),
+				"boostRate", o.feeCalculator.GetRelativeBoostPerWaitHour(),
+			)
+
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
 		}
 	}
@@ -150,6 +160,52 @@ func validatePositive(fee *big.Int) error {
 	return nil
 }
 
+// calculateETA estimates when the fee will reach the execution cost
+func calculateETA(currentFee, targetFee plugintypes.USD18, boostRate float64) *time.Duration {
+	if boostRate <= 0 {
+		return nil
+	}
+
+	// Convert the USD18 values to big.Float for calculation
+	currentFloat := new(big.Float).SetPrec(100).SetInt(currentFee)
+	targetFloat := new(big.Float).SetPrec(100).SetInt(targetFee)
+
+	// For target = current * (1 + hours * boostRate)
+	// Solving for hours: hours = (target/current - 1) / boostRate
+	ratio := new(big.Float).SetPrec(100)
+	ratio.Quo(targetFloat, currentFloat)
+	ratioFloat64, _ := ratio.Float64()
+
+	// Calculate hours needed: (target/current - 1) / boost_rate
+	// This is correct for linear boost because we're solving:
+	// target = current * (1 + hours * boostRate)
+	hoursNeeded := (ratioFloat64 - 1.0) / boostRate
+	if hoursNeeded <= 0 {
+		return nil
+	}
+
+	etaDuration := time.Duration(hoursNeeded * float64(time.Hour))
+	return &etaDuration
+}
+
+// formatETA converts the duration into a human-readable string
+func formatETA(eta *time.Duration) string {
+	if eta == nil {
+		return "boost rate is zero or already at target"
+	}
+
+	hours := eta.Hours()
+	if hours < 1 {
+		minutes := eta.Minutes()
+		return fmt.Sprintf("~%.0f minutes", minutes)
+	} else if hours < 24 {
+		return fmt.Sprintf("~%.1f hours", hours)
+	}
+
+	days := hours / 24
+	return fmt.Sprintf("~%.1f days", days)
+}
+
 var _ Observer = &observer{}
 
 // MessageFeeE18USDCalculator Calculates the fees (paid at source) of a set of messages in USD18s.
@@ -160,6 +216,9 @@ type MessageFeeE18USDCalculator interface {
 		messages []cciptypes.Message,
 		messageTimestamps map[cciptypes.Bytes32]time.Time,
 	) (map[cciptypes.Bytes32]plugintypes.USD18, error)
+
+	// GetRelativeBoostPerWaitHour returns the configured boost rate per hour
+	GetRelativeBoostPerWaitHour() float64
 }
 
 // ConstMessageFeeUSD18Calculator returns a fee of 0 for all messages.
@@ -182,6 +241,10 @@ func (n *ConstMessageFeeUSD18Calculator) MessageFeeUSD18(
 		messageFees[msg.Header.MessageID] = n.fee
 	}
 	return messageFees, nil
+}
+
+func (n *ConstMessageFeeUSD18Calculator) GetRelativeBoostPerWaitHour() float64 {
+	return 0
 }
 
 var _ MessageFeeE18USDCalculator = &ConstMessageFeeUSD18Calculator{}
@@ -245,6 +308,10 @@ func (n *StaticMessageFeeUSD18Calculator) MessageFeeUSD18(
 	}
 
 	return messageFees, nil
+}
+
+func (n *StaticMessageFeeUSD18Calculator) GetRelativeBoostPerWaitHour() float64 {
+	return 0
 }
 
 var _ MessageFeeE18USDCalculator = &StaticMessageFeeUSD18Calculator{}
@@ -338,13 +405,17 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
 		} else {
 			// TODO: What's the blockchain timestamp? Should we use now().UTC instead?
-			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
+			feeUSD18 = waitBoostedFee(c.lggr, c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
 		messageFees[msg.Header.MessageID] = feeUSD18
 	}
 
 	return messageFees, nil
+}
+
+func (c *CCIPMessageFeeUSD18Calculator) GetRelativeBoostPerWaitHour() float64 {
+	return c.relativeBoostPerWaitHour
 }
 
 // waitBoostedFee boosts the given fee according to the time passed since the msg was sent.
@@ -354,13 +425,17 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 //
 // wait_boosted_fee(m) = (1 + (now - m.send_time).hours * RELATIVE_BOOST_PER_WAIT_HOUR) * fee(m)
 func waitBoostedFee(
+	lggr logger.Logger,
 	waitTime time.Duration,
 	fee *big.Int,
-	relativeBoostPerWaitHour float64) *big.Int {
+	relativeBoostPerWaitHour float64,
+) *big.Int {
 	k := 1.0 + waitTime.Hours()*relativeBoostPerWaitHour
 
 	boostedFee := big.NewFloat(0).Mul(big.NewFloat(k), new(big.Float).SetInt(fee))
 	res, _ := boostedFee.Int(nil)
+
+	lggr.Debugw("Boosting happening", "waitTime", waitTime, "fee", fee, "boostedFee", res)
 
 	return res
 }
@@ -452,6 +527,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) computeExecutionCostUSD18(
 	message cciptypes.Message,
 ) plugintypes.USD18 {
 	messageGas := new(big.Int).SetUint64(c.estimateProvider.CalculateMessageMaxGas(message))
+	c.lggr.Debugw("Execution cost calculation", "messageGas", messageGas, "executionFee", executionFee)
 	return new(big.Int).Mul(messageGas, executionFee)
 }
 
@@ -466,6 +542,9 @@ func (c *CCIPMessageExecCostUSD18Calculator) computeDataAvailabilityCostUSD18(
 	}
 
 	messageGas := calculateMessageMaxDAGas(message, daConfig)
+	c.lggr.Debugw("Data availability cost calculation",
+		"messageGas", messageGas,
+		"dataAvailabilityFee", dataAvailabilityFee)
 	return big.NewInt(0).Mul(messageGas, dataAvailabilityFee)
 }
 

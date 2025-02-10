@@ -10,7 +10,18 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeOperation is the `initializeOperation` instruction.
+// Initialize a new standard timelock operation.
+//
+// This sets up a new operation with the given ID, predecessor, salt, and expected number of instructions.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the operation account.
+// - `_timelock_id`: A padded identifier for the timelock (unused here but required for PDA derivation).
+// - `id`: The unique identifier for the operation.
+// - `predecessor`: The identifier of the predecessor operation.
+// - `salt`: A salt value to help create unique PDAs.
+// - `instruction_count`: The total number of instructions that will be added to this operation.
 type InitializeOperation struct {
 	TimelockId       *[32]uint8
 	Id               *[32]uint8

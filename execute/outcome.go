@@ -36,12 +36,12 @@ func (p *Plugin) Outcome(
 		"outctx", outctx,
 		"query", query,
 		"attributedObservations", aos)
-	previousOutcome, err := exectypes.DecodeOutcome(outctx.PreviousOutcome)
+	previousOutcome, err := p.ocrTypeCodec.DecodeOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 
-	decodedAos, err := decodeAttributedObservations(aos)
+	decodedAos, err := decodeAttributedObservations(aos, p.ocrTypeCodec)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode observations: %w", err)
 	}
@@ -94,7 +94,7 @@ func (p *Plugin) Outcome(
 			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
 			"execPluginState", state)
 		if p.contractsInitialized {
-			return exectypes.Outcome{State: exectypes.Initialized}.Encode()
+			return p.ocrTypeCodec.EncodeOutcome(exectypes.Outcome{State: exectypes.Initialized})
 		}
 		return nil, nil
 	}
@@ -102,7 +102,7 @@ func (p *Plugin) Outcome(
 	p.observer.TrackOutcome(outcome, state)
 	lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
 
-	return outcome.Encode()
+	return p.ocrTypeCodec.EncodeOutcome(outcome)
 }
 
 func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exectypes.Outcome {
@@ -188,6 +188,7 @@ func (p *Plugin) getFilterOutcome(
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces)),
+		report.WithExtraMessageCheck(report.CheckIfInflight(p.inflightMessageCache.IsInflight)),
 		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),
 	)

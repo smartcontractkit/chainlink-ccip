@@ -405,6 +405,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "base-token-pool"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-program",
+ "spl-math",
+]
+
+[[package]]
 name = "base64"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -652,18 +662,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "ccip_invalid_receiver"
-version = "0.0.0-dev"
-dependencies = [
- "anchor-lang",
-]
-
-[[package]]
-name = "ccip_receiver"
+name = "ccip_offramp"
 version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "bytemuck",
+ "ethnum",
+ "fee_quoter",
+ "hex",
  "solana-program",
 ]
 
@@ -675,6 +682,7 @@ dependencies = [
  "anchor-spl",
  "bytemuck",
  "ethnum",
+ "fee_quoter",
  "hex",
  "solana-program",
 ]
@@ -951,6 +959,47 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 
 [[package]]
+name = "example-burnmint-token-pool"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "base-token-pool",
+ "solana-program",
+ "spl-math",
+]
+
+[[package]]
+name = "example-lockrelease-token-pool"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "base-token-pool",
+ "solana-program",
+ "spl-math",
+]
+
+[[package]]
+name = "example_ccip_receiver"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-program",
+]
+
+[[package]]
+name = "example_ccip_sender"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "fee_quoter",
+ "solana-program",
+]
+
+[[package]]
 name = "external-program-cpi-stub"
 version = "0.0.0-dev"
 dependencies = [
@@ -962,6 +1011,18 @@ name = "feature-probe"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "835a3dc7d1ec9e75e2b5fb4ba75396837112d2060b03f7d43bc1897c7f7211da"
+
+[[package]]
+name = "fee_quoter"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "ethnum",
+ "hex",
+ "solana-program",
+]
 
 [[package]]
 name = "fnv"
@@ -2377,6 +2438,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-token-pool"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "base-token-pool",
+ "example-burnmint-token-pool",
+ "example-lockrelease-token-pool",
+ "solana-program",
+ "spl-math",
+]
+
+[[package]]
+name = "test_ccip_invalid_receiver"
+version = "0.0.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "example_ccip_receiver",
+ "solana-program",
+]
+
+[[package]]
+name = "test_ccip_receiver"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "example_ccip_receiver",
+ "solana-program",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2441,16 +2535,6 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
-
-[[package]]
-name = "token-pool"
-version = "0.1.0-dev"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "solana-program",
- "spl-math",
-]
 
 [[package]]
 name = "toml"

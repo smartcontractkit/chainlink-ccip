@@ -3,6 +3,7 @@ package ccip
 import (
 	"github.com/gagliardetto/solana-go"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 )
 
@@ -18,7 +19,7 @@ type EventCCIPMessageSent struct {
 
 type EventCommitReportAccepted struct {
 	Discriminator [8]byte
-	Report        ccip_router.MerkleRoot
+	Report        ccip_offramp.MerkleRoot
 }
 
 type EventTransmitted struct {
@@ -34,7 +35,7 @@ type EventExecutionStateChanged struct {
 	SequenceNumber      uint64
 	MessageID           [32]byte
 	MessageHash         [32]byte
-	State               ccip_router.MessageExecutionState
+	State               ccip_offramp.MessageExecutionState
 }
 
 type EventSkippedAlreadyExecutedMessage struct {
@@ -52,6 +53,7 @@ type EventConfigSet struct {
 	F             uint8
 }
 
+// FeeQuoter-specific event
 type UsdPerTokenUpdated struct {
 	Discriminator [8]byte
 	Token         solana.PublicKey
@@ -59,6 +61,7 @@ type UsdPerTokenUpdated struct {
 	Timestamp     int64
 }
 
+// FeeQuoter-specific event
 type UsdPerUnitGasUpdated struct {
 	Discriminator [8]byte
 	DestChain     uint64

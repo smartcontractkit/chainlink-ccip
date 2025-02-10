@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
@@ -25,28 +27,28 @@ func TestMessageHashing(t *testing.T) {
 
 	t.Run("AnyToSVM", func(t *testing.T) {
 		t.Parallel()
-		h, err := HashAnyToSVMMessage(ccip_router.Any2SVMRampMessage{
+		h, err := HashAnyToSVMMessage(ccip_offramp.Any2SVMRampMessage{
 			Sender:        sender,
 			TokenReceiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			Data:          []byte{4, 5, 6},
-			Header: ccip_router.RampMessageHeader{
+			Header: ccip_offramp.RampMessageHeader{
 				MessageId:           [32]uint8{8, 5, 3},
 				SourceChainSelector: 67,
 				DestChainSelector:   78,
 				SequenceNumber:      89,
 				Nonce:               90,
 			},
-			ExtraArgs: ccip_router.Any2SVMRampExtraArgs{
+			ExtraArgs: ccip_offramp.Any2SVMRampExtraArgs{
 				ComputeUnits:     1000,
 				IsWritableBitmap: GenerateBitMapForIndexes([]int{0}),
 			},
-			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{
+			TokenAmounts: []ccip_offramp.Any2SVMTokenTransfer{
 				{
 					SourcePoolAddress: []byte{0, 1, 2, 3},
 					DestTokenAddress:  solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
 					DestGasAmount:     100,
 					ExtraData:         []byte{4, 5, 6},
-					Amount:            ccip_router.CrossChainAmount{LeBytes: tokenAmount},
+					Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokenAmount},
 				},
 			},
 		}, config.OnRampAddress,
@@ -62,7 +64,7 @@ func TestMessageHashing(t *testing.T) {
 	t.Run("SVMToAny", func(t *testing.T) {
 		t.Parallel()
 
-		extraArgs, err := SerializeExtraArgs(ccip_router.EVMExtraArgsV2{
+		extraArgs, err := SerializeExtraArgs(fee_quoter.EVMExtraArgsV2{
 			GasLimit:                 bin.Uint128{Lo: 1},
 			AllowOutOfOrderExecution: true,
 		}, EVMExtraArgsV2Tag)

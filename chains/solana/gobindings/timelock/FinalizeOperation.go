@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// FinalizeOperation is the `finalizeOperation` instruction.
+// Finalize a standard operation.
+//
+// Finalizing an operation marks it as ready for scheduling.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the operation account.
+// - `_timelock_id`: The timelock identifier (for PDA derivation).
+// - `_id`: The operation identifier.
 type FinalizeOperation struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

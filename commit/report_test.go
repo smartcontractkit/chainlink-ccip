@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 
 	"github.com/stretchr/testify/require"
 
@@ -76,7 +77,9 @@ func TestPluginReports(t *testing.T) {
 							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
 						},
 					},
-					RMNSignatures: nil,
+					RMNSignatures:        nil,
+					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
+					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
 				},
 			},
 			expReportInfo: ccipocr3.CommitReportInfo{},
@@ -98,7 +101,9 @@ func TestPluginReports(t *testing.T) {
 							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
 						},
 					},
-					RMNSignatures: nil,
+					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
+					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
+					RMNSignatures:        nil,
 				},
 			},
 			expReportInfo: ccipocr3.CommitReportInfo{},
@@ -116,8 +121,15 @@ func TestPluginReports(t *testing.T) {
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
 						},
+						{
+							ChainSel:      2,
+							OnRampAddress: []byte{1, 2, 3},
+							SeqNumsRange:  ccipocr3.NewSeqNumRange(110, 210),
+							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
+						},
 					},
-					RMNRemoteCfg: rmntypes.RemoteConfig{FSign: 123},
+					RMNRemoteCfg:     rmntypes.RemoteConfig{FSign: 123},
+					RMNEnabledChains: map[ccipocr3.ChainSelector]bool{3: true, 2: false},
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: ccipocr3.TokenPriceMap{
@@ -132,12 +144,20 @@ func TestPluginReports(t *testing.T) {
 			},
 			expReports: []ccipocr3.CommitPluginReport{
 				{
-					MerkleRoots: []ccipocr3.MerkleRootChain{
+					BlessedMerkleRoots: []ccipocr3.MerkleRootChain{
 						{
 							ChainSel:      3,
 							OnRampAddress: []byte{1, 2, 3},
 							SeqNumsRange:  ccipocr3.NewSeqNumRange(10, 20),
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
+						},
+					},
+					UnblessedMerkleRoots: []ccipocr3.MerkleRootChain{
+						{
+							ChainSel:      2,
+							OnRampAddress: []byte{1, 2, 3},
+							SeqNumsRange:  ccipocr3.NewSeqNumRange(110, 210),
+							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
 						},
 					},
 					PriceUpdates: ccipocr3.PriceUpdates{
@@ -154,6 +174,12 @@ func TestPluginReports(t *testing.T) {
 			expReportInfo: ccipocr3.CommitReportInfo{
 				RemoteF: 123,
 				MerkleRoots: []ccipocr3.MerkleRootChain{
+					{
+						ChainSel:      2,
+						OnRampAddress: []byte{1, 2, 3},
+						SeqNumsRange:  ccipocr3.NewSeqNumRange(110, 210),
+						MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6, 7},
+					},
 					{
 						ChainSel:      3,
 						OnRampAddress: []byte{1, 2, 3},
@@ -174,16 +200,19 @@ func TestPluginReports(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			ocrTypeCodec := ocrtypecodec.NewCommitCodecJSON()
+
 			cs := plugincommon.NewMockChainSupport(t)
 			p := Plugin{
 				lggr:            lggr,
 				reportCodec:     reportCodec,
+				ocrTypeCodec:    ocrTypeCodec,
 				oracleIDToP2PID: map[commontypes.OracleID]libocrtypes.PeerID{1: {1}},
 				chainSupport:    cs,
 			}
 			cs.EXPECT().SupportsDestChain(commontypes.OracleID(1)).Return(true, nil).Maybe()
 
-			outcomeBytes, err := tc.outc.Encode()
+			outcomeBytes, err := ocrTypeCodec.EncodeOutcome(tc.outc)
 			require.NoError(t, err)
 
 			reports, err := p.Reports(ctx, 0, outcomeBytes)
@@ -209,7 +238,10 @@ func TestPluginReports(t *testing.T) {
 
 func TestPluginReports_InvalidOutcome(t *testing.T) {
 	lggr := logger.Test(t)
-	p := Plugin{lggr: lggr}
+	p := Plugin{
+		lggr:         lggr,
+		ocrTypeCodec: ocrtypecodec.NewCommitCodecJSON(),
+	}
 	_, err := p.Reports(tests.Context(t), 0, []byte("invalid json"))
 	require.Error(t, err)
 }
@@ -258,7 +290,7 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 				lggr: logger.Test(t),
 			}
 			report := ccipocr3.CommitPluginReport{
-				MerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
+				BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
 			}
 			stale := p.isStaleReport(p.lggr, tc.reportSeqNum, tc.onChainSeqNum, report)
 			require.Equal(t, tc.shouldBeStale, stale)

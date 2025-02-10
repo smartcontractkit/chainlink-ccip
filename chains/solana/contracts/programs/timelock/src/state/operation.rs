@@ -2,40 +2,69 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::solana_program::keccak::{hashv, HASH_BYTES};
 
-use crate::constants::DONE_TIMESTAMP;
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, PartialOrd)]
+pub enum OperationState {
+    /// Operation is created but not yet finalized.
+    Initialized,
+    /// Operation is finalized (instructions are locked in) but not yet scheduled.
+    Finalized,
+    /// Operation is scheduled (ready to be executed when its time comes).
+    Scheduled,
+    /// Operation has been executed and is complete.
+    Done,
+}
 
 #[account]
 pub struct Operation {
+    pub state: OperationState,
     pub timestamp: u64,                     // scheduled timestamp in unix time
     pub id: [u8; 32],                       // hashed operation id
     pub predecessor: [u8; 32],              // hash of the previous operation
     pub salt: [u8; 32],                     // random salt for the operation
-    pub is_finalized: bool,                 // flag to indicate if the operation is finalized
     pub total_instructions: u32,            // total number of instructions in the operation
     pub instructions: Vec<InstructionData>, // list of instructions
+}
+
+impl Space for Operation {
+    // state(u8) + timestamp + id + predecessor + salt + total_ixs + vec prefix for instructions
+    const INIT_SPACE: usize = 1 + 8 + 32 + 32 + 32 + 4 + 4;
 }
 
 impl Operation {
     // before scheduling, timestamp should be 0
     pub fn is_scheduled(&self) -> bool {
-        self.timestamp > 0
+        self.state >= OperationState::Scheduled
     }
 
-    // scheduled but not executed
+    pub fn is_finalized(&self) -> bool {
+        self.state == OperationState::Finalized
+    }
+
     pub fn is_pending(&self) -> bool {
-        self.timestamp > DONE_TIMESTAMP
+        // scheduled but not executed
+        self.state == OperationState::Scheduled
     }
 
     pub fn is_ready(&self, current_timestamp: u64) -> bool {
-        self.timestamp > DONE_TIMESTAMP && self.timestamp <= current_timestamp
+        // scheduled and timestamp is in the past
+        self.state == OperationState::Scheduled && self.timestamp <= current_timestamp
     }
 
     pub fn is_done(&self) -> bool {
-        self.timestamp == DONE_TIMESTAMP
+        self.state == OperationState::Done
+    }
+
+    pub fn finalize(&mut self) {
+        self.state = OperationState::Finalized;
+    }
+
+    pub fn schedule(&mut self, scheduled_time: u64) {
+        self.timestamp = scheduled_time;
+        self.state = OperationState::Scheduled;
     }
 
     pub fn mark_done(&mut self) {
-        self.timestamp = DONE_TIMESTAMP;
+        self.state = OperationState::Done;
     }
 
     pub fn hash_instructions(&self, salt: [u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
@@ -72,14 +101,12 @@ impl Operation {
         hashv(&[&encoded_data]).to_bytes()
     }
 
+    // Validate instruction data integrity by computing a salted hash of the instruction data
+    // and comparing it against the stored operation ID. This ensures the uploaded
+    // instructions remain unaltered between stored account and execution
     pub fn verify_id(&self) -> bool {
         self.hash_instructions(self.salt) == self.id
     }
-}
-
-impl Space for Operation {
-    // timestamp + id + predecessor + salt + total_ixs + is_finalized + vec prefix for instructions
-    const INIT_SPACE: usize = 8 + 32 + 32 + 32 + 4 + 1 + 4;
 }
 
 // The native SVM's Instruction type from solana_program doesn't implement the AnchorSerialize trait.
@@ -145,11 +172,11 @@ mod tests {
         predecessor: [u8; HASH_BYTES],
     ) -> Operation {
         Operation {
+            state: OperationState::Initialized,
             timestamp: 0,
             id: [0u8; 32],
             predecessor,
             salt: [0u8; 32],
-            is_finalized: false,
             total_instructions: instructions.len() as u32,
             instructions,
         }
