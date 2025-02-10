@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Cancel is the `cancel` instruction.
+// Cancel a scheduled operation.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the accounts for cancellation.
+// - `timelock_id`: The timelock identifier.
+// - `id`: The operation identifier (precalculated).
 type Cancel struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

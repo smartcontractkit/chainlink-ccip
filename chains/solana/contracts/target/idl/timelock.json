@@ -1,9 +1,38 @@
 {
   "version": "0.0.1-dev",
   "name": "timelock",
+  "docs": [
+    "The `timelock` program provides a mechanism to schedule, execute, and (if needed) cancel",
+    "operations in a delayed fashion. It supports both standard operations (which enforce delays and dependencies)",
+    "and bypass operations (for emergency cases).",
+    "",
+    "Operation management for timelock system, handling both standard (timelock-enforced)",
+    "and bypass (emergency) operations.",
+    "",
+    "Standard Operation Flow:",
+    "- initialize -> append(init_ix, append_ix_data) -> finalize -> schedule -> execute_batch",
+    "- Enforces timelock delays and predecessor dependencies",
+    "",
+    "Bypass Operation Flow:",
+    "- initialize -> append(init_ix, append_ix_data) -> finalize -> bypass_execute_batch",
+    "- No required delay or additional checks, closes operation account after execution",
+    "",
+    "Implementation uses separate code paths and PDAs for each operation type",
+    "to maintain clear security boundaries and audit trails, despite similar logic.",
+    "All operations enforce state transitions, size limits, and role-based access."
+  ],
   "instructions": [
     {
       "name": "initialize",
+      "docs": [
+        "Initialize the timelock configuration.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the accounts required for initialization.",
+        "- `timelock_id`: A unique, padded identifier for this timelock instance.",
+        "- `min_delay`: The minimum delay (in seconds) required for scheduled operations."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -74,6 +103,15 @@
     },
     {
       "name": "batchAddAccess",
+      "docs": [
+        "Add a new access role in batch. Only the admin is allowed to perform this operation.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the accounts required for batch adding access.",
+        "- `timelock_id`: A unique, padded identifier for this timelock instance.",
+        "- `role`: The role to be added."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -116,6 +154,20 @@
     },
     {
       "name": "initializeOperation",
+      "docs": [
+        "Initialize a new standard timelock operation.",
+        "",
+        "This sets up a new operation with the given ID, predecessor, salt, and expected number of instructions.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the operation account.",
+        "- `_timelock_id`: A padded identifier for the timelock (unused here but required for PDA derivation).",
+        "- `id`: The unique identifier for the operation.",
+        "- `predecessor`: The identifier of the predecessor operation.",
+        "- `salt`: A salt value to help create unique PDAs.",
+        "- `instruction_count`: The total number of instructions that will be added to this operation."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -187,7 +239,18 @@
       ]
     },
     {
-      "name": "appendInstructions",
+      "name": "initializeInstruction",
+      "docs": [
+        "Append a new instruction to an existing standard operation.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the operation account.",
+        "- `_timelock_id`: The timelock identifier (for PDA derivation).",
+        "- `_id`: The operation identifier.",
+        "- `program_id`: The target program for the instruction.",
+        "- `accounts`: The list of accounts required for the instruction."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -235,17 +298,101 @@
           }
         },
         {
-          "name": "instructionsBatch",
+          "name": "programId",
+          "type": "publicKey"
+        },
+        {
+          "name": "accounts",
           "type": {
             "vec": {
-              "defined": "InstructionData"
+              "defined": "InstructionAccount"
             }
           }
         }
       ]
     },
     {
+      "name": "appendInstructionData",
+      "docs": [
+        "Append additional instruction data to an instruction of an existing standard operation.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the operation account.",
+        "- `_timelock_id`: The timelock identifier (for PDA derivation).",
+        "- `_id`: The operation identifier.",
+        "- `ix_index`: The index of the instruction to which the data will be appended.",
+        "- `ix_data_chunk`: A chunk of data to be appended."
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "ixIndex",
+          "type": "u32"
+        },
+        {
+          "name": "ixDataChunk",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
       "name": "finalizeOperation",
+      "docs": [
+        "Finalize a standard operation.",
+        "",
+        "Finalizing an operation marks it as ready for scheduling.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the operation account.",
+        "- `_timelock_id`: The timelock identifier (for PDA derivation).",
+        "- `_id`: The operation identifier."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -291,6 +438,17 @@
     },
     {
       "name": "clearOperation",
+      "docs": [
+        "Clear an operation that has been finalized.",
+        "",
+        "This effectively closes the operation account so that it can be reinitialized later.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the operation account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `_id`: The operation identifier."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -336,6 +494,16 @@
     },
     {
       "name": "scheduleBatch",
+      "docs": [
+        "Schedule a finalized operation to be executed after a delay.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the accounts for scheduling.",
+        "- `timelock_id`: The timelock identifier.",
+        "- `id`: The operation identifier.",
+        "- `delay`: The delay (in seconds) before the operation can be executed."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -385,6 +553,15 @@
     },
     {
       "name": "cancel",
+      "docs": [
+        "Cancel a scheduled operation.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the accounts for cancellation.",
+        "- `timelock_id`: The timelock identifier.",
+        "- `id`: The operation identifier (precalculated)."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -430,6 +607,15 @@
     },
     {
       "name": "executeBatch",
+      "docs": [
+        "Execute a scheduled batch of instructions.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the accounts required for execution.",
+        "- `timelock_id`: The timelock identifier.",
+        "- `id`: The operation identifier."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -485,6 +671,19 @@
     },
     {
       "name": "initializeBypasserOperation",
+      "docs": [
+        "Initialize a bypasser operation.",
+        "",
+        "Bypasser operations have no predecessor and can be executed without delay.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the bypasser operation account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `id`: The operation identifier.",
+        "- `salt`: A salt value for PDA derivation.",
+        "- `instruction_count`: The number of instructions to be added."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -547,7 +746,18 @@
       ]
     },
     {
-      "name": "appendBypasserInstructions",
+      "name": "initializeBypasserInstruction",
+      "docs": [
+        "Initialize an instruction for a bypasser operation.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the bypasser operation account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `_id`: The operation identifier.",
+        "- `program_id`: The target program for the instruction.",
+        "- `accounts`: The list of accounts required for the instruction."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -595,17 +805,101 @@
           }
         },
         {
-          "name": "instructionsBatch",
+          "name": "programId",
+          "type": "publicKey"
+        },
+        {
+          "name": "accounts",
           "type": {
             "vec": {
-              "defined": "InstructionData"
+              "defined": "InstructionAccount"
             }
           }
         }
       ]
     },
     {
+      "name": "appendBypasserInstructionData",
+      "docs": [
+        "Append additional data to an instruction of a bypasser operation.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the bypasser operation account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `_id`: The operation identifier.",
+        "- `ix_index`: The index of the instruction.",
+        "- `ix_data_chunk`: The data to append."
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "roleAccessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "ixIndex",
+          "type": "u32"
+        },
+        {
+          "name": "ixDataChunk",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
       "name": "finalizeBypasserOperation",
+      "docs": [
+        "Finalize a bypasser operation.",
+        "",
+        "Marks the bypasser operation as finalized, ready for execution.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the bypasser operation account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `_id`: The operation identifier."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -651,6 +945,17 @@
     },
     {
       "name": "clearBypasserOperation",
+      "docs": [
+        "Clear a finalized bypasser operation.",
+        "",
+        "Closes the bypasser operation account.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the bypasser operation account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `_id`: The operation identifier."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -696,6 +1001,15 @@
     },
     {
       "name": "bypasserExecuteBatch",
+      "docs": [
+        "Execute a bypasser operation immediately.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the bypasser execution account.",
+        "- `timelock_id`: The timelock identifier.",
+        "- `id`: The operation identifier."
+      ],
       "accounts": [
         {
           "name": "operation",
@@ -746,6 +1060,17 @@
     },
     {
       "name": "updateDelay",
+      "docs": [
+        "Update the minimum delay required for scheduled operations.",
+        "",
+        "Only the admin can update the delay.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the configuration account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `delay`: The new minimum delay value."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -776,6 +1101,17 @@
     },
     {
       "name": "blockFunctionSelector",
+      "docs": [
+        "Block a function selector from being called.",
+        "",
+        "Only the admin can block function selectors.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the configuration account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `selector`: The 8-byte function selector(Anchor discriminator) to block."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -811,6 +1147,17 @@
     },
     {
       "name": "unblockFunctionSelector",
+      "docs": [
+        "Unblock a previously blocked function selector.",
+        "",
+        "Only the admin can unblock function selectors.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the configuration account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `selector`: The function selector to unblock."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -846,6 +1193,17 @@
     },
     {
       "name": "transferOwnership",
+      "docs": [
+        "Propose a new owner for the timelock.",
+        "",
+        "Only the current owner (admin) can propose a new owner.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the configuration account.",
+        "- `_timelock_id`: The timelock identifier.",
+        "- `proposed_owner`: The public key of the proposed new owner."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -876,6 +1234,16 @@
     },
     {
       "name": "acceptOwnership",
+      "docs": [
+        "Accept ownership of the timelock.",
+        "",
+        "The proposed new owner must call this function to assume ownership.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the configuration account.",
+        "- `_timelock_id`: The timelock identifier."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -959,6 +1327,12 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "state",
+            "type": {
+              "defined": "OperationState"
+            }
+          },
+          {
             "name": "timestamp",
             "type": "u64"
           },
@@ -988,10 +1362,6 @@
                 32
               ]
             }
-          },
-          {
-            "name": "isFinalized",
-            "type": "bool"
           },
           {
             "name": "totalInstructions",
@@ -1158,6 +1528,26 @@
           },
           {
             "name": "Bypasser"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OperationState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Initialized"
+          },
+          {
+            "name": "Finalized"
+          },
+          {
+            "name": "Scheduled"
+          },
+          {
+            "name": "Done"
           }
         ]
       }

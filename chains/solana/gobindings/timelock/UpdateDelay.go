@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// UpdateDelay is the `updateDelay` instruction.
+// Update the minimum delay required for scheduled operations.
+//
+// Only the admin can update the delay.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the configuration account.
+// - `_timelock_id`: The timelock identifier.
+// - `delay`: The new minimum delay value.
 type UpdateDelay struct {
 	TimelockId *[32]uint8
 	Delay      *uint64

@@ -10,11 +10,20 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendBypasserInstructions is the `appendBypasserInstructions` instruction.
-type AppendBypasserInstructions struct {
-	TimelockId        *[32]uint8
-	Id                *[32]uint8
-	InstructionsBatch *[]InstructionData
+// Append additional data to an instruction of a bypasser operation.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the bypasser operation account.
+// - `_timelock_id`: The timelock identifier.
+// - `_id`: The operation identifier.
+// - `ix_index`: The index of the instruction.
+// - `ix_data_chunk`: The data to append.
+type AppendBypasserInstructionData struct {
+	TimelockId  *[32]uint8
+	Id          *[32]uint8
+	IxIndex     *uint32
+	IxDataChunk *[]byte
 
 	// [0] = [WRITE] operation
 	//
@@ -28,105 +37,111 @@ type AppendBypasserInstructions struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewAppendBypasserInstructionsInstructionBuilder creates a new `AppendBypasserInstructions` instruction builder.
-func NewAppendBypasserInstructionsInstructionBuilder() *AppendBypasserInstructions {
-	nd := &AppendBypasserInstructions{
+// NewAppendBypasserInstructionDataInstructionBuilder creates a new `AppendBypasserInstructionData` instruction builder.
+func NewAppendBypasserInstructionDataInstructionBuilder() *AppendBypasserInstructionData {
+	nd := &AppendBypasserInstructionData{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
 
 // SetTimelockId sets the "timelockId" parameter.
-func (inst *AppendBypasserInstructions) SetTimelockId(timelockId [32]uint8) *AppendBypasserInstructions {
+func (inst *AppendBypasserInstructionData) SetTimelockId(timelockId [32]uint8) *AppendBypasserInstructionData {
 	inst.TimelockId = &timelockId
 	return inst
 }
 
 // SetId sets the "id" parameter.
-func (inst *AppendBypasserInstructions) SetId(id [32]uint8) *AppendBypasserInstructions {
+func (inst *AppendBypasserInstructionData) SetId(id [32]uint8) *AppendBypasserInstructionData {
 	inst.Id = &id
 	return inst
 }
 
-// SetInstructionsBatch sets the "instructionsBatch" parameter.
-func (inst *AppendBypasserInstructions) SetInstructionsBatch(instructionsBatch []InstructionData) *AppendBypasserInstructions {
-	inst.InstructionsBatch = &instructionsBatch
+// SetIxIndex sets the "ixIndex" parameter.
+func (inst *AppendBypasserInstructionData) SetIxIndex(ixIndex uint32) *AppendBypasserInstructionData {
+	inst.IxIndex = &ixIndex
+	return inst
+}
+
+// SetIxDataChunk sets the "ixDataChunk" parameter.
+func (inst *AppendBypasserInstructionData) SetIxDataChunk(ixDataChunk []byte) *AppendBypasserInstructionData {
+	inst.IxDataChunk = &ixDataChunk
 	return inst
 }
 
 // SetOperationAccount sets the "operation" account.
-func (inst *AppendBypasserInstructions) SetOperationAccount(operation ag_solanago.PublicKey) *AppendBypasserInstructions {
+func (inst *AppendBypasserInstructionData) SetOperationAccount(operation ag_solanago.PublicKey) *AppendBypasserInstructionData {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(operation).WRITE()
 	return inst
 }
 
 // GetOperationAccount gets the "operation" account.
-func (inst *AppendBypasserInstructions) GetOperationAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructionData) GetOperationAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *AppendBypasserInstructions) SetConfigAccount(config ag_solanago.PublicKey) *AppendBypasserInstructions {
+func (inst *AppendBypasserInstructionData) SetConfigAccount(config ag_solanago.PublicKey) *AppendBypasserInstructionData {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *AppendBypasserInstructions) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructionData) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetRoleAccessControllerAccount sets the "roleAccessController" account.
-func (inst *AppendBypasserInstructions) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *AppendBypasserInstructions {
+func (inst *AppendBypasserInstructionData) SetRoleAccessControllerAccount(roleAccessController ag_solanago.PublicKey) *AppendBypasserInstructionData {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(roleAccessController)
 	return inst
 }
 
 // GetRoleAccessControllerAccount gets the "roleAccessController" account.
-func (inst *AppendBypasserInstructions) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructionData) GetRoleAccessControllerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *AppendBypasserInstructions) SetAuthorityAccount(authority ag_solanago.PublicKey) *AppendBypasserInstructions {
+func (inst *AppendBypasserInstructionData) SetAuthorityAccount(authority ag_solanago.PublicKey) *AppendBypasserInstructionData {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *AppendBypasserInstructions) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructionData) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *AppendBypasserInstructions) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AppendBypasserInstructions {
+func (inst *AppendBypasserInstructionData) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AppendBypasserInstructionData {
 	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *AppendBypasserInstructions) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *AppendBypasserInstructionData) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[4]
 }
 
-func (inst AppendBypasserInstructions) Build() *Instruction {
+func (inst AppendBypasserInstructionData) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_AppendBypasserInstructions,
+		TypeID: Instruction_AppendBypasserInstructionData,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst AppendBypasserInstructions) ValidateAndBuild() (*Instruction, error) {
+func (inst AppendBypasserInstructionData) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *AppendBypasserInstructions) Validate() error {
+func (inst *AppendBypasserInstructionData) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.TimelockId == nil {
@@ -135,8 +150,11 @@ func (inst *AppendBypasserInstructions) Validate() error {
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
-		if inst.InstructionsBatch == nil {
-			return errors.New("InstructionsBatch parameter is not set")
+		if inst.IxIndex == nil {
+			return errors.New("IxIndex parameter is not set")
+		}
+		if inst.IxDataChunk == nil {
+			return errors.New("IxDataChunk parameter is not set")
 		}
 	}
 
@@ -161,19 +179,20 @@ func (inst *AppendBypasserInstructions) Validate() error {
 	return nil
 }
 
-func (inst *AppendBypasserInstructions) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *AppendBypasserInstructionData) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("AppendBypasserInstructions")).
+			programBranch.Child(ag_format.Instruction("AppendBypasserInstructionData")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("       TimelockId", *inst.TimelockId))
-						paramsBranch.Child(ag_format.Param("               Id", *inst.Id))
-						paramsBranch.Child(ag_format.Param("InstructionsBatch", *inst.InstructionsBatch))
+					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param(" TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("         Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param("    IxIndex", *inst.IxIndex))
+						paramsBranch.Child(ag_format.Param("IxDataChunk", *inst.IxDataChunk))
 					})
 
 					// Accounts of the instruction:
@@ -188,7 +207,7 @@ func (inst *AppendBypasserInstructions) EncodeToTree(parent ag_treeout.Branches)
 		})
 }
 
-func (obj AppendBypasserInstructions) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj AppendBypasserInstructionData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `TimelockId` param:
 	err = encoder.Encode(obj.TimelockId)
 	if err != nil {
@@ -199,14 +218,19 @@ func (obj AppendBypasserInstructions) MarshalWithEncoder(encoder *ag_binary.Enco
 	if err != nil {
 		return err
 	}
-	// Serialize `InstructionsBatch` param:
-	err = encoder.Encode(obj.InstructionsBatch)
+	// Serialize `IxIndex` param:
+	err = encoder.Encode(obj.IxIndex)
+	if err != nil {
+		return err
+	}
+	// Serialize `IxDataChunk` param:
+	err = encoder.Encode(obj.IxDataChunk)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *AppendBypasserInstructions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *AppendBypasserInstructionData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TimelockId`:
 	err = decoder.Decode(&obj.TimelockId)
 	if err != nil {
@@ -217,30 +241,37 @@ func (obj *AppendBypasserInstructions) UnmarshalWithDecoder(decoder *ag_binary.D
 	if err != nil {
 		return err
 	}
-	// Deserialize `InstructionsBatch`:
-	err = decoder.Decode(&obj.InstructionsBatch)
+	// Deserialize `IxIndex`:
+	err = decoder.Decode(&obj.IxIndex)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IxDataChunk`:
+	err = decoder.Decode(&obj.IxDataChunk)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewAppendBypasserInstructionsInstruction declares a new AppendBypasserInstructions instruction with the provided parameters and accounts.
-func NewAppendBypasserInstructionsInstruction(
+// NewAppendBypasserInstructionDataInstruction declares a new AppendBypasserInstructionData instruction with the provided parameters and accounts.
+func NewAppendBypasserInstructionDataInstruction(
 	// Parameters:
 	timelockId [32]uint8,
 	id [32]uint8,
-	instructionsBatch []InstructionData,
+	ixIndex uint32,
+	ixDataChunk []byte,
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *AppendBypasserInstructions {
-	return NewAppendBypasserInstructionsInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *AppendBypasserInstructionData {
+	return NewAppendBypasserInstructionDataInstructionBuilder().
 		SetTimelockId(timelockId).
 		SetId(id).
-		SetInstructionsBatch(instructionsBatch).
+		SetIxIndex(ixIndex).
+		SetIxDataChunk(ixDataChunk).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).
 		SetRoleAccessControllerAccount(roleAccessController).
