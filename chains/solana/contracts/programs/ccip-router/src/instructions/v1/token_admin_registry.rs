@@ -55,6 +55,16 @@ pub fn owner_propose_administrator(
     ctx: Context<RegisterTokenAdminRegistryByOwner>,
     token_admin_registry_admin: Pubkey,
 ) -> Result<()> {
+    let mint_authority = ctx
+        .accounts
+        .mint
+        .mint_authority
+        .ok_or(CcipRouterError::Unauthorized)?;
+    require!(
+        ctx.accounts.authority.key() == mint_authority,
+        CcipRouterError::Unauthorized
+    );
+
     let token_mint = ctx.accounts.mint.key().to_owned();
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
 
@@ -68,6 +78,16 @@ pub fn owner_override_pending_administrator(
     ctx: Context<OverridePendingTokenAdminRegistryByOwner>,
     token_admin_registry_admin: Pubkey,
 ) -> Result<()> {
+    let mint_authority = ctx
+        .accounts
+        .mint
+        .mint_authority
+        .ok_or(CcipRouterError::Unauthorized)?;
+    require!(
+        ctx.accounts.authority.key() == mint_authority,
+        CcipRouterError::Unauthorized
+    );
+
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
 
     require_eq!(

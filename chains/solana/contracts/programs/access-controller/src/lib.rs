@@ -6,6 +6,12 @@ use arrayvec::arrayvec;
 
 declare_id!("9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW");
 
+impl anchor_lang::Id for AccessController {
+    fn id() -> Pubkey {
+        crate::ID
+    }
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Unauthorized")]

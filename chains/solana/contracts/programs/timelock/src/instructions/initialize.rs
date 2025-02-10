@@ -34,8 +34,15 @@ pub fn initialize(
 pub fn batch_add_access<'info>(
     ctx: Context<'_, '_, '_, 'info, BatchAddAccess<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _role: Role,
+    role: Role,
 ) -> Result<()> {
+    let expected = ctx.accounts.config.get_role_controller(&role);
+    require_keys_eq!(
+        expected,
+        ctx.accounts.role_access_controller.key(),
+        TimelockError::InvalidAccessController
+    );
+
     require!(
         !ctx.remaining_accounts.is_empty(),
         TimelockError::InvalidInput
@@ -80,7 +87,7 @@ pub struct Initialize<'info> {
     pub program_data: Account<'info, ProgramData>,
 
     // access controller program and states per role
-    pub access_controller_program: Program<'info, access_controller::program::AccessController>,
+    pub access_controller_program: Program<'info, AccessController>,
     #[account(owner = access_controller_program.key())]
     pub proposer_role_access_controller: AccountLoader<'info, AccessController>,
     #[account(owner = access_controller_program.key())]
@@ -100,13 +107,12 @@ pub struct BatchAddAccess<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    pub access_controller_program: Program<'info, access_controller::program::AccessController>,
+    pub access_controller_program: Program<'info, AccessController>,
 
     // NOTE: access controller for the role of access list
     #[account(
         mut,
         owner = access_controller_program.key(),
-        address = config.get_role_controller(&role) @ TimelockError::InvalidAccessController,
     )]
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
