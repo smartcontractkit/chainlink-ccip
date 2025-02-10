@@ -275,12 +275,34 @@ pub enum FeeQuoterError {
     Unauthorized,
     #[msg("Invalid inputs")]
     InvalidInputs,
-    #[msg("Invalid inputs")]
+    #[msg("Gas limit is zero")]
+    ZeroGasLimit,
+    #[msg("Default gas limit exceeds the maximum")]
+    DefaultGasLimitExceedsMaximum,
+    #[msg("Invalid version of the onchain state")]
     InvalidVersion,
+    #[msg("Proposed owner is the current owner")]
+    RedundantOwnerProposal,
     #[msg("Account should be writable")]
     InvalidInputsMissingWritable,
+    #[msg("Chain selector is invalid")]
+    InvalidInputsChainSelector,
+    #[msg("Mint account input is invalid")]
+    InvalidInputsMint,
+    #[msg("Mint account input has an invalid owner")]
+    InvalidInputsMintOwner,
     #[msg("Token config account is invalid")]
     InvalidInputsTokenConfigAccount,
+    #[msg("Missing extra args in message to SVM receiver")]
+    InvalidInputsMissingExtraArgs,
+    #[msg("Missing data after extra args tag")]
+    InvalidInputsMissingDataAfterExtraArgs,
+    #[msg("Destination chain state account is invalid")]
+    InvalidInputsDestChainStateAccount,
+    #[msg("Per chain per token config account is invalid")]
+    InvalidInputsPerChainPerTokenConfig,
+    #[msg("Billing token config account is invalid")]
+    InvalidInputsBillingTokenConfig,
     #[msg("Number of accounts provided is incorrect")]
     InvalidInputsAccountCount,
     #[msg("No price or gas update provided")]
@@ -295,8 +317,6 @@ pub enum FeeQuoterError {
     MessageTooLarge,
     #[msg("Message contains an unsupported number of tokens")]
     UnsupportedNumberOfTokens,
-    #[msg("Chain family selector not supported")]
-    UnsupportedChainFamilySelector,
     #[msg("Invalid EVM address")]
     InvalidEVMAddress,
     #[msg("Invalid encoding")]

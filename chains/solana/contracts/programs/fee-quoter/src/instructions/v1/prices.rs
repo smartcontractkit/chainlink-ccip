@@ -83,7 +83,7 @@ fn update_billing_token_config_price(
 ) -> Result<()> {
     require!(
         token_config_account.version == 1,
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::InvalidVersion
     );
     token_config_account.config.usd_per_token = TimestampedPackedU224 {
         value: token_update.usd_per_token,
@@ -111,12 +111,12 @@ fn apply_gas_price_update<'info>(
     require_keys_eq!(
         dest_chain_state_account_info.key(),
         expected,
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::InvalidInputsDestChainStateAccount
     );
 
     require!(
         dest_chain_state_account_info.is_writable,
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::InvalidInputsMissingWritable
     );
 
     // As the account is sent as remaining accounts, then Anchor won't automatically (de)serialize the account
@@ -132,7 +132,7 @@ fn update_chain_state_gas_price(
 ) -> Result<()> {
     require!(
         chain_state_account.version == 1,
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::InvalidVersion
     );
 
     chain_state_account.state.usd_per_unit_gas = TimestampedPackedU224 {
