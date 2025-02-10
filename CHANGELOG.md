@@ -1,5 +1,11 @@
 # @chainlink/crib
 
+## 2.4.0
+
+### Minor Changes
+
+- [#393](https://github.com/smartcontractkit/crib/pull/393) [`3d66e4e`](https://github.com/smartcontractkit/crib/commit/3d66e4ebb14ccd2e7898317763ab6b1605fe82d0) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - added skipRoleBindingCheck flag to allow running CRIB on EKS clusters in accounts other than staging (where there's no crib-poweruser rolebinding automatically created)
+
 ## 2.3.0
 
 ### Minor Changes
