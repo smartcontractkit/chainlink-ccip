@@ -322,6 +322,7 @@ func CheckIfInflight(inflight IsInflight) Check {
 // checkMessages to get a set of which are ready to execute.
 func (b *execReportBuilder) checkMessages(ctx context.Context, report exectypes.CommitData) (map[int]struct{}, error) {
 	readyMessages := make(map[int]struct{})
+	notReady := make(map[int]messageStatus)
 	for i := 0; i < len(report.Messages); i++ {
 		updatedReport, status, err := b.checkMessage(ctx, i, report)
 		if err != nil {
@@ -331,8 +332,18 @@ func (b *execReportBuilder) checkMessages(ctx context.Context, report exectypes.
 		report = updatedReport
 		if status == ReadyToExecute {
 			readyMessages[i] = struct{}{}
+		} else {
+			notReady[i] = status
 		}
 	}
+
+	if len(notReady) > 0 {
+		b.lggr.Infow("messages not ready for execution",
+			"sourceChain", report.SourceChain,
+			"notReady", notReady,
+			"report", report)
+	}
+
 	return readyMessages, nil
 }
 
