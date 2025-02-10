@@ -41,6 +41,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 		"--rpc-port", port,
 		"--faucet-port", faucetPort,
 		"--ledger", t.TempDir(),
+		"--deactivate-feature", "EenyoWx9UMXYKpR8mW5Jmfmy2fRjzUtM7NduYMY8bx33",
 	}, flags...)
 
 	cmd := exec.Command("solana-test-validator", args...)
