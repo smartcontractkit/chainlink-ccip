@@ -1,0 +1,2131 @@
+{
+  "address": "C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8",
+  "metadata": {
+    "name": "ccip_router",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "docs": [
+    "The `ccip_router` module contains the implementation of the Cross-Chain Interoperability Protocol (CCIP) Router.",
+    "",
+    "This is the Collapsed Router Program for CCIP.",
+    "As it's upgradable persisting the same program id, there is no need to have an indirection of a Proxy Program.",
+    "This Router handles both the OnRamp and OffRamp flow of the CCIP Messages.",
+    "",
+    "NOTE to devs: This file however should contain *no logic*, only the entrypoints to the different versioned modules,",
+    "thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface."
+  ],
+  "instructions": [
+    {
+      "name": "accept_admin_role_token_admin_registry",
+      "docs": [
+        "Accepts the admin role of the token admin registry.",
+        "",
+        "The Pending Admin must call this function to accept the admin role of the Token Admin Registry.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for accepting the admin role.",
+        "* `mint` - The public key of the token mint."
+      ],
+      "discriminator": [
+        106,
+        240,
+        16,
+        173,
+        137,
+        213,
+        163,
+        246
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "token_admin_registry",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "accept_ownership",
+      "docs": [
+        "Accepts the ownership of the router by the proposed owner.",
+        "",
+        "Shared func signature with other programs",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for accepting ownership.",
+        "The new owner must be a signer of the transaction."
+      ],
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "add_chain_selector",
+      "docs": [
+        "Adds a new chain selector to the router.",
+        "",
+        "The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).",
+        "When adding a new chain, the Admin needs to specify if it's enabled or not.",
+        "They may enable only source, or only destination, or neither, or both.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for adding the chain selector.",
+        "* `new_chain_selector` - The new chain selector to be added.",
+        "* `source_chain_config` - The configuration for the chain as source.",
+        "* `dest_chain_config` - The configuration for the chain as destination."
+      ],
+      "discriminator": [
+        28,
+        60,
+        171,
+        0,
+        195,
+        113,
+        56,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "dest_chain_state",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "dest_chain_config",
+          "type": {
+            "defined": {
+              "name": "DestChainConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "add_offramp",
+      "docs": [
+        "Add an offramp address to the list of offramps allowed by the router, for a",
+        "particular source chain. External users will check this list before accepting",
+        "a `ccip_receive` CPI.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `source_chain_selector` - The source chain for the offramp's lane.",
+        "* `offramp` - The offramp's address."
+      ],
+      "discriminator": [
+        164,
+        255,
+        154,
+        96,
+        204,
+        239,
+        24,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "allowed_offramp",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "source_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "offramp",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "ccip_admin_override_pending_administrator",
+      "docs": [
+        "Overrides the pending admin of the Token Admin Registry",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "discriminator": [
+        163,
+        206,
+        164,
+        199,
+        248,
+        92,
+        36,
+        46
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "token_admin_registry",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_admin_registry_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "ccip_admin_propose_administrator",
+      "docs": [
+        "Token Admin Registry //",
+        "Registers the Token Admin Registry via the CCIP Admin",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "discriminator": [
+        218,
+        37,
+        139,
+        107,
+        142,
+        228,
+        51,
+        219
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "token_admin_registry",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_admin_registry_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "ccip_send",
+      "docs": [
+        "On Ramp Flow //",
+        "Sends a message to the destination chain.",
+        "",
+        "Request a message to be sent to the destination chain.",
+        "The method name needs to be ccip_send with Anchor encoding.",
+        "This function is called by the CCIP Sender Contract (or final user) to send a message to the CCIP Router.",
+        "The message will be sent to the receiver on the destination chain selector.",
+        "This message emits the event CCIPMessageSent with all the necessary data to be retrieved by the OffChain Code",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for sending the message.",
+        "* `dest_chain_selector` - The chain selector for the destination chain.",
+        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+      ],
+      "discriminator": [
+        108,
+        216,
+        134,
+        191,
+        249,
+        234,
+        33,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "dest_chain_state",
+          "writable": true
+        },
+        {
+          "name": "nonce",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "fee_token_program"
+        },
+        {
+          "name": "fee_token_mint"
+        },
+        {
+          "name": "fee_token_user_associated_account",
+          "docs": [
+            "If paying with native SOL, this must be the zero address."
+          ]
+        },
+        {
+          "name": "fee_token_receiver",
+          "writable": true
+        },
+        {
+          "name": "fee_billing_signer"
+        },
+        {
+          "name": "fee_quoter"
+        },
+        {
+          "name": "fee_quoter_config"
+        },
+        {
+          "name": "fee_quoter_dest_chain"
+        },
+        {
+          "name": "fee_quoter_billing_token_config"
+        },
+        {
+          "name": "fee_quoter_link_token_config"
+        },
+        {
+          "name": "token_pools_signer",
+          "docs": [
+            "CPI signers, optional if no tokens are being transferred."
+          ],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "dest_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "message",
+          "type": {
+            "defined": {
+              "name": "SVM2AnyMessage"
+            }
+          }
+        },
+        {
+          "name": "token_indexes",
+          "type": "bytes"
+        }
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialization Flow //",
+        "Initializes the CCIP Router.",
+        "",
+        "The initialization of the Router is responsibility of Admin, nothing more than calling this method should be done first.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for initialization.",
+        "* `svm_chain_selector` - The chain selector for SVM.",
+        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "token_pools_signer",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "svm_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "fee_aggregator",
+          "type": "pubkey"
+        },
+        {
+          "name": "fee_quoter",
+          "type": "pubkey"
+        },
+        {
+          "name": "link_token_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "owner_override_pending_administrator",
+      "docs": [
+        "Overrides the pending admin of the Token Admin Registry by the token owner",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "discriminator": [
+        230,
+        111,
+        134,
+        149,
+        203,
+        168,
+        118,
+        201
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "token_admin_registry"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_admin_registry_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "owner_propose_administrator",
+      "docs": [
+        "Registers the Token Admin Registry by the token owner.",
+        "",
+        "The Authority of the Mint Token can claim the registry of the token.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for registration.",
+        "* `token_admin_registry_admin` - The public key of the token admin registry admin to propose."
+      ],
+      "discriminator": [
+        175,
+        81,
+        160,
+        246,
+        206,
+        132,
+        18,
+        22
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "token_admin_registry",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_admin_registry_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "remove_offramp",
+      "docs": [
+        "Remove an offramp address from the list of offramps allowed by the router, for a",
+        "particular source chain. External users will check this list before accepting",
+        "a `ccip_receive` CPI.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `source_chain_selector` - The source chain for the offramp's lane.",
+        "* `offramp` - The offramp's address."
+      ],
+      "discriminator": [
+        252,
+        152,
+        51,
+        170,
+        241,
+        13,
+        199,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "allowed_offramp",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "source_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "offramp",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_pool",
+      "docs": [
+        "Sets the pool lookup table for a given token mint.",
+        "",
+        "The administrator of the token admin registry can set the pool lookup table for a given token mint.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for setting the pool.",
+        "* `writable_indexes` - a bit map of the indexes of the accounts in lookup table that are writable"
+      ],
+      "discriminator": [
+        119,
+        30,
+        14,
+        180,
+        115,
+        225,
+        167,
+        238
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "token_admin_registry",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "pool_lookuptable"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "writable_indexes",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin_role_token_admin_registry",
+      "docs": [
+        "Transfers the admin role of the token admin registry to a new admin.",
+        "",
+        "Only the Admin can transfer the Admin Role of the Token Admin Registry, this setups the Pending Admin and then it's their responsibility to accept the role.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer.",
+        "* `mint` - The public key of the token mint.",
+        "* `new_admin` - The public key of the new admin."
+      ],
+      "discriminator": [
+        178,
+        98,
+        203,
+        181,
+        203,
+        107,
+        106,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "token_admin_registry",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "transfer_ownership",
+      "docs": [
+        "Transfers the ownership of the router to a new proposed owner.",
+        "",
+        "Shared func signature with other programs",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer.",
+        "* `proposed_owner` - The public key of the new proposed owner."
+      ],
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposed_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_dest_chain_config",
+      "docs": [
+        "Updates the configuration of the destination chain selector.",
+        "",
+        "The Admin is the only one able to update the destination chain config.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the chain selector.",
+        "* `dest_chain_selector` - The destination chain selector to be updated.",
+        "* `dest_chain_config` - The new configuration for the destination chain."
+      ],
+      "discriminator": [
+        215,
+        122,
+        81,
+        22,
+        190,
+        58,
+        219,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "dest_chain_state",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "dest_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "dest_chain_config",
+          "type": {
+            "defined": {
+              "name": "DestChainConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_fee_aggregator",
+      "docs": [
+        "Config //",
+        "Updates the fee aggregator in the router configuration.",
+        "The Admin is the only one able to update the fee aggregator.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token)."
+      ],
+      "discriminator": [
+        85,
+        112,
+        115,
+        60,
+        22,
+        95,
+        230,
+        56
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_aggregator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_svm_chain_selector",
+      "docs": [
+        "Updates the SVM chain selector in the router configuration.",
+        "",
+        "This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `new_chain_selector` - The new chain selector for SVM."
+      ],
+      "discriminator": [
+        164,
+        212,
+        71,
+        101,
+        166,
+        113,
+        26,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_chain_selector",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_billed_funds",
+      "docs": [
+        "Billing //",
+        "Transfers the accumulated billed fees in a particular token to an arbitrary token account.",
+        "Only the CCIP Admin can withdraw billed funds.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer of billed fees.",
+        "* `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.",
+        "* `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0."
+      ],
+      "discriminator": [
+        16,
+        116,
+        73,
+        38,
+        77,
+        232,
+        6,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "fee_token_mint"
+        },
+        {
+          "name": "fee_token_accum",
+          "writable": true
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "fee_billing_signer"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "transfer_all",
+          "type": "bool"
+        },
+        {
+          "name": "desired_amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AllowedOfframp",
+      "discriminator": [
+        247,
+        97,
+        179,
+        16,
+        207,
+        36,
+        236,
+        132
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "DestChain",
+      "discriminator": [
+        77,
+        18,
+        241,
+        132,
+        212,
+        54,
+        218,
+        16
+      ]
+    },
+    {
+      "name": "ExternalExecutionConfig",
+      "discriminator": [
+        159,
+        157,
+        150,
+        212,
+        168,
+        103,
+        117,
+        39
+      ]
+    },
+    {
+      "name": "Nonce",
+      "discriminator": [
+        143,
+        197,
+        147,
+        95,
+        106,
+        165,
+        50,
+        43
+      ]
+    },
+    {
+      "name": "TokenAdminRegistry",
+      "discriminator": [
+        70,
+        92,
+        207,
+        200,
+        76,
+        17,
+        57,
+        114
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdministratorTransferRequested",
+      "discriminator": [
+        159,
+        30,
+        110,
+        86,
+        22,
+        35,
+        70,
+        125
+      ]
+    },
+    {
+      "name": "AdministratorTransferred",
+      "discriminator": [
+        103,
+        127,
+        255,
+        114,
+        168,
+        163,
+        159,
+        124
+      ]
+    },
+    {
+      "name": "CCIPMessageSent",
+      "discriminator": [
+        23,
+        77,
+        73,
+        183,
+        123,
+        185,
+        115,
+        57
+      ]
+    },
+    {
+      "name": "DestChainAdded",
+      "discriminator": [
+        59,
+        154,
+        48,
+        81,
+        230,
+        41,
+        80,
+        200
+      ]
+    },
+    {
+      "name": "DestChainConfigUpdated",
+      "discriminator": [
+        3,
+        141,
+        73,
+        190,
+        73,
+        231,
+        51,
+        80
+      ]
+    },
+    {
+      "name": "FeeTokenAdded",
+      "discriminator": [
+        181,
+        180,
+        252,
+        21,
+        215,
+        79,
+        93,
+        237
+      ]
+    },
+    {
+      "name": "FeeTokenDisabled",
+      "discriminator": [
+        34,
+        139,
+        66,
+        75,
+        30,
+        17,
+        45,
+        151
+      ]
+    },
+    {
+      "name": "FeeTokenEnabled",
+      "discriminator": [
+        106,
+        180,
+        145,
+        189,
+        113,
+        180,
+        21,
+        15
+      ]
+    },
+    {
+      "name": "FeeTokenRemoved",
+      "discriminator": [
+        40,
+        31,
+        230,
+        252,
+        183,
+        150,
+        147,
+        201
+      ]
+    },
+    {
+      "name": "OfframpAdded",
+      "discriminator": [
+        158,
+        77,
+        52,
+        73,
+        113,
+        247,
+        76,
+        150
+      ]
+    },
+    {
+      "name": "OfframpRemoved",
+      "discriminator": [
+        231,
+        81,
+        202,
+        9,
+        89,
+        193,
+        154,
+        37
+      ]
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "discriminator": [
+        79,
+        54,
+        99,
+        123,
+        57,
+        244,
+        134,
+        35
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "discriminator": [
+        172,
+        61,
+        205,
+        183,
+        250,
+        50,
+        38,
+        98
+      ]
+    },
+    {
+      "name": "PoolSet",
+      "discriminator": [
+        135,
+        203,
+        185,
+        106,
+        113,
+        87,
+        177,
+        32
+      ]
+    },
+    {
+      "name": "PremiumMultiplierWeiPerEthUpdated",
+      "discriminator": [
+        151,
+        5,
+        223,
+        182,
+        215,
+        187,
+        249,
+        225
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidSequenceInterval",
+      "msg": "The given sequence interval is invalid"
+    },
+    {
+      "code": 6001,
+      "name": "RootNotCommitted",
+      "msg": "The given Merkle Root is missing"
+    },
+    {
+      "code": 6002,
+      "name": "ExistingMerkleRoot",
+      "msg": "The given Merkle Root is already committed"
+    },
+    {
+      "code": 6003,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidInputs",
+      "msg": "Invalid inputs"
+    },
+    {
+      "code": 6005,
+      "name": "UnsupportedSourceChainSelector",
+      "msg": "Source chain selector not supported"
+    },
+    {
+      "code": 6006,
+      "name": "UnsupportedDestinationChainSelector",
+      "msg": "Destination chain selector not supported"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidProof",
+      "msg": "Invalid Proof for Merkle Root"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidMessage",
+      "msg": "Invalid message format"
+    },
+    {
+      "code": 6009,
+      "name": "ReachedMaxSequenceNumber",
+      "msg": "Reached max sequence number"
+    },
+    {
+      "code": 6010,
+      "name": "ManualExecutionNotAllowed",
+      "msg": "Manual execution not allowed"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidInputsTokenIndices",
+      "msg": "Invalid pool account account indices"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidInputsPoolAccounts",
+      "msg": "Invalid pool accounts"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidInputsConfigAccounts",
+      "msg": "Invalid config account"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidInputsTokenAdminRegistryAccounts",
+      "msg": "Invalid Token Admin Registry account"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidInputsLookupTableAccounts",
+      "msg": "Invalid LookupTable account"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidInputsLookupTableAccountWritable",
+      "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidInputsTokenAmount",
+      "msg": "Cannot send zero tokens"
+    },
+    {
+      "code": 6019,
+      "name": "OfframpReleaseMintBalanceMismatch",
+      "msg": "Release or mint balance mismatch"
+    },
+    {
+      "code": 6020,
+      "name": "OfframpInvalidDataLength",
+      "msg": "Invalid data length"
+    },
+    {
+      "code": 6021,
+      "name": "StaleCommitReport",
+      "msg": "Stale commit report"
+    },
+    {
+      "code": 6022,
+      "name": "DestinationChainDisabled",
+      "msg": "Destination chain disabled"
+    },
+    {
+      "code": 6023,
+      "name": "FeeTokenDisabled",
+      "msg": "Fee token disabled"
+    },
+    {
+      "code": 6024,
+      "name": "MessageTooLarge",
+      "msg": "Message exceeds maximum data size"
+    },
+    {
+      "code": 6025,
+      "name": "UnsupportedNumberOfTokens",
+      "msg": "Message contains an unsupported number of tokens"
+    },
+    {
+      "code": 6026,
+      "name": "UnsupportedChainFamilySelector",
+      "msg": "Chain family selector not supported"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidEVMAddress",
+      "msg": "Invalid EVM address"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidEncoding",
+      "msg": "Invalid encoding"
+    },
+    {
+      "code": 6029,
+      "name": "InvalidInputsAtaAddress",
+      "msg": "Invalid Associated Token Account address"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidInputsAtaWritable",
+      "msg": "Invalid Associated Token Account writable flag"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidTokenPrice",
+      "msg": "Invalid token price"
+    },
+    {
+      "code": 6032,
+      "name": "StaleGasPrice",
+      "msg": "Stale gas price"
+    },
+    {
+      "code": 6033,
+      "name": "InsufficientLamports",
+      "msg": "Insufficient lamports"
+    },
+    {
+      "code": 6034,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 6035,
+      "name": "UnsupportedToken",
+      "msg": "Unsupported token"
+    },
+    {
+      "code": 6036,
+      "name": "InvalidInputsMissingTokenConfig",
+      "msg": "Inputs are missing token configuration"
+    },
+    {
+      "code": 6037,
+      "name": "MessageFeeTooHigh",
+      "msg": "Message fee is too high"
+    },
+    {
+      "code": 6038,
+      "name": "SourceTokenDataTooLarge",
+      "msg": "Source token data is too large"
+    },
+    {
+      "code": 6039,
+      "name": "MessageGasLimitTooHigh",
+      "msg": "Message gas limit too high"
+    },
+    {
+      "code": 6040,
+      "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
+      "msg": "Extra arg out of order execution must be true"
+    },
+    {
+      "code": 6041,
+      "name": "InvalidTokenAdminRegistryInputsZeroAddress",
+      "msg": "New Admin can not be zero address"
+    },
+    {
+      "code": 6042,
+      "name": "InvalidTokenAdminRegistryProposedAdmin",
+      "msg": "An already owned registry can not be proposed"
+    },
+    {
+      "code": 6043,
+      "name": "InvalidWritabilityBitmap",
+      "msg": "Invalid writability bitmap"
+    },
+    {
+      "code": 6044,
+      "name": "InvalidExtraArgsTag",
+      "msg": "Invalid extra args tag"
+    },
+    {
+      "code": 6045,
+      "name": "InvalidChainFamilySelector",
+      "msg": "Invalid chain family selector"
+    },
+    {
+      "code": 6046,
+      "name": "InvalidTokenReceiver",
+      "msg": "Invalid token receiver"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidSVMAddress",
+      "msg": "Invalid SVM address"
+    },
+    {
+      "code": 6048,
+      "name": "SenderNotAllowed",
+      "msg": "Sender not allowed for that destination chain"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdministratorTransferRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "current_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdministratorTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AllowedOfframp",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "CCIPMessageSent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "sequence_number",
+            "type": "u64"
+          },
+          {
+            "name": "message",
+            "type": {
+              "defined": {
+                "name": "SVM2AnyRampMessage"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "svm_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "_padding1",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "_padding2",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "fee_quoter",
+            "type": "pubkey"
+          },
+          {
+            "name": "link_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_aggregator",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossChainAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "le_bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "DestChainState"
+              }
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "DestChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "dest_chain_config",
+            "type": {
+              "defined": {
+                "name": "DestChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allowed_senders",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "allow_list_enabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "dest_chain_config",
+            "type": {
+              "defined": {
+                "name": "DestChainConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sequence_number",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExternalExecutionConfig",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "FeeTokenAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "enabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTokenDisabled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTokenEnabled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTokenRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Nonce",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "counter",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "offramp",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "offramp",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_pool_lookup_table",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_pool_lookup_table",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PremiumMultiplierWeiPerEthUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "premium_multiplier_wei_per_eth",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RampMessageHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "message_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "sequence_number",
+            "type": "u64"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVM2AnyMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "token_amounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SVMTokenAmount"
+                }
+              }
+            }
+          },
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "extra_args",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVM2AnyRampMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "header",
+            "type": {
+              "defined": {
+                "name": "RampMessageHeader"
+              }
+            }
+          },
+          {
+            "name": "sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "extra_args",
+            "type": "bytes"
+          },
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_amounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SVM2AnyTokenTransfer"
+                }
+              }
+            }
+          },
+          {
+            "name": "fee_token_amount",
+            "type": {
+              "defined": {
+                "name": "CrossChainAmount"
+              }
+            }
+          },
+          {
+            "name": "fee_value_juels",
+            "type": {
+              "defined": {
+                "name": "CrossChainAmount"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVM2AnyTokenTransfer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_pool_address",
+            "type": "pubkey"
+          },
+          {
+            "name": "dest_token_address",
+            "type": "bytes"
+          },
+          {
+            "name": "extra_data",
+            "type": "bytes"
+          },
+          {
+            "name": "amount",
+            "type": {
+              "defined": {
+                "name": "CrossChainAmount"
+              }
+            }
+          },
+          {
+            "name": "dest_exec_data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMTokenAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenAdminRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "administrator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_administrator",
+            "type": "pubkey"
+          },
+          {
+            "name": "lookup_table",
+            "type": "pubkey"
+          },
+          {
+            "name": "writable_indexes",
+            "type": {
+              "array": [
+                "u128",
+                2
+              ]
+            }
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ]
+}

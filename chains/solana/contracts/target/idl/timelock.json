@@ -1,0 +1,1668 @@
+{
+  "address": "LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn",
+  "metadata": {
+    "name": "timelock",
+    "version": "0.0.1-dev",
+    "spec": "0.1.0",
+    "description": "SVM implementation of RBAC Timelock"
+  },
+  "instructions": [
+    {
+      "name": "accept_ownership",
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "append_bypasser_instructions",
+      "discriminator": [
+        127,
+        68,
+        8,
+        210,
+        106,
+        213,
+        25,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "instructions_batch",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "InstructionData"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "append_instructions",
+      "discriminator": [
+        58,
+        58,
+        137,
+        122,
+        115,
+        51,
+        144,
+        134
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "instructions_batch",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "InstructionData"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "batch_add_access",
+      "discriminator": [
+        73,
+        141,
+        223,
+        79,
+        66,
+        154,
+        226,
+        67
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "access_controller_program"
+        },
+        {
+          "name": "role_access_controller",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "role",
+          "type": {
+            "defined": {
+              "name": "Role"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "block_function_selector",
+      "discriminator": [
+        119,
+        89,
+        101,
+        41,
+        72,
+        143,
+        218,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "selector",
+          "type": {
+            "array": [
+              "u8",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "bypasser_execute_batch",
+      "discriminator": [
+        90,
+        62,
+        66,
+        6,
+        227,
+        174,
+        30,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "timelock_signer"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel",
+      "discriminator": [
+        232,
+        219,
+        223,
+        41,
+        219,
+        236,
+        220,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "clear_bypasser_operation",
+      "discriminator": [
+        200,
+        21,
+        249,
+        130,
+        56,
+        13,
+        128,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "clear_operation",
+      "discriminator": [
+        111,
+        217,
+        62,
+        240,
+        224,
+        75,
+        60,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "execute_batch",
+      "discriminator": [
+        112,
+        159,
+        211,
+        51,
+        238,
+        70,
+        212,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "predecessor_operation"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "timelock_signer"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "finalize_bypasser_operation",
+      "discriminator": [
+        45,
+        55,
+        198,
+        51,
+        124,
+        24,
+        169,
+        250
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "finalize_operation",
+      "discriminator": [
+        63,
+        208,
+        32,
+        98,
+        85,
+        182,
+        236,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "program"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "access_controller_program"
+        },
+        {
+          "name": "proposer_role_access_controller"
+        },
+        {
+          "name": "executor_role_access_controller"
+        },
+        {
+          "name": "canceller_role_access_controller"
+        },
+        {
+          "name": "bypasser_role_access_controller"
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "min_delay",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_bypasser_operation",
+      "discriminator": [
+        58,
+        27,
+        48,
+        204,
+        19,
+        197,
+        63,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "instruction_count",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "initialize_operation",
+      "discriminator": [
+        15,
+        96,
+        217,
+        171,
+        124,
+        4,
+        113,
+        243
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "predecessor",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "instruction_count",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "schedule_batch",
+      "discriminator": [
+        242,
+        140,
+        87,
+        106,
+        71,
+        226,
+        86,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "operation",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "role_access_controller"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "delay",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_ownership",
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proposed_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unblock_function_selector",
+      "discriminator": [
+        53,
+        84,
+        245,
+        196,
+        149,
+        52,
+        30,
+        57
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "selector",
+          "type": {
+            "array": [
+              "u8",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_delay",
+      "discriminator": [
+        164,
+        186,
+        80,
+        62,
+        85,
+        88,
+        182,
+        147
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_timelock_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "delay",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AccessController",
+      "discriminator": [
+        143,
+        45,
+        12,
+        204,
+        220,
+        20,
+        114,
+        87
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "Operation",
+      "discriminator": [
+        171,
+        150,
+        196,
+        17,
+        229,
+        166,
+        58,
+        44
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BypasserCallExecuted",
+      "discriminator": [
+        61,
+        41,
+        96,
+        207,
+        16,
+        173,
+        99,
+        75
+      ]
+    },
+    {
+      "name": "CallExecuted",
+      "discriminator": [
+        237,
+        120,
+        238,
+        142,
+        189,
+        37,
+        65,
+        128
+      ]
+    },
+    {
+      "name": "CallScheduled",
+      "discriminator": [
+        191,
+        85,
+        90,
+        167,
+        132,
+        223,
+        184,
+        57
+      ]
+    },
+    {
+      "name": "Cancelled",
+      "discriminator": [
+        136,
+        23,
+        42,
+        65,
+        143,
+        233,
+        234,
+        46
+      ]
+    },
+    {
+      "name": "FunctionSelectorBlocked",
+      "discriminator": [
+        67,
+        101,
+        36,
+        217,
+        222,
+        85,
+        191,
+        71
+      ]
+    },
+    {
+      "name": "FunctionSelectorUnblocked",
+      "discriminator": [
+        189,
+        124,
+        164,
+        141,
+        141,
+        189,
+        0,
+        218
+      ]
+    },
+    {
+      "name": "MinDelayChange",
+      "discriminator": [
+        186,
+        71,
+        244,
+        116,
+        244,
+        76,
+        230,
+        254
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidInput",
+      "msg": "Invalid inputs"
+    },
+    {
+      "code": 6001,
+      "name": "Overflow",
+      "msg": "Overflow"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidId",
+      "msg": "Provided ID is invalid"
+    },
+    {
+      "code": 6003,
+      "name": "OperationNotFinalized",
+      "msg": "operation not finalized"
+    },
+    {
+      "code": 6004,
+      "name": "OperationAlreadyFinalized",
+      "msg": "operation is already finalized"
+    },
+    {
+      "code": 6005,
+      "name": "TooManyInstructions",
+      "msg": "too many instructions in the operation"
+    },
+    {
+      "code": 6006,
+      "name": "OperationAlreadyScheduled",
+      "msg": "operation already scheduled"
+    },
+    {
+      "code": 6007,
+      "name": "DelayInsufficient",
+      "msg": "insufficient delay"
+    },
+    {
+      "code": 6008,
+      "name": "OperationNotCancellable",
+      "msg": "operation cannot be cancelled"
+    },
+    {
+      "code": 6009,
+      "name": "OperationNotReady",
+      "msg": "operation is not ready"
+    },
+    {
+      "code": 6010,
+      "name": "OperationAlreadyExecuted",
+      "msg": "operation is already executed"
+    },
+    {
+      "code": 6011,
+      "name": "MissingDependency",
+      "msg": "Predecessor operation is not found"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidAccessController",
+      "msg": "Provided access controller is invalid"
+    },
+    {
+      "code": 6013,
+      "name": "BlockedSelector",
+      "msg": "selector is blocked"
+    },
+    {
+      "code": 6014,
+      "name": "AlreadyBlocked",
+      "msg": "selector is already blocked"
+    },
+    {
+      "code": 6015,
+      "name": "SelectorNotFound",
+      "msg": "selector not found"
+    },
+    {
+      "code": 6016,
+      "name": "MaxCapacityReached",
+      "msg": "maximum capacity reached for function blocker"
+    }
+  ],
+  "types": [
+    {
+      "name": "AccessController",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "access_list",
+            "type": {
+              "defined": {
+                "name": "AccessList"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AccessList",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                "pubkey",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BlockedSelectors",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    8
+                  ]
+                },
+                128
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BypasserCallExecuted",
+      "docs": [
+        "@dev Emitted when a call is performed via bypasser."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "index",
+            "type": "u64"
+          },
+          {
+            "name": "target",
+            "type": "pubkey"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CallExecuted",
+      "docs": [
+        "@dev Emitted when a call is performed as part of operation `id`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u64"
+          },
+          {
+            "name": "target",
+            "type": "pubkey"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CallScheduled",
+      "docs": [
+        "@dev Emitted when a call is scheduled as part of operation `id`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u64"
+          },
+          {
+            "name": "target",
+            "type": "pubkey"
+          },
+          {
+            "name": "predecessor",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "salt",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "delay",
+            "type": "u64"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Cancelled",
+      "docs": [
+        "@dev Emitted when operation `id` is cancelled."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "timelock_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposer_role_access_controller",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor_role_access_controller",
+            "type": "pubkey"
+          },
+          {
+            "name": "canceller_role_access_controller",
+            "type": "pubkey"
+          },
+          {
+            "name": "bypasser_role_access_controller",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_delay",
+            "type": "u64"
+          },
+          {
+            "name": "blocked_selectors",
+            "type": {
+              "defined": {
+                "name": "BlockedSelectors"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FunctionSelectorBlocked",
+      "docs": [
+        "@dev Emitted when a function selector is blocked."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selector",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FunctionSelectorUnblocked",
+      "docs": [
+        "@dev Emitted when a function selector is unblocked."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "selector",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InstructionAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_signer",
+            "type": "bool"
+          },
+          {
+            "name": "is_writable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InstructionData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "InstructionAccount"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MinDelayChange",
+      "docs": [
+        "@dev Emitted when the minimum delay for future operations is modified."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_duration",
+            "type": "u64"
+          },
+          {
+            "name": "new_duration",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Operation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "predecessor",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "salt",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "is_finalized",
+            "type": "bool"
+          },
+          {
+            "name": "total_instructions",
+            "type": "u32"
+          },
+          {
+            "name": "instructions",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "InstructionData"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Role",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Admin"
+          },
+          {
+            "name": "Proposer"
+          },
+          {
+            "name": "Executor"
+          },
+          {
+            "name": "Canceller"
+          },
+          {
+            "name": "Bypasser"
+          }
+        ]
+      }
+    }
+  ]
+}

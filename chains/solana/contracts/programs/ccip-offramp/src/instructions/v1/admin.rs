@@ -9,7 +9,9 @@ use crate::context::{
 use crate::event::admin::{
     OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded, SourceChainConfigUpdated,
 };
-use crate::state::{Ocr3ConfigInfo, SourceChain, SourceChainConfig, SourceChainState};
+use crate::state::{
+    Ocr3ConfigInfo, Ocr3ConfigInfoInput, SourceChain, SourceChainConfig, SourceChainState,
+};
 use crate::CcipOfframpError;
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
@@ -117,7 +119,7 @@ pub fn update_enable_manual_execution_after(
 pub fn set_ocr_config(
     ctx: Context<SetOcrConfig>,
     plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
-    config_info: Ocr3ConfigInfo,
+    config_info: Ocr3ConfigInfoInput,
     signers: Vec<[u8; 20]>,
     transmitters: Vec<Pubkey>,
 ) -> Result<()> {

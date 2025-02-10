@@ -1,0 +1,173 @@
+{
+  "address": "4HeqEoSyfYpeC2goFLj9eHgkxV33mR5G7JYAbRsN14uQ",
+  "metadata": {
+    "name": "external_program_cpi_stub",
+    "version": "0.0.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "account_mut",
+      "discriminator": [
+        12,
+        2,
+        137,
+        19,
+        22,
+        235,
+        144,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "u8_value",
+          "writable": true
+        },
+        {
+          "name": "stub_caller",
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "account_read",
+      "discriminator": [
+        79,
+        53,
+        80,
+        124,
+        182,
+        81,
+        206,
+        85
+      ],
+      "accounts": [
+        {
+          "name": "u8_value"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "empty",
+      "discriminator": [
+        214,
+        44,
+        4,
+        247,
+        12,
+        41,
+        217,
+        110
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "u8_value",
+          "writable": true
+        },
+        {
+          "name": "stub_caller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "struct_instruction_data",
+      "discriminator": [
+        132,
+        84,
+        80,
+        47,
+        117,
+        198,
+        94,
+        67
+      ],
+      "accounts": [],
+      "args": [
+        {
+          "name": "data",
+          "type": {
+            "defined": {
+              "name": "Value"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "u8_instruction_data",
+      "discriminator": [
+        17,
+        175,
+        156,
+        253,
+        91,
+        173,
+        26,
+        228
+      ],
+      "accounts": [],
+      "args": [
+        {
+          "name": "data",
+          "type": "u8"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Value",
+      "discriminator": [
+        135,
+        158,
+        244,
+        117,
+        72,
+        203,
+        24,
+        194
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Value",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

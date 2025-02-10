@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)] // TODO this is no longer needed as zero_copy
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
 pub struct Config {
     pub version: u8,
     _padding0: [u8; 7],
