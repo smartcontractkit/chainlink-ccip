@@ -374,9 +374,9 @@ pub enum AnchorErrorHack {
 pub enum CcipRouterError {
     #[msg("The signer is unauthorized")]
     Unauthorized,
-    #[msg("Invalid version of the onchain state")]
-    InvalidInputsMint,
     #[msg("Mint account input is invalid")]
+    InvalidInputsMint,
+    #[msg("Invalid version of the onchain state")]
     InvalidVersion,
     #[msg("Fee token doesn't match transfer token")]
     FeeTokenMismatch,
