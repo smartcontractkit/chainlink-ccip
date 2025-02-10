@@ -7,6 +7,8 @@
 .env*
 .dbenv
 !*.env.example
+!*.env.aws*
+!*.env.local*
 !.github/actions/setup-postgres/.env
 .direnv
 .idea

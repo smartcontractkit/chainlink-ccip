@@ -2,3 +2,6 @@
 
 deployments/ccip-v2 @smartcontractkit/crib @smartcontractkit/ccip
 dependencies/ccip-v2-scripts @smartcontractkit/crib @smartcontractkit/ccip
+
+deployments/daas @smartcontractkit/crib @smartcontractkit/don-automation
+dependencies/daas @smartcontractkit/crib @smartcontractkit/don-automation

@@ -4,10 +4,19 @@ name: daas
 
 vars:
   CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
+  PROVIDER:
+    source: all
+    default: "aws"
+  REGISTRY:
+    source: env
+    default: prod
   DEVSPACE_ENV_FILE:
     source: env
     default: .env
-  ## Local directories
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  ## local directories
   SCRIPTS_DIR:
     source: env
     default: "${CRIB_DIR}/scripts"
@@ -17,38 +26,106 @@ vars:
   IMPORTS_DIR:
     source: env
     default: "${CRIB_DIR}/imports"
-  ##
-  PROVIDER:
-    source: all
-    default: "aws"
-  CHAINLINK_HELM_REGISTRY_URI:
-    source: env
-    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
   - path: ${IMPORTS_DIR}/lib-aws
   - path: ${IMPORTS_DIR}/lib-kind
 
+pullSecrets:
+  regcred-prod:
+    registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-prod
+
 pipelines:
-  daas:
+  ## dependency pipelines
+
+  deps-kind:
+    run: |-
+      run_dependency_pipelines ingress-controller
+      run_dependency_pipelines cert-manager
+
+  deps-daas:
+    run: |-
+      run_dependency_pipelines chainlink-daas
+
+  deps-vcluster-daas:
     run: |-
       run_dependency_pipelines vcluster-daas
 
+  ## top level pipelines
+
+  daas-kind:
+    run: |-
+      [ "$PROVIDER" != "local" ] && ensure_pull_secrets --all
+      run_pipelines deps-kind
+      run_pipelines deps-daas
+
+  daas-aws:
+    run: |-
+      run_pipelines deps-vcluster-daas
+
 profiles:
-  - name: default
+  ## dependency profiles
+
+  - name: deps-kind
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          ingress-controller:
+            path: ${DEPENDENCIES_DIR}/ingress-controller
+            namespace: ingress-nginx
+            overwriteVars: true
+            profiles: []
+          cert-manager:
+            path: ${DEPENDENCIES_DIR}/cert-manager
+            namespace: cert-manager
+            overwriteVars: true
+            profiles: []
+
+  - name: deps-daas
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          chainlink-daas:
+            path: ${DEPENDENCIES_DIR}/daas/chainlink-daas.yaml
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles:
+              - use-${REGISTRY}-registry
+
+  - name: deps-vcluster-daas
     patches:
       - op: add
         path: dependencies
         value:
           vcluster-daas:
             path: ${DEPENDENCIES_DIR}/daas/vcluster-daas.yaml
-            overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-            profiles: [crib-stage]
+            overwriteVars: true
+            profiles:
+              - deploy-crib-aws
+              - deploy-anvil
+
+  ## top level profiles
+
+  - name: daas-aws
+    parents:
+      - profile: deps-vcluster-daas
+
+  - name: daas-kind
+    parents:
+      - profile: deps-kind
+      - profile: deps-daas
 
 commands:
-  daas:
-    command: devspace run-pipeline daas -p default
-    description: Run the daas pipeline.
+  daas-aws:
+    command: devspace run-pipeline daas-aws -p daas-aws
+    description: Run the daas aws pipeline.
+    appendArgs: true
+  daas-kind:
+    command: devspace run-pipeline daas-kind -p daas-kind
+    description: Run the daas kind pipeline.
     appendArgs: true

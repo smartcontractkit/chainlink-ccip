@@ -73,7 +73,7 @@ jobs:
           aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
-          command: "daas"
+          command: "daas-aws"
           product-image: ${{ secrets.AWS_ACCOUNT_ID_SDLC }}.dkr.ecr.us-west-2.amazonaws.com/ccip
           product-image-tag: develop
           product-dir: "daas"
