@@ -123,10 +123,14 @@ func (o *observer) Observe(
 
 	costlyMessages := make([]cciptypes.Bytes32, 0)
 	for _, msg := range messages {
-		fee, ok := messageFees[msg.Header.MessageID]
-		if !ok {
-			return nil, fmt.Errorf("missing fee for message %s", msg.Header.MessageID)
+		checkFeeDisabled := o.disableAvailableFeeUsdCheckByChain[msg.Header.SourceChainSelector]
+		fee, feeExists := messageFees[msg.Header.MessageID]
+		if checkFeeDisabled && (!feeExists || fee.Cmp(big.NewInt(0)) >= 0) {
+			// If fee check is disabled and there's no fee, or if there is still a >= 0 fee passed in, then this is
+			// acceptable and we should continue to the next message.
+			continue
 		}
+
 		if err := validatePositive(fee); err != nil {
 			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
 		}
@@ -135,12 +139,7 @@ func (o *observer) Observe(
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
 		}
 		if err := validatePositive(execCost); err != nil {
-			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
-		}
-		checkFeeDisabled, exists := o.disableAvailableFeeUsdCheckByChain[msg.Header.SourceChainSelector]
-		if exists && checkFeeDisabled {
-			lggr.Debugw("Skipping fee check", "messageID", msg.Header.MessageID.String())
-			continue
+			return nil, fmt.Errorf("invalid exec cost for message %s: %w", msg.Header.MessageID, err)
 		}
 		lggr.Debugw("Comparing fee and exec cost", "fee", fee, "execCost", execCost)
 		if fee.Cmp(execCost) < 0 {
