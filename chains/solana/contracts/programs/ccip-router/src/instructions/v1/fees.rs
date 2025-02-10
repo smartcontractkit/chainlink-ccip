@@ -108,8 +108,8 @@ pub fn transfer_fee<'info>(
 ) -> Result<()> {
     require!(
         fee.token == transfer.mint.key(),
-        CcipRouterError::InvalidInputs
-    ); // TODO use more specific error
+        CcipRouterError::FeeTokenMismatch
+    );
 
     do_billing_transfer(token_program, transfer, fee.amount, decimals, signer_bump)
 }
