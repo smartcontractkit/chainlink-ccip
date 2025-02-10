@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 )
 
 func Test_maxQueryLength(t *testing.T) {
