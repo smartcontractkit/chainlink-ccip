@@ -700,6 +700,7 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 		provider                string
 		waitTimeout             *time.Duration
 		sleepBetweenAttempts    *time.Duration
+		skipRoleBindingCheck    bool
 		applyK8sClientMockCalls func(*wrappermocks.K8sCLI)
 		expectedErr             error
 	}{
@@ -709,6 +710,7 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			skipRoleBindingCheck: false,
 			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
 					EnsureNamespaceExists(context.TODO(), "crib-test").
@@ -728,6 +730,7 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			skipRoleBindingCheck: false,
 			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
 					EnsureNamespaceExists(context.TODO(), "crib-test").
@@ -747,6 +750,7 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "kind",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			skipRoleBindingCheck: false,
 			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
 					EnsureNamespaceExists(context.TODO(), "crib-test").
@@ -760,6 +764,7 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			skipRoleBindingCheck: false,
 			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
 					EnsureNamespaceExists(context.TODO(), "crib-test").
@@ -773,6 +778,7 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			skipRoleBindingCheck: false,
 			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
 					EnsureNamespaceExists(context.TODO(), "crib-test").
@@ -789,6 +795,7 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			skipRoleBindingCheck: false,
 			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
 					EnsureNamespaceExists(context.TODO(), "crib-test").
@@ -802,6 +809,23 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			},
 			expectedErr: errors.New("failed to label namespace: LabelNamespace failed"),
 		},
+		{
+			name:                 "SkipRoleBindingCheck",
+			namespace:            "crib-test",
+			provider:             "aws",
+			waitTimeout:          &defaultWaitTimeout,
+			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			skipRoleBindingCheck: true,
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
+				m.EXPECT().
+					EnsureNamespaceExists(context.TODO(), "crib-test").
+					Return(false, nil)
+				m.EXPECT().
+					LabelNamespace(context.TODO(), "crib-test", map[string]string{"chain.link/component": "CRIB", "chain.link/cost-center": "CRIB", "chain.link/product": "TestProduct", "chain.link/team": "CRIB"}).
+					Return(nil)
+			},
+			expectedErr: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -810,7 +834,7 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 
 			mockK8sClient := wrappermocks.NewK8sCLI(t)
 			tc.applyK8sClientMockCalls(mockK8sClient)
-			err := utils.EnsureCribNamespaceReady(context.TODO(), mockK8sClient, k8smocks.NewResourceInterface(t), tc.namespace, tc.provider, tc.waitTimeout, tc.sleepBetweenAttempts)
+			err := utils.EnsureCribNamespaceReady(context.TODO(), mockK8sClient, k8smocks.NewResourceInterface(t), tc.namespace, tc.provider, tc.waitTimeout, tc.sleepBetweenAttempts, tc.skipRoleBindingCheck)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())
