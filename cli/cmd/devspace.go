@@ -196,7 +196,7 @@ var ensureNamespaceCmd = &cobra.Command{
 			}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
 		}
 
-		if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+		if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil, viper.GetBool("CRIB_SKIP_ROLE_BINDING_CHECK")); err != nil {
 			logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
 			os.Exit(1)
 		}

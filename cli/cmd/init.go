@@ -223,7 +223,7 @@ var initCmd = &cobra.Command{
 			}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
 		}
 
-		if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+		if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil, viper.GetBool("CRIB_SKIP_ROLE_BINDING_CHECK")); err != nil {
 			logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
 			os.Exit(1)
 		}
@@ -298,6 +298,7 @@ func init() {
 	initCmd.Flags().String("provider", "", fmt.Sprintf("Provider to initialize (should be one of: %v)", supportedProviders))
 
 	// flow control flags
+	initCmd.Flags().Bool("skip-role-binding-check", false, "When set, the command will skip waiting for the crib-poweruser role binding (useful for running crib without kyverno)")
 	initCmd.Flags().Bool("write-config", false, "Persists config acquired interactively back to .env passed via --config (WARNING: comments will be lost!)")
 
 	// bind to viper (we can safely ignore the errors here, as the flags are guaranteed to exist)
@@ -311,6 +312,7 @@ func init() {
 	_ = viper.BindPFlag("CRIB_EKS_CLUSTER_NAME", initCmd.Flags().Lookup("crib-eks-cluster-name"))
 	_ = viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("crib-eks-alias-name"))
 	_ = viper.BindPFlag("DEVSPACE_NAMESPACE", initCmd.Flags().Lookup("devspace-namespace"))
+	_ = viper.BindPFlag("CRIB_SKIP_ROLE_BINDING_CHECK", initCmd.Flags().Lookup("skip-role-binding-check"))
 	_ = viper.BindPFlag("WRITE_CONFIG", initCmd.Flags().Lookup("write-config"))
 	_ = viper.BindPFlag("PROVIDER", initCmd.Flags().Lookup("provider"))
 	_ = viper.BindPFlag("CHAINLINK_COMPONENT", initCmd.Flags().Lookup("chainlink-component"))
@@ -321,6 +323,7 @@ func init() {
 	// set defaults
 	viper.SetDefault("AWS_CONFIG_FILE", initCmd.Flags().Lookup("aws-config-file").DefValue)
 	viper.SetDefault("KUBECONFIG", initCmd.Flags().Lookup("kubeconfig").DefValue)
+	viper.SetDefault("CRIB_SKIP_ROLE_BINDING_CHECK", initCmd.Flags().Lookup("skip-role-binding-check").DefValue)
 
 	// defaults that came from cribbit.sh
 	viper.SetDefault("CRIB_EKS_CLUSTER_NAME", "main-stage-cluster")

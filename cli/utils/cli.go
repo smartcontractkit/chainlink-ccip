@@ -276,7 +276,7 @@ func GetChainlinkDockerRegistries(provider string) map[string]string {
 	}
 }
 
-func EnsureCribNamespaceReady(ctx context.Context, k8sClient wrappers.K8sCLI, rolebindingClient dynamic.ResourceInterface, namespace string, provider string, waitTimeout *time.Duration, sleepBetweenAttempts *time.Duration) error {
+func EnsureCribNamespaceReady(ctx context.Context, k8sClient wrappers.K8sCLI, rolebindingClient dynamic.ResourceInterface, namespace string, provider string, waitTimeout *time.Duration, sleepBetweenAttempts *time.Duration, skipRoleBindingCheck bool) error {
 	defaultWaitTimeout := 20 * time.Second
 	defaultSleepBetweenAttempts := 500 * time.Millisecond
 
@@ -293,7 +293,11 @@ func EnsureCribNamespaceReady(ctx context.Context, k8sClient wrappers.K8sCLI, ro
 	}
 	slog.Debug("k8s namespace in place", slog.String("name", namespace), slog.Bool("already_exists", alreadyExists))
 
-	if provider == "aws" {
+	if provider != "aws" {
+		return nil
+	}
+
+	if !skipRoleBindingCheck {
 		roleBindingName := fmt.Sprintf("%s-crib-poweruser", namespace)
 		slog.Info("waiting for rolebinding creation", slog.String("role_binding_name", roleBindingName), slog.String("namespace", namespace))
 		startTime := time.Now()
@@ -305,18 +309,21 @@ func EnsureCribNamespaceReady(ctx context.Context, k8sClient wrappers.K8sCLI, ro
 			slog.String("namespace", namespace),
 			slog.Float64("elapsed_seconds", time.Since(startTime).Seconds()),
 		)
-
-		// Get labels
-		labels, err := GetNamespaceLabels()
-		if err != nil {
-			return fmt.Errorf("failed to compose namespace labels: : %w", err)
-		}
-
-		// Apply labels to the namespace
-		if err := k8sClient.LabelNamespace(ctx, namespace, labels); err != nil {
-			return fmt.Errorf("failed to label namespace: %w", err)
-		}
+	} else {
+		slog.Info("skipping crib-poweruser rolebinding check because CRIB_SKIP_ROLE_BINDING_CHECK is set to true", slog.String("name", namespace))
 	}
+
+	// Get labels
+	labels, err := GetNamespaceLabels()
+	if err != nil {
+		return fmt.Errorf("failed to compose namespace labels: : %w", err)
+	}
+
+	// Apply labels to the namespace
+	if err := k8sClient.LabelNamespace(ctx, namespace, labels); err != nil {
+		return fmt.Errorf("failed to label namespace: %w", err)
+	}
+
 	return nil
 }
 
