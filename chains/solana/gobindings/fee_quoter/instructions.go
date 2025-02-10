@@ -126,6 +126,23 @@ var (
 	// * `cfg` - The token transfer fee configuration.
 	Instruction_SetTokenTransferFeeConfig = ag_binary.TypeID([8]byte{76, 243, 16, 214, 126, 11, 254, 77})
 
+	// Add a price updater address to the list of allowed price updaters.
+	// On price updates, the fee quoter will check the that caller is allowed.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for this operation.
+	// * `price_updater` - The price updater address.
+	Instruction_AddPriceUpdater = ag_binary.TypeID([8]byte{200, 26, 13, 120, 226, 182, 64, 16})
+
+	// Remove a price updater address from the list of allowed price updaters.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for this operation.
+	// * `price_updater` - The price updater address.
+	Instruction_RemovePriceUpdater = ag_binary.TypeID([8]byte{10, 61, 172, 48, 110, 8, 162, 198})
+
 	// Calculates the fee for sending a message to the destination chain.
 	//
 	// # Arguments
@@ -155,6 +172,23 @@ var (
 	// - deserialized and processed extra args
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 
+	// Updates prices for tokens and gas. This method may only be called by an allowed price updater.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts always required for the price updates
+	// * `token_updates` - Vector of token price updates
+	// * `gas_updates` - Vector of gas price updates
+	//
+	// # Additional accounts
+	//
+	// In addition to the fixed amount of accounts defined in the `UpdatePrices` context,
+	// the following accounts must be provided:
+	//
+	// * First, the billing token config accounts for each token whose price is being updated, in the same order
+	// as the token_updates vector.
+	// * Then, the dest chain accounts of every chain whose gas price is being updated, in the same order as the
+	// gas_updates vector.
 	Instruction_UpdatePrices = ag_binary.TypeID([8]byte{62, 161, 234, 136, 106, 26, 18, 160})
 )
 
@@ -179,6 +213,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "UpdateDestChainConfig"
 	case Instruction_SetTokenTransferFeeConfig:
 		return "SetTokenTransferFeeConfig"
+	case Instruction_AddPriceUpdater:
+		return "AddPriceUpdater"
+	case Instruction_RemovePriceUpdater:
+		return "RemovePriceUpdater"
 	case Instruction_GetFee:
 		return "GetFee"
 	case Instruction_UpdatePrices:
@@ -229,6 +267,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_token_transfer_fee_config", (*SetTokenTransferFeeConfig)(nil),
+		},
+		{
+			"add_price_updater", (*AddPriceUpdater)(nil),
+		},
+		{
+			"remove_price_updater", (*RemovePriceUpdater)(nil),
 		},
 		{
 			"get_fee", (*GetFee)(nil),

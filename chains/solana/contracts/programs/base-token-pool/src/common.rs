@@ -12,6 +12,9 @@ pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed 
 pub const POOL_STATE_SEED: &[u8] = b"ccip_tokenpool_config";
 pub const POOL_SIGNER_SEED: &[u8] = b"ccip_tokenpool_signer";
 
+pub const EXTERNAL_TOKENPOOL_SIGNER: &[u8] = b"external_token_pools_signer";
+pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
+
 // discriminators
 #[allow(dead_code)]
 pub const RELEASE_MINT: [u8; 8] = [0x14, 0x94, 0x71, 0xc6, 0xe5, 0xaa, 0x47, 0x30];
@@ -31,7 +34,8 @@ pub struct BaseConfig {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub rate_limit_admin: Pubkey,
-    pub ramp_authority: Pubkey, // signer for CCIP calls
+    pub router_onramp_authority: Pubkey, // signer PDA for CCIP onramp calls
+    pub router: Pubkey,                  // router address
 
     // rebalancing - only used for lock/release pools
     pub rebalancer: Pubkey,
@@ -50,7 +54,7 @@ impl BaseConfig {
         mint: &InterfaceAccount<Mint>,
         pool_program: Pubkey,
         owner: Pubkey,
-        ramp_authority: Pubkey,
+        router: Pubkey,
     ) -> Result<()> {
         let token_info = mint.to_account_info();
 
@@ -68,7 +72,9 @@ impl BaseConfig {
         );
         self.owner = owner;
         self.rate_limit_admin = owner;
-        self.ramp_authority = ramp_authority;
+        self.router = router;
+        (self.router_onramp_authority, _) =
+            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &router);
 
         Ok(())
     }
@@ -100,17 +106,20 @@ impl BaseConfig {
         Ok(())
     }
 
-    pub fn set_ramp_authority(&mut self, new_authority: Pubkey) -> Result<()> {
-        require!(
-            new_authority != Pubkey::default(),
+    pub fn set_router(&mut self, new_router: Pubkey) -> Result<()> {
+        require_keys_neq!(
+            new_router,
+            Pubkey::default(),
             CcipTokenPoolError::InvalidInputs
         );
 
-        let old_authority = self.ramp_authority;
-        self.ramp_authority = new_authority;
+        let old_router = self.router;
+        self.router = new_router;
+        (self.router_onramp_authority, _) =
+            Pubkey::find_program_address(&[POOL_SIGNER_SEED], &new_router);
         emit!(RouterUpdated {
-            old_authority,
-            new_authority
+            old_router,
+            new_router,
         });
         Ok(())
     }
@@ -353,8 +362,8 @@ pub struct RemoteChainRemoved {
 
 #[event]
 pub struct RouterUpdated {
-    pub old_authority: Pubkey,
-    pub new_authority: Pubkey,
+    pub old_router: Pubkey,
+    pub new_router: Pubkey,
 }
 
 #[event]

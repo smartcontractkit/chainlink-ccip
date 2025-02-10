@@ -16,26 +16,34 @@ type ReleaseOrMintTokens struct {
 
 	// [0] = [SIGNER] authority
 	//
-	// [1] = [WRITE] state
+	// [1] = [] offrampProgram
+	// ··········· CHECK offramp program: exists only to derive the allowed offramp PDA
+	// ··········· and the authority PDA.
 	//
-	// [2] = [] tokenProgram
+	// [2] = [] allowedOfframp
+	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
+	// ··········· If PDA does not exist, the router doesn't allow this offramp
 	//
-	// [3] = [WRITE] mint
+	// [3] = [WRITE] state
 	//
-	// [4] = [] poolSigner
+	// [4] = [] tokenProgram
 	//
-	// [5] = [WRITE] poolTokenAccount
+	// [5] = [WRITE] mint
 	//
-	// [6] = [WRITE] chainConfig
+	// [6] = [] poolSigner
 	//
-	// [7] = [WRITE] receiverTokenAccount
+	// [7] = [WRITE] poolTokenAccount
+	//
+	// [8] = [WRITE] chainConfig
+	//
+	// [9] = [WRITE] receiverTokenAccount
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewReleaseOrMintTokensInstructionBuilder creates a new `ReleaseOrMintTokens` instruction builder.
 func NewReleaseOrMintTokensInstructionBuilder() *ReleaseOrMintTokens {
 	nd := &ReleaseOrMintTokens{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 8),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
 	}
 	return nd
 }
@@ -57,81 +65,111 @@ func (inst *ReleaseOrMintTokens) GetAuthorityAccount() *ag_solanago.AccountMeta 
 	return inst.AccountMetaSlice[0]
 }
 
+// SetOfframpProgramAccount sets the "offrampProgram" account.
+// CHECK offramp program: exists only to derive the allowed offramp PDA
+// and the authority PDA.
+func (inst *ReleaseOrMintTokens) SetOfframpProgramAccount(offrampProgram ag_solanago.PublicKey) *ReleaseOrMintTokens {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(offrampProgram)
+	return inst
+}
+
+// GetOfframpProgramAccount gets the "offrampProgram" account.
+// CHECK offramp program: exists only to derive the allowed offramp PDA
+// and the authority PDA.
+func (inst *ReleaseOrMintTokens) GetOfframpProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
+// SetAllowedOfframpAccount sets the "allowedOfframp" account.
+// CHECK PDA of the router program verifying the signer is an allowed offramp.
+// If PDA does not exist, the router doesn't allow this offramp
+func (inst *ReleaseOrMintTokens) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *ReleaseOrMintTokens {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(allowedOfframp)
+	return inst
+}
+
+// GetAllowedOfframpAccount gets the "allowedOfframp" account.
+// CHECK PDA of the router program verifying the signer is an allowed offramp.
+// If PDA does not exist, the router doesn't allow this offramp
+func (inst *ReleaseOrMintTokens) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
 // SetStateAccount sets the "state" account.
 func (inst *ReleaseOrMintTokens) SetStateAccount(state ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(state).WRITE()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(state).WRITE()
 	return inst
 }
 
 // GetStateAccount gets the "state" account.
 func (inst *ReleaseOrMintTokens) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetTokenProgramAccount sets the "tokenProgram" account.
 func (inst *ReleaseOrMintTokens) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(tokenProgram)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
 // GetTokenProgramAccount gets the "tokenProgram" account.
 func (inst *ReleaseOrMintTokens) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[4]
 }
 
 // SetMintAccount sets the "mint" account.
 func (inst *ReleaseOrMintTokens) SetMintAccount(mint ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(mint).WRITE()
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(mint).WRITE()
 	return inst
 }
 
 // GetMintAccount gets the "mint" account.
 func (inst *ReleaseOrMintTokens) GetMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[5]
 }
 
 // SetPoolSignerAccount sets the "poolSigner" account.
 func (inst *ReleaseOrMintTokens) SetPoolSignerAccount(poolSigner ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(poolSigner)
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(poolSigner)
 	return inst
 }
 
 // GetPoolSignerAccount gets the "poolSigner" account.
 func (inst *ReleaseOrMintTokens) GetPoolSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[6]
 }
 
 // SetPoolTokenAccountAccount sets the "poolTokenAccount" account.
 func (inst *ReleaseOrMintTokens) SetPoolTokenAccountAccount(poolTokenAccount ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(poolTokenAccount).WRITE()
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(poolTokenAccount).WRITE()
 	return inst
 }
 
 // GetPoolTokenAccountAccount gets the "poolTokenAccount" account.
 func (inst *ReleaseOrMintTokens) GetPoolTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice[7]
 }
 
 // SetChainConfigAccount sets the "chainConfig" account.
 func (inst *ReleaseOrMintTokens) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(chainConfig).WRITE()
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
 // GetChainConfigAccount gets the "chainConfig" account.
 func (inst *ReleaseOrMintTokens) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice[8]
 }
 
 // SetReceiverTokenAccountAccount sets the "receiverTokenAccount" account.
 func (inst *ReleaseOrMintTokens) SetReceiverTokenAccountAccount(receiverTokenAccount ag_solanago.PublicKey) *ReleaseOrMintTokens {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(receiverTokenAccount).WRITE()
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(receiverTokenAccount).WRITE()
 	return inst
 }
 
 // GetReceiverTokenAccountAccount gets the "receiverTokenAccount" account.
 func (inst *ReleaseOrMintTokens) GetReceiverTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice[9]
 }
 
 func (inst ReleaseOrMintTokens) Build() *Instruction {
@@ -165,24 +203,30 @@ func (inst *ReleaseOrMintTokens) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.OfframpProgram is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.TokenProgram is not set")
+			return errors.New("accounts.AllowedOfframp is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.Mint is not set")
+			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.PoolSigner is not set")
+			return errors.New("accounts.TokenProgram is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.PoolTokenAccount is not set")
+			return errors.New("accounts.Mint is not set")
 		}
 		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.ChainConfig is not set")
+			return errors.New("accounts.PoolSigner is not set")
 		}
 		if inst.AccountMetaSlice[7] == nil {
+			return errors.New("accounts.PoolTokenAccount is not set")
+		}
+		if inst.AccountMetaSlice[8] == nil {
+			return errors.New("accounts.ChainConfig is not set")
+		}
+		if inst.AccountMetaSlice[9] == nil {
 			return errors.New("accounts.ReceiverTokenAccount is not set")
 		}
 	}
@@ -203,15 +247,17 @@ func (inst *ReleaseOrMintTokens) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta(" tokenProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("   poolSigner", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("    poolToken", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("receiverToken", inst.AccountMetaSlice[7]))
+					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("offrampProgram", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("  tokenProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("          mint", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("    poolSigner", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("     poolToken", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("   chainConfig", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta(" receiverToken", inst.AccountMetaSlice[9]))
 					})
 				})
 		})
@@ -240,6 +286,8 @@ func NewReleaseOrMintTokensInstruction(
 	releaseOrMint ReleaseOrMintInV1,
 	// Accounts:
 	authority ag_solanago.PublicKey,
+	offrampProgram ag_solanago.PublicKey,
+	allowedOfframp ag_solanago.PublicKey,
 	state ag_solanago.PublicKey,
 	tokenProgram ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
@@ -250,6 +298,8 @@ func NewReleaseOrMintTokensInstruction(
 	return NewReleaseOrMintTokensInstructionBuilder().
 		SetReleaseOrMint(releaseOrMint).
 		SetAuthorityAccount(authority).
+		SetOfframpProgramAccount(offrampProgram).
+		SetAllowedOfframpAccount(allowedOfframp).
 		SetStateAccount(state).
 		SetTokenProgramAccount(tokenProgram).
 		SetMintAccount(mint).

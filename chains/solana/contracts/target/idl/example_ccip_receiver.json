@@ -52,8 +52,17 @@
       "accounts": [
         {
           "name": "authority",
-          "isMut": true,
+          "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "offrampProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK offramp program: exists only to derive the allowed offramp PDA",
+            "and the authority PDA. Must be second."
+          ]
         },
         {
           "name": "allowedOfframp",

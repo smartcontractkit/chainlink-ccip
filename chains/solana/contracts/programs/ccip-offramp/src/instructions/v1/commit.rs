@@ -96,6 +96,10 @@ pub fn commit<'info>(
             let cpi_accounts = fee_quoter::cpi::accounts::UpdatePrices {
                 config: ctx.accounts.fee_quoter_config.to_account_info(),
                 authority: ctx.accounts.fee_billing_signer.to_account_info(),
+                allowed_price_updater: ctx
+                    .accounts
+                    .fee_quoter_allowed_price_updater
+                    .to_account_info(),
             };
             let cpi_remaining_accounts = ctx.remaining_accounts[1..].to_vec();
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, cpi_signer)

@@ -12,7 +12,7 @@ import (
 
 // Initialize is the `initialize` instruction.
 type Initialize struct {
-	RampAuthority *ag_solanago.PublicKey
+	Router *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
@@ -32,9 +32,9 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetRampAuthority sets the "rampAuthority" parameter.
-func (inst *Initialize) SetRampAuthority(rampAuthority ag_solanago.PublicKey) *Initialize {
-	inst.RampAuthority = &rampAuthority
+// SetRouter sets the "router" parameter.
+func (inst *Initialize) SetRouter(router ag_solanago.PublicKey) *Initialize {
+	inst.Router = &router
 	return inst
 }
 
@@ -102,8 +102,8 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 func (inst *Initialize) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.RampAuthority == nil {
-			return errors.New("RampAuthority parameter is not set")
+		if inst.Router == nil {
+			return errors.New("Router parameter is not set")
 		}
 	}
 
@@ -135,7 +135,7 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("RampAuthority", *inst.RampAuthority))
+						paramsBranch.Child(ag_format.Param("Router", *inst.Router))
 					})
 
 					// Accounts of the instruction:
@@ -150,16 +150,16 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `RampAuthority` param:
-	err = encoder.Encode(obj.RampAuthority)
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `RampAuthority`:
-	err = decoder.Decode(&obj.RampAuthority)
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
 	if err != nil {
 		return err
 	}
@@ -169,14 +169,14 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	rampAuthority ag_solanago.PublicKey,
+	router ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetRampAuthority(rampAuthority).
+		SetRouter(router).
 		SetStateAccount(state).
 		SetMintAccount(mint).
 		SetAuthorityAccount(authority).

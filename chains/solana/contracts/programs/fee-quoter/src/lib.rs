@@ -40,7 +40,6 @@ pub mod fee_quoter {
         link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
-        offramp_signer: Pubkey,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             version: 1,
@@ -49,10 +48,7 @@ pub mod fee_quoter {
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
-            offramp_signer,
         });
-
-        // ctx.accounts.state.latest_price_sequence_number = 0; // TODO each offramp has its own price seq_nr?
 
         Ok(())
     }
@@ -180,6 +176,30 @@ pub mod fee_quoter {
         v1::admin::set_token_transfer_fee_config(ctx, chain_selector, mint, cfg)
     }
 
+    /// Add a price updater address to the list of allowed price updaters.
+    /// On price updates, the fee quoter will check the that caller is allowed.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for this operation.
+    /// * `price_updater` - The price updater address.
+    pub fn add_price_updater(ctx: Context<AddPriceUpdater>, price_updater: Pubkey) -> Result<()> {
+        v1::admin::add_price_updater(ctx, price_updater)
+    }
+
+    /// Remove a price updater address from the list of allowed price updaters.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for this operation.
+    /// * `price_updater` - The price updater address.
+    pub fn remove_price_updater(
+        ctx: Context<RemovePriceUpdater>,
+        price_updater: Pubkey,
+    ) -> Result<()> {
+        v1::admin::remove_price_updater(ctx, price_updater)
+    }
+
     /// Calculates the fee for sending a message to the destination chain.
     ///
     /// # Arguments
@@ -215,6 +235,23 @@ pub mod fee_quoter {
         v1::public::get_fee(ctx, dest_chain_selector, message)
     }
 
+    /// Updates prices for tokens and gas. This method may only be called by an allowed price updater.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts always required for the price updates
+    /// * `token_updates` - Vector of token price updates
+    /// * `gas_updates` - Vector of gas price updates
+    ///
+    /// # Additional accounts
+    ///
+    /// In addition to the fixed amount of accounts defined in the `UpdatePrices` context,
+    /// the following accounts must be provided:
+    ///
+    /// * First, the billing token config accounts for each token whose price is being updated, in the same order
+    /// as the token_updates vector.
+    /// * Then, the dest chain accounts of every chain whose gas price is being updated, in the same order as the
+    /// gas_updates vector.
     pub fn update_prices<'info>(
         ctx: Context<'_, '_, 'info, 'info, UpdatePrices<'info>>,
         token_updates: Vec<TokenPriceUpdate>,
@@ -325,4 +362,6 @@ pub enum FeeQuoterError {
     InvalidTokenReceiver,
     #[msg("Invalid SVM address")]
     InvalidSVMAddress,
+    #[msg("The caller is not an authorized price updater")]
+    UnauthorizedPriceUpdater,
 }

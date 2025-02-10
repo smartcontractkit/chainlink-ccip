@@ -67,3 +67,13 @@ pub struct TokenTransferFeeConfigUpdated {
     pub token: Pubkey,
     pub token_transfer_fee_config: TokenTransferFeeConfig,
 }
+
+#[event]
+pub struct PriceUpdaterAdded {
+    pub price_updater: Pubkey,
+}
+
+#[event]
+pub struct PriceUpdaterRemoved {
+    pub price_updater: Pubkey,
+}

@@ -18,22 +18,26 @@ import (
 type CcipReceive struct {
 	Message *Any2SVMMessage
 
-	// [0] = [WRITE, SIGNER] authority
+	// [0] = [SIGNER] authority
 	//
-	// [1] = [] allowedOfframp
+	// [1] = [] offrampProgram
+	// ··········· CHECK offramp program: exists only to derive the allowed offramp PDA
+	// ··········· and the authority PDA. Must be second.
+	//
+	// [2] = [] allowedOfframp
 	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
 	// ··········· If PDA does not exist, the router doesn't allow this offramp
 	//
-	// [2] = [] approvedSender
+	// [3] = [] approvedSender
 	//
-	// [3] = [] state
+	// [4] = [] state
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCcipReceiveInstructionBuilder creates a new `CcipReceive` instruction builder.
 func NewCcipReceiveInstructionBuilder() *CcipReceive {
 	nd := &CcipReceive{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -46,7 +50,7 @@ func (inst *CcipReceive) SetMessage(message Any2SVMMessage) *CcipReceive {
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *CcipReceive) SetAuthorityAccount(authority ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
@@ -55,11 +59,26 @@ func (inst *CcipReceive) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetOfframpProgramAccount sets the "offrampProgram" account.
+// CHECK offramp program: exists only to derive the allowed offramp PDA
+// and the authority PDA. Must be second.
+func (inst *CcipReceive) SetOfframpProgramAccount(offrampProgram ag_solanago.PublicKey) *CcipReceive {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(offrampProgram)
+	return inst
+}
+
+// GetOfframpProgramAccount gets the "offrampProgram" account.
+// CHECK offramp program: exists only to derive the allowed offramp PDA
+// and the authority PDA. Must be second.
+func (inst *CcipReceive) GetOfframpProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAllowedOfframpAccount sets the "allowedOfframp" account.
 // CHECK PDA of the router program verifying the signer is an allowed offramp.
 // If PDA does not exist, the router doesn't allow this offramp
 func (inst *CcipReceive) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(allowedOfframp)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(allowedOfframp)
 	return inst
 }
 
@@ -67,29 +86,29 @@ func (inst *CcipReceive) SetAllowedOfframpAccount(allowedOfframp ag_solanago.Pub
 // CHECK PDA of the router program verifying the signer is an allowed offramp.
 // If PDA does not exist, the router doesn't allow this offramp
 func (inst *CcipReceive) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetApprovedSenderAccount sets the "approvedSender" account.
 func (inst *CcipReceive) SetApprovedSenderAccount(approvedSender ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(approvedSender)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(approvedSender)
 	return inst
 }
 
 // GetApprovedSenderAccount gets the "approvedSender" account.
 func (inst *CcipReceive) GetApprovedSenderAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetStateAccount sets the "state" account.
 func (inst *CcipReceive) SetStateAccount(state ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(state)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(state)
 	return inst
 }
 
 // GetStateAccount gets the "state" account.
 func (inst *CcipReceive) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst CcipReceive) Build() *Instruction {
@@ -123,12 +142,15 @@ func (inst *CcipReceive) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.AllowedOfframp is not set")
+			return errors.New("accounts.OfframpProgram is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.ApprovedSender is not set")
+			return errors.New("accounts.AllowedOfframp is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.ApprovedSender is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.State is not set")
 		}
 	}
@@ -149,11 +171,12 @@ func (inst *CcipReceive) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("approvedSender", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("offrampProgram", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("allowedOfframp", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("approvedSender", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -182,12 +205,14 @@ func NewCcipReceiveInstruction(
 	message Any2SVMMessage,
 	// Accounts:
 	authority ag_solanago.PublicKey,
+	offrampProgram ag_solanago.PublicKey,
 	allowedOfframp ag_solanago.PublicKey,
 	approvedSender ag_solanago.PublicKey,
 	state ag_solanago.PublicKey) *CcipReceive {
 	return NewCcipReceiveInstructionBuilder().
 		SetMessage(message).
 		SetAuthorityAccount(authority).
+		SetOfframpProgramAccount(offrampProgram).
 		SetAllowedOfframpAccount(allowedOfframp).
 		SetApprovedSenderAccount(approvedSender).
 		SetStateAccount(state)

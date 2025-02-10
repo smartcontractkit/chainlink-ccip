@@ -32,22 +32,30 @@ type ManuallyExecute struct {
 	//
 	// [3] = [WRITE] commitReport
 	//
-	// [4] = [] externalExecutionConfig
+	// [4] = [] offramp
 	//
-	// [5] = [WRITE, SIGNER] authority
+	// [5] = [] allowedOfframp
+	// ··········· CHECK PDA of the router program verifying the signer is an allowed offramp.
+	// ··········· If PDA does not exist, the router doesn't allow this offramp. This is just used
+	// ··········· so that token pools and receivers can then check that the caller is an actual offramp that
+	// ··········· has been registered in the router as such for that source chain.
 	//
-	// [6] = [] systemProgram
+	// [6] = [] externalExecutionConfig
 	//
-	// [7] = [] sysvarInstructions
+	// [7] = [WRITE, SIGNER] authority
 	//
-	// [8] = [] tokenPoolsSigner
+	// [8] = [] systemProgram
+	//
+	// [9] = [] sysvarInstructions
+	//
+	// [10] = [] tokenPoolsSigner
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewManuallyExecuteInstructionBuilder creates a new `ManuallyExecute` instruction builder.
 func NewManuallyExecuteInstructionBuilder() *ManuallyExecute {
 	nd := &ManuallyExecute{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 9),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 11),
 	}
 	return nd
 }
@@ -108,59 +116,89 @@ func (inst *ManuallyExecute) GetCommitReportAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
+// SetOfframpAccount sets the "offramp" account.
+func (inst *ManuallyExecute) SetOfframpAccount(offramp ag_solanago.PublicKey) *ManuallyExecute {
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(offramp)
+	return inst
+}
+
+// GetOfframpAccount gets the "offramp" account.
+func (inst *ManuallyExecute) GetOfframpAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[4]
+}
+
+// SetAllowedOfframpAccount sets the "allowedOfframp" account.
+// CHECK PDA of the router program verifying the signer is an allowed offramp.
+// If PDA does not exist, the router doesn't allow this offramp. This is just used
+// so that token pools and receivers can then check that the caller is an actual offramp that
+// has been registered in the router as such for that source chain.
+func (inst *ManuallyExecute) SetAllowedOfframpAccount(allowedOfframp ag_solanago.PublicKey) *ManuallyExecute {
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(allowedOfframp)
+	return inst
+}
+
+// GetAllowedOfframpAccount gets the "allowedOfframp" account.
+// CHECK PDA of the router program verifying the signer is an allowed offramp.
+// If PDA does not exist, the router doesn't allow this offramp. This is just used
+// so that token pools and receivers can then check that the caller is an actual offramp that
+// has been registered in the router as such for that source chain.
+func (inst *ManuallyExecute) GetAllowedOfframpAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[5]
+}
+
 // SetExternalExecutionConfigAccount sets the "externalExecutionConfig" account.
 func (inst *ManuallyExecute) SetExternalExecutionConfigAccount(externalExecutionConfig ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(externalExecutionConfig)
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(externalExecutionConfig)
 	return inst
 }
 
 // GetExternalExecutionConfigAccount gets the "externalExecutionConfig" account.
 func (inst *ManuallyExecute) GetExternalExecutionConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[6]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *ManuallyExecute) SetAuthorityAccount(authority ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ManuallyExecute) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice[7]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *ManuallyExecute) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *ManuallyExecute) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice[8]
 }
 
 // SetSysvarInstructionsAccount sets the "sysvarInstructions" account.
 func (inst *ManuallyExecute) SetSysvarInstructionsAccount(sysvarInstructions ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(sysvarInstructions)
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(sysvarInstructions)
 	return inst
 }
 
 // GetSysvarInstructionsAccount gets the "sysvarInstructions" account.
 func (inst *ManuallyExecute) GetSysvarInstructionsAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice[9]
 }
 
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 func (inst *ManuallyExecute) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(tokenPoolsSigner)
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(tokenPoolsSigner)
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 func (inst *ManuallyExecute) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
+	return inst.AccountMetaSlice[10]
 }
 
 func (inst ManuallyExecute) Build() *Instruction {
@@ -206,18 +244,24 @@ func (inst *ManuallyExecute) Validate() error {
 			return errors.New("accounts.CommitReport is not set")
 		}
 		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.ExternalExecutionConfig is not set")
+			return errors.New("accounts.Offramp is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.AllowedOfframp is not set")
 		}
 		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.SystemProgram is not set")
+			return errors.New("accounts.ExternalExecutionConfig is not set")
 		}
 		if inst.AccountMetaSlice[7] == nil {
-			return errors.New("accounts.SysvarInstructions is not set")
+			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[8] == nil {
+			return errors.New("accounts.SystemProgram is not set")
+		}
+		if inst.AccountMetaSlice[9] == nil {
+			return errors.New("accounts.SysvarInstructions is not set")
+		}
+		if inst.AccountMetaSlice[10] == nil {
 			return errors.New("accounts.TokenPoolsSigner is not set")
 		}
 	}
@@ -239,16 +283,18 @@ func (inst *ManuallyExecute) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=9]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=11]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                 config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("     referenceAddresses", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("            sourceChain", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("           commitReport", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("     sysvarInstructions", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("                offramp", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("         allowedOfframp", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("          systemProgram", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("     sysvarInstructions", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("       tokenPoolsSigner", inst.AccountMetaSlice[10]))
 					})
 				})
 		})
@@ -291,6 +337,8 @@ func NewManuallyExecuteInstruction(
 	referenceAddresses ag_solanago.PublicKey,
 	sourceChain ag_solanago.PublicKey,
 	commitReport ag_solanago.PublicKey,
+	offramp ag_solanago.PublicKey,
+	allowedOfframp ag_solanago.PublicKey,
 	externalExecutionConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
@@ -303,6 +351,8 @@ func NewManuallyExecuteInstruction(
 		SetReferenceAddressesAccount(referenceAddresses).
 		SetSourceChainAccount(sourceChain).
 		SetCommitReportAccount(commitReport).
+		SetOfframpAccount(offramp).
+		SetAllowedOfframpAccount(allowedOfframp).
 		SetExternalExecutionConfigAccount(externalExecutionConfig).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

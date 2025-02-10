@@ -66,6 +66,23 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey) (
 	if err != nil {
 		return TokenPool{}, err
 	}
+	// preload with defined config.EvmChainSelector
+	evmChainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), poolProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
+	svmChainPDA, _, err := TokenPoolChainConfigPDA(config.SvmChainSelector, mint.PublicKey(), poolProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
+	evmBillingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
+	svmBillingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.SvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
 	tokenConfigPda, _, err := state.FindFqBillingTokenConfigPDA(mint.PublicKey(), config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
@@ -83,18 +100,10 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey) (
 		Chain:            map[uint64]solana.PublicKey{},
 		Billing:          map[uint64]solana.PublicKey{},
 	}
-	// preload with defined EVM and SVM chain selectors
-	for _, cs := range []uint64{config.EvmChainSelector, config.SvmChainSelector} {
-		p.Chain[cs], _, err = TokenPoolChainConfigPDA(cs, mint.PublicKey(), poolProgram)
-		if err != nil {
-			return TokenPool{}, err
-		}
-		p.Billing[cs], _, err = state.FindFqPerChainPerTokenConfigPDA(cs, mint.PublicKey(), config.FeeQuoterProgram)
-		if err != nil {
-			return TokenPool{}, err
-		}
-	}
-
+	p.Chain[config.EvmChainSelector] = evmChainPDA
+	p.Chain[config.SvmChainSelector] = svmChainPDA
+	p.Billing[config.EvmChainSelector] = evmBillingPDA
+	p.Billing[config.SvmChainSelector] = svmBillingPDA
 	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
@@ -176,8 +185,8 @@ type EventChainRemoved struct {
 
 type EventRouterUpdated struct {
 	Discriminator [8]byte
-	OldAuthority  solana.PublicKey
-	NewAuthority  solana.PublicKey
+	OldRouter     solana.PublicKey
+	NewRouter     solana.PublicKey
 }
 
 func MethodToEvent(m string) string {

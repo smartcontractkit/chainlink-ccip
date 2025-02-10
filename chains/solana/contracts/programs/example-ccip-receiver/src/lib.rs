@@ -7,6 +7,7 @@ pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 pub const APPROVED_SENDER_SEED: &[u8] = b"approved_ccip_sender";
 pub const TOKEN_ADMIN_SEED: &[u8] = b"receiver_token_admin";
 pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
+pub const STATE: &[u8] = b"state";
 
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
@@ -133,27 +134,38 @@ pub struct Initialize<'info> {
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]
 pub struct CcipReceive<'info> {
-    // Offramp CPI signer must be first
-    #[account(mut)]
+    // Offramp CPI signer PDA must be first.
+    // It is not mutable, and thus cannot be used as payer of init/realloc of other PDAs.
+    #[account(
+        seeds = [EXTERNAL_EXECUTION_CONFIG_SEED],
+        bump,
+        seeds::program = offramp_program.key(),
+    )]
     pub authority: Signer<'info>,
 
+    /// CHECK offramp program: exists only to derive the allowed offramp PDA
+    /// and the authority PDA. Must be second.
+    pub offramp_program: UncheckedAccount<'info>,
+
+    // PDA to verify that calling offramp is valid. Must be third. It is left up to the implementer to decide
+    // how they want to persist the router address to verify that this is the correct account (e.g. in the top level of
+    // a global config/state account for the receiver, which is what this example does, or hard-coded,
+    // or stored in any other way in any other account).
     /// CHECK PDA of the router program verifying the signer is an allowed offramp.
     /// If PDA does not exist, the router doesn't allow this offramp
     #[account(
-        constraint = {
-        let (pda, _) = Pubkey::find_program_address(
-            &[
-                ALLOWED_OFFRAMP,
-                message.source_chain_selector.to_le_bytes().as_ref(),
-                authority.key().as_ref(),
-            ],
-            &state.router.key(),
-        );
-        allowed_offramp.key() == pda && allowed_offramp.owner == &state.router.key()
-        } @ CcipReceiverError::InvalidCaller
+        owner = state.router @ CcipReceiverError::InvalidCaller, // this guarantees that it was initialized
+        seeds = [
+            ALLOWED_OFFRAMP,
+            message.source_chain_selector.to_le_bytes().as_ref(),
+            offramp_program.key().as_ref()
+        ],
+        bump,
+        seeds::program = state.router,
     )]
     pub allowed_offramp: UncheckedAccount<'info>,
 
+    // -- From here on, these are receiver-specific PDAs.
     #[account(
         seeds = [
             APPROVED_SENDER_SEED,
@@ -165,7 +177,7 @@ pub struct CcipReceive<'info> {
     )]
     pub approved_sender: Account<'info, ApprovedSender>, // if PDA does not exist, the message sender and/or source chain are not approved
     #[account(
-        seeds = [b"state"],
+        seeds = [STATE],
         bump,
     )]
     pub state: Account<'info, BaseState>,
@@ -175,7 +187,7 @@ pub struct CcipReceive<'info> {
 pub struct UpdateConfig<'info> {
     #[account(
         mut,
-        seeds = [b"state"],
+        seeds = [STATE],
         bump,
     )]
     pub state: Account<'info, BaseState>,
@@ -189,7 +201,7 @@ pub struct UpdateConfig<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
-        seeds = [b"state"],
+        seeds = [STATE],
         bump,
     )]
     pub state: Account<'info, BaseState>,
@@ -204,7 +216,7 @@ pub struct AcceptOwnership<'info> {
 pub struct ApproveSender<'info> {
     #[account(
         mut,
-        seeds = [b"state"],
+        seeds = [STATE],
         bump,
     )]
     pub state: Account<'info, BaseState>,
@@ -234,7 +246,7 @@ pub struct ApproveSender<'info> {
 pub struct UnapproveSender<'info> {
     #[account(
         mut,
-        seeds = [b"state"],
+        seeds = [STATE],
         bump,
     )]
     pub state: Account<'info, BaseState>,
@@ -262,7 +274,7 @@ pub struct UnapproveSender<'info> {
 pub struct WithdrawTokens<'info> {
     #[account(
         mut,
-        seeds = [b"state"],
+        seeds = [STATE],
         bump,
     )]
     pub state: Account<'info, BaseState>,
