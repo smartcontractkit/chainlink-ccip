@@ -24,16 +24,18 @@ pub enum ErrorCode {
     Full = 2,
 }
 
-pub const MAX_ADDRS: usize = 64;
+#[constant]
+pub const MAX_ADDRS: u64 = 64;
 
 #[zero_copy]
 pub struct AccessList {
-    xs: [Pubkey; MAX_ADDRS],
+    xs: [Pubkey; MAX_ADDRS as usize],
     len: u64,
 }
 arrayvec!(AccessList, Pubkey, u64);
 const_assert!(
-    mem::size_of::<AccessList>() == mem::size_of::<u64>() + mem::size_of::<Pubkey>() * MAX_ADDRS
+    mem::size_of::<AccessList>()
+        == mem::size_of::<u64>() + mem::size_of::<Pubkey>() * MAX_ADDRS as usize
 );
 
 #[account(zero_copy)]

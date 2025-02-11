@@ -5,8 +5,8 @@ use anchor_lang::solana_program::{keccak, secp256k1_recover::*};
 use crate::ocr3base::{ConfigSet, Ocr3Error, Transmitted, MAX_ORACLES};
 use crate::state::{Ocr3Config, Ocr3ConfigInfo};
 
-pub const MAX_SIGNERS: usize = MAX_ORACLES;
-pub const MAX_TRANSMITTERS: usize = MAX_ORACLES;
+pub const MAX_SIGNERS: usize = MAX_ORACLES as usize;
+pub const MAX_TRANSMITTERS: usize = MAX_ORACLES as usize;
 
 pub const TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT_NO_SIGNATURES: u128 = 8 // anchor discriminator
     + 2 * 32 // report context

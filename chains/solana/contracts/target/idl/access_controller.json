@@ -231,5 +231,12 @@
         ]
       }
     }
+  ],
+  "constants": [
+    {
+      "name": "MAX_ADDRS",
+      "type": "u64",
+      "value": "64"
+    }
   ]
 }
