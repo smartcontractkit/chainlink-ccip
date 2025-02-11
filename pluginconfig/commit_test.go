@@ -485,7 +485,7 @@ func TestPreventRMNEnabledBeingChanged(t *testing.T) {
 		}
 	}
 
-	t.Errorf("the RMNEnabled field was not found, it's type was changes or the JSON tag was changed." +
+	t.Errorf("the RMNEnabled field was not found, it's type was changed or the JSON tag was changed." +
 		" If you are making changes to the RMNEnabled field please sync with the RMN team first.")
 }
 
