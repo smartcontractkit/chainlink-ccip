@@ -55,7 +55,10 @@ pub fn add_chain_selector(
     dest_chain_state.version = 1;
     dest_chain_state.chain_selector = new_chain_selector;
     dest_chain_state.config = dest_chain_config.clone();
-    dest_chain_state.state = DestChainState { sequence_number: 0 };
+    dest_chain_state.state = DestChainState {
+        sequence_number: 0,
+        rollback_sequence_number: 0,
+    };
 
     emit!(events::DestChainAdded {
         dest_chain_selector: new_chain_selector,
@@ -78,6 +81,46 @@ pub fn update_dest_chain_config(
         dest_chain_selector,
         dest_chain_config,
     });
+    Ok(())
+}
+
+pub fn bump_ccip_version_for_dest_chain(
+    ctx: Context<UpdateDestChainSelectorConfig>,
+    dest_chain_selector: u64,
+) -> Result<()> {
+    let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
+
+    dest_chain_state.rollback_sequence_number = dest_chain_state.sequence_number;
+    dest_chain_state.sequence_number = 0;
+
+    emit!(events::CcipVersionForDestChainVersionBumped {
+        dest_chain_selector,
+        sequence_number: dest_chain_state.rollback_sequence_number,
+    });
+
+    Ok(())
+}
+
+pub fn rollback_ccip_version_for_dest_chain(
+    ctx: Context<UpdateDestChainSelectorConfig>,
+    dest_chain_selector: u64,
+) -> Result<()> {
+    let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
+
+    require_gt!(
+        dest_chain_state.rollback_sequence_number,
+        0,
+        CcipRouterError::InvalidCcipVersionRollback
+    );
+
+    dest_chain_state.sequence_number = dest_chain_state.rollback_sequence_number;
+    dest_chain_state.rollback_sequence_number = 0;
+
+    emit!(events::CcipVersionForDestChainVersionRolledBack {
+        dest_chain_selector,
+        sequence_number: dest_chain_state.rollback_sequence_number,
+    });
+
     Ok(())
 }
 

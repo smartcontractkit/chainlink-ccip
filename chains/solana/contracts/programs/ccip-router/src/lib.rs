@@ -206,6 +206,32 @@ pub mod ccip_router {
         v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
     }
 
+    /// Bumps the CCIP version for a destination chain.
+    /// This effectively just resets the sequence number of the destination chain state.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context containing the accounts required for the bump.
+    /// * `dest_chain_selector` - The destination chain selector to bump version for.
+    pub fn bump_ccip_version_for_dest_chain(
+        ctx: Context<UpdateDestChainSelectorConfig>,
+        dest_chain_selector: u64,
+    ) -> Result<()> {
+        v1::admin::bump_ccip_version_for_dest_chain(ctx, dest_chain_selector)
+    }
+
+    /// Rolls back the CCIP version for a destination chain.
+    /// This effectively just restores the old version's sequence number of the destination chain state.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context containing the accounts required for the rollback.
+    /// * `dest_chain_selector` - The destination chain selector to rollback the version for.
+    pub fn rollback_ccip_version_for_dest_chain(
+        ctx: Context<UpdateDestChainSelectorConfig>,
+        dest_chain_selector: u64,
+    ) -> Result<()> {
+        v1::admin::rollback_ccip_version_for_dest_chain(ctx, dest_chain_selector)
+    }
+
     ///////////////////////////
     /// Token Admin Registry //
     ///////////////////////////
@@ -420,4 +446,6 @@ pub enum CcipRouterError {
     InvalidTokenAdminRegistryProposedAdmin,
     #[msg("Sender not allowed for that destination chain")]
     SenderNotAllowed,
+    #[msg("Invalid rollback attempt on the CCIP version of the onramp to the destination chain")]
+    InvalidCcipVersionRollback,
 }

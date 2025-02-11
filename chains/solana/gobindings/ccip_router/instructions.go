@@ -135,6 +135,22 @@ var (
 	// * `new_chain_selector` - The new chain selector for SVM.
 	Instruction_UpdateSvmChainSelector = ag_binary.TypeID([8]byte{164, 212, 71, 101, 166, 113, 26, 93})
 
+	// Bumps the CCIP version for a destination chain.
+	// This effectively just resets the sequence number of the destination chain state.
+	//
+	// # Arguments
+	// * `ctx` - The context containing the accounts required for the bump.
+	// * `dest_chain_selector` - The destination chain selector to bump version for.
+	Instruction_BumpCcipVersionForDestChain = ag_binary.TypeID([8]byte{120, 25, 6, 201, 42, 224, 235, 187})
+
+	// Rolls back the CCIP version for a destination chain.
+	// This effectively just restores the old version's sequence number of the destination chain state.
+	//
+	// # Arguments
+	// * `ctx` - The context containing the accounts required for the rollback.
+	// * `dest_chain_selector` - The destination chain selector to rollback the version for.
+	Instruction_RollbackCcipVersionForDestChain = ag_binary.TypeID([8]byte{95, 107, 33, 138, 26, 57, 154, 110})
+
 	// Token Admin Registry //
 	// Registers the Token Admin Registry via the CCIP Admin
 	//
@@ -250,6 +266,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "RemoveOfframp"
 	case Instruction_UpdateSvmChainSelector:
 		return "UpdateSvmChainSelector"
+	case Instruction_BumpCcipVersionForDestChain:
+		return "BumpCcipVersionForDestChain"
+	case Instruction_RollbackCcipVersionForDestChain:
+		return "RollbackCcipVersionForDestChain"
 	case Instruction_CcipAdminProposeAdministrator:
 		return "CcipAdminProposeAdministrator"
 	case Instruction_CcipAdminOverridePendingAdministrator:
@@ -314,6 +334,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"update_svm_chain_selector", (*UpdateSvmChainSelector)(nil),
+		},
+		{
+			"bump_ccip_version_for_dest_chain", (*BumpCcipVersionForDestChain)(nil),
+		},
+		{
+			"rollback_ccip_version_for_dest_chain", (*RollbackCcipVersionForDestChain)(nil),
 		},
 		{
 			"ccip_admin_propose_administrator", (*CcipAdminProposeAdministrator)(nil),

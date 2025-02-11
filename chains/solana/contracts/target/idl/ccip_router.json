@@ -398,6 +398,84 @@
       ]
     },
     {
+      "name": "bumpCcipVersionForDestChain",
+      "docs": [
+        "Bumps the CCIP version for a destination chain.",
+        "This effectively just resets the sequence number of the destination chain state.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context containing the accounts required for the bump.",
+        "* `dest_chain_selector` - The destination chain selector to bump version for."
+      ],
+      "accounts": [
+        {
+          "name": "destChainState",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "rollbackCcipVersionForDestChain",
+      "docs": [
+        "Rolls back the CCIP version for a destination chain.",
+        "This effectively just restores the old version's sequence number of the destination chain state.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context containing the accounts required for the rollback.",
+        "* `dest_chain_selector` - The destination chain selector to rollback the version for."
+      ],
+      "accounts": [
+        {
+          "name": "destChainState",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "ccipAdminProposeAdministrator",
       "docs": [
         "Token Admin Registry //",
@@ -1242,6 +1320,10 @@
           {
             "name": "sequenceNumber",
             "type": "u64"
+          },
+          {
+            "name": "rollbackSequenceNumber",
+            "type": "u64"
           }
         ]
       }
@@ -1340,6 +1422,9 @@
           },
           {
             "name": "SenderNotAllowed"
+          },
+          {
+            "name": "InvalidCcipVersionRollback"
           }
         ]
       }
@@ -1481,6 +1566,36 @@
         {
           "name": "offramp",
           "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CcipVersionForDestChainVersionBumped",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sequenceNumber",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CcipVersionForDestChainVersionRolledBack",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sequenceNumber",
+          "type": "u64",
           "index": false
         }
       ]

@@ -22,7 +22,13 @@ pub struct Config {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainState {
-    pub sequence_number: u64, // The last used sequence number
+    pub sequence_number: u64, // The last used sequence number. On upgrades, this is reset to 0.
+
+    // The following property is used to support one rollback operation, in which the sequence number of
+    // the previous OnRamp version is restored. The upgrade/rollback is done per-lane (i.e. per dest chain).
+    // If it's 0, that means that it is not possible to rollback to the previous version. As version upgrades
+    // are not often, we won't need to rollback multiple versions.
+    pub rollback_sequence_number: u64, // The last used sequence number in the previous onramp version
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]

@@ -371,12 +371,18 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 }
 
 type DestChainState struct {
-	SequenceNumber uint64
+	SequenceNumber         uint64
+	RollbackSequenceNumber uint64
 }
 
 func (obj DestChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `SequenceNumber` param:
 	err = encoder.Encode(obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Serialize `RollbackSequenceNumber` param:
+	err = encoder.Encode(obj.RollbackSequenceNumber)
 	if err != nil {
 		return err
 	}
@@ -386,6 +392,11 @@ func (obj DestChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 func (obj *DestChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `SequenceNumber`:
 	err = decoder.Decode(&obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RollbackSequenceNumber`:
+	err = decoder.Decode(&obj.RollbackSequenceNumber)
 	if err != nil {
 		return err
 	}
@@ -452,6 +463,7 @@ const (
 	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
 	InvalidTokenAdminRegistryProposedAdmin_CcipRouterError
 	SenderNotAllowed_CcipRouterError
+	InvalidCcipVersionRollback_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -504,6 +516,8 @@ func (value CcipRouterError) String() string {
 		return "InvalidTokenAdminRegistryProposedAdmin"
 	case SenderNotAllowed_CcipRouterError:
 		return "SenderNotAllowed"
+	case InvalidCcipVersionRollback_CcipRouterError:
+		return "InvalidCcipVersionRollback"
 	default:
 		return ""
 	}
