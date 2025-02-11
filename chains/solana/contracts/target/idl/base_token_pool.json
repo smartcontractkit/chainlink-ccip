@@ -1,0 +1,555 @@
+{
+  "address": "TokenPooL1111111111111111111111111111111111",
+  "metadata": {
+    "name": "base_token_pool",
+    "version": "0.1.0-dev",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [],
+  "events": [
+    {
+      "name": "Burned",
+      "discriminator": [
+        207,
+        37,
+        251,
+        154,
+        239,
+        229,
+        14,
+        67
+      ]
+    },
+    {
+      "name": "ConfigChanged",
+      "discriminator": [
+        147,
+        25,
+        86,
+        98,
+        98,
+        77,
+        78,
+        192
+      ]
+    },
+    {
+      "name": "Locked",
+      "discriminator": [
+        188,
+        53,
+        118,
+        62,
+        64,
+        12,
+        198,
+        84
+      ]
+    },
+    {
+      "name": "Minted",
+      "discriminator": [
+        174,
+        131,
+        21,
+        57,
+        88,
+        117,
+        114,
+        121
+      ]
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "discriminator": [
+        79,
+        54,
+        99,
+        123,
+        57,
+        244,
+        134,
+        35
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "discriminator": [
+        172,
+        61,
+        205,
+        183,
+        250,
+        50,
+        38,
+        98
+      ]
+    },
+    {
+      "name": "RateLimitConfigured",
+      "discriminator": [
+        249,
+        210,
+        194,
+        93,
+        236,
+        75,
+        175,
+        59
+      ]
+    },
+    {
+      "name": "Released",
+      "discriminator": [
+        232,
+        229,
+        255,
+        136,
+        101,
+        189,
+        15,
+        220
+      ]
+    },
+    {
+      "name": "RemoteChainConfigured",
+      "discriminator": [
+        231,
+        252,
+        78,
+        228,
+        152,
+        49,
+        233,
+        226
+      ]
+    },
+    {
+      "name": "RemoteChainRemoved",
+      "discriminator": [
+        4,
+        212,
+        235,
+        138,
+        165,
+        232,
+        75,
+        32
+      ]
+    },
+    {
+      "name": "RemotePoolsAppended",
+      "discriminator": [
+        248,
+        177,
+        249,
+        167,
+        14,
+        247,
+        25,
+        223
+      ]
+    },
+    {
+      "name": "RouterUpdated",
+      "discriminator": [
+        230,
+        116,
+        235,
+        209,
+        74,
+        144,
+        208,
+        95
+      ]
+    },
+    {
+      "name": "TokensConsumed",
+      "discriminator": [
+        126,
+        8,
+        242,
+        245,
+        121,
+        78,
+        210,
+        0
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidInitPoolPermissions",
+      "msg": "Pool authority does not match token mint owner"
+    },
+    {
+      "code": 6001,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidInputs",
+      "msg": "Invalid inputs"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidPoolCaller",
+      "msg": "Caller is not ramp on router"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidSender",
+      "msg": "Sender not allowed"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidSourcePoolAddress",
+      "msg": "Invalid source pool address"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidToken",
+      "msg": "Invalid token"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidTokenAmountConversion",
+      "msg": "Invalid token amount conversion"
+    },
+    {
+      "code": 6008,
+      "name": "RLBucketOverfilled",
+      "msg": "RateLimit: bucket overfilled"
+    },
+    {
+      "code": 6009,
+      "name": "RLMaxCapacityExceeded",
+      "msg": "RateLimit: max capacity exceeded"
+    },
+    {
+      "code": 6010,
+      "name": "RLRateLimitReached",
+      "msg": "RateLimit: rate limit reached"
+    },
+    {
+      "code": 6011,
+      "name": "RLInvalidRateLimitRate",
+      "msg": "RateLimit: invalid rate limit rate"
+    },
+    {
+      "code": 6012,
+      "name": "RLDisabledNonZeroRateLimit",
+      "msg": "RateLimit: disabled non-zero rate limit"
+    },
+    {
+      "code": 6013,
+      "name": "LiquidityNotAccepted",
+      "msg": "Liquidity not accepted"
+    }
+  ],
+  "types": [
+    {
+      "name": "Burned",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "RateLimitConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Locked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Minted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RateLimitConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "capacity",
+            "type": "u64"
+          },
+          {
+            "name": "rate",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RateLimitConfigured",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "outbound_rate_limit",
+            "type": {
+              "defined": {
+                "name": "RateLimitConfig"
+              }
+            }
+          },
+          {
+            "name": "inbound_rate_limit",
+            "type": {
+              "defined": {
+                "name": "RateLimitConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Released",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteChainConfigured",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "token",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "previous_token",
+            "type": {
+              "defined": {
+                "name": "RemoteAddress"
+              }
+            }
+          },
+          {
+            "name": "pool_addresses",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RemoteAddress"
+                }
+              }
+            }
+          },
+          {
+            "name": "previous_pool_addresses",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RemoteAddress"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteChainRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemotePoolsAppended",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "pool_addresses",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RemoteAddress"
+                }
+              }
+            }
+          },
+          {
+            "name": "previous_pool_addresses",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RemoteAddress"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RouterUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_router",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_router",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensConsumed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokens",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

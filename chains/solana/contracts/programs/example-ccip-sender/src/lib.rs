@@ -218,6 +218,12 @@ pub mod example_ccip_sender {
     }
 
     pub fn withdraw_tokens(ctx: Context<WithdrawTokens>, amount: u64, decimals: u8) -> Result<()> {
+        require_keys_eq!(
+            ctx.accounts.token_program.key(),
+            *ctx.accounts.mint.to_account_info().owner,
+            CcipSenderError::InvalidRouter // todo: wrong error
+        );
+
         let mut ix = transfer_checked(
             &spl_token_2022::ID, // use spl-token-2022 to compile instruction - change program later
             &ctx.accounts.program_token_account.key(),

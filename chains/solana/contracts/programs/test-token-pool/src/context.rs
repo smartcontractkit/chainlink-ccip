@@ -1,8 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::get_associated_token_address_with_program_id,
-    token_interface::{Mint, TokenAccount},
-};
+use anchor_spl::token_interface::{Mint, TokenAccount};
 use base_token_pool::common::*;
 
 use crate::{ChainConfig, State};
