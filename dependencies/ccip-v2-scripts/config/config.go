@@ -249,7 +249,7 @@ func (c ChainConfigurer) externalHTTPRPC() *string {
 		u := fmt.Sprintf("https://%s", hostName)
 		return &u
 	}
-	u := fmt.Sprintf("https://%s-geth-%d-ws.%s:443", c.env.Namespace, c.chainID, c.env.IngressBaseDomain)
+	u := fmt.Sprintf("https://%s-geth-%d-http.%s:443", c.env.Namespace, c.chainID, c.env.IngressBaseDomain)
 	return &u
 }
 
