@@ -1,7 +1,9 @@
 package pluginconfig
 
 import (
+	"encoding/json"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -463,4 +465,40 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test to prevent the RMNEnabled field from being changed without syncing with the RMN team first.
+func TestPreventRMNEnabledBeingChanged(t *testing.T) {
+	expectedField := "RMNEnabled"
+	expectedType := "bool"
+	expectedJSONTag := "rmnEnabled"
+
+	typ := reflect.TypeOf(CommitOffchainConfig{})
+	numFields := typ.NumField()
+	for i := 0; i < numFields; i++ {
+		field := typ.Field(i)
+		if field.Name == expectedField &&
+			field.Type.String() == expectedType &&
+			field.Tag.Get("json") == expectedJSONTag {
+
+			return
+		}
+	}
+
+	t.Errorf("the RMNEnabled field was not found, it's type was changed or the JSON tag was changed." +
+		" If you are making changes to the RMNEnabled field please sync with the RMN team first.")
+}
+
+// Test to prevent CommitOffchainConfig from being changed without syncing with RMN team.
+func TestPreventCommitOffchainConfigEncodingBeingChanged(t *testing.T) {
+	cfg := CommitOffchainConfig{RMNEnabled: true}
+
+	encodedCfg, err := EncodeCommitOffchainConfig(cfg)
+	require.NoError(t, err)
+
+	jsonCfg, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	require.Equal(t, string(jsonCfg), string(encodedCfg),
+		"CommitOffchainConfig encoding has changed, please make sure you are in sync with the RMN team")
 }
