@@ -24,33 +24,15 @@ pub mod ccip_offramp {
     /// Initialization Flow //
     //////////////////////////
 
-    /// Initializes the CCIP Offramp.
+    /// Initializes the CCIP Offramp, except for the config account (due to stack size limitations).
     ///
-    /// The initialization of the Offramp is responsibility of Admin, nothing more than calling this method should be done first.
+    /// The initialization of the Offramp is responsibility of Admin, nothing more than calling these
+    /// initialization methods should be done first.
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
-    /// * `svm_chain_selector` - The chain selector for SVM.
-    /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
-    pub fn initialize(
-        ctx: Context<Initialize>,
-        svm_chain_selector: u64,
-        enable_execution_after: i64,
-    ) -> Result<()> {
-        {
-            let mut config = ctx.accounts.config.load_init()?;
-            require!(config.version == 0, CcipOfframpError::InvalidVersion); // assert uninitialized state - AccountLoader doesn't work with constraint
-            config.version = 1;
-            config.svm_chain_selector = svm_chain_selector;
-            config.enable_manual_execution_after = enable_execution_after;
-            config.owner = ctx.accounts.authority.key();
-            config.ocr3 = [
-                Ocr3Config::new(OcrPluginType::Commit as u8),
-                Ocr3Config::new(OcrPluginType::Execution as u8),
-            ];
-        }
-
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts
             .reference_addresses
             .set_inner(ReferenceAddresses {
@@ -62,6 +44,34 @@ pub mod ccip_offramp {
 
         ctx.accounts.state.latest_price_sequence_number = 0;
 
+        Ok(())
+    }
+
+    /// Initializes the CCIP Offramp Config account.
+    ///
+    /// The initialization of the Offramp is responsibility of Admin, nothing more than calling these
+    /// initialization methods should be done first.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for initialization of the config.
+    /// * `svm_chain_selector` - The chain selector for SVM.
+    /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+    pub fn initialize_config(
+        ctx: Context<InitializeConfig>,
+        svm_chain_selector: u64,
+        enable_execution_after: i64,
+    ) -> Result<()> {
+        let mut config = ctx.accounts.config.load_init()?;
+        require!(config.version == 0, CcipOfframpError::InvalidVersion); // assert uninitialized state - AccountLoader doesn't work with constraint
+        config.version = 1;
+        config.svm_chain_selector = svm_chain_selector;
+        config.enable_manual_execution_after = enable_execution_after;
+        config.owner = ctx.accounts.authority.key();
+        config.ocr3 = [
+            Ocr3Config::new(OcrPluginType::Commit as u8),
+            Ocr3Config::new(OcrPluginType::Execution as u8),
+        ];
         Ok(())
     }
 

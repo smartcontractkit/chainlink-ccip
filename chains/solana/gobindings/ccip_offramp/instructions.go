@@ -29,16 +29,27 @@ func init() {
 
 var (
 	// Initialization Flow //
-	// Initializes the CCIP Offramp.
+	// Initializes the CCIP Offramp, except for the config account (due to stack size limitations).
 	//
-	// The initialization of the Offramp is responsibility of Admin, nothing more than calling this method should be done first.
+	// The initialization of the Offramp is responsibility of Admin, nothing more than calling these
+	// initialization methods should be done first.
 	//
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for initialization.
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	// Initializes the CCIP Offramp Config account.
+	//
+	// The initialization of the Offramp is responsibility of Admin, nothing more than calling these
+	// initialization methods should be done first.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for initialization of the config.
 	// * `svm_chain_selector` - The chain selector for SVM.
 	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+	Instruction_InitializeConfig = ag_binary.TypeID([8]byte{208, 127, 21, 1, 194, 190, 196, 70})
 
 	// Transfers the ownership of the router to a new proposed owner.
 	//
@@ -189,6 +200,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_InitializeConfig:
+		return "InitializeConfig"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
@@ -233,6 +246,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"initialize_config", (*InitializeConfig)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),

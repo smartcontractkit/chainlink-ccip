@@ -83,26 +83,26 @@ pub fn get_fee<'info>(
         FeeQuoterError::MessageFeeTooHigh
     );
 
-    let default_token_dest_gas_overhead = ctx
-        .accounts
-        .dest_chain
-        .config
-        .default_token_dest_gas_overhead;
-
     let token_transfer_additional_data = per_chain_per_token_config_accounts
         .iter()
-        .map(|per_chain_per_token_config| TokenTransferAdditionalData {
-            dest_bytes_overhead: per_chain_per_token_config
-                .token_transfer_config
-                .dest_bytes_overhead,
-            dest_gas_overhead: if per_chain_per_token_config.token_transfer_config.is_enabled {
-                per_chain_per_token_config
-                    .token_transfer_config
-                    .dest_gas_overhead
-            } else {
-                default_token_dest_gas_overhead
+        .map(
+            |per_chain_per_token_config| match per_chain_per_token_config {
+                Some(config) if config.token_transfer_config.is_enabled => {
+                    TokenTransferAdditionalData {
+                        dest_bytes_overhead: config.token_transfer_config.dest_bytes_overhead,
+                        dest_gas_overhead: config.token_transfer_config.dest_gas_overhead,
+                    }
+                }
+                _ => TokenTransferAdditionalData {
+                    dest_bytes_overhead: ctx
+                        .accounts
+                        .dest_chain
+                        .config
+                        .default_token_dest_gas_overhead,
+                    dest_gas_overhead: CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+                },
             },
-        })
+        )
         .collect();
 
     Ok(GetFeeResult {
@@ -137,7 +137,7 @@ fn fee_for_msg(
     dest_chain: &DestChain,
     fee_token_config: &BillingTokenConfig,
     additional_token_configs: &[Option<BillingTokenConfig>],
-    additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
+    additional_token_configs_for_dest_chain: &[Option<PerChainPerTokenConfig>],
 ) -> Result<(SVMTokenAmount, ProcessedExtraArgs)> {
     let fee_token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
@@ -273,7 +273,7 @@ fn network_fee(
     message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     token_configs: &[Option<BillingTokenConfig>],
-    token_configs_for_dest_chain: &[PerChainPerTokenConfig],
+    token_configs_for_dest_chain: &[Option<PerChainPerTokenConfig>],
 ) -> Result<NetworkFee> {
     if message.token_amounts.is_empty() {
         return Ok(NetworkFee {
@@ -287,11 +287,13 @@ fn network_fee(
 
     for (i, token_amount) in message.token_amounts.iter().enumerate() {
         let config_for_dest_chain = &token_configs_for_dest_chain[i];
-        let token_network_fee = if config_for_dest_chain.token_transfer_config.is_enabled {
-            token_network_fees(&token_configs[i], token_amount, config_for_dest_chain)?
-        } else {
+
+        let token_network_fee = match config_for_dest_chain {
+            Some(config) if config.token_transfer_config.is_enabled => {
+                token_network_fees(&token_configs[i], token_amount, config)?
+            }
             // If the token has no specific overrides configured, we use the global defaults.
-            default_token_network_fees(dest_chain)
+            _ => default_token_network_fees(dest_chain),
         };
 
         fee += token_network_fee;
@@ -561,7 +563,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[Some(token_config)],
-                &[per_chain_per_token]
+                &[Some(per_chain_per_token)]
             )
             .unwrap()
             .0,
@@ -600,7 +602,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[Some(another_token_config)],
-                &[another_per_chain_per_token_config]
+                &[Some(another_per_chain_per_token_config)]
             )
             .unwrap()
             .0,
@@ -644,7 +646,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[Some(another_token_config.clone())],
-                &[another_per_chain_per_token_config.clone()]
+                &[Some(another_per_chain_per_token_config.clone())]
             )
             .unwrap()
             .0,
@@ -665,7 +667,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[Some(another_token_config)],
-                &[another_per_chain_per_token_config]
+                &[Some(another_per_chain_per_token_config)]
             )
             .unwrap()
             .0,
@@ -707,7 +709,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[None],
-                &[another_per_chain_per_token_config.clone()]
+                &[Some(another_per_chain_per_token_config.clone())]
             )
             .unwrap()
             .0,
@@ -728,7 +730,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[None],
-                &[another_per_chain_per_token_config.clone()]
+                &[Some(another_per_chain_per_token_config.clone())]
             )
             .unwrap()
             .0,
@@ -754,7 +756,7 @@ mod tests {
             .collect();
 
         let tokens: Vec<_> = tokens.into_iter().map(Some).collect();
-        let per_chains: Vec<_> = per_chains.into_iter().collect();
+        let per_chains: Vec<_> = per_chains.into_iter().map(Some).collect();
         set_syscall_stubs(Box::new(TestStubs));
 
         let mut chain = sample_dest_chain();
