@@ -87,7 +87,8 @@ pub mod ccip_router {
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        v1::admin::transfer_ownership(ctx, proposed_owner)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.transfer_ownership(ctx, proposed_owner)
     }
 
     /// Accepts the ownership of the router by the proposed owner.
@@ -99,7 +100,8 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for accepting ownership.
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        v1::admin::accept_ownership(ctx)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.accept_ownership(ctx)
     }
 
     /////////////
@@ -117,7 +119,8 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         fee_aggregator: Pubkey,
     ) -> Result<()> {
-        v1::admin::update_fee_aggregator(ctx, fee_aggregator)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.update_fee_aggregator(ctx, fee_aggregator)
     }
 
     /// Adds a new chain selector to the router.
@@ -137,7 +140,12 @@ pub mod ccip_router {
         new_chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::add_chain_selector(ctx, new_chain_selector, dest_chain_config)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.add_chain_selector(
+            ctx,
+            new_chain_selector,
+            dest_chain_config,
+        )
     }
 
     /// Updates the configuration of the destination chain selector.
@@ -154,7 +162,12 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.update_dest_chain_config(
+            ctx,
+            dest_chain_selector,
+            dest_chain_config,
+        )
     }
 
     /// Add an offramp address to the list of offramps allowed by the router, for a
@@ -171,7 +184,8 @@ pub mod ccip_router {
         source_chain_selector: u64,
         offramp: Pubkey,
     ) -> Result<()> {
-        v1::admin::add_offramp(ctx, source_chain_selector, offramp)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.add_offramp(ctx, source_chain_selector, offramp)
     }
 
     /// Remove an offramp address from the list of offramps allowed by the router, for a
@@ -188,7 +202,8 @@ pub mod ccip_router {
         source_chain_selector: u64,
         offramp: Pubkey,
     ) -> Result<()> {
-        v1::admin::remove_offramp(ctx, source_chain_selector, offramp)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.remove_offramp(ctx, source_chain_selector, offramp)
     }
 
     /// Updates the SVM chain selector in the router configuration.
@@ -203,7 +218,8 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.update_svm_chain_selector(ctx, new_chain_selector)
     }
 
     ///////////////////////////
@@ -332,7 +348,12 @@ pub mod ccip_router {
         transfer_all: bool,
         desired_amount: u64, // if transfer_all is false, this value must be 0
     ) -> Result<()> {
-        v1::admin::withdraw_billed_funds(ctx, transfer_all, desired_amount)
+        let default_code_version = ctx.accounts.config.load()?.default_code_version;
+        admin::router(default_code_version)?.withdraw_billed_funds(
+            ctx,
+            transfer_all,
+            desired_amount,
+        )
     }
 
     ///////////////////
@@ -420,4 +441,6 @@ pub enum CcipRouterError {
     InvalidTokenAdminRegistryProposedAdmin,
     #[msg("Sender not allowed for that destination chain")]
     SenderNotAllowed,
+    #[msg("Invalid code version")]
+    InvalidCodeVersion,
 }

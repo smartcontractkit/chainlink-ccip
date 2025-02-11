@@ -425,6 +425,24 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	return nil
 }
 
+type CodeVersion ag_binary.BorshEnum
+
+const (
+	V1_CodeVersion CodeVersion = iota
+	V2_CodeVersion
+)
+
+func (value CodeVersion) String() string {
+	switch value {
+	case V1_CodeVersion:
+		return "V1"
+	case V2_CodeVersion:
+		return "V2"
+	default:
+		return ""
+	}
+}
+
 type CcipRouterError ag_binary.BorshEnum
 
 const (
@@ -452,6 +470,7 @@ const (
 	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
 	InvalidTokenAdminRegistryProposedAdmin_CcipRouterError
 	SenderNotAllowed_CcipRouterError
+	InvalidCodeVersion_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -504,6 +523,8 @@ func (value CcipRouterError) String() string {
 		return "InvalidTokenAdminRegistryProposedAdmin"
 	case SenderNotAllowed_CcipRouterError:
 		return "SenderNotAllowed"
+	case InvalidCodeVersion_CcipRouterError:
+		return "InvalidCodeVersion"
 	default:
 		return ""
 	}

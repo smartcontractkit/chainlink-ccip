@@ -1,11 +1,33 @@
 use anchor_lang::prelude::*;
 
+use crate::CcipRouterError;
+
+#[repr(u8)]
+pub enum CodeVersion {
+    V1 = 1,
+    V2,
+}
+
+impl TryFrom<u8> for CodeVersion {
+    type Error = CcipRouterError;
+
+    fn try_from(value: u8) -> std::result::Result<CodeVersion, CcipRouterError> {
+        match value {
+            1 => Ok(CodeVersion::V1),
+            2 => Ok(CodeVersion::V2),
+            _ => Err(CcipRouterError::InvalidCodeVersion),
+        }
+    }
+}
+
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)] // TODO this is no longer needed as zero_copy
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct Config {
     pub version: u8,
-    _padding0: [u8; 7],
+    pub default_code_version: u8,
+    _padding0: [u8; 6],
+
     pub svm_chain_selector: u64,
 
     _padding1: [u8; 8],

@@ -909,11 +909,15 @@
             "type": "u8"
           },
           {
+            "name": "defaultCodeVersion",
+            "type": "u8"
+          },
+          {
             "name": "padding0",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -1265,6 +1269,20 @@
       }
     },
     {
+      "name": "CodeVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "V1"
+          },
+          {
+            "name": "V2"
+          }
+        ]
+      }
+    },
+    {
       "name": "CcipRouterError",
       "type": {
         "kind": "enum",
@@ -1340,6 +1358,9 @@
           },
           {
             "name": "SenderNotAllowed"
+          },
+          {
+            "name": "InvalidCodeVersion"
           }
         ]
       }

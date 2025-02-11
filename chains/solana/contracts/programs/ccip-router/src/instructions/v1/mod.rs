@@ -1,7 +1,7 @@
 ////////////////////
 // Public modules //
 ////////////////////
-pub mod admin;
+pub(super) mod admin;
 pub mod onramp;
 pub mod token_admin_registry;
 
