@@ -23,6 +23,9 @@ import (
 // Allowed values for the "provider" flag
 var supportedProviders = []string{"aws", "kind"}
 
+// AWS Profiles that are managed by CRIB
+var cribManagedAwsProfiles = []string{"staging-crib"}
+
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
@@ -103,7 +106,7 @@ var initCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
 
-		if !viper.GetBool("CRIB_CI_ENV") {
+		if !viper.GetBool("CRIB_CI_ENV") && slices.Contains(cribManagedAwsProfiles, viper.GetString("AWS_PROFILE")) {
 			if err := utils.SetupAwsProfile(
 				viper.GetString("AWS_CONFIG_FILE"),
 				viper.GetString("AWS_PROFILE"),
@@ -137,12 +140,7 @@ var initCmd = &cobra.Command{
 			logger.Error("failed to get a valid AWS session", slog.Any("error", err))
 			os.Exit(1)
 		}
-		logger.Info("AWS credentials working.")
-
-		if !viper.GetBool("CRIB_CI_ENV") && !utils.HasValidAwsSession(stsClient) {
-			logger.Error("AWS credentials still not detected. Exiting.")
-			os.Exit(1)
-		}
+		logger.Info("AWS credentials working.", slog.String("profile", viper.GetString("AWS_PROFILE")))
 
 		var k8sClient wrappers.K8sCLI
 		if !viper.GetBool("CRIB_CI_ENV") {
