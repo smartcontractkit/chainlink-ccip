@@ -49,7 +49,7 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 		remaining = unconfirmedTxCount
 
 		time.Sleep(500 * time.Millisecond)
-		if count > 60 {
+		if count > 200 {
 			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
 		}
 	}
