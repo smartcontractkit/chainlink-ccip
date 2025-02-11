@@ -114,6 +114,7 @@ hooks:
   # https://www.devspace.sh/docs/configuration/hooks/#wait-for-a-pod-to-be-running
   - wait:
       running: true
+      timeout: 300
       # This can be needed for init containers
       # that terminate instead of become running.
       terminatedWithCode: 0
