@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/go-git/go-git/v5"
+	"github.com/smartcontractkit/crib/cli/devspace"
 	"github.com/smartcontractkit/crib/cli/utils"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	"github.com/spf13/cobra"
@@ -557,6 +558,16 @@ var printIngressHostsCmd = &cobra.Command{
 	},
 }
 
+var splitRenderCmd = &cobra.Command{
+	Use:   "split-render",
+	Short: "Split and clean devspace \"--render\" output into separate yaml files, so they are easy to compare",
+	Run: func(cmd *cobra.Command, args []string) {
+		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
+		outputDirPath := viper.GetString("output-dir")
+		devspace.SplitRender(outputDirPath)
+	},
+}
+
 //nolint:gochecknoinits
 func init() {
 	rootCmd.AddCommand(devspaceCmd)
@@ -585,4 +596,8 @@ func init() {
 	_ = viper.BindPFlags(ingressCheckCmd.Flags())
 
 	devspaceCmd.AddCommand(printIngressHostsCmd)
+
+	splitRenderCmd.Flags().String("output-dir", ".tmp/manifests/", "Output directory to save rendered manifests")
+	_ = viper.BindPFlags(splitRenderCmd.Flags())
+	devspaceCmd.AddCommand(splitRenderCmd)
 }
