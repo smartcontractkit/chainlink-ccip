@@ -180,7 +180,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				cciptypes.ChainSelector(mr.SourceChainSelector),
 			)
 			if err != nil {
-				r.lggr.Errorw("get onRamp address for selector %d: %w", mr.SourceChainSelector, err)
+				r.lggr.Errorw("get onRamp address for selector", "sourceChain", mr.SourceChainSelector, "err", err)
 				continue
 			}
 
