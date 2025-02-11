@@ -238,7 +238,10 @@ func (p *Plugin) Observation(
 	var err error
 
 	if p.discoveryProcessor != nil {
+		tStart := time.Now()
 		discoveryObs, err = p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
+		lggr.Debugw("commit discovery observation finished",
+			"duration", time.Since(tStart), "err", err)
 		if err != nil {
 			lggr.Errorw("failed to discover contracts", "err", err)
 		}
@@ -342,13 +345,17 @@ func (p *Plugin) getPriceRelatedObservations(
 	var chainFeeObs chainfee.Observation
 	var err error
 
+	tStart := time.Now()
 	tokenPriceObs, err = p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
+	lggr.Debugw("token price observation finished", "duration", time.Since(tStart), "err", err)
 	if err != nil {
 		lggr.Errorw("get token price processor observation", "err", err,
 			"prevTokenPriceOutcome", prevOutcome.TokenPriceOutcome)
 	}
 
+	tStart = time.Now()
 	chainFeeObs, err = p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
+	lggr.Debugw("chain fee observation finished", "duration", time.Since(tStart), "err", err)
 	if err != nil {
 		lggr.Errorw("get gas prices processor observation",
 			"err", err, "prevChainFeeOutcome", prevOutcome.ChainFeeOutcome)

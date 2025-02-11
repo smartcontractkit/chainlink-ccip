@@ -1270,37 +1270,22 @@
         "kind": "enum",
         "variants": [
           {
-            "name": "InvalidSequenceInterval"
-          },
-          {
-            "name": "RootNotCommitted"
-          },
-          {
-            "name": "ExistingMerkleRoot"
-          },
-          {
             "name": "Unauthorized"
           },
           {
-            "name": "InvalidInputs"
+            "name": "InvalidInputsMint"
           },
           {
-            "name": "UnsupportedSourceChainSelector"
+            "name": "InvalidVersion"
           },
           {
-            "name": "UnsupportedDestinationChainSelector"
+            "name": "FeeTokenMismatch"
           },
           {
-            "name": "InvalidProof"
-          },
-          {
-            "name": "InvalidMessage"
+            "name": "RedundantOwnerProposal"
           },
           {
             "name": "ReachedMaxSequenceNumber"
-          },
-          {
-            "name": "ManualExecutionNotAllowed"
           },
           {
             "name": "InvalidInputsTokenIndices"
@@ -1327,34 +1312,7 @@
             "name": "InvalidInputsTokenAmount"
           },
           {
-            "name": "OfframpReleaseMintBalanceMismatch"
-          },
-          {
-            "name": "OfframpInvalidDataLength"
-          },
-          {
-            "name": "StaleCommitReport"
-          },
-          {
-            "name": "DestinationChainDisabled"
-          },
-          {
-            "name": "FeeTokenDisabled"
-          },
-          {
-            "name": "MessageTooLarge"
-          },
-          {
-            "name": "UnsupportedNumberOfTokens"
-          },
-          {
-            "name": "UnsupportedChainFamilySelector"
-          },
-          {
-            "name": "InvalidEVMAddress"
-          },
-          {
-            "name": "InvalidEncoding"
+            "name": "InvalidInputsTransferAllAmount"
           },
           {
             "name": "InvalidInputsAtaAddress"
@@ -1363,10 +1321,7 @@
             "name": "InvalidInputsAtaWritable"
           },
           {
-            "name": "InvalidTokenPrice"
-          },
-          {
-            "name": "StaleGasPrice"
+            "name": "InvalidInputsChainSelector"
           },
           {
             "name": "InsufficientLamports"
@@ -1375,43 +1330,13 @@
             "name": "InsufficientFunds"
           },
           {
-            "name": "UnsupportedToken"
-          },
-          {
-            "name": "InvalidInputsMissingTokenConfig"
-          },
-          {
-            "name": "MessageFeeTooHigh"
-          },
-          {
             "name": "SourceTokenDataTooLarge"
-          },
-          {
-            "name": "MessageGasLimitTooHigh"
-          },
-          {
-            "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
           },
           {
             "name": "InvalidTokenAdminRegistryInputsZeroAddress"
           },
           {
             "name": "InvalidTokenAdminRegistryProposedAdmin"
-          },
-          {
-            "name": "InvalidWritabilityBitmap"
-          },
-          {
-            "name": "InvalidExtraArgsTag"
-          },
-          {
-            "name": "InvalidChainFamilySelector"
-          },
-          {
-            "name": "InvalidTokenReceiver"
-          },
-          {
-            "name": "InvalidSVMAddress"
           },
           {
             "name": "SenderNotAllowed"

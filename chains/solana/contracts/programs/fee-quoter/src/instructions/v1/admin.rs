@@ -19,7 +19,7 @@ pub fn transfer_ownership(ctx: Context<UpdateConfig>, proposed_owner: Pubkey) ->
     let config = &mut ctx.accounts.config;
     require!(
         proposed_owner != config.owner,
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::RedundantOwnerProposal
     );
     emit!(OwnershipTransferRequested {
         from: config.owner,
@@ -160,19 +160,21 @@ pub fn set_token_transfer_fee_config(
 // --- helpers ---
 
 fn validate_dest_chain_config(dest_chain_selector: u64, config: &DestChainConfig) -> Result<()> {
-    // TODO improve errors
-    require!(dest_chain_selector != 0, FeeQuoterError::InvalidInputs);
+    require!(
+        dest_chain_selector != 0,
+        FeeQuoterError::InvalidInputsChainSelector
+    );
     require!(
         config.default_tx_gas_limit != 0,
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::ZeroGasLimit
     );
     require!(
         config.default_tx_gas_limit <= config.max_per_msg_gas_limit,
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::DefaultGasLimitExceedsMaximum
     );
     require!(
         config.chain_family_selector != [0; 4],
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::InvalidChainFamilySelector
     );
     Ok(())
 }
