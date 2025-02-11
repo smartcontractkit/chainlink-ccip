@@ -107,6 +107,7 @@ func GetDecodedECRAuthorizationToken(ecrClient wrappers.ECRAPI) ([]*GetDecodedEC
 	return output, nil
 }
 
+// HasValidAwsSession checks if the current AWS session is valid by calling sts.GetCallerIdentity
 // TODO: evaluate inspecting credentials expiry, so we can refresh the token beforehand
 func HasValidAwsSession(stsClient wrappers.STSAPI) bool {
 	_, err := stsClient.GetCallerIdentity(context.TODO(), &sts.GetCallerIdentityInput{})
@@ -138,6 +139,10 @@ func EnsureValidAwsSession(stsClient wrappers.STSAPI, awsConfigFile string, awsP
 	slog.Warn(fmt.Sprintf("%s Attempting to login via AWS SSO", msg))
 	if err := AwsSsoLogin(awsConfigFile, awsProfile); err != nil {
 		return fmt.Errorf("failed to aws sso login, %v", err)
+	}
+
+	if !HasValidAwsSession(stsClient) {
+		return errors.New(msg)
 	}
 
 	return nil
