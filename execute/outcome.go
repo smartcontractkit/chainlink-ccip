@@ -124,10 +124,6 @@ func (p *Plugin) getMessagesOutcome(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) exectypes.Outcome {
-
-	statusCache := report.NewMessageStatusCache(p.statusGetter)
-	txmStatusChecker := report.NewTXMCheck(statusCache, p.offchainCfg.MaxTxAttempts)
-
 	commitReports := make([]exectypes.CommitData, 0)
 	costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
 	for _, msgID := range observation.CostlyMessages {

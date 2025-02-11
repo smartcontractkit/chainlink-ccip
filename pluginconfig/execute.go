@@ -50,6 +50,10 @@ type ExecuteOffchainConfig struct {
 	// MaxSingleChainReports is the maximum number of single chain reports that can be included in a report.
 	// When set to 0, this setting is ignored.
 	MaxSingleChainReports uint64 `json:"maxSingleChainReports"`
+
+	// MaxTxmStatusChecks is the maximum number of times to check the transaction manager status for a fatal
+	// transaction result. When set to 0 Txm status checking is disabled.
+	MaxTxmStatusChecks uint64 `json:"maxTxmStatusChecks"`
 }
 
 func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {

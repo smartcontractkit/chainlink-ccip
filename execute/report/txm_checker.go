@@ -88,8 +88,8 @@ func NewTXMCheck(statuses *MessageStatusCache, maxAttempts uint64) Check {
 		ctx context.Context,
 		lggr logger.Logger,
 		msg ccipocr3.Message,
-		idx int,
-		report exectypes.CommitData,
+		_ int,
+		_ exectypes.CommitData,
 	) (messageStatus, error) {
 		details, err := statuses.statuses(ctx, msg.Header.MessageID.String())
 		if err != nil {

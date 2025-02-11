@@ -8,14 +8,12 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	txmtype "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
+	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -304,37 +302,24 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
 	}
 
-	// TODO: check txm status and inflight cache
-
-	//type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
-
-	sc := statuschecker.NewTxmStatusChecker(p.statusGetter.GetTransactionStatus)
+	statusCache := report.NewMessageStatusCache(p.statusGetter)
+	txmStatusChecker := report.NewTXMCheck(statusCache, p.offchainCfg.MaxTxmStatusChecks)
 	for chainSelector, msgs := range messageObs {
 		for seqNum, msg := range msgs {
-			// Remove inflight messages from observation.
+			// Inflight messages do not need to be observed.
 			if p.inflightMessageCache.IsInflight(chainSelector, msg.Header.MessageID) {
 				messageObs[chainSelector][seqNum] = cciptypes.Message{}
+				lggr.Infow("skipping message observation - inflight", "msg", msg)
 				continue
 			}
-			// Remove messages which have failed txm statuses.
-			statuses, _, err := sc.CheckMessageStatus(ctx, msg.Header.MessageID.String())
+			// Messages with fatal txm statuses do not need to be observed.
+			status, err := txmStatusChecker(ctx, lggr, msg, 0, exectypes.CommitData{})
 			if err != nil {
-				// max attempts...
-				// TODO: error type to check
+				lggr.Errorw("txm status check error", "msg", msg, "err", err)
+			} else if status != report.None {
 				messageObs[chainSelector][seqNum] = cciptypes.Message{}
-				lggr.Errorw("check message status error",
-					"msgid", msg.Header.MessageID.String(),
-					"err", err)
+				lggr.Infow(fmt.Sprintf("skipping message observation - txm status %s", status), "msg", msg)
 				continue
-			}
-			for _, status := range statuses {
-				if status == txmtype.Fatal {
-					messageObs[chainSelector][seqNum] = cciptypes.Message{}
-					lggr.Errorw("fatal status detected",
-						"msgid", msg.Header.MessageID.String(),
-						"err", err)
-					break
-				}
 			}
 		}
 	}
