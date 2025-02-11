@@ -67,7 +67,7 @@ pub struct UpdateConfig<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -82,7 +82,7 @@ pub struct AcceptOwnership<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -97,14 +97,14 @@ pub struct GetFee<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
     #[account(
         seeds = [seed::DEST_CHAIN, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub dest_chain: Account<'info, DestChain>,
 
@@ -137,7 +137,7 @@ pub struct AddBillingTokenConfig<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -153,8 +153,8 @@ pub struct AddBillingTokenConfig<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 
     #[account(
-        owner = token_program.key() @ FeeQuoterError::InvalidInputs,
-        constraint = token_config.mint == fee_token_mint.key() @ FeeQuoterError::InvalidInputs,
+        owner = token_program.key() @ FeeQuoterError::InvalidInputsMintOwner,
+        constraint = token_config.mint == fee_token_mint.key() @ FeeQuoterError::InvalidInputsMint,
     )]
     pub fee_token_mint: InterfaceAccount<'info, Mint>,
 
@@ -194,7 +194,7 @@ pub struct UpdateBillingTokenConfig<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -216,7 +216,7 @@ pub struct AddDestChain<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -245,7 +245,7 @@ pub struct UpdateDestChainConfig<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -253,7 +253,7 @@ pub struct UpdateDestChainConfig<'info> {
         mut,
         seeds = [seed::DEST_CHAIN, chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(dest_chain.version, MAX_CHAINSTATE_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub dest_chain: Account<'info, DestChain>,
 
@@ -268,7 +268,7 @@ pub struct SetTokenTransferFeeConfig<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -278,7 +278,7 @@ pub struct SetTokenTransferFeeConfig<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + PerChainPerTokenConfig::INIT_SPACE,
-        constraint = uninitialized(per_chain_per_token_config.version) || valid_version(per_chain_per_token_config.version, MAX_TOKEN_AND_CHAIN_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = uninitialized(per_chain_per_token_config.version) || valid_version(per_chain_per_token_config.version, MAX_TOKEN_AND_CHAIN_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub per_chain_per_token_config: Account<'info, PerChainPerTokenConfig>,
 
@@ -304,7 +304,7 @@ pub struct AddPriceUpdater<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -328,7 +328,7 @@ pub struct RemovePriceUpdater<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
 
@@ -355,7 +355,7 @@ pub struct UpdatePrices<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidInputs,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ FeeQuoterError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
     // Remaining accounts represent:
