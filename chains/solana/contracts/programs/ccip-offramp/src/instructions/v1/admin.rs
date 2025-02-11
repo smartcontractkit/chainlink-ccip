@@ -16,7 +16,7 @@ pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubke
     let mut config = ctx.accounts.config.load_mut()?;
     require!(
         proposed_owner != config.owner,
-        CcipOfframpError::InvalidInputs
+        CcipOfframpError::RedundantOwnerProposal
     );
     emit!(OwnershipTransferRequested {
         from: config.owner,
@@ -121,7 +121,7 @@ pub fn set_ocr_config(
     signers: Vec<[u8; 20]>,
     transmitters: Vec<Pubkey>,
 ) -> Result<()> {
-    require!(plugin_type < 2, CcipOfframpError::InvalidInputs);
+    require!(plugin_type < 2, CcipOfframpError::InvalidPluginType);
     let mut config = ctx.accounts.config.load_mut()?;
 
     let is_commit = plugin_type == OcrPluginType::Commit as u8;
