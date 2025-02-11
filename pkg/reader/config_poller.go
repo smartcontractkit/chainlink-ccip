@@ -161,7 +161,7 @@ func (c *configPoller) fetchChainConfig(
 		return ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
 	}
 
-	requests := c.reader.prepareBatchConfigRequests()
+	requests := c.reader.prepareBatchConfigRequests(chainSel)
 	batchResult, skipped, err := reader.ExtendedBatchGetLatestValues(ctx, requests, true)
 	if err != nil {
 		return ChainConfigSnapshot{}, fmt.Errorf("batch get latest values for chain %d: %w", chainSel, err)
@@ -173,7 +173,7 @@ func (c *configPoller) fetchChainConfig(
 			"contracts", skipped)
 	}
 
-	return c.reader.processConfigResults(batchResult)
+	return c.reader.processConfigResults(chainSel, batchResult)
 }
 
 // resultProcessor defines a function type for processing individual results
