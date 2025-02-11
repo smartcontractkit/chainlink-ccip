@@ -8,6 +8,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	txmtype "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -296,6 +298,52 @@ func (p *Plugin) getMessagesObservation(
 		previousOutcome.CommitReports,
 	)
 
+	// Compute hashes to allow deleting messages from the observation.
+	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
+	}
+
+	// TODO: check txm status and inflight cache
+
+	//type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
+
+	sc := statuschecker.NewTxmStatusChecker(p.statusGetter.GetTransactionStatus)
+	for chainSelector, msgs := range messageObs {
+		for seqNum, msg := range msgs {
+			// Remove inflight messages from observation.
+			if p.inflightMessageCache.IsInflight(chainSelector, msg.Header.MessageID) {
+				messageObs[chainSelector][seqNum] = cciptypes.Message{}
+				continue
+			}
+			// Remove messages which have failed txm statuses.
+			statuses, _, err := sc.CheckMessageStatus(ctx, msg.Header.MessageID.String())
+			if err != nil {
+				// max attempts...
+				// TODO: error type to check
+				messageObs[chainSelector][seqNum] = cciptypes.Message{}
+				lggr.Errorw("check message status error",
+					"msgid", msg.Header.MessageID.String(),
+					"err", err)
+				continue
+			}
+			for _, status := range statuses {
+				if status == txmtype.Fatal {
+					messageObs[chainSelector][seqNum] = cciptypes.Message{}
+					lggr.Errorw("fatal status detected",
+						"msgid", msg.Header.MessageID.String(),
+						"err", err)
+					break
+				}
+			}
+		}
+	}
+
+	// Remove messages which have failed txm statuses.
+	// This is a roundabout way to remove messages from the observation because it will continue to be
+	// executed by other nodes until >F nodes have failed to execute it.
+	// We cannot form consensus on the TXM state because the fatal status is not recorded onchain.
+
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
@@ -310,11 +358,6 @@ func (p *Plugin) getMessagesObservation(
 	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages: %w", err)
-	}
-
-	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
 	}
 
 	observation.CommitReports = commitReportCache
