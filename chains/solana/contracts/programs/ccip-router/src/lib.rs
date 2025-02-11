@@ -72,6 +72,8 @@ pub mod ccip_router {
 
         config.fee_aggregator = fee_aggregator;
 
+        config.default_code_version = 1;
+
         Ok(())
     }
 
