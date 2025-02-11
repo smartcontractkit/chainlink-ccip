@@ -8,7 +8,7 @@ import (
 )
 
 const tmplFile = "values.yaml.tmpl"
-const defaultFinalityDepth = 50
+const defaultFinalityDepth = 200
 
 type chain struct {
 	NetworkId     int64
