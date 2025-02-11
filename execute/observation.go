@@ -67,10 +67,13 @@ func (p *Plugin) Observation(
 	var discoveryObs dt.Observation
 	// discovery processor disabled by setting it to nil.
 	if p.discovery != nil {
+		tStart := time.Now()
 		discoveryObs, err = p.discovery.Observation(ctx, dt.Outcome{}, dt.Query{})
 		if err != nil {
 			lggr.Errorw("failed to discover contracts", "err", err)
 		}
+		lggr.Debugw("finished exec discovery observation",
+			"discoveryObs", discoveryObs, "duration", time.Since(tStart))
 
 		if !p.contractsInitialized {
 			lggr.Infow("contracts not initialized, only making discovery observations",
@@ -84,6 +87,7 @@ func (p *Plugin) Observation(
 		FChain:    fChain,
 	}
 
+	tStart := time.Now()
 	state := previousOutcome.State.Next()
 	lggr.Debugw("Execute plugin performing observation", "state", state)
 	switch state {
@@ -111,7 +115,8 @@ func (p *Plugin) Observation(
 	}
 
 	p.observer.TrackObservation(observation, state)
-	lggr.Infow("execute plugin got observation", "observation", observation)
+	lggr.Infow("execute plugin got observation", "observation", observation,
+		"duration", time.Since(tStart), "state", state)
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
