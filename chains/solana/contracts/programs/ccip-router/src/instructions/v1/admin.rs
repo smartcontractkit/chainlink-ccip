@@ -14,7 +14,7 @@ pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubke
     let mut config = ctx.accounts.config.load_mut()?;
     require!(
         proposed_owner != config.owner,
-        CcipRouterError::InvalidInputs
+        CcipRouterError::RedundantOwnerProposal
     );
     emit!(events::OwnershipTransferRequested {
         from: config.owner,
@@ -129,14 +129,20 @@ pub fn withdraw_billed_funds(
     };
 
     let amount = if transfer_all {
-        require!(desired_amount == 0, CcipRouterError::InvalidInputs);
+        require!(
+            desired_amount == 0,
+            CcipRouterError::InvalidInputsTransferAllAmount
+        );
         require!(
             ctx.accounts.fee_token_accum.amount > 0,
             CcipRouterError::InsufficientFunds
         );
         ctx.accounts.fee_token_accum.amount
     } else {
-        require!(desired_amount > 0, CcipRouterError::InvalidInputs);
+        require!(
+            desired_amount > 0,
+            CcipRouterError::InvalidInputsTokenAmount
+        );
         require!(
             desired_amount <= ctx.accounts.fee_token_accum.amount,
             CcipRouterError::InsufficientFunds
@@ -160,7 +166,9 @@ pub fn withdraw_billed_funds(
 fn validate_dest_chain_config(dest_chain_selector: u64, _config: &DestChainConfig) -> Result<()> {
     // As of now, the config has very few properties and there is very little to validate yet.
     // This is mainly a placeholder to add validations as that config object grows.
-    // TODO improve errors
-    require!(dest_chain_selector != 0, CcipRouterError::InvalidInputs);
+    require!(
+        dest_chain_selector != 0,
+        CcipRouterError::InvalidInputsChainSelector
+    );
     Ok(())
 }
