@@ -64,6 +64,8 @@ func TestCCIPRouter(t *testing.T) {
 	require.NoError(t, gerr)
 	token1PoolAdmin, gerr := solana.NewRandomPrivateKey()
 	require.NoError(t, gerr)
+	token2PoolAdmin, gerr := solana.NewRandomPrivateKey()
+	require.NoError(t, gerr)
 	feeAggregator, gerr := solana.NewRandomPrivateKey()
 	require.NoError(t, gerr)
 
@@ -98,6 +100,8 @@ func TestCCIPRouter(t *testing.T) {
 	token0, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram)
 	require.NoError(t, gerr)
 	token1, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram)
+	require.NoError(t, gerr)
+	token2, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram)
 	require.NoError(t, gerr)
 
 	signers, transmitters, getTransmitter := testutils.GenerateSignersAndTransmitters(t, config.MaxOracles)
@@ -175,6 +179,7 @@ func TestCCIPRouter(t *testing.T) {
 				ccipAdmin,
 				token0PoolAdmin,
 				token1PoolAdmin,
+				token2PoolAdmin,
 				feeAggregator),
 				solanaGoClient,
 				t)
@@ -193,36 +198,49 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("token", func(t *testing.T) {
-			ixs, ixErr := tokens.CreateToken(ctx, token0.Program, token0.Mint.PublicKey(), token0PoolAdmin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
-			require.NoError(t, ixErr)
+			ix0, ixErr0 := tokens.CreateToken(ctx, token0.Program, token0.Mint.PublicKey(), token0PoolAdmin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
+			require.NoError(t, ixErr0)
 
-			ixsAnotherToken, anotherTokenErr := tokens.CreateToken(ctx, token1.Program, token1.Mint.PublicKey(), token1PoolAdmin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
-			require.NoError(t, anotherTokenErr)
+			ix1, ixErr1 := tokens.CreateToken(ctx, token1.Program, token1.Mint.PublicKey(), token1PoolAdmin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
+			require.NoError(t, ixErr1)
+
+			ix2, ixErr2 := tokens.CreateToken(ctx, token2.Program, token2.Mint.PublicKey(), token2PoolAdmin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
+			require.NoError(t, ixErr2)
 
 			// mint tokens to user
 			ixAta0, addr0, ataErr := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint.PublicKey(), user.PublicKey(), token0PoolAdmin.PublicKey())
 			require.NoError(t, ataErr)
 			ixMintTo0, mintErr := tokens.MintTo(10000000, token0.Program, token0.Mint.PublicKey(), addr0, token0PoolAdmin.PublicKey())
 			require.NoError(t, mintErr)
-			ixAta1, addr1, ataErr := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint.PublicKey(), user.PublicKey(), token0PoolAdmin.PublicKey())
+			ixAta1, addr1, ataErr := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint.PublicKey(), user.PublicKey(), token1PoolAdmin.PublicKey())
 			require.NoError(t, ataErr)
 			ixMintTo1, mintErr := tokens.MintTo(10000000, token1.Program, token1.Mint.PublicKey(), addr1, token1PoolAdmin.PublicKey())
+			require.NoError(t, mintErr)
+			ixAta2, addr2, ataErr := tokens.CreateAssociatedTokenAccount(token2.Program, token2.Mint.PublicKey(), user.PublicKey(), token2PoolAdmin.PublicKey())
+			require.NoError(t, ataErr)
+			ixMintTo2, mintErr := tokens.MintTo(10000000, token2.Program, token2.Mint.PublicKey(), addr2, token2PoolAdmin.PublicKey())
 			require.NoError(t, mintErr)
 
 			// create ATA for receiver (receiver program address)
 			ixAtaReceiver0, recAddr0, recErr := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint.PublicKey(), config.ReceiverExternalExecutionConfigPDA, token0PoolAdmin.PublicKey())
 			require.NoError(t, recErr)
-			ixAtaReceiver1, recAddr1, recErr := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint.PublicKey(), config.ReceiverExternalExecutionConfigPDA, token0PoolAdmin.PublicKey())
+			ixAtaReceiver1, recAddr1, recErr := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint.PublicKey(), config.ReceiverExternalExecutionConfigPDA, token1PoolAdmin.PublicKey())
+			require.NoError(t, recErr)
+			ixAtaReceiver2, recAddr2, recErr := tokens.CreateAssociatedTokenAccount(token2.Program, token2.Mint.PublicKey(), config.ReceiverExternalExecutionConfigPDA, token2PoolAdmin.PublicKey())
 			require.NoError(t, recErr)
 
 			token0.User[user.PublicKey()] = addr0
 			token0.User[config.ReceiverExternalExecutionConfigPDA] = recAddr0
 			token1.User[user.PublicKey()] = addr1
 			token1.User[config.ReceiverExternalExecutionConfigPDA] = recAddr1
-			ixs = append(ixs, ixAta0, ixMintTo0, ixAtaReceiver0)
-			ixs = append(ixs, ixsAnotherToken...)
-			ixs = append(ixs, ixAta1, ixMintTo1, ixAtaReceiver1)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixs, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0.Mint, token1.Mint, token1PoolAdmin))
+			token2.User[user.PublicKey()] = addr2
+			token2.User[config.ReceiverExternalExecutionConfigPDA] = recAddr2
+			ix0 = append(ix0, ixAta0, ixMintTo0, ixAtaReceiver0)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix0, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token0.Mint))
+			ix1 = append(ix1, ixAta1, ixMintTo1, ixAtaReceiver1)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix1, token1PoolAdmin, config.DefaultCommitment, common.AddSigners(token1.Mint))
+			ix2 = append(ix2, ixAta2, ixMintTo2, ixAtaReceiver2)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, ix2, token2PoolAdmin, config.DefaultCommitment, common.AddSigners(token2.Mint))
 		})
 
 		t.Run("token-pool", func(t *testing.T) {
@@ -248,6 +266,16 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
+			ixInit2, err := test_token_pool.NewInitializeInstruction(
+				test_token_pool.BurnAndMint_PoolType,
+				config.CcipRouterProgram,
+				token2.PoolConfig,
+				token2.Mint.PublicKey(),
+				token2PoolAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
 			ixAta0, addr0, err := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint.PublicKey(), token0.PoolSigner, token0PoolAdmin.PublicKey())
 			require.NoError(t, err)
 			token0.PoolTokenAccount = addr0
@@ -256,17 +284,23 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			token1.PoolTokenAccount = addr1
 			token1.User[token1.PoolSigner] = token1.PoolTokenAccount
+			ixAta2, addr2, err := tokens.CreateAssociatedTokenAccount(token2.Program, token2.Mint.PublicKey(), token2.PoolSigner, token0PoolAdmin.PublicKey())
+			require.NoError(t, err)
+			token2.PoolTokenAccount = addr2
+			token2.User[token2.PoolSigner] = token2.PoolTokenAccount
 
 			ixAuth, err := tokens.SetTokenMintAuthority(token0.Program, token0.PoolSigner, token0.Mint.PublicKey(), token0PoolAdmin.PublicKey())
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit0, ixInit1, ixAta0, ixAta1, ixAuth}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin))
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit0, ixInit1, ixAta0, ixAta1, ixAuth, ixInit2, ixAta2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
 
 			// Lookup Table for Tokens
 			require.NoError(t, token0.SetupLookupTable(ctx, solanaGoClient, token0PoolAdmin))
 			token0Entries := token0.ToTokenPoolEntries()
 			require.NoError(t, token1.SetupLookupTable(ctx, solanaGoClient, token1PoolAdmin))
 			token1Entries := token1.ToTokenPoolEntries()
+			require.NoError(t, token2.SetupLookupTable(ctx, solanaGoClient, token2PoolAdmin))
+			token2Entries := token2.ToTokenPoolEntries()
 
 			// Verify Lookup tables where correctly initialized
 			lookupTableEntries0, err := common.GetAddressLookupTable(ctx, solanaGoClient, token0.PoolLookupTable)
@@ -278,6 +312,11 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, len(token1Entries), len(lookupTableEntries1))
 			require.Equal(t, token1Entries, lookupTableEntries1)
+
+			lookupTableEntries2, err := common.GetAddressLookupTable(ctx, solanaGoClient, token2.PoolLookupTable)
+			require.NoError(t, err)
+			require.Equal(t, len(token2Entries), len(lookupTableEntries2))
+			require.Equal(t, token2Entries, lookupTableEntries2)
 		})
 
 		t.Run("billing", func(t *testing.T) {
@@ -2463,7 +2502,12 @@ func TestCCIPRouter(t *testing.T) {
 					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
 				}, token1.PoolConfig, token1.Chain[selector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin))
+				ix2, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token2.Mint.PublicKey(), base_token_pool.RemoteConfig{
+					PoolAddresses: []base_token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
+					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
+				}, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
 			}
 		})
 
@@ -2482,7 +2526,9 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			ix1, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, token1.Mint.PublicKey(), base_token_pool.RateLimitConfig{}, base_token_pool.RateLimitConfig{}, token1.PoolConfig, token1.Chain[config.EvmChainSelector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin))
+			ix2, err := test_token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, token2.Mint.PublicKey(), base_token_pool.RateLimitConfig{}, base_token_pool.RateLimitConfig{}, token2.PoolConfig, token2.Chain[config.EvmChainSelector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
 		})
 
 		t.Run("Billing", func(t *testing.T) {
@@ -2494,6 +2540,10 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			ix3, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token1.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token1.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
+
+			// Deliberately not setting configuration for token2, as it exists to test cases where the configuration doesn't exist, given that it can't
+			// be removed (only disabled) after it's initially set.
+
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3}, ccipAdmin, config.DefaultCommitment)
 		})
 
@@ -2555,6 +2605,30 @@ func TestCCIPRouter(t *testing.T) {
 			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token0BillingConfigPda))
 			raw.AccountMetaSlice.Append(solana.Meta(token0PerChainPerConfigPda))
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+
+			feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
+			require.NotNil(t, feeResult)
+			fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.FeeQuoterProgram.String(), binary.LittleEndian.Uint64)
+			require.Greater(t, fee, uint64(0))
+		})
+
+		t.Run("Fee is retrieved for a correctly formatted message containing a nonnative token with no billing config", func(t *testing.T) {
+			message := fee_quoter.SVM2AnyMessage{
+				Receiver:     validReceiverAddress[:],
+				FeeToken:     wsol.mint,
+				TokenAmounts: []fee_quoter.SVMTokenAmount{{Token: token2.Mint.PublicKey(), Amount: 1}},
+				ExtraArgs:    emptyEVMExtraArgsV2,
+			}
+
+			// Token 2 is not configured with any fee overrides
+			token2BillingConfigPda := getFqTokenConfigPDA(token2.Mint.PublicKey())
+			token2PerChainPerConfigPda := getFqPerChainPerTokenConfigBillingPDA(token2.Mint.PublicKey())
+
+			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+			raw.AccountMetaSlice.Append(solana.Meta(token2BillingConfigPda))
+			raw.AccountMetaSlice.Append(solana.Meta(token2PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
