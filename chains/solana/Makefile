@@ -62,7 +62,7 @@ build-contracts:
 # Sparse index significantly speeds up dependency fetching, supposedly default in 1.70 but anchor build was still using a slow git download
 .PHONY: docker-build-contracts
 docker-build-contracts:
-	docker run --rm -it \
+	docker run --rm \
 		-v $(shell pwd)/contracts:/workdir \
 		-v ${TARGET_DIR}:/workdir/target \
 		-e CARGO_TARGET_DIR=/workdir/target \

@@ -25,6 +25,34 @@ var (
 // Currently only one contract per chain per name is supported.
 type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 
+// ChainConfigSnapshot represents the complete configuration state of the chain
+type ChainConfigSnapshot struct {
+	Offramp   OfframpConfig
+	RMNProxy  RMNProxyConfig
+	RMNRemote RMNRemoteConfig
+	FeeQuoter FeeQuoterConfig
+}
+
+type FeeQuoterConfig struct {
+	StaticConfig feeQuoterStaticConfig
+}
+
+type RMNRemoteConfig struct {
+	DigestHeader    rmnDigestHeader
+	VersionedConfig versionedConfig
+}
+
+type OfframpConfig struct {
+	CommitLatestOCRConfig OCRConfigResponse
+	ExecLatestOCRConfig   OCRConfigResponse
+	StaticConfig          offRampStaticChainConfig
+	DynamicConfig         offRampDynamicChainConfig
+}
+
+type RMNProxyConfig struct {
+	RemoteAddress []byte
+}
+
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
 	if resp == nil {
