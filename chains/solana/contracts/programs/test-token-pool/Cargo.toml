@@ -22,7 +22,7 @@ default = []
 [dependencies]
 anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
 anchor-spl = "0.30.1"
-solana-program = "1.18.17" # recommended version for Anchor 0.30.1
+solana-program = "=1.18.17" # recommended version for Anchor 0.30.1
 spl-math = { version = "0.2.0", features = [ "no-entrypoint" ] }
 base-token-pool = { version = "0.1.0-dev", path = "../base-token-pool/", features = ["no-entrypoint"] }
 example-burnmint-token-pool = { version = "0.1.0-dev", path = "../example-burnmint-token-pool", features = ["no-entrypoint"] }

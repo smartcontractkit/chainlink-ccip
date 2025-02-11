@@ -20,7 +20,7 @@ idl-build = [
 default = []
 
 [dependencies]
-solana-program = "1.18.17" # recommended version for Anchor 0.30.1
+solana-program = "=1.18.17" # recommended version for Anchor 0.30.1
 anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
 anchor-spl = "0.30.1"
 bytemuck = "1.7"
