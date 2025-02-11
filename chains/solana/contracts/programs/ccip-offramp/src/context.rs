@@ -169,7 +169,7 @@ pub struct UpdateConfig<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -183,7 +183,7 @@ pub struct TransferOwnership<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -197,7 +197,7 @@ pub struct AcceptOwnership<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -222,7 +222,7 @@ pub struct AddSourceChain<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -238,14 +238,14 @@ pub struct UpdateSourceChain<'info> {
         mut,
         seeds = [seed::SOURCE_CHAIN, new_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub source_chain: Account<'info, SourceChain>,
 
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -259,7 +259,7 @@ pub struct SetOcrConfig<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -280,14 +280,14 @@ pub struct CommitReportContext<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
     #[account(
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
-        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub reference_addresses: Account<'info, ReferenceAddresses>,
 
@@ -295,7 +295,7 @@ pub struct CommitReportContext<'info> {
         mut,
         seeds = [seed::SOURCE_CHAIN, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub source_chain: Account<'info, SourceChain>,
 
@@ -313,7 +313,7 @@ pub struct CommitReportContext<'info> {
     pub system_program: Program<'info, System>,
 
     /// CHECK: This is the sysvar instructions account
-    #[account(address = instructions::ID @ CcipOfframpError::InvalidInputs)]
+    #[account(address = instructions::ID @ CcipOfframpError::InvalidInputsSysvarAccount)]
     pub sysvar_instructions: UncheckedAccount<'info>,
 
     /// CHECK: This is the signer for the billing CPIs, used here to invoke fee quoter with price updates
@@ -325,7 +325,7 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: fee quoter program account, used to invoke fee quoter with price updates
     #[account(
-        address = reference_addresses.fee_quoter @ CcipOfframpError::InvalidInputs,
+        address = reference_addresses.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
@@ -359,21 +359,21 @@ pub struct ExecuteReportContext<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
     #[account(
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
-        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub reference_addresses: Account<'info, ReferenceAddresses>,
 
     #[account(
         seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub source_chain: Account<'info, SourceChain>,
 
@@ -381,7 +381,7 @@ pub struct ExecuteReportContext<'info> {
         mut,
         seeds = [seed::COMMIT_REPORT, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.root.as_ref()],
         bump,
-        constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidInputs,
+        constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub commit_report: Account<'info, CommitReport>,
 
@@ -392,7 +392,7 @@ pub struct ExecuteReportContext<'info> {
     /// so that token pools and receivers can then check that the caller is an actual offramp that
     /// has been registered in the router as such for that source chain.
     #[account(
-        owner = reference_addresses.router @ CcipOfframpError::InvalidInputs, // this guarantees that it was initialized
+        owner = reference_addresses.router @ CcipOfframpError::InvalidInputsAllowedOfframpAccount, // this guarantees that it was initialized
         seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), offramp.key().as_ref()],
         bump,
         seeds::program = reference_addresses.router,
@@ -408,7 +408,7 @@ pub struct ExecuteReportContext<'info> {
     pub system_program: Program<'info, System>,
 
     /// CHECK: This is a sysvar account
-    #[account(address = instructions::ID @ CcipOfframpError::InvalidInputs)]
+    #[account(address = instructions::ID @ CcipOfframpError::InvalidInputsSysvarAccount)]
     pub sysvar_instructions: AccountInfo<'info>,
 
     #[account(seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]

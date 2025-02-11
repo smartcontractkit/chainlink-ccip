@@ -1438,7 +1438,25 @@
             "name": "Unauthorized"
           },
           {
-            "name": "InvalidInputs"
+            "name": "InvalidNonce"
+          },
+          {
+            "name": "InvalidInputsMissingWritable"
+          },
+          {
+            "name": "OnrampNotConfigured"
+          },
+          {
+            "name": "FailedToDeserializeReport"
+          },
+          {
+            "name": "InvalidPluginType"
+          },
+          {
+            "name": "InvalidVersion"
+          },
+          {
+            "name": "RedundantOwnerProposal"
           },
           {
             "name": "UnsupportedSourceChainSelector"
@@ -1459,6 +1477,12 @@
             "name": "ManualExecutionNotAllowed"
           },
           {
+            "name": "InvalidInputsNumberOfAccounts"
+          },
+          {
+            "name": "InvalidInputsGlobalStateAccount"
+          },
+          {
             "name": "InvalidInputsTokenIndices"
           },
           {
@@ -1466,6 +1490,15 @@
           },
           {
             "name": "InvalidInputsTokenAccounts"
+          },
+          {
+            "name": "InvalidInputsSysvarAccount"
+          },
+          {
+            "name": "InvalidInputsFeeQuoterAccount"
+          },
+          {
+            "name": "InvalidInputsAllowedOfframpAccount"
           },
           {
             "name": "InvalidInputsConfigAccounts"
@@ -1480,9 +1513,6 @@
             "name": "InvalidInputsLookupTableAccountWritable"
           },
           {
-            "name": "InvalidInputsTokenAmount"
-          },
-          {
             "name": "OfframpReleaseMintBalanceMismatch"
           },
           {
@@ -1492,85 +1522,7 @@
             "name": "StaleCommitReport"
           },
           {
-            "name": "DestinationChainDisabled"
-          },
-          {
-            "name": "FeeTokenDisabled"
-          },
-          {
-            "name": "MessageTooLarge"
-          },
-          {
-            "name": "UnsupportedNumberOfTokens"
-          },
-          {
-            "name": "UnsupportedChainFamilySelector"
-          },
-          {
-            "name": "InvalidEVMAddress"
-          },
-          {
-            "name": "InvalidEncoding"
-          },
-          {
-            "name": "InvalidInputsAtaAddress"
-          },
-          {
-            "name": "InvalidInputsAtaWritable"
-          },
-          {
-            "name": "InvalidTokenPrice"
-          },
-          {
-            "name": "StaleGasPrice"
-          },
-          {
-            "name": "InsufficientLamports"
-          },
-          {
-            "name": "InsufficientFunds"
-          },
-          {
-            "name": "UnsupportedToken"
-          },
-          {
-            "name": "InvalidInputsMissingTokenConfig"
-          },
-          {
-            "name": "MessageFeeTooHigh"
-          },
-          {
-            "name": "SourceTokenDataTooLarge"
-          },
-          {
-            "name": "MessageGasLimitTooHigh"
-          },
-          {
-            "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
-          },
-          {
-            "name": "InvalidTokenAdminRegistryInputsZeroAddress"
-          },
-          {
-            "name": "InvalidTokenAdminRegistryProposedAdmin"
-          },
-          {
             "name": "InvalidWritabilityBitmap"
-          },
-          {
-            "name": "InvalidExtraArgsTag"
-          },
-          {
-            "name": "InvalidChainFamilySelector"
-          },
-          {
-            "name": "InvalidTokenReceiver"
-          },
-          {
-            "name": "InvalidSVMAddress"
-          },
-          {
-            "name": "SenderNotAllowed"
           }
         ]
       }
