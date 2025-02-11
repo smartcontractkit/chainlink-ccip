@@ -448,6 +448,10 @@ var ingressCheckCmd = &cobra.Command{
 			ingress := &ingressList.Items[i]
 			logger.Info("validating ingress", slog.String("name", ingress.Name), slog.String("namespace", ingress.Namespace))
 			logger.Debug("ingress object contents", slog.Any("status", ingress.Status))
+			if ingress.Spec.IngressClassName == nil {
+				logger.Error("spec.IngressClassName must be specified", slog.String("name", ingress.Name), slog.String("namespace", ingress.Namespace))
+				os.Exit(1)
+			}
 			var ingressSuffix string
 			switch *ingress.Spec.IngressClassName {
 			case "alb":
