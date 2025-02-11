@@ -471,7 +471,7 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 func TestPreventRMNEnabledBeingChanged(t *testing.T) {
 	expectedField := "RMNEnabled"
 	expectedType := "bool"
-	expectedJsonTag := "rmnEnabled"
+	expectedJSONTag := "rmnEnabled"
 
 	typ := reflect.TypeOf(CommitOffchainConfig{})
 	numFields := typ.NumField()
@@ -479,7 +479,7 @@ func TestPreventRMNEnabledBeingChanged(t *testing.T) {
 		field := typ.Field(i)
 		if field.Name == expectedField &&
 			field.Type.String() == expectedType &&
-			field.Tag.Get("json") == expectedJsonTag {
+			field.Tag.Get("json") == expectedJSONTag {
 
 			return
 		}
