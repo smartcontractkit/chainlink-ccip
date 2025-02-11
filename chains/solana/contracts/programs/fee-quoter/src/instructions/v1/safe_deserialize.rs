@@ -18,12 +18,16 @@ pub fn per_chain_per_token_config<'info>(
         ],
         &crate::ID,
     );
-    require_keys_eq!(account.key(), expected, FeeQuoterError::InvalidInputs);
+    require_keys_eq!(
+        account.key(),
+        expected,
+        FeeQuoterError::InvalidInputsPerChainPerTokenConfig
+    );
     let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
     require_eq!(
         account.version,
         1, // the v1 version of the onramp will always be tied to version 1 of the state
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::InvalidVersion
     );
     Ok(account.into_inner())
 }
@@ -40,12 +44,16 @@ pub fn billing_token_config<'info>(
 
     let (expected, _) =
         Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
-    require_keys_eq!(account.key(), expected, FeeQuoterError::InvalidInputs);
+    require_keys_eq!(
+        account.key(),
+        expected,
+        FeeQuoterError::InvalidInputsBillingTokenConfig
+    );
     let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
     require_eq!(
         account.version,
         1, // the v1 version of the onramp will always be tied to version 1 of the state
-        FeeQuoterError::InvalidInputs
+        FeeQuoterError::InvalidVersion
     );
     Ok(Some(account.into_inner().config))
 }
