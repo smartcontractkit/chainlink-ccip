@@ -636,6 +636,7 @@ func TestCCIPRouter(t *testing.T) {
 			Selector     uint64
 			Conf         fee_quoter.DestChainConfig
 			SkipOnUpdate bool
+			Error        string
 		}
 		invalidInputTests := []InvalidChainBillingInputTest{
 			{
@@ -646,12 +647,14 @@ func TestCCIPRouter(t *testing.T) {
 					MaxPerMsgGasLimit:   validFqDestChainConfig.MaxPerMsgGasLimit,
 					ChainFamilySelector: validFqDestChainConfig.ChainFamilySelector,
 				},
+				Error: fee_quoter.ZeroGasLimit_FeeQuoterError.String(),
 			},
 			{
 				Name:         "Zero DestChainSelector",
 				Selector:     0,
 				Conf:         validFqDestChainConfig,
 				SkipOnUpdate: true, // as the 0-selector is invalid, the config account can never be initialized
+				Error:        fee_quoter.InvalidInputsChainSelector_FeeQuoterError.String(),
 			},
 			{
 				Name:     "Zero ChainFamilySelector",
@@ -661,6 +664,7 @@ func TestCCIPRouter(t *testing.T) {
 					MaxPerMsgGasLimit:   validFqDestChainConfig.MaxPerMsgGasLimit,
 					ChainFamilySelector: [4]uint8{0, 0, 0, 0},
 				},
+				Error: fee_quoter.InvalidChainFamilySelector_FeeQuoterError.String(),
 			},
 			{
 				Name:     "DefaultTxGasLimit > MaxPerMsgGasLimit",
@@ -670,6 +674,7 @@ func TestCCIPRouter(t *testing.T) {
 					MaxPerMsgGasLimit:   1,
 					ChainFamilySelector: validFqDestChainConfig.ChainFamilySelector,
 				},
+				Error: fee_quoter.DefaultGasLimitExceedsMaximum_FeeQuoterError.String(),
 			},
 		}
 
@@ -688,7 +693,7 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SystemProgramID,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.InvalidInputs_FeeQuoterError.String()})
+					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + test.Error})
 					require.NotNil(t, result)
 				})
 			}
@@ -952,7 +957,7 @@ func TestCCIPRouter(t *testing.T) {
 						legacyAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.InvalidInputs_FeeQuoterError.String()})
+					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + test.Error})
 					require.NotNil(t, result)
 				})
 			}
@@ -1197,7 +1202,7 @@ func TestCCIPRouter(t *testing.T) {
 				ccipAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.InvalidInputs_FeeQuoterError.String()})
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.RedundantOwnerProposal_FeeQuoterError.String()})
 			require.NotNil(t, result)
 
 			// Validate proposed set to 0-address

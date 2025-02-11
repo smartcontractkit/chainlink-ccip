@@ -1134,70 +1134,61 @@
         "kind": "enum",
         "variants": [
           {
-            "name": "InvalidSequenceInterval"
-          },
-          {
-            "name": "RootNotCommitted"
-          },
-          {
-            "name": "ExistingMerkleRoot"
-          },
-          {
             "name": "Unauthorized"
           },
           {
             "name": "InvalidInputs"
           },
           {
-            "name": "UnsupportedSourceChainSelector"
+            "name": "ZeroGasLimit"
           },
           {
-            "name": "UnsupportedDestinationChainSelector"
+            "name": "DefaultGasLimitExceedsMaximum"
           },
           {
-            "name": "InvalidProof"
+            "name": "InvalidVersion"
           },
           {
-            "name": "InvalidMessage"
+            "name": "RedundantOwnerProposal"
           },
           {
-            "name": "ReachedMaxSequenceNumber"
+            "name": "InvalidInputsMissingWritable"
           },
           {
-            "name": "ManualExecutionNotAllowed"
+            "name": "InvalidInputsChainSelector"
           },
           {
-            "name": "InvalidInputsTokenIndices"
+            "name": "InvalidInputsMint"
           },
           {
-            "name": "InvalidInputsPoolAccounts"
+            "name": "InvalidInputsMintOwner"
+          },
+          {
+            "name": "InvalidInputsTokenConfigAccount"
+          },
+          {
+            "name": "InvalidInputsMissingExtraArgs"
+          },
+          {
+            "name": "InvalidInputsMissingDataAfterExtraArgs"
+          },
+          {
+            "name": "InvalidInputsDestChainStateAccount"
+          },
+          {
+            "name": "InvalidInputsPerChainPerTokenConfig"
+          },
+          {
+            "name": "InvalidInputsBillingTokenConfig"
+          },
+          {
+            "name": "InvalidInputsAccountCount"
+          },
+          {
+            "name": "InvalidInputsNoUpdates"
           },
           {
             "name": "InvalidInputsTokenAccounts"
-          },
-          {
-            "name": "InvalidInputsConfigAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAdminRegistryAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccountWritable"
-          },
-          {
-            "name": "InvalidInputsTokenAmount"
-          },
-          {
-            "name": "OfframpReleaseMintBalanceMismatch"
-          },
-          {
-            "name": "OfframpInvalidDataLength"
-          },
-          {
-            "name": "StaleCommitReport"
           },
           {
             "name": "DestinationChainDisabled"
@@ -1212,19 +1203,10 @@
             "name": "UnsupportedNumberOfTokens"
           },
           {
-            "name": "UnsupportedChainFamilySelector"
-          },
-          {
             "name": "InvalidEVMAddress"
           },
           {
             "name": "InvalidEncoding"
-          },
-          {
-            "name": "InvalidInputsAtaAddress"
-          },
-          {
-            "name": "InvalidInputsAtaWritable"
           },
           {
             "name": "InvalidTokenPrice"
@@ -1233,22 +1215,10 @@
             "name": "StaleGasPrice"
           },
           {
-            "name": "InsufficientLamports"
-          },
-          {
-            "name": "InsufficientFunds"
-          },
-          {
-            "name": "UnsupportedToken"
-          },
-          {
             "name": "InvalidInputsMissingTokenConfig"
           },
           {
             "name": "MessageFeeTooHigh"
-          },
-          {
-            "name": "SourceTokenDataTooLarge"
           },
           {
             "name": "MessageGasLimitTooHigh"
