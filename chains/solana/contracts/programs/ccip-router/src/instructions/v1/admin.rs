@@ -240,10 +240,10 @@ fn rollback_seq_nr(dest_chain_state: &mut DestChainState) -> Result<()> {
         CcipRouterError::InvalidCcipVersionRollback
     );
 
-    let current_seq_nr = dest_chain_state.sequence_number;
-
-    dest_chain_state.sequence_number = dest_chain_state.sequence_number_to_restore;
-    dest_chain_state.sequence_number_to_restore = current_seq_nr;
+    std::mem::swap(
+        &mut dest_chain_state.sequence_number,
+        &mut dest_chain_state.sequence_number_to_restore,
+    );
 
     // restore on next upgrade, as seq nr was of the previously-bumped CCIP version
     dest_chain_state.restore_on_action = RestoreOnAction::Upgrade;
