@@ -5,7 +5,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
@@ -43,17 +42,9 @@ func (n *Noop) TrackObservation(committypes.Observation) {}
 
 func (n *Noop) TrackOutcome(committypes.Outcome) {}
 
-func (n *Noop) TrackMerkleObservation(merkleroot.Observation, string) {}
-
-func (n *Noop) TrackMerkleOutcome(merkleroot.Outcome, string) {}
-
 func (n *Noop) TrackRmnReport(float64, bool) {}
 
 func (n *Noop) TrackRmnRequest(string, float64, uint64, string) {}
-
-func (n *Noop) TrackTokenPricesObservation(tokenprice.Observation) {}
-
-func (n *Noop) TrackTokenPricesOutcome(tokenprice.Outcome) {}
 
 func (n *Noop) TrackProcessorLatency(string, string, time.Duration, error) {}
 

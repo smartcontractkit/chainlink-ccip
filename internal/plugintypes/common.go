@@ -37,6 +37,10 @@ func NewUSD18(value int64) USD18 {
 	return big.NewInt(value)
 }
 
+// Trackable is an interface for types that can be tracked using Prometheus metrics.
+// That way we are moving responsibility of presenting proper stats and metrics to
+// the underlying types. It's meant to be implemented by Observation and Outcome in
+// the Commit Plugin's processors.
 type Trackable interface {
 	Stats() map[string]int
 }
