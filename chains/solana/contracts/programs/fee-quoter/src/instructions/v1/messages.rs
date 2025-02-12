@@ -67,7 +67,7 @@ fn validate_dest_family_address(
     match selector {
         CHAIN_FAMILY_SELECTOR_EVM => validate_evm_dest_address(&msg.receiver),
         CHAIN_FAMILY_SELECTOR_SVM => validate_svm_dest_address(&msg.receiver),
-        _ => Err(FeeQuoterError::UnsupportedChainFamilySelector.into()),
+        _ => Err(FeeQuoterError::InvalidChainFamilySelector.into()),
     }
 }
 
@@ -120,7 +120,11 @@ pub fn process_extra_args(
         }
         CHAIN_FAMILY_SELECTOR_SVM => {
             // Extra args are mandatory for a SVM destination, so the tag must exist.
-            require_gte!(extra_args.len(), 4, FeeQuoterError::InvalidInputs);
+            require_gte!(
+                extra_args.len(),
+                4,
+                FeeQuoterError::InvalidInputsMissingExtraArgs
+            );
             let tag: [u8; 4] = extra_args[..4].try_into().unwrap();
             let mut data = &extra_args[4..];
             Ok(parse_and_validate_svm_extra_args(
@@ -139,7 +143,7 @@ fn parse_and_validate_evm_extra_args(tag: [u8; 4], data: &mut &[u8]) -> Result<P
     match u32::from_be_bytes(tag) {
         EVM_EXTRA_ARGS_V2_TAG => {
             if data.is_empty() {
-                Err(FeeQuoterError::InvalidInputs.into())
+                Err(FeeQuoterError::InvalidInputsMissingDataAfterExtraArgs.into())
             } else {
                 let args = EVMExtraArgsV2::deserialize(data)?;
                 Ok(ProcessedExtraArgs {
@@ -352,7 +356,7 @@ pub mod tests {
         // evm - tag but no data fails
         assert_eq!(
             process_extra_args(&evm_dest_chain.config, &evm_tag_bytes, false).unwrap_err(),
-            FeeQuoterError::InvalidInputs.into()
+            FeeQuoterError::InvalidInputsMissingDataAfterExtraArgs.into()
         );
 
         // evm - default case: (no data or tag)
@@ -397,7 +401,7 @@ pub mod tests {
         // svm - empty tag (no data) fails
         assert_eq!(
             process_extra_args(&svm_dest_chain.config, &[], false).unwrap_err(),
-            FeeQuoterError::InvalidInputs.into()
+            FeeQuoterError::InvalidInputsMissingExtraArgs.into()
         );
 
         // svm - contains tokens but no receiver address

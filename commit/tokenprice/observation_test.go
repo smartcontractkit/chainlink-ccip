@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
@@ -86,7 +87,7 @@ func Test_Observation(t *testing.T) {
 					offChainCfg:      defaultCfg,
 					destChain:        destChainSel,
 					fRoleDON:         f,
-					metricsReporter:  NoopMetrics{},
+					metricsReporter:  plugincommon.NoopReporter{},
 				}
 			},
 			expObs: Observation{
@@ -114,7 +115,7 @@ func Test_Observation(t *testing.T) {
 					destChain:        destChainSel,
 					offChainCfg:      defaultCfg,
 					fRoleDON:         f,
-					metricsReporter:  NoopMetrics{},
+					metricsReporter:  plugincommon.NoopReporter{},
 				}
 			},
 			expObs: Observation{},

@@ -804,51 +804,35 @@ const (
 	RootNotCommitted_CcipOfframpError
 	ExistingMerkleRoot_CcipOfframpError
 	Unauthorized_CcipOfframpError
-	InvalidInputs_CcipOfframpError
+	InvalidNonce_CcipOfframpError
+	InvalidInputsMissingWritable_CcipOfframpError
+	OnrampNotConfigured_CcipOfframpError
+	FailedToDeserializeReport_CcipOfframpError
+	InvalidPluginType_CcipOfframpError
+	InvalidVersion_CcipOfframpError
+	RedundantOwnerProposal_CcipOfframpError
 	UnsupportedSourceChainSelector_CcipOfframpError
 	UnsupportedDestinationChainSelector_CcipOfframpError
 	InvalidProof_CcipOfframpError
 	InvalidMessage_CcipOfframpError
 	ReachedMaxSequenceNumber_CcipOfframpError
 	ManualExecutionNotAllowed_CcipOfframpError
+	InvalidInputsNumberOfAccounts_CcipOfframpError
+	InvalidInputsGlobalStateAccount_CcipOfframpError
 	InvalidInputsTokenIndices_CcipOfframpError
 	InvalidInputsPoolAccounts_CcipOfframpError
 	InvalidInputsTokenAccounts_CcipOfframpError
+	InvalidInputsSysvarAccount_CcipOfframpError
+	InvalidInputsFeeQuoterAccount_CcipOfframpError
+	InvalidInputsAllowedOfframpAccount_CcipOfframpError
 	InvalidInputsConfigAccounts_CcipOfframpError
 	InvalidInputsTokenAdminRegistryAccounts_CcipOfframpError
 	InvalidInputsLookupTableAccounts_CcipOfframpError
 	InvalidInputsLookupTableAccountWritable_CcipOfframpError
-	InvalidInputsTokenAmount_CcipOfframpError
 	OfframpReleaseMintBalanceMismatch_CcipOfframpError
 	OfframpInvalidDataLength_CcipOfframpError
 	StaleCommitReport_CcipOfframpError
-	DestinationChainDisabled_CcipOfframpError
-	FeeTokenDisabled_CcipOfframpError
-	MessageTooLarge_CcipOfframpError
-	UnsupportedNumberOfTokens_CcipOfframpError
-	UnsupportedChainFamilySelector_CcipOfframpError
-	InvalidEVMAddress_CcipOfframpError
-	InvalidEncoding_CcipOfframpError
-	InvalidInputsAtaAddress_CcipOfframpError
-	InvalidInputsAtaWritable_CcipOfframpError
-	InvalidTokenPrice_CcipOfframpError
-	StaleGasPrice_CcipOfframpError
-	InsufficientLamports_CcipOfframpError
-	InsufficientFunds_CcipOfframpError
-	UnsupportedToken_CcipOfframpError
-	InvalidInputsMissingTokenConfig_CcipOfframpError
-	MessageFeeTooHigh_CcipOfframpError
-	SourceTokenDataTooLarge_CcipOfframpError
-	MessageGasLimitTooHigh_CcipOfframpError
-	ExtraArgOutOfOrderExecutionMustBeTrue_CcipOfframpError
-	InvalidTokenAdminRegistryInputsZeroAddress_CcipOfframpError
-	InvalidTokenAdminRegistryProposedAdmin_CcipOfframpError
 	InvalidWritabilityBitmap_CcipOfframpError
-	InvalidExtraArgsTag_CcipOfframpError
-	InvalidChainFamilySelector_CcipOfframpError
-	InvalidTokenReceiver_CcipOfframpError
-	InvalidSVMAddress_CcipOfframpError
-	SenderNotAllowed_CcipOfframpError
 )
 
 func (value CcipOfframpError) String() string {
@@ -861,8 +845,20 @@ func (value CcipOfframpError) String() string {
 		return "ExistingMerkleRoot"
 	case Unauthorized_CcipOfframpError:
 		return "Unauthorized"
-	case InvalidInputs_CcipOfframpError:
-		return "InvalidInputs"
+	case InvalidNonce_CcipOfframpError:
+		return "InvalidNonce"
+	case InvalidInputsMissingWritable_CcipOfframpError:
+		return "InvalidInputsMissingWritable"
+	case OnrampNotConfigured_CcipOfframpError:
+		return "OnrampNotConfigured"
+	case FailedToDeserializeReport_CcipOfframpError:
+		return "FailedToDeserializeReport"
+	case InvalidPluginType_CcipOfframpError:
+		return "InvalidPluginType"
+	case InvalidVersion_CcipOfframpError:
+		return "InvalidVersion"
+	case RedundantOwnerProposal_CcipOfframpError:
+		return "RedundantOwnerProposal"
 	case UnsupportedSourceChainSelector_CcipOfframpError:
 		return "UnsupportedSourceChainSelector"
 	case UnsupportedDestinationChainSelector_CcipOfframpError:
@@ -875,12 +871,22 @@ func (value CcipOfframpError) String() string {
 		return "ReachedMaxSequenceNumber"
 	case ManualExecutionNotAllowed_CcipOfframpError:
 		return "ManualExecutionNotAllowed"
+	case InvalidInputsNumberOfAccounts_CcipOfframpError:
+		return "InvalidInputsNumberOfAccounts"
+	case InvalidInputsGlobalStateAccount_CcipOfframpError:
+		return "InvalidInputsGlobalStateAccount"
 	case InvalidInputsTokenIndices_CcipOfframpError:
 		return "InvalidInputsTokenIndices"
 	case InvalidInputsPoolAccounts_CcipOfframpError:
 		return "InvalidInputsPoolAccounts"
 	case InvalidInputsTokenAccounts_CcipOfframpError:
 		return "InvalidInputsTokenAccounts"
+	case InvalidInputsSysvarAccount_CcipOfframpError:
+		return "InvalidInputsSysvarAccount"
+	case InvalidInputsFeeQuoterAccount_CcipOfframpError:
+		return "InvalidInputsFeeQuoterAccount"
+	case InvalidInputsAllowedOfframpAccount_CcipOfframpError:
+		return "InvalidInputsAllowedOfframpAccount"
 	case InvalidInputsConfigAccounts_CcipOfframpError:
 		return "InvalidInputsConfigAccounts"
 	case InvalidInputsTokenAdminRegistryAccounts_CcipOfframpError:
@@ -889,68 +895,14 @@ func (value CcipOfframpError) String() string {
 		return "InvalidInputsLookupTableAccounts"
 	case InvalidInputsLookupTableAccountWritable_CcipOfframpError:
 		return "InvalidInputsLookupTableAccountWritable"
-	case InvalidInputsTokenAmount_CcipOfframpError:
-		return "InvalidInputsTokenAmount"
 	case OfframpReleaseMintBalanceMismatch_CcipOfframpError:
 		return "OfframpReleaseMintBalanceMismatch"
 	case OfframpInvalidDataLength_CcipOfframpError:
 		return "OfframpInvalidDataLength"
 	case StaleCommitReport_CcipOfframpError:
 		return "StaleCommitReport"
-	case DestinationChainDisabled_CcipOfframpError:
-		return "DestinationChainDisabled"
-	case FeeTokenDisabled_CcipOfframpError:
-		return "FeeTokenDisabled"
-	case MessageTooLarge_CcipOfframpError:
-		return "MessageTooLarge"
-	case UnsupportedNumberOfTokens_CcipOfframpError:
-		return "UnsupportedNumberOfTokens"
-	case UnsupportedChainFamilySelector_CcipOfframpError:
-		return "UnsupportedChainFamilySelector"
-	case InvalidEVMAddress_CcipOfframpError:
-		return "InvalidEVMAddress"
-	case InvalidEncoding_CcipOfframpError:
-		return "InvalidEncoding"
-	case InvalidInputsAtaAddress_CcipOfframpError:
-		return "InvalidInputsAtaAddress"
-	case InvalidInputsAtaWritable_CcipOfframpError:
-		return "InvalidInputsAtaWritable"
-	case InvalidTokenPrice_CcipOfframpError:
-		return "InvalidTokenPrice"
-	case StaleGasPrice_CcipOfframpError:
-		return "StaleGasPrice"
-	case InsufficientLamports_CcipOfframpError:
-		return "InsufficientLamports"
-	case InsufficientFunds_CcipOfframpError:
-		return "InsufficientFunds"
-	case UnsupportedToken_CcipOfframpError:
-		return "UnsupportedToken"
-	case InvalidInputsMissingTokenConfig_CcipOfframpError:
-		return "InvalidInputsMissingTokenConfig"
-	case MessageFeeTooHigh_CcipOfframpError:
-		return "MessageFeeTooHigh"
-	case SourceTokenDataTooLarge_CcipOfframpError:
-		return "SourceTokenDataTooLarge"
-	case MessageGasLimitTooHigh_CcipOfframpError:
-		return "MessageGasLimitTooHigh"
-	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipOfframpError:
-		return "ExtraArgOutOfOrderExecutionMustBeTrue"
-	case InvalidTokenAdminRegistryInputsZeroAddress_CcipOfframpError:
-		return "InvalidTokenAdminRegistryInputsZeroAddress"
-	case InvalidTokenAdminRegistryProposedAdmin_CcipOfframpError:
-		return "InvalidTokenAdminRegistryProposedAdmin"
 	case InvalidWritabilityBitmap_CcipOfframpError:
 		return "InvalidWritabilityBitmap"
-	case InvalidExtraArgsTag_CcipOfframpError:
-		return "InvalidExtraArgsTag"
-	case InvalidChainFamilySelector_CcipOfframpError:
-		return "InvalidChainFamilySelector"
-	case InvalidTokenReceiver_CcipOfframpError:
-		return "InvalidTokenReceiver"
-	case InvalidSVMAddress_CcipOfframpError:
-		return "InvalidSVMAddress"
-	case SenderNotAllowed_CcipOfframpError:
-		return "SenderNotAllowed"
 	default:
 		return ""
 	}
