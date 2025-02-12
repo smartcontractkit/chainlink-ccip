@@ -42,7 +42,6 @@ func (p *processor) Observation(
 		FChain:                fChain,
 		Timestamp:             now,
 	}
-	p.metricsReporter.TrackTokenPricesObservation(obs)
 	return obs, nil
 }
 

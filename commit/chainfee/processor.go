@@ -22,7 +22,7 @@ type processor struct {
 	ccipReader      readerpkg.CCIPReader
 	cfg             pluginconfig.CommitOffchainConfig
 	chainSupport    plugincommon.ChainSupport
-	metricsReporter MetricsReporter
+	metricsReporter plugincommon.MetricsReporter
 	fRoleDON        int
 }
 
@@ -35,9 +35,9 @@ func NewProcessor(
 	offChainConfig pluginconfig.CommitOffchainConfig,
 	chainSupport plugincommon.ChainSupport,
 	fRoleDON int,
-	metricsReporter MetricsReporter,
+	metricsReporter plugincommon.MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
-	return &processor{
+	p := &processor{
 		lggr:            lggr,
 		oracleID:        oracleID,
 		destChain:       destChain,
@@ -48,6 +48,7 @@ func NewProcessor(
 		cfg:             offChainConfig,
 		metricsReporter: metricsReporter,
 	}
+	return plugincommon.NewTrackedProcessor(lggr, p, processorLabel, metricsReporter)
 }
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
