@@ -9,7 +9,7 @@ import (
 
 type CommitInput struct {
 	PriceUpdates  PriceUpdates
-	MerkleRoot    MerkleRoot
+	MerkleRoot    *MerkleRoot `bin:"optional"`
 	RmnSignatures [][64]uint8
 }
 
@@ -19,10 +19,23 @@ func (obj CommitInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	if err != nil {
 		return err
 	}
-	// Serialize `MerkleRoot` param:
-	err = encoder.Encode(obj.MerkleRoot)
-	if err != nil {
-		return err
+	// Serialize `MerkleRoot` param (optional):
+	{
+		if obj.MerkleRoot == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.MerkleRoot)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	// Serialize `RmnSignatures` param:
 	err = encoder.Encode(obj.RmnSignatures)
@@ -38,10 +51,18 @@ func (obj *CommitInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	if err != nil {
 		return err
 	}
-	// Deserialize `MerkleRoot`:
-	err = decoder.Decode(&obj.MerkleRoot)
-	if err != nil {
-		return err
+	// Deserialize `MerkleRoot` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.MerkleRoot)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	// Deserialize `RmnSignatures`:
 	err = decoder.Decode(&obj.RmnSignatures)
@@ -810,6 +831,9 @@ const (
 	FailedToDeserializeReport_CcipOfframpError
 	InvalidPluginType_CcipOfframpError
 	InvalidVersion_CcipOfframpError
+	MissingExpectedPriceUpdates_CcipOfframpError
+	MissingExpectedMerkleRoot_CcipOfframpError
+	UnexpectedMerkleRoot_CcipOfframpError
 	RedundantOwnerProposal_CcipOfframpError
 	UnsupportedSourceChainSelector_CcipOfframpError
 	UnsupportedDestinationChainSelector_CcipOfframpError
@@ -857,6 +881,12 @@ func (value CcipOfframpError) String() string {
 		return "InvalidPluginType"
 	case InvalidVersion_CcipOfframpError:
 		return "InvalidVersion"
+	case MissingExpectedPriceUpdates_CcipOfframpError:
+		return "MissingExpectedPriceUpdates"
+	case MissingExpectedMerkleRoot_CcipOfframpError:
+		return "MissingExpectedMerkleRoot"
+	case UnexpectedMerkleRoot_CcipOfframpError:
+		return "UnexpectedMerkleRoot"
 	case RedundantOwnerProposal_CcipOfframpError:
 		return "RedundantOwnerProposal"
 	case UnsupportedSourceChainSelector_CcipOfframpError:

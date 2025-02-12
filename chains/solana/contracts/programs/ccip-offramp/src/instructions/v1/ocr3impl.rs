@@ -1,7 +1,7 @@
 use anchor_lang::AnchorSerialize;
 
-use crate::context::CommitInput;
 use crate::messages::ExecutionReportSingleChain;
+use crate::{context::CommitInput, MerkleRoot};
 
 use super::ocr3base::{Ocr3Report, ReportContext};
 
@@ -20,7 +20,7 @@ impl Ocr3Report for Ocr3ReportForCommit<'_> {
         4 + (32 + 28) * self.0.price_updates.token_price_updates.len() + // token_price_updates
       4 + (8 + 28) * self.0.price_updates.gas_price_updates.len() + // gas_price_updates
       4 + (32 + 32) * self.0.rmn_signatures.len() + // rmn signatures
-      self.0.merkle_root.len()
+      1 + self.0.merkle_root.as_ref().map(|r| r.len()).unwrap_or(MerkleRoot::static_len())
         // + 4 + 65 * self.rmn_signatures.len()
     }
 }

@@ -449,7 +449,7 @@
       "name": "commit",
       "docs": [
         "Off Ramp Flow //",
-        "Commits a report to the router.",
+        "Commits a report to the router, containing a Merkle Root.",
         "",
         "The method name needs to be commit with Anchor encoding.",
         "",
@@ -492,6 +492,130 @@
         {
           "name": "commitReport",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "sysvarInstructions",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterAllowedPriceUpdater",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "so that it can authorize the call made by this offramp"
+          ]
+        },
+        {
+          "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "reportContextByteWords",
+          "type": {
+            "array": [
+              {
+                "array": [
+                  "u8",
+                  32
+                ]
+              },
+              2
+            ]
+          }
+        },
+        {
+          "name": "rawReport",
+          "type": "bytes"
+        },
+        {
+          "name": "rs",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "ss",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "rawVs",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "commitPriceOnly",
+      "docs": [
+        "Commits a report to the router, with price updates only.",
+        "",
+        "The method name needs to be commit with Anchor encoding.",
+        "",
+        "This function is called by the OffChain when committing one Report to the SVM Router,",
+        "containing only price updates and no merkle root.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the commit.",
+        "* `report_context_byte_words` - consists of:",
+        "* report_context_byte_words[0]: ConfigDigest",
+        "* report_context_byte_words[1]: 24 byte padding, 8 byte sequence number",
+        "* `raw_report` - The serialized commit input report containing the price updates,",
+        "with no merkle root.",
+        "* `rs` - slice of R components of signatures",
+        "* `ss` - slice of S components of signatures",
+        "* `raw_vs` - array of V components of signatures"
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "referenceAddresses",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -985,7 +1109,9 @@
           {
             "name": "merkleRoot",
             "type": {
-              "defined": "MerkleRoot"
+              "option": {
+                "defined": "MerkleRoot"
+              }
             }
           },
           {
@@ -1493,6 +1619,15 @@
             "name": "InvalidVersion"
           },
           {
+            "name": "MissingExpectedPriceUpdates"
+          },
+          {
+            "name": "MissingExpectedMerkleRoot"
+          },
+          {
+            "name": "UnexpectedMerkleRoot"
+          },
+          {
             "name": "RedundantOwnerProposal"
           },
           {
@@ -1640,6 +1775,18 @@
           },
           "index": false
         },
+        {
+          "name": "priceUpdates",
+          "type": {
+            "defined": "PriceUpdates"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PriceOnlyCommitReportAccepted",
+      "fields": [
         {
           "name": "priceUpdates",
           "type": {

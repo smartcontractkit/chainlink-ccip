@@ -8,6 +8,10 @@ pub struct CommitReportAccepted {
     pub merkle_root: MerkleRoot,
     pub price_updates: PriceUpdates,
 }
+#[event]
+pub struct PriceOnlyCommitReportAccepted {
+    pub price_updates: PriceUpdates,
+}
 
 #[event]
 pub struct SkippedAlreadyExecutedMessage {
