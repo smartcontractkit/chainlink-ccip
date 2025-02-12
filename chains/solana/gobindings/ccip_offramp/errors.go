@@ -16,103 +16,301 @@ var (
 	_                      = errors.ErrUnsupported
 )
 var (
-	ErrInvalidConfigFMustBePositive = &customErrorDef{
+	ErrInvalidSequenceInterval = &customErrorDef{
 		code: 6000,
-		msg:  "Invalid config: F must be positive",
-		name: "InvalidConfigFMustBePositive",
+		msg:  "The given sequence interval is invalid",
+		name: "InvalidSequenceInterval",
 	}
-	ErrInvalidConfigTooManyTransmitters = &customErrorDef{
+	ErrRootNotCommitted = &customErrorDef{
 		code: 6001,
-		msg:  "Invalid config: Too many transmitters",
-		name: "InvalidConfigTooManyTransmitters",
+		msg:  "The given Merkle Root is missing",
+		name: "RootNotCommitted",
 	}
-	ErrInvalidConfigTooManySigners = &customErrorDef{
+	ErrExistingMerkleRoot = &customErrorDef{
 		code: 6002,
-		msg:  "Invalid config: Too many signers",
-		name: "InvalidConfigTooManySigners",
+		msg:  "The given Merkle Root is already committed",
+		name: "ExistingMerkleRoot",
 	}
-	ErrInvalidConfigFIsTooHigh = &customErrorDef{
+	ErrUnauthorized = &customErrorDef{
 		code: 6003,
-		msg:  "Invalid config: F is too high",
-		name: "InvalidConfigFIsTooHigh",
+		msg:  "The signer is unauthorized",
+		name: "Unauthorized",
 	}
-	ErrInvalidConfigRepeatedOracle = &customErrorDef{
+	ErrInvalidInputs = &customErrorDef{
 		code: 6004,
-		msg:  "Invalid config: Repeated oracle address",
-		name: "InvalidConfigRepeatedOracle",
+		msg:  "Invalid inputs",
+		name: "InvalidInputs",
 	}
-	ErrWrongMessageLength = &customErrorDef{
+	ErrUnsupportedSourceChainSelector = &customErrorDef{
 		code: 6005,
-		msg:  "Wrong message length",
-		name: "WrongMessageLength",
+		msg:  "Source chain selector not supported",
+		name: "UnsupportedSourceChainSelector",
 	}
-	ErrConfigDigestMismatch = &customErrorDef{
+	ErrUnsupportedDestinationChainSelector = &customErrorDef{
 		code: 6006,
-		msg:  "Config digest mismatch",
-		name: "ConfigDigestMismatch",
+		msg:  "Destination chain selector not supported",
+		name: "UnsupportedDestinationChainSelector",
 	}
-	ErrWrongNumberOfSignatures = &customErrorDef{
+	ErrInvalidProof = &customErrorDef{
 		code: 6007,
-		msg:  "Wrong number signatures",
-		name: "WrongNumberOfSignatures",
+		msg:  "Invalid Proof for Merkle Root",
+		name: "InvalidProof",
 	}
-	ErrUnauthorizedTransmitter = &customErrorDef{
+	ErrInvalidMessage = &customErrorDef{
 		code: 6008,
-		msg:  "Unauthorized transmitter",
-		name: "UnauthorizedTransmitter",
+		msg:  "Invalid message format",
+		name: "InvalidMessage",
 	}
-	ErrUnauthorizedSigner = &customErrorDef{
+	ErrReachedMaxSequenceNumber = &customErrorDef{
 		code: 6009,
-		msg:  "Unauthorized signer",
-		name: "UnauthorizedSigner",
+		msg:  "Reached max sequence number",
+		name: "ReachedMaxSequenceNumber",
 	}
-	ErrNonUniqueSignatures = &customErrorDef{
+	ErrManualExecutionNotAllowed = &customErrorDef{
 		code: 6010,
-		msg:  "Non unique signatures",
-		name: "NonUniqueSignatures",
+		msg:  "Manual execution not allowed",
+		name: "ManualExecutionNotAllowed",
 	}
-	ErrOracleCannotBeZeroAddress = &customErrorDef{
+	ErrInvalidInputsTokenIndices = &customErrorDef{
 		code: 6011,
-		msg:  "Oracle cannot be zero address",
-		name: "OracleCannotBeZeroAddress",
+		msg:  "Invalid pool account account indices",
+		name: "InvalidInputsTokenIndices",
 	}
-	ErrStaticConfigCannotBeChanged = &customErrorDef{
+	ErrInvalidInputsPoolAccounts = &customErrorDef{
 		code: 6012,
-		msg:  "Static config cannot be changed",
-		name: "StaticConfigCannotBeChanged",
+		msg:  "Invalid pool accounts",
+		name: "InvalidInputsPoolAccounts",
 	}
-	ErrInvalidPluginType = &customErrorDef{
+	ErrInvalidInputsTokenAccounts = &customErrorDef{
 		code: 6013,
-		msg:  "Incorrect plugin type",
-		name: "InvalidPluginType",
+		msg:  "Invalid token accounts",
+		name: "InvalidInputsTokenAccounts",
 	}
-	ErrInvalidSignature = &customErrorDef{
+	ErrInvalidInputsConfigAccounts = &customErrorDef{
 		code: 6014,
-		msg:  "Invalid signature",
-		name: "InvalidSignature",
+		msg:  "Invalid config account",
+		name: "InvalidInputsConfigAccounts",
 	}
-	ErrSignaturesOutOfRegistration = &customErrorDef{
+	ErrInvalidInputsTokenAdminRegistryAccounts = &customErrorDef{
 		code: 6015,
-		msg:  "Signatures out of registration",
-		name: "SignaturesOutOfRegistration",
+		msg:  "Invalid Token Admin Registry account",
+		name: "InvalidInputsTokenAdminRegistryAccounts",
+	}
+	ErrInvalidInputsLookupTableAccounts = &customErrorDef{
+		code: 6016,
+		msg:  "Invalid LookupTable account",
+		name: "InvalidInputsLookupTableAccounts",
+	}
+	ErrInvalidInputsLookupTableAccountWritable = &customErrorDef{
+		code: 6017,
+		msg:  "Invalid LookupTable account writable access",
+		name: "InvalidInputsLookupTableAccountWritable",
+	}
+	ErrInvalidInputsTokenAmount = &customErrorDef{
+		code: 6018,
+		msg:  "Cannot send zero tokens",
+		name: "InvalidInputsTokenAmount",
+	}
+	ErrOfframpReleaseMintBalanceMismatch = &customErrorDef{
+		code: 6019,
+		msg:  "Release or mint balance mismatch",
+		name: "OfframpReleaseMintBalanceMismatch",
+	}
+	ErrOfframpInvalidDataLength = &customErrorDef{
+		code: 6020,
+		msg:  "Invalid data length",
+		name: "OfframpInvalidDataLength",
+	}
+	ErrStaleCommitReport = &customErrorDef{
+		code: 6021,
+		msg:  "Stale commit report",
+		name: "StaleCommitReport",
+	}
+	ErrDestinationChainDisabled = &customErrorDef{
+		code: 6022,
+		msg:  "Destination chain disabled",
+		name: "DestinationChainDisabled",
+	}
+	ErrFeeTokenDisabled = &customErrorDef{
+		code: 6023,
+		msg:  "Fee token disabled",
+		name: "FeeTokenDisabled",
+	}
+	ErrMessageTooLarge = &customErrorDef{
+		code: 6024,
+		msg:  "Message exceeds maximum data size",
+		name: "MessageTooLarge",
+	}
+	ErrUnsupportedNumberOfTokens = &customErrorDef{
+		code: 6025,
+		msg:  "Message contains an unsupported number of tokens",
+		name: "UnsupportedNumberOfTokens",
+	}
+	ErrUnsupportedChainFamilySelector = &customErrorDef{
+		code: 6026,
+		msg:  "Chain family selector not supported",
+		name: "UnsupportedChainFamilySelector",
+	}
+	ErrInvalidEVMAddress = &customErrorDef{
+		code: 6027,
+		msg:  "Invalid EVM address",
+		name: "InvalidEVMAddress",
+	}
+	ErrInvalidEncoding = &customErrorDef{
+		code: 6028,
+		msg:  "Invalid encoding",
+		name: "InvalidEncoding",
+	}
+	ErrInvalidInputsAtaAddress = &customErrorDef{
+		code: 6029,
+		msg:  "Invalid Associated Token Account address",
+		name: "InvalidInputsAtaAddress",
+	}
+	ErrInvalidInputsAtaWritable = &customErrorDef{
+		code: 6030,
+		msg:  "Invalid Associated Token Account writable flag",
+		name: "InvalidInputsAtaWritable",
+	}
+	ErrInvalidTokenPrice = &customErrorDef{
+		code: 6031,
+		msg:  "Invalid token price",
+		name: "InvalidTokenPrice",
+	}
+	ErrStaleGasPrice = &customErrorDef{
+		code: 6032,
+		msg:  "Stale gas price",
+		name: "StaleGasPrice",
+	}
+	ErrInsufficientLamports = &customErrorDef{
+		code: 6033,
+		msg:  "Insufficient lamports",
+		name: "InsufficientLamports",
+	}
+	ErrInsufficientFunds = &customErrorDef{
+		code: 6034,
+		msg:  "Insufficient funds",
+		name: "InsufficientFunds",
+	}
+	ErrUnsupportedToken = &customErrorDef{
+		code: 6035,
+		msg:  "Unsupported token",
+		name: "UnsupportedToken",
+	}
+	ErrInvalidInputsMissingTokenConfig = &customErrorDef{
+		code: 6036,
+		msg:  "Inputs are missing token configuration",
+		name: "InvalidInputsMissingTokenConfig",
+	}
+	ErrMessageFeeTooHigh = &customErrorDef{
+		code: 6037,
+		msg:  "Message fee is too high",
+		name: "MessageFeeTooHigh",
+	}
+	ErrSourceTokenDataTooLarge = &customErrorDef{
+		code: 6038,
+		msg:  "Source token data is too large",
+		name: "SourceTokenDataTooLarge",
+	}
+	ErrMessageGasLimitTooHigh = &customErrorDef{
+		code: 6039,
+		msg:  "Message gas limit too high",
+		name: "MessageGasLimitTooHigh",
+	}
+	ErrExtraArgOutOfOrderExecutionMustBeTrue = &customErrorDef{
+		code: 6040,
+		msg:  "Extra arg out of order execution must be true",
+		name: "ExtraArgOutOfOrderExecutionMustBeTrue",
+	}
+	ErrInvalidTokenAdminRegistryInputsZeroAddress = &customErrorDef{
+		code: 6041,
+		msg:  "New Admin can not be zero address",
+		name: "InvalidTokenAdminRegistryInputsZeroAddress",
+	}
+	ErrInvalidTokenAdminRegistryProposedAdmin = &customErrorDef{
+		code: 6042,
+		msg:  "An already owned registry can not be proposed",
+		name: "InvalidTokenAdminRegistryProposedAdmin",
+	}
+	ErrInvalidWritabilityBitmap = &customErrorDef{
+		code: 6043,
+		msg:  "Invalid writability bitmap",
+		name: "InvalidWritabilityBitmap",
+	}
+	ErrInvalidExtraArgsTag = &customErrorDef{
+		code: 6044,
+		msg:  "Invalid extra args tag",
+		name: "InvalidExtraArgsTag",
+	}
+	ErrInvalidChainFamilySelector = &customErrorDef{
+		code: 6045,
+		msg:  "Invalid chain family selector",
+		name: "InvalidChainFamilySelector",
+	}
+	ErrInvalidTokenReceiver = &customErrorDef{
+		code: 6046,
+		msg:  "Invalid token receiver",
+		name: "InvalidTokenReceiver",
+	}
+	ErrInvalidSVMAddress = &customErrorDef{
+		code: 6047,
+		msg:  "Invalid SVM address",
+		name: "InvalidSVMAddress",
+	}
+	ErrSenderNotAllowed = &customErrorDef{
+		code: 6048,
+		msg:  "Sender not allowed for that destination chain",
+		name: "SenderNotAllowed",
 	}
 	Errors = map[int]CustomError{
-		6000: ErrInvalidConfigFMustBePositive,
-		6001: ErrInvalidConfigTooManyTransmitters,
-		6002: ErrInvalidConfigTooManySigners,
-		6003: ErrInvalidConfigFIsTooHigh,
-		6004: ErrInvalidConfigRepeatedOracle,
-		6005: ErrWrongMessageLength,
-		6006: ErrConfigDigestMismatch,
-		6007: ErrWrongNumberOfSignatures,
-		6008: ErrUnauthorizedTransmitter,
-		6009: ErrUnauthorizedSigner,
-		6010: ErrNonUniqueSignatures,
-		6011: ErrOracleCannotBeZeroAddress,
-		6012: ErrStaticConfigCannotBeChanged,
-		6013: ErrInvalidPluginType,
-		6014: ErrInvalidSignature,
-		6015: ErrSignaturesOutOfRegistration,
+		6000: ErrInvalidSequenceInterval,
+		6001: ErrRootNotCommitted,
+		6002: ErrExistingMerkleRoot,
+		6003: ErrUnauthorized,
+		6004: ErrInvalidInputs,
+		6005: ErrUnsupportedSourceChainSelector,
+		6006: ErrUnsupportedDestinationChainSelector,
+		6007: ErrInvalidProof,
+		6008: ErrInvalidMessage,
+		6009: ErrReachedMaxSequenceNumber,
+		6010: ErrManualExecutionNotAllowed,
+		6011: ErrInvalidInputsTokenIndices,
+		6012: ErrInvalidInputsPoolAccounts,
+		6013: ErrInvalidInputsTokenAccounts,
+		6014: ErrInvalidInputsConfigAccounts,
+		6015: ErrInvalidInputsTokenAdminRegistryAccounts,
+		6016: ErrInvalidInputsLookupTableAccounts,
+		6017: ErrInvalidInputsLookupTableAccountWritable,
+		6018: ErrInvalidInputsTokenAmount,
+		6019: ErrOfframpReleaseMintBalanceMismatch,
+		6020: ErrOfframpInvalidDataLength,
+		6021: ErrStaleCommitReport,
+		6022: ErrDestinationChainDisabled,
+		6023: ErrFeeTokenDisabled,
+		6024: ErrMessageTooLarge,
+		6025: ErrUnsupportedNumberOfTokens,
+		6026: ErrUnsupportedChainFamilySelector,
+		6027: ErrInvalidEVMAddress,
+		6028: ErrInvalidEncoding,
+		6029: ErrInvalidInputsAtaAddress,
+		6030: ErrInvalidInputsAtaWritable,
+		6031: ErrInvalidTokenPrice,
+		6032: ErrStaleGasPrice,
+		6033: ErrInsufficientLamports,
+		6034: ErrInsufficientFunds,
+		6035: ErrUnsupportedToken,
+		6036: ErrInvalidInputsMissingTokenConfig,
+		6037: ErrMessageFeeTooHigh,
+		6038: ErrSourceTokenDataTooLarge,
+		6039: ErrMessageGasLimitTooHigh,
+		6040: ErrExtraArgOutOfOrderExecutionMustBeTrue,
+		6041: ErrInvalidTokenAdminRegistryInputsZeroAddress,
+		6042: ErrInvalidTokenAdminRegistryProposedAdmin,
+		6043: ErrInvalidWritabilityBitmap,
+		6044: ErrInvalidExtraArgsTag,
+		6045: ErrInvalidChainFamilySelector,
+		6046: ErrInvalidTokenReceiver,
+		6047: ErrInvalidSVMAddress,
+		6048: ErrSenderNotAllowed,
 	}
 )
 
