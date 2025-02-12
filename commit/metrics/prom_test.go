@@ -361,7 +361,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 		method := "query"
 
 		reporter.TrackProcessorLatency(processor, method, time.Second, nil)
-		l1 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, "merkle", "method")
+		l1 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
 		require.Equal(t, 1, l1)
 
 		errs := testutil.ToFloat64(
