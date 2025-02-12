@@ -974,8 +974,9 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},
-		PriceFeedChainSelector:    sourceChain1,
-		InflightPriceCheckRetries: 10,
+		PriceFeedChainSelector:          sourceChain1,
+		InflightPriceCheckRetries:       10,
+		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

@@ -28,6 +28,8 @@ const (
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
 	defaultInflightPriceCheckRetries          = 5
 	defaultRelativeBoostPerWaitHour           = 0.2 // 20 percent
+	defaultMerkleRootAsyncObserverSyncFreq    = 5 * time.Second
+	defaultMerkleRootAsyncObserverSyncTimeout = 10 * time.Second
 )
 
 type FeeInfo struct {
@@ -127,6 +129,16 @@ type CommitOffchainConfig struct {
 
 	// InflightPriceCheckRetries is the number of rounds we wait for a price report to get recorded on the blockchain.
 	InflightPriceCheckRetries int `json:"inflightPriceCheckRetries"`
+
+	// MerkleRootAsyncObserverDisabled defines whether the async observer should be disabled. Default it is enabled.
+	MerkleRootAsyncObserverDisabled bool `json:"merkleRootAsyncObserverDisabled"`
+
+	// MerkleRootAsyncObserverSyncFreq defines how frequently the async merkle roots observer should sync.
+	// Zero indicates that operations are done synchronously.
+	MerkleRootAsyncObserverSyncFreq time.Duration `json:"merkleRootAsyncObserverSyncFreq"`
+
+	// MerkleRootAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch seqNums).
+	MerkleRootAsyncObserverSyncTimeout time.Duration `json:"merkleRootAsyncObserverSyncTimeout"`
 }
 
 func (c *CommitOffchainConfig) applyDefaults() {
@@ -161,8 +173,19 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	if c.InflightPriceCheckRetries == 0 {
 		c.InflightPriceCheckRetries = defaultInflightPriceCheckRetries
 	}
+
+	// We want to apply defaults only if the async feature is enabled.
+	if !c.MerkleRootAsyncObserverDisabled {
+		if c.MerkleRootAsyncObserverSyncFreq == 0 {
+			c.MerkleRootAsyncObserverSyncFreq = defaultMerkleRootAsyncObserverSyncFreq
+		}
+		if c.MerkleRootAsyncObserverSyncTimeout == 0 {
+			c.MerkleRootAsyncObserverSyncTimeout = defaultMerkleRootAsyncObserverSyncTimeout
+		}
+	}
 }
 
+//nolint:gocyclo // it is considered ok since we don't have complicated logic here
 func (c *CommitOffchainConfig) Validate() error {
 	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
 		return errors.New("remoteGasPriceBatchWriteFrequency not set")
@@ -202,6 +225,12 @@ func (c *CommitOffchainConfig) Validate() error {
 
 	if c.SignObservationPrefix == "" {
 		return fmt.Errorf("signObservationPrefix not set")
+	}
+
+	if !c.MerkleRootAsyncObserverDisabled &&
+		(c.MerkleRootAsyncObserverSyncFreq == 0 || c.MerkleRootAsyncObserverSyncTimeout == 0) {
+		return fmt.Errorf("merkle root async observer sync freq (%s) or sync timeout (%s) not set",
+			c.MerkleRootAsyncObserverSyncFreq, c.MerkleRootAsyncObserverSyncTimeout)
 	}
 
 	return nil
