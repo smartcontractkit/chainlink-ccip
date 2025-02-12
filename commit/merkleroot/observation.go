@@ -316,7 +316,7 @@ type Observer interface {
 type asyncObserver struct {
 	lggr                logger.Logger
 	syncObserver        observerImpl
-	cancelFunc          context.CancelFunc
+	cancelFunc          func()
 	mu                  *sync.RWMutex
 	offRampNextSeqNums  []plugintypes.SeqNumChain
 	onRampLatestSeqNums []plugintypes.SeqNumChain
@@ -340,6 +340,12 @@ func newAsyncObserver(lggr logger.Logger, observer observerImpl, tickDur, syncTi
 	ticker := time.NewTicker(tickDur)
 	lggr.Debugw("async observer started", "tickDur", tickDur, "syncTimeout", syncTimeout)
 	o.start(ctx, ticker.C, syncTimeout)
+
+	o.cancelFunc = func() {
+		cf()
+		ticker.Stop()
+	}
+
 	return o
 }
 
