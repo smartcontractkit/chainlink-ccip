@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -19,6 +21,7 @@ import (
 // This split is required to define the reporting logic in one place but inject only relevant dependencies to
 // plugins/processors. Also, it solves the problem of cyclic dependencies between the plugins/processors.
 type Reporter interface {
+	TrackProcessorLatency(processor string, method string, latency time.Duration)
 	TrackObservation(obs committypes.Observation)
 	TrackOutcome(outcome committypes.Outcome)
 
@@ -60,6 +63,8 @@ func (n *Noop) TrackRmnRequest(string, float64, uint64, string) {}
 func (n *Noop) TrackTokenPricesObservation(tokenprice.Observation) {}
 
 func (n *Noop) TrackTokenPricesOutcome(tokenprice.Outcome) {}
+
+func (n *Noop) TrackProcessorLatency(string, string, time.Duration) {}
 
 var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}

@@ -1,7 +1,9 @@
 package metrics
 
 import (
+	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -132,9 +134,21 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 }
 
 func (p *PromReporter) TrackObservation(obs committypes.Observation) {
+	for _, root := range obs.MerkleRootObs.MerkleRoots {
+		sourceChainSelector := root.ChainSel
+		maxSeqNr := root.SeqNumsRange.End()
+
+		fmt.Println(sourceChainSelector, maxSeqNr)
+	}
 }
 
 func (p *PromReporter) TrackOutcome(outcome committypes.Outcome) {
+	for _, root := range outcome.MerkleRootOutcome.RootsToReport {
+		sourceChainSelector := root.ChainSel
+		maxSeqNr := root.SeqNumsRange.End()
+
+		fmt.Println(sourceChainSelector, maxSeqNr)
+	}
 }
 
 func (p *PromReporter) TrackChainFeeObservation(obs chainfee.Observation) {
@@ -205,6 +219,10 @@ func (p *PromReporter) TrackTokenPricesOutcome(outcome tokenprice.Outcome) {
 			WithLabelValues(p.chainID, key).
 			Add(float64(count))
 	}
+}
+
+func (p *PromReporter) TrackProcessorLatency(processor string, method string, latency time.Duration) {
+
 }
 
 func merkleRootObservationMetrics(obs merkleroot.Observation) map[string]int {

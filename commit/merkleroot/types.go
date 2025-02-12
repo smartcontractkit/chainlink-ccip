@@ -2,6 +2,7 @@ package merkleroot
 
 import (
 	"sort"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
@@ -213,6 +214,7 @@ type MetricsReporter interface {
 	TrackMerkleObservation(obs Observation, state string)
 	TrackMerkleOutcome(outcome Outcome, state string)
 	TrackRmnReport(latency float64, success bool)
+	TrackProcessorLatency(processor string, method string, latency time.Duration)
 }
 
 type NoopMetrics struct{}
@@ -222,3 +224,5 @@ func (n NoopMetrics) TrackMerkleObservation(Observation, string) {}
 func (n NoopMetrics) TrackMerkleOutcome(Outcome, string) {}
 
 func (n NoopMetrics) TrackRmnReport(float64, bool) {}
+
+func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration) {}

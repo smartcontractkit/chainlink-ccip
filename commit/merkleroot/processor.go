@@ -54,8 +54,8 @@ func NewProcessor(
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnHomeReader readerpkg.RMNHome,
 	metricsReporter MetricsReporter,
-) *Processor {
-	return &Processor{
+) plugincommon.PluginProcessor[Query, Observation, Outcome] {
+	p := &Processor{
 		oracleID:        oracleID,
 		oracleIDToP2pID: oracleIDToP2pID,
 		offchainCfg:     offchainCfg,
@@ -77,6 +77,7 @@ func NewProcessor(
 		rmnHomeReader:   rmnHomeReader,
 		metricsReporter: metricsReporter,
 	}
+	return plugincommon.NewObservedProcessor(lggr, p, "merkleroot", metricsReporter)
 }
 
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}

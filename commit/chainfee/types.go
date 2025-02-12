@@ -51,6 +51,7 @@ type Update struct {
 type MetricsReporter interface {
 	TrackChainFeeObservation(obs Observation)
 	TrackChainFeeOutcome(outcome Outcome)
+	TrackProcessorLatency(processor string, method string, latency time.Duration)
 }
 
 type NoopMetrics struct{}
@@ -58,6 +59,8 @@ type NoopMetrics struct{}
 func (n NoopMetrics) TrackChainFeeObservation(Observation) {}
 
 func (n NoopMetrics) TrackChainFeeOutcome(Outcome) {}
+
+func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration) {}
 
 func (o Observation) IsEmpty() bool {
 	return len(o.FeeComponents) == 0 && len(o.NativeTokenPrices) == 0 && len(o.ChainFeeUpdates) == 0 &&

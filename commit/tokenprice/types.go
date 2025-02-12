@@ -57,6 +57,7 @@ type Observer interface {
 type MetricsReporter interface {
 	TrackTokenPricesObservation(obs Observation)
 	TrackTokenPricesOutcome(outcome Outcome)
+	TrackProcessorLatency(processor string, method string, latency time.Duration)
 }
 
 type NoopMetrics struct{}
@@ -64,3 +65,5 @@ type NoopMetrics struct{}
 func (n NoopMetrics) TrackTokenPricesObservation(Observation) {}
 
 func (n NoopMetrics) TrackTokenPricesOutcome(Outcome) {}
+
+func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration) {}

@@ -37,7 +37,7 @@ func NewProcessor(
 	fRoleDON int,
 	metricsReporter MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
-	return &processor{
+	p := &processor{
 		lggr:            lggr,
 		oracleID:        oracleID,
 		destChain:       destChain,
@@ -48,6 +48,7 @@ func NewProcessor(
 		cfg:             offChainConfig,
 		metricsReporter: metricsReporter,
 	}
+	return plugincommon.NewObservedProcessor(lggr, p, "chainfee", metricsReporter)
 }
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {

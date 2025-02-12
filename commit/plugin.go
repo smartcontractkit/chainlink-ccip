@@ -56,7 +56,7 @@ type Plugin struct {
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
-	discoveryProcessor  *discovery.ContractDiscoveryProcessor
+	discoveryProcessor  plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
 	metricsReporter     metrics.CommitPluginReporter
 	ocrTypeCodec        ocrtypecodec.CommitCodec
 
