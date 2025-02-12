@@ -55,25 +55,33 @@ func NewProcessor(
 	rmnHomeReader readerpkg.RMNHome,
 	metricsReporter MetricsReporter,
 ) *Processor {
+	var observer Observer
+	baseObserver := newObserverImpl(
+		lggr,
+		homeChain,
+		oracleID,
+		chainSupport,
+		ccipReader,
+		msgHasher,
+	)
+	if !offchainCfg.MerkleRootAsyncObserverDisabled {
+		observer = newAsyncObserver(
+			lggr,
+			baseObserver,
+			offchainCfg.MerkleRootAsyncObserverSyncFreq,
+			offchainCfg.MerkleRootAsyncObserverSyncTimeout,
+		)
+	} else {
+		observer = baseObserver
+	}
+
 	return &Processor{
 		oracleID:        oracleID,
 		oracleIDToP2pID: oracleIDToP2pID,
 		offchainCfg:     offchainCfg,
 		destChain:       destChain,
 		lggr:            lggr,
-		observer: newAsyncObserver(
-			lggr,
-			newObserverImpl(
-				lggr,
-				homeChain,
-				oracleID,
-				chainSupport,
-				ccipReader,
-				msgHasher,
-			),
-			offchainCfg.MerkleRootAsyncObserverSyncFreq,
-			offchainCfg.MerkleRootAsyncObserverSyncTimeout,
-		),
+		observer:        observer,
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,
 		chainSupport:    chainSupport,
