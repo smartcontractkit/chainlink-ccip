@@ -936,13 +936,7 @@
             "name": "WrongChainId"
           },
           {
-            "name": "InvalidSignature"
-          },
-          {
             "name": "FailedEcdsaRecover"
-          },
-          {
-            "name": "InvalidRootLen"
           },
           {
             "name": "SignersNotFinalized"
@@ -961,12 +955,6 @@
           },
           {
             "name": "SignaturesNotFinalized"
-          },
-          {
-            "name": "SignaturesRootMismatch"
-          },
-          {
-            "name": "SignaturesValidUntilMismatch"
           },
           {
             "name": "MismatchedInputSignerVectorsLength"

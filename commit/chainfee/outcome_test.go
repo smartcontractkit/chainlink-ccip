@@ -226,7 +226,7 @@ func TestProcessor_Outcome(t *testing.T) {
 					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
 					FeeInfo:                           tt.feeInfo,
 				},
-				metricsReporter: NoopMetrics{},
+				metricsReporter: plugincommon.NoopReporter{},
 			}
 
 			outcome, err := p.Outcome(ctx, Outcome{}, Query{}, tt.aos)

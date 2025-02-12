@@ -108,8 +108,6 @@ func (p *processor) Observation(
 		ChainFeeUpdates:   chainFeeUpdates,
 		TimestampNow:      now,
 	}
-
-	p.metricsReporter.TrackChainFeeObservation(obs)
 	return obs, nil
 }
 
