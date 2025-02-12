@@ -168,17 +168,13 @@ const (
 	Overflow_McmError
 	WrongMultiSig_McmError
 	WrongChainId_McmError
-	InvalidSignature_McmError
 	FailedEcdsaRecover_McmError
-	InvalidRootLen_McmError
 	SignersNotFinalized_McmError
 	SignersAlreadyFinalized_McmError
 	SignaturesAlreadyFinalized_McmError
 	SignatureCountMismatch_McmError
 	TooManySignatures_McmError
 	SignaturesNotFinalized_McmError
-	SignaturesRootMismatch_McmError
-	SignaturesValidUntilMismatch_McmError
 	MismatchedInputSignerVectorsLength_McmError
 	OutOfBoundsNumOfSigners_McmError
 	MismatchedInputGroupArraysLength_McmError
@@ -210,12 +206,8 @@ func (value McmError) String() string {
 		return "WrongMultiSig"
 	case WrongChainId_McmError:
 		return "WrongChainId"
-	case InvalidSignature_McmError:
-		return "InvalidSignature"
 	case FailedEcdsaRecover_McmError:
 		return "FailedEcdsaRecover"
-	case InvalidRootLen_McmError:
-		return "InvalidRootLen"
 	case SignersNotFinalized_McmError:
 		return "SignersNotFinalized"
 	case SignersAlreadyFinalized_McmError:
@@ -228,10 +220,6 @@ func (value McmError) String() string {
 		return "TooManySignatures"
 	case SignaturesNotFinalized_McmError:
 		return "SignaturesNotFinalized"
-	case SignaturesRootMismatch_McmError:
-		return "SignaturesRootMismatch"
-	case SignaturesValidUntilMismatch_McmError:
-		return "SignaturesValidUntilMismatch"
 	case MismatchedInputSignerVectorsLength_McmError:
 		return "MismatchedInputSignerVectorsLength"
 	case OutOfBoundsNumOfSigners_McmError:
