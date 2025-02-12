@@ -243,8 +243,7 @@ func (p processorState) String() string {
 type MetricsReporter interface {
 	TrackRmnReport(latency float64, success bool)
 	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
-	TrackProcessorObservation(processor string, obs plugintypes.Trackable)
-	TrackProcessorOutcome(processor string, out plugintypes.Trackable)
+	TrackProcessorOutput(processor string, method plugincommon.MethodType, obs plugintypes.Trackable)
 }
 
 type NoopMetrics struct{}
@@ -253,6 +252,4 @@ func (n NoopMetrics) TrackRmnReport(float64, bool) {}
 
 func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration, error) {}
 
-func (n NoopMetrics) TrackProcessorObservation(string, plugintypes.Trackable) {}
-
-func (n NoopMetrics) TrackProcessorOutcome(string, plugintypes.Trackable) {}
+func (n NoopMetrics) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}

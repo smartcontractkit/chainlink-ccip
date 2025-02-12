@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -68,14 +69,18 @@ func Test_TrackingTokenPrices(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorObservation(tokenPricesProcessor, tc.observation)
+			reporter.TrackProcessorOutput(tokenPricesProcessor, plugincommon.ObservationMethod, tc.observation)
 
 			feedTokens := int(testutil.ToFloat64(
-				reporter.processorObservationCounter.WithLabelValues(chainID, tokenPricesProcessor, "feedTokenPrices")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, tokenPricesProcessor, plugincommon.ObservationMethod, "feedTokenPrices",
+				)),
 			)
 			require.Equal(t, tc.expectedFeedToken, feedTokens)
 			feeQuoted := int(testutil.ToFloat64(
-				reporter.processorObservationCounter.WithLabelValues(chainID, tokenPricesProcessor, "feeQuoterTokenUpdates")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, tokenPricesProcessor, plugincommon.ObservationMethod, "feeQuoterTokenUpdates",
+				)),
 			)
 			require.Equal(t, tc.expectedFeeQuotedToken, feeQuoted)
 		})
@@ -115,10 +120,12 @@ func Test_TrackingTokenPrices(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorOutcome(tokenPricesProcessor, tc.outcome)
+			reporter.TrackProcessorOutput(tokenPricesProcessor, plugincommon.OutcomeMethod, tc.outcome)
 
 			tokenPrices := int(testutil.ToFloat64(
-				reporter.processorOutcomeCounter.WithLabelValues(chainID, tokenPricesProcessor, "tokenPrices")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, tokenPricesProcessor, plugincommon.OutcomeMethod, "tokenPrices",
+				)),
 			)
 			require.Equal(t, tc.expectedTokenPrices, tokenPrices)
 		})
@@ -172,18 +179,26 @@ func Test_TrackingChainFees(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorObservation(chainFeeProcessor, tc.observation)
+			reporter.TrackProcessorOutput(
+				chainFeeProcessor, plugincommon.ObservationMethod, tc.observation,
+			)
 
 			feeComponents := int(testutil.ToFloat64(
-				reporter.processorObservationCounter.WithLabelValues(chainID, chainFeeProcessor, "feeComponents")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, chainFeeProcessor, plugincommon.ObservationMethod, "feeComponents",
+				)),
 			)
 			require.Equal(t, tc.expectedFeeComponents, feeComponents)
 			nativePrices := int(testutil.ToFloat64(
-				reporter.processorObservationCounter.WithLabelValues(chainID, chainFeeProcessor, "nativeTokenPrices")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, chainFeeProcessor, plugincommon.ObservationMethod, "nativeTokenPrices",
+				)),
 			)
 			require.Equal(t, tc.expectedNativePrices, nativePrices)
 			chainFeeUpdates := int(testutil.ToFloat64(
-				reporter.processorObservationCounter.WithLabelValues(chainID, chainFeeProcessor, "chainFeeUpdates")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, chainFeeProcessor, plugincommon.ObservationMethod, "chainFeeUpdates",
+				)),
 			)
 			require.Equal(t, tc.expectedCHainFeeUpdates, chainFeeUpdates)
 		})
@@ -217,10 +232,12 @@ func Test_TrackingChainFees(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorOutcome(chainFeeProcessor, tc.outcome)
+			reporter.TrackProcessorOutput(chainFeeProcessor, plugincommon.OutcomeMethod, tc.outcome)
 
 			gasPrices := int(testutil.ToFloat64(
-				reporter.processorOutcomeCounter.WithLabelValues(chainID, chainFeeProcessor, "gasPrices")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, chainFeeProcessor, plugincommon.OutcomeMethod, "gasPrices",
+				)),
 			)
 			require.Equal(t, tc.expectedGasPrices, gasPrices)
 		})
@@ -275,14 +292,14 @@ func Test_MerkleRoots(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorObservation(processor, tc.observation)
+			reporter.TrackProcessorOutput(processor, plugincommon.ObservationMethod, tc.observation)
 
 			roots := int(testutil.ToFloat64(
-				reporter.processorObservationCounter.WithLabelValues(chainID, processor, "roots")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.ObservationMethod, "roots")),
 			)
 			require.Equal(t, tc.expectedRoots, roots)
 			messages := int(testutil.ToFloat64(
-				reporter.processorObservationCounter.WithLabelValues(chainID, processor, "messages")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.ObservationMethod, "messages")),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
 		})
@@ -334,18 +351,18 @@ func Test_MerkleRoots(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorOutcome(processor, tc.outcome)
+			reporter.TrackProcessorOutput(processor, plugincommon.OutcomeMethod, tc.outcome)
 
 			roots := int(testutil.ToFloat64(
-				reporter.processorOutcomeCounter.WithLabelValues(chainID, processor, "roots")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.OutcomeMethod, "roots")),
 			)
 			require.Equal(t, tc.expectedRoots, roots)
 			messages := int(testutil.ToFloat64(
-				reporter.processorOutcomeCounter.WithLabelValues(chainID, processor, "messages")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.OutcomeMethod, "messages")),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
 			rmns := int(testutil.ToFloat64(
-				reporter.processorOutcomeCounter.WithLabelValues(chainID, processor, "rmnSignatures")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.OutcomeMethod, "rmnSignatures")),
 			)
 			require.Equal(t, tc.expectedRMNSignatures, rmns)
 		})
@@ -400,8 +417,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 func cleanupMetrics(reporter *PromReporter) func() {
 	return func() {
 		reporter.processorErrors.Reset()
-		reporter.processorOutcomeCounter.Reset()
-		reporter.processorObservationCounter.Reset()
+		reporter.processorOutputCounter.Reset()
 		reporter.processorLatencyHistogram.Reset()
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -20,19 +21,12 @@ var (
 	RequestLatencyBucketsMilliseconds = []float64{
 		5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
 	}
-	promProcessorObservationCounter = promauto.NewCounterVec(
+	promProcessorOutputCounter = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ccip_commit_processor_observation_sizes",
+			Name: "ccip_commit_processor_output_sizes",
 			Help: "This metric tracks the number of different items in the commit processor",
 		},
-		[]string{"chainID", "processor", "type"},
-	)
-	promProcessorOutcomeCounter = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ccip_commit_processor_outcome_sizes",
-			Help: "This metric tracks the number of different items in the commit processor",
-		},
-		[]string{"chainID", "processor", "type"},
+		[]string{"chainID", "processor", "method", "type"},
 	)
 	promProcessorLatencyHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -74,8 +68,7 @@ type PromReporter struct {
 	merkleProcessorRmnReportHistogram *prometheus.HistogramVec
 	rmnControllerRmnRequestHistogram  *prometheus.HistogramVec
 	processorLatencyHistogram         *prometheus.HistogramVec
-	processorObservationCounter       *prometheus.CounterVec
-	processorOutcomeCounter           *prometheus.CounterVec
+	processorOutputCounter            *prometheus.CounterVec
 	processorErrors                   *prometheus.CounterVec
 }
 
@@ -92,10 +85,9 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 		merkleProcessorRmnReportHistogram: promMerkleProcessorRmnReportLatency,
 		rmnControllerRmnRequestHistogram:  promRmnControllerRmnRequestLatency,
 
-		processorLatencyHistogram:   promProcessorLatencyHistogram,
-		processorObservationCounter: promProcessorObservationCounter,
-		processorOutcomeCounter:     promProcessorOutcomeCounter,
-		processorErrors:             promProcessorErrors,
+		processorLatencyHistogram: promProcessorLatencyHistogram,
+		processorOutputCounter:    promProcessorOutputCounter,
+		processorErrors:           promProcessorErrors,
 	}, nil
 }
 
@@ -129,7 +121,12 @@ func (p *PromReporter) TrackRmnRequest(method string, latency float64, nodeID ui
 	p.rmnControllerRmnRequestHistogram.WithLabelValues(method, nodeIDStr, err).Observe(latency)
 }
 
-func (p *PromReporter) TrackProcessorLatency(processor string, method string, latency time.Duration, err error) {
+func (p *PromReporter) TrackProcessorLatency(
+	processor string,
+	method plugincommon.MethodType,
+	latency time.Duration,
+	err error,
+) {
 	if err != nil {
 		p.processorErrors.
 			WithLabelValues(p.chainID, processor, method).
@@ -142,18 +139,14 @@ func (p *PromReporter) TrackProcessorLatency(processor string, method string, la
 		Observe(float64(latency.Milliseconds()))
 }
 
-func (p *PromReporter) TrackProcessorObservation(processor string, obs plugintypes.Trackable) {
+func (p *PromReporter) TrackProcessorOutput(
+	processor string,
+	method plugincommon.MethodType,
+	obs plugintypes.Trackable,
+) {
 	for key, val := range obs.Stats() {
-		p.processorObservationCounter.
-			WithLabelValues(p.chainID, processor, key).
-			Add(float64(val))
-	}
-}
-
-func (p *PromReporter) TrackProcessorOutcome(processor string, out plugintypes.Trackable) {
-	for key, val := range out.Stats() {
-		p.processorOutcomeCounter.
-			WithLabelValues(p.chainID, processor, key).
+		p.processorOutputCounter.
+			WithLabelValues(p.chainID, processor, method, key).
 			Add(float64(val))
 	}
 }

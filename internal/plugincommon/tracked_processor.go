@@ -9,9 +9,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
+type MethodType = string
+
+const (
+	QueryMethod       MethodType = "query"
+	ObservationMethod MethodType = "observation"
+	OutcomeMethod     MethodType = "outcome"
+)
+
 type MetricsReporter interface {
-	TrackProcessorObservation(processor string, obs plugintypes.Trackable)
-	TrackProcessorOutcome(processor string, out plugintypes.Trackable)
+	TrackProcessorOutput(processor string, method MethodType, obs plugintypes.Trackable)
 	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
 }
 
@@ -41,7 +48,7 @@ func NewTrackedProcessor[Query any, Observation plugintypes.Trackable, Outcome p
 }
 
 func (p *TrackedProcessor[Query, Observation, Outcome]) Query(ctx context.Context, prev Outcome) (Query, error) {
-	return withTrackedMethod[Query](p, "query", func() (Query, error) {
+	return withTrackedMethod[Query](p, QueryMethod, func() (Query, error) {
 		return p.PluginProcessor.Query(ctx, prev)
 	})
 }
@@ -51,11 +58,11 @@ func (p *TrackedProcessor[Query, Observation, Outcome]) Observation(
 	prev Outcome,
 	query Query,
 ) (Observation, error) {
-	obs, err := withTrackedMethod[Observation](p, "observation", func() (Observation, error) {
+	obs, err := withTrackedMethod[Observation](p, ObservationMethod, func() (Observation, error) {
 		return p.PluginProcessor.Observation(ctx, prev, query)
 	})
 	if err != nil {
-		p.reporter.TrackProcessorObservation(p.processorName, obs)
+		p.reporter.TrackProcessorOutput(p.processorName, ObservationMethod, obs)
 	}
 	return obs, err
 }
@@ -66,11 +73,11 @@ func (p *TrackedProcessor[Query, Observation, Outcome]) Outcome(
 	query Query,
 	aos []AttributedObservation[Observation],
 ) (Outcome, error) {
-	out, err := withTrackedMethod[Outcome](p, "outcome", func() (Outcome, error) {
+	out, err := withTrackedMethod[Outcome](p, OutcomeMethod, func() (Outcome, error) {
 		return p.PluginProcessor.Outcome(ctx, prev, query, aos)
 	})
 	if err != nil {
-		p.reporter.TrackProcessorOutcome(p.processorName, out)
+		p.reporter.TrackProcessorOutput(p.processorName, OutcomeMethod, out)
 	}
 	return out, err
 }
@@ -98,6 +105,4 @@ type NoopReporter struct{}
 
 func (n NoopReporter) TrackProcessorLatency(string, string, time.Duration, error) {}
 
-func (n NoopReporter) TrackProcessorObservation(string, plugintypes.Trackable) {}
-
-func (n NoopReporter) TrackProcessorOutcome(string, plugintypes.Trackable) {}
+func (n NoopReporter) TrackProcessorOutput(string, MethodType, plugintypes.Trackable) {}

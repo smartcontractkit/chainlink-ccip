@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
@@ -13,9 +14,7 @@ import (
 // It allows you to track observation/outcome on the processor level as well as on the individual plugin level.
 // That gives us more flexibility and granularity in tracking the performance of the commit plugin.
 // Processors have a dedicated sub-interfaces covering only the relevant methods for reporting, please see:
-// - chainfee.MetricsReporter
 // - merkleroot.MetricsReporter
-// - tokenprice.MetricsReporter
 // - CommitPluginReporter
 // This split is required to define the reporting logic in one place but inject only relevant dependencies to
 // plugins/processors. Also, it solves the problem of cyclic dependencies between the plugins/processors.
@@ -26,9 +25,8 @@ type Reporter interface {
 	TrackRmnReport(latency float64, success bool)
 	TrackRmnRequest(method string, latency float64, nodeID uint64, err string)
 
-	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
-	TrackProcessorObservation(processor string, obs plugintypes.Trackable)
-	TrackProcessorOutcome(processor string, out plugintypes.Trackable)
+	TrackProcessorLatency(processor string, method plugincommon.MethodType, latency time.Duration, err error)
+	TrackProcessorOutput(processor string, method plugincommon.MethodType, obs plugintypes.Trackable)
 }
 
 type CommitPluginReporter interface {
@@ -46,11 +44,9 @@ func (n *Noop) TrackRmnReport(float64, bool) {}
 
 func (n *Noop) TrackRmnRequest(string, float64, uint64, string) {}
 
-func (n *Noop) TrackProcessorLatency(string, string, time.Duration, error) {}
+func (n *Noop) TrackProcessorLatency(string, plugincommon.MethodType, time.Duration, error) {}
 
-func (n *Noop) TrackProcessorObservation(string, plugintypes.Trackable) {}
-
-func (n *Noop) TrackProcessorOutcome(string, plugintypes.Trackable) {}
+func (n *Noop) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}
 
 var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}
