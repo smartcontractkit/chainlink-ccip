@@ -61,13 +61,18 @@ func NewProcessor(
 		offchainCfg:     offchainCfg,
 		destChain:       destChain,
 		lggr:            lggr,
-		observer: newObserverImpl(
+		observer: newAsyncObserver(
 			lggr,
-			homeChain,
-			oracleID,
-			chainSupport,
-			ccipReader,
-			msgHasher,
+			newObserverImpl(
+				lggr,
+				homeChain,
+				oracleID,
+				chainSupport,
+				ccipReader,
+				msgHasher,
+			),
+			reportingCfg.EstimatedRoundInterval,   /* tick interval */
+			2*reportingCfg.EstimatedRoundInterval, /* sync timeout */
 		),
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,
@@ -86,5 +91,5 @@ func (p *Processor) Close() error {
 		return nil
 	}
 
-	return services.CloseAll(p.rmnController, p.rmnHomeReader)
+	return services.CloseAll(p.rmnController, p.rmnHomeReader, p.observer)
 }
