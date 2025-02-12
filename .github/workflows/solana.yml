@@ -66,7 +66,7 @@ jobs:
           anchor build &&\
           chmod -R 755 ./target"
     - name: Upload target directory
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: solana-target
         path: ./chains/solana/contracts/target/
