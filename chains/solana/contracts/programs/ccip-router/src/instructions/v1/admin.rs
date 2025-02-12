@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use crate::events::admin as events;
+use crate::state::RestoreOnAction;
 use crate::{
     AcceptOwnership, AddChainSelector, CcipRouterError, DestChainConfig, DestChainState,
     TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, WithdrawBilledFunds,
@@ -57,7 +58,8 @@ pub fn add_chain_selector(
     dest_chain_state.config = dest_chain_config.clone();
     dest_chain_state.state = DestChainState {
         sequence_number: 0,
-        rollback_sequence_number: 0,
+        restore_on_action: RestoreOnAction::None,
+        sequence_number_to_restore: 0,
     };
 
     emit!(events::DestChainAdded {
@@ -90,13 +92,22 @@ pub fn bump_ccip_version_for_dest_chain(
 ) -> Result<()> {
     let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
 
-    dest_chain_state.rollback_sequence_number = dest_chain_state.sequence_number;
-    dest_chain_state.sequence_number = 0;
-
     emit!(events::CcipVersionForDestChainVersionBumped {
         dest_chain_selector,
-        sequence_number: dest_chain_state.rollback_sequence_number,
+        previous_sequence_number: dest_chain_state.sequence_number,
+        new_sequence_number: 0,
     });
+
+    let current_seq_nr = dest_chain_state.sequence_number;
+
+    dest_chain_state.sequence_number = match dest_chain_state.restore_on_action {
+        RestoreOnAction::Upgrade => dest_chain_state.sequence_number_to_restore,
+        _ => 0,
+    };
+    dest_chain_state.sequence_number_to_restore = current_seq_nr;
+
+    // restore on next rollback, as seq nr was of the previous CCIP version
+    dest_chain_state.restore_on_action = RestoreOnAction::Rollback;
 
     Ok(())
 }
@@ -107,19 +118,27 @@ pub fn rollback_ccip_version_for_dest_chain(
 ) -> Result<()> {
     let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
 
-    require_gt!(
-        dest_chain_state.rollback_sequence_number,
-        0,
+    // If there was loss of information, we can't rollback. We support at most 1 consecutive rollback.
+    // So, once a rollback has happened, the admin must bump the CCIP version before another rollback.
+    require_eq!(
+        dest_chain_state.restore_on_action,
+        RestoreOnAction::Rollback,
         CcipRouterError::InvalidCcipVersionRollback
     );
 
-    dest_chain_state.sequence_number = dest_chain_state.rollback_sequence_number;
-    dest_chain_state.rollback_sequence_number = 0;
-
     emit!(events::CcipVersionForDestChainVersionRolledBack {
         dest_chain_selector,
-        sequence_number: dest_chain_state.rollback_sequence_number,
+        previous_sequence_number: dest_chain_state.sequence_number,
+        new_sequence_number: dest_chain_state.sequence_number_to_restore,
     });
+
+    let current_seq_nr = dest_chain_state.sequence_number;
+
+    dest_chain_state.sequence_number = dest_chain_state.sequence_number_to_restore;
+    dest_chain_state.sequence_number_to_restore = current_seq_nr;
+
+    // restore on next upgrade, as seq nr was of the previously-bumped CCIP version
+    dest_chain_state.restore_on_action = RestoreOnAction::Upgrade;
 
     Ok(())
 }

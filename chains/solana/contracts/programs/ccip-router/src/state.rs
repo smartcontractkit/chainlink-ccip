@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anchor_lang::prelude::*;
 
 // zero_copy is used to prevent hitting stack/heap memory limits
@@ -20,6 +22,23 @@ pub struct Config {
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
 
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug, PartialEq, Eq, Copy)]
+pub enum RestoreOnAction {
+    None,
+    Upgrade,
+    Rollback,
+}
+
+impl Display for RestoreOnAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RestoreOnAction::None => write!(f, "None"),
+            RestoreOnAction::Upgrade => write!(f, "Upgrade"),
+            RestoreOnAction::Rollback => write!(f, "Rollback"),
+        }
+    }
+}
+
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainState {
     pub sequence_number: u64, // The last used sequence number. On upgrades, this is reset to 0.
@@ -28,7 +47,8 @@ pub struct DestChainState {
     // the previous OnRamp version is restored. The upgrade/rollback is done per-lane (i.e. per dest chain).
     // If it's 0, that means that it is not possible to rollback to the previous version. As version upgrades
     // are not often, we won't need to rollback multiple versions.
-    pub rollback_sequence_number: u64, // The last used sequence number in the previous onramp version
+    pub sequence_number_to_restore: u64, // The last used sequence number in the previous onramp version
+    pub restore_on_action: RestoreOnAction,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
