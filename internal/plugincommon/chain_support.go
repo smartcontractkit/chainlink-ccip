@@ -61,6 +61,10 @@ func (c ccipChainSupport) DestChain() cciptypes.ChainSelector {
 }
 
 func (c ccipChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, error) {
+	if c.homeChain == nil {
+		return nil, fmt.Errorf("home chain is nil")
+	}
+
 	allChainsSet, err := c.homeChain.GetKnownCCIPChains()
 	if err != nil {
 		c.lggr.Errorw("error getting known chains", "err", err)
@@ -92,6 +96,10 @@ func (c ccipChainSupport) SupportedChains(oracleID commontypes.OracleID) (mapset
 
 // SupportsDestChain returns true if the given oracle supports the dest chain, returns false otherwise
 func (c ccipChainSupport) SupportsDestChain(oracle commontypes.OracleID) (bool, error) {
+	if c.homeChain == nil {
+		return false, fmt.Errorf("home chain is nil")
+	}
+
 	destChainConfig, err := c.homeChain.GetChainConfig(c.destChain)
 	if err != nil {
 		return false, fmt.Errorf("get chain config: %w", err)
