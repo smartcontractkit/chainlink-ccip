@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -351,7 +353,41 @@ func Test_MerkleRoots(t *testing.T) {
 }
 
 func Test_LatencyAndErrors(t *testing.T) {
+	reporter, err := NewPromReporter(logger.Test(t), selector)
+	require.NoError(t, err)
 
+	t.Cleanup(cleanupMetrics(reporter))
+
+	t.Run("single latency metric", func(t *testing.T) {
+		reporter.TrackProcessorLatency("merkle", "method", time.Second, nil)
+		l1 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, "merkle", "method")
+		require.Equal(t, 1, l1)
+
+		errs := testutil.ToFloat64(
+			reporter.processorErrors.WithLabelValues(chainID, "merkle", "method"),
+		)
+		require.Equal(t, float64(0), errs)
+	})
+
+	t.Run("multiple latency metrics", func(t *testing.T) {
+		passCounter := 10
+		for i := 0; i < passCounter; i++ {
+			reporter.TrackProcessorLatency("chainfee", "method", time.Second, nil)
+		}
+		l2 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, "chainfee", "method")
+		require.Equal(t, passCounter, l2)
+	})
+
+	t.Run("multiple error metrics", func(t *testing.T) {
+		errCounter := 5
+		for i := 0; i < errCounter; i++ {
+			reporter.TrackProcessorLatency("discovery", "method", time.Second, fmt.Errorf("error"))
+		}
+		errs := testutil.ToFloat64(
+			reporter.processorErrors.WithLabelValues(chainID, "discovery", "method"),
+		)
+		require.Equal(t, float64(errCounter), errs)
+	})
 }
 
 func cleanupMetrics(reporter *PromReporter) func() {
