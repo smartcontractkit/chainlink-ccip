@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 
-#[constant]
 pub const MAX_ORACLES: u64 = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx
 
 #[error_code]

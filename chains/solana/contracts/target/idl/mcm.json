@@ -26,35 +26,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -88,43 +60,7 @@
       "accounts": [
         {
           "name": "signatures",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  97,
-                  116,
-                  117,
-                  114,
-                  101,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              },
-              {
-                "kind": "arg",
-                "path": "root"
-              },
-              {
-                "kind": "arg",
-                "path": "valid_until"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -181,75 +117,11 @@
       ],
       "accounts": [
         {
-          "name": "multisig_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "name": "multisig_config"
         },
         {
           "name": "config_signers",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -295,43 +167,7 @@
       "accounts": [
         {
           "name": "signatures",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  97,
-                  116,
-                  117,
-                  114,
-                  101,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              },
-              {
-                "kind": "arg",
-                "path": "root"
-              },
-              {
-                "kind": "arg",
-                "path": "valid_until"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -378,75 +214,11 @@
       ],
       "accounts": [
         {
-          "name": "multisig_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "name": "multisig_config"
         },
         {
           "name": "config_signers",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -481,141 +253,20 @@
       "accounts": [
         {
           "name": "multisig_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "root_metadata",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  109,
-                  101,
-                  116,
-                  97,
-                  100,
-                  97,
-                  116,
-                  97
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "name": "root_metadata"
         },
         {
           "name": "expiring_root_and_op_count",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  112,
-                  105,
-                  114,
-                  105,
-                  110,
-                  103,
-                  95,
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  97,
-                  110,
-                  100,
-                  95,
-                  111,
-                  112,
-                  95,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "to"
         },
         {
-          "name": "multisig_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "name": "multisig_signer"
         },
         {
           "name": "authority",
@@ -673,43 +324,7 @@
       "accounts": [
         {
           "name": "signatures",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  97,
-                  116,
-                  117,
-                  114,
-                  101,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              },
-              {
-                "kind": "arg",
-                "path": "root"
-              },
-              {
-                "kind": "arg",
-                "path": "valid_until"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -756,75 +371,11 @@
       ],
       "accounts": [
         {
-          "name": "multisig_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "name": "multisig_config"
         },
         {
           "name": "config_signers",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -859,43 +410,7 @@
       "accounts": [
         {
           "name": "signatures",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  97,
-                  116,
-                  117,
-                  114,
-                  101,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              },
-              {
-                "kind": "arg",
-                "path": "root"
-              },
-              {
-                "kind": "arg",
-                "path": "valid_until"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -903,8 +418,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -950,75 +464,11 @@
       ],
       "accounts": [
         {
-          "name": "multisig_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "name": "multisig_config"
         },
         {
           "name": "config_signers",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1026,8 +476,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -1065,35 +514,7 @@
       "accounts": [
         {
           "name": "multisig_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1101,88 +522,21 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         },
         {
-          "name": "program",
-          "address": "6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX"
+          "name": "program"
         },
         {
           "name": "program_data"
         },
         {
           "name": "root_metadata",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  109,
-                  101,
-                  116,
-                  97,
-                  100,
-                  97,
-                  116,
-                  97
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "expiring_root_and_op_count",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  112,
-                  105,
-                  114,
-                  105,
-                  110,
-                  103,
-                  95,
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  97,
-                  110,
-                  100,
-                  95,
-                  111,
-                  112,
-                  95,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": [
@@ -1216,148 +570,19 @@
       "accounts": [
         {
           "name": "multisig_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "config_signers",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "root_metadata",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  109,
-                  101,
-                  116,
-                  97,
-                  100,
-                  97,
-                  116,
-                  97
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "expiring_root_and_op_count",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  112,
-                  105,
-                  114,
-                  105,
-                  110,
-                  103,
-                  95,
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  97,
-                  110,
-                  100,
-                  95,
-                  111,
-                  112,
-                  95,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1365,8 +590,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -1422,190 +646,22 @@
       "accounts": [
         {
           "name": "root_signatures",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  97,
-                  116,
-                  117,
-                  114,
-                  101,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              },
-              {
-                "kind": "arg",
-                "path": "root"
-              },
-              {
-                "kind": "arg",
-                "path": "valid_until"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "root_metadata",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  109,
-                  101,
-                  116,
-                  97,
-                  100,
-                  97,
-                  116,
-                  97
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "seen_signed_hashes",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  101,
-                  101,
-                  110,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  100,
-                  95,
-                  104,
-                  97,
-                  115,
-                  104,
-                  101,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              },
-              {
-                "kind": "arg",
-                "path": "root"
-              },
-              {
-                "kind": "arg",
-                "path": "valid_until"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "expiring_root_and_op_count",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  112,
-                  105,
-                  114,
-                  105,
-                  110,
-                  103,
-                  95,
-                  114,
-                  111,
-                  111,
-                  116,
-                  95,
-                  97,
-                  110,
-                  100,
-                  95,
-                  111,
-                  112,
-                  95,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "multisig_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "name": "multisig_config"
         },
         {
           "name": "authority",
@@ -1613,8 +669,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -1676,35 +731,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  117,
-                  108,
-                  116,
-                  105,
-                  115,
-                  105,
-                  103,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "multisig_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",

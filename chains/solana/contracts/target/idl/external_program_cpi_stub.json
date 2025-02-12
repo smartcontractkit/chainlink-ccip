@@ -22,32 +22,14 @@
       "accounts": [
         {
           "name": "u8_value",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  56,
-                  95,
-                  118,
-                  97,
-                  108,
-                  117,
-                  101
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "stub_caller",
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": []
@@ -66,24 +48,7 @@
       ],
       "accounts": [
         {
-          "name": "u8_value",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  56,
-                  95,
-                  118,
-                  97,
-                  108,
-                  117,
-                  101
-                ]
-              }
-            ]
-          }
+          "name": "u8_value"
         }
       ],
       "args": []
@@ -118,24 +83,7 @@
       "accounts": [
         {
           "name": "u8_value",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  56,
-                  95,
-                  118,
-                  97,
-                  108,
-                  117,
-                  101
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "stub_caller",
@@ -143,8 +91,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": []

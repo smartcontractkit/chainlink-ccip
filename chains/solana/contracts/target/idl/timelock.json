@@ -22,35 +22,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -84,82 +56,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  98,
-                  121,
-                  112,
-                  97,
-                  115,
-                  115,
-                  101,
-                  114,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -170,8 +70,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -220,73 +119,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -297,8 +133,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -346,39 +181,10 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
-          "name": "access_controller_program",
-          "address": "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
+          "name": "access_controller_program"
         },
         {
           "name": "role_access_controller",
@@ -425,35 +231,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -496,113 +274,13 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  98,
-                  121,
-                  112,
-                  97,
-                  115,
-                  115,
-                  101,
-                  114,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
-          "name": "timelock_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "timelock_signer"
         },
         {
           "name": "role_access_controller"
@@ -649,73 +327,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -762,82 +377,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  98,
-                  121,
-                  112,
-                  97,
-                  115,
-                  115,
-                  101,
-                  114,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -884,73 +427,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -997,107 +477,16 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "predecessor_operation"
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
-          "name": "timelock_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "timelock_signer"
         },
         {
           "name": "role_access_controller"
@@ -1144,82 +533,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  98,
-                  121,
-                  112,
-                  97,
-                  115,
-                  115,
-                  101,
-                  114,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -1266,73 +583,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -1379,35 +633,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1415,19 +641,16 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         },
         {
-          "name": "program",
-          "address": "LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn"
+          "name": "program"
         },
         {
           "name": "program_data"
         },
         {
-          "name": "access_controller_program",
-          "address": "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
+          "name": "access_controller_program"
         },
         {
           "name": "proposer_role_access_controller"
@@ -1473,82 +696,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  98,
-                  121,
-                  112,
-                  97,
-                  115,
-                  115,
-                  101,
-                  114,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -1559,8 +710,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -1612,73 +762,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -1689,8 +776,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -1751,73 +837,10 @@
       "accounts": [
         {
           "name": "operation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  111,
-                  112,
-                  101,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "role_access_controller"
@@ -1868,35 +891,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1934,35 +929,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -2005,35 +972,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  109,
-                  101,
-                  108,
-                  111,
-                  99,
-                  107,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "timelock_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",

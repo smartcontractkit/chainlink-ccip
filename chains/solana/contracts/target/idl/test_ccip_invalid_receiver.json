@@ -22,39 +22,7 @@
       "accounts": [
         {
           "name": "allowed_offramp",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  108,
-                  108,
-                  111,
-                  119,
-                  101,
-                  100,
-                  95,
-                  111,
-                  102,
-                  102,
-                  114,
-                  97,
-                  109,
-                  112
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "source_chain_selector"
-              },
-              {
-                "kind": "arg",
-                "path": "offramp"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -62,8 +30,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -111,27 +78,10 @@
         },
         {
           "name": "counter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  117,
-                  110,
-                  116,
-                  101,
-                  114
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -168,43 +118,7 @@
           "name": "cpi_signer",
           "docs": [
             "CHECK"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108,
-                  115,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              }
-            ]
-          }
+          ]
         },
         {
           "name": "state",
@@ -276,47 +190,10 @@
           "name": "cpi_signer",
           "docs": [
             "CHECK"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108,
-                  115,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              }
-            ]
-          }
+          ]
         },
         {
-          "name": "offramp_program",
-          "address": "9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8"
+          "name": "offramp_program"
         },
         {
           "name": "allowed_offramp",
@@ -401,41 +278,7 @@
           "name": "cpi_signer",
           "docs": [
             "CHECK"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  101,
-                  120,
-                  101,
-                  99,
-                  117,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          ]
         },
         {
           "name": "offramp_program",

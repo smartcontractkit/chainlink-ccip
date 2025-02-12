@@ -108,7 +108,7 @@ func (obj *Counter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 type LockOrBurnInV1 struct {
 	Receiver            []byte
 	RemoteChainSelector uint64
-	OriginalSender      ag_solanago.PublicKey
+	OriginalSender      []byte
 	Amount              uint64
 	LocalToken          ag_solanago.PublicKey
 }
@@ -174,7 +174,7 @@ func (obj *LockOrBurnInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 type ReleaseOrMintInV1 struct {
 	OriginalSender      []byte
 	RemoteChainSelector uint64
-	Receiver            ag_solanago.PublicKey
+	Receiver            []byte
 	Amount              [32]uint8
 	LocalToken          ag_solanago.PublicKey
 

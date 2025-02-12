@@ -22,42 +22,7 @@
       "accounts": [
         {
           "name": "state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -80,89 +45,11 @@
       ],
       "accounts": [
         {
-          "name": "state",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "name": "state"
         },
         {
           "name": "chain_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "remote_chain_selector"
-              },
-              {
-                "kind": "arg",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -170,8 +57,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -209,89 +95,11 @@
       ],
       "accounts": [
         {
-          "name": "state",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "name": "state"
         },
         {
           "name": "chain_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "remote_chain_selector"
-              },
-              {
-                "kind": "arg",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -299,8 +107,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -328,89 +135,11 @@
       ],
       "accounts": [
         {
-          "name": "state",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "name": "state"
         },
         {
           "name": "chain_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "remote_chain_selector"
-              },
-              {
-                "kind": "arg",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -418,8 +147,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -455,89 +183,11 @@
       ],
       "accounts": [
         {
-          "name": "state",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "name": "state"
         },
         {
           "name": "chain_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "remote_chain_selector"
-              },
-              {
-                "kind": "arg",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -545,8 +195,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -583,41 +232,7 @@
       "accounts": [
         {
           "name": "state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "mint"
@@ -628,8 +243,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -666,42 +280,7 @@
         },
         {
           "name": "state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "token_program"
@@ -711,42 +290,7 @@
           "writable": true
         },
         {
-          "name": "pool_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "name": "pool_signer"
         },
         {
           "name": "pool_token_account",
@@ -754,50 +298,7 @@
         },
         {
           "name": "chain_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "lock_or_burn.remote_chain_selector"
-              },
-              {
-                "kind": "account",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": [
@@ -831,47 +332,7 @@
       "accounts": [
         {
           "name": "authority",
-          "signer": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108,
-                  115,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              }
-            ],
-            "program": {
-              "kind": "account",
-              "path": "offramp_program"
-            }
-          }
+          "signer": true
         },
         {
           "name": "offramp_program",
@@ -885,78 +346,11 @@
           "docs": [
             "CHECK PDA of the router program verifying the signer is an allowed offramp.",
             "If PDA does not exist, the router doesn't allow this offramp"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  108,
-                  108,
-                  111,
-                  119,
-                  101,
-                  100,
-                  95,
-                  111,
-                  102,
-                  102,
-                  114,
-                  97,
-                  109,
-                  112
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "release_or_mint.remote_chain_selector"
-              },
-              {
-                "kind": "account",
-                "path": "offramp_program"
-              }
-            ]
-          }
+          ]
         },
         {
           "name": "state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "token_program"
@@ -966,42 +360,7 @@
           "writable": true
         },
         {
-          "name": "pool_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "name": "pool_signer"
         },
         {
           "name": "pool_token_account",
@@ -1009,50 +368,7 @@
         },
         {
           "name": "chain_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "release_or_mint.remote_chain_selector"
-              },
-              {
-                "kind": "account",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "receiver_token_account",
@@ -1089,89 +405,11 @@
       ],
       "accounts": [
         {
-          "name": "state",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "name": "state"
         },
         {
           "name": "chain_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "remote_chain_selector"
-              },
-              {
-                "kind": "arg",
-                "path": "mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1179,8 +417,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -1225,42 +462,7 @@
       "accounts": [
         {
           "name": "state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1289,42 +491,7 @@
       "accounts": [
         {
           "name": "state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  99,
-                  105,
-                  112,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "state.config.mint",
-                "account": "State"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",

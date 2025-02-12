@@ -24,7 +24,6 @@ pub enum ErrorCode {
     Full = 2,
 }
 
-#[constant]
 pub const MAX_ADDRS: u64 = 64;
 
 #[zero_copy]

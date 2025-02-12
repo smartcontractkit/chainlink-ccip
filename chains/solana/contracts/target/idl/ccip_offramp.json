@@ -32,22 +32,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -84,56 +69,10 @@
             "Adding a chain selector implies initializing the state for a new chain,",
             "hence the need to initialize two accounts."
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  111,
-                  117,
-                  114,
-                  99,
-                  101,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "new_chain_selector"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "authority",
@@ -141,8 +80,7 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -200,53 +138,10 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
-          "name": "reference_addresses",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  101,
-                  102,
-                  101,
-                  114,
-                  101,
-                  110,
-                  99,
-                  101,
-                  95,
-                  97,
-                  100,
-                  100,
-                  114,
-                  101,
-                  115,
-                  115,
-                  101,
-                  115
-                ]
-              }
-            ]
-          }
+          "name": "reference_addresses"
         },
         {
           "name": "source_chain",
@@ -262,42 +157,13 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         },
         {
-          "name": "sysvar_instructions",
-          "address": "Sysvar1nstructions1111111111111111111111111"
+          "name": "sysvar_instructions"
         },
         {
-          "name": "fee_billing_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  102,
-                  101,
-                  101,
-                  95,
-                  98,
-                  105,
-                  108,
-                  108,
-                  105,
-                  110,
-                  103,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              }
-            ]
-          }
+          "name": "fee_billing_signer"
         },
         {
           "name": "fee_quoter"
@@ -306,63 +172,10 @@
           "name": "fee_quoter_allowed_price_updater",
           "docs": [
             "so that it can authorize the call made by this offramp"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  108,
-                  108,
-                  111,
-                  119,
-                  101,
-                  100,
-                  95,
-                  112,
-                  114,
-                  105,
-                  99,
-                  101,
-                  95,
-                  117,
-                  112,
-                  100,
-                  97,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "fee_billing_signer"
-              }
-            ],
-            "program": {
-              "kind": "account",
-              "path": "fee_quoter"
-            }
-          }
+          ]
         },
         {
-          "name": "fee_quoter_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "fee_quoter_config"
         }
       ],
       "args": [
@@ -442,56 +255,10 @@
       "accounts": [
         {
           "name": "source_chain",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  111,
-                  117,
-                  114,
-                  99,
-                  101,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "new_chain_selector"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "authority",
@@ -542,53 +309,10 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
-          "name": "reference_addresses",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  101,
-                  102,
-                  101,
-                  114,
-                  101,
-                  110,
-                  99,
-                  101,
-                  95,
-                  97,
-                  100,
-                  100,
-                  114,
-                  101,
-                  115,
-                  115,
-                  101,
-                  115
-                ]
-              }
-            ]
-          }
+          "name": "reference_addresses"
         },
         {
           "name": "source_chain"
@@ -598,8 +322,7 @@
           "writable": true
         },
         {
-          "name": "offramp",
-          "address": "offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5"
+          "name": "offramp"
         },
         {
           "name": "allowed_offramp",
@@ -608,77 +331,10 @@
             "If PDA does not exist, the router doesn't allow this offramp. This is just used",
             "so that token pools and receivers can then check that the caller is an actual offramp that",
             "has been registered in the router as such for that source chain."
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  108,
-                  108,
-                  111,
-                  119,
-                  101,
-                  100,
-                  95,
-                  111,
-                  102,
-                  102,
-                  114,
-                  97,
-                  109,
-                  112
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "source_chain.chain_selector",
-                "account": "SourceChain"
-              },
-              {
-                "kind": "account",
-                "path": "offramp"
-              }
-            ]
-          }
+          ]
         },
         {
-          "name": "external_execution_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  101,
-                  120,
-                  101,
-                  99,
-                  117,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "external_execution_config"
         },
         {
           "name": "authority",
@@ -686,51 +342,13 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         },
         {
-          "name": "sysvar_instructions",
-          "address": "Sysvar1nstructions1111111111111111111111111"
+          "name": "sysvar_instructions"
         },
         {
-          "name": "token_pools_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108,
-                  115,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              }
-            ]
-          }
+          "name": "token_pools_signer"
         }
       ],
       "args": [
@@ -785,54 +403,11 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "reference_addresses",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  101,
-                  102,
-                  101,
-                  114,
-                  101,
-                  110,
-                  99,
-                  101,
-                  95,
-                  97,
-                  100,
-                  100,
-                  114,
-                  101,
-                  115,
-                  115,
-                  101,
-                  115
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "router"
@@ -845,99 +420,15 @@
         },
         {
           "name": "state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "external_execution_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  101,
-                  120,
-                  101,
-                  99,
-                  117,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "token_pools_signer",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108,
-                  115,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -945,12 +436,10 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         },
         {
-          "name": "program",
-          "address": "offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5"
+          "name": "program"
         },
         {
           "name": "program_data"
@@ -993,53 +482,10 @@
       ],
       "accounts": [
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
-          "name": "reference_addresses",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  101,
-                  102,
-                  101,
-                  114,
-                  101,
-                  110,
-                  99,
-                  101,
-                  95,
-                  97,
-                  100,
-                  100,
-                  114,
-                  101,
-                  115,
-                  115,
-                  101,
-                  115
-                ]
-              }
-            ]
-          }
+          "name": "reference_addresses"
         },
         {
           "name": "source_chain"
@@ -1049,8 +495,7 @@
           "writable": true
         },
         {
-          "name": "offramp",
-          "address": "offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5"
+          "name": "offramp"
         },
         {
           "name": "allowed_offramp",
@@ -1059,77 +504,10 @@
             "If PDA does not exist, the router doesn't allow this offramp. This is just used",
             "so that token pools and receivers can then check that the caller is an actual offramp that",
             "has been registered in the router as such for that source chain."
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  108,
-                  108,
-                  111,
-                  119,
-                  101,
-                  100,
-                  95,
-                  111,
-                  102,
-                  102,
-                  114,
-                  97,
-                  109,
-                  112
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "source_chain.chain_selector",
-                "account": "SourceChain"
-              },
-              {
-                "kind": "account",
-                "path": "offramp"
-              }
-            ]
-          }
+          ]
         },
         {
-          "name": "external_execution_config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  101,
-                  120,
-                  101,
-                  99,
-                  117,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "external_execution_config"
         },
         {
           "name": "authority",
@@ -1137,51 +515,13 @@
           "signer": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         },
         {
-          "name": "sysvar_instructions",
-          "address": "Sysvar1nstructions1111111111111111111111111"
+          "name": "sysvar_instructions"
         },
         {
-          "name": "token_pools_signer",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  116,
-                  101,
-                  114,
-                  110,
-                  97,
-                  108,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108,
-                  115,
-                  95,
-                  115,
-                  105,
-                  103,
-                  110,
-                  101,
-                  114
-                ]
-              }
-            ]
-          }
+          "name": "token_pools_signer"
         }
       ],
       "args": [
@@ -1222,40 +562,11 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1319,22 +630,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1374,22 +670,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1429,56 +710,10 @@
       "accounts": [
         {
           "name": "source_chain",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  111,
-                  117,
-                  114,
-                  99,
-                  101,
-                  95,
-                  99,
-                  104,
-                  97,
-                  105,
-                  110,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "new_chain_selector"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "name": "config"
         },
         {
           "name": "authority",
@@ -1526,22 +761,7 @@
       "accounts": [
         {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "authority",
@@ -1758,83 +978,248 @@
   "errors": [
     {
       "code": 6000,
-      "name": "InvalidConfigFMustBePositive",
-      "msg": "Invalid config: F must be positive"
+      "name": "InvalidSequenceInterval",
+      "msg": "The given sequence interval is invalid"
     },
     {
       "code": 6001,
-      "name": "InvalidConfigTooManyTransmitters",
-      "msg": "Invalid config: Too many transmitters"
+      "name": "RootNotCommitted",
+      "msg": "The given Merkle Root is missing"
     },
     {
       "code": 6002,
-      "name": "InvalidConfigTooManySigners",
-      "msg": "Invalid config: Too many signers"
+      "name": "ExistingMerkleRoot",
+      "msg": "The given Merkle Root is already committed"
     },
     {
       "code": 6003,
-      "name": "InvalidConfigFIsTooHigh",
-      "msg": "Invalid config: F is too high"
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
     },
     {
       "code": 6004,
-      "name": "InvalidConfigRepeatedOracle",
-      "msg": "Invalid config: Repeated oracle address"
+      "name": "InvalidInputs",
+      "msg": "Invalid inputs"
     },
     {
       "code": 6005,
-      "name": "WrongMessageLength",
-      "msg": "Wrong message length"
+      "name": "UnsupportedSourceChainSelector",
+      "msg": "Source chain selector not supported"
     },
     {
       "code": 6006,
-      "name": "ConfigDigestMismatch",
-      "msg": "Config digest mismatch"
+      "name": "UnsupportedDestinationChainSelector",
+      "msg": "Destination chain selector not supported"
     },
     {
       "code": 6007,
-      "name": "WrongNumberOfSignatures",
-      "msg": "Wrong number signatures"
+      "name": "InvalidProof",
+      "msg": "Invalid Proof for Merkle Root"
     },
     {
       "code": 6008,
-      "name": "UnauthorizedTransmitter",
-      "msg": "Unauthorized transmitter"
+      "name": "InvalidMessage",
+      "msg": "Invalid message format"
     },
     {
       "code": 6009,
-      "name": "UnauthorizedSigner",
-      "msg": "Unauthorized signer"
+      "name": "ReachedMaxSequenceNumber",
+      "msg": "Reached max sequence number"
     },
     {
       "code": 6010,
-      "name": "NonUniqueSignatures",
-      "msg": "Non unique signatures"
+      "name": "ManualExecutionNotAllowed",
+      "msg": "Manual execution not allowed"
     },
     {
       "code": 6011,
-      "name": "OracleCannotBeZeroAddress",
-      "msg": "Oracle cannot be zero address"
+      "name": "InvalidInputsTokenIndices",
+      "msg": "Invalid pool account account indices"
     },
     {
       "code": 6012,
-      "name": "StaticConfigCannotBeChanged",
-      "msg": "Static config cannot be changed"
+      "name": "InvalidInputsPoolAccounts",
+      "msg": "Invalid pool accounts"
     },
     {
       "code": 6013,
-      "name": "InvalidPluginType",
-      "msg": "Incorrect plugin type"
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
     },
     {
       "code": 6014,
-      "name": "InvalidSignature",
-      "msg": "Invalid signature"
+      "name": "InvalidInputsConfigAccounts",
+      "msg": "Invalid config account"
     },
     {
       "code": 6015,
-      "name": "SignaturesOutOfRegistration",
-      "msg": "Signatures out of registration"
+      "name": "InvalidInputsTokenAdminRegistryAccounts",
+      "msg": "Invalid Token Admin Registry account"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidInputsLookupTableAccounts",
+      "msg": "Invalid LookupTable account"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidInputsLookupTableAccountWritable",
+      "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidInputsTokenAmount",
+      "msg": "Cannot send zero tokens"
+    },
+    {
+      "code": 6019,
+      "name": "OfframpReleaseMintBalanceMismatch",
+      "msg": "Release or mint balance mismatch"
+    },
+    {
+      "code": 6020,
+      "name": "OfframpInvalidDataLength",
+      "msg": "Invalid data length"
+    },
+    {
+      "code": 6021,
+      "name": "StaleCommitReport",
+      "msg": "Stale commit report"
+    },
+    {
+      "code": 6022,
+      "name": "DestinationChainDisabled",
+      "msg": "Destination chain disabled"
+    },
+    {
+      "code": 6023,
+      "name": "FeeTokenDisabled",
+      "msg": "Fee token disabled"
+    },
+    {
+      "code": 6024,
+      "name": "MessageTooLarge",
+      "msg": "Message exceeds maximum data size"
+    },
+    {
+      "code": 6025,
+      "name": "UnsupportedNumberOfTokens",
+      "msg": "Message contains an unsupported number of tokens"
+    },
+    {
+      "code": 6026,
+      "name": "UnsupportedChainFamilySelector",
+      "msg": "Chain family selector not supported"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidEVMAddress",
+      "msg": "Invalid EVM address"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidEncoding",
+      "msg": "Invalid encoding"
+    },
+    {
+      "code": 6029,
+      "name": "InvalidInputsAtaAddress",
+      "msg": "Invalid Associated Token Account address"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidInputsAtaWritable",
+      "msg": "Invalid Associated Token Account writable flag"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidTokenPrice",
+      "msg": "Invalid token price"
+    },
+    {
+      "code": 6032,
+      "name": "StaleGasPrice",
+      "msg": "Stale gas price"
+    },
+    {
+      "code": 6033,
+      "name": "InsufficientLamports",
+      "msg": "Insufficient lamports"
+    },
+    {
+      "code": 6034,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 6035,
+      "name": "UnsupportedToken",
+      "msg": "Unsupported token"
+    },
+    {
+      "code": 6036,
+      "name": "InvalidInputsMissingTokenConfig",
+      "msg": "Inputs are missing token configuration"
+    },
+    {
+      "code": 6037,
+      "name": "MessageFeeTooHigh",
+      "msg": "Message fee is too high"
+    },
+    {
+      "code": 6038,
+      "name": "SourceTokenDataTooLarge",
+      "msg": "Source token data is too large"
+    },
+    {
+      "code": 6039,
+      "name": "MessageGasLimitTooHigh",
+      "msg": "Message gas limit too high"
+    },
+    {
+      "code": 6040,
+      "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
+      "msg": "Extra arg out of order execution must be true"
+    },
+    {
+      "code": 6041,
+      "name": "InvalidTokenAdminRegistryInputsZeroAddress",
+      "msg": "New Admin can not be zero address"
+    },
+    {
+      "code": 6042,
+      "name": "InvalidTokenAdminRegistryProposedAdmin",
+      "msg": "An already owned registry can not be proposed"
+    },
+    {
+      "code": 6043,
+      "name": "InvalidWritabilityBitmap",
+      "msg": "Invalid writability bitmap"
+    },
+    {
+      "code": 6044,
+      "name": "InvalidExtraArgsTag",
+      "msg": "Invalid extra args tag"
+    },
+    {
+      "code": 6045,
+      "name": "InvalidChainFamilySelector",
+      "msg": "Invalid chain family selector"
+    },
+    {
+      "code": 6046,
+      "name": "InvalidTokenReceiver",
+      "msg": "Invalid token receiver"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidSVMAddress",
+      "msg": "Invalid SVM address"
+    },
+    {
+      "code": 6048,
+      "name": "SenderNotAllowed",
+      "msg": "Sender not allowed for that destination chain"
     }
   ],
   "types": [
@@ -2527,13 +1912,6 @@
           }
         ]
       }
-    }
-  ],
-  "constants": [
-    {
-      "name": "MAX_ORACLES",
-      "type": "u64",
-      "value": "16"
     }
   ]
 }
