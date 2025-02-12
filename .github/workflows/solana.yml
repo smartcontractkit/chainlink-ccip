@@ -56,7 +56,7 @@ jobs:
         docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ needs.get_anchor_version.outputs.anchor_version }}
         docker save -o docker-build.tar ccip-solana
     - name: build & save contract compilation artifacts
-      if: steps.cache-target.outputs.cache-hit != 'true'
+      # if: steps.cache-target.outputs.cache-hit != 'true'
       run: |
         docker run -v "$(pwd)/":/solana ccip-solana:build bash -c "\
           set -eoux pipefail &&\
@@ -65,6 +65,11 @@ jobs:
           cd /solana/contracts &&\
           anchor build &&\
           chmod -R 755 ./target"
+    - name: Upload target directory
+      uses: actions/upload-artifact@v3
+      with:
+        name: solana-target
+        path: ./chains/solana/contracts/target/
 
   rust:
     name: rust tests
