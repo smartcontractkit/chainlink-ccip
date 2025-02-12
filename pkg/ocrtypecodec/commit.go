@@ -42,23 +42,29 @@ func NewCommitCodecProto() *CommitCodecProto {
 }
 
 func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) {
-	sigs := make([]*ocrtypecodecpb.SignatureEcdsa, len(query.MerkleRootQuery.RMNSignatures.Signatures))
-	for i, sig := range query.MerkleRootQuery.RMNSignatures.Signatures {
-		sigs[i] = &ocrtypecodecpb.SignatureEcdsa{R: sig.R, S: sig.S}
+	sigs := make([]*ocrtypecodecpb.SignatureEcdsa, 0)
+	if query.MerkleRootQuery.RMNSignatures != nil {
+		sigs = make([]*ocrtypecodecpb.SignatureEcdsa, len(query.MerkleRootQuery.RMNSignatures.Signatures))
+		for i, sig := range query.MerkleRootQuery.RMNSignatures.Signatures {
+			sigs[i] = &ocrtypecodecpb.SignatureEcdsa{R: sig.R, S: sig.S}
+		}
 	}
 
-	laneUpdates := make([]*ocrtypecodecpb.DestChainUpdate, len(query.MerkleRootQuery.RMNSignatures.LaneUpdates))
-	for i, lu := range query.MerkleRootQuery.RMNSignatures.LaneUpdates {
-		laneUpdates[i] = &ocrtypecodecpb.DestChainUpdate{
-			LaneSource: &ocrtypecodecpb.SourceChainMeta{
-				SourceChainSelector: lu.LaneSource.SourceChainSelector,
-				OnrampAddress:       lu.LaneSource.OnrampAddress,
-			},
-			SeqNumRange: &ocrtypecodecpb.SeqNumRange{
-				MinMsgNr: lu.ClosedInterval.MinMsgNr,
-				MaxMsgNr: lu.ClosedInterval.MaxMsgNr,
-			},
-			Root: lu.Root,
+	laneUpdates := make([]*ocrtypecodecpb.DestChainUpdate, 0)
+	if query.MerkleRootQuery.RMNSignatures != nil {
+		laneUpdates = make([]*ocrtypecodecpb.DestChainUpdate, len(query.MerkleRootQuery.RMNSignatures.LaneUpdates))
+		for i, lu := range query.MerkleRootQuery.RMNSignatures.LaneUpdates {
+			laneUpdates[i] = &ocrtypecodecpb.DestChainUpdate{
+				LaneSource: &ocrtypecodecpb.SourceChainMeta{
+					SourceChainSelector: lu.LaneSource.SourceChainSelector,
+					OnrampAddress:       lu.LaneSource.OnrampAddress,
+				},
+				SeqNumRange: &ocrtypecodecpb.SeqNumRange{
+					MinMsgNr: lu.ClosedInterval.MinMsgNr,
+					MaxMsgNr: lu.ClosedInterval.MaxMsgNr,
+				},
+				Root: lu.Root,
+			}
 		}
 	}
 
