@@ -327,7 +327,7 @@ type Observer interface {
 
 	// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
 	// Check implementation specific details to learn if external calls are made, if values are cached, etc...
-	// NOTE: Make sure that caller supports the provided destination chain.
+	// NOTE: Make sure that caller supports the destination chain.
 	ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig
 
 	// ObserveFChain observes the FChain for each supported chain. Check implementation specific details to learn
@@ -344,7 +344,7 @@ type asyncObserver struct {
 	lggr                logger.Logger
 	observer            Observer
 	cf                  context.CancelFunc
-	useSyncCalls        bool // set to true if the provided syncTimeout is 0, useful for testing
+	useSyncCalls        bool // Will be true if the provided syncTimeout is 0, useful for testing
 	mu                  *sync.RWMutex
 	offRampNextSeqNums  []plugintypes.SeqNumChain
 	onRampLatestSeqNums []plugintypes.SeqNumChain
