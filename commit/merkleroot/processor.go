@@ -71,8 +71,8 @@ func NewProcessor(
 				ccipReader,
 				msgHasher,
 			),
-			reportingCfg.EstimatedRoundInterval,   /* tick interval */
-			2*reportingCfg.EstimatedRoundInterval, /* sync timeout */
+			offchainCfg.MerkleRootAsyncObserverSyncFreq,
+			offchainCfg.MerkleRootAsyncObserverSyncTimeout,
 		),
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,

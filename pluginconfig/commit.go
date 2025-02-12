@@ -28,6 +28,7 @@ const (
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
 	defaultInflightPriceCheckRetries          = 5
 	defaultRelativeBoostPerWaitHour           = 0.2 // 20 percent
+	defaultMerkleRootAsyncObserverSyncTimeout = 10 * time.Second
 )
 
 type FeeInfo struct {
@@ -127,6 +128,13 @@ type CommitOffchainConfig struct {
 
 	// InflightPriceCheckRetries is the number of rounds we wait for a price report to get recorded on the blockchain.
 	InflightPriceCheckRetries int `json:"inflightPriceCheckRetries"`
+
+	// MerkleRootAsyncObserverSyncFreq defines how frequently the async merkle roots observer should sync.
+	// Zero indicates that operations are done synchronously.
+	MerkleRootAsyncObserverSyncFreq time.Duration `json:"merkleRootAsyncObserverSyncFreq"`
+
+	// MerkleRootAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch seqNums).
+	MerkleRootAsyncObserverSyncTimeout time.Duration `json:"merkleRootAsyncObserverSyncTimeout"`
 }
 
 func (c *CommitOffchainConfig) applyDefaults() {
@@ -160,6 +168,10 @@ func (c *CommitOffchainConfig) applyDefaults() {
 
 	if c.InflightPriceCheckRetries == 0 {
 		c.InflightPriceCheckRetries = defaultInflightPriceCheckRetries
+	}
+
+	if c.MerkleRootAsyncObserverSyncTimeout == 0 {
+		c.MerkleRootAsyncObserverSyncTimeout = defaultMerkleRootAsyncObserverSyncTimeout
 	}
 }
 

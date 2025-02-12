@@ -335,6 +335,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
+				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
 			},
 		},
 		{
@@ -352,6 +353,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
+				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
 			},
 		},
 		{
@@ -375,14 +377,17 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        20,
 				InflightPriceCheckRetries:          5,
+				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
 			},
 		},
 		{
 			name: "Partial custom values",
 			input: CommitOffchainConfig{
-				RMNEnabled:          true,
-				NewMsgScanBatchSize: 300,
-				MaxMerkleTreeSize:   500,
+				RMNEnabled:                         true,
+				NewMsgScanBatchSize:                300,
+				MaxMerkleTreeSize:                  500,
+				MerkleRootAsyncObserverSyncFreq:    5 * time.Minute,
+				MerkleRootAsyncObserverSyncTimeout: 10 * time.Minute,
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -394,6 +399,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
+				MerkleRootAsyncObserverSyncFreq:    5 * time.Minute,
+				MerkleRootAsyncObserverSyncTimeout: 10 * time.Minute,
 			},
 		},
 	}

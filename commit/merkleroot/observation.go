@@ -365,8 +365,8 @@ func newAsyncObserver(lggr logger.Logger, observer Observer, tickDur, syncTimeou
 		onRampLatestSeqNums: make([]plugintypes.SeqNumChain, 0),
 	}
 
-	if syncTimeout == 0 {
-		o.lggr.Debugw("using sync calls for async observer, syncTimeout set to 0")
+	if tickDur == 0 {
+		o.lggr.Debugw("using sync calls for async observer, tickDur set to 0")
 		o.useSyncCalls = true
 		return o
 	}
