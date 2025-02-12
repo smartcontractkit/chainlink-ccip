@@ -104,6 +104,7 @@ func (p *PromReporter) TrackObservation(obs committypes.Observation) {
 		sourceChainSelector := root.ChainSel
 		maxSeqNr := root.SeqNumsRange.End()
 
+		// TODO Implement me in next PR!
 		fmt.Println(sourceChainSelector, maxSeqNr)
 	}
 }
@@ -113,6 +114,7 @@ func (p *PromReporter) TrackOutcome(outcome committypes.Outcome) {
 		sourceChainSelector := root.ChainSel
 		maxSeqNr := root.SeqNumsRange.End()
 
+		// TODO Implement me in next PR!
 		fmt.Println(sourceChainSelector, maxSeqNr)
 	}
 }

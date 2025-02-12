@@ -77,7 +77,7 @@ func NewProcessor(
 		rmnHomeReader:   rmnHomeReader,
 		metricsReporter: metricsReporter,
 	}
-	return plugincommon.NewObservedProcessor(lggr, p, "merkleroot", metricsReporter)
+	return plugincommon.NewTrackedProcessor(lggr, p, "merkleroot", metricsReporter)
 }
 
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}

@@ -350,6 +350,10 @@ func Test_MerkleRoots(t *testing.T) {
 	}
 }
 
+func Test_LatencyAndErrors(t *testing.T) {
+
+}
+
 func cleanupMetrics(reporter *PromReporter) func() {
 	return func() {
 		reporter.processorErrors.Reset()

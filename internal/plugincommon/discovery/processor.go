@@ -48,7 +48,7 @@ func NewContractDiscoveryProcessor(
 		fRoleDON:        fRoleDON,
 		oracleIDToP2PID: oracleIDToP2PID,
 	}
-	return plugincommon.NewObservedProcessor(lggr, p, "discovery", plugincommon.NoopReporter{})
+	return plugincommon.NewTrackedProcessor(lggr, p, "discovery", plugincommon.NoopReporter{})
 }
 
 // Query is not needed for this processor.

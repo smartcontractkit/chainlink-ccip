@@ -50,7 +50,7 @@ func NewProcessor(
 		fRoleDON:         fRoleDON,
 		metricsReporter:  metricsReporter,
 	}
-	return plugincommon.NewObservedProcessor(lggr, p, "tokenprice", metricsReporter)
+	return plugincommon.NewTrackedProcessor(lggr, p, "tokenprice", metricsReporter)
 }
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
