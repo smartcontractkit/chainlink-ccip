@@ -61,6 +61,8 @@ var (
 	// The new owner must be a signer of the transaction.
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
+	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
+
 	// Adds a billing token configuration.
 	// Only CCIP Admin can add a billing token configuration.
 	//
@@ -201,6 +203,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_SetDefaultCodeVersion:
+		return "SetDefaultCodeVersion"
 	case Instruction_AddBillingTokenConfig:
 		return "AddBillingTokenConfig"
 	case Instruction_UpdateBillingTokenConfig:
@@ -249,6 +253,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),
+		},
+		{
+			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
 		},
 		{
 			"add_billing_token_config", (*AddBillingTokenConfig)(nil),

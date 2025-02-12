@@ -416,6 +416,7 @@ func (obj *ProcessedExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 
 type DestChainConfig struct {
 	IsEnabled                         bool
+	LaneCodeVersion                   CodeVersion
 	MaxNumberOfTokensPerMsg           uint16
 	MaxDataBytes                      uint32
 	MaxPerMsgGasLimit                 uint32
@@ -439,6 +440,11 @@ type DestChainConfig struct {
 func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `IsEnabled` param:
 	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `LaneCodeVersion` param:
+	err = encoder.Encode(obj.LaneCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -538,6 +544,11 @@ func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `IsEnabled`:
 	err = decoder.Decode(&obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LaneCodeVersion`:
+	err = decoder.Decode(&obj.LaneCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -819,6 +830,24 @@ func (obj *TokenTransferFeeConfig) UnmarshalWithDecoder(decoder *ag_binary.Decod
 		return err
 	}
 	return nil
+}
+
+type CodeVersion ag_binary.BorshEnum
+
+const (
+	Default_CodeVersion CodeVersion = iota
+	V1_CodeVersion
+)
+
+func (value CodeVersion) String() string {
+	switch value {
+	case Default_CodeVersion:
+		return "Default"
+	case V1_CodeVersion:
+		return "V1"
+	default:
+		return ""
+	}
 }
 
 type FeeQuoterError ag_binary.BorshEnum
