@@ -78,9 +78,9 @@ func TestObservation(t *testing.T) {
 			setupMocks: func() {
 				mockObserver.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}}).Once()
-				mockObserver.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything, destChain).Return(
+				mockObserver.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}})
-				mockObserver.EXPECT().ObserveRMNRemoteCfg(mock.Anything, destChain).Return(rmntypes.RemoteConfig{})
+				mockObserver.EXPECT().ObserveRMNRemoteCfg(mock.Anything).Return(rmntypes.RemoteConfig{})
 				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
 			expectedObs: Observation{
