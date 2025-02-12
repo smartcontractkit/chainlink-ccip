@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	// Prometheus labels for merkle processor
+	processorLabel    = "merkleroot"
 	rootsLabel        = "roots"
 	messagesLabel     = "messages"
 	rmnSignatureLabel = "rmnSignatures"

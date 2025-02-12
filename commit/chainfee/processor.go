@@ -48,7 +48,7 @@ func NewProcessor(
 		cfg:             offChainConfig,
 		metricsReporter: metricsReporter,
 	}
-	return plugincommon.NewTrackedProcessor(lggr, p, "chainfee", metricsReporter)
+	return plugincommon.NewTrackedProcessor(lggr, p, processorLabel, metricsReporter)
 }
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {

@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	processorsLabel            = "tokenprice"
 	tokenPricesLabel           = "tokenPrices"
 	feedTokenPricesLabel       = "feedTokenPrices"
 	feeQuoterTokenUpdatesLabel = "feeQuoterTokenUpdates"

@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	processorLabel         = "chainfee"
 	gasPricesLabel         = "gasPrices"
 	feeComponentsLabel     = "feeComponents"
 	nativeTokenPricesLabel = "nativeTokenPrices"
