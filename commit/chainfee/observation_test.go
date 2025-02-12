@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	plugincommon2 "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
@@ -122,7 +123,7 @@ func Test_processor_Observation(t *testing.T) {
 				ccipReader:      ccipReader,
 				oracleID:        oracleID,
 				homeChain:       homeChain,
-				metricsReporter: NoopMetrics{},
+				metricsReporter: plugincommon2.NoopReporter{},
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)
@@ -316,7 +317,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				ccipReader:      ccipReader,
 				oracleID:        oracleID,
 				homeChain:       homeChain,
-				metricsReporter: NoopMetrics{},
+				metricsReporter: plugincommon2.NoopReporter{},
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)

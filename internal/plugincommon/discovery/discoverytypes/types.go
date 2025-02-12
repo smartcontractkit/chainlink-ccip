@@ -11,6 +11,10 @@ type Outcome struct {
 	// Request bool
 }
 
+func (o Outcome) Stats() map[string]int {
+	return map[string]int{}
+}
+
 // Query isn't needed for this processor.
 type Query []byte
 
@@ -23,6 +27,10 @@ type Observation struct {
 
 	// TODO: some sort of request flag to avoid including this every time.
 	// Request bool
+}
+
+func (o Observation) Stats() map[string]int {
+	return map[string]int{}
 }
 
 func (o Observation) IsEmpty() bool {
