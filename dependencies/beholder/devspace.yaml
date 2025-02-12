@@ -40,41 +40,55 @@ pipelines:
   load-test:
     run: |-
       run_dependency_pipelines redpanda
-      create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway
-      wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/instance=beholder-otel-collector-agent
-      wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/name=deployment-collector
+      create_deployments beholder-agent beholder-gateway
+      wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/instance=beholder-agent
+      wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/instance=beholder-gateway
       create_deployments beholder-load-tester-job
   kind:
     run: |-
       run_dependency_pipelines prometheus grafana loki tempo redpanda
       ensure_pull_secrets regcred-beholder
-      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
+      create_deployments beholder-client beholder-agent beholder-gateway
   deploy:
     run: |-
       run_dependency_pipelines redpanda
-      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway cp-kafka-rest
+      create_deployments beholder-client beholder-agent beholder-gateway cp-kafka-rest
 
 deployments:
-  beholder-test-client:
+  beholder-client:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      releaseName: beholder-test-client
+      releaseName: beholder-client
       displayOutput: true
       chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/beholder-test-client
-        version: "0.0.4"
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/generic-app
+        version: 1.3.1
       values:
+        name: beholder-client
+        image:
+          repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-test-client
+          tag: qa-latest
+
+        replicas: 1
+
+        service:
+          port: 9091
+
+        livenessProbe:
+          httpGet:
+            path: /metrics
+
+        readinessProbe:
+          httpGet:
+            path: /metrics
+
         podSecurityContext:
           fsGroup: 999
 
-        beholder-test-client:
-          image:
-            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-test-client
-            tag: qa-latest
-          args:
-            - -otel-exporter-grpc-endpoint
-            - beholder-otel-collector-agent:4317
+        args:
+          - -otel-exporter-grpc-endpoint
+          - beholder-agent:4317
 
   beholder-load-tester-job:
     kubectl:
@@ -97,7 +111,7 @@ deployments:
                   imagePullPolicy: Always
                   env:
                     - name: OTEL_COLLECTOR_GRPC_ENDPOINT
-                      value: "beholder-otel-collector-agent:4317"
+                      value: "beholder-agent:4317"
                     - name: OTEL_METRICS_READER_INTERVAL
                       value: "${OTEL_METRICS_READER_INTERVAL}"
                     - name: OTEL_TRACE_SAMPLE_RATIO
@@ -173,18 +187,18 @@ deployments:
                 fsGroup: 65534
           backoffLimit: 4  # Number of retries before considering the job as failed
 
-  beholder-otel-collector-agent:
+  beholder-agent:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      releaseName: beholder-otel-collector-agent
+      releaseName: beholder-agent
       displayOutput: true
       chart:
         name: opentelemetry-collector
         repo: https://open-telemetry.github.io/opentelemetry-helm-charts
-        version: "0.101.2"
+        version: 0.116.0
       values:
-        fullnameOverride: beholder-otel-collector-agent
+        fullnameOverride: beholder-agent
         mode: deployment
         securityContext:
           allowPrivilegeEscalation: false
@@ -194,8 +208,30 @@ deployments:
             drop:
               - ALL
         image:
-          repository: otel/opentelemetry-collector
-          tag: 0.106.1
+          repository: otel/opentelemetry-collector-contrib # Repository from guidelines given to NOPS
+          tag: 0.108.0 # Version from guidelines given to NOPS
+        ports:
+          otlp:
+            enabled: true
+          otlp-http:
+            enabled: true
+          jaeger-compact:
+            enabled: false
+          jaeger-thrift:
+            enabled: false
+          jaeger-grpc:
+            enabled: false
+          zipkin:
+            enabled: false
+          metrics:
+            enabled: true
+        serviceMonitor:
+          enabled: true
+          metricsEndpoints:
+            - port: metrics
+              interval: 1s
+          extraLabels:
+            release: prometheus
         config:
           receivers:
             otlp:
@@ -208,7 +244,7 @@ deployments:
             debug:
               verbosity: detailed
             otlphttp:
-              endpoint: http://deployment-collector:4318
+              endpoint: http://beholder-gateway:4318 # port is http
               tls:
                 insecure: true
           service:
@@ -232,115 +268,181 @@ deployments:
             nginx.ingress.kubernetes.io/backend-protocol: HTTP
             external-dns.alpha.kubernetes.io/ttl: "120"
           hosts:
-            - host: ${DEVSPACE_NAMESPACE}-beholder-otel-collector-agent-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+            - host: ${DEVSPACE_NAMESPACE}-beholder-agent-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
               paths:
                 - path: /
                   port: 4318
                   pathType: Prefix
+
+  beholder-gateway:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: beholder-gateway
+      displayOutput: true
+      chart:
+        name: opentelemetry-collector
+        repo: https://open-telemetry.github.io/opentelemetry-helm-charts
+        version: 0.116.0
+      values:
+        fullnameOverride: beholder-gateway
+        mode: deployment
+        image:
+          repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-gateway-otel-collector
+          tag: qa-latest
+        podSecurityContext:
+          fsGroup: 2000
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
         ports:
+          otlp:
+            enabled: true
+          otlp-http:
+            enabled: true
+          jaeger-compact:
+            enabled: false
+          jaeger-thrift:
+            enabled: false
+          jaeger-grpc:
+            enabled: false
+          zipkin:
+            enabled: false
           metrics:
             enabled: true
         serviceMonitor:
           enabled: true
           metricsEndpoints:
             - port: metrics
-              interval: 1s
-          extraLabels:
-            release: prometheus
-
-  beholder-otel-collector-gateway:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      releaseName: beholder-otel-collector-gateway
-      displayOutput: true
-      chart:
-        name: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/otel-resources"
-        version: "0.68.5"
-      values:
-        daemonset:
+              # interval: 15s
+        # When enabled, the chart will set the GOMEMLIMIT env var to 80% of the configured resources.limits.memory.
+        # If no resources.limits.memory are defined then enabling does nothing.
+        # It is HIGHLY recommend to enable this setting and set a value for resources.limits.memory.
+        useGOMEMLIMIT: true
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 256Mi
+        ingress:
           enabled: false
-        deployment:
-          config:
-            exporters:
-              beholder_kafka:
-                brokers:
-                  - redpanda:9093
-#                client_id: beholder-otel-collector-gateway-client-id-crib
-                kafka_sasl_password: ""
-                kafka_sasl_username: ""
-                schema_registry_url: http://redpanda:8081
-              debug:
-                verbosity: detailed
-            processors:
-              batch:
-                send_batch_size: 512
-                timeout: 5s
-              memory_limiter:
-                check_interval: 5s
-                limit_mib: 4000
-                spike_limit_mib: 800
-              tail_sampling:
-                decision_wait: 10s
-                expected_new_traces_per_sec: 10
-                num_traces: 1000
-                policies:
-                  - name: a-status-policy
-                    status_code:
-                      status_codes:
-                        - ERROR
-                    type: status_code
-                  - name: probabilistic-policy
-                    probabilistic:
-                      sampling_percentage: 10
-                    type: probabilistic
-            receivers:
-              otlp:
-                protocols:
-                  grpc:
-                    endpoint: 0.0.0.0:4317
-                  http:
-                    endpoint: 0.0.0.0:4318
-            service:
-              pipelines:
-                logs:
-                  exporters: [debug, beholder_kafka]
-                  processors: [batch]
-                  receivers: [otlp]
-                metrics:
-                  exporters: [debug]
-                  processors: [batch]
-                  receivers: [otlp]
-                traces:
-                  exporters: [debug]
-                  processors: [batch]
-                  receivers: [otlp]
-              telemetry:
-                metrics:
-                  address: 0.0.0.0:8888
-                  level: detailed
-          enabled: true
-          enabledLB: false
-          env:
-            - name: KAFKA_SASL_MECHANISM
-              value: PLAINTEXT
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: spec.nodeName
-        image:
-          registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
-          repository: atlas-beholder-gateway-otel-collector
-          tag: qa-latest
-        opentelemetry-operator:
+        podDisruptionBudget:
+          minAvailable: 2
+          maxUnavailable: 1
+        autoscaling:
           enabled: false
-        sidecar:
-          enabled: false
-        clusterRole:
-          enabled: false
-        clusterRoleBinding:
-          enabled: false
+          minReplicas: 3
+          maxReplicas: 6
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 60
+        extraEnvs:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: KAFKA_SASL_MECHANISM
+            value: PLAINTEXT
+        config:
+          exporters:
+            debug:
+              verbosity: detailed
+            debug/noop:
+              verbosity: normal
+              sampling_initial: 0
+              sampling_thereafter: 0
+            beholder_kafka:
+              brokers:
+                - redpanda:9093
+              schema_registry_url: http://redpanda:8081
+          extensions:
+            # The health_check extension is mandatory for this chart.
+            # Without the health_check extension the collector will fail the readiness and liveliness probes.
+            # The health_check extension can be modified, but should never be removed.
+            health_check:
+              endpoint: ${env:MY_POD_IP}:13133
+          processors:
+            batch:
+              send_batch_size: 5000
+              timeout: 10s
+            # Default memory limiter configuration for the collector based on k8s resource limits.
+            memory_limiter:
+              # check_interval is the time between measurements of memory usage.
+              check_interval: 5s
+              # By default limit_mib is set to 80% of ".Values.resources.limits.memory"
+              limit_percentage: 80
+              # By default spike_limit_mib is set to 25% of ".Values.resources.limits.memory"
+              spike_limit_percentage: 25
+            tail_sampling:
+              decision_wait: 10s
+              expected_new_traces_per_sec: 10
+              num_traces: 1000
+              policies:
+                - name: a-status-policy
+                  status_code:
+                    status_codes:
+                      - ERROR
+                  type: status_code
+                - name: probabilistic-policy
+                  probabilistic:
+                    sampling_percentage: 10
+                  type: probabilistic
+            # prevent empty attribute values from being rejected by thanos
+            transform/emptyvalues: # see https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/pkg/ottl/ottlfuncs/README.md#replace_all_patterns
+              error_mode: ignore
+              metric_statements:
+                - context: datapoint # for 'regular' attributes
+                  statements:
+                    - replace_all_patterns(attributes, "value", "^$", "NOT_SET")
+                - context: resource # for resource attributes
+                  statements:
+                    - replace_all_patterns(attributes, "value", "^$", "NOT_SET")
+          receivers:
+            jaeger: null
+            prometheus: null
+            zipkin: null
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: ${env:MY_POD_IP}:4317
+                http:
+                  endpoint: ${env:MY_POD_IP}:4318
+          service:
+            telemetry:
+              metrics:
+                address: ${env:MY_POD_IP}:8888
+                level: detailed
+            extensions:
+              - health_check
+            pipelines:
+              logs:
+                exporters:
+                  - debug
+                  - beholder_kafka
+                processors:
+                  - memory_limiter
+                  - batch
+                receivers:
+                  - otlp
+              metrics:
+                exporters:
+                  - debug
+                processors:
+                  - memory_limiter
+                  - transform/emptyvalues
+                  - batch
+                receivers:
+                  - otlp
+              traces:
+                exporters:
+                  - debug/noop
+                processors:
+                  - memory_limiter
+                  - batch
+                receivers:
+                  - otlp
 
   cp-kafka-rest:
     namespace: ${DEVSPACE_NAMESPACE}
@@ -382,28 +484,19 @@ profiles:
   - name: kind
     merge:
       deployments:
-        beholder-test-client:
+        beholder-client:
           helm:
             values:
-              beholder-test-client:
+              beholder-client:
                 affinity: []
                 topologySpreadConstraints: []
                 imagePullSecrets:
                   - name: regcred-beholder
-  - name: local-charts
-    merge:
-      deployments:
-        beholder-test-client:
-          helm:
-            chart:
-              name: beholder-test-client
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/beholder-test-client
-              version: null
 
   - name: load-test
     merge:
       deployments:
-        beholder-otel-collector-agent:
+        beholder-agent:
           helm:
             values:
               config:
@@ -428,18 +521,16 @@ profiles:
                 limits:
                   memory: "3.5Gi"
                   cpu: "4500m"
-        beholder-otel-collector-gateway:
+        beholder-gateway:
           helm:
             values:
-              deployment:
-                replicas: 1
-                resources:
-                  limits:
-                    cpu: '1'
-                    memory: 512Mi
-                  requests:
-                    cpu: '1'
-                    memory: 512Mi
+              resources:
+                limits:
+                  cpu: '1'
+                  memory: 512Mi
+                requests:
+                  cpu: '1'
+                  memory: 512Mi
     patches:
       - op: add
         path: vars
@@ -512,13 +603,3 @@ profiles:
         path: dependencies.redpanda.profiles
         value:
           - load-test
-
-  - name: git-charts
-    merge:
-      deployments:
-        beholder-test-client:
-          helm:
-            chart:
-              git: https://github.com/smartcontractkit/infra-charts
-              subPath: beholder-test-client
-              revision: 9c1de84e27f668e0d220f8050a3705f2dfa2e655
