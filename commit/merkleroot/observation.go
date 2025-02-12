@@ -235,37 +235,10 @@ func (p *Processor) getObservation(
 	nextState := previousOutcome.nextState()
 	switch nextState {
 	case selectingRangesForReport:
-		var (
-			offRampNextSeqNums  []plugintypes.SeqNumChain
-			onRampLatestSeqNums []plugintypes.SeqNumChain
-			rmnRemoteCfg        rmntypes.RemoteConfig
-		)
-
-		eg := &errgroup.Group{}
-
-		eg.Go(func() error {
-			offRampNextSeqNums = p.observer.ObserveOffRampNextSeqNums(ctx)
-			return nil
-		})
-
-		eg.Go(func() error {
-			onRampLatestSeqNums = p.observer.ObserveLatestOnRampSeqNums(ctx)
-			return nil
-		})
-
-		eg.Go(func() error {
-			rmnRemoteCfg = p.observer.ObserveRMNRemoteCfg(ctx)
-			return nil
-		})
-
-		if err := eg.Wait(); err != nil {
-			return Observation{}, nextState, fmt.Errorf("failed to get observation: %w", err)
-		}
-
 		return Observation{
-			OnRampMaxSeqNums:   onRampLatestSeqNums,
-			OffRampNextSeqNums: offRampNextSeqNums,
-			RMNRemoteConfig:    rmnRemoteCfg,
+			OnRampMaxSeqNums:   p.observer.ObserveLatestOnRampSeqNums(ctx),
+			OffRampNextSeqNums: p.observer.ObserveOffRampNextSeqNums(ctx),
+			RMNRemoteConfig:    p.observer.ObserveRMNRemoteCfg(ctx),
 			FChain:             p.observer.ObserveFChain(ctx),
 		}, nextState, nil
 	case buildingReport:
