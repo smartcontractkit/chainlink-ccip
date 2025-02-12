@@ -417,6 +417,7 @@ func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 	for _, op := range syncOps {
 		go o.applySyncOp(ctxSync, o.lggr, op.id, wg, op.op)
 	}
+	wg.Wait()
 	cf()
 }
 
