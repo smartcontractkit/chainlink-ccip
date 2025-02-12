@@ -49,7 +49,7 @@ pub mod seed {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct InitializeConfig<'info> {
     #[account(
         init,
         seeds = [seed::CONFIG],
@@ -59,6 +59,21 @@ pub struct Initialize<'info> {
     )]
     pub config: AccountLoader<'info, Config>,
 
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, CcipOfframp>,
+
+    // Initialization only allowed by program upgrade authority
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipOfframpError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
     #[account(
         init,
         seeds = [seed::REFERENCE_ADDRESSES],

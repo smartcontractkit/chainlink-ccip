@@ -54,21 +54,34 @@ func NewProcessor(
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnHomeReader readerpkg.RMNHome,
 	metricsReporter MetricsReporter,
-) *Processor {
-	return &Processor{
+) plugincommon.PluginProcessor[Query, Observation, Outcome] {
+	var observer Observer
+	baseObserver := newObserverImpl(
+		lggr,
+		homeChain,
+		oracleID,
+		chainSupport,
+		ccipReader,
+		msgHasher,
+	)
+	if !offchainCfg.MerkleRootAsyncObserverDisabled {
+		observer = newAsyncObserver(
+			lggr,
+			baseObserver,
+			offchainCfg.MerkleRootAsyncObserverSyncFreq,
+			offchainCfg.MerkleRootAsyncObserverSyncTimeout,
+		)
+	} else {
+		observer = baseObserver
+	}
+
+	p := &Processor{
 		oracleID:        oracleID,
 		oracleIDToP2pID: oracleIDToP2pID,
 		offchainCfg:     offchainCfg,
 		destChain:       destChain,
 		lggr:            lggr,
-		observer: newObserverImpl(
-			lggr,
-			homeChain,
-			oracleID,
-			chainSupport,
-			ccipReader,
-			msgHasher,
-		),
+		observer:        observer,
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,
 		chainSupport:    chainSupport,
@@ -77,6 +90,7 @@ func NewProcessor(
 		rmnHomeReader:   rmnHomeReader,
 		metricsReporter: metricsReporter,
 	}
+	return plugincommon.NewTrackedProcessor(lggr, p, processorLabel, metricsReporter)
 }
 
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}
@@ -86,5 +100,5 @@ func (p *Processor) Close() error {
 		return nil
 	}
 
-	return services.CloseAll(p.rmnController, p.rmnHomeReader)
+	return services.CloseAll(p.rmnController, p.rmnHomeReader, p.observer)
 }
