@@ -49,7 +49,7 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 			messageIDs:   []ccipocr3.Bytes32{b1, b2, b3},
 			messageFees:  map[ccipocr3.Bytes32]plugintypes.USD18{},
 			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
-			want:         []ccipocr3.Bytes32{},
+			want:         nil,
 			wantErr:      assert.NoError,
 		},
 		{
@@ -77,7 +77,7 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 				b3: plugintypes.NewUSD18(30),
 			},
 			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
-			want:         []ccipocr3.Bytes32{},
+			want:         nil,
 			wantErr:      assert.Error,
 		},
 		{
@@ -115,9 +115,7 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 			}
 
 			got, err := observer.Observe(ctx, messages, nil)
-			if tt.wantErr(t, err) {
-				return
-			}
+			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -250,15 +248,15 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 			messages: []ccipocr3.Message{
 				{
 					Header:        ccipocr3.RampMessageHeader{MessageID: b1},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(140),
+					FeeValueJuels: ccipocr3.NewBigIntFromInt64(14e14),
 				},
 				{
 					Header:        ccipocr3.RampMessageHeader{MessageID: b2},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(250),
+					FeeValueJuels: ccipocr3.NewBigIntFromInt64(25e14),
 				},
 				{
 					Header:        ccipocr3.RampMessageHeader{MessageID: b3},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(360),
+					FeeValueJuels: ccipocr3.NewBigIntFromInt64(36e14),
 				},
 			},
 			messageTimeStamps: map[ccipocr3.Bytes32]time.Time{
@@ -266,12 +264,12 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 				b2: t2,
 				b3: t3,
 			},
-			linkPrice:                ccipocr3.NewBigIntFromInt64(100),
+			linkPrice:                ccipocr3.NewBigIntFromInt64(8e18), // 8 USD
 			relativeBoostPerWaitHour: 0.5,
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18(28000),
-				b2: plugintypes.NewUSD18(37500),
-				b3: plugintypes.NewUSD18(36000),
+				b1: plugintypes.NewUSD18(2.24e16),
+				b2: plugintypes.NewUSD18(3e16),
+				b3: plugintypes.NewUSD18(2.88e16),
 			},
 			wantErr: assert.NoError,
 		},
@@ -293,9 +291,7 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 			}
 
 			got, err := calculator.MessageFeeUSD18(ctx, tt.messages, tt.messageTimeStamps)
-			if tt.wantErr(t, err, "MessageFeeUSD18(...)") {
-				return
-			}
+			tt.wantErr(t, err, "MessageFeeUSD18(...)")
 			assert.Equal(t, tt.want, got)
 		})
 	}
