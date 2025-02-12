@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 // Reporter is a simple interface used for tracking observations and outcomes of the commit plugin.
@@ -21,20 +22,15 @@ import (
 // This split is required to define the reporting logic in one place but inject only relevant dependencies to
 // plugins/processors. Also, it solves the problem of cyclic dependencies between the plugins/processors.
 type Reporter interface {
-	TrackProcessorLatency(processor string, method string, latency time.Duration)
 	TrackObservation(obs committypes.Observation)
 	TrackOutcome(outcome committypes.Outcome)
 
-	TrackMerkleObservation(obs merkleroot.Observation, state string)
-	TrackMerkleOutcome(outcome merkleroot.Outcome, state string)
 	TrackRmnReport(latency float64, success bool)
 	TrackRmnRequest(method string, latency float64, nodeID uint64, err string)
 
-	TrackChainFeeObservation(obs chainfee.Observation)
-	TrackChainFeeOutcome(outcome chainfee.Outcome)
-
-	TrackTokenPricesObservation(obs tokenprice.Observation)
-	TrackTokenPricesOutcome(outcome tokenprice.Outcome)
+	TrackProcessorLatency(processor string, method string, latency time.Duration)
+	TrackProcessorObservation(processor string, obs plugintypes.Trackable, err error)
+	TrackProcessorOutcome(processor string, out plugintypes.Trackable, err error)
 }
 
 type CommitPluginReporter interface {
@@ -47,10 +43,6 @@ type Noop struct{}
 func (n *Noop) TrackObservation(committypes.Observation) {}
 
 func (n *Noop) TrackOutcome(committypes.Outcome) {}
-
-func (n *Noop) TrackChainFeeObservation(chainfee.Observation) {}
-
-func (n *Noop) TrackChainFeeOutcome(chainfee.Outcome) {}
 
 func (n *Noop) TrackMerkleObservation(merkleroot.Observation, string) {}
 
@@ -65,6 +57,10 @@ func (n *Noop) TrackTokenPricesObservation(tokenprice.Observation) {}
 func (n *Noop) TrackTokenPricesOutcome(tokenprice.Outcome) {}
 
 func (n *Noop) TrackProcessorLatency(string, string, time.Duration) {}
+
+func (n *Noop) TrackProcessorObservation(string, plugintypes.Trackable, error) {}
+
+func (n *Noop) TrackProcessorOutcome(string, plugintypes.Trackable, error) {}
 
 var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}

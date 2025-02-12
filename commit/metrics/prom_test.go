@@ -25,6 +25,7 @@ const (
 )
 
 func Test_TrackingTokenPrices(t *testing.T) {
+	tokenPricesProcessor := "tokenprices"
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
@@ -65,14 +66,14 @@ func Test_TrackingTokenPrices(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackTokenPricesObservation(tc.observation)
+			reporter.TrackProcessorObservation(tokenPricesProcessor, tc.observation, nil)
 
 			feedTokens := int(testutil.ToFloat64(
-				reporter.tokenProcessorObservationCounter.WithLabelValues(chainID, "feedTokenPrices")),
+				reporter.processorObservationCounter.WithLabelValues(chainID, tokenPricesProcessor, "feedTokenPrices")),
 			)
 			require.Equal(t, tc.expectedFeedToken, feedTokens)
 			feeQuoted := int(testutil.ToFloat64(
-				reporter.tokenProcessorObservationCounter.WithLabelValues(chainID, "feeQuoterTokenUpdates")),
+				reporter.processorObservationCounter.WithLabelValues(chainID, tokenPricesProcessor, "feeQuoterTokenUpdates")),
 			)
 			require.Equal(t, tc.expectedFeeQuotedToken, feeQuoted)
 		})
@@ -112,10 +113,10 @@ func Test_TrackingTokenPrices(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackTokenPricesOutcome(tc.outcome)
+			reporter.TrackProcessorOutcome(tokenPricesProcessor, tc.outcome, err)
 
 			tokenPrices := int(testutil.ToFloat64(
-				reporter.tokenProcessorOutcomeCounter.WithLabelValues(chainID, "tokenPrices")),
+				reporter.processorOutcomeCounter.WithLabelValues(chainID, tokenPricesProcessor, "tokenPrices")),
 			)
 			require.Equal(t, tc.expectedTokenPrices, tokenPrices)
 		})
@@ -123,6 +124,7 @@ func Test_TrackingTokenPrices(t *testing.T) {
 }
 
 func Test_TrackingChainFees(t *testing.T) {
+	chainFeeProcessor := "chainfee"
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
@@ -168,18 +170,18 @@ func Test_TrackingChainFees(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackChainFeeObservation(tc.observation)
+			reporter.TrackProcessorObservation(chainFeeProcessor, tc.observation, nil)
 
 			feeComponents := int(testutil.ToFloat64(
-				reporter.chainFeeProcessorObservationCounter.WithLabelValues(chainID, "feeComponents")),
+				reporter.processorObservationCounter.WithLabelValues(chainID, chainFeeProcessor, "feeComponents")),
 			)
 			require.Equal(t, tc.expectedFeeComponents, feeComponents)
 			nativePrices := int(testutil.ToFloat64(
-				reporter.chainFeeProcessorObservationCounter.WithLabelValues(chainID, "nativeTokenPrices")),
+				reporter.processorObservationCounter.WithLabelValues(chainID, chainFeeProcessor, "nativeTokenPrices")),
 			)
 			require.Equal(t, tc.expectedNativePrices, nativePrices)
 			chainFeeUpdates := int(testutil.ToFloat64(
-				reporter.chainFeeProcessorObservationCounter.WithLabelValues(chainID, "chainFeeUpdates")),
+				reporter.processorObservationCounter.WithLabelValues(chainID, chainFeeProcessor, "chainFeeUpdates")),
 			)
 			require.Equal(t, tc.expectedCHainFeeUpdates, chainFeeUpdates)
 		})
@@ -213,10 +215,10 @@ func Test_TrackingChainFees(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackChainFeeOutcome(tc.outcome)
+			reporter.TrackProcessorOutcome(chainFeeProcessor, tc.outcome, nil)
 
 			gasPrices := int(testutil.ToFloat64(
-				reporter.chainFeeProcessorOutcomeCounter.WithLabelValues(chainID, "gasPrices")),
+				reporter.processorOutcomeCounter.WithLabelValues(chainID, chainFeeProcessor, "gasPrices")),
 			)
 			require.Equal(t, tc.expectedGasPrices, gasPrices)
 		})
@@ -224,6 +226,7 @@ func Test_TrackingChainFees(t *testing.T) {
 }
 
 func Test_MerkleRoots(t *testing.T) {
+	processor := "merkleroot"
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
@@ -270,14 +273,14 @@ func Test_MerkleRoots(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackMerkleObservation(tc.observation, tc.state)
+			reporter.TrackProcessorObservation(processor, tc.observation, nil)
 
 			roots := int(testutil.ToFloat64(
-				reporter.merkleProcessorObservationCounter.WithLabelValues(chainID, tc.state, "roots")),
+				reporter.processorObservationCounter.WithLabelValues(chainID, processor, "roots")),
 			)
 			require.Equal(t, tc.expectedRoots, roots)
 			messages := int(testutil.ToFloat64(
-				reporter.merkleProcessorObservationCounter.WithLabelValues(chainID, tc.state, "messages")),
+				reporter.processorObservationCounter.WithLabelValues(chainID, processor, "messages")),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
 		})
@@ -329,18 +332,18 @@ func Test_MerkleRoots(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackMerkleOutcome(tc.outcome, tc.state)
+			reporter.TrackProcessorOutcome(processor, tc.outcome, nil)
 
 			roots := int(testutil.ToFloat64(
-				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "roots")),
+				reporter.processorOutcomeCounter.WithLabelValues(chainID, processor, "roots")),
 			)
 			require.Equal(t, tc.expectedRoots, roots)
 			messages := int(testutil.ToFloat64(
-				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "messages")),
+				reporter.processorOutcomeCounter.WithLabelValues(chainID, processor, "messages")),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
 			rmns := int(testutil.ToFloat64(
-				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "rmnSignatures")),
+				reporter.processorOutcomeCounter.WithLabelValues(chainID, processor, "rmnSignatures")),
 			)
 			require.Equal(t, tc.expectedRMNSignatures, rmns)
 		})
@@ -349,11 +352,9 @@ func Test_MerkleRoots(t *testing.T) {
 
 func cleanupMetrics(reporter *PromReporter) func() {
 	return func() {
-		reporter.chainFeeProcessorObservationCounter.Reset()
-		reporter.chainFeeProcessorOutcomeCounter.Reset()
-		reporter.merkleProcessorOutcomeCounter.Reset()
-		reporter.merkleProcessorObservationCounter.Reset()
-		reporter.tokenProcessorOutcomeCounter.Reset()
-		reporter.tokenProcessorObservationCounter.Reset()
+		reporter.processorOutcomeErrors.Reset()
+		reporter.processorObservationErrors.Reset()
+		reporter.processorOutcomeCounter.Reset()
+		reporter.processorObservationCounter.Reset()
 	}
 }

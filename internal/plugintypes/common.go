@@ -36,3 +36,7 @@ type USD18 = *big.Int
 func NewUSD18(value int64) USD18 {
 	return big.NewInt(value)
 }
+
+type Trackable interface {
+	Stats() map[string]int
+}

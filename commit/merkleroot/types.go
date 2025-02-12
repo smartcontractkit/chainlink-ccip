@@ -11,6 +11,13 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+const (
+	// Prometheus labels for merkle processor
+	rootsLabel        = "roots"
+	messagesLabel     = "messages"
+	rmnSignatureLabel = "rmnSignatures"
+)
+
 type Query struct {
 	RetryRMNSignatures bool
 	RMNSignatures      *rmn.ReportSignatures
@@ -23,6 +30,17 @@ type Observation struct {
 	OffRampNextSeqNums []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
 	RMNRemoteConfig    rmntypes.RemoteConfig            `json:"rmnRemoteConfig"`
 	FChain             map[cciptypes.ChainSelector]int  `json:"fChain"`
+}
+
+func (o Observation) Stats() map[string]int {
+	counts := map[string]int{
+		rootsLabel:    len(o.MerkleRoots),
+		messagesLabel: 0,
+	}
+	for _, root := range o.MerkleRoots {
+		counts[messagesLabel] += root.SeqNumsRange.Length()
+	}
+	return counts
 }
 
 func (o Observation) IsEmpty() bool {
@@ -148,6 +166,18 @@ type Outcome struct {
 	RMNRemoteCfg                    rmntypes.RemoteConfig            `json:"rmnRemoteCfg"`
 }
 
+func (o Outcome) Stats() map[string]int {
+	counts := map[string]int{
+		rootsLabel:        len(o.RootsToReport),
+		rmnSignatureLabel: len(o.RMNReportSignatures),
+		messagesLabel:     0,
+	}
+	for _, root := range o.RootsToReport {
+		counts[messagesLabel] += root.SeqNumsRange.Length()
+	}
+	return counts
+}
+
 // Sort all fields of the given Outcome
 func (o *Outcome) Sort() {
 	sort.Slice(o.RangesSelectedForReport, func(i, j int) bool {
@@ -211,18 +241,18 @@ func (p processorState) String() string {
 
 // MetricsReporter exposes only relevant methods for reporting merkle roots from metrics.Reporter
 type MetricsReporter interface {
-	TrackMerkleObservation(obs Observation, state string)
-	TrackMerkleOutcome(outcome Outcome, state string)
 	TrackRmnReport(latency float64, success bool)
 	TrackProcessorLatency(processor string, method string, latency time.Duration)
+	TrackProcessorObservation(processor string, obs plugintypes.Trackable, err error)
+	TrackProcessorOutcome(processor string, out plugintypes.Trackable, err error)
 }
 
 type NoopMetrics struct{}
 
-func (n NoopMetrics) TrackMerkleObservation(Observation, string) {}
-
-func (n NoopMetrics) TrackMerkleOutcome(Outcome, string) {}
-
 func (n NoopMetrics) TrackRmnReport(float64, bool) {}
 
 func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration) {}
+
+func (n NoopMetrics) TrackProcessorObservation(string, plugintypes.Trackable, error) {}
+
+func (n NoopMetrics) TrackProcessorOutcome(string, plugintypes.Trackable, error) {}

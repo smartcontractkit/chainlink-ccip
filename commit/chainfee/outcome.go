@@ -89,7 +89,6 @@ func (p *processor) Outcome(
 
 	lggr.Infow("Gas Prices Outcome", "gasPrices", gasPrices)
 	out := Outcome{GasPrices: gasPrices}
-	p.metricsReporter.TrackChainFeeOutcome(out)
 	return out, nil
 }
 

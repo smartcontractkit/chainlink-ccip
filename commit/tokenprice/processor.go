@@ -89,7 +89,6 @@ func (p *processor) Outcome(
 	}
 
 	out := Outcome{TokenPrices: tokenPriceOutcome}
-	p.metricsReporter.TrackTokenPricesOutcome(out)
 	return out, nil
 }
 
