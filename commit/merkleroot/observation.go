@@ -316,7 +316,7 @@ type Observer interface {
 type asyncObserver struct {
 	lggr                logger.Logger
 	syncObserver        observerImpl
-	cf                  context.CancelFunc
+	cancelFunc          context.CancelFunc
 	mu                  *sync.RWMutex
 	offRampNextSeqNums  []plugintypes.SeqNumChain
 	onRampLatestSeqNums []plugintypes.SeqNumChain
@@ -331,7 +331,7 @@ func newAsyncObserver(lggr logger.Logger, observer observerImpl, tickDur, syncTi
 	o := &asyncObserver{
 		lggr:                lggr,
 		syncObserver:        observer,
-		cf:                  cf,
+		cancelFunc:          cf,
 		mu:                  &sync.RWMutex{},
 		offRampNextSeqNums:  make([]plugintypes.SeqNumChain, 0),
 		onRampLatestSeqNums: make([]plugintypes.SeqNumChain, 0),
@@ -359,6 +359,7 @@ func (o *asyncObserver) start(ctx context.Context, ticker <-chan time.Time, sync
 func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 	o.lggr.Debugw("async observer is syncing", "syncTimeout", syncTimeout)
 	ctxSync, cf := context.WithTimeout(ctx, syncTimeout)
+	defer cf()
 
 	syncOps := []struct {
 		id string
@@ -390,7 +391,6 @@ func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 		go o.applySyncOp(ctxSync, o.lggr, op.id, wg, op.op)
 	}
 	wg.Wait()
-	cf()
 }
 
 // applySyncOp applies the given operation synchronously.
@@ -439,9 +439,9 @@ func (o *asyncObserver) ObserveFChain(ctx context.Context) map[cciptypes.ChainSe
 
 // Close closes the observer and releases any resources.
 func (o *asyncObserver) Close() error {
-	if o.cf != nil {
-		o.cf()
-		o.cf = nil
+	if o.cancelFunc != nil {
+		o.cancelFunc()
+		o.cancelFunc = nil
 	}
 	return nil
 }
