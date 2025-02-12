@@ -28,9 +28,9 @@ type Reporter interface {
 	TrackRmnReport(latency float64, success bool)
 	TrackRmnRequest(method string, latency float64, nodeID uint64, err string)
 
-	TrackProcessorLatency(processor string, method string, latency time.Duration)
-	TrackProcessorObservation(processor string, obs plugintypes.Trackable, err error)
-	TrackProcessorOutcome(processor string, out plugintypes.Trackable, err error)
+	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
+	TrackProcessorObservation(processor string, obs plugintypes.Trackable)
+	TrackProcessorOutcome(processor string, out plugintypes.Trackable)
 }
 
 type CommitPluginReporter interface {
@@ -56,11 +56,11 @@ func (n *Noop) TrackTokenPricesObservation(tokenprice.Observation) {}
 
 func (n *Noop) TrackTokenPricesOutcome(tokenprice.Outcome) {}
 
-func (n *Noop) TrackProcessorLatency(string, string, time.Duration) {}
+func (n *Noop) TrackProcessorLatency(string, string, time.Duration, error) {}
 
-func (n *Noop) TrackProcessorObservation(string, plugintypes.Trackable, error) {}
+func (n *Noop) TrackProcessorObservation(string, plugintypes.Trackable) {}
 
-func (n *Noop) TrackProcessorOutcome(string, plugintypes.Trackable, error) {}
+func (n *Noop) TrackProcessorOutcome(string, plugintypes.Trackable) {}
 
 var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}

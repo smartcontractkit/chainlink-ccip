@@ -66,7 +66,7 @@ func Test_TrackingTokenPrices(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorObservation(tokenPricesProcessor, tc.observation, nil)
+			reporter.TrackProcessorObservation(tokenPricesProcessor, tc.observation)
 
 			feedTokens := int(testutil.ToFloat64(
 				reporter.processorObservationCounter.WithLabelValues(chainID, tokenPricesProcessor, "feedTokenPrices")),
@@ -113,7 +113,7 @@ func Test_TrackingTokenPrices(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorOutcome(tokenPricesProcessor, tc.outcome, err)
+			reporter.TrackProcessorOutcome(tokenPricesProcessor, tc.outcome)
 
 			tokenPrices := int(testutil.ToFloat64(
 				reporter.processorOutcomeCounter.WithLabelValues(chainID, tokenPricesProcessor, "tokenPrices")),
@@ -170,7 +170,7 @@ func Test_TrackingChainFees(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorObservation(chainFeeProcessor, tc.observation, nil)
+			reporter.TrackProcessorObservation(chainFeeProcessor, tc.observation)
 
 			feeComponents := int(testutil.ToFloat64(
 				reporter.processorObservationCounter.WithLabelValues(chainID, chainFeeProcessor, "feeComponents")),
@@ -215,7 +215,7 @@ func Test_TrackingChainFees(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorOutcome(chainFeeProcessor, tc.outcome, nil)
+			reporter.TrackProcessorOutcome(chainFeeProcessor, tc.outcome)
 
 			gasPrices := int(testutil.ToFloat64(
 				reporter.processorOutcomeCounter.WithLabelValues(chainID, chainFeeProcessor, "gasPrices")),
@@ -273,7 +273,7 @@ func Test_MerkleRoots(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorObservation(processor, tc.observation, nil)
+			reporter.TrackProcessorObservation(processor, tc.observation)
 
 			roots := int(testutil.ToFloat64(
 				reporter.processorObservationCounter.WithLabelValues(chainID, processor, "roots")),
@@ -332,7 +332,7 @@ func Test_MerkleRoots(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackProcessorOutcome(processor, tc.outcome, nil)
+			reporter.TrackProcessorOutcome(processor, tc.outcome)
 
 			roots := int(testutil.ToFloat64(
 				reporter.processorOutcomeCounter.WithLabelValues(chainID, processor, "roots")),
@@ -352,8 +352,7 @@ func Test_MerkleRoots(t *testing.T) {
 
 func cleanupMetrics(reporter *PromReporter) func() {
 	return func() {
-		reporter.processorOutcomeErrors.Reset()
-		reporter.processorObservationErrors.Reset()
+		reporter.processorErrors.Reset()
 		reporter.processorOutcomeCounter.Reset()
 		reporter.processorObservationCounter.Reset()
 	}

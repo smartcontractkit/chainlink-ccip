@@ -42,19 +42,12 @@ var (
 		},
 		[]string{"chainID", "processor", "method"},
 	)
-	promProcessorObservationErrors = promauto.NewCounterVec(
+	promProcessorErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ccip_commit_processor_observation_errors",
+			Name: "ccip_commit_processor_errors",
 			Help: "This metric tracks the number of errors in the commit processor observation",
 		},
-		[]string{"chainID", "processor"},
-	)
-	promProcessorOutcomeErrors = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ccip_commit_processor_outcome_errors",
-			Help: "This metric tracks the number of errors in the commit processor outcome",
-		},
-		[]string{"chainID", "processor"},
+		[]string{"chainID", "processor", "method"},
 	)
 	promMerkleProcessorRmnReportLatency = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -83,8 +76,7 @@ type PromReporter struct {
 	processorLatencyHistogram         *prometheus.HistogramVec
 	processorObservationCounter       *prometheus.CounterVec
 	processorOutcomeCounter           *prometheus.CounterVec
-	processorObservationErrors        *prometheus.CounterVec
-	processorOutcomeErrors            *prometheus.CounterVec
+	processorErrors                   *prometheus.CounterVec
 }
 
 func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*PromReporter, error) {
@@ -103,8 +95,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 		processorLatencyHistogram:   promProcessorLatencyHistogram,
 		processorObservationCounter: promProcessorObservationCounter,
 		processorOutcomeCounter:     promProcessorOutcomeCounter,
-		processorObservationErrors:  promProcessorObservationErrors,
-		processorOutcomeErrors:      promProcessorOutcomeErrors,
+		processorErrors:             promProcessorErrors,
 	}, nil
 }
 
@@ -136,20 +127,20 @@ func (p *PromReporter) TrackRmnRequest(method string, latency float64, nodeID ui
 	p.rmnControllerRmnRequestHistogram.WithLabelValues(method, nodeIDStr, err).Observe(latency)
 }
 
-func (p *PromReporter) TrackProcessorLatency(processor string, method string, latency time.Duration) {
+func (p *PromReporter) TrackProcessorLatency(processor string, method string, latency time.Duration, err error) {
+	if err != nil {
+		p.processorErrors.
+			WithLabelValues(p.chainID, processor, method).
+			Inc()
+		return
+	}
+
 	p.processorLatencyHistogram.
 		WithLabelValues(p.chainID, processor, method).
 		Observe(float64(latency.Milliseconds()))
 }
 
-func (p *PromReporter) TrackProcessorObservation(processor string, obs plugintypes.Trackable, err error) {
-	if err != nil {
-		p.processorObservationErrors.
-			WithLabelValues(p.chainID, processor).
-			Inc()
-		return
-	}
-
+func (p *PromReporter) TrackProcessorObservation(processor string, obs plugintypes.Trackable) {
 	for key, val := range obs.Stats() {
 		p.processorObservationCounter.
 			WithLabelValues(p.chainID, processor, key).
@@ -157,14 +148,7 @@ func (p *PromReporter) TrackProcessorObservation(processor string, obs plugintyp
 	}
 }
 
-func (p *PromReporter) TrackProcessorOutcome(processor string, out plugintypes.Trackable, err error) {
-	if err != nil {
-		p.processorOutcomeErrors.
-			WithLabelValues(p.chainID, processor).
-			Inc()
-		return
-	}
-
+func (p *PromReporter) TrackProcessorOutcome(processor string, out plugintypes.Trackable) {
 	for key, val := range out.Stats() {
 		p.processorOutcomeCounter.
 			WithLabelValues(p.chainID, processor, key).

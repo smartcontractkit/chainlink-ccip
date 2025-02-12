@@ -10,9 +10,9 @@ import (
 )
 
 type MetricsReporter interface {
-	TrackProcessorObservation(processor string, obs plugintypes.Trackable, err error)
-	TrackProcessorOutcome(processor string, out plugintypes.Trackable, err error)
-	TrackProcessorLatency(processor string, method string, latency time.Duration)
+	TrackProcessorObservation(processor string, obs plugintypes.Trackable)
+	TrackProcessorOutcome(processor string, out plugintypes.Trackable)
+	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
 }
 
 type ObservedProcessor[Query any, Observation plugintypes.Trackable, Outcome plugintypes.Trackable] struct {
@@ -46,7 +46,9 @@ func (p *ObservedProcessor[Query, Observation, Outcome]) Observation(ctx context
 	obs, err := withObservedQuery[Observation](p, "observation", func() (Observation, error) {
 		return p.PluginProcessor.Observation(ctx, prev, query)
 	})
-	p.reporter.TrackProcessorObservation(p.processorName, obs, err)
+	if err != nil {
+		p.reporter.TrackProcessorObservation(p.processorName, obs)
+	}
 	return obs, err
 }
 
@@ -54,7 +56,9 @@ func (p *ObservedProcessor[Query, Observation, Outcome]) Outcome(ctx context.Con
 	out, err := withObservedQuery[Outcome](p, "outcome", func() (Outcome, error) {
 		return p.PluginProcessor.Outcome(ctx, prev, query, aos)
 	})
-	p.reporter.TrackProcessorOutcome(p.processorName, out, err)
+	if err != nil {
+		p.reporter.TrackProcessorOutcome(p.processorName, out)
+	}
 	return out, err
 }
 
@@ -64,23 +68,24 @@ func withObservedQuery[T any, Query any, Observation plugintypes.Trackable, Outc
 	f func() (T, error),
 ) (T, error) {
 	queryStarted := time.Now()
-	defer func() {
-		latency := time.Since(queryStarted)
-		p.reporter.TrackProcessorLatency(p.processorName, method, latency)
-		p.lggr.Debugw("tracking processor latency",
-			"processor", p.processorName,
-			"method", method,
-			"latency", latency,
-		)
-	}()
-	return f()
+	resp, err := f()
+
+	latency := time.Since(queryStarted)
+	p.reporter.TrackProcessorLatency(p.processorName, method, latency, err)
+	p.lggr.Debugw("tracking processor latency",
+		"processor", p.processorName,
+		"method", method,
+		"latency", latency,
+	)
+
+	return resp, err
 }
 
 type NoopReporter struct{}
 
-func (n NoopReporter) TrackProcessorLatency(string, string, time.Duration) {}
+func (n NoopReporter) TrackProcessorLatency(string, string, time.Duration, error) {}
 
-func (n NoopReporter) TrackProcessorObservation(processor string, obs plugintypes.Trackable, err error) {
+func (n NoopReporter) TrackProcessorObservation(processor string, obs plugintypes.Trackable) {
 }
 
-func (n NoopReporter) TrackProcessorOutcome(processor string, out plugintypes.Trackable, err error) {}
+func (n NoopReporter) TrackProcessorOutcome(processor string, out plugintypes.Trackable) {}
