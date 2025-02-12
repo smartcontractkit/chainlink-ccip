@@ -22,7 +22,7 @@ type EventCommitReportAccepted struct {
 	Report        ccip_offramp.MerkleRoot
 }
 
-type EventCommitReportPriceOnlyAccepted struct {
+type EventPriceOnlyCommitReportAccepted struct {
 	Discriminator [8]byte
 	PriceUpdates  ccip_offramp.PriceUpdates
 }

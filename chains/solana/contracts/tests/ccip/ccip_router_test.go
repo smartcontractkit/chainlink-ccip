@@ -4603,6 +4603,7 @@ func TestCCIPRouter(t *testing.T) {
 					RunStateValidations     func(t *testing.T)
 					ReportContext           *[2][32]byte
 					PriceSequenceComparator Comparator
+					skipWithNoMerkleRoot    bool
 				}{
 					{
 						Name:              "No price updates",
@@ -4614,6 +4615,7 @@ func TestCCIPRouter(t *testing.T) {
 						},
 						RunStateValidations:     func(t *testing.T) {},
 						PriceSequenceComparator: Greater, // it is a newer commit but with no price update
+						skipWithNoMerkleRoot:    true,
 					},
 					{
 						Name: "Single token price update",
@@ -4915,6 +4917,61 @@ func TestCCIPRouter(t *testing.T) {
 
 						testcase.RunEventValidations(t, tx)
 						testcase.RunStateValidations(t)
+					})
+				}
+
+				for _, testcase := range priceUpdatesCases {
+					if testcase.skipWithNoMerkleRoot {
+						continue
+					}
+					t.Run("prices only: "+testcase.Name, func(t *testing.T) {
+						report := ccip_offramp.CommitInput{
+							MerkleRoot:   nil,
+							PriceUpdates: testcase.PriceUpdates,
+						}
+
+						var reportContext [2][32]byte
+						if testcase.ReportContext != nil {
+							reportContext = *testcase.ReportContext
+						} else {
+							reportContext = ccip.NextCommitReportContext()
+						}
+
+						sigs, err := ccip.SignCommitReport(reportContext, report, signers)
+						require.NoError(t, err)
+
+						transmitter := getTransmitter()
+
+						raw := ccip_offramp.NewCommitPriceOnlyInstruction(
+							reportContext,
+							testutils.MustMarshalBorsh(t, report),
+							sigs.Rs,
+							sigs.Ss,
+							sigs.RawVs,
+							config.OfframpConfigPDA,
+							config.OfframpReferenceAddressesPDA,
+							transmitter.PublicKey(),
+							solana.SystemProgramID,
+							solana.SysVarInstructionsPubkey,
+							config.OfframpBillingSignerPDA,
+							config.FeeQuoterProgram,
+							config.FqAllowedPriceUpdaterOfframpPDA,
+							config.FqConfigPDA,
+						)
+
+						for _, pubkey := range testcase.RemainingAccounts {
+							raw.AccountMetaSlice.Append(solana.Meta(pubkey).WRITE())
+						}
+
+						instruction, err := raw.ValidateAndBuild()
+						require.NoError(t, err)
+
+						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(MaxCU))
+						commitEvent := ccip.EventPriceOnlyCommitReportAccepted{}
+						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "PriceOnlyCommitReportAccepted", &commitEvent, config.PrintEvents))
+
+						require.Equal(t, commitEvent.PriceUpdates, testcase.PriceUpdates)
+
 					})
 				}
 			})
