@@ -373,7 +373,6 @@ func (p *Plugin) getPriceRelatedObservations(
 	}()
 
 	wg.Wait()
-
 	return tokenPriceObs, chainFeeObs
 }
 
