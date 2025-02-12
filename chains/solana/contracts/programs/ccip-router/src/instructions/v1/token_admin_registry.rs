@@ -18,7 +18,7 @@ use crate::{
     SetPoolTokenAdminRegistry,
 };
 
-const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;
+const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 8;
 
 pub struct Impl;
 impl TokenAdminRegistry for Impl {

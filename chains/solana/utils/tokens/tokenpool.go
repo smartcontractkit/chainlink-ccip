@@ -17,9 +17,8 @@ import (
 
 type TokenPool struct {
 	// token details
-	Program        solana.PublicKey
-	Mint           solana.PrivateKey
-	FeeTokenConfig solana.PublicKey
+	Program solana.PublicKey
+	Mint    solana.PrivateKey
 
 	// admin registry PDA
 	AdminRegistryPDA solana.PublicKey
@@ -36,9 +35,6 @@ type TokenPool struct {
 
 	// remote chain config lookup
 	Chain map[uint64]solana.PublicKey
-
-	// billing config lookup
-	Billing map[uint64]solana.PublicKey
 }
 
 func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
@@ -51,7 +47,6 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 		tp.PoolSigner,       // 5
 		tp.Program,          // 6
 		tp.Mint.PublicKey(), // 7 - writable
-		tp.FeeTokenConfig,   // 8
 	}
 	return append(list, tp.AdditionalAccounts...)
 }
@@ -71,35 +66,19 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	if err != nil {
 		return TokenPool{}, err
 	}
-	evmBillingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
-	if err != nil {
-		return TokenPool{}, err
-	}
-	svmBillingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.SvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
-	if err != nil {
-		return TokenPool{}, err
-	}
-	tokenConfigPda, _, err := state.FindFqBillingTokenConfigPDA(mint.PublicKey(), config.FeeQuoterProgram)
-	if err != nil {
-		return TokenPool{}, err
-	}
 
 	p := TokenPool{
 		Program:          tokenProgram,
 		Mint:             mint,
-		FeeTokenConfig:   tokenConfigPda,
 		AdminRegistryPDA: tokenAdminRegistryPDA,
 		PoolProgram:      poolProgram,
 		PoolLookupTable:  solana.PublicKey{},
 		WritableIndexes:  []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
 		User:             map[solana.PublicKey]solana.PublicKey{},
 		Chain:            map[uint64]solana.PublicKey{},
-		Billing:          map[uint64]solana.PublicKey{},
 	}
 	p.Chain[config.EvmChainSelector] = evmChainPDA
 	p.Chain[config.SvmChainSelector] = svmChainPDA
-	p.Billing[config.EvmChainSelector] = evmBillingPDA
-	p.Billing[config.SvmChainSelector] = svmBillingPDA
 	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), poolProgram)
 	if err != nil {
 		return TokenPool{}, err
@@ -200,7 +179,6 @@ func ParseTokenLookupTable(ctx context.Context, client *rpc.Client, token TokenP
 }
 
 func ParseTokenLookupTableWithChain(ctx context.Context, client *rpc.Client, token TokenPool, userTokenAccount solana.PublicKey, chainSelector uint64) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, error) {
-	tokenBillingConfig := token.Billing[chainSelector]
 	poolChainConfig := token.Chain[chainSelector]
 
 	tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
@@ -232,7 +210,6 @@ func ParseTokenLookupTableWithChain(ctx context.Context, client *rpc.Client, tok
 
 	list := []*solana.AccountMeta{
 		solana.Meta(userTokenAccount).WRITE(),
-		solana.Meta(tokenBillingConfig),
 		solana.Meta(poolChainConfig).WRITE(),
 	}
 	list = append(list, lookupTableMeta...)

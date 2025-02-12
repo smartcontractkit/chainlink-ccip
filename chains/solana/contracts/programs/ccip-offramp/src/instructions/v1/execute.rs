@@ -143,7 +143,6 @@ fn internal_execute<'info>(
     for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
         let accs = get_token_accounts_for(
             ctx.accounts.reference_addresses.router,
-            ctx.accounts.reference_addresses.fee_quoter,
             ctx.remaining_accounts,
             execution_report.message.token_receiver,
             execution_report.message.header.source_chain_selector,
@@ -289,7 +288,6 @@ fn internal_execute<'info>(
 
 fn get_token_accounts_for<'a>(
     router: Pubkey,
-    fee_quoter: Pubkey,
     accounts: &'a [AccountInfo<'a>],
     token_receiver: Pubkey,
     chain_selector: u64,
@@ -302,7 +300,6 @@ fn get_token_accounts_for<'a>(
         token_receiver,
         chain_selector,
         router,
-        fee_quoter,
         &accounts[start..end],
     )?;
 

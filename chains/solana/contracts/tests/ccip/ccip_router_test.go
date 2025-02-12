@@ -2573,19 +2573,28 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("Billing", func(t *testing.T) {
-			ix0, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token0.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			billing0Evm, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, token0.Mint.PublicKey(), config.FeeQuoterProgram)
 			require.NoError(t, err)
-			ix1, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token1.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token1.Billing[config.EvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			billing1Evm, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, token1.Mint.PublicKey(), config.FeeQuoterProgram)
 			require.NoError(t, err)
-			ix2, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token0.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token0.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			ix0Evm, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, billing0Evm, ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			ix3, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token1.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token1.Billing[config.SvmChainSelector], ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			ix1Evm, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token1.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, billing1Evm, ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+
+			billing0Svm, _, err := state.FindFqPerChainPerTokenConfigPDA(config.SvmChainSelector, token0.Mint.PublicKey(), config.FeeQuoterProgram)
+			require.NoError(t, err)
+			billing1Svm, _, err := state.FindFqPerChainPerTokenConfigPDA(config.SvmChainSelector, token1.Mint.PublicKey(), config.FeeQuoterProgram)
+			require.NoError(t, err)
+			ix0Svm, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token0.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, billing0Svm, ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+			ix1Svm, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.SvmChainSelector, token1.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, billing1Svm, ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 
 			// Deliberately not setting configuration for token2, as it exists to test cases where the configuration doesn't exist, given that it can't
 			// be removed (only disabled) after it's initially set.
 
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3}, ccipAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0Evm, ix1Evm, ix0Svm, ix1Svm}, ccipAdmin, config.DefaultCommitment)
 
 			// check TokenTransferFeeConfigUpdated events
 			parsedEvents, perr := common.ParseMultipleEvents[ccip.TokenTransferFeeConfigUpdated](result.Meta.LogMessages, "TokenTransferFeeConfigUpdated", config.PrintEvents)
@@ -2612,7 +2621,9 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("Permissions", func(t *testing.T) {
 			t.Parallel()
 			t.Run("Billing can only be set by CCIP admin", func(t *testing.T) {
-				ix, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token0.Billing[config.EvmChainSelector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+				billing0, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, token0.Mint.PublicKey(), config.FeeQuoterProgram)
+				require.NoError(t, err)
+				ix, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, billing0, token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, token1PoolAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
 			})
@@ -3516,6 +3527,9 @@ func TestCCIPRouter(t *testing.T) {
 				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, userTokenAccount)
 				require.NoError(t, err)
 				base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas...)
+				billing0, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, token0.Mint.PublicKey(), config.FeeQuoterProgram)
+				require.NoError(t, err)
+				base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(billing0))
 
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
@@ -6868,7 +6882,9 @@ func TestCCIPRouter(t *testing.T) {
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
 					require.NoError(t, err)
-					tokenMetas[1] = solana.Meta(token0.Billing[config.SvmChainSelector])       // overwrite field that our TokenPool utils assume will be for EVM
+					billing0, _, err := state.FindFqBillingTokenConfigPDA(token0.Mint.PublicKey(), config.FeeQuoterProgram)
+					require.NoError(t, err)
+					tokenMetas[1] = solana.Meta(billing0)                                      // overwrite field that our TokenPool utils assume will be for EVM
 					tokenMetas[2] = solana.Meta(token0.Chain[config.SvmChainSelector]).WRITE() // overwrite field that our TokenPool utils assume will be for EVM
 					raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
 					executeIx, err := raw.ValidateAndBuild()

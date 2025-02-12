@@ -13,7 +13,7 @@ use super::messages::ReleaseOrMintInV1;
 use crate::{seed, CcipOfframpError};
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
-const MIN_TOKEN_POOL_ACCOUNTS: usize = 12; // see TokenAccounts struct for all required accounts
+const MIN_TOKEN_POOL_ACCOUNTS: usize = 10; // see TokenAccounts struct for all required accounts
 
 pub fn calculate_token_pool_account_indices(
     i: usize,
@@ -41,12 +41,7 @@ pub fn calculate_token_pool_account_indices(
 }
 
 pub(super) struct TokenAccounts<'a> {
-    // The fields prefixed with `_` are not used by the offramp directly,
-    // but are present in the token lookup table anyway for other pool-related functionality.
-    // So, the code here still validates that they are correct, even if those values are not
-    // then read by this program.
     pub user_token_account: &'a AccountInfo<'a>,
-    pub _token_billing_config: &'a AccountInfo<'a>,
     pub pool_chain_config: &'a AccountInfo<'a>,
     pub pool_program: &'a AccountInfo<'a>,
     pub pool_config: &'a AccountInfo<'a>,
@@ -54,7 +49,6 @@ pub(super) struct TokenAccounts<'a> {
     pub pool_signer: &'a AccountInfo<'a>,
     pub token_program: &'a AccountInfo<'a>,
     pub mint: &'a AccountInfo<'a>,
-    pub _fee_token_config: &'a AccountInfo<'a>,
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
@@ -62,12 +56,10 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     token_receiver: Pubkey,
     chain_selector: u64,
     router: Pubkey,
-    fee_quoter: Pubkey,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
     // accounts based on user or chain
     let (user_token_account, remaining_accounts) = accounts.split_first().unwrap();
-    let (token_billing_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
     let (pool_chain_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
 
     // constant accounts for any pool interaction
@@ -79,7 +71,6 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     let (pool_signer, remaining_accounts) = remaining_accounts.split_first().unwrap();
     let (token_program, remaining_accounts) = remaining_accounts.split_first().unwrap();
     let (mint, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (fee_token_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
 
     // Account validations (using remaining_accounts does not facilitate built-in anchor checks)
     {
@@ -124,19 +115,6 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             CcipOfframpError::InvalidInputsPoolAccounts
         );
 
-        let (expected_fee_token_config, _) = Pubkey::find_program_address(
-            &[
-                fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
-                mint.key.as_ref(),
-            ],
-            &fee_quoter,
-        );
-        require_keys_eq!(
-            fee_token_config.key(),
-            expected_fee_token_config,
-            CcipOfframpError::InvalidInputsConfigAccounts
-        );
-
         // check token accounts
         require_keys_eq!(
             *mint.owner,
@@ -161,18 +139,6 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             ),
             CcipOfframpError::InvalidInputsTokenAccounts
         );
-
-        // check per token per chain configs
-        // billing: configured via CCIP fee quoter
-        // chain config: configured via pool
-        let (expected_billing_config, _) = Pubkey::find_program_address(
-            &[
-                fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
-                chain_selector.to_le_bytes().as_ref(),
-                mint.key().as_ref(),
-            ],
-            &fee_quoter,
-        );
         let (expected_pool_chain_config, _) = Pubkey::find_program_address(
             &[
                 seed::TOKEN_POOL_CONFIG,
@@ -180,11 +146,6 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
                 mint.key().as_ref(),
             ],
             &pool_program.key(),
-        );
-        require_keys_eq!(
-            token_billing_config.key(),
-            expected_billing_config, // TODO: determine if this can be zero key for optional billing config?
-            CcipOfframpError::InvalidInputsConfigAccounts
         );
         require_keys_eq!(
             pool_chain_config.key(),
@@ -222,7 +183,6 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             pool_signer,
             token_program,
             mint,
-            fee_token_config,
         ];
         {
             // validate pool addresses
@@ -256,7 +216,6 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
 
     Ok(TokenAccounts {
         user_token_account,
-        _token_billing_config: token_billing_config,
         pool_chain_config,
         pool_program,
         pool_config,
@@ -264,7 +223,6 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         pool_signer,
         token_program,
         mint,
-        _fee_token_config: fee_token_config,
         remaining_accounts,
     })
 }
