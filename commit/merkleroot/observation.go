@@ -367,13 +367,19 @@ func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 		{
 			id: "offRampNextSeqNums",
 			op: func(ctx context.Context) {
-				o.offRampNextSeqNums = o.syncObserver.ObserveOffRampNextSeqNums(ctxSync)
+				offRampNext := o.syncObserver.ObserveOffRampNextSeqNums(ctxSync)
+				o.mu.Lock()
+				o.offRampNextSeqNums = offRampNext
+				o.mu.Unlock()
 			},
 		},
 		{
 			id: "onRampLatestSeqNums",
 			op: func(ctx context.Context) {
-				o.onRampLatestSeqNums = o.syncObserver.ObserveLatestOnRampSeqNums(ctxSync)
+				onRampLast := o.syncObserver.ObserveLatestOnRampSeqNums(ctxSync)
+				o.mu.Lock()
+				o.onRampLatestSeqNums = onRampLast
+				o.mu.Unlock()
 			},
 		},
 	}
@@ -393,9 +399,7 @@ func (o *asyncObserver) applySyncOp(
 	defer wg.Done()
 	tStart := time.Now()
 	o.lggr.Debugw("async observer applying sync operation", "id", id)
-	o.mu.Lock()
 	op(ctx)
-	o.mu.Unlock()
 	lggr.Debugw("async observer has applied the sync operation",
 		"id", id, "duration", time.Since(tStart))
 }
