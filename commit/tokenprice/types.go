@@ -71,22 +71,3 @@ type Observer interface {
 
 	ObserveFChain() map[cciptypes.ChainSelector]int
 }
-
-// MetricsReporter exposes only relevant methods for reporting token prices from metrics.Reporter
-type MetricsReporter interface {
-	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
-	TrackProcessorObservation(processor string, obs plugintypes.Trackable)
-	TrackProcessorOutcome(processor string, out plugintypes.Trackable)
-}
-
-type NoopMetrics struct{}
-
-func (n NoopMetrics) TrackTokenPricesObservation(Observation) {}
-
-func (n NoopMetrics) TrackTokenPricesOutcome(Outcome) {}
-
-func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration, error) {}
-
-func (n NoopMetrics) TrackProcessorObservation(string, plugintypes.Trackable) {}
-
-func (n NoopMetrics) TrackProcessorOutcome(string, plugintypes.Trackable) {}

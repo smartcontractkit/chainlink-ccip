@@ -141,7 +141,7 @@ func TestOutcome(t *testing.T) {
 		destChain:       destChainSel,
 		offChainCfg:     offChainCfg,
 		fRoleDON:        1,
-		metricsReporter: NoopMetrics{},
+		metricsReporter: plugincommon.NoopReporter{},
 	}
 
 	outcome, err := p.Outcome(ctx, Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{

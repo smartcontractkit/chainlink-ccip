@@ -66,4 +66,3 @@ var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}
 var _ chainfee.MetricsReporter = &PromReporter{}
 var _ merkleroot.MetricsReporter = &PromReporter{}
-var _ tokenprice.MetricsReporter = &PromReporter{}
