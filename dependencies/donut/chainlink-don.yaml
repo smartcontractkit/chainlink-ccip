@@ -52,9 +52,12 @@ vars:
   # chains
   # Option to generate variable number of networks to be configured in Node config
   # It is required when network-generated profile is activated
-  CHAINS_COUNT:
+  GETH_CHAINS_COUNT:
     source: env
     default: 2
+  SOLANA_CHAINS_COUNT:
+    source: env
+    default: 1
   # switch
   ENABLE_DON_BASE:
     source: env
@@ -207,7 +210,8 @@ profiles:
       $(
         pushd ./scripts/network_configs/ > /dev/null
         go run main.go \
-          -chains-count="${CHAINS_COUNT}"
+          -geth-chains-count="${GETH_CHAINS_COUNT}" \
+          -solana-chains-count="${SOLANA_CHAINS_COUNT}"
       )
   # versions
   - name: version-latest

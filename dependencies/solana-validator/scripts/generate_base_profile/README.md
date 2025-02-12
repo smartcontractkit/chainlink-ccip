@@ -4,8 +4,7 @@ It outputs the config to std out.
 
 Usage:
 ```
-go run main.go \
-  -geth-chains-count=2 \
-  -solana-chains-count=1
+TEMPLATES_DIR=./ \
+go run main.go
 ```
 

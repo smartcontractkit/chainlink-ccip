@@ -12,7 +12,8 @@ type DevspaceEnv struct {
 	IngressBaseDomain string
 	TmpDir            string
 	CIEnv             bool
-	ChainsCount       int
+	GethChainsCount   int
+	SolanaChainsCount int
 }
 
 func NewDevspaceEnvFromEnv() DevspaceEnv {
@@ -23,7 +24,8 @@ func NewDevspaceEnvFromEnv() DevspaceEnv {
 		DonNodeCount:      viper.GetInt("DON_NODE_COUNT"),
 		IngressBaseDomain: viper.GetString("DEVSPACE_INGRESS_BASE_DOMAIN"),
 		TmpDir:            viper.GetString("TMP_DIR"),
-		ChainsCount:       viper.GetInt("CHAINS_COUNT"),
+		GethChainsCount:   viper.GetInt("GETH_CHAINS_COUNT"),
+		SolanaChainsCount: viper.GetInt("SOLANA_CHAINS_COUNT"),
 		CIEnv:             viper.GetBool("CRIB_CI_ENV"),
 	}
 }

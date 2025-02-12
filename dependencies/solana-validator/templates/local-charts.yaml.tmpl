@@ -1,0 +1,9 @@
+deployments:
+  {{- range .Chains }}
+  solana-{{ .NetworkId }}:
+    helm:
+      chart:
+        name: crib-solana-validator
+        path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-solana-validator
+        version: null
+  {{- end }}

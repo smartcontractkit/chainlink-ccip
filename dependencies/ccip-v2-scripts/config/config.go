@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/tls"
 	"fmt"
+	"strings"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
@@ -10,6 +11,19 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"google.golang.org/grpc/credentials"
 )
+
+type ChainType int
+
+// Define constants using iota
+const (
+	EVM ChainType = iota
+	SOLANA
+)
+
+// String method to convert enum values to readable strings
+func (s ChainType) String() string {
+	return [...]string{"EVM", "SOLANA"}[s]
+}
 
 func GetEnvConfig(env DevspaceEnv) (*devenv.EnvironmentConfig, error) {
 	chainConfigurers := getChainConfigurers(env)
@@ -51,16 +65,25 @@ func GetEnvConfig(env DevspaceEnv) (*devenv.EnvironmentConfig, error) {
 
 func getChainConfigurers(env DevspaceEnv) []ChainConfigurer {
 	chainConfigurers := []ChainConfigurer{
-		NewChainConfigurer(env, uint64(1337), "alpha"),
-		NewChainConfigurer(env, uint64(2337), "beta"),
+		NewChainConfigurer(env, uint64(1337), EVM, "alpha"),
+		NewChainConfigurer(env, uint64(2337), EVM, "beta"),
 	}
 
-	if env.ChainsCount > 2 {
+	if env.GethChainsCount > 2 {
 		//nolint:gosec
-		for i := 1; i <= env.ChainsCount-2; i++ {
+		for i := 1; i <= env.GethChainsCount-2; i++ {
 			const baseChainID uint64 = 90000000
 			chainID := baseChainID + uint64(i)
-			c := NewChainConfigurer(env, chainID, fmt.Sprintf("nchain-%d", chainID))
+			c := NewChainConfigurer(env, chainID, EVM, fmt.Sprintf("nchain-%d", chainID))
+
+			chainConfigurers = append(chainConfigurers, c)
+		}
+	}
+	if env.SolanaChainsCount > 0 {
+		//nolint:gosec
+		for i := 1; i <= env.SolanaChainsCount; i++ {
+			chainID := 1000 + uint64(i)
+			c := NewChainConfigurer(env, chainID, SOLANA, fmt.Sprintf("solana-local-%d", chainID))
 
 			chainConfigurers = append(chainConfigurers, c)
 		}
@@ -146,9 +169,10 @@ type ChainConfigurer struct {
 	deployerKey string
 	env         DevspaceEnv
 	chainName   string
+	chainType   ChainType
 }
 
-func NewChainConfigurer(env DevspaceEnv, chainID uint64, name string) ChainConfigurer {
+func NewChainConfigurer(env DevspaceEnv, chainID uint64, chainType ChainType, name string) ChainConfigurer {
 	// These are generally known private keys used for testing
 	testKey := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
@@ -157,6 +181,7 @@ func NewChainConfigurer(env DevspaceEnv, chainID uint64, name string) ChainConfi
 		chainID:     chainID,
 		chainName:   name,
 		deployerKey: testKey,
+		chainType:   chainType,
 	}
 }
 
@@ -181,7 +206,7 @@ func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {
 	chainConfig := &devenv.ChainConfig{
 		ChainID:   c.chainID,
 		ChainName: c.chainName,
-		ChainType: "EVM",
+		ChainType: c.chainType.String(),
 		WSRPCs: []devenv.CribRPCs{{
 			External: *wsExternalRPC,
 			Internal: *wsInternalRPC,
@@ -203,8 +228,8 @@ func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {
 func (c ChainConfigurer) GetTransmittedChainConfigs() crib.ChainConfig {
 	chainConfig := crib.ChainConfig{
 		ChainID:   c.chainID,
-		ChainName: "alpha",
-		ChainType: "EVM",
+		ChainName: c.getChainName(),
+		ChainType: c.chainType.String(),
 		WSRPCs: []crib.RPC{
 			{
 				Internal: c.internalWSRPC(),
@@ -239,7 +264,7 @@ func (c ChainConfigurer) externalWSRPC() *string {
 		u := fmt.Sprintf("wss://%s", hostName)
 		return &u
 	}
-	u := fmt.Sprintf("wss://%s-geth-%d-ws.%s", c.env.Namespace, c.chainID, c.env.IngressBaseDomain)
+	u := fmt.Sprintf("wss://%s-%s-%d-ws.%s", c.env.Namespace, c.chainTypeHosNamePart(), c.chainID, c.env.IngressBaseDomain)
 	return &u
 }
 
@@ -249,16 +274,42 @@ func (c ChainConfigurer) externalHTTPRPC() *string {
 		u := fmt.Sprintf("https://%s", hostName)
 		return &u
 	}
-	u := fmt.Sprintf("https://%s-geth-%d-http.%s:443", c.env.Namespace, c.chainID, c.env.IngressBaseDomain)
+	u := fmt.Sprintf("https://%s-%s-%d-http.%s:443", c.env.Namespace, c.chainTypeHosNamePart(), c.chainID, c.env.IngressBaseDomain)
 	return &u
+}
+
+func (c ChainConfigurer) chainTypeHosNamePart() string {
+	var chainType string
+	if c.chainType == EVM {
+		chainType = "geth"
+	} else if c.chainType == SOLANA {
+		chainType = "solana"
+	}
+	return chainType
 }
 
 func (c ChainConfigurer) internalWSRPC() *string {
-	u := fmt.Sprintf("ws://%s-geth-%d-ws:8546", c.env.Namespace, c.chainID)
-	return &u
+	if c.chainType == EVM {
+		u := fmt.Sprintf("ws://geth-%d-ws:8546", c.chainID)
+		return &u
+	} else if c.chainType == SOLANA {
+		u := fmt.Sprintf("ws://solana-%d:8545", c.chainID)
+		return &u
+	}
+	return nil
 }
 
 func (c ChainConfigurer) internalHTTPRPC() *string {
-	u := fmt.Sprintf("http://%s-geth-%d:8544", c.env.Namespace, c.chainID)
-	return &u
+	if c.chainType == EVM {
+		u := fmt.Sprintf("http://geth-%d:8544", c.chainID)
+		return &u
+	} else if c.chainType == SOLANA {
+		u := fmt.Sprintf("http://solana-%d:8544", c.chainID)
+		return &u
+	}
+	return nil
+}
+
+func (c ChainConfigurer) getChainName() string {
+	return fmt.Sprintf("%s-simulated-%d", strings.ToLower(c.chainType.String()), c.chainID)
 }

@@ -1,0 +1,59 @@
+---
+version: v2beta1
+name: daas
+
+vars:
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  ## Local directories
+  SCRIPTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/scripts"
+  DEPENDENCIES_DIR:
+    source: env
+    default: "${CRIB_DIR}/dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/imports"
+  ##
+  PROVIDER:
+    source: all
+    default: "aws"
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  SOLANA_CHAINS_COUNT:
+    source: env
+    default: "1"
+
+imports:
+  - path: ${IMPORTS_DIR}/lib-common
+  - path: ${IMPORTS_DIR}/lib-aws
+  - path: ${IMPORTS_DIR}/lib-kind
+
+pipelines:
+  solana-validator:
+    run: |-
+      run_dependency_pipelines solana-validator
+      crib devspace ingress-check
+
+profiles:
+  - name: default
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          solana-validator:
+            path: ${DEPENDENCIES_DIR}/solana-validator
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - local-charts
+
+commands:
+  deploy:
+    command: devspace run-pipeline solana-validator -p default
+    description: Deploy solana-validator
+    appendArgs: true

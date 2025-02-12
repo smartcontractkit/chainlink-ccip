@@ -14,7 +14,8 @@ func InitViper() {
 	MustHaveEnv("DEVSPACE_INGRESS_BASE_DOMAIN")
 	MustHaveEnv("TMP_DIR")
 	OptionalEnv("CRIB_CI_ENV")
-	OptionalEnv("CHAINS_COUNT")
+	OptionalEnv("GETH_CHAINS_COUNT")
+	OptionalEnv("SOLANA_CHAINS_COUNT")
 }
 
 func OptionalEnv(key string) {

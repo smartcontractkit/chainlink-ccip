@@ -1,0 +1,13 @@
+---
+networkPolicy:
+  # Allow additional services to access solana
+  extraIngressSelectors:
+    - podSelector:
+        matchLabels:
+          app: atlas
+    - podSelector:
+        matchLabels:
+          app: ccip-scripts-deployer
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: chainlink-don

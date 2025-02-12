@@ -1,6 +1,6 @@
 ---
 version: v2beta1
-name: geth
+name: solana
 
 vars:
   LOCAL_TEMPLATES_DIR:
@@ -27,10 +27,10 @@ vars:
     source: env
     default: default.yaml
   # How many blockchain networks should it deploy
-  # By default it will create beta (1337) and alpha (2337) chains, the minimum number is 1
+  # If set to 0, it won't deploy any chains
   CHAINS_COUNT:
     source: env
-    default: 2
+    default: 1
 
 pipelines:
   kind:
@@ -39,7 +39,14 @@ pipelines:
       run_pipelines deploy
   deploy:
     run: |-
-      create_deployments --all
+      if [ "${CHAINS_COUNT}" -gt 0 ]; then
+        create_deployments --all
+      fi
+
+pullSecrets:
+  regcred-prod-ecr:
+    registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-prod-ecr
 
 hooks:
   - wait:
@@ -49,8 +56,8 @@ hooks:
     container:
       labelSelector:
         # vars don't work here, = releaseName
-        release: "geth"
-    events: ["after:deploy:geth"]
+        release: "solana"
+    events: ["after:deploy:solana"]
 
 # The list of deployments is generated from the template
 profiles:
@@ -60,9 +67,25 @@ profiles:
           ENABLE_BASE_PROFILE: "true"
     merge: |-
       $(
-        pushd ./scripts/generate_base_profile > /dev/null
-        go run main.go -chain-overrides-dir="./../../values/chain-overrides/" \
-          -chain-overrides-file="${CHAIN_OVERRIDES_FILENAME}" \
-          -chains-count="${CHAINS_COUNT}" -provider="${PROVIDER}" \
-          -product="${CHAINLINK_PRODUCT}" -use-case="${USE_CASE}"
+        if [ "${CHAINS_COUNT}" -gt 0 ]; then
+          pushd ./scripts/generate_base_profile > /dev/null
+          go run main.go -chain-overrides-dir="./../../values/chain-overrides/" \
+            -chain-overrides-file="${CHAIN_OVERRIDES_FILENAME}" \
+            -chains-count="${CHAINS_COUNT}" -provider="${PROVIDER}" \
+            -product="${CHAINLINK_PRODUCT}" -use-case="${USE_CASE}"
+        else
+          echo "deployments:"
+        fi
+      )
+  - name: local-charts
+    merge: |-
+      $(
+        if [ "${CHAINS_COUNT}" -gt 0 ]; then
+          pushd ./scripts/generate_base_profile > /dev/null
+          go run main.go -chain-overrides-dir="./../../values/chain-overrides/" \
+           -chains-count="${CHAINS_COUNT}" -provider="${PROVIDER}" \
+            -template="local-charts.yaml.tmpl"
+        else
+          echo "deployments:"
+        fi
       )

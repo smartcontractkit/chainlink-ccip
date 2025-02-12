@@ -41,9 +41,12 @@ vars:
   DON_BOOT_NODE_COUNT:
     source: env
     default: 1
-  CHAINS_COUNT:
+  GETH_CHAINS_COUNT:
     source: env
     default: 2
+  SOLANA_CHAINS_COUNT:
+    source: env
+    default: 0
   ENABLE_MONITORING:
     source: env
     default: false
@@ -69,7 +72,8 @@ pipelines:
     run: |-
       run_pipelines maybe-kind
 
-      run_dependency_pipelines geth
+      run_dependency_pipelines geth-chains
+      run_dependency_pipelines solana-chains
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
       # Deploy CCIP enabled fully configured DON
@@ -79,7 +83,8 @@ pipelines:
     run: |-
       run_pipelines maybe-kind
 
-      run_dependency_pipelines geth
+      run_dependency_pipelines geth-chains
+      run_dependency_pipelines solana-chains
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
       # Deploy CCIP enabled fully configured DON
@@ -89,7 +94,8 @@ pipelines:
   ccip-v2-infra-only-render:
     run: |-
       run_pipelines maybe-kind
-      run_dependency_pipelines geth
+      run_dependency_pipelines geth-chains
+      run_dependency_pipelines solana-chains
       run_dependency_pipelines ccip-don --set-flag infraOnly="true"
   geth:
     run: |-
@@ -97,10 +103,12 @@ pipelines:
         run_dependency_pipelines kind-core
       fi
 
-      run_dependency_pipelines geth
+      run_dependency_pipelines geth-chains
+      run_dependency_pipelines solana-chains
   debug-gap:
     run: |-
-      run_dependency_pipelines geth
+      run_dependency_pipelines geth-chains
+      run_dependency_pipelines solana-chains
       task ccip-v2-scripts:build
       run_dependency_pipelines ccip-v2-scripts --pipeline deploy-home-chain-contracts
   ccip-v2-scripts-home-chain:
@@ -167,10 +175,18 @@ profiles:
       - op: add
         path: dependencies
         value:
-          geth:
+          geth-chains:
             path: ${DEPENDENCIES_DIR}/geth-v2
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              CHAINS_COUNT: ${GETH_CHAINS_COUNT}
+          solana-chains:
+            path: ${DEPENDENCIES_DIR}/solana-validator
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              CHAINS_COUNT: ${SOLANA_CHAINS_COUNT}
           ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
@@ -191,7 +207,7 @@ profiles:
       - op: add
         path: dependencies
         value:
-          geth:
+          geth-chains:
             path: ${DEPENDENCIES_DIR}/geth-v2
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}

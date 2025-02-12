@@ -1,0 +1,63 @@
+deployments:
+  {{- range .Chains }}
+  solana-{{ .NetworkId }}:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: "solana-{{ .NetworkId }}"
+      chart:
+        name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-solana-validator"
+        version: "0.2.0"
+      valuesFiles:
+        {{- if eq $.Provider "kind" }}
+        - ${LOCAL_VALUES_DIR}/node/env.kind.yaml
+        {{- end }}
+        {{- if eq $.Provider "aws" }}
+        - ${LOCAL_VALUES_DIR}/node/env.aws-staging.yaml
+        {{- end }}
+        {{- if eq $.Product "ccip" }}
+        - ${LOCAL_VALUES_DIR}/node/product.ccip.yaml
+        {{- end }}
+        {{- if eq $.UseCase "ccip-load-tests" }}
+        - ${LOCAL_VALUES_DIR}/node/use-case.ccip-load-tests.yaml
+        {{- end }}
+      values:
+        blockchain:
+          networkId: "{{ .NetworkId }}"
+          publicKey: 9n1pyVGGo6V4mpiSDMVay5As9NurEkY283wwRk1Kto2C
+
+        networkPolicyDefault:
+          ingress:
+            allowCustomCidrs: true
+            # Should be a comma separated list of CIDR blocks. To include
+            # AWS ALB private CIDRs and optionally other custom CIDRs.
+            # Example format: 10.0.0.0/16,192.168.0.1/24
+            customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+        networkPolicies:
+          enabled: true
+          extraIngressSelectors:
+            # whitelist chainlink-don deployment from donut dependency
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: chainlink-don
+        ingress:
+          enabled: true
+          hosts:
+            - host: ${DEVSPACE_NAMESPACE}-solana-{{ .NetworkId }}-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: "solana-{{ .NetworkId }}"
+                        port:
+                          number: 8544
+            - host: ${DEVSPACE_NAMESPACE}-solana-{{ .NetworkId }}-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: "solana-{{ .NetworkId }}"
+                        port:
+                          number: 8545
+  {{- end }}

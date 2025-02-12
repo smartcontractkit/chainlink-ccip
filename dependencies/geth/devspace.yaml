@@ -20,11 +20,6 @@ pipelines:
     run: |-
       create_deployments geth
 
-pullSecrets:
-  regcred-stage-ecr:
-    registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
-    secret: regcred-stage-ecr
-
 hooks:
   - wait:
       running: true

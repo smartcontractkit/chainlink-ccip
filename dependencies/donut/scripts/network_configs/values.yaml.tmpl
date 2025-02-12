@@ -5,7 +5,7 @@ deployments:
           common:
             chainlink:
               v2Config:
-                {{- range .Chains  }}
+                {{- range .GethChains  }}
                 01-network-geth-chain-{{ .NetworkId }}.toml: |
                   [[EVM]]
                   ChainID = {{ .NetworkId }}
@@ -18,3 +18,14 @@ deployments:
                   HTTPURL = "http://geth-{{ .NetworkId }}:8544"
                   WSURL = "ws://geth-{{ .NetworkId }}:8546"
                 {{- end }}
+                {{- range .SolanaChains  }}
+                01-network-solana-chain-{{ .ChainId }}.toml: |
+                  [[Solana]]
+                  ChainID = '{{ .ChainId }}'
+                  Enabled = true
+
+                  [[Solana.Nodes]]
+                  Name = 'node-{{ .ChainId }}'
+                  URL = "http://solana-{{ .ChainId }}:8544"
+                {{- end }}
+
