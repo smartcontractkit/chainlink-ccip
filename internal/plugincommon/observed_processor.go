@@ -85,7 +85,6 @@ type NoopReporter struct{}
 
 func (n NoopReporter) TrackProcessorLatency(string, string, time.Duration, error) {}
 
-func (n NoopReporter) TrackProcessorObservation(processor string, obs plugintypes.Trackable) {
-}
+func (n NoopReporter) TrackProcessorObservation(string, plugintypes.Trackable) {}
 
-func (n NoopReporter) TrackProcessorOutcome(processor string, out plugintypes.Trackable) {}
+func (n NoopReporter) TrackProcessorOutcome(string, plugintypes.Trackable) {}

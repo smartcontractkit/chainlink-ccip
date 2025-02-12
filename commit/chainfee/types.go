@@ -6,7 +6,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -50,6 +49,13 @@ func (o Observation) Stats() map[string]int {
 	}
 }
 
+func (o Observation) IsEmpty() bool {
+	return len(o.FeeComponents) == 0 &&
+		len(o.NativeTokenPrices) == 0 &&
+		len(o.ChainFeeUpdates) == 0 &&
+		len(o.FChain) == 0 && o.TimestampNow.IsZero()
+}
+
 // AggregateObservation is the aggregation of a list of observations
 type AggregateObservation struct {
 	FeeComponents     map[cciptypes.ChainSelector][]types.ChainFeeComponents `json:"feeComponents"`
@@ -67,24 +73,4 @@ type ComponentsUSDPrices struct {
 type Update struct {
 	ChainFee  ComponentsUSDPrices `json:"chainFee"`
 	Timestamp time.Time           `json:"timestamp"`
-}
-
-// MetricsReporter exposes only relevant methods for reporting chain fees from metrics.Reporter
-type MetricsReporter interface {
-	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
-	TrackProcessorObservation(processor string, obs plugintypes.Trackable)
-	TrackProcessorOutcome(processor string, out plugintypes.Trackable)
-}
-
-type NoopMetrics struct{}
-
-func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration, error) {}
-
-func (n NoopMetrics) TrackProcessorObservation(string, plugintypes.Trackable) {}
-
-func (n NoopMetrics) TrackProcessorOutcome(string, plugintypes.Trackable) {}
-
-func (o Observation) IsEmpty() bool {
-	return len(o.FeeComponents) == 0 && len(o.NativeTokenPrices) == 0 && len(o.ChainFeeUpdates) == 0 &&
-		len(o.FChain) == 0 && o.TimestampNow.IsZero()
 }

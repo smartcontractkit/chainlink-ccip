@@ -3,7 +3,6 @@ package metrics
 import (
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
@@ -64,5 +63,4 @@ func (n *Noop) TrackProcessorOutcome(string, plugintypes.Trackable) {}
 
 var _ Reporter = &PromReporter{}
 var _ CommitPluginReporter = &PromReporter{}
-var _ chainfee.MetricsReporter = &PromReporter{}
 var _ merkleroot.MetricsReporter = &PromReporter{}
