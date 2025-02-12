@@ -50,7 +50,7 @@ jobs:
         path: chains/solana/contracts/target
         key: ${{ runner.os }}-solana-contract-artifacts-${{ hashFiles('**/Cargo.lock') }}
     - name: build & save image
-      if: steps.cache-image.outputs.cache-hit != 'true'
+      # if: steps.cache-image.outputs.cache-hit != 'true'
       run: |
         cd contracts
         docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ needs.get_anchor_version.outputs.anchor_version }}
