@@ -39,7 +39,7 @@ impl Display for RestoreOnAction {
     }
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug, PartialEq, Eq, Copy)]
 pub struct DestChainState {
     pub sequence_number: u64, // The last used sequence number. On upgrades, this is reset to 0.
 

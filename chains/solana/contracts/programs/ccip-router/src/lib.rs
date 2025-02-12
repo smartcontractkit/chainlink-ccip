@@ -208,6 +208,8 @@ pub mod ccip_router {
 
     /// Bumps the CCIP version for a destination chain.
     /// This effectively just resets the sequence number of the destination chain state.
+    /// If there had been a previous rollback, on re-upgrade the sequence number will resume from where it was
+    /// prior to the rollback.
     ///
     /// # Arguments
     /// * `ctx` - The context containing the accounts required for the bump.
