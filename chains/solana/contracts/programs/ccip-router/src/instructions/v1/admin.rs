@@ -94,7 +94,7 @@ pub fn bump_ccip_version_for_dest_chain(
 
     let previous_sequence_number = dest_chain_state.sequence_number;
 
-    bump_seq_nr(dest_chain_state)?;
+    upgrade(dest_chain_state)?;
 
     emit!(events::CcipVersionForDestChainVersionBumped {
         dest_chain_selector,
@@ -113,7 +113,7 @@ pub fn rollback_ccip_version_for_dest_chain(
 
     let previous_sequence_number = dest_chain_state.sequence_number;
 
-    rollback_seq_nr(dest_chain_state)?;
+    rollback(dest_chain_state)?;
 
     emit!(events::CcipVersionForDestChainVersionRolledBack {
         dest_chain_selector,
@@ -216,7 +216,10 @@ fn validate_dest_chain_config(dest_chain_selector: u64, _config: &DestChainConfi
     Ok(())
 }
 
-fn bump_seq_nr(dest_chain_state: &mut DestChainState) -> Result<()> {
+// On upgrade, the sequence number is reset to 0 and the previous sequence number is saved for a future rollback.
+// If a rollback has previously occurred, on upgrade the previous sequence number for the current version is restored
+// instead of resetting to 0.
+fn upgrade(dest_chain_state: &mut DestChainState) -> Result<()> {
     let current_seq_nr = dest_chain_state.sequence_number;
 
     dest_chain_state.sequence_number = match dest_chain_state.restore_on_action {
@@ -231,7 +234,9 @@ fn bump_seq_nr(dest_chain_state: &mut DestChainState) -> Result<()> {
     Ok(())
 }
 
-fn rollback_seq_nr(dest_chain_state: &mut DestChainState) -> Result<()> {
+// On rollback, the sequence number is restored to the previous version's sequence number. The current sequence number
+// for the version being rolled back to is saved for a future upgrade, so it can resume from where it was.
+fn rollback(dest_chain_state: &mut DestChainState) -> Result<()> {
     // If there was loss of information, we can't rollback. We support at most 1 consecutive rollback.
     // So, once a rollback has happened, the admin must bump the CCIP version before another rollback.
     require_eq!(
@@ -256,13 +261,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn first_update() {
+    fn first_upgrade() {
         let state = &mut DestChainState {
             sequence_number: 5,
             restore_on_action: RestoreOnAction::None, // initial state
             sequence_number_to_restore: 0,
         };
-        bump_seq_nr(state).unwrap();
+        upgrade(state).unwrap();
         assert_eq!(
             state,
             &DestChainState {
@@ -274,13 +279,13 @@ mod tests {
     }
 
     #[test]
-    fn second_update() {
+    fn second_upgrade() {
         let state = &mut DestChainState {
             sequence_number: 2,
             restore_on_action: RestoreOnAction::Rollback,
             sequence_number_to_restore: 5,
         };
-        bump_seq_nr(state).unwrap();
+        upgrade(state).unwrap();
         assert_eq!(
             state,
             &DestChainState {
@@ -298,7 +303,7 @@ mod tests {
             restore_on_action: RestoreOnAction::Rollback,
             sequence_number_to_restore: 2,
         };
-        rollback_seq_nr(state).unwrap();
+        rollback(state).unwrap();
         assert_eq!(
             state,
             &DestChainState {
@@ -316,7 +321,7 @@ mod tests {
             restore_on_action: RestoreOnAction::Upgrade,
             sequence_number_to_restore: 3,
         };
-        let result = rollback_seq_nr(state);
+        let result = rollback(state);
         assert!(result.is_err()); // can't rollback twice in a row
     }
 
@@ -327,7 +332,7 @@ mod tests {
             restore_on_action: RestoreOnAction::Upgrade,
             sequence_number_to_restore: 3,
         };
-        bump_seq_nr(state).unwrap();
+        upgrade(state).unwrap();
         assert_eq!(
             state,
             &DestChainState {

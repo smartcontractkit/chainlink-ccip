@@ -24,9 +24,9 @@ pub struct Config {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug, PartialEq, Eq, Copy)]
 pub enum RestoreOnAction {
-    None,
-    Upgrade,
-    Rollback,
+    None,     // initial case, there's no saved sequence number to restore
+    Upgrade, // after a rollback, the saved sequence number must be restored on the following upgrade
+    Rollback, // after an upgrade, the saved sequence number must be restored on the following rollback
 }
 
 impl Display for RestoreOnAction {
