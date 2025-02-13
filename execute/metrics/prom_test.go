@@ -64,14 +64,14 @@ func Test_TrackingTokenReadiness(t *testing.T) {
 
 			readyTokens := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, string(tc.state), plugincommon.ObservationMethod, "tokenReady",
+					chainID, plugincommon.ObservationMethod, string(tc.state), "tokenReady",
 				),
 			)
 			require.Equal(t, tc.expectedReadyTokens, int(readyTokens))
 
 			waitingTokens := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, string(tc.state), plugincommon.ObservationMethod, "tokenWaiting",
+					chainID, plugincommon.ObservationMethod, string(tc.state), "tokenWaiting",
 				),
 			)
 			require.Equal(t, tc.expectedWaitingTokens, int(waitingTokens))
