@@ -23,6 +23,9 @@ type ExecutePluginReportSingleChain struct {
 type ExecuteReportInfo struct {
 	AbstractReports []ExecutePluginReportSingleChain
 	MerkleRoots     []MerkleRootChain
+
+	// TxID to use when submitting the report.
+	TxID string
 }
 
 // Encode v1 execute report info. Very basic versioning in the first byte to

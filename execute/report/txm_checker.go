@@ -37,25 +37,25 @@ func NewMessageStatusCache(statusGetter StatusGetter) *MessageStatusCache {
 	}
 }
 
-func toID(msgID string, attempt uint64) string {
-	return fmt.Sprintf("%s-%d", msgID, attempt)
+func toID(selector ccipocr3.ChainSelector, msgID string, attempt uint64) string {
+	return fmt.Sprintf("%d-%s-%d", selector, msgID, attempt)
 }
 
 // NextTransactionID returns the next transaction ID for the given message ID.
-func (m *MessageStatusCache) NextTransactionID(msgID string) string {
+func (m *MessageStatusCache) NextTransactionID(selector ccipocr3.ChainSelector, msgID string) string {
 	// this works with a zero value, so no need to hceck if cache[msgID] exists.
-	return toID(msgID, m.cache[msgID].numAttempts)
+	return toID(selector, msgID, m.cache[msgID].numAttempts)
 }
 
 // statuses fetches the statusu details for a given message ID. Results are cached for subsequent calls.
-func (m *MessageStatusCache) statuses(ctx context.Context, msgID string) (MessageStatusDetails, error) {
+func (m *MessageStatusCache) statuses(ctx context.Context, selector ccipocr3.ChainSelector, msgID string) (MessageStatusDetails, error) {
 	if details, ok := m.cache[msgID]; ok {
 		return details, nil
 	}
 
 	var details MessageStatusDetails
 	for {
-		transactionID := toID(msgID, details.numAttempts)
+		transactionID := toID(selector, msgID, details.numAttempts)
 		status, err := m.statusGetter(ctx, transactionID)
 
 		if err != nil && status == types.Unknown {
@@ -81,6 +81,8 @@ func (m *MessageStatusCache) statuses(ctx context.Context, msgID string) (Messag
 // NewTXMCheck creates a new check that queries the TXM for the status of a transaction.
 //
 // Algorithm ported from OCR2 version: chainlink/core/services/relay/evm/statuschecker/txm_status_checker.go#L31
+//
+// TODO: this is used during observation, not report building. So it no longer needs to implement the Check interface.
 func NewTXMCheck(statuses *MessageStatusCache, maxAttempts uint64) Check {
 	return func(
 		ctx context.Context,
@@ -89,7 +91,7 @@ func NewTXMCheck(statuses *MessageStatusCache, maxAttempts uint64) Check {
 		_ int,
 		_ exectypes.CommitData,
 	) (messageStatus, error) {
-		details, err := statuses.statuses(ctx, msg.Header.MessageID.String())
+		details, err := statuses.statuses(ctx, msg.Header.SourceChainSelector, msg.Header.MessageID.String())
 		if err != nil {
 			return None, err
 		}

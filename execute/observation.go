@@ -302,8 +302,15 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
 	}
 
-	statusCache := report.NewMessageStatusCache(p.statusGetter)
-	txmStatusChecker := report.NewTXMCheck(statusCache, p.offchainCfg.MaxTxmStatusChecks)
+	//p.statusCache.
+	txmStatusChecker := report.NewTXMCheck(p.statusCache, p.offchainCfg.MaxTxmStatusChecks)
+	// TXM Status checking only supports singleton execution because the msgID is used for the transactionID.
+	// Arbitrary txm checking would be much more complex because we don't know which messages are in the same report.
+	isSingletonExecute := p.offchainCfg.MaxReportMessages == 1 && p.offchainCfg.MaxSingleChainReports == 1
+	if isSingletonExecute {
+		// Reset cache during message observation. It will be referenced again when the report is generated.
+		p.statusCache = report.NewMessageStatusCache(p.statusGetter)
+	}
 	for chainSelector, msgs := range messageObs {
 		for seqNum, msg := range msgs {
 			// Inflight messages do not need to be observed.
@@ -313,7 +320,7 @@ func (p *Plugin) getMessagesObservation(
 				continue
 			}
 			// Messages with fatal txm statuses do not need to be observed.
-			if p.statusGetter != nil {
+			if p.statusGetter != nil && isSingletonExecute {
 				status, err := txmStatusChecker(ctx, lggr, msg, 0, exectypes.CommitData{})
 				if err != nil {
 					lggr.Errorw("txm status check error", "msg", msg, "err", err)

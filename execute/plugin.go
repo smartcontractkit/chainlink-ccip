@@ -78,6 +78,8 @@ type Plugin struct {
 	commitRootsCache cache.CommitsRootsCache
 	// inflightMessageCache prevents duplicate reports from being sent for the same message.
 	inflightMessageCache inflightMessageCache
+	// statusCache remembers message status to optimize DB lookups. It is reset for each round.
+	statusCache *report.MessageStatusCache
 }
 
 func NewPlugin(
@@ -462,6 +464,18 @@ func (p *Plugin) Reports(
 	}
 
 	reportInfo := extractReportInfo(decodedOutcome)
+
+	// Add the TxID if we have a single chain report with a single message.
+	if p.offchainCfg.MaxSingleChainReports == 1 && p.offchainCfg.MaxReportMessages == 1 {
+		if len(decodedOutcome.Report.ChainReports) == 1 {
+			if len(decodedOutcome.Report.ChainReports[0].Messages) == 1 {
+				msg := decodedOutcome.Report.ChainReports[0].Messages[0]
+				reportInfo.TxID = p.statusCache.NextTransactionID(
+					msg.Header.SourceChainSelector, msg.Header.MessageID.String())
+			}
+		}
+	}
+
 	encodedInfo, err := reportInfo.Encode()
 	if err != nil {
 		return nil, err

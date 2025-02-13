@@ -307,7 +307,6 @@ func Test_getMessagesObservation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			ctx := context.Background()
 
 			// Create mock objects
@@ -332,6 +331,10 @@ func Test_getMessagesObservation(t *testing.T) {
 
 			if tt.statusGetter != nil {
 				plugin.statusGetter = tt.statusGetter()
+
+				// If the status getter is provided, set the offchain configuration to use it.
+				plugin.offchainCfg.MaxSingleChainReports = 1
+				plugin.offchainCfg.MaxReportMessages = 1
 			}
 
 			// Set up mock expectations
