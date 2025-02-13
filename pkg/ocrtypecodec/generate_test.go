@@ -1,12 +1,127 @@
 package ocrtypecodec
 
 import (
+	"fmt"
 	"math/rand"
+	"strings"
+	"testing"
+	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/ocrtypecodecpb"
 )
+
+func runBenchmark(
+	t *testing.T,
+	name string,
+	obj interface{},
+	decodeJsonFunc func([]byte) (interface{}, error),
+	encodeJsonFunc func(interface{}) ([]byte, error),
+	decodeProtoFunc func([]byte) (interface{}, error),
+	encodeProtoFunc func(interface{}) ([]byte, error),
+) resultData {
+	result := resultData{name: name}
+
+	tStart := time.Now()
+	jsonEnc, err := encodeJsonFunc(obj)
+	require.NoError(t, err)
+	result.jsonEncodingTime = time.Since(tStart)
+	tStart = time.Now()
+	jsonDec, err := decodeJsonFunc(jsonEnc)
+	result.jsonDecodingTime = time.Since(tStart)
+	require.NoError(t, err)
+	result.jsonEncodingDataLength = len(jsonEnc)
+
+	tStart = time.Now()
+	protoEnc, err := encodeProtoFunc(obj)
+	require.NoError(t, err)
+	result.protoEncodingTime = time.Since(tStart)
+	tStart = time.Now()
+	protoDec, err := decodeProtoFunc(protoEnc)
+	result.protoDecodingTime = time.Since(tStart)
+	require.NoError(t, err)
+	result.protoEncodingDataLength = len(protoEnc)
+
+	// sanity check
+	require.Equal(t, jsonDec, protoDec)
+	return result
+}
+
+// Helper functions for pretty-printing results
+
+type resultDataArray []resultData
+
+func (r resultDataArray) String() string {
+	if len(r) == 0 {
+		return "No results available"
+	}
+
+	// Table header
+	header := []string{"Name", "JSON Enc", "Proto Enc", "JSON Dec", "Proto Dec", "JSON Size", "Proto Size"}
+	columnWidths := []int{0, 20, 20, 20, 20, 12, 12}
+
+	for _, entry := range r {
+		if columnWidths[0] < len(entry.name) {
+			columnWidths[0] = len(entry.name) + 1
+		}
+	}
+
+	// Table separator
+	separator := strings.Repeat("-", sum(columnWidths)+len(columnWidths)*3)
+
+	// Format header row
+	var sb strings.Builder
+	sb.WriteString(separator + "\n")
+	sb.WriteString(formatRow(header, columnWidths) + "\n")
+	sb.WriteString(separator + "\n")
+
+	// Format data rows
+	for _, data := range r {
+		row := []string{
+			data.name,
+			data.jsonEncodingTime.String(),
+			data.protoEncodingTime.String(),
+			data.jsonDecodingTime.String(),
+			data.protoDecodingTime.String(),
+			fmt.Sprintf("%d", data.jsonEncodingDataLength),
+			fmt.Sprintf("%d", data.protoEncodingDataLength),
+		}
+		sb.WriteString(formatRow(row, columnWidths) + "\n")
+	}
+
+	sb.WriteString(separator)
+	return sb.String()
+}
+
+// formatRow formats a row with padding for each column
+func formatRow(fields []string, widths []int) string {
+	var parts []string
+	for i, field := range fields {
+		parts = append(parts, fmt.Sprintf("%-*s", widths[i], field))
+	}
+	return "| " + strings.Join(parts, " | ") + " |"
+}
+
+// sum calculates the total width of all columns
+func sum(arr []int) int {
+	total := 0
+	for _, v := range arr {
+		total += v
+	}
+	return total
+}
+
+type resultData struct {
+	name                    string
+	jsonEncodingTime        time.Duration
+	protoEncodingTime       time.Duration
+	jsonDecodingTime        time.Duration
+	protoDecodingTime       time.Duration
+	jsonEncodingDataLength  int
+	protoEncodingDataLength int
+}
 
 // genQuery generates a Protobuf Query object with the specified number of signatures and lane updates.
 func genQuery(numSigs int, numLaneUpdates int) *ocrtypecodecpb.Query {
@@ -356,4 +471,214 @@ func randomBytes(n int) []byte {
 	b := make([]byte, n)
 	rand.Read(b)
 	return b
+}
+
+// genExecObservation generates a randomized ExecObservation for benchmarking.
+func genExecObservation(numCommitReports, numMessagesPerChain, numTokenDataPerChain, numNoncesPerChain, numCostlyMessages int) *ocrtypecodecpb.ExecObservation {
+	return &ocrtypecodecpb.ExecObservation{
+		CommitReports:         genCommitReports(numCommitReports),
+		SeqNumsToMessages:     genMessages(numMessagesPerChain),
+		MessageHashes:         genMessageHashes(numMessagesPerChain),
+		TokenDataObservations: genTokenDataObservations(numTokenDataPerChain),
+		CostlyMessages:        genBytes32Slice(numCostlyMessages),
+		Nonces:                genNonces(numNoncesPerChain),
+		Contracts:             genDiscoveryObservation(32),
+		FChain:                genFChain(5),
+	}
+}
+
+// genCommitReports generates a map of CommitObservations.
+func genCommitReports(n int) map[uint64]*ocrtypecodecpb.CommitObservations {
+	commitReports := make(map[uint64]*ocrtypecodecpb.CommitObservations, n)
+	for i := 0; i < n; i++ {
+		chainSel := uint64(rand.Uint64())
+		commitReports[chainSel] = &ocrtypecodecpb.CommitObservations{
+			CommitData: genCommitData(rand.Intn(5) + 1), // 1 to 5 commit reports per chain
+		}
+	}
+	return commitReports
+}
+
+func genTokenDataObservations(n int) *ocrtypecodecpb.TokenDataObservations {
+	tokenData := make(map[uint64]*ocrtypecodecpb.SeqNumToTokenData, n)
+	for i := 0; i < n; i++ {
+		data := make(map[uint64]*ocrtypecodecpb.MessageTokenData, rand.Intn(5))
+		for j := 0; j < rand.Intn(5); j++ {
+			data[rand.Uint64()] = genMessageTokenDataEntry()
+		}
+		tokenData[rand.Uint64()] = &ocrtypecodecpb.SeqNumToTokenData{TokenData: data}
+	}
+	return &ocrtypecodecpb.TokenDataObservations{TokenData: tokenData}
+}
+
+// genCommitData generates a slice of CommitData.
+func genCommitData(n int) []*ocrtypecodecpb.CommitData {
+	commits := make([]*ocrtypecodecpb.CommitData, n)
+	for i := 0; i < n; i++ {
+		commits[i] = &ocrtypecodecpb.CommitData{
+			SourceChain:         uint64(rand.Uint64()),
+			OnRampAddress:       randomBytes(20),
+			Timestamp:           uint64(time.Now().Unix()),
+			BlockNum:            rand.Uint64(),
+			MerkleRoot:          randomBytes(32),
+			SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{MinMsgNr: uint64(rand.Uint64()), MaxMsgNr: uint64(rand.Uint64() + 100)},
+			ExecutedMessages:    genSeqNums(rand.Intn(10)),
+			Messages:            genMessageSlice(rand.Intn(10)),
+			Hashes:              genBytes32Slice(rand.Intn(10)),
+			CostlyMessages:      genBytes32Slice(rand.Intn(5)),
+			MessageTokenData:    genMessageTokenData(rand.Intn(10)),
+		}
+	}
+	return commits
+}
+
+// genSeqNums generates a slice of sequence numbers.
+func genSeqNums(n int) []uint64 {
+	seqNums := make([]uint64, n)
+	for i := 0; i < n; i++ {
+		seqNums[i] = uint64(rand.Uint64())
+	}
+	return seqNums
+}
+
+// genMessageSlice generates a slice of messages.
+func genMessageSlice(n int) []*ocrtypecodecpb.Message {
+	messages := make([]*ocrtypecodecpb.Message, n)
+	for i := 0; i < n; i++ {
+		messages[i] = genMessage()
+	}
+	return messages
+}
+
+// genMessageTokenData generates a slice of MessageTokenData.
+func genMessageTokenData(n int) []*ocrtypecodecpb.MessageTokenData {
+	tokenData := make([]*ocrtypecodecpb.MessageTokenData, n)
+	for i := 0; i < n; i++ {
+		tokenData[i] = genMessageTokenDataEntry()
+	}
+	return tokenData
+}
+
+// genMessages generates a map of chain selectors to message observations.
+func genMessages(n int) map[uint64]*ocrtypecodecpb.SeqNumToMessage {
+	messages := make(map[uint64]*ocrtypecodecpb.SeqNumToMessage, n)
+	for i := 0; i < n; i++ {
+		chainSel := uint64(rand.Uint64())
+		messages[chainSel] = &ocrtypecodecpb.SeqNumToMessage{Messages: genMessageMap(rand.Intn(10) + 1)}
+	}
+	return messages
+}
+
+// genMessageMap generates a map of sequence numbers to messages.
+func genMessageMap(n int) map[uint64]*ocrtypecodecpb.Message {
+	msgs := make(map[uint64]*ocrtypecodecpb.Message, n)
+	for i := 0; i < n; i++ {
+		msgs[uint64(rand.Uint64())] = genMessage()
+	}
+	return msgs
+}
+
+// genMessage generates a single Message.
+func genMessage() *ocrtypecodecpb.Message {
+	return &ocrtypecodecpb.Message{
+		Header:           genMessageHeader(),
+		Sender:           randomBytes(20),
+		Data:             randomBytes(50),
+		Receiver:         randomBytes(20),
+		ExtraArgs:        randomBytes(20),
+		ExtraArgsDecoded: genStringToBytesMap(3),
+		FeeToken:         randomBytes(20),
+		FeeTokenAmount:   randomBytes(32),
+		FeeValueJuels:    randomBytes(32),
+		TokenAmounts:     genRampTokenAmounts(rand.Intn(5)),
+	}
+}
+
+// genMessageHeader generates a RampMessageHeader.
+func genMessageHeader() *ocrtypecodecpb.RampMessageHeader {
+	return &ocrtypecodecpb.RampMessageHeader{
+		MessageId:           randomBytes(32),
+		SourceChainSelector: uint64(rand.Uint64()),
+		DestChainSelector:   uint64(rand.Uint64()),
+		SequenceNumber:      uint64(rand.Uint64()),
+		Nonce:               rand.Uint64(),
+		MsgHash:             randomBytes(32),
+		OnRamp:              randomBytes(20),
+	}
+}
+
+func genRampTokenAmounts(n int) []*ocrtypecodecpb.RampTokenAmount {
+	amounts := make([]*ocrtypecodecpb.RampTokenAmount, n)
+	for i := 0; i < n; i++ {
+		amounts[i] = &ocrtypecodecpb.RampTokenAmount{
+			SourcePoolAddress:   randomBytes(20),
+			DestTokenAddress:    randomBytes(20),
+			ExtraData:           randomBytes(32),
+			Amount:              randomBytes(32),
+			DestExecData:        randomBytes(32),
+			DestExecDataDecoded: genStringToBytesMap(3),
+		}
+	}
+	return amounts
+}
+
+// genMessageHashes generates a map of message hashes.
+func genMessageHashes(n int) map[uint64]*ocrtypecodecpb.SeqNumToBytes {
+	hashes := make(map[uint64]*ocrtypecodecpb.SeqNumToBytes, n)
+	for i := 0; i < n; i++ {
+		chainSel := uint64(rand.Uint64())
+		hashes[chainSel] = &ocrtypecodecpb.SeqNumToBytes{SeqNumToBytes: genSeqNumToBytes(rand.Intn(10))}
+	}
+	return hashes
+}
+
+// genSeqNumToBytes generates a map of sequence numbers to bytes32.
+func genSeqNumToBytes(n int) map[uint64][]byte {
+	result := make(map[uint64][]byte, n)
+	for i := 0; i < n; i++ {
+		result[uint64(rand.Uint64())] = randomBytes(32)
+	}
+	return result
+}
+
+// genMessageTokenDataEntry generates MessageTokenData.
+func genMessageTokenDataEntry() *ocrtypecodecpb.MessageTokenData {
+	tokenData := make([]*ocrtypecodecpb.TokenData, rand.Intn(5))
+	for i := range tokenData {
+		tokenData[i] = &ocrtypecodecpb.TokenData{
+			Ready: rand.Intn(2) == 1,
+			Data:  randomBytes(32),
+		}
+	}
+	return &ocrtypecodecpb.MessageTokenData{TokenData: tokenData}
+}
+
+// genNonces generates nonce observations.
+func genNonces(n int) map[uint64]*ocrtypecodecpb.StringAddrToNonce {
+	nonces := make(map[uint64]*ocrtypecodecpb.StringAddrToNonce, n)
+	for i := 0; i < n; i++ {
+		chainSel := rand.Uint64()
+		addrToNonce := make(map[string]uint64)
+		for j := 0; j < rand.Intn(32); j++ {
+			addrToNonce[genRandomString(5)] = rand.Uint64()
+		}
+		nonces[chainSel] = &ocrtypecodecpb.StringAddrToNonce{Nonces: addrToNonce}
+	}
+	return nonces
+}
+
+func genBytes32Slice(n int) [][]byte {
+	result := make([][]byte, n)
+	for i := 0; i < n; i++ {
+		result[i] = randomBytes(32)
+	}
+	return result
+}
+
+func genStringToBytesMap(n int) map[string][]byte {
+	m := make(map[string][]byte, n)
+	for i := 0; i < n; i++ {
+		m[genRandomString(5)] = randomBytes(32)
+	}
+	return m
 }

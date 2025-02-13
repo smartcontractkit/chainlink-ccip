@@ -2,25 +2,13 @@ package ocrtypecodec
 
 import (
 	"fmt"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 )
-
-type resultData struct {
-	name                    string
-	jsonEncodingTime        time.Duration
-	protoEncodingTime       time.Duration
-	jsonDecodingTime        time.Duration
-	protoDecodingTime       time.Duration
-	jsonEncodingDataLength  int
-	protoEncodingDataLength int
-}
 
 func TestCommitQuery(t *testing.T) {
 	jsonCodec := NewCommitCodecJSON()
@@ -191,104 +179,4 @@ func TestCommitOutcome(t *testing.T) {
 	}
 
 	fmt.Println(resultDataArray(results))
-}
-
-func runBenchmark(
-	t *testing.T,
-	name string,
-	obj interface{},
-	decodeJsonFunc func([]byte) (interface{}, error),
-	encodeJsonFunc func(interface{}) ([]byte, error),
-	decodeProtoFunc func([]byte) (interface{}, error),
-	encodeProtoFunc func(interface{}) ([]byte, error),
-) resultData {
-	result := resultData{name: name}
-
-	tStart := time.Now()
-	jsonEnc, err := encodeJsonFunc(obj)
-	require.NoError(t, err)
-	result.jsonEncodingTime = time.Since(tStart)
-	tStart = time.Now()
-	jsonDec, err := decodeJsonFunc(jsonEnc)
-	result.jsonDecodingTime = time.Since(tStart)
-	require.NoError(t, err)
-	result.jsonEncodingDataLength = len(jsonEnc)
-
-	tStart = time.Now()
-	protoEnc, err := encodeProtoFunc(obj)
-	require.NoError(t, err)
-	result.protoEncodingTime = time.Since(tStart)
-	tStart = time.Now()
-	protoDec, err := decodeProtoFunc(protoEnc)
-	result.protoDecodingTime = time.Since(tStart)
-	require.NoError(t, err)
-	result.protoEncodingDataLength = len(protoEnc)
-
-	// sanity check
-	require.Equal(t, jsonDec, protoDec)
-	return result
-}
-
-// Helper functions for pretty-printing results
-
-type resultDataArray []resultData
-
-func (r resultDataArray) String() string {
-	if len(r) == 0 {
-		return "No results available"
-	}
-
-	// Table header
-	header := []string{"Name", "JSON Enc", "Proto Enc", "JSON Dec", "Proto Dec", "JSON Size", "Proto Size"}
-	columnWidths := []int{0, 20, 20, 20, 20, 12, 12}
-
-	for _, entry := range r {
-		if columnWidths[0] < len(entry.name) {
-			columnWidths[0] = len(entry.name) + 1
-		}
-	}
-
-	// Table separator
-	separator := strings.Repeat("-", sum(columnWidths)+len(columnWidths)*3)
-
-	// Format header row
-	var sb strings.Builder
-	sb.WriteString(separator + "\n")
-	sb.WriteString(formatRow(header, columnWidths) + "\n")
-	sb.WriteString(separator + "\n")
-
-	// Format data rows
-	for _, data := range r {
-		row := []string{
-			data.name,
-			data.jsonEncodingTime.String(),
-			data.protoEncodingTime.String(),
-			data.jsonDecodingTime.String(),
-			data.protoDecodingTime.String(),
-			fmt.Sprintf("%d", data.jsonEncodingDataLength),
-			fmt.Sprintf("%d", data.protoEncodingDataLength),
-		}
-		sb.WriteString(formatRow(row, columnWidths) + "\n")
-	}
-
-	sb.WriteString(separator)
-	return sb.String()
-}
-
-// formatRow formats a row with padding for each column
-func formatRow(fields []string, widths []int) string {
-	var parts []string
-	for i, field := range fields {
-		parts = append(parts, fmt.Sprintf("%-*s", widths[i], field))
-	}
-	return "| " + strings.Join(parts, " | ") + " |"
-}
-
-// sum calculates the total width of all columns
-func sum(arr []int) int {
-	total := 0
-	for _, v := range arr {
-		total += v
-	}
-	return total
 }

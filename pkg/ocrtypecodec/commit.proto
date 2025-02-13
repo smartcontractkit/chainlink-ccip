@@ -182,3 +182,96 @@ message MainOutcome {
   uint64 inflight_price_ocr_sequence_number = 1;
   int32 remaining_price_checks = 2;
 }
+
+// ------------------------------------------------------------
+
+message ExecObservation {
+  map<uint64, CommitObservations> commit_reports = 1;
+  map<uint64, SeqNumToMessage> seqNumsToMessages = 2; // chain to SeqNumToMessage
+  map<uint64, SeqNumToBytes> messageHashes = 3; // chain to seqNum to bytes
+  TokenDataObservations token_data_observations = 4;
+  repeated bytes costly_messages = 5;
+  map<uint64, StringAddrToNonce> nonces = 6; // chain to stringSenderAddr to nonce
+  DiscoveryObservation contracts = 7;
+  map<uint64, int32> f_chain = 8;
+}
+
+message CommitObservations {
+  repeated CommitData commit_data = 1;
+}
+
+message CommitData {
+  uint64 source_chain = 1;
+  bytes on_ramp_address = 2;
+  uint64 timestamp = 3;
+  uint64 block_num = 4;
+  bytes merkle_root = 5;
+  SeqNumRange sequence_number_range = 6;
+  repeated uint64 executed_messages = 7;
+  repeated Message messages = 8;
+  repeated bytes hashes = 9;
+  repeated bytes costly_messages = 10;
+  repeated MessageTokenData message_token_data = 11;
+}
+
+message MessageTokenData {
+  repeated TokenData token_data = 1;
+}
+
+message TokenData {
+  bool ready = 1;
+  bytes data = 2;
+}
+
+message SeqNumToMessage {
+  map<uint64, Message> messages = 1;
+}
+
+message SeqNumToBytes {
+  map<uint64, bytes> seqNumToBytes = 1;
+}
+
+message TokenDataObservations {
+  map<uint64, SeqNumToTokenData> token_data = 1;
+}
+
+message SeqNumToTokenData {
+  map<uint64, MessageTokenData> token_data = 1;
+}
+
+
+message Message {
+  RampMessageHeader header = 1;
+  bytes sender = 2;
+  bytes data = 3;
+  bytes receiver = 4;
+  bytes extra_args = 5;
+  map<string, bytes> extra_args_decoded = 6;
+  bytes fee_token = 7;
+  bytes fee_token_amount = 8;
+  bytes fee_value_juels = 9;
+  repeated RampTokenAmount token_amounts = 10;
+}
+
+message RampMessageHeader {
+  bytes message_id = 1;
+  uint64 source_chain_selector = 2;
+  uint64 dest_chain_selector = 3;
+  uint64 sequence_number = 4;
+  uint64 nonce = 5;
+  bytes msg_hash = 6;
+  bytes on_ramp = 7;
+}
+
+message RampTokenAmount {
+  bytes source_pool_address = 1;
+  bytes dest_token_address = 2;
+  bytes extra_data = 3;
+  bytes amount = 4;
+  bytes dest_exec_data = 5;
+  map<string, bytes> dest_exec_data_decoded = 6;
+}
+
+message StringAddrToNonce {
+  map<string, uint64> nonces = 1;
+}
