@@ -3,48 +3,53 @@ use anchor_lang::prelude::*;
 use crate::context::seed::{DEST_CHAIN, FEE_BILLING_TOKEN_CONFIG};
 use crate::context::{GasPriceUpdate, TokenPriceUpdate, UpdatePrices};
 use crate::event::{UsdPerTokenUpdated, UsdPerUnitGasUpdated};
+use crate::instructions::interfaces::Prices;
 use crate::state::{BillingTokenConfigWrapper, DestChain, TimestampedPackedU224};
 use crate::FeeQuoterError;
 
-pub fn update_prices<'info>(
-    ctx: Context<'_, '_, 'info, 'info, UpdatePrices<'info>>,
-    token_updates: Vec<TokenPriceUpdate>,
-    gas_updates: Vec<GasPriceUpdate>,
-) -> Result<()> {
-    require!(
-        !token_updates.is_empty() || !gas_updates.is_empty(),
-        FeeQuoterError::InvalidInputsNoUpdates
-    );
+pub struct Impl;
+impl Prices for Impl {
+    fn update_prices<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, UpdatePrices<'info>>,
+        token_updates: Vec<TokenPriceUpdate>,
+        gas_updates: Vec<GasPriceUpdate>,
+    ) -> Result<()> {
+        require!(
+            !token_updates.is_empty() || !gas_updates.is_empty(),
+            FeeQuoterError::InvalidInputsNoUpdates
+        );
 
-    // Remaining accounts represent:
-    // - the accounts to update BillingTokenConfig for token prices
-    // - the accounts to update DestChain for gas prices
-    // They must be in order:
-    // 1. token_accounts[]
-    // 2. gas_accounts[]
-    // matching the order of the price updates.
-    // They must also all be writable so they can be updated.
-    require_eq!(
-        ctx.remaining_accounts.len(),
-        token_updates.len() + gas_updates.len(),
-        FeeQuoterError::InvalidInputsAccountCount
-    );
+        // Remaining accounts represent:
+        // - the accounts to update BillingTokenConfig for token prices
+        // - the accounts to update DestChain for gas prices
+        // They must be in order:
+        // 1. token_accounts[]
+        // 2. gas_accounts[]
+        // matching the order of the price updates.
+        // They must also all be writable so they can be updated.
+        require_eq!(
+            ctx.remaining_accounts.len(),
+            token_updates.len() + gas_updates.len(),
+            FeeQuoterError::InvalidInputsAccountCount
+        );
 
-    // For each token price update, unpack the corresponding remaining_account and update the price.
-    // Keep in mind that the remaining_accounts are sorted in the same order as tokens and gas price updates in the report.
-    for (i, update) in token_updates.iter().enumerate() {
-        apply_token_price_update(update, &ctx.remaining_accounts[i])?;
+        // For each token price update, unpack the corresponding remaining_account and update the price.
+        // Keep in mind that the remaining_accounts are sorted in the same order as tokens and gas price updates in the report.
+        for (i, update) in token_updates.iter().enumerate() {
+            apply_token_price_update(update, &ctx.remaining_accounts[i])?;
+        }
+
+        // Skip the first state account and the ones for token updates
+        let offset = token_updates.len();
+
+        // Do the same for gas price updates
+        for (i, update) in gas_updates.iter().enumerate() {
+            apply_gas_price_update(update, &ctx.remaining_accounts[i + offset])?;
+        }
+
+        Ok(())
     }
-
-    // Skip the first state account and the ones for token updates
-    let offset = token_updates.len();
-
-    // Do the same for gas price updates
-    for (i, update) in gas_updates.iter().enumerate() {
-        apply_gas_price_update(update, &ctx.remaining_accounts[i + offset])?;
-    }
-
-    Ok(())
 }
 
 /////////////

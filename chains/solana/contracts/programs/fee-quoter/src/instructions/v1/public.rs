@@ -11,6 +11,8 @@ use crate::messages::{
 use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
 use crate::FeeQuoterError;
 
+use super::super::interfaces::Public;
+
 use super::messages::validate_svm2any;
 use super::price_math::{get_validated_token_price, Exponential, Usd18Decimals};
 
@@ -33,85 +35,91 @@ pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3
 
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
 
-pub fn get_fee<'info>(
-    ctx: Context<'_, '_, 'info, 'info, GetFee>,
-    dest_chain_selector: u64,
-    message: SVM2AnyMessage,
-) -> Result<GetFeeResult> {
-    let remaining_accounts = &ctx.remaining_accounts;
-    let message = &message;
-    require_eq!(
-        remaining_accounts.len(),
-        2 * message.token_amounts.len(),
-        FeeQuoterError::InvalidInputsTokenAccounts
-    );
+pub struct Impl;
+impl Public for Impl {
+    fn get_fee<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, GetFee>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+    ) -> Result<GetFeeResult> {
+        let remaining_accounts = &ctx.remaining_accounts;
+        let message = &message;
+        require_eq!(
+            remaining_accounts.len(),
+            2 * message.token_amounts.len(),
+            FeeQuoterError::InvalidInputsTokenAccounts
+        );
 
-    let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
-        remaining_accounts.split_at(message.token_amounts.len());
+        let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
+            remaining_accounts.split_at(message.token_amounts.len());
 
-    let token_billing_config_accounts = token_billing_config_accounts
-        .iter()
-        .zip(message.token_amounts.iter())
-        .map(|(a, SVMTokenAmount { token, .. })| safe_deserialize::billing_token_config(a, *token))
-        .collect::<Result<Vec<_>>>()?;
-    let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
-        .iter()
-        .zip(message.token_amounts.iter())
-        .map(|(a, SVMTokenAmount { token, .. })| {
-            safe_deserialize::per_chain_per_token_config(a, *token, dest_chain_selector)
-        })
-        .collect::<Result<Vec<_>>>()?;
+        let token_billing_config_accounts = token_billing_config_accounts
+            .iter()
+            .zip(message.token_amounts.iter())
+            .map(|(a, SVMTokenAmount { token, .. })| {
+                safe_deserialize::billing_token_config(a, *token)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
+            .iter()
+            .zip(message.token_amounts.iter())
+            .map(|(a, SVMTokenAmount { token, .. })| {
+                safe_deserialize::per_chain_per_token_config(a, *token, dest_chain_selector)
+            })
+            .collect::<Result<Vec<_>>>()?;
 
-    let (fee, processed_extra_args) = fee_for_msg(
-        message,
-        &ctx.accounts.dest_chain,
-        &ctx.accounts.billing_token_config.config,
-        &token_billing_config_accounts,
-        &per_chain_per_token_config_accounts,
-    )?;
+        let (fee, processed_extra_args) = fee_for_msg(
+            message,
+            &ctx.accounts.dest_chain,
+            &ctx.accounts.billing_token_config.config,
+            &token_billing_config_accounts,
+            &per_chain_per_token_config_accounts,
+        )?;
 
-    let juels = convert(
-        &fee,
-        &ctx.accounts.billing_token_config.config,
-        &ctx.accounts.link_token_config.config,
-    )?
-    .amount;
+        let juels = convert(
+            &fee,
+            &ctx.accounts.billing_token_config.config,
+            &ctx.accounts.link_token_config.config,
+        )?
+        .amount;
 
-    require_gte!(
-        ctx.accounts.config.max_fee_juels_per_msg,
-        juels as u128,
-        FeeQuoterError::MessageFeeTooHigh
-    );
+        require_gte!(
+            ctx.accounts.config.max_fee_juels_per_msg,
+            juels as u128,
+            FeeQuoterError::MessageFeeTooHigh
+        );
 
-    let token_transfer_additional_data = per_chain_per_token_config_accounts
-        .iter()
-        .map(
-            |per_chain_per_token_config| match per_chain_per_token_config {
-                Some(config) if config.token_transfer_config.is_enabled => {
-                    TokenTransferAdditionalData {
-                        dest_bytes_overhead: config.token_transfer_config.dest_bytes_overhead,
-                        dest_gas_overhead: config.token_transfer_config.dest_gas_overhead,
+        let token_transfer_additional_data = per_chain_per_token_config_accounts
+            .iter()
+            .map(
+                |per_chain_per_token_config| match per_chain_per_token_config {
+                    Some(config) if config.token_transfer_config.is_enabled => {
+                        TokenTransferAdditionalData {
+                            dest_bytes_overhead: config.token_transfer_config.dest_bytes_overhead,
+                            dest_gas_overhead: config.token_transfer_config.dest_gas_overhead,
+                        }
                     }
-                }
-                _ => TokenTransferAdditionalData {
-                    dest_bytes_overhead: ctx
-                        .accounts
-                        .dest_chain
-                        .config
-                        .default_token_dest_gas_overhead,
-                    dest_gas_overhead: CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+                    _ => TokenTransferAdditionalData {
+                        dest_bytes_overhead: ctx
+                            .accounts
+                            .dest_chain
+                            .config
+                            .default_token_dest_gas_overhead,
+                        dest_gas_overhead: CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+                    },
                 },
-            },
-        )
-        .collect();
+            )
+            .collect();
 
-    Ok(GetFeeResult {
-        token: fee.token,
-        amount: fee.amount,
-        juels,
-        token_transfer_additional_data,
-        processed_extra_args,
-    })
+        Ok(GetFeeResult {
+            token: fee.token,
+            amount: fee.amount,
+            juels,
+            token_transfer_additional_data,
+            processed_extra_args,
+        })
+    }
 }
 
 // Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
