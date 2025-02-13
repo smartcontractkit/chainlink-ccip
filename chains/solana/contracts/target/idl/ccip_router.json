@@ -909,26 +909,8 @@
             "type": "u8"
           },
           {
-            "name": "padding0",
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          },
-          {
             "name": "svmChainSelector",
             "type": "u64"
-          },
-          {
-            "name": "padding1",
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
           },
           {
             "name": "owner",
@@ -937,15 +919,6 @@
           {
             "name": "proposedOwner",
             "type": "publicKey"
-          },
-          {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
           },
           {
             "name": "feeQuoter",

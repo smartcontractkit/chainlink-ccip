@@ -11,7 +11,7 @@ use crate::{AddOfframp, RemoveOfframp};
 use super::fees::do_billing_transfer;
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
+    let config = &mut ctx.accounts.config;
     require!(
         proposed_owner != config.owner,
         CcipRouterError::RedundantOwnerProposal
@@ -25,7 +25,7 @@ pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubke
 }
 
 pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
+    let config = &mut ctx.accounts.config;
     emit!(events::OwnershipTransferred {
         from: config.owner,
         to: config.proposed_owner,
@@ -39,7 +39,7 @@ pub fn update_fee_aggregator(
     ctx: Context<UpdateConfigCCIPRouter>,
     fee_aggregator: Pubkey,
 ) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
+    let config = &mut ctx.accounts.config;
     config.fee_aggregator = fee_aggregator;
     Ok(())
 }
@@ -109,7 +109,7 @@ pub fn update_svm_chain_selector(
     ctx: Context<UpdateConfigCCIPRouter>,
     new_chain_selector: u64,
 ) -> Result<()> {
-    let mut config = ctx.accounts.config.load_mut()?;
+    let config = &mut ctx.accounts.config;
 
     config.svm_chain_selector = new_chain_selector;
 

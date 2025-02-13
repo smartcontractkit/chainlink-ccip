@@ -60,7 +60,7 @@ pub mod ccip_router {
         fee_quoter: Pubkey,
         link_token_mint: Pubkey,
     ) -> Result<()> {
-        let mut config = ctx.accounts.config.load_init()?;
+        let config = &mut ctx.accounts.config;
         require!(config.version == 0, CcipRouterError::InvalidVersion); // assert uninitialized state - AccountLoader doesn't work with constraint
         config.version = 1;
         config.svm_chain_selector = svm_chain_selector;

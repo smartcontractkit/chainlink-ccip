@@ -1,21 +1,14 @@
 use anchor_lang::prelude::*;
 
-// zero_copy is used to prevent hitting stack/heap memory limits
-#[account(zero_copy)] // TODO this is no longer needed as zero_copy
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[account]
+#[derive(InitSpace, Debug)]
 pub struct Config {
     pub version: u8,
-    _padding0: [u8; 7],
+
     pub svm_chain_selector: u64,
-
-    _padding1: [u8; 8],
-
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-
-    _padding2: [u8; 8],
     pub fee_quoter: Pubkey,
-
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
