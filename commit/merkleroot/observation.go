@@ -563,21 +563,16 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	for _, sourceChain := range sourceChains {
 		eg.Go(func() error {
-			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain)
+			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
-				lggr.Errorf("failed to get expected next seq num for source chain %d: %s", sourceChain, err)
-				return nil
-			}
-
-			if nextOnRampSeqNum == 0 {
-				lggr.Errorf("unexpected next seq num for source chain %d, it is 0", sourceChain)
+				lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
 				return nil
 			}
 
 			mu.Lock()
 			latestOnRampSeqNums = append(
 				latestOnRampSeqNums,
-				plugintypes.NewSeqNumChain(sourceChain, nextOnRampSeqNum-1), // Latest is the next one minus one.
+				plugintypes.NewSeqNumChain(sourceChain, latestOnRampSeqNum),
 			)
 			mu.Unlock()
 

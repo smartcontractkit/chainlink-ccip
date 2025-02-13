@@ -1711,21 +1711,6 @@
           "index": false
         }
       ]
-    },
-    {
-      "name": "PremiumMultiplierWeiPerEthUpdated",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "premiumMultiplierWeiPerEth",
-          "type": "u64",
-          "index": false
-        }
-      ]
     }
   ],
   "errors": [
