@@ -167,7 +167,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			Key: consts.EventNameCommitReportAccepted,
 			Expressions: []query.Expression{
 				query.Timestamp(uint64(ts.Unix()), primitives.Gte),
-				query.Confidence(primitives.Finalized),
+				// We don't need to wait for the commit report accepted event to be finalized
+				// before we can start optimistically processing it.
+				query.Confidence(primitives.Unconfirmed),
 			},
 		},
 		query.LimitAndSort{
@@ -313,7 +315,9 @@ func (r *ccipChainReader) ExecutedMessages(
 					Value:    0,
 					Operator: primitives.Gt,
 				}),
-				query.Confidence(primitives.Finalized),
+				// We don't need to wait for an execute state changed event to be finalized
+				// before we optimistically mark a message as executed.
+				query.Confidence(primitives.Unconfirmed),
 			},
 		},
 		query.LimitAndSort{
