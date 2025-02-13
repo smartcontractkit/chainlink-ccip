@@ -878,6 +878,63 @@ func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) RunAndReturn(run fu
 	return _c
 }
 
+// LatestMsgSeqNum provides a mock function with given fields: ctx, chain
+func (_m *MockCCIPReader) LatestMsgSeqNum(ctx context.Context, chain ccipocr3.ChainSelector) (ccipocr3.SeqNum, error) {
+	ret := _m.Called(ctx, chain)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LatestMsgSeqNum")
+	}
+
+	var r0 ccipocr3.SeqNum
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)); ok {
+		return rf(ctx, chain)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) ccipocr3.SeqNum); ok {
+		r0 = rf(ctx, chain)
+	} else {
+		r0 = ret.Get(0).(ccipocr3.SeqNum)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, chain)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_LatestMsgSeqNum_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestMsgSeqNum'
+type MockCCIPReader_LatestMsgSeqNum_Call struct {
+	*mock.Call
+}
+
+// LatestMsgSeqNum is a helper method to define mock.On call
+//   - ctx context.Context
+//   - chain ccipocr3.ChainSelector
+func (_e *MockCCIPReader_Expecter) LatestMsgSeqNum(ctx interface{}, chain interface{}) *MockCCIPReader_LatestMsgSeqNum_Call {
+	return &MockCCIPReader_LatestMsgSeqNum_Call{Call: _e.mock.On("LatestMsgSeqNum", ctx, chain)}
+}
+
+func (_c *MockCCIPReader_LatestMsgSeqNum_Call) Run(run func(ctx context.Context, chain ccipocr3.ChainSelector)) *MockCCIPReader_LatestMsgSeqNum_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_LatestMsgSeqNum_Call) Return(_a0 ccipocr3.SeqNum, _a1 error) *MockCCIPReader_LatestMsgSeqNum_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_LatestMsgSeqNum_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)) *MockCCIPReader_LatestMsgSeqNum_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LinkPriceUSD provides a mock function with given fields: ctx
 func (_m *MockCCIPReader) LinkPriceUSD(ctx context.Context) (ccipocr3.BigInt, error) {
 	ret := _m.Called(ctx)
