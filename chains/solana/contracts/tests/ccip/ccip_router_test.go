@@ -6897,7 +6897,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{allowIx}, ccipAdmin, config.DefaultCommitment)
 
 					// Now the execute should succeed
-					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, setup.transmitter, config.DefaultCommitment, addressTables)
+					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, setup.transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(250_000))
 				})
 			})
 
