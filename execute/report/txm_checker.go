@@ -48,7 +48,11 @@ func (m *MessageStatusCache) NextTransactionID(selector ccipocr3.ChainSelector, 
 }
 
 // statuses fetches the statusu details for a given message ID. Results are cached for subsequent calls.
-func (m *MessageStatusCache) statuses(ctx context.Context, selector ccipocr3.ChainSelector, msgID string) (MessageStatusDetails, error) {
+func (m *MessageStatusCache) statuses(
+	ctx context.Context,
+	selector ccipocr3.ChainSelector,
+	msgID string,
+) (MessageStatusDetails, error) {
 	if details, ok := m.cache[msgID]; ok {
 		return details, nil
 	}

@@ -273,34 +273,10 @@ func readAllMessages(
 	return messageObs, availableReports, messageTimestamps
 }
 
-func (p *Plugin) getMessagesObservation(
-	ctx context.Context,
-	lggr logger.Logger,
-	previousOutcome exectypes.Outcome,
-	observation exectypes.Observation,
-) (exectypes.Observation, error) {
-	// Phase 2: Get messages and determine which messages are too costly to execute.
-	//          These messages will not be executed in the current round, but may be executed in future rounds
-	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
-	if len(previousOutcome.CommitReports) == 0 {
-		lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
-		// No reports to execute.
-		// This is expected after a cold start.
-		return observation, nil
-	}
-
-	messageObs, commitReportCache, messageTimestamps := readAllMessages(
-		ctx,
-		lggr,
-		p.ccipReader,
-		previousOutcome.CommitReports,
-	)
-
-	// Compute hashes to allow deleting messages from the observation.
-	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
-	}
+// filterMessages according to various caches that we know about.
+func (p *Plugin) filterMessages(
+	ctx context.Context, lggr logger.Logger, messageObs exectypes.MessageObservations,
+) exectypes.MessageObservations {
 
 	//p.statusCache.
 	txmStatusChecker := report.NewTXMCheck(p.statusCache, p.offchainCfg.MaxTxmStatusChecks)
@@ -334,10 +310,43 @@ func (p *Plugin) getMessagesObservation(
 		}
 	}
 
+	return messageObs
+}
+
+func (p *Plugin) getMessagesObservation(
+	ctx context.Context,
+	lggr logger.Logger,
+	previousOutcome exectypes.Outcome,
+	observation exectypes.Observation,
+) (exectypes.Observation, error) {
+	// Phase 2: Get messages and determine which messages are too costly to execute.
+	//          These messages will not be executed in the current round, but may be executed in future rounds
+	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
+	if len(previousOutcome.CommitReports) == 0 {
+		lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
+		// No reports to execute.
+		// This is expected after a cold start.
+		return observation, nil
+	}
+
+	messageObs, commitReportCache, messageTimestamps := readAllMessages(
+		ctx,
+		lggr,
+		p.ccipReader,
+		previousOutcome.CommitReports,
+	)
+
+	// Compute hashes to allow deleting messages from the observation.
+	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
+	}
+
 	// Remove messages which have failed txm statuses.
 	// This is a roundabout way to remove messages from the observation because it will continue to be
 	// executed by other nodes until >F nodes have failed to execute it.
 	// We cannot form consensus on the TXM state because the fatal status is not recorded onchain.
+	messageObs = p.filterMessages(ctx, lggr, messageObs)
 
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
