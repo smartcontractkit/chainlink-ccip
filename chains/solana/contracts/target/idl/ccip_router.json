@@ -443,6 +443,8 @@
       "docs": [
         "Rolls back the CCIP version for a destination chain.",
         "This effectively just restores the old version's sequence number of the destination chain state.",
+        "We only support 1 consecutive rollback. If a rollback has occurred for that lane, the version can't",
+        "be rolled back again without bumping the version first.",
         "",
         "# Arguments",
         "* `ctx` - The context containing the accounts required for the rollback.",
