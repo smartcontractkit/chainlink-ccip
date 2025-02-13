@@ -6,6 +6,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -38,8 +39,8 @@ func NewContractDiscoveryProcessor(
 	dest cciptypes.ChainSelector,
 	fRoleDON int,
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
-) *ContractDiscoveryProcessor {
-	return &ContractDiscoveryProcessor{
+) plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] {
+	p := &ContractDiscoveryProcessor{
 		lggr:            lggr,
 		reader:          reader,
 		homechain:       homechain,
@@ -47,6 +48,7 @@ func NewContractDiscoveryProcessor(
 		fRoleDON:        fRoleDON,
 		oracleIDToP2PID: oracleIDToP2PID,
 	}
+	return plugincommon.NewTrackedProcessor(lggr, p, "discovery", plugincommon.NoopReporter{})
 }
 
 // Query is not needed for this processor.
@@ -68,8 +70,12 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		return dt.Observation{}, fmt.Errorf("unable to get fchain: %w, seqNr: %d", err, seqNr)
 	}
 
-	// TODO: discover the full list of source chain selectors and pass it into DiscoverContracts.
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx)
+	chainConfigs, err := cdp.homechain.GetAllChainConfigs()
+	if err != nil {
+		return dt.Observation{}, fmt.Errorf("unable to get chain configs: %w, seqNr: %d", err, seqNr)
+	}
+
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx, maps.Keys(chainConfigs))
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w, seqNr: %d", err, seqNr)
 	}

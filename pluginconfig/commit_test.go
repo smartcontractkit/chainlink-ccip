@@ -1,7 +1,9 @@
 package pluginconfig
 
 import (
+	"encoding/json"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -123,6 +125,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		MaxReportTransmissionCheckAttempts uint32
 		MaxMerkleTreeSize                  uint32
 		SignObservationPrefix              string
+		MerkleRootAsyncObserverDisabled    bool
+		MerkleRootAsyncObserverSyncFreq    time.Duration
+		MerkleRootAsyncObserverSyncTimeout time.Duration
 	}
 	remoteTokenAddress := rand.RandomAddress()
 	aggregatorAddress := rand.RandomAddress()
@@ -148,6 +153,8 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultMerkleRootAsyncObserverSyncFreq,
 			},
 			false,
 		},
@@ -161,8 +168,40 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultMerkleRootAsyncObserverSyncFreq,
 			},
 			false,
+		},
+		{
+			"invalid, sync freq set to 0",
+			fields{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
+				TokenInfo:                          map[cciptypes.UnknownEncodedAddress]TokenInfo{},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    0,
+			},
+			true,
+		},
+		{
+			"invalid, sync timeout set to 0",
+			fields{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
+				TokenInfo:                          map[cciptypes.UnknownEncodedAddress]TokenInfo{},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+				MerkleRootAsyncObserverSyncTimeout: 0,
+				MerkleRootAsyncObserverSyncFreq:    1,
+			},
+			true,
 		},
 		{
 			"invalid, token price sources with no frequency",
@@ -245,6 +284,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: uint(tt.fields.MaxReportTransmissionCheckAttempts),
 				MaxMerkleTreeSize:                  uint64(tt.fields.MaxMerkleTreeSize),
 				SignObservationPrefix:              tt.fields.SignObservationPrefix,
+				MerkleRootAsyncObserverDisabled:    tt.fields.MerkleRootAsyncObserverDisabled,
+				MerkleRootAsyncObserverSyncFreq:    tt.fields.MerkleRootAsyncObserverSyncFreq,
+				MerkleRootAsyncObserverSyncTimeout: tt.fields.MerkleRootAsyncObserverSyncTimeout,
 			}
 			err := c.Validate()
 			if tt.wantErr {
@@ -333,12 +375,15 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
+				MerkleRootAsyncObserverSyncFreq:    defaultMerkleRootAsyncObserverSyncFreq,
+				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
 			},
 		},
 		{
-			name: "RMN enabled without timeout",
+			name: "RMN enabled without timeout and async observer is disabled",
 			input: CommitOffchainConfig{
-				RMNEnabled: true,
+				RMNEnabled:                      true,
+				MerkleRootAsyncObserverDisabled: true,
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -350,6 +395,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
+				MerkleRootAsyncObserverDisabled:    true,
 			},
 		},
 		{
@@ -373,14 +419,18 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        20,
 				InflightPriceCheckRetries:          5,
+				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultMerkleRootAsyncObserverSyncFreq,
 			},
 		},
 		{
 			name: "Partial custom values",
 			input: CommitOffchainConfig{
-				RMNEnabled:          true,
-				NewMsgScanBatchSize: 300,
-				MaxMerkleTreeSize:   500,
+				RMNEnabled:                         true,
+				NewMsgScanBatchSize:                300,
+				MaxMerkleTreeSize:                  500,
+				MerkleRootAsyncObserverSyncFreq:    5 * time.Minute,
+				MerkleRootAsyncObserverSyncTimeout: 10 * time.Minute,
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -392,6 +442,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
+				MerkleRootAsyncObserverSyncFreq:    5 * time.Minute,
+				MerkleRootAsyncObserverSyncTimeout: 10 * time.Minute,
 			},
 		},
 	}
@@ -463,4 +515,40 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test to prevent the RMNEnabled field from being changed without syncing with the RMN team first.
+func TestPreventRMNEnabledBeingChanged(t *testing.T) {
+	expectedField := "RMNEnabled"
+	expectedType := "bool"
+	expectedJSONTag := "rmnEnabled"
+
+	typ := reflect.TypeOf(CommitOffchainConfig{})
+	numFields := typ.NumField()
+	for i := 0; i < numFields; i++ {
+		field := typ.Field(i)
+		if field.Name == expectedField &&
+			field.Type.String() == expectedType &&
+			field.Tag.Get("json") == expectedJSONTag {
+
+			return
+		}
+	}
+
+	t.Errorf("the RMNEnabled field was not found, it's type was changed or the JSON tag was changed." +
+		" If you are making changes to the RMNEnabled field please sync with the RMN team first.")
+}
+
+// Test to prevent CommitOffchainConfig from being changed without syncing with RMN team.
+func TestPreventCommitOffchainConfigEncodingBeingChanged(t *testing.T) {
+	cfg := CommitOffchainConfig{RMNEnabled: true}
+
+	encodedCfg, err := EncodeCommitOffchainConfig(cfg)
+	require.NoError(t, err)
+
+	jsonCfg, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	require.Equal(t, string(jsonCfg), string(encodedCfg),
+		"CommitOffchainConfig encoding has changed, please make sure you are in sync with the RMN team")
 }

@@ -9,13 +9,13 @@ import (
 )
 
 type Config struct {
-	Version           uint8
-	Owner             ag_solanago.PublicKey
-	ProposedOwner     ag_solanago.PublicKey
-	MaxFeeJuelsPerMsg ag_binary.Uint128
-	LinkTokenMint     ag_solanago.PublicKey
-	Onramp            ag_solanago.PublicKey
-	OfframpSigner     ag_solanago.PublicKey
+	Version            uint8
+	Owner              ag_solanago.PublicKey
+	ProposedOwner      ag_solanago.PublicKey
+	MaxFeeJuelsPerMsg  ag_binary.Uint128
+	LinkTokenMint      ag_solanago.PublicKey
+	Onramp             ag_solanago.PublicKey
+	DefaultCodeVersion CodeVersion
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -56,8 +56,8 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `OfframpSigner` param:
-	err = encoder.Encode(obj.OfframpSigner)
+	// Serialize `DefaultCodeVersion` param:
+	err = encoder.Encode(obj.DefaultCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -108,8 +108,8 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `OfframpSigner`:
-	err = decoder.Decode(&obj.OfframpSigner)
+	// Deserialize `DefaultCodeVersion`:
+	err = decoder.Decode(&obj.DefaultCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -315,6 +315,36 @@ func (obj *PerChainPerTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	err = decoder.Decode(&obj.TokenTransferConfig)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+type AllowedPriceUpdater struct{}
+
+var AllowedPriceUpdaterDiscriminator = [8]byte{51, 136, 222, 161, 38, 7, 184, 190}
+
+func (obj AllowedPriceUpdater) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(AllowedPriceUpdaterDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AllowedPriceUpdater) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(AllowedPriceUpdaterDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[51 136 222 161 38 7 184 190]",
+				fmt.Sprint(discriminator[:]))
+		}
 	}
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 
 // The initialization is responsibility of the External User, CCIP is not handling initialization of Accounts
 type Initialize struct {
+	Router *ag_solanago.PublicKey
 
 	// [0] = [WRITE] counter
 	//
@@ -29,6 +30,12 @@ func NewInitializeInstructionBuilder() *Initialize {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
+}
+
+// SetRouter sets the "router" parameter.
+func (inst *Initialize) SetRouter(router ag_solanago.PublicKey) *Initialize {
+	inst.Router = &router
+	return inst
 }
 
 // SetCounterAccount sets the "counter" account.
@@ -93,6 +100,13 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *Initialize) Validate() error {
+	// Check whether all (required) parameters are set:
+	{
+		if inst.Router == nil {
+			return errors.New("Router parameter is not set")
+		}
+	}
+
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -120,7 +134,9 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("Router", *inst.Router))
+					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -134,20 +150,33 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
+	// Parameters:
+	router ag_solanago.PublicKey,
 	// Accounts:
 	counter ag_solanago.PublicKey,
 	externalExecutionConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
+		SetRouter(router).
 		SetCounterAccount(counter).
 		SetExternalExecutionConfigAccount(externalExecutionConfig).
 		SetAuthorityAccount(authority).

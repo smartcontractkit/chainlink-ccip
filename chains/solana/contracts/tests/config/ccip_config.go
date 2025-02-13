@@ -1,6 +1,8 @@
 package config
 
 import (
+	"encoding/hex"
+
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
@@ -36,11 +38,18 @@ var (
 	SvmChainSelector uint64 = 15
 	EvmChainSelector uint64 = 21
 	EvmChainLE              = common.Uint64ToLE(EvmChainSelector)
+	// bytes4(keccak256("CCIP EVMExtraArgsV2"));
+	EvmChainFamilySelector, _ = hex.DecodeString("2812d52c")
+	// bytes4(keccak256("CCIP SVMExtraArgsV1"));
+	SvmChainFamilySelector, _ = hex.DecodeString("1e10bdc4")
+
+	// example programs
+	CcipBaseSender          = solana.MustPublicKeyFromBase58("CcipSender111111111111111111111111111111111")
+	CcipBaseReceiver        = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+	CcipBasePoolBurnMint    = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111111BurnMint")
+	CcipBasePoolLockRelease = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111LockReLease")
 
 	// router/onramp PDAs
-	// example programs
-	CcipBaseReceiver = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
-
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	ExternalTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipRouterProgram)
 	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipLogicReceiver)
@@ -48,12 +57,8 @@ var (
 	BillingSignerPDA, _, _                   = state.FindFeeBillingSignerPDA(CcipRouterProgram)
 	SvmDestChainStatePDA, _                  = state.FindDestChainStatePDA(SvmChainSelector, CcipRouterProgram)
 	EvmDestChainStatePDA, _                  = state.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
-
-	// fee quoter PDAs
-	FqConfigPDA, _, _        = state.FindFqConfigPDA(FeeQuoterProgram)
-	FqEvmDestChainPDA, _, _  = state.FindFqDestChainPDA(EvmChainSelector, FeeQuoterProgram)
-	FqSvmDestChainPDA, _, _  = state.FindFqDestChainPDA(SvmChainSelector, FeeQuoterProgram)
-	FqBillingSignerPDA, _, _ = state.FindFqBillingSignerPDA(FeeQuoterProgram)
+	AllowedOfframpEvmPDA, _                  = state.FindAllowedOfframpPDA(EvmChainSelector, CcipOfframpProgram, CcipRouterProgram)
+	AllowedOfframpSvmPDA, _                  = state.FindAllowedOfframpPDA(SvmChainSelector, CcipOfframpProgram, CcipRouterProgram)
 
 	// Offramp PDAs
 	OfframpConfigPDA, _, _                  = state.FindOfframpConfigPDA(CcipOfframpProgram)
@@ -64,4 +69,10 @@ var (
 	OfframpStatePDA, _, _                   = state.FindOfframpStatePDA(CcipOfframpProgram)
 	OfframpExternalExecutionConfigPDA, _, _ = state.FindExternalExecutionConfigPDA(CcipOfframpProgram)
 	OfframpTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipOfframpProgram)
+
+	// fee quoter PDAs
+	FqConfigPDA, _, _                     = state.FindFqConfigPDA(FeeQuoterProgram)
+	FqEvmDestChainPDA, _, _               = state.FindFqDestChainPDA(EvmChainSelector, FeeQuoterProgram)
+	FqSvmDestChainPDA, _, _               = state.FindFqDestChainPDA(SvmChainSelector, FeeQuoterProgram)
+	FqAllowedPriceUpdaterOfframpPDA, _, _ = state.FindFqAllowedPriceUpdaterPDA(OfframpBillingSignerPDA, FeeQuoterProgram)
 )

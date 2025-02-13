@@ -29,6 +29,14 @@ func init() {
 
 var (
 	Instruction_CcipReceive = ag_binary.TypeID([8]byte{11, 244, 9, 249, 44, 83, 47, 245})
+
+	Instruction_AddOfframp = ag_binary.TypeID([8]byte{164, 255, 154, 96, 204, 239, 24, 2})
+
+	Instruction_PoolProxyReleaseOrMint = ag_binary.TypeID([8]byte{22, 95, 117, 49, 2, 121, 100, 188})
+
+	Instruction_PoolProxyLockOrBurn = ag_binary.TypeID([8]byte{123, 20, 147, 83, 195, 25, 120, 101})
+
+	Instruction_ReceiverProxyExecute = ag_binary.TypeID([8]byte{99, 169, 76, 14, 44, 89, 147, 67})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -36,6 +44,14 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_CcipReceive:
 		return "CcipReceive"
+	case Instruction_AddOfframp:
+		return "AddOfframp"
+	case Instruction_PoolProxyReleaseOrMint:
+		return "PoolProxyReleaseOrMint"
+	case Instruction_PoolProxyLockOrBurn:
+		return "PoolProxyLockOrBurn"
+	case Instruction_ReceiverProxyExecute:
+		return "ReceiverProxyExecute"
 	default:
 		return ""
 	}
@@ -58,6 +74,18 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"ccip_receive", (*CcipReceive)(nil),
+		},
+		{
+			"add_offramp", (*AddOfframp)(nil),
+		},
+		{
+			"pool_proxy_release_or_mint", (*PoolProxyReleaseOrMint)(nil),
+		},
+		{
+			"pool_proxy_lock_or_burn", (*PoolProxyLockOrBurn)(nil),
+		},
+		{
+			"receiver_proxy_execute", (*ReceiverProxyExecute)(nil),
 		},
 	},
 )

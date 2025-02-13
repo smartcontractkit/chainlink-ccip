@@ -245,6 +245,64 @@ func (_c *MockRMNHome_GetOffChainConfig_Call) RunAndReturn(run func(ccipocr3.Byt
 	return _c
 }
 
+// GetRMNEnabledSourceChains provides a mock function with given fields: configDigest
+func (_m *MockRMNHome) GetRMNEnabledSourceChains(configDigest ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]bool, error) {
+	ret := _m.Called(configDigest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRMNEnabledSourceChains")
+	}
+
+	var r0 map[ccipocr3.ChainSelector]bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]bool, error)); ok {
+		return rf(configDigest)
+	}
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) map[ccipocr3.ChainSelector]bool); ok {
+		r0 = rf(configDigest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]bool)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(ccipocr3.Bytes32) error); ok {
+		r1 = rf(configDigest)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRMNHome_GetRMNEnabledSourceChains_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRMNEnabledSourceChains'
+type MockRMNHome_GetRMNEnabledSourceChains_Call struct {
+	*mock.Call
+}
+
+// GetRMNEnabledSourceChains is a helper method to define mock.On call
+//   - configDigest ccipocr3.Bytes32
+func (_e *MockRMNHome_Expecter) GetRMNEnabledSourceChains(configDigest interface{}) *MockRMNHome_GetRMNEnabledSourceChains_Call {
+	return &MockRMNHome_GetRMNEnabledSourceChains_Call{Call: _e.mock.On("GetRMNEnabledSourceChains", configDigest)}
+}
+
+func (_c *MockRMNHome_GetRMNEnabledSourceChains_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockRMNHome_GetRMNEnabledSourceChains_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(ccipocr3.Bytes32))
+	})
+	return _c
+}
+
+func (_c *MockRMNHome_GetRMNEnabledSourceChains_Call) Return(_a0 map[ccipocr3.ChainSelector]bool, _a1 error) *MockRMNHome_GetRMNEnabledSourceChains_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRMNHome_GetRMNEnabledSourceChains_Call) RunAndReturn(run func(ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]bool, error)) *MockRMNHome_GetRMNEnabledSourceChains_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRMNNodesInfo provides a mock function with given fields: configDigest
 func (_m *MockRMNHome) GetRMNNodesInfo(configDigest ccipocr3.Bytes32) ([]types.HomeNodeInfo, error) {
 	ret := _m.Called(configDigest)

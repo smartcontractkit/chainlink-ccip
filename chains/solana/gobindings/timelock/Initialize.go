@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Initialize is the `initialize` instruction.
+// Initialize the timelock configuration.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the accounts required for initialization.
+// - `timelock_id`: A unique, padded identifier for this timelock instance.
+// - `min_delay`: The minimum delay (in seconds) required for scheduled operations.
 type Initialize struct {
 	TimelockId *[32]uint8
 	MinDelay   *uint64

@@ -67,3 +67,19 @@ pub struct TokenTransferFeeConfigUpdated {
     pub token: Pubkey,
     pub token_transfer_fee_config: TokenTransferFeeConfig,
 }
+
+#[event]
+pub struct PremiumMultiplierWeiPerEthUpdated {
+    pub token: Pubkey,
+    pub premium_multiplier_wei_per_eth: u64,
+}
+
+#[event]
+pub struct PriceUpdaterAdded {
+    pub price_updater: Pubkey,
+}
+
+#[event]
+pub struct PriceUpdaterRemoved {
+    pub price_updater: Pubkey,
+}

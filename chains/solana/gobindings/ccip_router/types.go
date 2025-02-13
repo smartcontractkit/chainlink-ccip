@@ -428,17 +428,12 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 type CcipRouterError ag_binary.BorshEnum
 
 const (
-	InvalidSequenceInterval_CcipRouterError CcipRouterError = iota
-	RootNotCommitted_CcipRouterError
-	ExistingMerkleRoot_CcipRouterError
-	Unauthorized_CcipRouterError
-	InvalidInputs_CcipRouterError
-	UnsupportedSourceChainSelector_CcipRouterError
-	UnsupportedDestinationChainSelector_CcipRouterError
-	InvalidProof_CcipRouterError
-	InvalidMessage_CcipRouterError
+	Unauthorized_CcipRouterError CcipRouterError = iota
+	InvalidInputsMint_CcipRouterError
+	InvalidVersion_CcipRouterError
+	FeeTokenMismatch_CcipRouterError
+	RedundantOwnerProposal_CcipRouterError
 	ReachedMaxSequenceNumber_CcipRouterError
-	ManualExecutionNotAllowed_CcipRouterError
 	InvalidInputsTokenIndices_CcipRouterError
 	InvalidInputsPoolAccounts_CcipRouterError
 	InvalidInputsTokenAccounts_CcipRouterError
@@ -447,62 +442,32 @@ const (
 	InvalidInputsLookupTableAccounts_CcipRouterError
 	InvalidInputsLookupTableAccountWritable_CcipRouterError
 	InvalidInputsTokenAmount_CcipRouterError
-	OfframpReleaseMintBalanceMismatch_CcipRouterError
-	OfframpInvalidDataLength_CcipRouterError
-	StaleCommitReport_CcipRouterError
-	DestinationChainDisabled_CcipRouterError
-	FeeTokenDisabled_CcipRouterError
-	MessageTooLarge_CcipRouterError
-	UnsupportedNumberOfTokens_CcipRouterError
-	UnsupportedChainFamilySelector_CcipRouterError
-	InvalidEVMAddress_CcipRouterError
-	InvalidEncoding_CcipRouterError
+	InvalidInputsTransferAllAmount_CcipRouterError
 	InvalidInputsAtaAddress_CcipRouterError
 	InvalidInputsAtaWritable_CcipRouterError
-	InvalidTokenPrice_CcipRouterError
-	StaleGasPrice_CcipRouterError
+	InvalidInputsChainSelector_CcipRouterError
 	InsufficientLamports_CcipRouterError
 	InsufficientFunds_CcipRouterError
-	UnsupportedToken_CcipRouterError
-	InvalidInputsMissingTokenConfig_CcipRouterError
-	MessageFeeTooHigh_CcipRouterError
 	SourceTokenDataTooLarge_CcipRouterError
-	MessageGasLimitTooHigh_CcipRouterError
-	ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError
 	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
 	InvalidTokenAdminRegistryProposedAdmin_CcipRouterError
-	InvalidWritabilityBitmap_CcipRouterError
-	InvalidExtraArgsTag_CcipRouterError
-	InvalidChainFamilySelector_CcipRouterError
-	InvalidTokenReceiver_CcipRouterError
-	InvalidSVMAddress_CcipRouterError
 	SenderNotAllowed_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
 	switch value {
-	case InvalidSequenceInterval_CcipRouterError:
-		return "InvalidSequenceInterval"
-	case RootNotCommitted_CcipRouterError:
-		return "RootNotCommitted"
-	case ExistingMerkleRoot_CcipRouterError:
-		return "ExistingMerkleRoot"
 	case Unauthorized_CcipRouterError:
 		return "Unauthorized"
-	case InvalidInputs_CcipRouterError:
-		return "InvalidInputs"
-	case UnsupportedSourceChainSelector_CcipRouterError:
-		return "UnsupportedSourceChainSelector"
-	case UnsupportedDestinationChainSelector_CcipRouterError:
-		return "UnsupportedDestinationChainSelector"
-	case InvalidProof_CcipRouterError:
-		return "InvalidProof"
-	case InvalidMessage_CcipRouterError:
-		return "InvalidMessage"
+	case InvalidInputsMint_CcipRouterError:
+		return "InvalidInputsMint"
+	case InvalidVersion_CcipRouterError:
+		return "InvalidVersion"
+	case FeeTokenMismatch_CcipRouterError:
+		return "FeeTokenMismatch"
+	case RedundantOwnerProposal_CcipRouterError:
+		return "RedundantOwnerProposal"
 	case ReachedMaxSequenceNumber_CcipRouterError:
 		return "ReachedMaxSequenceNumber"
-	case ManualExecutionNotAllowed_CcipRouterError:
-		return "ManualExecutionNotAllowed"
 	case InvalidInputsTokenIndices_CcipRouterError:
 		return "InvalidInputsTokenIndices"
 	case InvalidInputsPoolAccounts_CcipRouterError:
@@ -519,64 +484,24 @@ func (value CcipRouterError) String() string {
 		return "InvalidInputsLookupTableAccountWritable"
 	case InvalidInputsTokenAmount_CcipRouterError:
 		return "InvalidInputsTokenAmount"
-	case OfframpReleaseMintBalanceMismatch_CcipRouterError:
-		return "OfframpReleaseMintBalanceMismatch"
-	case OfframpInvalidDataLength_CcipRouterError:
-		return "OfframpInvalidDataLength"
-	case StaleCommitReport_CcipRouterError:
-		return "StaleCommitReport"
-	case DestinationChainDisabled_CcipRouterError:
-		return "DestinationChainDisabled"
-	case FeeTokenDisabled_CcipRouterError:
-		return "FeeTokenDisabled"
-	case MessageTooLarge_CcipRouterError:
-		return "MessageTooLarge"
-	case UnsupportedNumberOfTokens_CcipRouterError:
-		return "UnsupportedNumberOfTokens"
-	case UnsupportedChainFamilySelector_CcipRouterError:
-		return "UnsupportedChainFamilySelector"
-	case InvalidEVMAddress_CcipRouterError:
-		return "InvalidEVMAddress"
-	case InvalidEncoding_CcipRouterError:
-		return "InvalidEncoding"
+	case InvalidInputsTransferAllAmount_CcipRouterError:
+		return "InvalidInputsTransferAllAmount"
 	case InvalidInputsAtaAddress_CcipRouterError:
 		return "InvalidInputsAtaAddress"
 	case InvalidInputsAtaWritable_CcipRouterError:
 		return "InvalidInputsAtaWritable"
-	case InvalidTokenPrice_CcipRouterError:
-		return "InvalidTokenPrice"
-	case StaleGasPrice_CcipRouterError:
-		return "StaleGasPrice"
+	case InvalidInputsChainSelector_CcipRouterError:
+		return "InvalidInputsChainSelector"
 	case InsufficientLamports_CcipRouterError:
 		return "InsufficientLamports"
 	case InsufficientFunds_CcipRouterError:
 		return "InsufficientFunds"
-	case UnsupportedToken_CcipRouterError:
-		return "UnsupportedToken"
-	case InvalidInputsMissingTokenConfig_CcipRouterError:
-		return "InvalidInputsMissingTokenConfig"
-	case MessageFeeTooHigh_CcipRouterError:
-		return "MessageFeeTooHigh"
 	case SourceTokenDataTooLarge_CcipRouterError:
 		return "SourceTokenDataTooLarge"
-	case MessageGasLimitTooHigh_CcipRouterError:
-		return "MessageGasLimitTooHigh"
-	case ExtraArgOutOfOrderExecutionMustBeTrue_CcipRouterError:
-		return "ExtraArgOutOfOrderExecutionMustBeTrue"
 	case InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError:
 		return "InvalidTokenAdminRegistryInputsZeroAddress"
 	case InvalidTokenAdminRegistryProposedAdmin_CcipRouterError:
 		return "InvalidTokenAdminRegistryProposedAdmin"
-	case InvalidWritabilityBitmap_CcipRouterError:
-		return "InvalidWritabilityBitmap"
-	case InvalidExtraArgsTag_CcipRouterError:
-		return "InvalidExtraArgsTag"
-	case InvalidChainFamilySelector_CcipRouterError:
-		return "InvalidChainFamilySelector"
-	case InvalidTokenReceiver_CcipRouterError:
-		return "InvalidTokenReceiver"
-	case InvalidSVMAddress_CcipRouterError:
-		return "InvalidSVMAddress"
 	case SenderNotAllowed_CcipRouterError:
 		return "SenderNotAllowed"
 	default:

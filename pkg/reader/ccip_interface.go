@@ -25,6 +25,34 @@ var (
 // Currently only one contract per chain per name is supported.
 type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 
+// ChainConfigSnapshot represents the complete configuration state of the chain
+type ChainConfigSnapshot struct {
+	Offramp   OfframpConfig
+	RMNProxy  RMNProxyConfig
+	RMNRemote RMNRemoteConfig
+	FeeQuoter FeeQuoterConfig
+}
+
+type FeeQuoterConfig struct {
+	StaticConfig feeQuoterStaticConfig
+}
+
+type RMNRemoteConfig struct {
+	DigestHeader    rmnDigestHeader
+	VersionedConfig versionedConfig
+}
+
+type OfframpConfig struct {
+	CommitLatestOCRConfig OCRConfigResponse
+	ExecLatestOCRConfig   OCRConfigResponse
+	StaticConfig          offRampStaticChainConfig
+	DynamicConfig         offRampDynamicChainConfig
+}
+
+type RMNProxyConfig struct {
+	RemoteAddress []byte
+}
+
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
 	if resp == nil {
@@ -100,6 +128,9 @@ type CCIPReader interface {
 		seqNumRange cciptypes.SeqNumRange,
 	) ([]cciptypes.Message, error)
 
+	// LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
+	LatestMsgSeqNum(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error)
+
 	// GetExpectedNextSequenceNumber reads the destination and returns the expected next onRamp sequence number.
 	GetExpectedNextSequenceNumber(
 		ctx context.Context,
@@ -150,8 +181,11 @@ type CCIPReader interface {
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
 	GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error)
 
-	// DiscoverContracts reads from all available contract readers to discover contract addresses.
-	DiscoverContracts(ctx context.Context) (ContractAddresses, error)
+	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
+	// contract and source chain selector.
+	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
+	// fetch the source config from the offramp for each of them.
+	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
 	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
 	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
@@ -172,4 +206,9 @@ type CCIPReader interface {
 
 	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
 	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
+
+	// GetOffRampSourceChainsConfig returns the sourceChains config for all the provided source chains.
+	// If a config was not found it will be missing from the returned map.
+	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
+	) (map[cciptypes.ChainSelector]SourceChainConfig, error)
 }

@@ -56,10 +56,6 @@
         {
           "name": "onramp",
           "type": "publicKey"
-        },
-        {
-          "name": "offrampSigner",
-          "type": "publicKey"
         }
       ]
     },
@@ -119,6 +115,29 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "setDefaultCodeVersion",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "codeVersion",
+          "type": {
+            "defined": "CodeVersion"
+          }
+        }
+      ]
     },
     {
       "name": "addBillingTokenConfig",
@@ -408,6 +427,85 @@
       ]
     },
     {
+      "name": "addPriceUpdater",
+      "docs": [
+        "Add a price updater address to the list of allowed price updaters.",
+        "On price updates, the fee quoter will check the that caller is allowed.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `price_updater` - The price updater address."
+      ],
+      "accounts": [
+        {
+          "name": "allowedPriceUpdater",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "removePriceUpdater",
+      "docs": [
+        "Remove a price updater address from the list of allowed price updaters.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for this operation.",
+        "* `price_updater` - The price updater address."
+      ],
+      "accounts": [
+        {
+          "name": "allowedPriceUpdater",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "getFee",
       "docs": [
         "Calculates the fee for sending a message to the destination chain.",
@@ -478,16 +576,44 @@
     },
     {
       "name": "updatePrices",
+      "docs": [
+        "Updates prices for tokens and gas. This method may only be called by an allowed price updater.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts always required for the price updates",
+        "* `token_updates` - Vector of token price updates",
+        "* `gas_updates` - Vector of gas price updates",
+        "",
+        "# Additional accounts",
+        "",
+        "In addition to the fixed amount of accounts defined in the `UpdatePrices` context,",
+        "the following accounts must be provided:",
+        "",
+        "* First, the billing token config accounts for each token whose price is being updated, in the same order",
+        "as the token_updates vector.",
+        "* Then, the dest chain accounts of every chain whose gas price is being updated, in the same order as the",
+        "gas_updates vector."
+      ],
       "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
         {
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "allowedPriceUpdater",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "was added by the owner as an allowed price updater. The constraints enforced guarantee that it is the right PDA",
+            "and that it was initialized."
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -541,8 +667,10 @@
             "type": "publicKey"
           },
           {
-            "name": "offrampSigner",
-            "type": "publicKey"
+            "name": "defaultCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
           }
         ]
       }
@@ -617,6 +745,13 @@
             }
           }
         ]
+      }
+    },
+    {
+      "name": "AllowedPriceUpdater",
+      "type": {
+        "kind": "struct",
+        "fields": []
       }
     }
   ],
@@ -850,6 +985,12 @@
             "type": "bool"
           },
           {
+            "name": "laneCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
+          },
+          {
             "name": "maxNumberOfTokensPerMsg",
             "type": "u16"
           },
@@ -1023,19 +1164,24 @@
       }
     },
     {
-      "name": "FeeQuoterError",
+      "name": "CodeVersion",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "InvalidSequenceInterval"
+            "name": "Default"
           },
           {
-            "name": "RootNotCommitted"
-          },
-          {
-            "name": "ExistingMerkleRoot"
-          },
+            "name": "V1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeQuoterError",
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
             "name": "Unauthorized"
           },
@@ -1043,55 +1189,55 @@
             "name": "InvalidInputs"
           },
           {
-            "name": "UnsupportedSourceChainSelector"
+            "name": "ZeroGasLimit"
           },
           {
-            "name": "UnsupportedDestinationChainSelector"
+            "name": "DefaultGasLimitExceedsMaximum"
           },
           {
-            "name": "InvalidProof"
+            "name": "InvalidVersion"
           },
           {
-            "name": "InvalidMessage"
+            "name": "RedundantOwnerProposal"
           },
           {
-            "name": "ReachedMaxSequenceNumber"
+            "name": "InvalidInputsMissingWritable"
           },
           {
-            "name": "ManualExecutionNotAllowed"
+            "name": "InvalidInputsChainSelector"
           },
           {
-            "name": "InvalidInputsTokenIndices"
+            "name": "InvalidInputsMint"
           },
           {
-            "name": "InvalidInputsPoolAccounts"
+            "name": "InvalidInputsMintOwner"
+          },
+          {
+            "name": "InvalidInputsTokenConfigAccount"
+          },
+          {
+            "name": "InvalidInputsMissingExtraArgs"
+          },
+          {
+            "name": "InvalidInputsMissingDataAfterExtraArgs"
+          },
+          {
+            "name": "InvalidInputsDestChainStateAccount"
+          },
+          {
+            "name": "InvalidInputsPerChainPerTokenConfig"
+          },
+          {
+            "name": "InvalidInputsBillingTokenConfig"
+          },
+          {
+            "name": "InvalidInputsAccountCount"
+          },
+          {
+            "name": "InvalidInputsNoUpdates"
           },
           {
             "name": "InvalidInputsTokenAccounts"
-          },
-          {
-            "name": "InvalidInputsConfigAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAdminRegistryAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccountWritable"
-          },
-          {
-            "name": "InvalidInputsTokenAmount"
-          },
-          {
-            "name": "OfframpReleaseMintBalanceMismatch"
-          },
-          {
-            "name": "OfframpInvalidDataLength"
-          },
-          {
-            "name": "StaleCommitReport"
           },
           {
             "name": "DestinationChainDisabled"
@@ -1106,19 +1252,10 @@
             "name": "UnsupportedNumberOfTokens"
           },
           {
-            "name": "UnsupportedChainFamilySelector"
-          },
-          {
             "name": "InvalidEVMAddress"
           },
           {
             "name": "InvalidEncoding"
-          },
-          {
-            "name": "InvalidInputsAtaAddress"
-          },
-          {
-            "name": "InvalidInputsAtaWritable"
           },
           {
             "name": "InvalidTokenPrice"
@@ -1127,22 +1264,10 @@
             "name": "StaleGasPrice"
           },
           {
-            "name": "InsufficientLamports"
-          },
-          {
-            "name": "InsufficientFunds"
-          },
-          {
-            "name": "UnsupportedToken"
-          },
-          {
             "name": "InvalidInputsMissingTokenConfig"
           },
           {
             "name": "MessageFeeTooHigh"
-          },
-          {
-            "name": "SourceTokenDataTooLarge"
           },
           {
             "name": "MessageGasLimitTooHigh"
@@ -1161,6 +1286,9 @@
           },
           {
             "name": "InvalidSVMAddress"
+          },
+          {
+            "name": "UnauthorizedPriceUpdater"
           }
         ]
       }
@@ -1344,6 +1472,41 @@
           "type": {
             "defined": "TokenTransferFeeConfig"
           },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PremiumMultiplierWeiPerEthUpdated",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "premiumMultiplierWeiPerEth",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PriceUpdaterAdded",
+      "fields": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PriceUpdaterRemoved",
+      "fields": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey",
           "index": false
         }
       ]

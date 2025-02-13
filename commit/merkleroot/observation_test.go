@@ -78,9 +78,9 @@ func TestObservation(t *testing.T) {
 			setupMocks: func() {
 				mockObserver.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}}).Once()
-				mockObserver.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything, destChain).Return(
+				mockObserver.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}})
-				mockObserver.EXPECT().ObserveRMNRemoteCfg(mock.Anything, destChain).Return(rmntypes.RemoteConfig{})
+				mockObserver.EXPECT().ObserveRMNRemoteCfg(mock.Anything).Return(rmntypes.RemoteConfig{})
 				mockObserver.EXPECT().ObserveFChain(mock.Anything).Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
 			expectedObs: Observation{
@@ -119,7 +119,8 @@ func TestObservation(t *testing.T) {
 						SeqNumsRange: [2]cciptypes.SeqNum{5, 10},
 						MerkleRoot:   [32]byte{1}},
 				},
-				FChain: map[cciptypes.ChainSelector]int{1: 3},
+				RMNEnabledChains: map[cciptypes.ChainSelector]bool{1: true},
+				FChain:           map[cciptypes.ChainSelector]int{1: 3},
 			},
 		},
 		{
@@ -160,6 +161,11 @@ func TestObservation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
+			rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
+			rmnHomeReader.EXPECT().GetRMNEnabledSourceChains(tc.prevOutcome.RMNRemoteCfg.ConfigDigest).
+				Return(map[cciptypes.ChainSelector]bool{1: true}, nil).Maybe()
+
+			p.rmnHomeReader = rmnHomeReader
 			p.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller setup
 			obs, err := p.Observation(ctx, tc.prevOutcome, tc.query)
 

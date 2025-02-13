@@ -664,9 +664,7 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for setting the pool.",
-        "* `mint` - The public key of the token mint.",
-        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.",
-        "* `is_writable` - index of account in lookup table that is writable"
+        "* `writable_indexes` - a bit map of the indexes of the accounts in lookup table that are writable"
       ],
       "accounts": [
         {
@@ -884,7 +882,13 @@
           "name": "tokenIndexes",
           "type": "bytes"
         }
-      ]
+      ],
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
     }
   ],
   "accounts": [
@@ -1266,37 +1270,22 @@
         "kind": "enum",
         "variants": [
           {
-            "name": "InvalidSequenceInterval"
-          },
-          {
-            "name": "RootNotCommitted"
-          },
-          {
-            "name": "ExistingMerkleRoot"
-          },
-          {
             "name": "Unauthorized"
           },
           {
-            "name": "InvalidInputs"
+            "name": "InvalidInputsMint"
           },
           {
-            "name": "UnsupportedSourceChainSelector"
+            "name": "InvalidVersion"
           },
           {
-            "name": "UnsupportedDestinationChainSelector"
+            "name": "FeeTokenMismatch"
           },
           {
-            "name": "InvalidProof"
-          },
-          {
-            "name": "InvalidMessage"
+            "name": "RedundantOwnerProposal"
           },
           {
             "name": "ReachedMaxSequenceNumber"
-          },
-          {
-            "name": "ManualExecutionNotAllowed"
           },
           {
             "name": "InvalidInputsTokenIndices"
@@ -1323,34 +1312,7 @@
             "name": "InvalidInputsTokenAmount"
           },
           {
-            "name": "OfframpReleaseMintBalanceMismatch"
-          },
-          {
-            "name": "OfframpInvalidDataLength"
-          },
-          {
-            "name": "StaleCommitReport"
-          },
-          {
-            "name": "DestinationChainDisabled"
-          },
-          {
-            "name": "FeeTokenDisabled"
-          },
-          {
-            "name": "MessageTooLarge"
-          },
-          {
-            "name": "UnsupportedNumberOfTokens"
-          },
-          {
-            "name": "UnsupportedChainFamilySelector"
-          },
-          {
-            "name": "InvalidEVMAddress"
-          },
-          {
-            "name": "InvalidEncoding"
+            "name": "InvalidInputsTransferAllAmount"
           },
           {
             "name": "InvalidInputsAtaAddress"
@@ -1359,10 +1321,7 @@
             "name": "InvalidInputsAtaWritable"
           },
           {
-            "name": "InvalidTokenPrice"
-          },
-          {
-            "name": "StaleGasPrice"
+            "name": "InvalidInputsChainSelector"
           },
           {
             "name": "InsufficientLamports"
@@ -1371,43 +1330,13 @@
             "name": "InsufficientFunds"
           },
           {
-            "name": "UnsupportedToken"
-          },
-          {
-            "name": "InvalidInputsMissingTokenConfig"
-          },
-          {
-            "name": "MessageFeeTooHigh"
-          },
-          {
             "name": "SourceTokenDataTooLarge"
-          },
-          {
-            "name": "MessageGasLimitTooHigh"
-          },
-          {
-            "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
           },
           {
             "name": "InvalidTokenAdminRegistryInputsZeroAddress"
           },
           {
             "name": "InvalidTokenAdminRegistryProposedAdmin"
-          },
-          {
-            "name": "InvalidWritabilityBitmap"
-          },
-          {
-            "name": "InvalidExtraArgsTag"
-          },
-          {
-            "name": "InvalidChainFamilySelector"
-          },
-          {
-            "name": "InvalidTokenReceiver"
-          },
-          {
-            "name": "InvalidSVMAddress"
           },
           {
             "name": "SenderNotAllowed"
@@ -1629,21 +1558,6 @@
         {
           "name": "newAdmin",
           "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "PremiumMultiplierWeiPerEthUpdated",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "premiumMultiplierWeiPerEth",
-          "type": "u64",
           "index": false
         }
       ]

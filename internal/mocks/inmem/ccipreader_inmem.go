@@ -119,6 +119,11 @@ func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
 	}), nil
 }
 
+func (r InMemoryCCIPReader) LatestMsgSeqNum(
+	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	return 0, nil
+}
+
 func (r InMemoryCCIPReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error) {
@@ -162,7 +167,9 @@ func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 	return nil
 }
 
-func (r InMemoryCCIPReader) DiscoverContracts(ctx context.Context) (reader.ContractAddresses, error) {
+func (r InMemoryCCIPReader) DiscoverContracts(
+	ctx context.Context,
+	allChains []cciptypes.ChainSelector) (reader.ContractAddresses, error) {
 	return nil, nil
 }
 
@@ -202,6 +209,11 @@ func (r InMemoryCCIPReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, er
 
 func (r InMemoryCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
 	return r.ConfigDigest, nil
+}
+
+func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]reader.SourceChainConfig, error) {
+	return nil, nil
 }
 
 // Interface compatibility check.

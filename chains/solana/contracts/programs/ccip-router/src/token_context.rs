@@ -27,7 +27,7 @@ pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
@@ -51,7 +51,7 @@ pub struct OverridePendingTokenAdminRegistryByCCIPAdmin<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
@@ -73,7 +73,7 @@ pub struct RegisterTokenAdminRegistryByOwner<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
@@ -82,7 +82,7 @@ pub struct RegisterTokenAdminRegistryByOwner<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
-        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidInputs,
+        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -101,7 +101,7 @@ pub struct OverridePendingTokenAdminRegistryByOwner<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
@@ -125,14 +125,14 @@ pub struct ModifyTokenAdminRegistry<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -145,14 +145,14 @@ pub struct SetPoolTokenAdminRegistry<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
@@ -167,14 +167,14 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
-        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps

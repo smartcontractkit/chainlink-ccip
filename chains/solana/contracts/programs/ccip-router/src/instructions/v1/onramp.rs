@@ -23,7 +23,7 @@ pub fn ccip_send<'info>(
     dest_chain_selector: u64,
     message: SVM2AnyMessage,
     token_indexes: Vec<u8>,
-) -> Result<()> {
+) -> Result<[u8; 32]> {
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
 
@@ -123,7 +123,7 @@ pub fn ccip_send<'info>(
     let token_count = message.token_amounts.len();
     require!(
         token_indexes.len() == token_count,
-        CcipRouterError::InvalidInputs,
+        CcipRouterError::InvalidInputsTokenIndices,
     );
 
     let mut new_message: SVM2AnyRampMessage = SVM2AnyRampMessage {
@@ -211,7 +211,7 @@ pub fn ccip_send<'info>(
         message: new_message,
     });
 
-    Ok(())
+    Ok(*message_id)
 }
 
 mod helpers {

@@ -11,6 +11,8 @@ use crate::messages::{
 use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
 use crate::FeeQuoterError;
 
+use super::super::interfaces::Public;
+
 use super::messages::validate_svm2any;
 use super::price_math::{get_validated_token_price, Exponential, Usd18Decimals};
 
@@ -33,85 +35,91 @@ pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3
 
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
 
-pub fn get_fee<'info>(
-    ctx: Context<'_, '_, 'info, 'info, GetFee>,
-    dest_chain_selector: u64,
-    message: SVM2AnyMessage,
-) -> Result<GetFeeResult> {
-    let remaining_accounts = &ctx.remaining_accounts;
-    let message = &message;
-    require_eq!(
-        remaining_accounts.len(),
-        2 * message.token_amounts.len(),
-        FeeQuoterError::InvalidInputsTokenAccounts
-    );
+pub struct Impl;
+impl Public for Impl {
+    fn get_fee<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, GetFee>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+    ) -> Result<GetFeeResult> {
+        let remaining_accounts = &ctx.remaining_accounts;
+        let message = &message;
+        require_eq!(
+            remaining_accounts.len(),
+            2 * message.token_amounts.len(),
+            FeeQuoterError::InvalidInputsTokenAccounts
+        );
 
-    let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
-        remaining_accounts.split_at(message.token_amounts.len());
+        let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
+            remaining_accounts.split_at(message.token_amounts.len());
 
-    let token_billing_config_accounts = token_billing_config_accounts
-        .iter()
-        .zip(message.token_amounts.iter())
-        .map(|(a, SVMTokenAmount { token, .. })| safe_deserialize::billing_token_config(a, *token))
-        .collect::<Result<Vec<_>>>()?;
-    let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
-        .iter()
-        .zip(message.token_amounts.iter())
-        .map(|(a, SVMTokenAmount { token, .. })| {
-            safe_deserialize::per_chain_per_token_config(a, *token, dest_chain_selector)
+        let token_billing_config_accounts = token_billing_config_accounts
+            .iter()
+            .zip(message.token_amounts.iter())
+            .map(|(a, SVMTokenAmount { token, .. })| {
+                safe_deserialize::billing_token_config(a, *token)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
+            .iter()
+            .zip(message.token_amounts.iter())
+            .map(|(a, SVMTokenAmount { token, .. })| {
+                safe_deserialize::per_chain_per_token_config(a, *token, dest_chain_selector)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let (fee, processed_extra_args) = fee_for_msg(
+            message,
+            &ctx.accounts.dest_chain,
+            &ctx.accounts.billing_token_config.config,
+            &token_billing_config_accounts,
+            &per_chain_per_token_config_accounts,
+        )?;
+
+        let juels = convert(
+            &fee,
+            &ctx.accounts.billing_token_config.config,
+            &ctx.accounts.link_token_config.config,
+        )?
+        .amount;
+
+        require_gte!(
+            ctx.accounts.config.max_fee_juels_per_msg,
+            juels as u128,
+            FeeQuoterError::MessageFeeTooHigh
+        );
+
+        let token_transfer_additional_data = per_chain_per_token_config_accounts
+            .iter()
+            .map(
+                |per_chain_per_token_config| match per_chain_per_token_config {
+                    Some(config) if config.token_transfer_config.is_enabled => {
+                        TokenTransferAdditionalData {
+                            dest_bytes_overhead: config.token_transfer_config.dest_bytes_overhead,
+                            dest_gas_overhead: config.token_transfer_config.dest_gas_overhead,
+                        }
+                    }
+                    _ => TokenTransferAdditionalData {
+                        dest_bytes_overhead: ctx
+                            .accounts
+                            .dest_chain
+                            .config
+                            .default_token_dest_gas_overhead,
+                        dest_gas_overhead: CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+                    },
+                },
+            )
+            .collect();
+
+        Ok(GetFeeResult {
+            token: fee.token,
+            amount: fee.amount,
+            juels,
+            token_transfer_additional_data,
+            processed_extra_args,
         })
-        .collect::<Result<Vec<_>>>()?;
-
-    let (fee, processed_extra_args) = fee_for_msg(
-        message,
-        &ctx.accounts.dest_chain,
-        &ctx.accounts.billing_token_config.config,
-        &token_billing_config_accounts,
-        &per_chain_per_token_config_accounts,
-    )?;
-
-    let juels = convert(
-        &fee,
-        &ctx.accounts.billing_token_config.config,
-        &ctx.accounts.link_token_config.config,
-    )?
-    .amount;
-
-    require_gte!(
-        ctx.accounts.config.max_fee_juels_per_msg,
-        juels as u128,
-        FeeQuoterError::MessageFeeTooHigh
-    );
-
-    let default_token_dest_gas_overhead = ctx
-        .accounts
-        .dest_chain
-        .config
-        .default_token_dest_gas_overhead;
-
-    let token_transfer_additional_data = per_chain_per_token_config_accounts
-        .iter()
-        .map(|per_chain_per_token_config| TokenTransferAdditionalData {
-            dest_bytes_overhead: per_chain_per_token_config
-                .token_transfer_config
-                .dest_bytes_overhead,
-            dest_gas_overhead: if per_chain_per_token_config.token_transfer_config.is_enabled {
-                per_chain_per_token_config
-                    .token_transfer_config
-                    .dest_gas_overhead
-            } else {
-                default_token_dest_gas_overhead
-            },
-        })
-        .collect();
-
-    Ok(GetFeeResult {
-        token: fee.token,
-        amount: fee.amount,
-        juels,
-        token_transfer_additional_data,
-        processed_extra_args,
-    })
+    }
 }
 
 // Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
@@ -137,7 +145,7 @@ fn fee_for_msg(
     dest_chain: &DestChain,
     fee_token_config: &BillingTokenConfig,
     additional_token_configs: &[Option<BillingTokenConfig>],
-    additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
+    additional_token_configs_for_dest_chain: &[Option<PerChainPerTokenConfig>],
 ) -> Result<(SVMTokenAmount, ProcessedExtraArgs)> {
     let fee_token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
@@ -273,7 +281,7 @@ fn network_fee(
     message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     token_configs: &[Option<BillingTokenConfig>],
-    token_configs_for_dest_chain: &[PerChainPerTokenConfig],
+    token_configs_for_dest_chain: &[Option<PerChainPerTokenConfig>],
 ) -> Result<NetworkFee> {
     if message.token_amounts.is_empty() {
         return Ok(NetworkFee {
@@ -287,11 +295,13 @@ fn network_fee(
 
     for (i, token_amount) in message.token_amounts.iter().enumerate() {
         let config_for_dest_chain = &token_configs_for_dest_chain[i];
-        let token_network_fee = if config_for_dest_chain.token_transfer_config.is_enabled {
-            token_network_fees(&token_configs[i], token_amount, config_for_dest_chain)?
-        } else {
+
+        let token_network_fee = match config_for_dest_chain {
+            Some(config) if config.token_transfer_config.is_enabled => {
+                token_network_fees(&token_configs[i], token_amount, config)?
+            }
             // If the token has no specific overrides configured, we use the global defaults.
-            default_token_network_fees(dest_chain)
+            _ => default_token_network_fees(dest_chain),
         };
 
         fee += token_network_fee;
@@ -561,7 +571,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[Some(token_config)],
-                &[per_chain_per_token]
+                &[Some(per_chain_per_token)]
             )
             .unwrap()
             .0,
@@ -600,7 +610,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[Some(another_token_config)],
-                &[another_per_chain_per_token_config]
+                &[Some(another_per_chain_per_token_config)]
             )
             .unwrap()
             .0,
@@ -644,7 +654,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[Some(another_token_config.clone())],
-                &[another_per_chain_per_token_config.clone()]
+                &[Some(another_per_chain_per_token_config.clone())]
             )
             .unwrap()
             .0,
@@ -665,7 +675,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[Some(another_token_config)],
-                &[another_per_chain_per_token_config]
+                &[Some(another_per_chain_per_token_config)]
             )
             .unwrap()
             .0,
@@ -707,7 +717,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[None],
-                &[another_per_chain_per_token_config.clone()]
+                &[Some(another_per_chain_per_token_config.clone())]
             )
             .unwrap()
             .0,
@@ -728,7 +738,7 @@ mod tests {
                 &chain,
                 &sample_billing_config(),
                 &[None],
-                &[another_per_chain_per_token_config.clone()]
+                &[Some(another_per_chain_per_token_config.clone())]
             )
             .unwrap()
             .0,
@@ -754,7 +764,7 @@ mod tests {
             .collect();
 
         let tokens: Vec<_> = tokens.into_iter().map(Some).collect();
-        let per_chains: Vec<_> = per_chains.into_iter().collect();
+        let per_chains: Vec<_> = per_chains.into_iter().map(Some).collect();
         set_syscall_stubs(Box::new(TestStubs));
 
         let mut chain = sample_dest_chain();

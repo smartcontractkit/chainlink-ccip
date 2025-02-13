@@ -11,19 +11,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -251,7 +252,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 
 func Test_maxReportLength(t *testing.T) {
 	rep := ccipocr3.CommitPluginReport{
-		MerkleRoots: make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
+		BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
 		PriceUpdates: ccipocr3.PriceUpdates{
 			TokenPriceUpdates: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
 			GasPriceUpdates:   make([]ccipocr3.GasPriceChain, estimatedMaxNumberOfSourceChains),
@@ -259,8 +260,8 @@ func Test_maxReportLength(t *testing.T) {
 		RMNSignatures: make([]ccipocr3.RMNECDSASignature, estimatedMaxRmnNodesCount),
 	}
 
-	for i := range rep.MerkleRoots {
-		rep.MerkleRoots[i] = ccipocr3.MerkleRootChain{
+	for i := range rep.BlessedMerkleRoots {
+		rep.BlessedMerkleRoots[i] = ccipocr3.MerkleRootChain{
 			ChainSel:      math.MaxUint64,
 			OnRampAddress: make([]byte, 40),
 			SeqNumsRange:  ccipocr3.NewSeqNumRange(math.MaxUint64, math.MaxUint64),
@@ -295,7 +296,7 @@ func Test_maxReportLength(t *testing.T) {
 func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 	t.Run("basic checks for the happy flow", func(t *testing.T) {
 		ctx := tests.Context(t)
-		lggr := logger.Test(t)
+		lggr := mocks.NullLogger
 
 		offChainConfig := pluginconfig.CommitOffchainConfig{
 			MaxMerkleTreeSize: 123,

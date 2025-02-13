@@ -2,6 +2,7 @@ package merkleroot
 
 import (
 	"sort"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
@@ -10,17 +11,36 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+const (
+	processorLabel    = "merkleroot"
+	rootsLabel        = "roots"
+	messagesLabel     = "messages"
+	rmnSignatureLabel = "rmnSignatures"
+)
+
 type Query struct {
 	RetryRMNSignatures bool
 	RMNSignatures      *rmn.ReportSignatures
 }
 
 type Observation struct {
-	MerkleRoots        []cciptypes.MerkleRootChain     `json:"merkleRoots"`
-	OnRampMaxSeqNums   []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
-	OffRampNextSeqNums []plugintypes.SeqNumChain       `json:"offRampNextSeqNums"`
-	RMNRemoteConfig    rmntypes.RemoteConfig           `json:"rmnRemoteConfig"`
-	FChain             map[cciptypes.ChainSelector]int `json:"fChain"`
+	MerkleRoots        []cciptypes.MerkleRootChain      `json:"merkleRoots"`
+	RMNEnabledChains   map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
+	OnRampMaxSeqNums   []plugintypes.SeqNumChain        `json:"onRampMaxSeqNums"`
+	OffRampNextSeqNums []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
+	RMNRemoteConfig    rmntypes.RemoteConfig            `json:"rmnRemoteConfig"`
+	FChain             map[cciptypes.ChainSelector]int  `json:"fChain"`
+}
+
+func (o Observation) Stats() map[string]int {
+	counts := map[string]int{
+		rootsLabel:    len(o.MerkleRoots),
+		messagesLabel: 0,
+	}
+	for _, root := range o.MerkleRoots {
+		counts[messagesLabel] += root.SeqNumsRange.Length()
+	}
+	return counts
 }
 
 func (o Observation) IsEmpty() bool {
@@ -35,6 +55,9 @@ func (o Observation) IsEmpty() bool {
 type aggregatedObservation struct {
 	// A map from chain selectors to the list of merkle roots observed for each chain
 	MerkleRoots map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain
+
+	// RMNEnabledChains is a map of the RMN-enabled source chains.
+	RMNEnabledChains map[cciptypes.ChainSelector][]bool
 
 	// A map from chain selectors to the list of OnRamp max sequence numbers observed for each chain
 	OnRampMaxSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
@@ -53,6 +76,7 @@ type aggregatedObservation struct {
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) aggregatedObservation {
 	aggObs := aggregatedObservation{
 		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
+		RMNEnabledChains:   make(map[cciptypes.ChainSelector][]bool),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		RMNRemoteConfigs:   make([]rmntypes.RemoteConfig, 0),
@@ -65,6 +89,11 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		for _, merkleRoot := range obs.MerkleRoots {
 			aggObs.MerkleRoots[merkleRoot.ChainSel] =
 				append(aggObs.MerkleRoots[merkleRoot.ChainSel], merkleRoot)
+		}
+
+		// RMNEnabledChains
+		for chainSel, enabled := range obs.RMNEnabledChains {
+			aggObs.RMNEnabledChains[chainSel] = append(aggObs.RMNEnabledChains[chainSel], enabled)
 		}
 
 		// OnRampMaxSeqNums
@@ -99,6 +128,9 @@ type consensusObservation struct {
 	// A map from chain selectors to each chain's consensus merkle root
 	MerkleRoots map[cciptypes.ChainSelector]cciptypes.MerkleRootChain
 
+	// RMNEnabledChains holds the consensus of RMNEnabledChains
+	RMNEnabledChains map[cciptypes.ChainSelector]bool
+
 	// A map from chain selectors to each chain's consensus OnRamp max sequence number
 	OnRampMaxSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
 
@@ -124,13 +156,26 @@ const (
 )
 
 type Outcome struct {
-	OutcomeType                     OutcomeType                   `json:"outcomeType"`
-	RangesSelectedForReport         []plugintypes.ChainRange      `json:"rangesSelectedForReport"`
-	RootsToReport                   []cciptypes.MerkleRootChain   `json:"rootsToReport"`
-	OffRampNextSeqNums              []plugintypes.SeqNumChain     `json:"offRampNextSeqNums"`
-	ReportTransmissionCheckAttempts uint                          `json:"reportTransmissionCheckAttempts"`
-	RMNReportSignatures             []cciptypes.RMNECDSASignature `json:"rmnReportSignatures"`
-	RMNRemoteCfg                    rmntypes.RemoteConfig         `json:"rmnRemoteCfg"`
+	OutcomeType                     OutcomeType                      `json:"outcomeType"`
+	RangesSelectedForReport         []plugintypes.ChainRange         `json:"rangesSelectedForReport"`
+	RootsToReport                   []cciptypes.MerkleRootChain      `json:"rootsToReport"`
+	RMNEnabledChains                map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
+	OffRampNextSeqNums              []plugintypes.SeqNumChain        `json:"offRampNextSeqNums"`
+	ReportTransmissionCheckAttempts uint                             `json:"reportTransmissionCheckAttempts"`
+	RMNReportSignatures             []cciptypes.RMNECDSASignature    `json:"rmnReportSignatures"`
+	RMNRemoteCfg                    rmntypes.RemoteConfig            `json:"rmnRemoteCfg"`
+}
+
+func (o Outcome) Stats() map[string]int {
+	counts := map[string]int{
+		rootsLabel:        len(o.RootsToReport),
+		rmnSignatureLabel: len(o.RMNReportSignatures),
+		messagesLabel:     0,
+	}
+	for _, root := range o.RootsToReport {
+		counts[messagesLabel] += root.SeqNumsRange.Length()
+	}
+	return counts
 }
 
 // Sort all fields of the given Outcome
@@ -196,15 +241,15 @@ func (p processorState) String() string {
 
 // MetricsReporter exposes only relevant methods for reporting merkle roots from metrics.Reporter
 type MetricsReporter interface {
-	TrackMerkleObservation(obs Observation, state string)
-	TrackMerkleOutcome(outcome Outcome, state string)
 	TrackRmnReport(latency float64, success bool)
+	TrackProcessorLatency(processor string, method string, latency time.Duration, err error)
+	TrackProcessorOutput(processor string, method plugincommon.MethodType, obs plugintypes.Trackable)
 }
 
 type NoopMetrics struct{}
 
-func (n NoopMetrics) TrackMerkleObservation(Observation, string) {}
-
-func (n NoopMetrics) TrackMerkleOutcome(Outcome, string) {}
-
 func (n NoopMetrics) TrackRmnReport(float64, bool) {}
+
+func (n NoopMetrics) TrackProcessorLatency(string, string, time.Duration, error) {}
+
+func (n NoopMetrics) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}

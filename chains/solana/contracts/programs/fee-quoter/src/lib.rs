@@ -17,7 +17,7 @@ pub mod event;
 pub mod extra_args;
 
 mod instructions;
-use instructions::v1;
+use instructions::router;
 
 #[program]
 pub mod fee_quoter {
@@ -40,7 +40,6 @@ pub mod fee_quoter {
         link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
-        offramp_signer: Pubkey,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             version: 1,
@@ -49,10 +48,8 @@ pub mod fee_quoter {
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
-            offramp_signer,
+            default_code_version: CodeVersion::V1,
         });
-
-        // ctx.accounts.state.latest_price_sequence_number = 0; // TODO each offramp has its own price seq_nr?
 
         Ok(())
     }
@@ -66,7 +63,7 @@ pub mod fee_quoter {
     /// * `ctx` - The context containing the accounts required for the transfer.
     /// * `proposed_owner` - The public key of the new proposed owner.
     pub fn transfer_ownership(ctx: Context<UpdateConfig>, new_owner: Pubkey) -> Result<()> {
-        v1::admin::transfer_ownership(ctx, new_owner)
+        router::admin(ctx.accounts.config.default_code_version).transfer_ownership(ctx, new_owner)
     }
 
     /// Accepts the ownership of the fee quoter by the proposed owner.
@@ -78,7 +75,15 @@ pub mod fee_quoter {
     /// * `ctx` - The context containing the accounts required for accepting ownership.
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        v1::admin::accept_ownership(ctx)
+        router::admin(ctx.accounts.config.default_code_version).accept_ownership(ctx)
+    }
+
+    pub fn set_default_code_version(
+        ctx: Context<UpdateConfig>,
+        code_version: CodeVersion,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .set_default_code_version(ctx, code_version)
     }
 
     /// Adds a billing token configuration.
@@ -92,7 +97,8 @@ pub mod fee_quoter {
         ctx: Context<AddBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        v1::admin::add_billing_token_config(ctx, config)
+        router::admin(ctx.accounts.config.default_code_version)
+            .add_billing_token_config(ctx, config)
     }
 
     /// Updates the billing token configuration.
@@ -106,7 +112,8 @@ pub mod fee_quoter {
         ctx: Context<UpdateBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        v1::admin::update_billing_token_config(ctx, config)
+        router::admin(ctx.accounts.config.default_code_version)
+            .update_billing_token_config(ctx, config)
     }
 
     /// Adds a new destination chain selector to the fee quoter.
@@ -124,7 +131,11 @@ pub mod fee_quoter {
         chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::add_dest_chain(ctx, chain_selector, dest_chain_config)
+        router::admin(ctx.accounts.config.default_code_version).add_dest_chain(
+            ctx,
+            chain_selector,
+            dest_chain_config,
+        )
     }
 
     /// Disables the destination chain selector.
@@ -139,7 +150,8 @@ pub mod fee_quoter {
         ctx: Context<UpdateDestChainConfig>,
         chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::disable_dest_chain(ctx, chain_selector)
+        router::admin(ctx.accounts.config.default_code_version)
+            .disable_dest_chain(ctx, chain_selector)
     }
 
     /// Updates the configuration of the destination chain selector.
@@ -156,7 +168,11 @@ pub mod fee_quoter {
         chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::update_dest_chain_config(ctx, chain_selector, dest_chain_config)
+        router::admin(ctx.accounts.config.default_code_version).update_dest_chain_config(
+            ctx,
+            chain_selector,
+            dest_chain_config,
+        )
     }
 
     /// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
@@ -177,7 +193,38 @@ pub mod fee_quoter {
         mint: Pubkey,
         cfg: TokenTransferFeeConfig,
     ) -> Result<()> {
-        v1::admin::set_token_transfer_fee_config(ctx, chain_selector, mint, cfg)
+        router::admin(ctx.accounts.config.default_code_version).set_token_transfer_fee_config(
+            ctx,
+            chain_selector,
+            mint,
+            cfg,
+        )
+    }
+
+    /// Add a price updater address to the list of allowed price updaters.
+    /// On price updates, the fee quoter will check the that caller is allowed.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for this operation.
+    /// * `price_updater` - The price updater address.
+    pub fn add_price_updater(ctx: Context<AddPriceUpdater>, price_updater: Pubkey) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .add_price_updater(ctx, price_updater)
+    }
+
+    /// Remove a price updater address from the list of allowed price updaters.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for this operation.
+    /// * `price_updater` - The price updater address.
+    pub fn remove_price_updater(
+        ctx: Context<RemovePriceUpdater>,
+        price_updater: Pubkey,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .remove_price_updater(ctx, price_updater)
     }
 
     /// Calculates the fee for sending a message to the destination chain.
@@ -212,15 +259,42 @@ pub mod fee_quoter {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<GetFeeResult> {
-        v1::public::get_fee(ctx, dest_chain_selector, message)
+        let default_code_version = ctx.accounts.config.default_code_version;
+        let lane_code_version = ctx.accounts.dest_chain.config.lane_code_version;
+        router::public(lane_code_version, default_code_version).get_fee(
+            ctx,
+            dest_chain_selector,
+            message,
+        )
     }
 
+    /// Updates prices for tokens and gas. This method may only be called by an allowed price updater.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts always required for the price updates
+    /// * `token_updates` - Vector of token price updates
+    /// * `gas_updates` - Vector of gas price updates
+    ///
+    /// # Additional accounts
+    ///
+    /// In addition to the fixed amount of accounts defined in the `UpdatePrices` context,
+    /// the following accounts must be provided:
+    ///
+    /// * First, the billing token config accounts for each token whose price is being updated, in the same order
+    /// as the token_updates vector.
+    /// * Then, the dest chain accounts of every chain whose gas price is being updated, in the same order as the
+    /// gas_updates vector.
     pub fn update_prices<'info>(
         ctx: Context<'_, '_, 'info, 'info, UpdatePrices<'info>>,
         token_updates: Vec<TokenPriceUpdate>,
         gas_updates: Vec<GasPriceUpdate>,
     ) -> Result<()> {
-        v1::prices::update_prices(ctx, token_updates, gas_updates)
+        router::prices(ctx.accounts.config.default_code_version).update_prices(
+            ctx,
+            token_updates,
+            gas_updates,
+        )
     }
 }
 
@@ -234,51 +308,44 @@ pub enum AnchorErrorHack {
 
 #[error_code]
 pub enum FeeQuoterError {
-    // TODO review unused ones and remove them
-    #[msg("The given sequence interval is invalid")]
-    InvalidSequenceInterval,
-    #[msg("The given Merkle Root is missing")]
-    RootNotCommitted,
-    #[msg("The given Merkle Root is already committed")]
-    ExistingMerkleRoot,
     #[msg("The signer is unauthorized")]
     Unauthorized,
     #[msg("Invalid inputs")]
     InvalidInputs,
-    #[msg("Source chain selector not supported")]
-    UnsupportedSourceChainSelector,
-    #[msg("Destination chain selector not supported")]
-    UnsupportedDestinationChainSelector,
-    #[msg("Invalid Proof for Merkle Root")]
-    InvalidProof,
-    #[msg("Invalid message format")]
-    InvalidMessage,
-    #[msg("Reached max sequence number")]
-    ReachedMaxSequenceNumber,
-    #[msg("Manual execution not allowed")]
-    ManualExecutionNotAllowed,
-    #[msg("Invalid pool account account indices")]
-    InvalidInputsTokenIndices,
-    #[msg("Invalid pool accounts")]
-    InvalidInputsPoolAccounts,
+    #[msg("Gas limit is zero")]
+    ZeroGasLimit,
+    #[msg("Default gas limit exceeds the maximum")]
+    DefaultGasLimitExceedsMaximum,
+    #[msg("Invalid version of the onchain state")]
+    InvalidVersion,
+    #[msg("Proposed owner is the current owner")]
+    RedundantOwnerProposal,
+    #[msg("Account should be writable")]
+    InvalidInputsMissingWritable,
+    #[msg("Chain selector is invalid")]
+    InvalidInputsChainSelector,
+    #[msg("Mint account input is invalid")]
+    InvalidInputsMint,
+    #[msg("Mint account input has an invalid owner")]
+    InvalidInputsMintOwner,
+    #[msg("Token config account is invalid")]
+    InvalidInputsTokenConfigAccount,
+    #[msg("Missing extra args in message to SVM receiver")]
+    InvalidInputsMissingExtraArgs,
+    #[msg("Missing data after extra args tag")]
+    InvalidInputsMissingDataAfterExtraArgs,
+    #[msg("Destination chain state account is invalid")]
+    InvalidInputsDestChainStateAccount,
+    #[msg("Per chain per token config account is invalid")]
+    InvalidInputsPerChainPerTokenConfig,
+    #[msg("Billing token config account is invalid")]
+    InvalidInputsBillingTokenConfig,
+    #[msg("Number of accounts provided is incorrect")]
+    InvalidInputsAccountCount,
+    #[msg("No price or gas update provided")]
+    InvalidInputsNoUpdates,
     #[msg("Invalid token accounts")]
     InvalidInputsTokenAccounts,
-    #[msg("Invalid config account")]
-    InvalidInputsConfigAccounts,
-    #[msg("Invalid Token Admin Registry account")]
-    InvalidInputsTokenAdminRegistryAccounts,
-    #[msg("Invalid LookupTable account")]
-    InvalidInputsLookupTableAccounts,
-    #[msg("Invalid LookupTable account writable access")]
-    InvalidInputsLookupTableAccountWritable,
-    #[msg("Cannot send zero tokens")]
-    InvalidInputsTokenAmount,
-    #[msg("Release or mint balance mismatch")]
-    OfframpReleaseMintBalanceMismatch,
-    #[msg("Invalid data length")]
-    OfframpInvalidDataLength,
-    #[msg("Stale commit report")]
-    StaleCommitReport,
     #[msg("Destination chain disabled")]
     DestinationChainDisabled,
     #[msg("Fee token disabled")]
@@ -287,32 +354,18 @@ pub enum FeeQuoterError {
     MessageTooLarge,
     #[msg("Message contains an unsupported number of tokens")]
     UnsupportedNumberOfTokens,
-    #[msg("Chain family selector not supported")]
-    UnsupportedChainFamilySelector,
     #[msg("Invalid EVM address")]
     InvalidEVMAddress,
     #[msg("Invalid encoding")]
     InvalidEncoding,
-    #[msg("Invalid Associated Token Account address")]
-    InvalidInputsAtaAddress,
-    #[msg("Invalid Associated Token Account writable flag")]
-    InvalidInputsAtaWritable,
     #[msg("Invalid token price")]
     InvalidTokenPrice,
     #[msg("Stale gas price")]
     StaleGasPrice,
-    #[msg("Insufficient lamports")]
-    InsufficientLamports,
-    #[msg("Insufficient funds")]
-    InsufficientFunds,
-    #[msg("Unsupported token")]
-    UnsupportedToken,
     #[msg("Inputs are missing token configuration")]
     InvalidInputsMissingTokenConfig,
     #[msg("Message fee is too high")]
     MessageFeeTooHigh,
-    #[msg("Source token data is too large")]
-    SourceTokenDataTooLarge,
     #[msg("Message gas limit too high")]
     MessageGasLimitTooHigh,
     #[msg("Extra arg out of order execution must be true")]
@@ -325,4 +378,6 @@ pub enum FeeQuoterError {
     InvalidTokenReceiver,
     #[msg("Invalid SVM address")]
     InvalidSVMAddress,
+    #[msg("The caller is not an authorized price updater")]
+    UnauthorizedPriceUpdater,
 }

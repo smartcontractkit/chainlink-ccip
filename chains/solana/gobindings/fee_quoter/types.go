@@ -416,6 +416,7 @@ func (obj *ProcessedExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 
 type DestChainConfig struct {
 	IsEnabled                         bool
+	LaneCodeVersion                   CodeVersion
 	MaxNumberOfTokensPerMsg           uint16
 	MaxDataBytes                      uint32
 	MaxPerMsgGasLimit                 uint32
@@ -439,6 +440,11 @@ type DestChainConfig struct {
 func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `IsEnabled` param:
 	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `LaneCodeVersion` param:
+	err = encoder.Encode(obj.LaneCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -538,6 +544,11 @@ func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `IsEnabled`:
 	err = decoder.Decode(&obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LaneCodeVersion`:
+	err = decoder.Decode(&obj.LaneCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -821,102 +832,105 @@ func (obj *TokenTransferFeeConfig) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	return nil
 }
 
+type CodeVersion ag_binary.BorshEnum
+
+const (
+	Default_CodeVersion CodeVersion = iota
+	V1_CodeVersion
+)
+
+func (value CodeVersion) String() string {
+	switch value {
+	case Default_CodeVersion:
+		return "Default"
+	case V1_CodeVersion:
+		return "V1"
+	default:
+		return ""
+	}
+}
+
 type FeeQuoterError ag_binary.BorshEnum
 
 const (
-	InvalidSequenceInterval_FeeQuoterError FeeQuoterError = iota
-	RootNotCommitted_FeeQuoterError
-	ExistingMerkleRoot_FeeQuoterError
-	Unauthorized_FeeQuoterError
+	Unauthorized_FeeQuoterError FeeQuoterError = iota
 	InvalidInputs_FeeQuoterError
-	UnsupportedSourceChainSelector_FeeQuoterError
-	UnsupportedDestinationChainSelector_FeeQuoterError
-	InvalidProof_FeeQuoterError
-	InvalidMessage_FeeQuoterError
-	ReachedMaxSequenceNumber_FeeQuoterError
-	ManualExecutionNotAllowed_FeeQuoterError
-	InvalidInputsTokenIndices_FeeQuoterError
-	InvalidInputsPoolAccounts_FeeQuoterError
+	ZeroGasLimit_FeeQuoterError
+	DefaultGasLimitExceedsMaximum_FeeQuoterError
+	InvalidVersion_FeeQuoterError
+	RedundantOwnerProposal_FeeQuoterError
+	InvalidInputsMissingWritable_FeeQuoterError
+	InvalidInputsChainSelector_FeeQuoterError
+	InvalidInputsMint_FeeQuoterError
+	InvalidInputsMintOwner_FeeQuoterError
+	InvalidInputsTokenConfigAccount_FeeQuoterError
+	InvalidInputsMissingExtraArgs_FeeQuoterError
+	InvalidInputsMissingDataAfterExtraArgs_FeeQuoterError
+	InvalidInputsDestChainStateAccount_FeeQuoterError
+	InvalidInputsPerChainPerTokenConfig_FeeQuoterError
+	InvalidInputsBillingTokenConfig_FeeQuoterError
+	InvalidInputsAccountCount_FeeQuoterError
+	InvalidInputsNoUpdates_FeeQuoterError
 	InvalidInputsTokenAccounts_FeeQuoterError
-	InvalidInputsConfigAccounts_FeeQuoterError
-	InvalidInputsTokenAdminRegistryAccounts_FeeQuoterError
-	InvalidInputsLookupTableAccounts_FeeQuoterError
-	InvalidInputsLookupTableAccountWritable_FeeQuoterError
-	InvalidInputsTokenAmount_FeeQuoterError
-	OfframpReleaseMintBalanceMismatch_FeeQuoterError
-	OfframpInvalidDataLength_FeeQuoterError
-	StaleCommitReport_FeeQuoterError
 	DestinationChainDisabled_FeeQuoterError
 	FeeTokenDisabled_FeeQuoterError
 	MessageTooLarge_FeeQuoterError
 	UnsupportedNumberOfTokens_FeeQuoterError
-	UnsupportedChainFamilySelector_FeeQuoterError
 	InvalidEVMAddress_FeeQuoterError
 	InvalidEncoding_FeeQuoterError
-	InvalidInputsAtaAddress_FeeQuoterError
-	InvalidInputsAtaWritable_FeeQuoterError
 	InvalidTokenPrice_FeeQuoterError
 	StaleGasPrice_FeeQuoterError
-	InsufficientLamports_FeeQuoterError
-	InsufficientFunds_FeeQuoterError
-	UnsupportedToken_FeeQuoterError
 	InvalidInputsMissingTokenConfig_FeeQuoterError
 	MessageFeeTooHigh_FeeQuoterError
-	SourceTokenDataTooLarge_FeeQuoterError
 	MessageGasLimitTooHigh_FeeQuoterError
 	ExtraArgOutOfOrderExecutionMustBeTrue_FeeQuoterError
 	InvalidExtraArgsTag_FeeQuoterError
 	InvalidChainFamilySelector_FeeQuoterError
 	InvalidTokenReceiver_FeeQuoterError
 	InvalidSVMAddress_FeeQuoterError
+	UnauthorizedPriceUpdater_FeeQuoterError
 )
 
 func (value FeeQuoterError) String() string {
 	switch value {
-	case InvalidSequenceInterval_FeeQuoterError:
-		return "InvalidSequenceInterval"
-	case RootNotCommitted_FeeQuoterError:
-		return "RootNotCommitted"
-	case ExistingMerkleRoot_FeeQuoterError:
-		return "ExistingMerkleRoot"
 	case Unauthorized_FeeQuoterError:
 		return "Unauthorized"
 	case InvalidInputs_FeeQuoterError:
 		return "InvalidInputs"
-	case UnsupportedSourceChainSelector_FeeQuoterError:
-		return "UnsupportedSourceChainSelector"
-	case UnsupportedDestinationChainSelector_FeeQuoterError:
-		return "UnsupportedDestinationChainSelector"
-	case InvalidProof_FeeQuoterError:
-		return "InvalidProof"
-	case InvalidMessage_FeeQuoterError:
-		return "InvalidMessage"
-	case ReachedMaxSequenceNumber_FeeQuoterError:
-		return "ReachedMaxSequenceNumber"
-	case ManualExecutionNotAllowed_FeeQuoterError:
-		return "ManualExecutionNotAllowed"
-	case InvalidInputsTokenIndices_FeeQuoterError:
-		return "InvalidInputsTokenIndices"
-	case InvalidInputsPoolAccounts_FeeQuoterError:
-		return "InvalidInputsPoolAccounts"
+	case ZeroGasLimit_FeeQuoterError:
+		return "ZeroGasLimit"
+	case DefaultGasLimitExceedsMaximum_FeeQuoterError:
+		return "DefaultGasLimitExceedsMaximum"
+	case InvalidVersion_FeeQuoterError:
+		return "InvalidVersion"
+	case RedundantOwnerProposal_FeeQuoterError:
+		return "RedundantOwnerProposal"
+	case InvalidInputsMissingWritable_FeeQuoterError:
+		return "InvalidInputsMissingWritable"
+	case InvalidInputsChainSelector_FeeQuoterError:
+		return "InvalidInputsChainSelector"
+	case InvalidInputsMint_FeeQuoterError:
+		return "InvalidInputsMint"
+	case InvalidInputsMintOwner_FeeQuoterError:
+		return "InvalidInputsMintOwner"
+	case InvalidInputsTokenConfigAccount_FeeQuoterError:
+		return "InvalidInputsTokenConfigAccount"
+	case InvalidInputsMissingExtraArgs_FeeQuoterError:
+		return "InvalidInputsMissingExtraArgs"
+	case InvalidInputsMissingDataAfterExtraArgs_FeeQuoterError:
+		return "InvalidInputsMissingDataAfterExtraArgs"
+	case InvalidInputsDestChainStateAccount_FeeQuoterError:
+		return "InvalidInputsDestChainStateAccount"
+	case InvalidInputsPerChainPerTokenConfig_FeeQuoterError:
+		return "InvalidInputsPerChainPerTokenConfig"
+	case InvalidInputsBillingTokenConfig_FeeQuoterError:
+		return "InvalidInputsBillingTokenConfig"
+	case InvalidInputsAccountCount_FeeQuoterError:
+		return "InvalidInputsAccountCount"
+	case InvalidInputsNoUpdates_FeeQuoterError:
+		return "InvalidInputsNoUpdates"
 	case InvalidInputsTokenAccounts_FeeQuoterError:
 		return "InvalidInputsTokenAccounts"
-	case InvalidInputsConfigAccounts_FeeQuoterError:
-		return "InvalidInputsConfigAccounts"
-	case InvalidInputsTokenAdminRegistryAccounts_FeeQuoterError:
-		return "InvalidInputsTokenAdminRegistryAccounts"
-	case InvalidInputsLookupTableAccounts_FeeQuoterError:
-		return "InvalidInputsLookupTableAccounts"
-	case InvalidInputsLookupTableAccountWritable_FeeQuoterError:
-		return "InvalidInputsLookupTableAccountWritable"
-	case InvalidInputsTokenAmount_FeeQuoterError:
-		return "InvalidInputsTokenAmount"
-	case OfframpReleaseMintBalanceMismatch_FeeQuoterError:
-		return "OfframpReleaseMintBalanceMismatch"
-	case OfframpInvalidDataLength_FeeQuoterError:
-		return "OfframpInvalidDataLength"
-	case StaleCommitReport_FeeQuoterError:
-		return "StaleCommitReport"
 	case DestinationChainDisabled_FeeQuoterError:
 		return "DestinationChainDisabled"
 	case FeeTokenDisabled_FeeQuoterError:
@@ -925,32 +939,18 @@ func (value FeeQuoterError) String() string {
 		return "MessageTooLarge"
 	case UnsupportedNumberOfTokens_FeeQuoterError:
 		return "UnsupportedNumberOfTokens"
-	case UnsupportedChainFamilySelector_FeeQuoterError:
-		return "UnsupportedChainFamilySelector"
 	case InvalidEVMAddress_FeeQuoterError:
 		return "InvalidEVMAddress"
 	case InvalidEncoding_FeeQuoterError:
 		return "InvalidEncoding"
-	case InvalidInputsAtaAddress_FeeQuoterError:
-		return "InvalidInputsAtaAddress"
-	case InvalidInputsAtaWritable_FeeQuoterError:
-		return "InvalidInputsAtaWritable"
 	case InvalidTokenPrice_FeeQuoterError:
 		return "InvalidTokenPrice"
 	case StaleGasPrice_FeeQuoterError:
 		return "StaleGasPrice"
-	case InsufficientLamports_FeeQuoterError:
-		return "InsufficientLamports"
-	case InsufficientFunds_FeeQuoterError:
-		return "InsufficientFunds"
-	case UnsupportedToken_FeeQuoterError:
-		return "UnsupportedToken"
 	case InvalidInputsMissingTokenConfig_FeeQuoterError:
 		return "InvalidInputsMissingTokenConfig"
 	case MessageFeeTooHigh_FeeQuoterError:
 		return "MessageFeeTooHigh"
-	case SourceTokenDataTooLarge_FeeQuoterError:
-		return "SourceTokenDataTooLarge"
 	case MessageGasLimitTooHigh_FeeQuoterError:
 		return "MessageGasLimitTooHigh"
 	case ExtraArgOutOfOrderExecutionMustBeTrue_FeeQuoterError:
@@ -963,6 +963,8 @@ func (value FeeQuoterError) String() string {
 		return "InvalidTokenReceiver"
 	case InvalidSVMAddress_FeeQuoterError:
 		return "InvalidSVMAddress"
+	case UnauthorizedPriceUpdater_FeeQuoterError:
+		return "UnauthorizedPriceUpdater"
 	default:
 		return ""
 	}

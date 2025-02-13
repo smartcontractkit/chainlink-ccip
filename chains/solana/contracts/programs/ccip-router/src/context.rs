@@ -46,7 +46,7 @@ pub mod seed {
 #[derive(Accounts)]
 pub struct WithdrawBilledFunds<'info> {
     #[account(
-        owner = token_program.key() @ CcipRouterError::InvalidInputs,
+        owner = token_program.key() @ CcipRouterError::InvalidInputsMint,
     )]
     pub fee_token_mint: InterfaceAccount<'info, Mint>,
 
@@ -62,7 +62,7 @@ pub struct WithdrawBilledFunds<'info> {
         mut,
         constraint = recipient.key() == get_associated_token_address_with_program_id(
             &config.load()?.fee_aggregator.key(), &fee_token_mint.key(), &token_program.key()
-        ) @ CcipRouterError::InvalidInputs,
+        ) @ CcipRouterError::InvalidInputsAtaAddress,
     )]
     pub recipient: InterfaceAccount<'info, TokenAccount>,
 
@@ -78,7 +78,7 @@ pub struct WithdrawBilledFunds<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -124,7 +124,7 @@ pub struct TransferOwnership<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -138,7 +138,7 @@ pub struct AcceptOwnership<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -162,7 +162,7 @@ pub struct AddChainSelector<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -178,7 +178,7 @@ pub struct UpdateDestChainSelectorConfig<'info> {
         mut,
         seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
         realloc = ANCHOR_DISCRIMINATOR + DestChain::INIT_SPACE + dest_chain_config.dynamic_space(),
         realloc::payer = authority,
         // `realloc::zero = true` is only necessary in cases where an instruction is capable of reallocating
@@ -191,7 +191,7 @@ pub struct UpdateDestChainSelectorConfig<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -206,7 +206,7 @@ pub struct UpdateConfigCCIPRouter<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -230,7 +230,7 @@ pub struct AddOfframp<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -254,7 +254,7 @@ pub struct RemoveOfframp<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -274,7 +274,7 @@ pub struct CcipSend<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
     pub config: AccountLoader<'info, Config>,
 
@@ -282,7 +282,7 @@ pub struct CcipSend<'info> {
         mut,
         seeds = [seed::DEST_CHAIN_STATE, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
-        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
     )]
     pub dest_chain_state: Account<'info, DestChain>,
 
@@ -292,7 +292,7 @@ pub struct CcipSend<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Nonce::INIT_SPACE,
-        constraint = uninitialized(nonce.version) || valid_version(nonce.version, MAX_NONCE_V) @ CcipRouterError::InvalidInputs,
+        constraint = uninitialized(nonce.version) || valid_version(nonce.version, MAX_NONCE_V) @ CcipRouterError::InvalidVersion,
     )]
     pub nonce: Account<'info, Nonce>,
 
@@ -306,9 +306,9 @@ pub struct CcipSend<'info> {
     pub fee_token_program: Interface<'info, TokenInterface>,
 
     #[account(
-        owner = fee_token_program.key() @ CcipRouterError::InvalidInputs,
+        owner = fee_token_program.key() @ CcipRouterError::InvalidInputsMint,
         constraint = (message.fee_token == Pubkey::default() && fee_token_mint.key() == native_mint::ID)
-            || message.fee_token.key() == fee_token_mint.key() @ CcipRouterError::InvalidInputs,
+            || message.fee_token.key() == fee_token_mint.key() @ CcipRouterError::InvalidInputsMint,
     )]
     pub fee_token_mint: InterfaceAccount<'info, Mint>, // pass pre-2022 wSOL if using native SOL
 
@@ -349,7 +349,7 @@ pub struct CcipSend<'info> {
     ////////////////////
     /// CHECK: This is the account for the Fee Quoter program
     #[account(
-        address = config.load()?.fee_quoter @ CcipRouterError::InvalidInputs,
+        address = config.load()?.fee_quoter @ CcipRouterError::InvalidVersion,
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 

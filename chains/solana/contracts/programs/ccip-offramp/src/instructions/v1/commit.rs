@@ -18,7 +18,7 @@ pub fn commit<'info>(
     raw_vs: [u8; 32],
 ) -> Result<()> {
     let report = CommitInput::deserialize(&mut raw_report.as_ref())
-        .map_err(|_| CcipOfframpError::InvalidInputs)?;
+        .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
 
     // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
@@ -33,7 +33,7 @@ pub fn commit<'info>(
     );
     require!(
         is_on_ramp_configured(&source_chain.config, &report.merkle_root.on_ramp_address),
-        CcipOfframpError::InvalidInputs
+        CcipOfframpError::OnrampNotConfigured
     );
 
     // Check if the report contains price updates
@@ -46,7 +46,7 @@ pub fn commit<'info>(
         require_eq!(
             ctx.remaining_accounts.len(),
             0,
-            CcipOfframpError::InvalidInputs
+            CcipOfframpError::InvalidInputsNumberOfAccounts
         );
     } else {
         // There are price updates in the report.
@@ -66,7 +66,7 @@ pub fn commit<'info>(
         require_eq!(
             ctx.remaining_accounts.len(),
             minimum_remaining_accounts,
-            CcipOfframpError::InvalidInputs
+            CcipOfframpError::InvalidInputsNumberOfAccounts
         );
 
         let ocr_sequence_number = report_context.sequence_number();
@@ -76,11 +76,11 @@ pub fn commit<'info>(
         require_keys_eq!(
             ctx.remaining_accounts[0].key(),
             expected_state_key,
-            CcipOfframpError::InvalidInputs
+            CcipOfframpError::InvalidInputsGlobalStateAccount
         );
         require!(
             ctx.remaining_accounts[0].is_writable,
-            CcipOfframpError::InvalidInputs
+            CcipOfframpError::InvalidInputsMissingWritable
         );
 
         let mut global_state: Account<GlobalState> = Account::try_from(&ctx.remaining_accounts[0])?;
@@ -96,6 +96,10 @@ pub fn commit<'info>(
             let cpi_accounts = fee_quoter::cpi::accounts::UpdatePrices {
                 config: ctx.accounts.fee_quoter_config.to_account_info(),
                 authority: ctx.accounts.fee_billing_signer.to_account_info(),
+                allowed_price_updater: ctx
+                    .accounts
+                    .fee_quoter_allowed_price_updater
+                    .to_account_info(),
             };
             let cpi_remaining_accounts = ctx.remaining_accounts[1..].to_vec();
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, cpi_signer)
