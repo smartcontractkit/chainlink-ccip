@@ -282,6 +282,138 @@ func Test_TrackingOutcomes(t *testing.T) {
 	}
 }
 
+func Test_SequenceNumbers(t *testing.T) {
+	tt := []struct {
+		name   string
+		obs    exectypes.Observation
+		out    exectypes.Outcome
+		method plugincommon.MethodType
+		exp    map[cciptypes.ChainSelector]cciptypes.SeqNum
+	}{
+		{
+			name:   "empty observation should not report anything",
+			obs:    exectypes.Observation{},
+			method: plugincommon.ObservationMethod,
+			exp:    map[cciptypes.ChainSelector]cciptypes.SeqNum{},
+		},
+		{
+			name: "single chain observation with seq nr",
+			obs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					123: {
+						1: {},
+						4: {},
+					},
+				},
+			},
+			method: plugincommon.ObservationMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 4,
+			},
+		},
+		{
+			name: "multiple chain observations with sequence numbers",
+			obs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					123: {
+						1: {},
+						2: {},
+					},
+					456: {
+						4: {},
+					},
+				},
+			},
+			method: plugincommon.ObservationMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+				456: 4,
+			},
+		},
+		{
+			name: "single chain outcome with seq nr",
+			out: exectypes.Outcome{
+				CommitReports: []exectypes.CommitData{
+					{
+						SourceChain: 123,
+						Messages: []cciptypes.Message{
+							{
+								Header: cciptypes.RampMessageHeader{
+									SequenceNumber: 2,
+								},
+							},
+						},
+					},
+				},
+			},
+			method: plugincommon.OutcomeMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+			},
+		},
+		{
+			name: "multiple chain outcomes with sequence numbers",
+			out: exectypes.Outcome{
+				CommitReports: []exectypes.CommitData{
+					{
+						SourceChain: 123,
+						Messages: []cciptypes.Message{
+							{
+								Header: cciptypes.RampMessageHeader{
+									SequenceNumber: 2,
+								},
+							},
+						},
+					},
+					{
+						SourceChain: 456,
+						Messages: []cciptypes.Message{
+							{
+								Header: cciptypes.RampMessageHeader{
+									SequenceNumber: 4,
+								},
+							},
+							{
+								Header: cciptypes.RampMessageHeader{
+									SequenceNumber: 2,
+								},
+							},
+						},
+					},
+				},
+			},
+			method: plugincommon.OutcomeMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+				456: 4,
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter, err := NewPromReporter(logger.Test(t), selector)
+			require.NoError(t, err)
+
+			t.Cleanup(cleanupMetrics(reporter))
+
+			switch tc.method {
+			case plugincommon.ObservationMethod:
+				reporter.TrackObservation(tc.obs, exectypes.GetCommitReports)
+			case plugincommon.OutcomeMethod:
+				reporter.TrackOutcome(tc.out, exectypes.GetCommitReports)
+			}
+
+			for sourceChainSelector, maxSeqNr := range tc.exp {
+				seqNum := testutil.ToFloat64(
+					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChainSelector.String(), tc.method),
+				)
+				require.Equal(t, float64(maxSeqNr), seqNum)
+			}
+		})
+	}
+}
+
 func cleanupMetrics(p *PromReporter) func() {
 	return func() {
 		p.sequenceNumbers.Reset()

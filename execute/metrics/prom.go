@@ -60,7 +60,7 @@ func (p *PromReporter) TrackObservation(obs exectypes.Observation, state exectyp
 
 	for sourceChainSelector, cr := range obs.Messages {
 		maxSeqNr := pickHighestSeqNr(maps.Keys(cr))
-		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.OutcomeMethod)
+		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.ObservationMethod)
 	}
 }
 
