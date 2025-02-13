@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -62,12 +63,16 @@ func Test_TrackingTokenReadiness(t *testing.T) {
 			reporter.TrackObservation(exectypes.Observation{TokenData: tc.observation}, tc.state)
 
 			readyTokens := testutil.ToFloat64(
-				reporter.tokenDataReadinessCounter.WithLabelValues(chainID, string(tc.state), "ready"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, string(tc.state), plugincommon.ObservationMethod, "tokenReady",
+				),
 			)
 			require.Equal(t, tc.expectedReadyTokens, int(readyTokens))
 
 			waitingTokens := testutil.ToFloat64(
-				reporter.tokenDataReadinessCounter.WithLabelValues(chainID, string(tc.state), "waiting"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, string(tc.state), plugincommon.ObservationMethod, "tokenWaiting",
+				),
 			)
 			require.Equal(t, tc.expectedWaitingTokens, int(waitingTokens))
 		})
@@ -149,21 +154,31 @@ func Test_TrackingObservations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			reporter.TrackObservation(tc.observation, tc.state)
 
-			costlyMsgs := testutil.ToFloat64(reporter.costlyMessagesCounter.WithLabelValues(chainID, string(tc.state)))
+			costlyMsgs := testutil.ToFloat64(
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "costlyMessages",
+				),
+			)
 			require.Equal(t, tc.expectedCostlyMessages, int(costlyMsgs))
 
 			nonces := testutil.ToFloat64(
-				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "nonces"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "nonces",
+				),
 			)
 			require.Equal(t, tc.expectedNonces, int(nonces))
 
 			commitReports := testutil.ToFloat64(
-				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "commitReports"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "commitReports",
+				),
 			)
 			require.Equal(t, tc.expectedCommitReports, int(commitReports))
 
 			messages := testutil.ToFloat64(
-				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "messages"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "messages",
+				),
 			)
 			require.Equal(t, tc.expectedMessageCount, int(messages))
 		})
@@ -244,17 +259,23 @@ func Test_TrackingOutcomes(t *testing.T) {
 			reporter.TrackOutcome(tc.outcome, tc.state)
 
 			messages := testutil.ToFloat64(
-				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "messages"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.OutcomeMethod, string(tc.state), "messages",
+				),
 			)
 			require.Equal(t, tc.expectedMessagesCount, int(messages))
 
 			sourceChains := testutil.ToFloat64(
-				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "sourceChains"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.OutcomeMethod, string(tc.state), "sourceChains",
+				),
 			)
 			require.Equal(t, tc.expectedSourceChainCount, int(sourceChains))
 
 			tokenData := testutil.ToFloat64(
-				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "tokenData"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.OutcomeMethod, string(tc.state), "tokenData",
+				),
 			)
 			require.Equal(t, tc.expectedTokenDataCount, int(tokenData))
 		})
@@ -263,9 +284,7 @@ func Test_TrackingOutcomes(t *testing.T) {
 
 func cleanupMetrics(p *PromReporter) func() {
 	return func() {
-		p.costlyMessagesCounter.Reset()
-		p.tokenDataReadinessCounter.Reset()
-		p.outcomeDetailsCounter.Reset()
-		p.observationDetailsCounter.Reset()
+		p.sequenceNumbers.Reset()
+		p.outputDetailsCounter.Reset()
 	}
 }
