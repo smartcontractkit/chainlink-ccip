@@ -223,7 +223,7 @@ pub fn commit_price_only<'info>(
         .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
     require!(
         report.merkle_root.is_none(),
-        CcipOfframpError::MissingExpectedMerkleRoot
+        CcipOfframpError::UnexpectedMerkleRoot,
     );
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
 
