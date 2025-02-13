@@ -69,6 +69,7 @@ func (m *MessageStatusCache) statuses(ctx context.Context, msgID string) (Messag
 		}
 		if status == types.Fatal {
 			details.hasFatalStatus = true
+			break
 		}
 		details.numAttempts++
 	}

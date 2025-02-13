@@ -268,8 +268,6 @@ func Test_getMessagesObservation(t *testing.T) {
 					return types.Fatal, nil
 				}
 			},
-			//inflightMessageCache func() *cache.InflightMessageCache
-			//statusGetter         func() report.StatusGetter
 			previousOutcome: exectypes.Outcome{
 				CommitReports: []exectypes.CommitData{
 					{
