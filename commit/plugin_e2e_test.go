@@ -103,11 +103,21 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
 				{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
 			},
+			RootsToReport:    make([]ccipocr3.MerkleRootChain, 0),
+			RMNEnabledChains: make(map[ccipocr3.ChainSelector]bool),
 			OffRampNextSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
-			RMNRemoteCfg: params.rmnReportCfg,
+			ReportTransmissionCheckAttempts: 0,
+			RMNReportSignatures:             make([]ccipocr3.RMNECDSASignature, 0),
+			RMNRemoteCfg:                    params.rmnReportCfg,
+		},
+		TokenPriceOutcome: tokenprice.Outcome{
+			TokenPrices: make(ccipocr3.TokenPriceMap),
+		},
+		ChainFeeOutcome: chainfee.Outcome{
+			GasPrices: make([]ccipocr3.GasPriceChain, 0),
 		},
 	}
 
@@ -135,6 +145,35 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 	outcomeReportGeneratedOneInflightCheck := outcomeReportGenerated
 	outcomeReportGeneratedOneInflightCheck.MerkleRootOutcome.ReportTransmissionCheckAttempts = 1
 
+	emptyOutcomeOverrides := func(ov func(o committypes.Outcome) committypes.Outcome) committypes.Outcome {
+		empty := committypes.Outcome{
+			MerkleRootOutcome: merkleroot.Outcome{
+				OutcomeType:                     merkleroot.ReportIntervalsSelected,
+				RangesSelectedForReport:         []plugintypes.ChainRange{},
+				RootsToReport:                   make([]ccipocr3.MerkleRootChain, 0),
+				RMNEnabledChains:                make(map[ccipocr3.ChainSelector]bool),
+				OffRampNextSeqNums:              []plugintypes.SeqNumChain{},
+				ReportTransmissionCheckAttempts: 0,
+				RMNReportSignatures:             make([]ccipocr3.RMNECDSASignature, 0),
+				RMNRemoteCfg: rmntypes.RemoteConfig{
+					ContractAddress:  []byte{},
+					ConfigDigest:     ccipocr3.Bytes32{},
+					Signers:          make([]rmntypes.RemoteSignerInfo, 0),
+					FSign:            0,
+					ConfigVersion:    0,
+					RmnReportVersion: ccipocr3.Bytes32{},
+				},
+			},
+			TokenPriceOutcome: tokenprice.Outcome{
+				TokenPrices: make(ccipocr3.TokenPriceMap),
+			},
+			ChainFeeOutcome: chainfee.Outcome{
+				GasPrices: make([]ccipocr3.GasPriceChain, 0),
+			},
+		}
+		return ov(empty)
+	}
+
 	testCases := []struct {
 		name                  string
 		prevOutcome           committypes.Outcome
@@ -154,7 +193,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		{
 			name:            "discovery enabled, should discover contracts",
 			prevOutcome:     committypes.Outcome{},
-			expOutcome:      committypes.Outcome{},
+			expOutcome:      emptyOutcomeOverrides(func(o committypes.Outcome) committypes.Outcome { return o }),
 			enableDiscovery: true,
 		},
 		{
@@ -242,17 +281,22 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				preparePriceReaderMock(n.priceReader)
 			}
 
-			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
+			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecProto().EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrtypecodec.NewCommitCodecProto().DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
-			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
+			assert.Len(t, res.Transmitted, len(tc.expT
+
+
+
+
+			ransmittedReports))
 			for i := range res.Transmitted {
 				decoded, err := reportCodec.Decode(params.ctx, res.Transmitted[i].Report)
 				assert.NoError(t, err)
