@@ -9,152 +9,179 @@ use crate::event::{
     OwnershipTransferRequested, OwnershipTransferred, PriceUpdaterAdded, PriceUpdaterRemoved,
     TokenTransferFeeConfigUpdated,
 };
+use crate::instructions::interfaces::Admin;
 use crate::state::{
-    BillingTokenConfig, DestChain, DestChainConfig, DestChainState, PerChainPerTokenConfig,
-    TimestampedPackedU224, TokenTransferFeeConfig,
+    BillingTokenConfig, CodeVersion, DestChain, DestChainConfig, DestChainState,
+    PerChainPerTokenConfig, TimestampedPackedU224, TokenTransferFeeConfig,
 };
 use crate::FeeQuoterError;
 
-pub fn transfer_ownership(ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
-    let config = &mut ctx.accounts.config;
-    require!(
-        proposed_owner != config.owner,
-        FeeQuoterError::RedundantOwnerProposal
-    );
-    emit!(OwnershipTransferRequested {
-        from: config.owner,
-        to: proposed_owner,
-    });
-    ctx.accounts.config.proposed_owner = proposed_owner;
-    Ok(())
-}
-
-pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-    let config = &mut ctx.accounts.config;
-    emit!(OwnershipTransferred {
-        from: config.owner,
-        to: config.proposed_owner,
-    });
-    ctx.accounts.config.owner = ctx.accounts.config.proposed_owner;
-    ctx.accounts.config.proposed_owner = Pubkey::default();
-    Ok(())
-}
-
-pub fn add_billing_token_config(
-    ctx: Context<AddBillingTokenConfig>,
-    config: BillingTokenConfig,
-) -> Result<()> {
-    emit!(FeeTokenAdded {
-        fee_token: config.mint,
-        enabled: config.enabled
-    });
-    ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
-    ctx.accounts.billing_token_config.config = config;
-    Ok(())
-}
-
-pub fn update_billing_token_config(
-    ctx: Context<UpdateBillingTokenConfig>,
-    config: BillingTokenConfig,
-) -> Result<()> {
-    if config.enabled != ctx.accounts.billing_token_config.config.enabled {
-        // enabled/disabled status has changed
-        match config.enabled {
-            true => emit!(FeeTokenEnabled {
-                fee_token: config.mint
-            }),
-            false => emit!(FeeTokenDisabled {
-                fee_token: config.mint
-            }),
-        }
-    }
-    // TODO should we emit an event if the config has changed regardless of the enabled/disabled?
-
-    ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
-    ctx.accounts.billing_token_config.config = config;
-    Ok(())
-}
-
-pub fn add_dest_chain(
-    ctx: Context<AddDestChain>,
-    chain_selector: u64,
-    dest_chain_config: DestChainConfig,
-) -> Result<()> {
-    validate_dest_chain_config(chain_selector, &dest_chain_config)?;
-    ctx.accounts.dest_chain.set_inner(DestChain {
-        version: 1,
-        chain_selector,
-        state: DestChainState {
-            usd_per_unit_gas: TimestampedPackedU224 {
-                timestamp: 0,
-                value: [0; 28],
-            },
-        },
-        config: dest_chain_config.clone(),
-    });
-    emit!(DestChainAdded {
-        dest_chain_selector: chain_selector,
-        dest_chain_config,
-    });
-    Ok(())
-}
-
-pub fn disable_dest_chain(ctx: Context<UpdateDestChainConfig>, chain_selector: u64) -> Result<()> {
-    ctx.accounts.dest_chain.config.is_enabled = false;
-    emit!(DestChainConfigUpdated {
-        dest_chain_selector: chain_selector,
-        dest_chain_config: ctx.accounts.dest_chain.config.clone(),
-    });
-    Ok(())
-}
-
-pub fn update_dest_chain_config(
-    ctx: Context<UpdateDestChainConfig>,
-    chain_selector: u64,
-    dest_chain_config: DestChainConfig,
-) -> Result<()> {
-    validate_dest_chain_config(chain_selector, &dest_chain_config)?;
-    ctx.accounts.dest_chain.config = dest_chain_config.clone();
-    emit!(DestChainConfigUpdated {
-        dest_chain_selector: chain_selector,
-        dest_chain_config,
-    });
-    Ok(())
-}
-
-pub fn add_price_updater(_ctx: Context<AddPriceUpdater>, price_updater: Pubkey) -> Result<()> {
-    emit!(PriceUpdaterAdded { price_updater });
-    Ok(())
-}
-
-pub fn remove_price_updater(
-    _ctx: Context<RemovePriceUpdater>,
-    price_updater: Pubkey,
-) -> Result<()> {
-    emit!(PriceUpdaterRemoved { price_updater });
-    Ok(())
-}
-
-pub fn set_token_transfer_fee_config(
-    ctx: Context<SetTokenTransferFeeConfig>,
-    chain_selector: u64,
-    mint: Pubkey,
-    cfg: TokenTransferFeeConfig,
-) -> Result<()> {
-    ctx.accounts
-        .per_chain_per_token_config
-        .set_inner(PerChainPerTokenConfig {
-            version: 1, // update this if we change the account struct
-            chain_selector,
-            mint,
-            token_transfer_config: cfg.clone(),
+pub struct Impl;
+impl Admin for Impl {
+    fn transfer_ownership(&self, ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        require!(
+            proposed_owner != config.owner,
+            FeeQuoterError::RedundantOwnerProposal
+        );
+        emit!(OwnershipTransferRequested {
+            from: config.owner,
+            to: proposed_owner,
         });
-    emit!(TokenTransferFeeConfigUpdated {
-        dest_chain_selector: chain_selector,
-        token: mint,
-        token_transfer_fee_config: cfg,
-    });
-    Ok(())
+        ctx.accounts.config.proposed_owner = proposed_owner;
+        Ok(())
+    }
+
+    fn accept_ownership(&self, ctx: Context<AcceptOwnership>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        emit!(OwnershipTransferred {
+            from: config.owner,
+            to: config.proposed_owner,
+        });
+        ctx.accounts.config.owner = ctx.accounts.config.proposed_owner;
+        ctx.accounts.config.proposed_owner = Pubkey::default();
+        Ok(())
+    }
+
+    fn set_default_code_version(
+        &self,
+        ctx: Context<UpdateConfig>,
+        code_version: CodeVersion,
+    ) -> Result<()> {
+        ctx.accounts.config.default_code_version = code_version;
+        Ok(())
+    }
+
+    fn add_billing_token_config(
+        &self,
+        ctx: Context<AddBillingTokenConfig>,
+        config: BillingTokenConfig,
+    ) -> Result<()> {
+        emit!(FeeTokenAdded {
+            fee_token: config.mint,
+            enabled: config.enabled
+        });
+        ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
+        ctx.accounts.billing_token_config.config = config;
+        Ok(())
+    }
+
+    fn update_billing_token_config(
+        &self,
+        ctx: Context<UpdateBillingTokenConfig>,
+        config: BillingTokenConfig,
+    ) -> Result<()> {
+        if config.enabled != ctx.accounts.billing_token_config.config.enabled {
+            // enabled/disabled status has changed
+            match config.enabled {
+                true => emit!(FeeTokenEnabled {
+                    fee_token: config.mint
+                }),
+                false => emit!(FeeTokenDisabled {
+                    fee_token: config.mint
+                }),
+            }
+        }
+        // TODO should we emit an event if the config has changed regardless of the enabled/disabled?
+
+        ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
+        ctx.accounts.billing_token_config.config = config;
+        Ok(())
+    }
+
+    fn add_dest_chain(
+        &self,
+        ctx: Context<AddDestChain>,
+        chain_selector: u64,
+        dest_chain_config: DestChainConfig,
+    ) -> Result<()> {
+        validate_dest_chain_config(chain_selector, &dest_chain_config)?;
+        ctx.accounts.dest_chain.set_inner(DestChain {
+            version: 1,
+            chain_selector,
+            state: DestChainState {
+                usd_per_unit_gas: TimestampedPackedU224 {
+                    timestamp: 0,
+                    value: [0; 28],
+                },
+            },
+            config: dest_chain_config.clone(),
+        });
+        emit!(DestChainAdded {
+            dest_chain_selector: chain_selector,
+            dest_chain_config,
+        });
+        Ok(())
+    }
+
+    fn disable_dest_chain(
+        &self,
+        ctx: Context<UpdateDestChainConfig>,
+        chain_selector: u64,
+    ) -> Result<()> {
+        ctx.accounts.dest_chain.config.is_enabled = false;
+        emit!(DestChainConfigUpdated {
+            dest_chain_selector: chain_selector,
+            dest_chain_config: ctx.accounts.dest_chain.config.clone(),
+        });
+        Ok(())
+    }
+
+    fn update_dest_chain_config(
+        &self,
+        ctx: Context<UpdateDestChainConfig>,
+        chain_selector: u64,
+        dest_chain_config: DestChainConfig,
+    ) -> Result<()> {
+        validate_dest_chain_config(chain_selector, &dest_chain_config)?;
+        ctx.accounts.dest_chain.config = dest_chain_config.clone();
+        emit!(DestChainConfigUpdated {
+            dest_chain_selector: chain_selector,
+            dest_chain_config,
+        });
+        Ok(())
+    }
+
+    fn add_price_updater(
+        &self,
+        _ctx: Context<AddPriceUpdater>,
+        price_updater: Pubkey,
+    ) -> Result<()> {
+        emit!(PriceUpdaterAdded { price_updater });
+        Ok(())
+    }
+
+    fn remove_price_updater(
+        &self,
+        _ctx: Context<RemovePriceUpdater>,
+        price_updater: Pubkey,
+    ) -> Result<()> {
+        emit!(PriceUpdaterRemoved { price_updater });
+        Ok(())
+    }
+
+    fn set_token_transfer_fee_config(
+        &self,
+        ctx: Context<SetTokenTransferFeeConfig>,
+        chain_selector: u64,
+        mint: Pubkey,
+        cfg: TokenTransferFeeConfig,
+    ) -> Result<()> {
+        ctx.accounts
+            .per_chain_per_token_config
+            .set_inner(PerChainPerTokenConfig {
+                version: 1, // update this if we change the account struct
+                chain_selector,
+                mint,
+                token_transfer_config: cfg.clone(),
+            });
+        emit!(TokenTransferFeeConfigUpdated {
+            dest_chain_selector: chain_selector,
+            token: mint,
+            token_transfer_fee_config: cfg,
+        });
+        Ok(())
+    }
 }
 
 // --- helpers ---
