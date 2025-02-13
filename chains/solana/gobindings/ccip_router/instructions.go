@@ -69,6 +69,17 @@ var (
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
 	// Config //
+	// Sets the default code version to be used. This is then used by the slim routing layer to determine
+	// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
+	//
+	// Shared func signature with other programs
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `code_version` - The new code version to be set as default.
+	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
+
 	// Updates the fee aggregator in the router configuration.
 	// The Admin is the only one able to update the fee aggregator.
 	//
@@ -238,6 +249,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_SetDefaultCodeVersion:
+		return "SetDefaultCodeVersion"
 	case Instruction_UpdateFeeAggregator:
 		return "UpdateFeeAggregator"
 	case Instruction_AddChainSelector:
@@ -296,6 +309,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),
+		},
+		{
+			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
 		},
 		{
 			"update_fee_aggregator", (*UpdateFeeAggregator)(nil),

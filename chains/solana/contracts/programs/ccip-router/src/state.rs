@@ -1,9 +1,30 @@
+use std::fmt::Display;
+
+use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+#[repr(u8)]
+pub enum CodeVersion {
+    Default = 0,
+    V1,
+}
+
+impl Display for CodeVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CodeVersion::Default => write!(f, "Default"),
+            CodeVersion::V1 => write!(f, "V1"),
+        }
+    }
+}
 
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct Config {
     pub version: u8,
+
+    pub default_code_version: CodeVersion,
 
     pub svm_chain_selector: u64,
     pub owner: Pubkey,
@@ -20,6 +41,9 @@ pub struct DestChainState {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainConfig {
+    // The code version of the lane, in case we need to shift traffic to new logic for a single lane to test an upgrade
+    pub lane_code_version: CodeVersion,
+
     // list of senders authorized to send messages to this destination chain.
     // Note: The attribute name `max_len` is slightly misleading: it is not in any
     // way limiting the actual length of the vector during initialization; it just
