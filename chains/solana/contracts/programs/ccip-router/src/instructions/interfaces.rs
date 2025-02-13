@@ -48,6 +48,18 @@ pub trait Admin {
         dest_chain_config: DestChainConfig,
     ) -> Result<()>;
 
+    fn bump_ccip_version_for_dest_chain(
+        &self,
+        ctx: Context<UpdateDestChainSelectorConfig>,
+        dest_chain_selector: u64,
+    ) -> Result<()>;
+
+    fn rollback_ccip_version_for_dest_chain(
+        &self,
+        ctx: Context<UpdateDestChainSelectorConfig>,
+        dest_chain_selector: u64,
+    ) -> Result<()>;
+
     fn add_offramp(
         &self,
         _ctx: Context<AddOfframp>,

@@ -240,6 +240,38 @@ pub mod ccip_router {
             .update_svm_chain_selector(ctx, new_chain_selector)
     }
 
+    /// Bumps the CCIP version for a destination chain.
+    /// This effectively just resets the sequence number of the destination chain state.
+    /// If there had been a previous rollback, on re-upgrade the sequence number will resume from where it was
+    /// prior to the rollback.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context containing the accounts required for the bump.
+    /// * `dest_chain_selector` - The destination chain selector to bump version for.
+    pub fn bump_ccip_version_for_dest_chain(
+        ctx: Context<UpdateDestChainSelectorConfig>,
+        dest_chain_selector: u64,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .bump_ccip_version_for_dest_chain(ctx, dest_chain_selector)
+    }
+
+    /// Rolls back the CCIP version for a destination chain.
+    /// This effectively just restores the old version's sequence number of the destination chain state.
+    /// We only support 1 consecutive rollback. If a rollback has occurred for that lane, the version can't
+    /// be rolled back again without bumping the version first.
+    ///
+    /// # Arguments
+    /// * `ctx` - The context containing the accounts required for the rollback.
+    /// * `dest_chain_selector` - The destination chain selector to rollback the version for.
+    pub fn rollback_ccip_version_for_dest_chain(
+        ctx: Context<UpdateDestChainSelectorConfig>,
+        dest_chain_selector: u64,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .rollback_ccip_version_for_dest_chain(ctx, dest_chain_selector)
+    }
+
     ///////////////////////////
     /// Token Admin Registry //
     ///////////////////////////
@@ -465,4 +497,6 @@ pub enum CcipRouterError {
     SenderNotAllowed,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
+    #[msg("Invalid rollback attempt on the CCIP version of the onramp to the destination chain")]
+    InvalidCcipVersionRollback,
 }
