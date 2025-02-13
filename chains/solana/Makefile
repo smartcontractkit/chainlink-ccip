@@ -69,6 +69,14 @@ docker-build-contracts:
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
 		${ANCHOR_IMAGE} anchor build
 
+.PHONY: docker-update-contracts
+docker-update-contracts:
+	docker run --rm \
+		-v $(shell pwd)/contracts:/workdir \
+		-v ${TARGET_DIR}:/workdir/target \
+		-e CARGO_TARGET_DIR=/workdir/target \
+		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
+		${ANCHOR_IMAGE} anchor keys sync
 
 .PHONY: solana-checks
 solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
