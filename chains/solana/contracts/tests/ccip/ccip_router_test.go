@@ -148,6 +148,8 @@ func TestCCIPRouter(t *testing.T) {
 	validFqDestChainConfig := fee_quoter.DestChainConfig{
 		IsEnabled: true,
 
+		LaneCodeVersion: fee_quoter.Default_CodeVersion,
+
 		// minimal valid config
 		DefaultTxGasLimit:           200000,
 		MaxPerMsgGasLimit:           3000000,
