@@ -1588,7 +1588,7 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, cerr)
 						result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, ccipAdmin, config.DefaultCommitment)
 
-						// Check event PremiumMultiplierWeiPerEthUpdated
+						// check event PremiumMultiplierWeiPerEthUpdated
 						premiumMultiplierWeiPerEthUpdatedEvent := ccip.PremiumMultiplierWeiPerEthUpdated{}
 						require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "PremiumMultiplierWeiPerEthUpdated", &premiumMultiplierWeiPerEthUpdatedEvent, config.PrintEvents))
 						require.Equal(t, tokenConfig.Mint, premiumMultiplierWeiPerEthUpdatedEvent.Token)
