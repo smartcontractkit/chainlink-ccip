@@ -233,7 +233,9 @@ func TestCcipReceiver(t *testing.T) {
 
 	t.Run("token withdraw", func(t *testing.T) {
 		// use token pool for address derivation & state management
-		token, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram)
+		mint := solana.MustPrivateKeyFromBase58("4dD1x6rv1uLHKWCrYBY9WYa781YgNQGocVpqrS1EzfDQAq9TK4Vdyju6eLXicoSmjiGU9uZ9ExJHmC5GzwGoQUWD")
+		require.NoError(t, err)
+		token, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mint)
 		require.NoError(t, err)
 
 		ixs, ixErr := tokens.CreateToken(ctx, token.Program, token.Mint.PublicKey(), ccipAdmin.PublicKey(), 0, solClient, rpc.CommitmentConfirmed)
