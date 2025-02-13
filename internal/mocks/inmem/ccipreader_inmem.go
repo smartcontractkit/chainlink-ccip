@@ -119,6 +119,11 @@ func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
 	}), nil
 }
 
+func (r InMemoryCCIPReader) LatestMsgSeqNum(
+	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	return 0, nil
+}
+
 func (r InMemoryCCIPReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error) {
