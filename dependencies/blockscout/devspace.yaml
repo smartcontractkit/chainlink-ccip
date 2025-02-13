@@ -3,129 +3,103 @@ name: blockscout
 
 vars:
   # Check image versions against compatibility matrix
-  #   https://docs.blockscout.com/setup/requirements/back-front-compatibility-matrix
+  #  https://docs.blockscout.com/setup/requirements/back-front-compatibility-matrix
   BLOCKSCOUT_BACKEND_IMAGE_TAG:
     source: env
-    value: 6.8.1
+    value: "6.10.2"
   BLOCKSCOUT_FRONTEND_IMAGE_TAG:
     source: env
-    value: v1.34.2
+    value: "v1.37.5"
   LOCAL_TEMPLATES_DIR:
     source: env
     default: ./templates
-  ENABLE_GETH_1337:
+  ETHEREUM_VARIANT:
+    source: env
+    default: besu # or geth
+  CHAIN_NAME:
+    source: env
+    default: ""
+  CHAIN_ID:
+    source: env
+    default: ""
+  CHAIN_TYPE:
+    source: env
+    default: "EVM"
+  ENABLE_BASE:
     source: env
     default: true
-  ENABLE_GETH_2337:
+  ENVIRONMENT:
     source: env
-    default: false
+    default: sandbox
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
 
 pipelines:
   deploy:
     run: |-
-      if [[ "$ENABLE_GETH_1337" == "true" ]]; then
-        create_deployments blockscout-postgres-1337
-        create_deployments blockscout-1337
-      fi
+      echo "DEVSPACE_INGRESS_BASE_DOMAIN: ${DEVSPACE_INGRESS_BASE_DOMAIN}"
+      create_deployments blockscout-postgres-${ETHEREUM_VARIANT}-chain-${CHAIN_NAME}-${CHAIN_ID}
+      create_deployments blockscout-${ETHEREUM_VARIANT}-chain-${CHAIN_NAME}-${CHAIN_ID}
 
-       if [[ "$ENABLE_GETH_2337" == "true" ]]; then
-        create_deployments blockscout-postgres-2337
-        create_deployments blockscout-2337
-      fi
+hooks:
+  - name: set-devspace-namespace
+    command: |-
+      devspace use namespace ${NAMESPACE}
+    events: ["before:deploy:blockscout-postgres-${ETHEREUM_VARIANT}-chain-${CHAIN_NAME}-${CHAIN_ID}"]
 
 profiles:
-  # Geth 1337 Profiles
-  - name: blockscout-base-1337
+  - name: base
     activation:
       - vars:
-          ENABLE_GETH_1337: "true"
+          ENABLE_BASE: "true"
     merge: |-
       $(
-        CHAIN_ID=1337 \
+        CHAIN_ID=${CHAIN_ID} \
+        CHAIN_NAME=${CHAIN_NAME} \
+        DEVSPACE_INGRESS_BASE_DOMAIN=${DEVSPACE_INGRESS_BASE_DOMAIN} \
+        ETHEREUM_VARIANT=${ETHEREUM_VARIANT} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.base.yaml
       )
-  - name: kind-1337
+
+  - name: kind
     activation:
       - vars:
           PROVIDER: "kind"
-          ENABLE_GETH_1337: "true"
     merge: |-
       $(
-        CHAIN_ID=1337 \
+        CHAIN_ID=${CHAIN_ID} \
+        CHAIN_NAME=${CHAIN_NAME} \
+        ETHEREUM_VARIANT=${ETHEREUM_VARIANT} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-kind.yaml
       )
-  - name: aws-1337
+
+  - name: aws
     activation:
       - vars:
           PROVIDER: "aws"
-          ENABLE_GETH_1337: "true"
+          ENVIROMENT: "stage"
     merge: |-
       $(
-        CHAIN_ID=1337 \
+        CHAIN_ID=${CHAIN_ID} \
+        CHAIN_NAME=${CHAIN_NAME} \
+        ETHEREUM_VARIANT=${ETHEREUM_VARIANT} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-staging.yaml
       )
-  # Geth 2337 Profiles
-  - name: blockscout-base-2337
+
+  - name: aws-sandbox
     activation:
       - vars:
-          ENABLE_GETH_2337: "true"
+          ENVIRONMENT: "sandbox"
     merge: |-
       $(
-        CHAIN_ID=2337 \
+        CHAIN_ID=${CHAIN_ID} \
+        CHAIN_NAME=${CHAIN_NAME} \
+        DEVSPACE_INGRESS_BASE_DOMAIN=${DEVSPACE_INGRESS_BASE_DOMAIN} \
+        ETHEREUM_VARIANT=${ETHEREUM_VARIANT} \
         gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/blockscout.base.yaml
+          --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-sandbox.yaml
       )
-  - name: kind-2337
-    activation:
-      - vars:
-          PROVIDER: "kind"
-          ENABLE_GETH_2337: "true"
-    merge: |-
-      $(
-        CHAIN_ID=2337 \
-        gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-kind.yaml
-      )
-  - name: aws-2337
-    activation:
-      - vars:
-          PROVIDER: "aws"
-          ENABLE_GETH_2337: "true"
-    merge: |-
-      $(
-        CHAIN_ID=2337 \
-        gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-staging.yaml
-      )
-  - name: local-charts-1337
-    # todo: delete automatic activations after fix is merged with upstream and release
-    activation:
-      - vars:
-          ENABLE_GETH_1337: "true"
-          PROVIDER: "aws"
-    merge:
-      deployments:
-        blockscout-1337:
-          helm:
-            chart:
-              name: blockscout-stack
-              path: ${CHAINLINK_CODE_DIR}/blockscout-helm-charts/charts/blockscout-stack
-              repo: null
-              version: null
-  - name: local-charts-2337
-    activation:
-      - vars:
-          ENABLE_GETH_2337: "true"
-          PROVIDER: "aws"
-    merge:
-      deployments:
-        blockscout-2337:
-          helm:
-            chart:
-              name: blockscout-stack
-              path: ${CHAINLINK_CODE_DIR}/blockscout-helm-charts/charts/blockscout-stack
-              repo: null
-              version: null

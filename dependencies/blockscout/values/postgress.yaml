@@ -1,0 +1,36 @@
+architecture: standalone
+auth:
+  enablePostgresUser: true
+  postgresPassword: postgres
+  username: blockscout
+  password: blockscout123
+  database: blockscout
+  existingSecret: ''
+image:
+  registry: docker.io
+  repository: bitnami/postgresql
+  tag: 16
+tls:
+  enabled: false
+containerPorts:
+  postgresql: 5432
+primary:
+  extendedConfiguration: |
+    max_connections = 400
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: gp3
+  resources:
+    limits:
+      memory: 2Gi
+      cpu: 1000m
+    requests:
+      memory: 1Gi
+      cpu: 500m
+networkPolicy:
+  enabled: false
+volumePermissions:
+  enabled: false
+metrics:
+  enabled: false

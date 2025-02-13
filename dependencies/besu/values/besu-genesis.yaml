@@ -1,0 +1,13 @@
+rawGenesisConfig:
+  genesis:
+    config:
+      chainId: 1337
+      algorithm:
+        consensus: qbft
+        blockperiodseconds: 5
+        epochlength: 30000
+        requesttimeoutseconds: 20
+    gasLimit: '0x35A4E900' # 900000000
+    difficulty: '0x1'
+    coinbase: '0x0000000000000000000000000000000000000000'
+    includeQuickStartAccounts: true

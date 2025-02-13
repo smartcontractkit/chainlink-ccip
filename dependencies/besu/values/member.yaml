@@ -1,0 +1,13 @@
+cluster:
+  provider: aws
+
+node:
+  besu:
+    metrics:
+      serviceMonitorEnabled: false
+quorumFlags:
+  privacy: true
+  # this will erase keys - so be careful with this on validators
+  removeKeysOnDelete: false
+  # isBootnode: false    # set this to true if this node is a bootnode
+  usesBootnodes: true

@@ -1,16 +1,6 @@
 # Blockscout component (Alpha)
 Blockscout component to deploy one or many blockscout instances using [blockscout-stack chart](https://github.com/blockscout/helm-charts/tree/main/charts/blockscout-stack)
 
-## Pre-req
-### AWS Provider
-Currently, there is [an issue in the blockscout chart](https://github.com/blockscout/helm-charts/pull/43). 
-To deploy in AWS provider you'll need to clone the forked version of blockscout 
-
-```shell
-cd $CHAINLINK_CODE_DIR
-git clone git@github.com:scheibinger/helm-charts.git blockscout-helm-charts --branch fix-security-context
-```
-
 ## Features
 * Component provides config to deploy blockscout for Geth 1337 and 2337 chains.
 * It provides a reusable gomplate templates with the base config. You can easily reuse existing config and add other chains if needed
@@ -47,9 +37,6 @@ When deploying to Staging EKS cluster, there are stability issues, mostly relate
 There are 2 backend instances (1 API  and 1 Indexer). During redeployments, the number can increase to 5, because there is also another batch job for running the DB migrations.
 
 To guarantee available connections in the connection pool for each instance, the Postgres `max_connections` property is bumped to `400` and each instance is configured to use `60` connections. That should provide enough connections for 5 instances running at the same time.
-
-### Further improvements
-* [PR to fix securityContext and image tags issue](https://github.com/blockscout/helm-charts/pull/43).
 
 #### DB Setup
 There is a room for improvement in the DB setup, for some reason I noticed it is getting moved between nodes quite often and that is causing the disruption for entire cluster.
