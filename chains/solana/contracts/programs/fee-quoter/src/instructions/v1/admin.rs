@@ -97,10 +97,10 @@ impl Admin for Impl {
                 premium_multiplier_wei_per_eth: config.premium_multiplier_wei_per_eth,
             });
         }
-      
+
         ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
         ctx.accounts.billing_token_config.config = config;
-      
+
         Ok(())
     }
 
