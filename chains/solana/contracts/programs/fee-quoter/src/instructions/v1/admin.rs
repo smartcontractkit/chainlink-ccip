@@ -6,8 +6,8 @@ use crate::context::{
 };
 use crate::event::{
     DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled,
-    OwnershipTransferRequested, OwnershipTransferred, PriceUpdaterAdded, PriceUpdaterRemoved,
-    TokenTransferFeeConfigUpdated,
+    OwnershipTransferRequested, OwnershipTransferred, PremiumMultiplierWeiPerEthUpdated,
+    PriceUpdaterAdded, PriceUpdaterRemoved, TokenTransferFeeConfigUpdated,
 };
 use crate::state::{
     BillingTokenConfig, DestChain, DestChainConfig, DestChainState, PerChainPerTokenConfig,
@@ -70,8 +70,23 @@ pub fn update_billing_token_config(
     }
     // TODO should we emit an event if the config has changed regardless of the enabled/disabled?
 
+    // emit an event if the premium multiplier has changed, before updating the config
+    if config.premium_multiplier_wei_per_eth
+        != ctx
+            .accounts
+            .billing_token_config
+            .config
+            .premium_multiplier_wei_per_eth
+    {
+        emit!(PremiumMultiplierWeiPerEthUpdated {
+            token: config.mint,
+            premium_multiplier_wei_per_eth: config.premium_multiplier_wei_per_eth,
+        });
+    }
+
     ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
     ctx.accounts.billing_token_config.config = config;
+
     Ok(())
 }
 

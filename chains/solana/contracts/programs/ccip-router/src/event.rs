@@ -102,10 +102,3 @@ pub mod events {
         }
     }
 }
-
-#[event]
-// TODO: Check why this is not used
-pub struct PremiumMultiplierWeiPerEthUpdated {
-    pub token: Pubkey,
-    pub premium_multiplier_wei_per_eth: u64,
-}
