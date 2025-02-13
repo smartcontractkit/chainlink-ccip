@@ -22,10 +22,22 @@ const (
 	oracleIDLoggerKey     = "oracleID"
 	donIDLoggerKey        = "donID"
 	configDigestLoggerKey = "configDigest"
+	ocrPhaseLoggerKey     = "ocrPhase"
 
 	// ocrSeqNrKey refers to the OCR sequence number.
 	// Linter complains if this is a plain "string" type.
 	ocrSeqNrKey = contextKey(ocrSeqNrLoggerKey)
+	ocrPhaseKey = contextKey(ocrPhaseLoggerKey)
+)
+
+// OCR phase values, all loggers should use these to standardize output.
+const (
+	PhaseQuery          = "qry"
+	PhaseObservation    = "obs"
+	PhaseOutcome        = "otcm"
+	PhaseReports        = "rprt"
+	PhaseShouldAccept   = "sacc"
+	PhaseShouldTransmit = "strn"
 )
 
 // WithComponent returns a logger with the component log field set.
@@ -53,21 +65,24 @@ func WithPluginConstants(
 	)
 }
 
-// WithOCRSeqNr returns a context.Context and logger with the OCR sequence number set
-// in both the context and the logger fields.
-func WithOCRSeqNr(
+// WithOCRInfo returns a context.Context and logger with the OCR sequence number
+// and ocr phase set in both the context and the logger fields.
+func WithOCRInfo(
 	ctx context.Context,
 	lggr logger.Logger,
 	ocrSeqNr uint64,
+	ocrPhase string,
 ) (context.Context, logger.Logger) {
-	newCtx := ctxWithOCRSeqNr(ctx, ocrSeqNr)
+	newCtx := ctxWithOCRVals(ctx, ocrSeqNr, ocrPhase)
 	newLggr := WithContextValues(newCtx, lggr)
 	return newCtx, newLggr
 }
 
-// ctxWithOCRSeqNr returns a context.Context with the OCR sequence number appropriately set.
-func ctxWithOCRSeqNr(ctx context.Context, seqNr uint64) context.Context {
-	return context.WithValue(ctx, ocrSeqNrKey, seqNr)
+// ctxWithOCRVals returns a context.Context with the OCR sequence number appropriately set.
+func ctxWithOCRVals(ctx context.Context, seqNr uint64, ocrPhase string) context.Context {
+	c1 := context.WithValue(ctx, ocrSeqNrKey, seqNr)
+	c2 := context.WithValue(c1, ocrPhaseKey, ocrPhase)
+	return c2
 }
 
 // WithContextValues returns a logger with the OCR sequence number set to the correct log field key.
@@ -80,6 +95,7 @@ func WithContextValues(
 	return logger.With(
 		lggr,
 		ocrSeqNrLoggerKey, GetSeqNr(ctx),
+		ocrPhaseLoggerKey, ctx.Value(ocrPhaseKey),
 	)
 }
 

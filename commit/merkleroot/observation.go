@@ -34,6 +34,9 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
+var ErrSignaturesNotProvidedByLeader = errors.New("rmn signatures were not provided by the leader, " +
+	"in most cases this indicates that the RMN nodes did not include any chain in their response")
+
 // ObservationQuorum requires "across all chains" at least 2F+1 observations.
 func (p *Processor) ObservationQuorum(
 	_ context.Context, _ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation,
@@ -60,17 +63,23 @@ func (p *Processor) Observation(
 	}
 
 	if err := p.verifyQuery(ctx, prevOutcome, q); err != nil {
+		if errors.Is(err, ErrSignaturesNotProvidedByLeader) {
+			lggr.Warnw("RMN signatures not available, returning only fChain", "err", err)
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nil
+		}
 		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
 
 	tStart := time.Now()
-	observation, nextState, err := p.getObservation(ctx, q, prevOutcome)
+	observation, nextState, err := p.getObservation(ctx, lggr, q, prevOutcome)
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
 	lggr.Infow("sending merkle root processor observation",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
-	p.metricsReporter.TrackMerkleObservation(observation, nextState.String())
 	return observation, nil
 }
 
@@ -203,7 +212,7 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 
 	// If in the BuildingReport state and RMN signatures are required but not provided, return an error.
 	if nextState == buildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
-		return false, fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
+		return false, ErrSignaturesNotProvidedByLeader
 	}
 
 	// If in the BuildingReport state but RMN remote config is not available, return an error.
@@ -221,52 +230,44 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 }
 
 func (p *Processor) getObservation(
-	ctx context.Context, q Query, previousOutcome Outcome) (Observation, processorState, error) {
+	ctx context.Context, lggr logger.Logger, q Query, previousOutcome Outcome) (Observation, processorState, error) {
 	nextState := previousOutcome.nextState()
 	switch nextState {
 	case selectingRangesForReport:
-		var (
-			offRampNextSeqNums  []plugintypes.SeqNumChain
-			onRampLatestSeqNums []plugintypes.SeqNumChain
-			rmnRemoteCfg        rmntypes.RemoteConfig
-		)
-
-		eg := &errgroup.Group{}
-
-		eg.Go(func() error {
-			offRampNextSeqNums = p.observer.ObserveOffRampNextSeqNums(ctx)
-			return nil
-		})
-
-		eg.Go(func() error {
-			onRampLatestSeqNums = p.observer.ObserveLatestOnRampSeqNums(ctx, p.destChain)
-			return nil
-		})
-
-		eg.Go(func() error {
-			rmnRemoteCfg = p.observer.ObserveRMNRemoteCfg(ctx, p.destChain)
-			return nil
-		})
-
-		if err := eg.Wait(); err != nil {
-			return Observation{}, nextState, fmt.Errorf("failed to get observation: %w", err)
-		}
-
 		return Observation{
-			OnRampMaxSeqNums:   onRampLatestSeqNums,
-			OffRampNextSeqNums: offRampNextSeqNums,
-			RMNRemoteConfig:    rmnRemoteCfg,
+			OnRampMaxSeqNums:   p.observer.ObserveLatestOnRampSeqNums(ctx),
+			OffRampNextSeqNums: p.observer.ObserveOffRampNextSeqNums(ctx),
+			RMNRemoteConfig:    p.observer.ObserveRMNRemoteCfg(ctx),
 			FChain:             p.observer.ObserveFChain(ctx),
 		}, nextState, nil
 	case buildingReport:
 		if q.RetryRMNSignatures {
 			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
-			// So there's nothing to observe, i.e. we don't want to build the report yet.
-			return Observation{}, nextState, nil
+			// So there's nothing to observe except for fChain, i.e. we don't want to build the report yet.
+			return Observation{
+				// We observe fChain to avoid errors in the outcome phase.
+				// We check q.RetryRMNSignatures there and return the appropriate state and outcome
+				// in order to retry.
+				FChain: p.observer.ObserveFChain(ctx),
+			}, nextState, nil
 		}
+
+		rmnEnabledChains := make(map[cciptypes.ChainSelector]bool)
+
+		if p.offchainCfg.RMNEnabled {
+			var err error
+			rmnEnabledChains, err = p.rmnHomeReader.GetRMNEnabledSourceChains(previousOutcome.RMNRemoteCfg.ConfigDigest)
+			if err != nil {
+				return Observation{}, nextState, fmt.Errorf("failed to get RMN enabled source chains for %s: %w",
+					previousOutcome.RMNRemoteCfg.ConfigDigest.String(), err)
+			}
+			lggr.Debugw("fetched RMN-enabled chains from rmnHome", "rmnEnabledChains", rmnEnabledChains)
+		}
+
 		return Observation{
-			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			FChain:      p.observer.ObserveFChain(ctx),
+			MerkleRoots:      p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
+			FChain:           p.observer.ObserveFChain(ctx),
+			RMNEnabledChains: rmnEnabledChains,
 		}, nextState, nil
 	case waitingForReportTransmission:
 		return Observation{
@@ -289,8 +290,8 @@ type Observer interface {
 	ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain
 
 	// ObserveLatestOnRampSeqNums observes the latest OnRamp sequence numbers for each configured source chain.
-	// NOTE: Make sure that caller supports the provided destination chain.
-	ObserveLatestOnRampSeqNums(ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain
+	// NOTE: Make sure that caller supports the destination chain.
+	ObserveLatestOnRampSeqNums(ctx context.Context) []plugintypes.SeqNumChain
 
 	// ObserveMerkleRoots computes and returns the merkle roots for the provided sequence number ranges.
 	// NOTE: Make sure that caller supports the provided chains.
@@ -298,13 +299,156 @@ type Observer interface {
 
 	// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
 	// Check implementation specific details to learn if external calls are made, if values are cached, etc...
-	// NOTE: Make sure that caller supports the provided destination chain.
-	ObserveRMNRemoteCfg(ctx context.Context, dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig
+	// NOTE: Make sure that caller supports the destination chain.
+	ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig
 
 	// ObserveFChain observes the FChain for each supported chain. Check implementation specific details to learn
 	// if external calls are made, if values are cached, etc...
 	// NOTE: You can assume that every oracle can call this method, since data are fetched from home chain.
 	ObserveFChain(ctx context.Context) map[cciptypes.ChainSelector]int
+
+	// Close closes the observer and releases any resources.
+	Close() error
+}
+
+// asyncObserver is an Observer implementation that fetches the data asynchronously.
+type asyncObserver struct {
+	lggr                logger.Logger
+	syncObserver        observerImpl
+	cancelFunc          func()
+	mu                  *sync.RWMutex
+	offRampNextSeqNums  []plugintypes.SeqNumChain
+	onRampLatestSeqNums []plugintypes.SeqNumChain
+}
+
+// newAsyncObserver creates a new asyncObserver.
+// It fetches the data from the base observer asynchronously and caches the results.
+// It fetches the data every tickDur and uses a timeout of syncTimeout to kill long RPC calls.
+func newAsyncObserver(lggr logger.Logger, observer observerImpl, tickDur, syncTimeout time.Duration) *asyncObserver {
+	ctx, cf := context.WithCancel(context.Background())
+
+	o := &asyncObserver{
+		lggr:                lggr,
+		syncObserver:        observer,
+		cancelFunc:          cf,
+		mu:                  &sync.RWMutex{},
+		offRampNextSeqNums:  make([]plugintypes.SeqNumChain, 0),
+		onRampLatestSeqNums: make([]plugintypes.SeqNumChain, 0),
+	}
+
+	ticker := time.NewTicker(tickDur)
+	lggr.Debugw("async observer started", "tickDur", tickDur, "syncTimeout", syncTimeout)
+	o.start(ctx, ticker.C, syncTimeout)
+
+	o.cancelFunc = func() {
+		cf()
+		ticker.Stop()
+	}
+
+	return o
+}
+
+func (o *asyncObserver) start(ctx context.Context, ticker <-chan time.Time, syncTimeout time.Duration) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker:
+				o.sync(ctx, syncTimeout)
+			}
+		}
+	}()
+}
+
+func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
+	o.lggr.Debugw("async observer is syncing", "syncTimeout", syncTimeout)
+	ctxSync, cf := context.WithTimeout(ctx, syncTimeout)
+	defer cf()
+
+	syncOps := []struct {
+		id string
+		op func(context.Context)
+	}{
+		{
+			id: "offRampNextSeqNums",
+			op: func(ctx context.Context) {
+				offRampNext := o.syncObserver.ObserveOffRampNextSeqNums(ctxSync)
+				o.mu.Lock()
+				o.offRampNextSeqNums = offRampNext
+				o.mu.Unlock()
+			},
+		},
+		{
+			id: "onRampLatestSeqNums",
+			op: func(ctx context.Context) {
+				onRampLast := o.syncObserver.ObserveLatestOnRampSeqNums(ctxSync)
+				o.mu.Lock()
+				o.onRampLatestSeqNums = onRampLast
+				o.mu.Unlock()
+			},
+		},
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(syncOps))
+	for _, op := range syncOps {
+		go o.applySyncOp(ctxSync, o.lggr, op.id, wg, op.op)
+	}
+	wg.Wait()
+}
+
+// applySyncOp applies the given operation synchronously.
+func (o *asyncObserver) applySyncOp(
+	ctx context.Context, lggr logger.Logger, id string, wg *sync.WaitGroup, op func(ctx context.Context)) {
+	defer wg.Done()
+	tStart := time.Now()
+	o.lggr.Debugw("async observer applying sync operation", "id", id)
+	op(ctx)
+	lggr.Debugw("async observer has applied the sync operation",
+		"id", id, "duration", time.Since(tStart))
+}
+
+// ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp.
+// Values are fetched from observers state which are fetched async.
+func (o *asyncObserver) ObserveOffRampNextSeqNums(_ context.Context) []plugintypes.SeqNumChain {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	return o.offRampNextSeqNums
+}
+
+// ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
+// Values are fetched from observers state which are fetched async.
+func (o *asyncObserver) ObserveLatestOnRampSeqNums(_ context.Context) []plugintypes.SeqNumChain {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	return o.onRampLatestSeqNums
+}
+
+// ObserveMerkleRoots observes the merkle roots for the given sequence number ranges.
+// It directly calls the base observer since this values cannot be known in advance.
+func (o *asyncObserver) ObserveMerkleRoots(
+	ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain {
+	return o.syncObserver.ObserveMerkleRoots(ctx, ranges)
+}
+
+// ObserveRMNRemoteCfg observes the RMN Remote Config by directly calling the base observer since this value is cached.
+func (o *asyncObserver) ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig {
+	return o.syncObserver.ObserveRMNRemoteCfg(ctx)
+}
+
+// ObserveFChain observes the FChain by directly calling the base observer since this value is cached.
+func (o *asyncObserver) ObserveFChain(ctx context.Context) map[cciptypes.ChainSelector]int {
+	return o.syncObserver.ObserveFChain(ctx)
+}
+
+// Close closes the observer and releases any resources.
+func (o *asyncObserver) Close() error {
+	if o.cancelFunc != nil {
+		o.cancelFunc()
+		o.cancelFunc = nil
+	}
+	return nil
 }
 
 type observerImpl struct {
@@ -357,7 +501,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, o.chainSupport.DestChain(), allSourceChains)
+	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
@@ -395,8 +539,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 }
 
 // ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
-func (o observerImpl) ObserveLatestOnRampSeqNums(
-	ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain {
+func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
 	allSourceChains, err := o.chainSupport.KnownSourceChainsSlice()
@@ -420,21 +563,16 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 
 	for _, sourceChain := range sourceChains {
 		eg.Go(func() error {
-			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain, destChain)
+			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
-				lggr.Errorf("failed to get expected next seq num for source chain %d: %s", sourceChain, err)
-				return nil
-			}
-
-			if nextOnRampSeqNum == 0 {
-				lggr.Errorf("unexpected next seq num for source chain %d, it is 0", sourceChain)
+				lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
 				return nil
 			}
 
 			mu.Lock()
 			latestOnRampSeqNums = append(
 				latestOnRampSeqNums,
-				plugintypes.NewSeqNumChain(sourceChain, nextOnRampSeqNum-1), // Latest is the next one minus one.
+				plugintypes.NewSeqNumChain(sourceChain, latestOnRampSeqNum),
 			)
 			mu.Unlock()
 
@@ -592,12 +730,10 @@ func (o observerImpl) computeMerkleRoot(
 
 // ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
 // NOTE: At least two external calls are made.
-func (o observerImpl) ObserveRMNRemoteCfg(
-	ctx context.Context,
-	dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig {
+func (o observerImpl) ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig {
 	lggr := logutil.WithContextValues(ctx, o.lggr)
 
-	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx, dstChain)
+	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx)
 	if err != nil {
 		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
 			// destination chain not supported
@@ -622,4 +758,8 @@ func (o observerImpl) ObserveFChain(ctx context.Context) map[cciptypes.ChainSele
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
+}
+
+func (o observerImpl) Close() error {
+	return nil
 }

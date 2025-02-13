@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::keccak::HASH_BYTES;
 
 use access_controller::AccessController;
 
@@ -11,7 +12,7 @@ use crate::state::{Config, Operation};
 pub fn cancel<'info>(
     _ctx: Context<'_, '_, '_, 'info, Cancel<'info>>,
     _timelock_id: [u8; TIMELOCK_ID_PADDED],
-    id: [u8; 32],
+    id: [u8; HASH_BYTES],
 ) -> Result<()> {
     emit!(Cancelled { id });
     // NOTE: PDA is closed - is handled by anchor on exit due to the `close` attribute
@@ -19,13 +20,13 @@ pub fn cancel<'info>(
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct Cancel<'info> {
     #[account(
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        close = authority, // todo: check if we send fund back to the signer, otherwise, we'll have additional destination account
+        close = authority,
         constraint = operation.id == id @ TimelockError::InvalidId,
         constraint = operation.is_pending() @ TimelockError::OperationNotCancellable,
     )]
@@ -34,7 +35,7 @@ pub struct Cancel<'info> {
     #[account( seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
-    // NOTE: access controller check happens in only_role_or_admin_role macro
+    // NOTE: access controller check happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]

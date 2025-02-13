@@ -206,14 +206,15 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			require.Equal(t, strconv.Itoa(int(requiredAmount)), adminWsolBalance.Value.Amount)
 		})
 
-		t.Run("success: schedule and execute batch instructions", func(t *testing.T) {
+		t.Run("success: preload and execute batch instructions via bypasser_execute_batch", func(t *testing.T) {
 			salt, err := timelockutil.SimpleSalt()
 			require.NoError(t, err)
 			op := timelockutil.Operation{
-				TimelockID:  config.TestTimelockID,
-				Predecessor: config.TimelockEmptyOpID,
-				Salt:        salt,
-				Delay:       uint64(1000),
+				TimelockID:   config.TestTimelockID,
+				Predecessor:  config.TimelockEmptyOpID,
+				Salt:         salt,
+				Delay:        uint64(1000),
+				IsBypasserOp: true,
 			}
 
 			cIx, _, ciErr := tokens.CreateAssociatedTokenAccount(
@@ -243,9 +244,10 @@ func TestTimelockBypasserExecute(t *testing.T) {
 
 			id := op.OperationID()
 			operationPDA := op.OperationPDA()
-			signer := roleMap[timelock.Proposer_Role].RandomPick()
+			signer := roleMap[timelock.Bypasser_Role].RandomPick()
+			ac := roleMap[timelock.Bypasser_Role].AccessController
 
-			ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, signer.PublicKey())
+			ixs, err := timelockutil.GetPreloadBypasserOperationIxs(config.TestTimelockID, op, signer.PublicKey(), ac.PublicKey())
 			require.NoError(t, err)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
@@ -258,15 +260,12 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			}
 
 			require.Equal(t,
-				true,
-				opAccount.IsFinalized,
+				timelock.Finalized_OperationState,
+				opAccount.State,
 				"operation is not finalized",
 			)
 
 			t.Run("success: bypass_execute_batch", func(t *testing.T) {
-				signer := roleMap[timelock.Bypasser_Role].RandomPick()
-				ac := roleMap[timelock.Bypasser_Role].AccessController
-
 				ix := timelock.NewBypasserExecuteBatchInstruction(
 					config.TestTimelockID,
 					id,
@@ -297,11 +296,8 @@ func TestTimelockBypasserExecute(t *testing.T) {
 					require.Equal(t, ixx.Data, common.NormalizeData(event.Data))
 				}
 
-				var opAccount timelock.Operation
-				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
-				if err != nil {
-					require.NoError(t, err, "failed to get account info")
-				}
+				// check if operation pda is closed
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, operationPDA, config.DefaultCommitment)
 
 				recipientWsolBalance, err := solanaGoClient.GetTokenAccountBalance(
 					ctx,

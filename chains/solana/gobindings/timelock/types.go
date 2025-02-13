@@ -141,6 +141,7 @@ const (
 	DelayInsufficient_TimelockError
 	OperationNotCancellable_TimelockError
 	OperationNotReady_TimelockError
+	OperationAlreadyExecuted_TimelockError
 	MissingDependency_TimelockError
 	InvalidAccessController_TimelockError
 	BlockedSelector_TimelockError
@@ -171,6 +172,8 @@ func (value TimelockError) String() string {
 		return "OperationNotCancellable"
 	case OperationNotReady_TimelockError:
 		return "OperationNotReady"
+	case OperationAlreadyExecuted_TimelockError:
+		return "OperationAlreadyExecuted"
 	case MissingDependency_TimelockError:
 		return "MissingDependency"
 	case InvalidAccessController_TimelockError:
@@ -210,6 +213,30 @@ func (value Role) String() string {
 		return "Canceller"
 	case Bypasser_Role:
 		return "Bypasser"
+	default:
+		return ""
+	}
+}
+
+type OperationState ag_binary.BorshEnum
+
+const (
+	Initialized_OperationState OperationState = iota
+	Finalized_OperationState
+	Scheduled_OperationState
+	Done_OperationState
+)
+
+func (value OperationState) String() string {
+	switch value {
+	case Initialized_OperationState:
+		return "Initialized"
+	case Finalized_OperationState:
+		return "Finalized"
+	case Scheduled_OperationState:
+		return "Scheduled"
+	case Done_OperationState:
+		return "Done"
 	default:
 		return ""
 	}

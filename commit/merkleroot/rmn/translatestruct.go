@@ -3,7 +3,7 @@ package rmn
 import (
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )

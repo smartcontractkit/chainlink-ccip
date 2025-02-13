@@ -7,8 +7,8 @@ use access_controller::AccessController;
 use bytemuck::Zeroable;
 
 use crate::constants::{
-    EMPTY_PREDECESSOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED, TIMELOCK_OPERATION_SEED,
-    TIMELOCK_SIGNER_SEED,
+    EMPTY_PREDECESSOR, TIMELOCK_BYPASSER_OPERATION_SEED, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED,
+    TIMELOCK_OPERATION_SEED, TIMELOCK_SIGNER_SEED,
 };
 use crate::error::TimelockError;
 use crate::event::*;
@@ -19,7 +19,7 @@ use crate::state::{Config, InstructionData, Operation};
 pub fn execute_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, ExecuteBatch<'info>>,
     timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; 32],
+    _id: [u8; HASH_BYTES],
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
 
@@ -38,8 +38,9 @@ pub fn execute_batch<'info>(
             ctx.program_id,
         );
 
-        require!(
-            ctx.accounts.predecessor_operation.key() == expected_address,
+        require_keys_eq!(
+            ctx.accounts.predecessor_operation.key(),
+            expected_address,
             TimelockError::InvalidInput
         );
 
@@ -49,8 +50,9 @@ pub fn execute_batch<'info>(
 
         require!(predecessor_acc.is_done(), TimelockError::MissingDependency);
     } else {
-        require!(
-            ctx.accounts.predecessor_operation.key() == Pubkey::zeroed(),
+        require_keys_eq!(
+            ctx.accounts.predecessor_operation.key(),
+            Pubkey::zeroed(),
             TimelockError::InvalidInput
         );
     }
@@ -78,9 +80,7 @@ pub fn execute_batch<'info>(
         });
     }
 
-    require!(op.is_ready(current_time), TimelockError::OperationNotReady);
-
-    // all executed, update the timestamp
+    // all executed, update the operation state
     op.mark_done();
 
     Ok(())
@@ -88,10 +88,11 @@ pub fn execute_batch<'info>(
 
 /// execute operation(instructions) w/o checking predecessors and readiness
 /// bypasser_execute also need the operation to be uploaded formerly
+/// NOTE: operation is closed after execution
 pub fn bypasser_execute_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, BypasserExecuteBatch<'info>>,
     timelock_id: [u8; TIMELOCK_ID_PADDED],
-    _id: [u8; 32],
+    _id: [u8; HASH_BYTES],
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
 
@@ -166,7 +167,7 @@ pub struct ExecuteBatch<'info> {
     )]
     pub timelock_signer: UncheckedAccount<'info>,
 
-    // NOTE: access controller check happens in only_role_or_admin_role macro
+    // NOTE: access controller check happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]
@@ -174,13 +175,14 @@ pub struct ExecuteBatch<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; 32], id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct BypasserExecuteBatch<'info> {
     #[account(
         mut,
-        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
+        seeds = [TIMELOCK_BYPASSER_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
+        constraint = operation.is_finalized() @ TimelockError::OperationNotFinalized,
+        close = authority, // close the operation after bypasser execution
     )]
     pub operation: Account<'info, Operation>,
 
@@ -194,7 +196,7 @@ pub struct BypasserExecuteBatch<'info> {
     )]
     pub timelock_signer: UncheckedAccount<'info>,
 
-    // NOTE: access controller check happens in only_role_or_admin_role macro
+    // NOTE: access controller check happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
     #[account(mut)]

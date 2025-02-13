@@ -2,6 +2,7 @@ package commit
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -10,22 +11,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -65,7 +68,8 @@ func Test_maxQueryLength(t *testing.T) {
 		TokenPriceQuery: tokenprice.Query{},
 		ChainFeeQuery:   chainfee.Query{},
 	}
-	b, err := q.Encode()
+
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeQuery(q)
 	require.NoError(t, err)
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
@@ -126,7 +130,7 @@ func Test_maxObservationLength(t *testing.T) {
 	maxObs := committypes.Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenprice.Observation{
-			FeedTokenPrices: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
+			FeedTokenPrices: make(ccipocr3.TokenPriceMap),
 			FeeQuoterTokenUpdates: make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig,
 				estimatedMaxNumberOfPricedTokens),
 			FChain:    make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
@@ -146,20 +150,28 @@ func Test_maxObservationLength(t *testing.T) {
 		FChain: make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
 	}
 
-	for i := range maxObs.TokenPriceObs.FeedTokenPrices {
-		maxObs.TokenPriceObs.FeedTokenPrices[i] = ccipocr3.TokenPrice{
-			TokenID: ccipocr3.UnknownEncodedAddress(strings.Repeat("x", 20)),
-			Price:   ccipocr3.NewBigIntFromInt64(math.MaxInt64),
-		}
+	for i := range estimatedMaxNumberOfPricedTokens {
+		tokenID := ccipocr3.UnknownEncodedAddress(generateStringWithCounter(i, 20))
+		maxObs.TokenPriceObs.FeedTokenPrices[tokenID] = ccipocr3.NewBigIntFromInt64(math.MaxInt64)
 	}
 
-	b, err := maxObs.Encode()
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeObservation(maxObs)
 	require.NoError(t, err)
 
 	const testOffset = 50
 	assert.Greater(t, maxObservationLength, len(b)-testOffset)
 	assert.Less(t, maxObservationLength, len(b)+testOffset)
 	assert.Less(t, maxObservationLength, ocr3types.MaxMaxObservationLength)
+}
+
+// Generate a string with a counter and fill the rest with 'x's
+func generateStringWithCounter(counter, length int) string {
+	counterStr := fmt.Sprintf("%d", counter)
+	paddingLength := length - len(counterStr)
+	if paddingLength < 0 {
+		paddingLength = 0
+	}
+	return counterStr + strings.Repeat("x", paddingLength)
 }
 
 func Test_maxOutcomeLength(t *testing.T) {
@@ -181,7 +193,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 			},
 		},
 		TokenPriceOutcome: tokenprice.Outcome{
-			TokenPrices: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
+			TokenPrices: make(ccipocr3.TokenPriceMap, estimatedMaxNumberOfSourceChains),
 		},
 		ChainFeeOutcome: chainfee.Outcome{
 			GasPrices: make([]ccipocr3.GasPriceChain, estimatedMaxNumberOfSourceChains),
@@ -217,12 +229,9 @@ func Test_maxOutcomeLength(t *testing.T) {
 			NodeIndex:        math.MaxUint64,
 		}
 	}
-
-	for i := range maxOutc.TokenPriceOutcome.TokenPrices {
-		maxOutc.TokenPriceOutcome.TokenPrices[i] = ccipocr3.TokenPrice{
-			TokenID: ccipocr3.UnknownEncodedAddress(strings.Repeat("x", 20)),
-			Price:   ccipocr3.NewBigIntFromInt64(math.MaxInt64),
-		}
+	for i := range estimatedMaxNumberOfPricedTokens {
+		tokenID := ccipocr3.UnknownEncodedAddress(generateStringWithCounter(i, 20))
+		maxOutc.TokenPriceOutcome.TokenPrices[tokenID] = ccipocr3.NewBigIntFromInt64(math.MaxInt64)
 	}
 
 	for i := range maxOutc.ChainFeeOutcome.GasPrices {
@@ -232,10 +241,10 @@ func Test_maxOutcomeLength(t *testing.T) {
 		}
 	}
 
-	b, err := maxOutc.Encode()
+	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(maxOutc)
 	require.NoError(t, err)
 
-	const testOffset = 10
+	const testOffset = 50
 	assert.Greater(t, maxOutcomeLength, len(b)-testOffset)
 	assert.Less(t, maxOutcomeLength, len(b)+testOffset)
 	assert.Less(t, maxOutcomeLength, ocr3types.MaxMaxOutcomeLength)
@@ -243,7 +252,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 
 func Test_maxReportLength(t *testing.T) {
 	rep := ccipocr3.CommitPluginReport{
-		MerkleRoots: make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
+		BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
 		PriceUpdates: ccipocr3.PriceUpdates{
 			TokenPriceUpdates: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
 			GasPriceUpdates:   make([]ccipocr3.GasPriceChain, estimatedMaxNumberOfSourceChains),
@@ -251,8 +260,8 @@ func Test_maxReportLength(t *testing.T) {
 		RMNSignatures: make([]ccipocr3.RMNECDSASignature, estimatedMaxRmnNodesCount),
 	}
 
-	for i := range rep.MerkleRoots {
-		rep.MerkleRoots[i] = ccipocr3.MerkleRootChain{
+	for i := range rep.BlessedMerkleRoots {
+		rep.BlessedMerkleRoots[i] = ccipocr3.MerkleRootChain{
 			ChainSel:      math.MaxUint64,
 			OnRampAddress: make([]byte, 40),
 			SeqNumsRange:  ccipocr3.NewSeqNumRange(math.MaxUint64, math.MaxUint64),
@@ -287,7 +296,7 @@ func Test_maxReportLength(t *testing.T) {
 func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 	t.Run("basic checks for the happy flow", func(t *testing.T) {
 		ctx := tests.Context(t)
-		lggr := logger.Test(t)
+		lggr := mocks.NullLogger
 
 		offChainConfig := pluginconfig.CommitOffchainConfig{
 			MaxMerkleTreeSize: 123,

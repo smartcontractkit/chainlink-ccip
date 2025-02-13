@@ -135,6 +135,40 @@ func TestSeqNumRangeLimit(t *testing.T) {
 	}
 }
 
+func TestSeqNumFilterSlice(t *testing.T) {
+	testCases := []struct {
+		name     string
+		r        SeqNumRange
+		seqs     []SeqNum
+		expected []SeqNum
+	}{
+		{
+			"none",
+			SeqNumRange{0, 0},
+			[]SeqNum{1, 2, 3},
+			nil,
+		},
+		{
+			"zero in range",
+			SeqNumRange{0, 0},
+			[]SeqNum{1, 2, 0, 3},
+			[]SeqNum{0},
+		},
+		{
+			"inclusive",
+			SeqNumRange{10, 20},
+			[]SeqNum{1, 10, 2, 0, 4, 13, 3, 20},
+			[]SeqNum{10, 13, 20},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, tc.r.FilterSlice(tc.seqs))
+		})
+	}
+}
+
 func TestCCIPMsg_String(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -1,0 +1,22 @@
+[package]
+name = "test_ccip_invalid_receiver"
+version = "0.0.0-dev"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "test_ccip_invalid_receiver"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.29.0"
+anchor-spl = "0.29.0"
+solana-program = "1.17.25" # pin solana to 1.17
+example_ccip_receiver = { version = "0.1.0-dev", path = "../example-ccip-receiver", features = ["no-entrypoint"] }

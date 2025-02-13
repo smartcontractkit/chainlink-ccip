@@ -76,31 +76,35 @@ type PluginFactory struct {
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
 
-func NewPluginFactory(
-	lggr logger.Logger,
-	donID plugintypes.DonID,
-	ocrConfig reader.OCR3ConfigWithMeta,
-	execCodec cciptypes.ExecutePluginCodec,
-	msgHasher cciptypes.MessageHasher,
-	extraDataCodec cciptypes.ExtraDataCodec,
-	homeChainReader reader.HomeChain,
-	tokenDataEncoder cciptypes.TokenDataEncoder,
-	estimateProvider cciptypes.EstimateProvider,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
-) *PluginFactory {
+type PluginFactoryParams struct {
+	Lggr             logger.Logger
+	DonID            plugintypes.DonID
+	OcrConfig        reader.OCR3ConfigWithMeta
+	ExecCodec        cciptypes.ExecutePluginCodec
+	MsgHasher        cciptypes.MessageHasher
+	ExtraDataCodec   cciptypes.ExtraDataCodec
+	HomeChainReader  reader.HomeChain
+	TokenDataEncoder cciptypes.TokenDataEncoder
+	EstimateProvider cciptypes.EstimateProvider
+	ContractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	ContractWriters  map[cciptypes.ChainSelector]types.ContractWriter
+}
+
+// NewExecutePluginFactory creates a new PluginFactory instance. For execute plugin, oracle instances are not managed by
+// the factory. It is safe to assume that a factory instance will create exactly one plugin instance.
+func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 	return &PluginFactory{
-		baseLggr:         lggr,
-		donID:            donID,
-		ocrConfig:        ocrConfig,
-		execCodec:        execCodec,
-		msgHasher:        msgHasher,
-		extraDataCodec:   extraDataCodec,
-		homeChainReader:  homeChainReader,
-		estimateProvider: estimateProvider,
-		contractReaders:  contractReaders,
-		chainWriters:     chainWriters,
-		tokenDataEncoder: tokenDataEncoder,
+		baseLggr:         params.Lggr,
+		donID:            params.DonID,
+		ocrConfig:        params.OcrConfig,
+		execCodec:        params.ExecCodec,
+		msgHasher:        params.MsgHasher,
+		extraDataCodec:   params.ExtraDataCodec,
+		homeChainReader:  params.HomeChainReader,
+		estimateProvider: params.EstimateProvider,
+		tokenDataEncoder: params.TokenDataEncoder,
+		contractReaders:  params.ContractReaders,
+		chainWriters:     params.ContractWriters,
 	}
 }
 
@@ -114,7 +118,7 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
 	}
 
-	if err = offchainConfig.Validate(); err != nil {
+	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
 	}
 

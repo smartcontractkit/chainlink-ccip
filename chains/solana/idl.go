@@ -9,3 +9,19 @@ var ccipRouterIdl string
 func FetchCCIPRouterIDL() string {
 	return ccipRouterIdl
 }
+
+//go:embed contracts/target/idl/ccip_offramp.json
+var ccipOfframpIdl string
+
+// FetchCCIPOfframpIDL returns
+func FetchCCIPOfframpIDL() string {
+	return ccipOfframpIdl
+}
+
+//go:embed contracts/target/idl/fee_quoter.json
+var feeQuoterIdl string
+
+// FetchCCIPOfframpIDL returns
+func FetchFeeQuoterIDL() string {
+	return feeQuoterIdl
+}

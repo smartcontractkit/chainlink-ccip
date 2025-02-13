@@ -9,18 +9,42 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+const (
+	processorsLabel            = "tokenprice"
+	tokenPricesLabel           = "tokenPrices"
+	feedTokenPricesLabel       = "feedTokenPrices"
+	feeQuoterTokenUpdatesLabel = "feeQuoterTokenUpdates"
+)
+
 type Query struct {
 }
 
 type Outcome struct {
-	TokenPrices []cciptypes.TokenPrice `json:"tokenPrices"`
+	TokenPrices cciptypes.TokenPriceMap `json:"tokenPrices"`
+}
+
+func (out Outcome) Stats() map[string]int {
+	return map[string]int{
+		tokenPricesLabel: len(out.TokenPrices),
+	}
 }
 
 type Observation struct {
-	FeedTokenPrices       []cciptypes.TokenPrice                                         `json:"feedTokenPrices"`
+	FeedTokenPrices       cciptypes.TokenPriceMap                                        `json:"feedTokenPrices"`
 	FeeQuoterTokenUpdates map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig `json:"feeQuoterTokenUpdates"`
 	FChain                map[cciptypes.ChainSelector]int                                `json:"fChain"`
 	Timestamp             time.Time                                                      `json:"timestamp"`
+}
+
+func (obs Observation) IsEmpty() bool {
+	return len(obs.FeedTokenPrices) == 0 && len(obs.FeeQuoterTokenUpdates) == 0 && len(obs.FChain) == 0
+}
+
+func (obs Observation) Stats() map[string]int {
+	return map[string]int{
+		feedTokenPricesLabel:       len(obs.FeedTokenPrices),
+		feeQuoterTokenUpdatesLabel: len(obs.FeeQuoterTokenUpdates),
+	}
 }
 
 // AggregateObservation is the aggregation of a list of observations
@@ -48,15 +72,3 @@ type Observer interface {
 
 	ObserveFChain() map[cciptypes.ChainSelector]int
 }
-
-// MetricsReporter exposes only relevant methods for reporting token prices from metrics.Reporter
-type MetricsReporter interface {
-	TrackTokenPricesObservation(obs Observation)
-	TrackTokenPricesOutcome(outcome Outcome)
-}
-
-type NoopMetrics struct{}
-
-func (n NoopMetrics) TrackTokenPricesObservation(Observation) {}
-
-func (n NoopMetrics) TrackTokenPricesOutcome(Outcome) {}

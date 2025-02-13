@@ -9,7 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
 func TestMessageHashing(t *testing.T) {
@@ -24,41 +27,48 @@ func TestMessageHashing(t *testing.T) {
 
 	t.Run("AnyToSVM", func(t *testing.T) {
 		t.Parallel()
-		h, err := HashAnyToSVMMessage(ccip_router.Any2SVMRampMessage{
-			Sender:   sender,
-			Receiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
-			Data:     []byte{4, 5, 6},
-			Header: ccip_router.RampMessageHeader{
+		h, err := HashAnyToSVMMessage(ccip_offramp.Any2SVMRampMessage{
+			Sender:        sender,
+			TokenReceiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
+			Data:          []byte{4, 5, 6},
+			Header: ccip_offramp.RampMessageHeader{
 				MessageId:           [32]uint8{8, 5, 3},
 				SourceChainSelector: 67,
 				DestChainSelector:   78,
 				SequenceNumber:      89,
 				Nonce:               90,
 			},
-			ExtraArgs: ccip_router.SVMExtraArgs{
+			ExtraArgs: ccip_offramp.Any2SVMRampExtraArgs{
 				ComputeUnits:     1000,
-				IsWritableBitmap: 1,
-				Accounts: []solana.PublicKey{
-					solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
-				},
+				IsWritableBitmap: GenerateBitMapForIndexes([]int{0}),
 			},
-			TokenAmounts: []ccip_router.Any2SVMTokenTransfer{
+			TokenAmounts: []ccip_offramp.Any2SVMTokenTransfer{
 				{
 					SourcePoolAddress: []byte{0, 1, 2, 3},
 					DestTokenAddress:  solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
 					DestGasAmount:     100,
 					ExtraData:         []byte{4, 5, 6},
-					Amount:            tokenAmount,
+					Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokenAmount},
 				},
 			},
-		}, config.OnRampAddress)
+		}, config.OnRampAddress,
+			[]solana.PublicKey{
+				solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
+				solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
+			})
 
 		require.NoError(t, err)
-		require.Equal(t, "60f412fe7c28ae6981b694f92677276f767a98e0314b9a31a3c38366223e7e52", hex.EncodeToString(h))
+		require.Equal(t, "8ceebcae8acd670231be9eb13203797bf6cb09e7a4851dd57600af3ed3945eb0", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {
 		t.Parallel()
+
+		extraArgs, err := SerializeExtraArgs(fee_quoter.EVMExtraArgsV2{
+			GasLimit:                 bin.Uint128{Lo: 1},
+			AllowOutOfOrderExecution: true,
+		}, EVMExtraArgsV2Tag)
+		require.NoError(t, err)
 
 		h, err := HashSVMToAnyMessage(ccip_router.SVM2AnyRampMessage{
 			Header: ccip_router.RampMessageHeader{
@@ -68,26 +78,24 @@ func TestMessageHashing(t *testing.T) {
 				SequenceNumber:      30,
 				Nonce:               40,
 			},
-			Sender:   solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa"),
-			Data:     []byte{4, 5, 6},
-			Receiver: sender,
-			ExtraArgs: ccip_router.AnyExtraArgs{
-				GasLimit:                 bin.Uint128{Lo: 1},
-				AllowOutOfOrderExecution: true,
-			},
+			Sender:         solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa"),
+			Data:           []byte{4, 5, 6},
+			Receiver:       sender,
+			ExtraArgs:      extraArgs,
 			FeeToken:       solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
-			FeeTokenAmount: 50,
+			FeeTokenAmount: ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(50)},
+			FeeValueJuels:  ccip_router.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(500)},
 			TokenAmounts: []ccip_router.SVM2AnyTokenTransfer{
 				{
 					SourcePoolAddress: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
 					DestTokenAddress:  []byte{0, 1, 2, 3},
 					ExtraData:         []byte{4, 5, 6},
-					Amount:            tokenAmount,
+					Amount:            ccip_router.CrossChainAmount{LeBytes: tokenAmount},
 					DestExecData:      []byte{4, 5, 6},
 				},
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "df0890c0fb144ce4dee6556f2cd41382676f75e7292b61eca658b1d122a36f58", hex.EncodeToString(h))
+		require.Equal(t, "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7", hex.EncodeToString(h))
 	})
 }

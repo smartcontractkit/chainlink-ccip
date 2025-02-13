@@ -2,10 +2,8 @@ package commit
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"time"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
@@ -41,7 +39,7 @@ const (
 	// Estimated maximum number of priced tokens that the Commit DON supports.
 	// This value does not indicate a system limitation but just an estimation to properly tune the OCR parameters.
 	// The value can be adjusted as needed.
-	estimatedMaxNumberOfPricedTokens = 10_000
+	estimatedMaxNumberOfPricedTokens = 14_445
 
 	// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
 	// that assumes estimatedMaxNumberOfSourceChains source chains and
@@ -51,15 +49,15 @@ const (
 
 	// maxObservationLength is set to the maximum size of an observation
 	// check factory_test for the calculation
-	maxObservationLength = 1_047_202
+	maxObservationLength = 1_047_206
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 1_167_836
+	maxOutcomeLength = 1_167_845
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
-	maxReportLength = 993_982
+	maxReportLength = 128_2933
 
 	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
 	maxReportCount = 1
@@ -80,35 +78,37 @@ type PluginFactory struct {
 	rmnCrypto         cciptypes.RMNCrypto
 }
 
-// NewPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by the
-// factory. It is safe to assume that a factory instance will create exactly one plugin instance.
-func NewPluginFactory(
-	lggr logger.Logger,
-	donID plugintypes.DonID,
-	ocrConfig reader.OCR3ConfigWithMeta,
-	commitCodec cciptypes.CommitPluginCodec,
-	msgHasher cciptypes.MessageHasher,
-	extraDataCodec cciptypes.ExtraDataCodec,
-	homeChainReader reader.HomeChain,
-	homeChainSelector cciptypes.ChainSelector,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
-	rmnPeerClient rmn.PeerClient,
-	rmnCrypto cciptypes.RMNCrypto,
-) *PluginFactory {
+type CommitPluginFactoryParams struct {
+	Lggr              logger.Logger
+	DonID             plugintypes.DonID
+	OcrConfig         reader.OCR3ConfigWithMeta
+	CommitCodec       cciptypes.CommitPluginCodec
+	MsgHasher         cciptypes.MessageHasher
+	ExtraDataCodec    cciptypes.ExtraDataCodec
+	HomeChainReader   reader.HomeChain
+	HomeChainSelector cciptypes.ChainSelector
+	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	ContractWriters   map[cciptypes.ChainSelector]types.ContractWriter
+	RmnPeerClient     rmn.PeerClient
+	RmnCrypto         cciptypes.RMNCrypto
+}
+
+// NewCommitPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by
+// the factory. It is safe to assume that a factory instance will create exactly one plugin instance.
+func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 	return &PluginFactory{
-		baseLggr:          lggr,
-		donID:             donID,
-		ocrConfig:         ocrConfig,
-		commitCodec:       commitCodec,
-		msgHasher:         msgHasher,
-		extraDataCodec:    extraDataCodec,
-		homeChainReader:   homeChainReader,
-		homeChainSelector: homeChainSelector,
-		contractReaders:   contractReaders,
-		chainWriters:      chainWriters,
-		rmnPeerClient:     rmnPeerClient,
-		rmnCrypto:         rmnCrypto,
+		baseLggr:          params.Lggr,
+		donID:             params.DonID,
+		ocrConfig:         params.OcrConfig,
+		commitCodec:       params.CommitCodec,
+		msgHasher:         params.MsgHasher,
+		extraDataCodec:    params.ExtraDataCodec,
+		homeChainReader:   params.HomeChainReader,
+		homeChainSelector: params.HomeChainSelector,
+		contractReaders:   params.ContractReaders,
+		chainWriters:      params.ContractWriters,
+		rmnPeerClient:     params.RmnPeerClient,
+		rmnCrypto:         params.RmnCrypto,
 	}
 }
 
@@ -154,23 +154,21 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 				ocr3types.ReportingPluginInfo{},
 				fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
 		}
-		rmnHomeBoundContract := types.BoundContract{
-			Address: "0x" + hex.EncodeToString(rmnHomeAddress),
-			Name:    consts.ContractNameRMNHome,
-		}
 
-		if err1 := rmnCr.Bind(ctx, []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
-		}
-		rmnHomeReader = readerpkg.NewRMNHomePoller(
+		rmnHomeReader, err = readerpkg.NewRMNHomeChainReader(
+			ctx,
+			lggr,
+			readerpkg.HomeChainPollingInterval,
+			p.homeChainSelector,
+			rmnHomeAddress,
 			rmnCr,
-			rmnHomeBoundContract,
-			logutil.WithComponent(lggr, "RMNHomePoller"),
-			5*time.Second,
 		)
+		if err != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to initialize RMNHome reader: %w", err)
+		}
 
 		if err := rmnHomeReader.Start(ctx); err != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome reader: %w", err)
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome: %w", err)
 		}
 	}
 

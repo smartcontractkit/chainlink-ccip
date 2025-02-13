@@ -16,14 +16,15 @@ import (
 )
 
 type processor struct {
-	oracleID         commontypes.OracleID
+	oracleID commontypes.OracleID
+	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
 	lggr             logger.Logger
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
-	metricsReporter  MetricsReporter
+	metricsReporter  plugincommon.MetricsReporter
 	fRoleDON         int
 }
 
@@ -36,9 +37,9 @@ func NewProcessor(
 	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
-	metricsReporter MetricsReporter,
+	metricsReporter plugincommon.MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
-	return &processor{
+	p := &processor{
 		oracleID:         oracleID,
 		lggr:             lggr,
 		offChainCfg:      offChainCfg,
@@ -49,6 +50,7 @@ func NewProcessor(
 		fRoleDON:         fRoleDON,
 		metricsReporter:  metricsReporter,
 	}
+	return plugincommon.NewTrackedProcessor(lggr, p, processorsLabel, metricsReporter)
 }
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
@@ -81,8 +83,12 @@ func (p *processor) Outcome(
 		"tokenPrices", tokenPriceOutcome,
 	)
 
+	if len(tokenPriceOutcome) == 0 {
+		lggr.Debugw("No token prices to report")
+		return Outcome{}, nil
+	}
+
 	out := Outcome{TokenPrices: tokenPriceOutcome}
-	p.metricsReporter.TrackTokenPricesOutcome(out)
 	return out, nil
 }
 

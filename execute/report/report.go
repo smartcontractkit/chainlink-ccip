@@ -13,10 +13,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// buildSingleChainReportHelper converts the on-chain event data stored in cciptypes.ExecutePluginCommitData into the
+// buildSingleChainReportHelper converts the on-chain event data stored in ccipocr3.ExecutePluginCommitData into the
 // final on-chain report format. Messages in the report are selected based on the readyMessages argument. If
 // readyMessages is empty all messages will be included. This allows the caller to create smaller reports if needed.
 //
@@ -27,7 +26,7 @@ func buildSingleChainReportHelper(
 	lggr logger.Logger,
 	report exectypes.CommitData,
 	readyMessages map[int]struct{},
-) (cciptypes.ExecutePluginReportSingleChain, error) {
+) (ccipocr3.ExecutePluginReportSingleChain, error) {
 	if len(readyMessages) == 0 {
 		if readyMessages == nil {
 			readyMessages = make(map[int]struct{})
@@ -39,12 +38,12 @@ func buildSingleChainReportHelper(
 
 	if len(readyMessages) == 0 {
 		lggr.Infow("no messages ready for execution", "sourceChain", report.SourceChain)
-		return cciptypes.ExecutePluginReportSingleChain{}, nil
+		return ccipocr3.ExecutePluginReportSingleChain{}, nil
 	}
 
 	numMsg := len(report.Messages)
 	if len(report.MessageTokenData) != numMsg {
-		return cciptypes.ExecutePluginReportSingleChain{},
+		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("token data length mismatch: got %d, expected %d", len(report.MessageTokenData), numMsg)
 	}
 
@@ -56,7 +55,7 @@ func buildSingleChainReportHelper(
 
 	tree, err := ConstructMerkleTree(report, lggr)
 	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{},
+		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
 	}
 
@@ -64,20 +63,20 @@ func buildSingleChainReportHelper(
 	hash := tree.Root()
 	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
 		actualStr := "0x" + hex.EncodeToString(hash[:])
-		return cciptypes.ExecutePluginReportSingleChain{},
+		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
 
 	lggr.Debugw("merkle root verified",
 		"sourceChain", report.SourceChain,
 		"commitRoot", report.MerkleRoot.String(),
-		"computedRoot", cciptypes.Bytes32(hash))
+		"computedRoot", ccipocr3.Bytes32(hash))
 
 	// Iterate sequence range and executed messages to select messages to execute.
 	numMsgs := len(report.Messages)
 	var toExecute []int
 	var offchainTokenData [][][]byte
-	var msgInRoot []cciptypes.Message
+	var msgInRoot []ccipocr3.Message
 	for i, msg := range report.Messages {
 		if _, ok := readyMessages[i]; ok {
 			offchainTokenData = append(offchainTokenData, report.MessageTokenData[i].ToByteSlice())
@@ -94,11 +93,11 @@ func buildSingleChainReportHelper(
 		"toExecute", toExecute)
 	proof, err := tree.Prove(toExecute)
 	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{},
+		return ccipocr3.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
 	}
 
-	var proofsCast []cciptypes.Bytes32
+	var proofsCast []ccipocr3.Bytes32
 	for _, p := range proof.Hashes {
 		proofsCast = append(proofsCast, p)
 	}
@@ -106,12 +105,12 @@ func buildSingleChainReportHelper(
 	lggr.Debugw("generated proofs", "sourceChain", report.SourceChain,
 		"proofs", proofsCast, "proof", proof)
 
-	finalReport := cciptypes.ExecutePluginReportSingleChain{
+	finalReport := ccipocr3.ExecutePluginReportSingleChain{
 		SourceChainSelector: report.SourceChain,
 		Messages:            msgInRoot,
 		OffchainTokenData:   offchainTokenData,
 		Proofs:              proofsCast,
-		ProofFlagBits:       cciptypes.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
+		ProofFlagBits:       ccipocr3.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
 	}
 
 	lggr.Debugw("final report", "sourceChain", report.SourceChain, "report", finalReport)
@@ -126,6 +125,7 @@ const (
 	Error                         messageStatus = "error"
 	ReadyToExecute                messageStatus = "ready_to_execute"
 	AlreadyExecuted               messageStatus = "already_executed"
+	AlreadyInflight               messageStatus = "already_inflight"
 	TokenDataNotReady             messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
 	PseudoDeleted                 messageStatus = "message_pseudo_deleted"
 	TokenDataFetchError           messageStatus = "token_data_fetch_error"
@@ -224,7 +224,7 @@ func CheckTokenData() Check {
 
 // CheckTooCostly compares the costly list for a given message.
 func CheckTooCostly() Check {
-	return func(lggr logger.Logger, msg cciptypes.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
 		// 4. Check if the message is too costly to execute.
 		if slices.Contains(report.CostlyMessages, msg.Header.MessageID) {
 			lggr.Infow(
@@ -245,11 +245,11 @@ func CheckTooCostly() Check {
 // initialized using a list of sender nonces from the destination chain. In
 // order to check multiple messages from the same sender, a copy of the initial
 // list is maintained with incremented nonces after each message.
-func CheckNonces(sendersNonce map[cciptypes.ChainSelector]map[string]uint64) Check {
+func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64) Check {
 	// temporary map to store state between nonce checks for this round.
-	expectedNonce := make(map[cciptypes.ChainSelector]map[string]uint64)
+	expectedNonce := make(map[ccipocr3.ChainSelector]map[string]uint64)
 
-	return func(lggr logger.Logger, msg cciptypes.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
 		// Setting the Nonce to zero (or omitting it) indicates that the message
 		// can be executed out of order. We allow this in the plugin by skipping
 		// the nonce check.
@@ -302,6 +302,40 @@ func CheckNonces(sendersNonce map[cciptypes.ChainSelector]map[string]uint64) Che
 	}
 }
 
+type IsInflight func(src ccipocr3.ChainSelector, msgID ccipocr3.Bytes32) bool
+
+func CheckIfInflight(inflight IsInflight) Check {
+	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+		if inflight(report.SourceChain, msg.Header.MessageID) {
+			lggr.Infow(
+				"message already in flight",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", "inflight")
+			return AlreadyInflight, nil
+		}
+		return None, nil
+	}
+}
+
+// checkMessages to get a set of which are ready to execute.
+func (b *execReportBuilder) checkMessages(ctx context.Context, report exectypes.CommitData) (map[int]struct{}, error) {
+	readyMessages := make(map[int]struct{})
+	for i := 0; i < len(report.Messages); i++ {
+		updatedReport, status, err := b.checkMessage(ctx, i, report)
+		if err != nil {
+			return nil,
+				fmt.Errorf("unable to check message: %w", err)
+		}
+		report = updatedReport
+		if status == ReadyToExecute {
+			readyMessages[i] = struct{}{}
+		}
+	}
+	return readyMessages, nil
+}
+
 // checkMessage for execution readiness.
 func (b *execReportBuilder) checkMessage(
 	_ context.Context, idx int, execReport exectypes.CommitData,
@@ -334,15 +368,15 @@ func (b *execReportBuilder) checkMessage(
 // verifyReport is a final step to ensure the encoded message meets our exec criteria.
 func (b *execReportBuilder) verifyReport(
 	ctx context.Context,
-	execReport cciptypes.ExecutePluginReportSingleChain,
+	execReport ccipocr3.ExecutePluginReportSingleChain,
 ) (bool, validationMetadata, error) {
 	// Compute the size of the encoded report.
 	// Note: ExecutePluginReport is a strict array of data, so wrapping the final report
 	//       does not add any additional overhead to the size being computed here.
 	encoded, err := b.encoder.Encode(
 		ctx,
-		cciptypes.ExecutePluginReport{
-			ChainReports: []cciptypes.ExecutePluginReportSingleChain{execReport},
+		ccipocr3.ExecutePluginReport{
+			ChainReports: []ccipocr3.ExecutePluginReportSingleChain{execReport},
 		},
 	)
 	if err != nil {
@@ -389,55 +423,50 @@ func (b *execReportBuilder) verifyReport(
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
 	report exectypes.CommitData,
-) (cciptypes.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
+) (ccipocr3.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
 	finalize := func(
-		execReport cciptypes.ExecutePluginReportSingleChain,
+		execReport ccipocr3.ExecutePluginReportSingleChain,
 		commitReport exectypes.CommitData,
 		meta validationMetadata,
-	) (cciptypes.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
+	) (ccipocr3.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
 		b.accumulated = b.accumulated.accumulate(meta)
 		commitReport = markNewMessagesExecuted(execReport, commitReport)
 		return execReport, commitReport, nil
 	}
 
 	// Check which messages are ready to execute, and update report with any additional metadata needed for execution.
-	readyMessages := make(map[int]struct{})
-	for i := 0; i < len(report.Messages); i++ {
-		updatedReport, status, err := b.checkMessage(ctx, i, report)
-		if err != nil {
-			return cciptypes.ExecutePluginReportSingleChain{},
-				exectypes.CommitData{},
-				fmt.Errorf("unable to check message: %w", err)
-		}
-		report = updatedReport
-		if status == ReadyToExecute {
-			readyMessages[i] = struct{}{}
-		}
+	readyMessages, err := b.checkMessages(ctx, report)
+	if err != nil {
+		return ccipocr3.ExecutePluginReportSingleChain{},
+			exectypes.CommitData{},
+			fmt.Errorf("unable to check message: %w", err)
 	}
-
 	if len(readyMessages) == 0 {
-		return cciptypes.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
+		return ccipocr3.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
 	}
 
-	// Attempt to include all messages in the report.
-	finalReport, err :=
-		buildSingleChainReportHelper(b.lggr, report, readyMessages)
-	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{},
-			exectypes.CommitData{},
-			fmt.Errorf("unable to build a single chain report (max): %w", err)
+	// Unless there is a message limit, attempt to build a report for executing all ready messages.
+	if b.maxMessages == 0 {
+		finalReport, err :=
+			buildSingleChainReportHelper(b.lggr, report, readyMessages)
+		if err != nil {
+			return ccipocr3.ExecutePluginReportSingleChain{},
+				exectypes.CommitData{},
+				fmt.Errorf("unable to build a single chain report (max): %w", err)
+		}
+
+		validReport, meta, err := b.verifyReport(ctx, finalReport)
+		if err != nil {
+			return ccipocr3.ExecutePluginReportSingleChain{},
+				exectypes.CommitData{},
+				fmt.Errorf("unable to verify report: %w", err)
+		} else if validReport {
+			return finalize(finalReport, report, meta)
+		}
 	}
 
-	validReport, meta, err := b.verifyReport(ctx, finalReport)
-	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{},
-			exectypes.CommitData{},
-			fmt.Errorf("unable to verify report: %w", err)
-	} else if validReport {
-		return finalize(finalReport, report, meta)
-	}
-
-	finalReport = cciptypes.ExecutePluginReportSingleChain{}
+	var finalReport ccipocr3.ExecutePluginReportSingleChain
+	var meta validationMetadata
 	msgs := make(map[int]struct{})
 	for i := range report.Messages {
 		if _, ok := readyMessages[i]; !ok {
@@ -448,19 +477,24 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 		finalReport2, err := buildSingleChainReportHelper(b.lggr, report, msgs)
 		if err != nil {
-			return cciptypes.ExecutePluginReportSingleChain{},
+			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
 				fmt.Errorf("unable to build a single chain report (messages %d): %w", len(msgs), err)
 		}
 
 		validReport, meta2, err := b.verifyReport(ctx, finalReport2)
 		if err != nil {
-			return cciptypes.ExecutePluginReportSingleChain{},
+			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
 			finalReport = finalReport2
 			meta = meta2
+
+			// Stop searching if we reach the maximum number of messages.
+			if b.maxMessages > 0 && uint64(len(msgs)) >= b.maxMessages {
+				break
+			}
 		} else {
 			// this message didn't work, continue to the next one
 			delete(msgs, i)
@@ -468,7 +502,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 	}
 
 	if len(msgs) == 0 {
-		return cciptypes.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
+		return ccipocr3.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
 	}
 
 	return finalize(finalReport, report, meta)

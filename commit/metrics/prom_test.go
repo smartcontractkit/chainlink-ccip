@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -12,9 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -25,6 +29,7 @@ const (
 )
 
 func Test_TrackingTokenPrices(t *testing.T) {
+	tokenPricesProcessor := "tokenprices"
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
@@ -39,7 +44,7 @@ func Test_TrackingTokenPrices(t *testing.T) {
 		{
 			name: "empty/missing structs should not report anything",
 			observation: tokenprice.Observation{
-				FeedTokenPrices:       []cciptypes.TokenPrice{},
+				FeedTokenPrices:       nil,
 				FeeQuoterTokenUpdates: nil,
 			},
 			expectedFeedToken:      0,
@@ -48,13 +53,9 @@ func Test_TrackingTokenPrices(t *testing.T) {
 		{
 			name: "data is properly reported",
 			observation: tokenprice.Observation{
-				FeedTokenPrices: []cciptypes.TokenPrice{
-					{
-						TokenID: cciptypes.UnknownEncodedAddress("0x123"),
-					},
-					{
-						TokenID: cciptypes.UnknownEncodedAddress("0x456"),
-					},
+				FeedTokenPrices: cciptypes.TokenPriceMap{
+					cciptypes.UnknownEncodedAddress("0x123"): {},
+					cciptypes.UnknownEncodedAddress("0x456"): {},
 				},
 				FeeQuoterTokenUpdates: map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
 					cciptypes.UnknownEncodedAddress("0x123"): {},
@@ -69,14 +70,18 @@ func Test_TrackingTokenPrices(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackTokenPricesObservation(tc.observation)
+			reporter.TrackProcessorOutput(tokenPricesProcessor, plugincommon.ObservationMethod, tc.observation)
 
 			feedTokens := int(testutil.ToFloat64(
-				reporter.tokenProcessorObservationCounter.WithLabelValues(chainID, "feedTokenPrices")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, tokenPricesProcessor, plugincommon.ObservationMethod, "feedTokenPrices",
+				)),
 			)
 			require.Equal(t, tc.expectedFeedToken, feedTokens)
 			feeQuoted := int(testutil.ToFloat64(
-				reporter.tokenProcessorObservationCounter.WithLabelValues(chainID, "feeQuoterTokenUpdates")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, tokenPricesProcessor, plugincommon.ObservationMethod, "feeQuoterTokenUpdates",
+				)),
 			)
 			require.Equal(t, tc.expectedFeeQuotedToken, feeQuoted)
 		})
@@ -90,7 +95,7 @@ func Test_TrackingTokenPrices(t *testing.T) {
 		{
 			name: "empty/missing structs should not report anything",
 			outcome: tokenprice.Outcome{
-				TokenPrices: []cciptypes.TokenPrice{},
+				TokenPrices: cciptypes.TokenPriceMap{},
 			},
 			expectedTokenPrices: 0,
 		},
@@ -104,10 +109,10 @@ func Test_TrackingTokenPrices(t *testing.T) {
 		{
 			name: "data is properly reported",
 			outcome: tokenprice.Outcome{
-				TokenPrices: []cciptypes.TokenPrice{
-					cciptypes.NewTokenPrice("0x123", big.NewInt(1)),
-					cciptypes.NewTokenPrice("0x234", big.NewInt(2)),
-					cciptypes.NewTokenPrice("0x123", big.NewInt(3)),
+				TokenPrices: cciptypes.TokenPriceMap{
+					cciptypes.UnknownEncodedAddress("0x123"): cciptypes.NewBigIntFromInt64(1),
+					cciptypes.UnknownEncodedAddress("0x234"): cciptypes.NewBigIntFromInt64(2),
+					cciptypes.UnknownEncodedAddress("0x125"): cciptypes.NewBigIntFromInt64(3),
 				},
 			},
 			expectedTokenPrices: 3,
@@ -116,10 +121,12 @@ func Test_TrackingTokenPrices(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackTokenPricesOutcome(tc.outcome)
+			reporter.TrackProcessorOutput(tokenPricesProcessor, plugincommon.OutcomeMethod, tc.outcome)
 
 			tokenPrices := int(testutil.ToFloat64(
-				reporter.tokenProcessorOutcomeCounter.WithLabelValues(chainID, "tokenPrices")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, tokenPricesProcessor, plugincommon.OutcomeMethod, "tokenPrices",
+				)),
 			)
 			require.Equal(t, tc.expectedTokenPrices, tokenPrices)
 		})
@@ -127,6 +134,7 @@ func Test_TrackingTokenPrices(t *testing.T) {
 }
 
 func Test_TrackingChainFees(t *testing.T) {
+	chainFeeProcessor := "chainfee"
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
@@ -172,18 +180,26 @@ func Test_TrackingChainFees(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackChainFeeObservation(tc.observation)
+			reporter.TrackProcessorOutput(
+				chainFeeProcessor, plugincommon.ObservationMethod, tc.observation,
+			)
 
 			feeComponents := int(testutil.ToFloat64(
-				reporter.chainFeeProcessorObservationCounter.WithLabelValues(chainID, "feeComponents")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, chainFeeProcessor, plugincommon.ObservationMethod, "feeComponents",
+				)),
 			)
 			require.Equal(t, tc.expectedFeeComponents, feeComponents)
 			nativePrices := int(testutil.ToFloat64(
-				reporter.chainFeeProcessorObservationCounter.WithLabelValues(chainID, "nativeTokenPrices")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, chainFeeProcessor, plugincommon.ObservationMethod, "nativeTokenPrices",
+				)),
 			)
 			require.Equal(t, tc.expectedNativePrices, nativePrices)
 			chainFeeUpdates := int(testutil.ToFloat64(
-				reporter.chainFeeProcessorObservationCounter.WithLabelValues(chainID, "chainFeeUpdates")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, chainFeeProcessor, plugincommon.ObservationMethod, "chainFeeUpdates",
+				)),
 			)
 			require.Equal(t, tc.expectedCHainFeeUpdates, chainFeeUpdates)
 		})
@@ -217,10 +233,12 @@ func Test_TrackingChainFees(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackChainFeeOutcome(tc.outcome)
+			reporter.TrackProcessorOutput(chainFeeProcessor, plugincommon.OutcomeMethod, tc.outcome)
 
 			gasPrices := int(testutil.ToFloat64(
-				reporter.chainFeeProcessorOutcomeCounter.WithLabelValues(chainID, "gasPrices")),
+				reporter.processorOutputCounter.WithLabelValues(
+					chainID, chainFeeProcessor, plugincommon.OutcomeMethod, "gasPrices",
+				)),
 			)
 			require.Equal(t, tc.expectedGasPrices, gasPrices)
 		})
@@ -228,6 +246,7 @@ func Test_TrackingChainFees(t *testing.T) {
 }
 
 func Test_MerkleRoots(t *testing.T) {
+	processor := "merkleroot"
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
@@ -274,14 +293,14 @@ func Test_MerkleRoots(t *testing.T) {
 
 	for _, tc := range obsTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackMerkleObservation(tc.observation, tc.state)
+			reporter.TrackProcessorOutput(processor, plugincommon.ObservationMethod, tc.observation)
 
 			roots := int(testutil.ToFloat64(
-				reporter.merkleProcessorObservationCounter.WithLabelValues(chainID, tc.state, "roots")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.ObservationMethod, "roots")),
 			)
 			require.Equal(t, tc.expectedRoots, roots)
 			messages := int(testutil.ToFloat64(
-				reporter.merkleProcessorObservationCounter.WithLabelValues(chainID, tc.state, "messages")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.ObservationMethod, "messages")),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
 		})
@@ -333,31 +352,195 @@ func Test_MerkleRoots(t *testing.T) {
 
 	for _, tc := range outTcs {
 		t.Run(tc.name, func(t *testing.T) {
-			reporter.TrackMerkleOutcome(tc.outcome, tc.state)
+			reporter.TrackProcessorOutput(processor, plugincommon.OutcomeMethod, tc.outcome)
 
 			roots := int(testutil.ToFloat64(
-				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "roots")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.OutcomeMethod, "roots")),
 			)
 			require.Equal(t, tc.expectedRoots, roots)
 			messages := int(testutil.ToFloat64(
-				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "messages")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.OutcomeMethod, "messages")),
 			)
 			require.Equal(t, tc.expectedMessages, messages)
 			rmns := int(testutil.ToFloat64(
-				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "rmnSignatures")),
+				reporter.processorOutputCounter.WithLabelValues(chainID, processor, plugincommon.OutcomeMethod, "rmnSignatures")),
 			)
 			require.Equal(t, tc.expectedRMNSignatures, rmns)
 		})
 	}
 }
 
+func Test_LatencyAndErrors(t *testing.T) {
+	reporter, err := NewPromReporter(logger.Test(t), selector)
+	require.NoError(t, err)
+
+	t.Run("single latency metric", func(t *testing.T) {
+		processor := "merkle"
+		method := "query"
+
+		reporter.TrackProcessorLatency(processor, method, time.Second, nil)
+		l1 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
+		require.Equal(t, 1, l1)
+
+		errs := testutil.ToFloat64(
+			reporter.processorErrors.WithLabelValues(chainID, processor, method),
+		)
+		require.Equal(t, float64(0), errs)
+	})
+
+	t.Run("multiple latency metrics", func(t *testing.T) {
+		processor := "chainfee"
+		method := "observation"
+
+		passCounter := 10
+		for i := 0; i < passCounter; i++ {
+			reporter.TrackProcessorLatency(processor, method, time.Second, nil)
+		}
+		l2 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
+		require.Equal(t, passCounter, l2)
+	})
+
+	t.Run("multiple error metrics", func(t *testing.T) {
+		processor := "discovery"
+		method := "outcome"
+
+		errCounter := 5
+		for i := 0; i < errCounter; i++ {
+			reporter.TrackProcessorLatency(processor, method, time.Second, fmt.Errorf("error"))
+		}
+		errs := testutil.ToFloat64(
+			reporter.processorErrors.WithLabelValues(chainID, processor, method),
+		)
+		require.Equal(t, float64(errCounter), errs)
+	})
+}
+
+func Test_SequenceNumbers(t *testing.T) {
+	tt := []struct {
+		name   string
+		obs    committypes.Observation
+		out    committypes.Outcome
+		method plugincommon.MethodType
+		exp    map[cciptypes.ChainSelector]cciptypes.SeqNum
+	}{
+		{
+			name:   "empty observation should not report anything",
+			obs:    committypes.Observation{},
+			method: plugincommon.ObservationMethod,
+			exp:    map[cciptypes.ChainSelector]cciptypes.SeqNum{},
+		},
+		{
+			name: "single chain observation with seq nr",
+			obs: committypes.Observation{
+				MerkleRootObs: merkleroot.Observation{
+					MerkleRoots: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     cciptypes.ChainSelector(123),
+							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
+						},
+					},
+				},
+			},
+			method: plugincommon.ObservationMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+			},
+		},
+		{
+			name: "multiple chain observations with sequence numbers",
+			obs: committypes.Observation{
+				MerkleRootObs: merkleroot.Observation{
+					MerkleRoots: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     cciptypes.ChainSelector(123),
+							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
+						},
+						{
+							ChainSel:     cciptypes.ChainSelector(456),
+							SeqNumsRange: cciptypes.NewSeqNumRange(3, 4),
+						},
+						{
+							ChainSel:     cciptypes.ChainSelector(789),
+							SeqNumsRange: cciptypes.NewSeqNumRange(0, 0),
+						},
+					},
+				},
+			},
+			method: plugincommon.ObservationMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+				456: 4,
+			},
+		},
+		{
+			name: "single chain outcome with seq nr",
+			out: committypes.Outcome{
+				MerkleRootOutcome: merkleroot.Outcome{
+					RootsToReport: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     cciptypes.ChainSelector(123),
+							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
+						},
+					},
+				},
+			},
+			method: plugincommon.OutcomeMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+			},
+		},
+		{
+			name: "multiple chain outcomes with sequence numbers",
+			out: committypes.Outcome{
+				MerkleRootOutcome: merkleroot.Outcome{
+					RootsToReport: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     cciptypes.ChainSelector(123),
+							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
+						},
+						{
+							ChainSel:     cciptypes.ChainSelector(456),
+							SeqNumsRange: cciptypes.NewSeqNumRange(3, 4),
+						},
+					},
+				},
+			},
+			method: plugincommon.OutcomeMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+				456: 4,
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter, err := NewPromReporter(logger.Test(t), selector)
+			require.NoError(t, err)
+
+			t.Cleanup(cleanupMetrics(reporter))
+
+			switch tc.method {
+			case plugincommon.ObservationMethod:
+				reporter.TrackObservation(tc.obs)
+			case plugincommon.OutcomeMethod:
+				reporter.TrackOutcome(tc.out)
+			}
+
+			for sourceChainSelector, maxSeqNr := range tc.exp {
+				seqNum := testutil.ToFloat64(
+					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChainSelector.String(), tc.method),
+				)
+				require.Equal(t, float64(maxSeqNr), seqNum)
+			}
+		})
+	}
+}
+
 func cleanupMetrics(reporter *PromReporter) func() {
 	return func() {
-		reporter.chainFeeProcessorObservationCounter.Reset()
-		reporter.chainFeeProcessorOutcomeCounter.Reset()
-		reporter.merkleProcessorOutcomeCounter.Reset()
-		reporter.merkleProcessorObservationCounter.Reset()
-		reporter.tokenProcessorOutcomeCounter.Reset()
-		reporter.tokenProcessorObservationCounter.Reset()
+		reporter.processorErrors.Reset()
+		reporter.processorOutputCounter.Reset()
+		reporter.processorLatencyHistogram.Reset()
 	}
 }

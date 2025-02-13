@@ -297,30 +297,29 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("success: schedule all operations", func(t *testing.T) {
 					for _, op := range []timelockutil.Operation{op1, op2, op3} {
-						invalidIxs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, proposer.PublicKey())
+						invalidIxs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, proposer.PublicKey(), proposerAccessController)
 						require.NoError(t, ierr)
 						for _, ix := range invalidIxs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 						}
 
-						t.Run("clear operation", func(t *testing.T) {
-							// clear instructions so that we can reinitialize the operation
-							clearIx, ciErr := timelock.NewClearOperationInstruction(
-								config.TestTimelockID,
-								op.OperationID(),
-								op.OperationPDA(),
-								timelockutil.GetConfigPDA(config.TestTimelockID),
-								proposer.PublicKey(),
-							).ValidateAndBuild()
-							require.NoError(t, ciErr)
+						// clear instructions so that we can reinitialize the operation
+						clearIx, ciErr := timelock.NewClearOperationInstruction(
+							config.TestTimelockID,
+							op.OperationID(),
+							op.OperationPDA(),
+							timelockutil.GetConfigPDA(config.TestTimelockID),
+							proposerAccessController,
+							proposer.PublicKey(),
+						).ValidateAndBuild()
+						require.NoError(t, ciErr)
 
-							// send clear and check if it's closed
-							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{clearIx}, proposer, config.DefaultCommitment)
-							testutils.AssertClosedAccount(ctx, t, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
-						})
+						// send clear and check if it's closed
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{clearIx}, proposer, config.DefaultCommitment)
+						testutils.AssertClosedAccount(ctx, t, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
 
 						// re-preload instructions
-						ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, proposer.PublicKey())
+						ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, proposer.PublicKey(), proposerAccessController)
 						require.NoError(t, err)
 						for _, ix := range ixs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
@@ -464,9 +463,9 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 					}
 
 					require.Equal(t,
-						config.TimelockOpDoneTimestamp,
-						opAccount.Timestamp,
-						"Executed operation's time should be 1(DONE_TIMESTAMP)",
+						timelock.Done_OperationState,
+						opAccount.State,
+						"Executed operation should be marked as done",
 					)
 				})
 
@@ -511,9 +510,9 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 					}
 
 					require.Equal(t,
-						config.TimelockOpDoneTimestamp,
-						opAccount.Timestamp,
-						"Executed operation's time should be 1(DONE_TIMESTAMP)",
+						timelock.Done_OperationState,
+						opAccount.State,
+						"Executed operation should be marked as done",
 					)
 
 					recipientWsolBalance, err := solanaGoClient.GetTokenAccountBalance(
@@ -604,7 +603,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 		id := op.OperationID()
 		operationPDA := op.OperationPDA()
 
-		ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, proposer.PublicKey())
+		ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, op, proposer.PublicKey(), proposerAccessController)
 		require.NoError(t, err)
 		for _, ix := range ixs {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)

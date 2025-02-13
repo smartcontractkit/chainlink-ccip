@@ -3,7 +3,10 @@ package inmem
 import (
 	"context"
 	"math/big"
+	"sort"
 	"time"
+
+	mapset "github.com/deckarep/golang-set/v2"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -41,12 +44,12 @@ func (r InMemoryCCIPReader) GetContractAddress(contractName string, chain ccipty
 // GetExpectedNextSequenceNumber implements reader.CCIP.
 func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
-	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	sourceChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	panic("unimplemented")
 }
 
 func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
-	_ context.Context, _ cciptypes.ChainSelector, ts time.Time, limit int,
+	_ context.Context, ts time.Time, limit int,
 ) ([]plugintypes.CommitPluginReportWithMeta, error) {
 	results := slicelib.Filter(r.Reports, func(report plugintypes.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
@@ -57,16 +60,16 @@ func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 	return results, nil
 }
 
-func (r InMemoryCCIPReader) ExecutedMessageRanges(
-	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
-) ([]cciptypes.SeqNumRange, error) {
+func (r InMemoryCCIPReader) ExecutedMessages(
+	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
+) ([]cciptypes.SeqNum, error) {
 	msgs, ok := r.Messages[source]
 	// no messages for chain
 	if !ok {
 		return nil, nil
 	}
 	filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
-		return seqNumRange.Contains(msg.Header.SequenceNumber) && msg.Destination == dest && msg.Executed
+		return seqNumRange.Contains(msg.Header.SequenceNumber) && msg.Destination == r.Dest && msg.Executed
 	})
 
 	// Build executed ranges
@@ -88,7 +91,15 @@ func (r InMemoryCCIPReader) ExecutedMessageRanges(
 	if currentRange != nil {
 		ranges = append(ranges, *currentRange)
 	}
-	return ranges, nil
+
+	seqNums := make([]cciptypes.SeqNum, 0, len(ranges))
+	for _, r := range ranges {
+		seqNums = append(seqNums, r.ToSlice()...)
+	}
+
+	unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
+	sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
+	return unqSeqNums, nil
 }
 
 func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
@@ -108,6 +119,11 @@ func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
 	}), nil
 }
 
+func (r InMemoryCCIPReader) LatestMsgSeqNum(
+	ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	return 0, nil
+}
+
 func (r InMemoryCCIPReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error) {
@@ -116,7 +132,7 @@ func (r InMemoryCCIPReader) NextSeqNum(
 
 func (r InMemoryCCIPReader) Nonces(
 	ctx context.Context,
-	source, dest cciptypes.ChainSelector,
+	source cciptypes.ChainSelector,
 	addresses []string,
 ) (map[string]uint64, error) {
 	return nil, nil
@@ -151,21 +167,18 @@ func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 	return nil
 }
 
-func (r InMemoryCCIPReader) DiscoverContracts(ctx context.Context) (reader.ContractAddresses, error) {
+func (r InMemoryCCIPReader) DiscoverContracts(
+	ctx context.Context,
+	allChains []cciptypes.ChainSelector) (reader.ContractAddresses, error) {
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) GetRMNRemoteConfig(
-	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector,
-) (rmntypes.RemoteConfig, error) {
+func (r InMemoryCCIPReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error) {
 	return rmntypes.RemoteConfig{}, nil
 }
 
 func (r InMemoryCCIPReader) GetRmnCurseInfo(
-	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector,
-	sourceChainSelectors []cciptypes.ChainSelector,
+	ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector,
 ) (*reader.CurseInfo, error) {
 	return &reader.CurseInfo{
 		CursedSourceChains: map[cciptypes.ChainSelector]bool{},
@@ -196,6 +209,11 @@ func (r InMemoryCCIPReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, er
 
 func (r InMemoryCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
 	return r.ConfigDigest, nil
+}
+
+func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]reader.SourceChainConfig, error) {
+	return nil, nil
 }
 
 // Interface compatibility check.

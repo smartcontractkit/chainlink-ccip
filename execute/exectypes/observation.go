@@ -2,11 +2,24 @@ package exectypes
 
 import (
 	"context"
-	"encoding/json"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+)
+
+const (
+	sourceChainsLabel  = "sourceChains"
+	messagesLabel      = "messages"
+	tokenDataLabel     = "tokenData"
+	commitReportsLabel = "commitReports"
+	noncesLabel        = "nonces"
+	costlyMessages     = "costlyMessages"
+	tokenStateReady    = "tokenReady"
+	tokenStateWaiting  = "tokenWaiting"
 )
 
 // CommitObservations contain the commit plugin report data organized by the source chain selector.
@@ -29,6 +42,17 @@ func (mo MessageObservations) Flatten() []cciptypes.Message {
 		}
 	}
 	return results
+}
+
+func (mo MessageObservations) Stats() map[string]int {
+	messagesCount := 0
+	for _, chainMessages := range mo {
+		messagesCount += len(chainMessages)
+	}
+
+	return map[string]int{
+		messagesLabel: messagesCount,
+	}
 }
 
 func GetHashes(ctx context.Context, mo MessageObservations, hasher cciptypes.MessageHasher) (MessageHashes, error) {
@@ -106,6 +130,8 @@ type Observation struct {
 
 	// Contracts are part of the initial discovery phase which runs to initialize the CCIP Reader.
 	Contracts dt.Observation `json:"contracts"`
+
+	FChain map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
 func (co CommitObservations) Flatten() []CommitData {
@@ -114,6 +140,17 @@ func (co CommitObservations) Flatten() []CommitData {
 		results = append(results, reports...)
 	}
 	return results
+}
+
+func (co CommitObservations) Stats() map[string]int {
+	commitReportsCount := 0
+	for _, commit := range co {
+		commitReportsCount += len(commit)
+	}
+
+	return map[string]int{
+		commitReportsLabel: commitReportsCount,
+	}
 }
 
 // NewObservation constructs an Observation object.
@@ -137,17 +174,57 @@ func NewObservation(
 	}
 }
 
-// Encode the Observation into a byte slice.
-func (obs Observation) Encode() ([]byte, error) {
-	return json.Marshal(obs)
+func (o Observation) Stats() map[string]int {
+	stats := map[string]int{}
+	mergeStats(&stats, o.Nonces)
+	mergeStats(&stats, o.CommitReports)
+	mergeStats(&stats, o.Messages)
+	mergeStats(&stats, o.TokenData)
+	maps.Copy(stats, o.trackCostlyMessages())
+	return stats
 }
 
-// DecodeObservation from a byte slice into an Observation.
-func DecodeObservation(b []byte) (Observation, error) {
-	if len(b) == 0 {
-		return Observation{}, nil
+func mergeStats(dest *map[string]int, t plugintypes.Trackable) {
+	if t == nil {
+		return
 	}
-	obs := Observation{}
-	err := json.Unmarshal(b, &obs)
-	return obs, err
+	maps.Copy(*dest, t.Stats())
+}
+
+func (o NonceObservations) Stats() map[string]int {
+	noncesCount := 0
+	for _, chainNonces := range o {
+		noncesCount += len(chainNonces)
+	}
+
+	return map[string]int{
+		noncesLabel: noncesCount,
+	}
+}
+
+func (o TokenDataObservations) Stats() map[string]int {
+	tokenCounters := map[string]int{
+		tokenStateReady:   0,
+		tokenStateWaiting: 0,
+	}
+
+	for _, chainTokens := range o {
+		for _, tokenData := range chainTokens {
+			for _, token := range tokenData.TokenData {
+				counterKey := tokenStateWaiting
+				if token.IsReady() {
+					counterKey = tokenStateReady
+				}
+				tokenCounters[counterKey]++
+			}
+		}
+	}
+
+	return tokenCounters
+}
+
+func (o Observation) trackCostlyMessages() map[string]int {
+	return map[string]int{
+		costlyMessages: len(o.CostlyMessages),
+	}
 }

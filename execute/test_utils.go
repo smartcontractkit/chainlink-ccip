@@ -131,7 +131,7 @@ func (it *IntTest) WithMessages(
 
 		it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
-				MerkleRoots: []cciptypes.MerkleRootChain{
+				BlessedMerkleRoots: []cciptypes.MerkleRootChain{
 					{
 						ChainSel:     reportData.SourceChain,
 						SeqNumsRange: reportData.SequenceNumberRange,
@@ -255,14 +255,14 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	if it.feeCalculator != nil {
 		feeCalculator = it.feeCalculator
 	} else {
-		feeCalculator = costlymessages.NewZeroMessageFeeUSD18Calculator()
+		feeCalculator = costlymessages.NewConstMessageFeeUSD18Calculator(big.NewInt(5))
 	}
 
 	var execCostCalculator costlymessages.MessageExecCostUSD18Calculator
 	if it.execCostCalculator != nil {
 		execCostCalculator = it.execCostCalculator
 	} else {
-		execCostCalculator = costlymessages.NewZeroMessageExecCostUSD18Calculator()
+		execCostCalculator = costlymessages.NewConstMessageExecCostUSD18Calculator(big.NewInt(3))
 	}
 
 	costlyMessageObserver := costlymessages.NewObserver(
@@ -529,4 +529,45 @@ func (t *timeMachine) Now() time.Time {
 
 func (t *timeMachine) SetNow(now time.Time) {
 	t.now = now
+}
+
+func emptyMessagesForRange(start, end uint64) []cciptypes.Message {
+	messages := make([]cciptypes.Message, end-start+1)
+	for i := start; i <= end; i++ {
+		messages[i-start] = cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:      cciptypes.Bytes32{byte(i)},
+				SequenceNumber: cciptypes.SeqNum(i),
+			},
+		}
+	}
+	return messages
+}
+
+func emptyMessagesMapForRange(start, end uint64) map[cciptypes.SeqNum]cciptypes.Message {
+	messages := make(map[cciptypes.SeqNum]cciptypes.Message)
+	for i := start; i <= end; i++ {
+		messages[cciptypes.SeqNum(i)] = cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:      cciptypes.Bytes32{byte(i)},
+				SequenceNumber: cciptypes.SeqNum(i),
+			},
+		}
+	}
+	return messages
+}
+
+func emptyMessagesMapForRanges(ranges []cciptypes.SeqNumRange) map[cciptypes.SeqNum]cciptypes.Message {
+	messages := make(map[cciptypes.SeqNum]cciptypes.Message)
+	for _, r := range ranges {
+		for i := r.Start(); i <= r.End(); i++ {
+			messages[i] = cciptypes.Message{
+				Header: cciptypes.RampMessageHeader{
+					MessageID:      cciptypes.Bytes32{byte(i)},
+					SequenceNumber: i,
+				},
+			}
+		}
+	}
+	return messages
 }

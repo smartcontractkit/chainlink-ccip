@@ -139,12 +139,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 }
 
 type Operation struct {
+	State             OperationState
 	Timestamp         uint64
 	Id                [32]uint8
 	Predecessor       [32]uint8
 	Salt              [32]uint8
-	Authority         ag_solanago.PublicKey
-	IsFinalized       bool
 	TotalInstructions uint32
 	Instructions      []InstructionData
 }
@@ -154,6 +153,11 @@ var OperationDiscriminator = [8]byte{171, 150, 196, 17, 229, 166, 58, 44}
 func (obj Operation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
 	err = encoder.WriteBytes(OperationDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
 	if err != nil {
 		return err
 	}
@@ -174,16 +178,6 @@ func (obj Operation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	}
 	// Serialize `Salt` param:
 	err = encoder.Encode(obj.Salt)
-	if err != nil {
-		return err
-	}
-	// Serialize `Authority` param:
-	err = encoder.Encode(obj.Authority)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsFinalized` param:
-	err = encoder.Encode(obj.IsFinalized)
 	if err != nil {
 		return err
 	}
@@ -214,6 +208,11 @@ func (obj *Operation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 				fmt.Sprint(discriminator[:]))
 		}
 	}
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Timestamp`:
 	err = decoder.Decode(&obj.Timestamp)
 	if err != nil {
@@ -231,16 +230,6 @@ func (obj *Operation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	}
 	// Deserialize `Salt`:
 	err = decoder.Decode(&obj.Salt)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Authority`:
-	err = decoder.Decode(&obj.Authority)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsFinalized`:
-	err = decoder.Decode(&obj.IsFinalized)
 	if err != nil {
 		return err
 	}

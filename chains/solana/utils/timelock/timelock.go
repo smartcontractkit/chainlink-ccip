@@ -39,6 +39,15 @@ func GetOperationPDA(timelockID [32]byte, opID [32]byte) solana.PublicKey {
 	return pda
 }
 
+func GetBypasserOperationPDA(timelockID [32]byte, opID [32]byte) solana.PublicKey {
+	pda, _, _ := solana.FindProgramAddress([][]byte{
+		[]byte("timelock_bypasser_operation"),
+		timelockID[:],
+		opID[:],
+	}, config.TimelockProgram)
+	return pda
+}
+
 // instruction builder for initializing access controllers
 func GetInitAccessControllersIxs(ctx context.Context, roleAcAccount solana.PublicKey, authority solana.PrivateKey, client *rpc.Client) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
@@ -111,7 +120,7 @@ func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccoun
 }
 
 // instructions builder for preloading instructions to timelock operation
-func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey) ([]solana.Instruction, error) {
+func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey, proposerAc solana.PublicKey) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 	initOpIx, ioErr := timelock.NewInitializeOperationInstruction(
 		timelockID,
@@ -121,6 +130,7 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		op.IxsCountU32(),
 		op.OperationPDA(),
 		GetConfigPDA(timelockID),
+		proposerAc,
 		authority,
 		solana.SystemProgramID,
 	).ValidateAndBuild()
@@ -129,20 +139,53 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 	}
 	ixs = append(ixs, initOpIx)
 
-	for _, instruction := range op.ToInstructionData() {
-		appendIxsIx, apErr := timelock.NewAppendInstructionsInstruction(
+	for ixIndex, ixData := range op.ToInstructionData() {
+		initIx, err := timelock.NewInitializeInstructionInstruction(
 			timelockID,
 			op.OperationID(),
-			[]timelock.InstructionData{instruction}, // this should be a slice of instruction within 1232 bytes
+			ixData.ProgramId, // ProgramId
+			ixData.Accounts,  // The list of accounts for this instruction
+			// Accounts:
 			op.OperationPDA(),
 			GetConfigPDA(timelockID),
+			proposerAc,
 			authority,
-			solana.SystemProgramID, // for reallocation
+			solana.SystemProgramID,
 		).ValidateAndBuild()
-		if apErr != nil {
-			return nil, fmt.Errorf("failed to build append instructions instruction: %w", apErr)
+		if err != nil {
+			return nil, fmt.Errorf("failed building InitializeInstruction (ixIndex=%d): %w", ixIndex, err)
 		}
-		ixs = append(ixs, appendIxsIx)
+		ixs = append(ixs, initIx)
+
+		rawData := ixData.Data
+		offset := 0
+
+		for offset < len(rawData) {
+			end := offset + config.AppendIxDataChunkSize
+			if end > len(rawData) {
+				end = len(rawData)
+			}
+			chunk := rawData[offset:end]
+
+			appendIx, err := timelock.NewAppendInstructionDataInstruction(
+				timelockID,
+				op.OperationID(),
+				//nolint:gosec
+				uint32(ixIndex), // which instruction index we are chunking
+				chunk,           // partial data
+				op.OperationPDA(),
+				GetConfigPDA(timelockID),
+				proposerAc,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return nil, fmt.Errorf("failed building AppendInstructionData (ixIndex=%d): %w", ixIndex, err)
+			}
+			ixs = append(ixs, appendIx)
+
+			offset = end
+		}
 	}
 
 	finOpIx, foErr := timelock.NewFinalizeOperationInstruction(
@@ -150,6 +193,91 @@ func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.
 		op.OperationID(),
 		op.OperationPDA(),
 		GetConfigPDA(timelockID),
+		proposerAc,
+		authority,
+	).ValidateAndBuild()
+	if foErr != nil {
+		return nil, fmt.Errorf("failed to build finalize operation instruction: %w", foErr)
+	}
+	ixs = append(ixs, finOpIx)
+
+	return ixs, nil
+}
+
+// instructions builder for preloading instructions to timelock bypasser operation
+func GetPreloadBypasserOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey, bypasserAc solana.PublicKey) ([]solana.Instruction, error) {
+	ixs := []solana.Instruction{}
+	initOpIx, ioErr := timelock.NewInitializeBypasserOperationInstruction(
+		timelockID,
+		op.OperationID(),
+		op.Salt,
+		op.IxsCountU32(),
+		op.OperationPDA(),
+		GetConfigPDA(timelockID),
+		bypasserAc,
+		authority,
+		solana.SystemProgramID,
+	).ValidateAndBuild()
+	if ioErr != nil {
+		return nil, fmt.Errorf("failed to build initialize operation instruction: %w", ioErr)
+	}
+	ixs = append(ixs, initOpIx)
+
+	for ixIndex, ixData := range op.ToInstructionData() {
+		initIx, err := timelock.NewInitializeBypasserInstructionInstruction(
+			timelockID,
+			op.OperationID(),
+			ixData.ProgramId, // ProgramId
+			ixData.Accounts,  // The list of accounts for this instruction
+			// Accounts:
+			op.OperationPDA(),
+			GetConfigPDA(timelockID),
+			bypasserAc,
+			authority,
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed building InitializeInstruction (ixIndex=%d): %w", ixIndex, err)
+		}
+		ixs = append(ixs, initIx)
+
+		rawData := ixData.Data
+		offset := 0
+
+		for offset < len(rawData) {
+			end := offset + config.AppendIxDataChunkSize
+			if end > len(rawData) {
+				end = len(rawData)
+			}
+			chunk := rawData[offset:end]
+
+			appendIx, err := timelock.NewAppendBypasserInstructionDataInstruction(
+				timelockID,
+				op.OperationID(),
+				//nolint:gosec
+				uint32(ixIndex), // which instruction index we are chunking
+				chunk,           // partial data
+				op.OperationPDA(),
+				GetConfigPDA(timelockID),
+				bypasserAc,
+				authority,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return nil, fmt.Errorf("failed building AppendInstructionData (ixIndex=%d): %w", ixIndex, err)
+			}
+			ixs = append(ixs, appendIx)
+
+			offset = end
+		}
+	}
+
+	finOpIx, foErr := timelock.NewFinalizeBypasserOperationInstruction(
+		timelockID,
+		op.OperationID(),
+		op.OperationPDA(),
+		GetConfigPDA(timelockID),
+		bypasserAc,
 		authority,
 	).ValidateAndBuild()
 	if foErr != nil {
@@ -236,7 +364,8 @@ func WaitForOperationToBeReady(ctx context.Context, client *rpc.Client, opPDA so
 		return fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	if opAccount.Timestamp == config.TimelockOpDoneTimestamp {
+	if opAccount.State == timelock.Done_OperationState {
+		// skip waiting if operation is already done
 		return nil
 	}
 

@@ -10,8 +10,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -377,6 +378,14 @@ func Test_Processor_Outcome(t *testing.T) {
 								MerkleRoot:    bytes32a,
 							},
 						},
+						RMNEnabledChains: map[cciptypes.ChainSelector]bool{
+							chainA: true,
+							chainB: true,
+							chainC: true,
+							chainD: true,
+							chainE: true,
+							chainF: true,
+						},
 						FChain: map[cciptypes.ChainSelector]int{
 							chainA: 1,
 							chainB: 1,
@@ -415,6 +424,14 @@ func Test_Processor_Outcome(t *testing.T) {
 						SeqNumsRange:  cciptypes.NewSeqNumRange(10, 15),
 						MerkleRoot:    cciptypes.Bytes32{0xa},
 					},
+				},
+				RMNEnabledChains: map[cciptypes.ChainSelector]bool{
+					chainA: true,
+					chainB: true,
+					chainC: true,
+					chainD: true,
+					chainE: true,
+					chainF: true,
 				},
 				RMNReportSignatures: []cciptypes.RMNECDSASignature{
 					{R: bytes32a, S: bytes32b},

@@ -42,7 +42,6 @@ func (p *processor) Observation(
 		FChain:                fChain,
 		Timestamp:             now,
 	}
-	p.metricsReporter.TrackTokenPricesObservation(obs)
 	return obs, nil
 }
 
@@ -55,43 +54,33 @@ func (p *processor) ObserveFChain(lggr logger.Logger) map[cciptypes.ChainSelecto
 	return fChain
 }
 
-func (p *processor) ObserveFeedTokenPrices(ctx context.Context, lggr logger.Logger) []cciptypes.TokenPrice {
+func (p *processor) ObserveFeedTokenPrices(ctx context.Context, lggr logger.Logger) cciptypes.TokenPriceMap {
 	if p.tokenPriceReader == nil {
 		lggr.Debugw("no token price reader available")
-		return []cciptypes.TokenPrice{}
+		return cciptypes.TokenPriceMap{}
 	}
 
 	supportedChains, err := p.chainSupport.SupportedChains(p.oracleID)
 	if err != nil {
 		lggr.Warnw("call to SupportedChains failed", "err", err)
-		return []cciptypes.TokenPrice{}
+		return cciptypes.TokenPriceMap{}
 	}
 
 	if !supportedChains.Contains(p.offChainCfg.PriceFeedChainSelector) {
 		lggr.Debugf("oracle does not support feed chain %d", p.offChainCfg.PriceFeedChainSelector)
-		return []cciptypes.TokenPrice{}
-
+		return cciptypes.TokenPriceMap{}
 	}
 
 	tokensToQuery := maps.Keys(p.offChainCfg.TokenInfo)
-	// sort tokens to query to ensure deterministic order
-	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
 	tokenPrices, err := p.tokenPriceReader.GetFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
 		lggr.Errorw("call to GetFeedPricesUSD failed",
 			"err", err)
-		return []cciptypes.TokenPrice{}
+		return cciptypes.TokenPriceMap{}
 	}
 
-	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokenPrices))
-	for _, token := range tokensToQuery {
-		if tokenPrices[token] != nil {
-			tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[token]))
-		}
-	}
-
-	return tokenPricesUSD
+	return tokenPrices
 }
 
 func (p *processor) ObserveFeeQuoterTokenUpdates(

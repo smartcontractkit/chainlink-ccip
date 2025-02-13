@@ -34,14 +34,8 @@ pub enum McmError {
     #[msg("Invalid chainID")]
     WrongChainId,
 
-    #[msg("Invalid signature")]
-    InvalidSignature,
-
     #[msg("Failed ECDSA recover")]
     FailedEcdsaRecover,
-
-    #[msg("Invalid root length")]
-    InvalidRootLen,
 
     #[msg("Config signers not finalized")]
     SignersNotFinalized,
@@ -60,12 +54,6 @@ pub enum McmError {
 
     #[msg("Signatures not finalized")]
     SignaturesNotFinalized,
-
-    #[msg("Signatures root mismatch")]
-    SignaturesRootMismatch,
-
-    #[msg("Signatures valid until mismatch")]
-    SignaturesValidUntilMismatch,
 
     #[msg("The input vectors for signer addresses and signer groups must have the same length")]
     MismatchedInputSignerVectorsLength = 200,

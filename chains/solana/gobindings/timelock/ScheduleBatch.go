@@ -10,7 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ScheduleBatch is the `scheduleBatch` instruction.
+// Schedule a finalized operation to be executed after a delay.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the accounts for scheduling.
+// - `timelock_id`: The timelock identifier.
+// - `id`: The operation identifier.
+// - `delay`: The delay (in seconds) before the operation can be executed.
 type ScheduleBatch struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

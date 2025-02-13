@@ -25,6 +25,7 @@ type Operation struct {
 	Salt         [32]byte      // random salt for the operation
 	Delay        uint64        // delay in seconds
 	instructions []Instruction // instruction data slice, use Add method to add instructions and accounts
+	IsBypasserOp bool          // is this operation for bypasser_execute_batch
 }
 
 // add instruction and required accounts to operation
@@ -37,9 +38,6 @@ func (op *Operation) AddInstruction(ix solana.Instruction, additionalPrograms []
 
 	for i, acc := range ix.Accounts() {
 		accounts[i] = *acc
-		// for debugging
-		// fmt.Printf("Account %d: %s (signer: %v, writable: %v)\n",
-		// 	i, acc.PublicKey, acc.IsSigner, acc.IsWritable)
 	}
 
 	op.instructions = append(op.instructions, Instruction{
@@ -77,7 +75,6 @@ func (op *Operation) RemainingAccounts() []*solana.AccountMeta {
 				existing.IsWritable = existing.IsWritable || acc.IsWritable
 			} else {
 				accCopy := acc
-				// todo: maybe keep it as it is and override on chain(in case if we gonna calc root from this)
 				accCopy.IsSigner = false // force false for CPI
 				accountMap[key] = &accCopy
 			}
@@ -102,6 +99,9 @@ func (op *Operation) OperationID() [32]byte {
 
 func (op *Operation) OperationPDA() solana.PublicKey {
 	id := op.OperationID()
+	if op.IsBypasserOp {
+		return GetBypasserOperationPDA(op.TimelockID, id)
+	}
 	return GetOperationPDA(op.TimelockID, id)
 }
 

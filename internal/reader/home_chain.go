@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -59,7 +60,7 @@ type homeChainPoller struct {
 	lggr                    logger.Logger
 	mutex                   *sync.RWMutex
 	state                   state
-	failedPolls             uint
+	failedPolls             atomic.Uint32
 	ccipConfigBoundContract types.BoundContract
 	// How frequently the poller fetches the chain configs
 	pollingDuration time.Duration
@@ -78,7 +79,7 @@ func NewHomeChainConfigPoller(
 		homeChainReader:         homeChainReader,
 		state:                   state{},
 		mutex:                   &sync.RWMutex{},
-		failedPolls:             0,
+		failedPolls:             atomic.Uint32{},
 		lggr:                    lggr,
 		pollingDuration:         pollingInterval,
 		ccipConfigBoundContract: ccipConfigBoundContract,
@@ -109,15 +110,13 @@ func (r *homeChainPoller) poll() {
 	for {
 		select {
 		case <-ctx.Done():
-			r.mutex.Lock()
-			r.failedPolls = 0
-			r.mutex.Unlock()
+			r.failedPolls.Store(0)
 			return
 		case <-ticker.C:
 			if err := r.fetchAndSetConfigs(ctx); err != nil {
-				r.mutex.Lock()
-				r.failedPolls++
-				r.mutex.Unlock()
+				r.failedPolls.Add(1)
+			} else {
+				r.failedPolls.Store(0)
 			}
 		}
 	}
@@ -143,6 +142,11 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
 		}
 
+		validCfgInfos := getValidChainConfigInfos(r.lggr, chainConfigInfos)
+
+		if len(validCfgInfos) == 0 {
+			continue
+		}
 		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
 
 		if uint64(len(chainConfigInfos)) < defaultConfigPageSize {
@@ -267,9 +271,8 @@ func (r *homeChainPoller) Ready() error {
 }
 
 func (r *homeChainPoller) HealthReport() map[string]error {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	if r.failedPolls >= MaxFailedPolls {
+	f := r.failedPolls.Load()
+	if f >= MaxFailedPolls {
 		r.sync.SvcErrBuffer.Append(fmt.Errorf("polling failed %d times in a row", MaxFailedPolls))
 	}
 	return map[string]error{r.Name(): r.sync.Healthy()}
@@ -332,6 +335,37 @@ func convertOnChainConfigToHomeChainConfig(
 		}
 	}
 	return chainConfigs
+}
+
+func validateChainConfigInfos(chainConfigInfo ChainConfigInfo) error {
+	if chainConfigInfo.ChainSelector == 0 {
+		return errors.New("chain selector is 0")
+	}
+	if chainConfigInfo.ChainConfig.FChain == 0 {
+		return errors.New("fChain is 0")
+	}
+
+	if len(chainConfigInfo.ChainConfig.Readers) == 0 {
+		return errors.New("readers is empty")
+	}
+
+	if len(chainConfigInfo.ChainConfig.Config) == 0 {
+		return errors.New("config is empty")
+	}
+
+	return nil
+}
+
+func getValidChainConfigInfos(lggr logger.Logger, chainConfigInfos []ChainConfigInfo) []ChainConfigInfo {
+	validChainConfigInfos := make([]ChainConfigInfo, 0)
+	for _, chainConfigInfo := range chainConfigInfos {
+		if err := validateChainConfigInfos(chainConfigInfo); err != nil {
+			lggr.Warnw("invalid chain config info", "err", err)
+			continue
+		}
+		validChainConfigInfos = append(validChainConfigInfos, chainConfigInfo)
+	}
+	return validChainConfigInfos
 }
 
 // HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make

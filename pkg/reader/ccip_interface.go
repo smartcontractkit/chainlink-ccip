@@ -25,6 +25,34 @@ var (
 // Currently only one contract per chain per name is supported.
 type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 
+// ChainConfigSnapshot represents the complete configuration state of the chain
+type ChainConfigSnapshot struct {
+	Offramp   OfframpConfig
+	RMNProxy  RMNProxyConfig
+	RMNRemote RMNRemoteConfig
+	FeeQuoter FeeQuoterConfig
+}
+
+type FeeQuoterConfig struct {
+	StaticConfig feeQuoterStaticConfig
+}
+
+type RMNRemoteConfig struct {
+	DigestHeader    rmnDigestHeader
+	VersionedConfig versionedConfig
+}
+
+type OfframpConfig struct {
+	CommitLatestOCRConfig OCRConfigResponse
+	ExecLatestOCRConfig   OCRConfigResponse
+	StaticConfig          offRampStaticChainConfig
+	DynamicConfig         offRampDynamicChainConfig
+}
+
+type RMNProxyConfig struct {
+	RemoteAddress []byte
+}
+
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
 	if resp == nil {
@@ -75,42 +103,42 @@ func NewCCIPReaderWithExtendedContractReaders(
 }
 
 type CCIPReader interface {
-	// CommitReportsGTETimestamp reads the requested chain starting at a given timestamp
+	// CommitReportsGTETimestamp reads the destination chain starting at a given timestamp
 	// and finds all ReportAccepted up to the provided limit.
 	CommitReportsGTETimestamp(
 		ctx context.Context,
-		dest cciptypes.ChainSelector,
 		ts time.Time,
 		limit int,
 	) ([]plugintypes2.CommitPluginReportWithMeta, error)
 
-	// ExecutedMessageRanges reads the destination chain and finds which messages are executed.
-	// A slice of sequence number ranges is returned to express which messages are executed.
-	ExecutedMessageRanges(
+	// ExecutedMessages reads the destination chain and finds which messages are executed from the provided source chain.
+	// A slice of sequence numbers is returned to express which messages are executed.
+	ExecutedMessages(
 		ctx context.Context,
-		source, dest cciptypes.ChainSelector,
+		source cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
-	) ([]cciptypes.SeqNumRange, error)
+	) ([]cciptypes.SeqNum, error)
 
-	// MsgsBetweenSeqNums reads the provided chains.
-	// Finds and returns ccip messages submitted between the provided sequence numbers.
-	// Messages are sorted ascending based on their timestamp and limited up to the provided limit.
+	// MsgsBetweenSeqNums reads the provided chains, finds and returns ccip messages
+	// submitted between the provided sequence numbers. Messages are sorted ascending based on
+	// their timestamp and limited up to the provided limit.
 	MsgsBetweenSeqNums(
 		ctx context.Context,
 		chain cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
 	) ([]cciptypes.Message, error)
 
-	// GetExpectedNextSequenceNumber returns the next sequence number to be used
-	// in the onramp.
+	// LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
+	LatestMsgSeqNum(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error)
+
+	// GetExpectedNextSequenceNumber reads the destination and returns the expected next onRamp sequence number.
 	GetExpectedNextSequenceNumber(
 		ctx context.Context,
-		sourceChainSelector, destChainSelector cciptypes.ChainSelector,
+		sourceChainSelector cciptypes.ChainSelector,
 	) (cciptypes.SeqNum, error)
 
 	// NextSeqNum reads the destination chain.
 	// Returns the next expected sequence number for each one of the provided chains.
-	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
 	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (
 		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
@@ -121,7 +149,7 @@ type CCIPReader interface {
 	// it must be encoding according to the source chain requirements with typeconv.AddressBytesToString.
 	Nonces(
 		ctx context.Context,
-		source, dest cciptypes.ChainSelector,
+		source cciptypes.ChainSelector,
 		addresses []string,
 	) (map[string]uint64, error)
 
@@ -147,21 +175,17 @@ type CCIPReader interface {
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
 
-	GetRMNRemoteConfig(
-		ctx context.Context,
-		destChainSelector cciptypes.ChainSelector,
-	) (rmntypes.RemoteConfig, error)
+	GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error)
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(
-		ctx context.Context,
-		destChainSelector cciptypes.ChainSelector,
-		sourceChainSelectors []cciptypes.ChainSelector,
-	) (*CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error)
 
-	// DiscoverContracts reads from all available contract readers to discover contract addresses.
-	DiscoverContracts(ctx context.Context) (ContractAddresses, error)
+	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
+	// contract and source chain selector.
+	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
+	// fetch the source config from the offramp for each of them.
+	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
 	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
 	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
@@ -182,4 +206,9 @@ type CCIPReader interface {
 
 	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
 	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
+
+	// GetOffRampSourceChainsConfig returns the sourceChains config for all the provided source chains.
+	// If a config was not found it will be missing from the returned map.
+	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
+	) (map[cciptypes.ChainSelector]SourceChainConfig, error)
 }

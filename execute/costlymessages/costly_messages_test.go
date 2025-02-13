@@ -49,7 +49,7 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 			messageIDs:   []ccipocr3.Bytes32{b1, b2, b3},
 			messageFees:  map[ccipocr3.Bytes32]plugintypes.USD18{},
 			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
-			want:         []ccipocr3.Bytes32{},
+			want:         nil,
 			wantErr:      assert.NoError,
 		},
 		{
@@ -77,7 +77,7 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 				b3: plugintypes.NewUSD18(30),
 			},
 			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
-			want:         []ccipocr3.Bytes32{},
+			want:         nil,
 			wantErr:      assert.Error,
 		},
 		{
@@ -115,15 +115,15 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 			}
 
 			got, err := observer.Observe(ctx, messages, nil)
-			if tt.wantErr(t, err) {
-				return
-			}
+			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
 func TestWaitBoostedFee(t *testing.T) {
+	lggr := logger.Test(t)
+
 	tests := []struct {
 		name                     string
 		sendTimeDiff             time.Duration
@@ -219,7 +219,7 @@ func TestWaitBoostedFee(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			boosted := waitBoostedFee(tc.sendTimeDiff, tc.fee, tc.relativeBoostPerWaitHour)
+			boosted := waitBoostedFee(lggr, tc.sendTimeDiff, tc.fee, tc.relativeBoostPerWaitHour)
 			diff := big.NewInt(0).Sub(boosted, tc.fee)
 			assert.Equal(t, diff, tc.diff)
 		})
@@ -248,15 +248,15 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 			messages: []ccipocr3.Message{
 				{
 					Header:        ccipocr3.RampMessageHeader{MessageID: b1},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(140),
+					FeeValueJuels: ccipocr3.NewBigIntFromInt64(14e14),
 				},
 				{
 					Header:        ccipocr3.RampMessageHeader{MessageID: b2},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(250),
+					FeeValueJuels: ccipocr3.NewBigIntFromInt64(25e14),
 				},
 				{
 					Header:        ccipocr3.RampMessageHeader{MessageID: b3},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(360),
+					FeeValueJuels: ccipocr3.NewBigIntFromInt64(36e14),
 				},
 			},
 			messageTimeStamps: map[ccipocr3.Bytes32]time.Time{
@@ -264,12 +264,12 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 				b2: t2,
 				b3: t3,
 			},
-			linkPrice:                ccipocr3.NewBigIntFromInt64(100),
+			linkPrice:                ccipocr3.NewBigIntFromInt64(8e18), // 8 USD
 			relativeBoostPerWaitHour: 0.5,
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18(28000),
-				b2: plugintypes.NewUSD18(37500),
-				b3: plugintypes.NewUSD18(36000),
+				b1: plugintypes.NewUSD18(2.24e16),
+				b2: plugintypes.NewUSD18(3e16),
+				b3: plugintypes.NewUSD18(2.88e16),
 			},
 			wantErr: assert.NoError,
 		},
@@ -291,9 +291,7 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 			}
 
 			got, err := calculator.MessageFeeUSD18(ctx, tt.messages, tt.messageTimeStamps)
-			if tt.wantErr(t, err, "MessageFeeUSD18(...)") {
-				return
-			}
+			tt.wantErr(t, err, "MessageFeeUSD18(...)")
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -580,4 +578,183 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestValidatePositive(t *testing.T) {
+	tests := []struct {
+		name    string
+		fee     *big.Int
+		wantErr bool
+	}{
+		{
+			name:    "nil fee",
+			fee:     nil,
+			wantErr: true,
+		},
+		{
+			name:    "negative fee",
+			fee:     big.NewInt(-1),
+			wantErr: true,
+		},
+		{
+			name:    "zero fee",
+			fee:     big.NewInt(0),
+			wantErr: true,
+		},
+		{
+			name:    "positive fee",
+			fee:     big.NewInt(1),
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePositive(tt.fee)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validatePositive() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCalculateETA(t *testing.T) {
+	tests := []struct {
+		name       string
+		currentFee *big.Int
+		targetFee  *big.Int
+		boostRate  float64
+		wantETA    *time.Duration
+	}{
+		{
+			name:       "zero boost rate returns nil",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(200),
+			boostRate:  0,
+			wantETA:    nil,
+		},
+		{
+			name:       "negative boost rate returns nil",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(200),
+			boostRate:  -0.5,
+			wantETA:    nil,
+		},
+		{
+			name:       "target less than current returns nil",
+			currentFee: big.NewInt(200),
+			targetFee:  big.NewInt(100),
+			boostRate:  0.5,
+			wantETA:    nil,
+		},
+		{
+			name:       "simple doubling with 0.5 boost rate",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(200),
+			boostRate:  0.5,
+			wantETA:    durationPtr(2 * time.Hour),
+		},
+		{
+			name:       "50% increase with 0.25 boost rate",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(150),
+			boostRate:  0.25,
+			wantETA:    durationPtr(2 * time.Hour),
+		},
+		{
+			name:       "large numbers - 2x with 0.5 boost",
+			currentFee: new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil), // 10^30
+			targetFee: new(big.Int).Mul(
+				big.NewInt(2),
+				new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil),
+			), // 2 * 10^30
+			boostRate: 0.5,
+			wantETA:   durationPtr(2 * time.Hour),
+		},
+		{
+			name:       "fractional increase - 10% with 0.1 boost",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(110),
+			boostRate:  0.1,
+			wantETA:    durationPtr(1 * time.Hour),
+		},
+		{
+			name:       "many days ETA",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(1000),
+			boostRate:  0.1,
+			wantETA:    durationPtr(90 * time.Hour),
+		},
+		{
+			name:       "very small boost rate",
+			currentFee: big.NewInt(100),
+			targetFee:  big.NewInt(150),
+			boostRate:  0.01,
+			wantETA:    durationPtr(50 * time.Hour),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotETA := calculateETA(tt.currentFee, tt.targetFee, tt.boostRate)
+
+			if tt.wantETA == nil {
+				assert.Nil(t, gotETA)
+			} else {
+				assert.NotNil(t, gotETA)
+				// Allow for small floating point differences
+				assert.InDelta(t, tt.wantETA.Hours(), gotETA.Hours(), 0.001)
+			}
+		})
+	}
+}
+
+func TestFormatETA(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration *time.Duration
+		want     string
+	}{
+		{
+			name:     "nil duration",
+			duration: nil,
+			want:     "boost rate is zero or already at target",
+		},
+		{
+			name:     "less than one hour",
+			duration: durationPtr(30 * time.Minute),
+			want:     "~30 minutes",
+		},
+		{
+			name:     "exactly one hour",
+			duration: durationPtr(1 * time.Hour),
+			want:     "~1.0 hours",
+		},
+		{
+			name:     "multiple hours",
+			duration: durationPtr(5*time.Hour + 30*time.Minute),
+			want:     "~5.5 hours",
+		},
+		{
+			name:     "exactly one day",
+			duration: durationPtr(24 * time.Hour),
+			want:     "~1.0 days",
+		},
+		{
+			name:     "multiple days",
+			duration: durationPtr(72*time.Hour + 12*time.Hour),
+			want:     "~3.5 days",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatETA(tt.duration)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
 }
