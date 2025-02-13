@@ -25,7 +25,7 @@ type ExecuteReportInfo struct {
 	MerkleRoots     []MerkleRootChain
 
 	// TxID to use when submitting the report.
-	TxID string
+	TxID string `json:",omitempty"`
 }
 
 // Encode v1 execute report info. Very basic versioning in the first byte to
