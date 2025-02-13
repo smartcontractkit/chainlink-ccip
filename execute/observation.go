@@ -307,19 +307,22 @@ func (p *Plugin) getMessagesObservation(
 	for chainSelector, msgs := range messageObs {
 		for seqNum, msg := range msgs {
 			// Inflight messages do not need to be observed.
-			if p.inflightMessageCache.IsInflight(chainSelector, msg.Header.MessageID) {
+			if p.inflightMessageCache != nil && p.inflightMessageCache.IsInflight(chainSelector, msg.Header.MessageID) {
 				messageObs[chainSelector][seqNum] = cciptypes.Message{}
 				lggr.Infow("skipping message observation - inflight", "msg", msg)
 				continue
 			}
 			// Messages with fatal txm statuses do not need to be observed.
-			status, err := txmStatusChecker(ctx, lggr, msg, 0, exectypes.CommitData{})
-			if err != nil {
-				lggr.Errorw("txm status check error", "msg", msg, "err", err)
-			} else if status != report.None {
-				messageObs[chainSelector][seqNum] = cciptypes.Message{}
-				lggr.Infow(fmt.Sprintf("skipping message observation - txm status %s", status), "msg", msg)
-				continue
+			if p.statusGetter != nil {
+				status, err := txmStatusChecker(ctx, lggr, msg, 0, exectypes.CommitData{})
+				if err != nil {
+					lggr.Errorw("txm status check error", "msg", msg, "err", err)
+				} else if status != report.None {
+					messageObs[chainSelector][seqNum] = cciptypes.Message{}
+					lggr.Infow(fmt.Sprintf("skipping message observation - txm status %s", status),
+						"msg", msg)
+					continue
+				}
 			}
 		}
 	}

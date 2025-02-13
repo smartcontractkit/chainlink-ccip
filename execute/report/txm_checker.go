@@ -12,10 +12,7 @@ import (
 )
 
 // StatusGetter is a narrowed interface to the contract writer that only exposes the GetTransactionStatus method.
-type StatusGetter interface {
-	// GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
-	GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error)
-}
+type StatusGetter func(ctx context.Context, transactionID string) (types.TransactionStatus, error)
 
 type MessageStatusDetails struct {
 	numAttempts    uint64
@@ -59,7 +56,7 @@ func (m *MessageStatusCache) statuses(ctx context.Context, msgID string) (Messag
 	var details MessageStatusDetails
 	for {
 		transactionID := toID(msgID, details.numAttempts)
-		status, err := m.statusGetter.GetTransactionStatus(ctx, transactionID)
+		status, err := m.statusGetter(ctx, transactionID)
 
 		if err != nil && status == types.Unknown {
 			// TODO: Would be nice to have a typed error here as a more deliberate check.

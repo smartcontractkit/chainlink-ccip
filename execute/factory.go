@@ -190,7 +190,7 @@ func (p PluginFactory) NewReportingPlugin(
 			lggr,
 			costlyMessageObserver,
 			metricsReporter,
-			p.chainWriters[p.ocrConfig.Config.ChainSelector], // dest writer can get status.
+			p.chainWriters[p.ocrConfig.Config.ChainSelector].GetTransactionStatus, // dest writer can get status.
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{
