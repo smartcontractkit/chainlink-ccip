@@ -16,6 +16,8 @@ use crate::instructions::v1;
 mod state;
 use state::*;
 
+use crate::event::admin::{ConfigSet, ReferenceAddressesSet};
+
 #[program]
 pub mod ccip_offramp {
     use super::*;
@@ -43,6 +45,12 @@ pub mod ccip_offramp {
             });
 
         ctx.accounts.state.latest_price_sequence_number = 0;
+
+        emit!(ReferenceAddressesSet {
+            router: ctx.accounts.router.key(),
+            fee_quoter: ctx.accounts.fee_quoter.key(),
+            offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
+        });
 
         Ok(())
     }
@@ -72,6 +80,12 @@ pub mod ccip_offramp {
             Ocr3Config::new(OcrPluginType::Commit as u8),
             Ocr3Config::new(OcrPluginType::Execution as u8),
         ];
+
+        emit!(ConfigSet {
+            chain_selector: svm_chain_selector,
+            enable_manual_execution_after: enable_execution_after,
+        });
+
         Ok(())
     }
 
