@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 )
 
 // Events - temporary event struct to decode
@@ -84,4 +85,17 @@ type OwnershipTransferred struct {
 	Discriminator [8]byte
 	From          solana.PublicKey
 	To            solana.PublicKey
+}
+
+type PremiumMultiplierWeiPerEthUpdated struct {
+	Discriminator              [8]byte
+	Token                      solana.PublicKey
+	PremiumMultiplierWeiPerEth uint64
+}
+
+type TokenTransferFeeConfigUpdated struct {
+	Discriminator            [8]byte
+	DestinationChainSelector uint64
+	Token                    solana.PublicKey
+	TokenTransferFeeConfig   fee_quoter.TokenTransferFeeConfig
 }

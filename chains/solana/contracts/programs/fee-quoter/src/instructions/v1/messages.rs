@@ -495,6 +495,7 @@ pub mod tests {
             state: crate::DestChainState { usd_per_unit_gas },
             config: crate::DestChainConfig {
                 is_enabled: true,
+                lane_code_version: crate::state::CodeVersion::Default,
                 max_number_of_tokens_per_msg: 1,
                 max_data_bytes: 30000,
                 max_per_msg_gas_limit: 3000000,
