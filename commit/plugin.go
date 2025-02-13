@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -56,7 +57,7 @@ type Plugin struct {
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
-	discoveryProcessor  *discovery.ContractDiscoveryProcessor
+	discoveryProcessor  plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
 	metricsReporter     metrics.CommitPluginReporter
 	ocrTypeCodec        ocrtypecodec.CommitCodec
 
@@ -343,24 +344,35 @@ func (p *Plugin) getPriceRelatedObservations(
 
 	var tokenPriceObs tokenprice.Observation
 	var chainFeeObs chainfee.Observation
-	var err error
 
-	tStart := time.Now()
-	tokenPriceObs, err = p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
-	lggr.Debugw("token price observation finished", "duration", time.Since(tStart), "err", err)
-	if err != nil {
-		lggr.Errorw("get token price processor observation", "err", err,
-			"prevTokenPriceOutcome", prevOutcome.TokenPriceOutcome)
-	}
+	wg := sync.WaitGroup{}
+	wg.Add(2)
 
-	tStart = time.Now()
-	chainFeeObs, err = p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
-	lggr.Debugw("chain fee observation finished", "duration", time.Since(tStart), "err", err)
-	if err != nil {
-		lggr.Errorw("get gas prices processor observation",
-			"err", err, "prevChainFeeOutcome", prevOutcome.ChainFeeOutcome)
-	}
+	go func() {
+		defer wg.Done()
+		var err error
+		tStart := time.Now()
+		tokenPriceObs, err = p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
+		lggr.Debugw("token price observation finished", "duration", time.Since(tStart), "err", err)
+		if err != nil {
+			lggr.Errorw("get token price processor observation", "err", err,
+				"prevTokenPriceOutcome", prevOutcome.TokenPriceOutcome)
+		}
+	}()
 
+	go func() {
+		defer wg.Done()
+		var err error
+		tStart := time.Now()
+		chainFeeObs, err = p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
+		lggr.Debugw("chain fee observation finished", "duration", time.Since(tStart), "err", err)
+		if err != nil {
+			lggr.Errorw("get gas prices processor observation",
+				"err", err, "prevChainFeeOutcome", prevOutcome.ChainFeeOutcome)
+		}
+	}()
+
+	wg.Wait()
 	return tokenPriceObs, chainFeeObs
 }
 

@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -25,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -296,7 +296,7 @@ func Test_maxReportLength(t *testing.T) {
 func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 	t.Run("basic checks for the happy flow", func(t *testing.T) {
 		ctx := tests.Context(t)
-		lggr := logger.Test(t)
+		lggr := mocks.NullLogger
 
 		offChainConfig := pluginconfig.CommitOffchainConfig{
 			MaxMerkleTreeSize: 123,

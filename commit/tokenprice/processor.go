@@ -24,7 +24,7 @@ type processor struct {
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
-	metricsReporter  MetricsReporter
+	metricsReporter  plugincommon.MetricsReporter
 	fRoleDON         int
 }
 
@@ -37,9 +37,9 @@ func NewProcessor(
 	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
-	metricsReporter MetricsReporter,
+	metricsReporter plugincommon.MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
-	return &processor{
+	p := &processor{
 		oracleID:         oracleID,
 		lggr:             lggr,
 		offChainCfg:      offChainCfg,
@@ -50,6 +50,7 @@ func NewProcessor(
 		fRoleDON:         fRoleDON,
 		metricsReporter:  metricsReporter,
 	}
+	return plugincommon.NewTrackedProcessor(lggr, p, processorsLabel, metricsReporter)
 }
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
@@ -88,7 +89,6 @@ func (p *processor) Outcome(
 	}
 
 	out := Outcome{TokenPrices: tokenPriceOutcome}
-	p.metricsReporter.TrackTokenPricesOutcome(out)
 	return out, nil
 }
 
