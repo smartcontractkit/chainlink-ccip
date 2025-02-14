@@ -112,11 +112,10 @@ const (
 
 // Event Names
 const (
-	EventNameCCIPMessageSent               = "CCIPMessageSent"
-	EventNameExecutionStateChanged         = "ExecutionStateChanged"
-	EventNameCommitReportAccepted          = "CommitReportAccepted"
-	EventNamePriceOnlyCommitReportAccepted = "PriceOnlyCommitReportAccepted"
-	EventNameCCTPMessageSent               = "MessageSent"
+	EventNameCCIPMessageSent       = "CCIPMessageSent"
+	EventNameExecutionStateChanged = "ExecutionStateChanged"
+	EventNameCommitReportAccepted  = "CommitReportAccepted"
+	EventNameCCTPMessageSent       = "MessageSent"
 )
 
 // Event Attributes

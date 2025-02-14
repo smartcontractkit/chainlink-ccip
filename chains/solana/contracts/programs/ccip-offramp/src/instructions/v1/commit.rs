@@ -5,9 +5,9 @@ use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
 
 use crate::context::{seed, CommitInput, CommitReportContext, OcrPluginType};
-use crate::event::{CommitReportAccepted, PriceOnlyCommitReportAccepted};
+use crate::event::CommitReportAccepted;
 use crate::state::GlobalState;
-use crate::{CcipOfframpError, PriceOnlyCommitReportContext};
+use crate::{CcipOfframpError, MerkleRoot, PriceOnlyCommitReportContext};
 
 pub fn commit<'info>(
     ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
@@ -192,7 +192,8 @@ pub fn commit_price_only<'info>(
         cpi_accounts,
     )?;
 
-    emit!(PriceOnlyCommitReportAccepted {
+    emit!(CommitReportAccepted {
+        merkle_root: MerkleRoot::default(),
         price_updates: report.price_updates.clone(),
     });
 

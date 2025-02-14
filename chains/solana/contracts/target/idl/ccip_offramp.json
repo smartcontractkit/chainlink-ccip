@@ -1785,18 +1785,6 @@
       ]
     },
     {
-      "name": "PriceOnlyCommitReportAccepted",
-      "fields": [
-        {
-          "name": "priceUpdates",
-          "type": {
-            "defined": "PriceUpdates"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
       "name": "SkippedAlreadyExecutedMessage",
       "fields": [
         {
