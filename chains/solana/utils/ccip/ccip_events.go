@@ -21,10 +21,6 @@ type EventCCIPMessageSent struct {
 type EventCommitReportAccepted struct {
 	Discriminator [8]byte
 	Report        ccip_offramp.MerkleRoot
-}
-
-type EventPriceOnlyCommitReportAccepted struct {
-	Discriminator [8]byte
 	PriceUpdates  ccip_offramp.PriceUpdates
 }
 

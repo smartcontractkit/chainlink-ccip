@@ -4996,8 +4996,8 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 
 						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(MaxCU))
-						commitEvent := ccip.EventPriceOnlyCommitReportAccepted{}
-						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "PriceOnlyCommitReportAccepted", &commitEvent, config.PrintEvents))
+						commitEvent := ccip.EventCommitReportAccepted{}
+						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
 
 						require.Equal(t, commitEvent.PriceUpdates, testcase.PriceUpdates)
 						testcase.RunEventValidations(t, tx)

@@ -167,7 +167,7 @@ pub struct GasPriceUpdate {
 }
 
 /// Struct to hold a merkle root and an interval for a source chain
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Default, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct MerkleRoot {
     pub source_chain_selector: u64, // Remote source chain selector that the Merkle Root is scoped to
     pub on_ramp_address: Vec<u8>,   // Generic onramp address, to support arbitrary sources
