@@ -76,7 +76,9 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 			// for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint, config.CcipBasePoolLockRelease} {
 			for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint} {
-				p, err := tokens.NewTokenPool(v.tokenProgram, poolProgram)
+				mintPriv, err := solana.NewRandomPrivateKey()
+				require.NoError(t, err)
+				p, err := tokens.NewTokenPool(v.tokenProgram, poolProgram, mintPriv)
 				require.NoError(t, err)
 				mint := p.Mint.PublicKey()
 
