@@ -65,7 +65,6 @@ impl Admin for Impl {
         let config = &mut ctx.accounts.config;
         config.fee_aggregator = fee_aggregator;
         emit!(events::ConfigSet {
-            version: config.version,
             svm_chain_selector: config.svm_chain_selector,
             fee_quoter: config.fee_quoter,
             link_token_mint: config.link_token_mint,
@@ -193,7 +192,6 @@ impl Admin for Impl {
         config.svm_chain_selector = new_chain_selector;
 
         emit!(events::ConfigSet {
-            version: config.version,
             svm_chain_selector: config.svm_chain_selector,
             fee_quoter: config.fee_quoter,
             link_token_mint: config.link_token_mint,

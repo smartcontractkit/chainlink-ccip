@@ -20,9 +20,6 @@ pub mod extra_args;
 mod instructions;
 use instructions::router;
 
-/// Version of the program
-const VERSION: u8 = 1;
-
 #[program]
 pub mod fee_quoter {
     use super::*;
@@ -45,24 +42,21 @@ pub mod fee_quoter {
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
     ) -> Result<()> {
-        const DEFAULT_CODE_VERSION: CodeVersion = CodeVersion::V1;
-
         ctx.accounts.config.set_inner(Config {
-            version: VERSION,
+            version: 1,
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
-            default_code_version: DEFAULT_CODE_VERSION,
+            default_code_version: CodeVersion::V1,
         });
 
         emit!(ConfigSet {
-            version: VERSION,
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
-            default_code_version: DEFAULT_CODE_VERSION
+            default_code_version: CodeVersion::V1,
         });
 
         Ok(())

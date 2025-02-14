@@ -1313,11 +1313,6 @@
       "name": "ConfigSet",
       "fields": [
         {
-          "name": "version",
-          "type": "u8",
-          "index": false
-        },
-        {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128",
           "index": false

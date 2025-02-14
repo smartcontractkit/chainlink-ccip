@@ -21,7 +21,6 @@ pub mod events {
         // NOTE: ownership update events can be found in OwnershipTransferRequested, OwnershipTransferred
         #[event]
         pub struct ConfigSet {
-            pub version: u8,
             pub svm_chain_selector: u64,
             pub fee_quoter: Pubkey,
             pub link_token_mint: Pubkey,

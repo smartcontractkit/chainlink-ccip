@@ -58,7 +58,6 @@ impl Admin for Impl {
         config.default_code_version = code_version;
 
         emit!(ConfigSet {
-            version: config.version,
             max_fee_juels_per_msg: config.max_fee_juels_per_msg,
             link_token_mint: config.link_token_mint,
             onramp: config.onramp,

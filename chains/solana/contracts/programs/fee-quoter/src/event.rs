@@ -4,7 +4,6 @@ use crate::state::{CodeVersion, DestChainConfig, TokenTransferFeeConfig};
 
 #[event]
 pub struct ConfigSet {
-    pub version: u8,
     pub max_fee_juels_per_msg: u128,
     pub link_token_mint: Pubkey,
     pub onramp: Pubkey,

@@ -1503,11 +1503,6 @@
       "name": "ConfigSet",
       "fields": [
         {
-          "name": "version",
-          "type": "u8",
-          "index": false
-        },
-        {
           "name": "svmChainSelector",
           "type": "u64",
           "index": false

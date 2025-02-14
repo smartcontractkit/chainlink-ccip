@@ -497,7 +497,6 @@ func TestCCIPRouter(t *testing.T) {
 
 			var configSetEvent ccip.EventRouterConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
-			require.Equal(t, uint8(1), configSetEvent.Version)
 			require.Equal(t, invalidSVMChainSelector, configSetEvent.SvmChainSelector)
 			require.Equal(t, config.FeeQuoterProgram, configSetEvent.FeeQuoter)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
@@ -544,7 +543,6 @@ func TestCCIPRouter(t *testing.T) {
 
 			var configSetEvent ccip.EventFeeQuoterConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
-			require.Equal(t, uint8(1), configSetEvent.Version)
 			require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
@@ -658,14 +656,12 @@ func TestCCIPRouter(t *testing.T) {
 
 			var refAddrEvent ccip.EventOfframpReferenceAddressesSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ReferenceAddressesSet", &refAddrEvent, config.PrintEvents))
-			require.Equal(t, uint8(1), refAddrEvent.Version)
 			require.Equal(t, config.CcipRouterProgram, refAddrEvent.Router)
 			require.Equal(t, config.FeeQuoterProgram, refAddrEvent.FeeQuoter)
 			require.Equal(t, lookupTableAddr, refAddrEvent.OfframpLookupTable)
 
 			var configSetEvent ccip.EventOfframpConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
-			require.Equal(t, uint8(1), configSetEvent.Version)
 			require.Equal(t, invalidSVMChainSelector, configSetEvent.SvmChainSelector)
 			require.Equal(t, config.EnableExecutionAfter, configSetEvent.EnableManualExecutionAfter)
 
