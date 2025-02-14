@@ -27,9 +27,9 @@ pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
     #[account(
         init,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
@@ -41,7 +41,7 @@ pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     // The following validation is the only difference between the two contexts
     // Only CCIP Admin can propose an owner for the token admin registry if not the mint authority
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -51,9 +51,9 @@ pub struct OverridePendingTokenAdminRegistryByCCIPAdmin<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
     #[account(
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
@@ -63,7 +63,7 @@ pub struct OverridePendingTokenAdminRegistryByCCIPAdmin<'info> {
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     // The following validation is the only difference between the two contexts
     // Only CCIP Admin can propose an owner for the token admin registry if not the mint authority
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -73,9 +73,9 @@ pub struct RegisterTokenAdminRegistryByOwner<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
     #[account(
         init,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
@@ -101,9 +101,9 @@ pub struct OverridePendingTokenAdminRegistryByOwner<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
     #[account(
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
@@ -125,9 +125,9 @@ pub struct ModifyTokenAdminRegistry<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
     #[account(
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
@@ -145,9 +145,9 @@ pub struct SetPoolTokenAdminRegistry<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
     #[account(
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
@@ -167,9 +167,9 @@ pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
     #[account(
         mut,
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
