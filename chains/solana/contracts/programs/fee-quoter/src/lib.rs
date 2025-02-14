@@ -13,6 +13,7 @@ pub mod state;
 use state::*;
 
 pub mod event;
+use event::*;
 
 pub mod extra_args;
 
@@ -41,14 +42,25 @@ pub mod fee_quoter {
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
     ) -> Result<()> {
+        const VERSION: u8 = 1;
+        const DEFAULT_CODE_VERSION: CodeVersion = CodeVersion::V1;
+
         ctx.accounts.config.set_inner(Config {
-            version: 1,
+            version: VERSION,
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
-            default_code_version: CodeVersion::V1,
+            default_code_version: DEFAULT_CODE_VERSION,
+        });
+
+        emit!(ConfigSet {
+            version: VERSION,
+            max_fee_juels_per_msg,
+            link_token_mint,
+            onramp,
+            default_code_version: DEFAULT_CODE_VERSION
         });
 
         Ok(())

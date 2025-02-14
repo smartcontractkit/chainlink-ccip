@@ -1296,6 +1296,38 @@
   ],
   "events": [
     {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "version",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128",
+          "index": false
+        },
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "onramp",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "defaultCodeVersion",
+          "type": {
+            "defined": "CodeVersion"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "FeeTokenAdded",
       "fields": [
         {
