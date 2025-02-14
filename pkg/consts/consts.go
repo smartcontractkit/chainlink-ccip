@@ -79,7 +79,8 @@ const (
 			    bytes32 rawVs // signatures
 			  ) external
 	*/
-	MethodCommit = "Commit"
+	MethodCommit          = "Commit"
+	MethodCommitPriceOnly = "CommitPriceOnly"
 
 	// On EVM:
 	// function execute(bytes32[3] calldata reportContext, bytes calldata report) external
@@ -111,10 +112,11 @@ const (
 
 // Event Names
 const (
-	EventNameCCIPMessageSent       = "CCIPMessageSent"
-	EventNameExecutionStateChanged = "ExecutionStateChanged"
-	EventNameCommitReportAccepted  = "CommitReportAccepted"
-	EventNameCCTPMessageSent       = "MessageSent"
+	EventNameCCIPMessageSent               = "CCIPMessageSent"
+	EventNameExecutionStateChanged         = "ExecutionStateChanged"
+	EventNameCommitReportAccepted          = "CommitReportAccepted"
+	EventNamePriceOnlyCommitReportAccepted = "PriceOnlyCommitReportAccepted"
+	EventNameCCTPMessageSent               = "MessageSent"
 )
 
 // Event Attributes
