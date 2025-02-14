@@ -1,23 +1,35 @@
 use std::fmt::Display;
 
+use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
-// zero_copy is used to prevent hitting stack/heap memory limits
-#[account(zero_copy)] // TODO this is no longer needed as zero_copy
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+#[repr(u8)]
+pub enum CodeVersion {
+    Default = 0,
+    V1,
+}
+
+impl Display for CodeVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CodeVersion::Default => write!(f, "Default"),
+            CodeVersion::V1 => write!(f, "V1"),
+        }
+    }
+}
+
+#[account]
+#[derive(InitSpace, Debug)]
 pub struct Config {
     pub version: u8,
-    _padding0: [u8; 7],
+
+    pub default_code_version: CodeVersion,
+
     pub svm_chain_selector: u64,
-
-    _padding1: [u8; 8],
-
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-
-    _padding2: [u8; 8],
     pub fee_quoter: Pubkey,
-
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
@@ -53,6 +65,9 @@ pub struct DestChainState {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainConfig {
+    // The code version of the lane, in case we need to shift traffic to new logic for a single lane to test an upgrade
+    pub lane_code_version: CodeVersion,
+
     // list of senders authorized to send messages to this destination chain.
     // Note: The attribute name `max_len` is slightly misleading: it is not in any
     // way limiting the actual length of the vector during initialization; it just
