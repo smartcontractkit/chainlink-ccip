@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
@@ -93,4 +94,35 @@ type TokenTransferFeeConfigUpdated struct {
 	DestinationChainSelector uint64
 	Token                    solana.PublicKey
 	TokenTransferFeeConfig   fee_quoter.TokenTransferFeeConfig
+}
+
+type EventOfframpConfigSet struct {
+	Discriminator              [8]byte
+	ChainSelector              uint64
+	EnableManualExecutionAfter int64
+}
+
+type EventOfframpReferenceAddressesSet struct {
+	Discriminator      [8]byte
+	Router             solana.PublicKey
+	FeeQuoter          solana.PublicKey
+	OfframpLookupTable solana.PublicKey
+}
+
+type EventRouterConfigSet struct {
+	Discriminator    [8]byte
+	Version          uint8
+	SvmChainSelector uint64
+	FeeQuoter        solana.PublicKey
+	LinkTokenMint    solana.PublicKey
+	FeeAggregator    solana.PublicKey
+}
+
+type EventFeeQuoterConfigSet struct {
+	Discriminator      [8]byte
+	Version            uint8
+	MaxFeeJuelsPerMsg  bin.Uint128
+	LinkTokenMint      solana.PublicKey
+	Onramp             solana.PublicKey
+	DefaultCodeVersion fee_quoter.CodeVersion
 }
