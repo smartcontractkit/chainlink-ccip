@@ -1024,15 +1024,16 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 			continue
 		}
 
+		chainCopy := chain
 		wg.Add(1)
-		go func(chain cciptypes.ChainSelector) {
+		go func(chainSel cciptypes.ChainSelector) {
 			defer wg.Done()
 
 			// Get cached OnRamp configurations
-			config, err := r.configPoller.GetChainConfig(ctx, chain)
+			config, err := r.configPoller.GetChainConfig(ctx, chainSel)
 			if err != nil {
 				lggr.Errorw("Failed to get chain config",
-					"chain", chain,
+					"chain", chainSel,
 					"err", err)
 				return
 			}
@@ -1045,7 +1046,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 			if len(config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter) > 0 {
 				resp = resp.Append(
 					consts.ContractNameFeeQuoter,
-					chain,
+					chainSel,
 					config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter)
 			}
 
@@ -1053,10 +1054,10 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 			if len(config.OnRamp.DestChainConfig.Router) > 0 {
 				resp = resp.Append(
 					consts.ContractNameRouter,
-					chain,
+					chainSel,
 					config.OnRamp.DestChainConfig.Router)
 			}
-		}(chain)
+		}(chainCopy)
 	}
 
 	// Wait for all goroutines to complete
