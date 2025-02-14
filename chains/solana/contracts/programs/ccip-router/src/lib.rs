@@ -19,6 +19,9 @@ use crate::messages::*;
 mod instructions;
 use crate::instructions::router;
 
+/// The current version of the program.
+const VERSION: u8 = 1;
+
 // Anchor discriminators for CPI calls
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
     [0x72, 0xa1, 0x5e, 0x1d, 0x93, 0x19, 0xe8, 0xbf]; // lock_or_burn_tokens
@@ -59,8 +62,8 @@ pub mod ccip_router {
         fee_quoter: Pubkey,
         link_token_mint: Pubkey,
     ) -> Result<()> {
-        let config = Config {
-            version: 1,
+        ctx.accounts.config.set_inner(Config {
+            version: VERSION,
             default_code_version: CodeVersion::V1,
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
@@ -68,9 +71,7 @@ pub mod ccip_router {
             fee_quoter,
             link_token_mint,
             fee_aggregator,
-        };
-
-        ctx.accounts.config.set_inner(config);
+        });
 
         emit!(events::admin::ConfigSet {
             version: ctx.accounts.config.version,
