@@ -5007,6 +5007,8 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "PriceOnlyCommitReportAccepted", &commitEvent, config.PrintEvents))
 
 						require.Equal(t, commitEvent.PriceUpdates, testcase.PriceUpdates)
+						testcase.RunEventValidations(t, tx)
+						testcase.RunStateValidations(t)
 					})
 				}
 			})

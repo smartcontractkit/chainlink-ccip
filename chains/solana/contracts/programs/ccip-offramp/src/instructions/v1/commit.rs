@@ -210,11 +210,10 @@ pub fn commit_price_only<'info>(
 }
 
 mod helpers {
-
     use fee_quoter::cpi::accounts::UpdatePrices;
 
     use super::*;
-    pub fn update_prices<'info>(
+    pub(super) fn update_prices<'info>(
         report: &CommitInput,
         report_context: &ReportContext,
         remaining_accounts: &'info [AccountInfo<'info>],

@@ -379,7 +379,6 @@ pub struct CommitReportContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(_report_context_byte_words: [[u8; 32]; 2], raw_report: Vec<u8>)]
 pub struct PriceOnlyCommitReportContext<'info> {
     #[account(
         seeds = [seed::CONFIG],
