@@ -1,28 +1,43 @@
 ---
 version: v2beta1
-name: chainlink-daas
+name: chainlink-daas-operator
+
 require:
   devspace: ">= 6.0"
+
 vars:
+  # default
   DEVSPACE_ENV_FILE:
     source: env
     default: .env
+  # switches / activation
+  ENV: # options=[local|stage|prod]
+    source: env
+    default: prod
+  PROVIDER: # options=[kind|aws]
+    source: all
+    default: aws
+  REGISTRY: # options=[localhost|aws]
+    source: env
+    default: prod
+  # specific
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+
 pullSecrets:
   regcred-prod:
     registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
     secret: regcred-prod
+
 pipelines:
   deploy:
     run: |-
       create_deployments chainlink-daas-operator
-      # create_deployments chainlink-daas-api
   purge:
     run: |-
-      # purge_deployments chainlink-daas-api
       purge_deployments chainlink-daas-operator
+
 deployments:
   chainlink-daas-operator:
     namespace: ${DEVSPACE_NAMESPACE}
@@ -33,17 +48,26 @@ deployments:
       values:
         image: {}
         imagePullSecrets: []
-  chainlink-daas-api:
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/daas-operator-resources
-        version: 0.0.1
-      values:
-        dapi:
-          enabled: true
+
 profiles:
-  - name: use-prod-registry
+  - name: use-aws-registry
+    activation: # match all
+      - vars:
+          PROVIDER: aws
+          REGISTRY: aws
+    patches:
+      - op: replace
+        path: deployments.chainlink-daas-operator.helm.values.image
+        value:
+          repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
+          pullPolicy: Always
+          tag: 0.0.6
+
+  - name: use-aws-registry-on-local
+    activation: # match all
+      - vars:
+          ENV: local
+          REGISTRY: aws
     patches:
       - op: replace
         path: deployments.chainlink-daas-operator.helm.values.imagePullSecrets
@@ -55,7 +79,12 @@ profiles:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
           tag: 0.0.6
-  - name: use-local-registry
+
+  - name: use-localhost-registry
+    activation: # match all
+      - vars:
+          ENV: local
+          REGISTRY: localhost
     patches:
       - op: replace
         path: deployments.chainlink-daas-operator.helm.values.image

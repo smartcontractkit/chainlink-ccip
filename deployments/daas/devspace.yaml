@@ -3,20 +3,27 @@ version: v2beta1
 name: daas
 
 vars:
-  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
-  PROVIDER:
-    source: all
-    default: "aws"
-  REGISTRY:
-    source: env
-    default: prod
   DEVSPACE_ENV_FILE:
     source: env
     default: .env
-  CHAINLINK_HELM_REGISTRY_URI:
+  # switches / activation
+  ENV: # options=[local|stage|prod]
     source: env
-    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+    default: prod
+  PROVIDER: # options=[kind|aws]
+    source: all
+    default: aws
+  REGISTRY: # options=[localhost|aws]
+    source: env
+    default: prod
+  CLUSTER_SERVICES: # options=[ingress-controller-nginx|cert-manager|minio-operator]
+    source: env
+    default: ("ingress-controller-nginx" "cert-manager")
+  BLOCKCHAIN: # options=[anvil]
+    source: env
+    default: ("anvil")
   ## local directories
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
   SCRIPTS_DIR:
     source: env
     default: "${CRIB_DIR}/scripts"
@@ -26,6 +33,16 @@ vars:
   IMPORTS_DIR:
     source: env
     default: "${CRIB_DIR}/imports"
+  # specific (consolidate from used dependencies)
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  HOST_NAME:
+    source: env
+    default: main.stage.cldev.sh
+  AWS_ACM_CERT_ARN:
+    source: env
+    default: ""
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -42,28 +59,55 @@ pipelines:
 
   deps-kind:
     run: |-
-      run_dependency_pipelines ingress-controller
-      run_dependency_pipelines cert-manager
+      [[ "${CLUSTER_SERVICES[@]}" =~ "ingress-controller-nginx" ]] && run_dependency_pipelines ingress-controller-nginx
+      [[ "${CLUSTER_SERVICES[@]}" =~ "cert-manager" ]] && run_dependency_pipelines cert-manager
+      [[ "${CLUSTER_SERVICES[@]}" =~ "minio-operator" ]] && run_dependency_pipelines minio-operator
+      echo "done"
 
   deps-daas:
     run: |-
-      run_dependency_pipelines chainlink-daas
+      run_dependency_pipelines daas-operator
 
   deps-vcluster-daas:
     run: |-
       run_dependency_pipelines vcluster-daas
 
+  deps-blockchain:
+    run: |-
+      [[ "${BLOCKCHAIN[@]}" =~ "anvil" ]] && run_dependency_pipelines anvil
+      # moar blockchains
+
+  deps-minio-tenant: # todo
+    run: |-
+      run_dependency_pipelines minio-tenant
+
+  deps-daas-api:
+    run: |-
+      run_dependency_pipelines daas-api
+
   ## top level pipelines
 
   daas-kind:
     run: |-
-      [ "$PROVIDER" != "local" ] && ensure_pull_secrets --all
+      [[ "$ENV" == "local" && "$REGISTRY" == "aws" ]] && ensure_pull_secrets --all
       run_pipelines deps-kind
       run_pipelines deps-daas
 
   daas-aws:
     run: |-
       run_pipelines deps-vcluster-daas
+
+  daas-blockchain:
+    run: |-
+      run_pipelines deps-blockchain
+
+  daas-minio-tenant: # todo
+    run: |-
+      run_pipelines deps-minio-tenant
+
+  daas-api:
+    run: |-
+      run_pipelines deps-daas-api
 
 profiles:
   ## dependency profiles
@@ -73,7 +117,7 @@ profiles:
       - op: add
         path: dependencies
         value:
-          ingress-controller:
+          ingress-controller-nginx:
             path: ${DEPENDENCIES_DIR}/ingress-controller
             namespace: ingress-nginx
             overwriteVars: true
@@ -83,18 +127,22 @@ profiles:
             namespace: cert-manager
             overwriteVars: true
             profiles: []
+          minio-operator:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-minio-operator.yaml
+            namespace: minio
+            overwriteVars: true
+            profiles: []
 
   - name: deps-daas
     patches:
       - op: add
         path: dependencies
         value:
-          chainlink-daas:
-            path: ${DEPENDENCIES_DIR}/daas/chainlink-daas.yaml
+          daas-operator:
+            path: ${DEPENDENCIES_DIR}/daas/chainlink-daas-operator.yaml
             namespace: ${DEVSPACE_NAMESPACE}
             overwriteVars: true
-            profiles:
-              - use-${REGISTRY}-registry
+            profiles: []
 
   - name: deps-vcluster-daas
     patches:
@@ -109,6 +157,39 @@ profiles:
               - deploy-crib-aws
               - deploy-anvil
 
+  - name: deps-blockchain
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          anvil:
+            path: ${DEPENDENCIES_DIR}/daas/blockchain-anvil.yaml
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles: []
+
+  - name: deps-minio-tenant # todo
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          minio-tenant:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-minio-tenant.yaml
+            namespace: minio
+            overwriteVars: true
+            profiles: []
+
+  - name: deps-daas-api
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          daas-api:
+            path: ${DEPENDENCIES_DIR}/daas/chainlink-daas-operator-resources.yaml
+            namespace: daas
+            overwriteVars: true
+            profiles: []
+
   ## top level profiles
 
   - name: daas-aws
@@ -120,7 +201,20 @@ profiles:
       - profile: deps-kind
       - profile: deps-daas
 
+  - name: daas-blockchain
+    parents:
+      - profile: deps-blockchain
+
+  - name: daas-minio-tenant
+    parents:
+      - profile: deps-minio-tenant
+
+  - name: daas-api
+    parents:
+      - profile: deps-daas-api
+
 commands:
+  # todo: consolidate based off switches (ENV|PROVIDER|REGISTRY)
   daas-aws:
     command: devspace run-pipeline daas-aws -p daas-aws
     description: Run the daas aws pipeline.
@@ -128,4 +222,17 @@ commands:
   daas-kind:
     command: devspace run-pipeline daas-kind -p daas-kind
     description: Run the daas kind pipeline.
+    appendArgs: true
+  # extras
+  daas-blockchain:
+    command: devspace run-pipeline daas-blockchain -p daas-blockchain
+    description: Run the daas blockchain pipeline.
+    appendArgs: true
+  daas-minio-tenant:
+    command: devspace run-pipeline daas-minio-tenant -p daas-minio-tenant
+    description: Run the daas minio-tenant pipeline.
+    appendArgs: true
+  daas-api:
+    command: devspace run-pipeline daas-api -p daas-api
+    description: Run the daas api pipeline.
     appendArgs: true

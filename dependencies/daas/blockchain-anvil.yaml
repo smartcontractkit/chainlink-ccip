@@ -1,0 +1,114 @@
+---
+version: v2beta1
+name: blockchain-anvil
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  # default
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  # specific
+  HOST_NAME:
+    source: env
+    default: main.stage.cldev.sh
+  AWS_ACM_CERT_ARN:
+    source: env
+    default: ""
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments anvil
+  purge:
+    run: |-
+      purge_deployments anvil
+
+deployments:
+  anvil:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: ghcr.io/foundry-rs/foundry:latest
+            command: [anvil]
+            args:
+              - --host
+              - "0.0.0.0"
+              - --port
+              - "8545"
+              - --chain-id
+              - "31337"
+              - --block-time
+              - "10"
+              - --dump-state
+              - /data/anvil/anvil_state.json
+        service:
+          name: anvil
+          type: NodePort
+          ports:
+            - port: 8545
+        podSecurityContext:
+          fsGroup: 1000
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+
+profiles:
+  - name: anvil-ingress
+    patches:
+      - op: add
+        path: deployments.anvil.helm.values.ingress
+        value:
+          name: anvil
+          ingressClassName: alb
+          annotations:
+            alb.ingress.kubernetes.io/certificate-arn: ${AWS_ACM_CERT_ARN}
+            alb.ingress.kubernetes.io/group.name: sandbox
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+            alb.ingress.kubernetes.io/ssl-redirect: "443"
+          rules:
+            - host: ${DEVSPACE_NAMESPACE}-anvil.${HOST_NAME}
+              path: /*
+              pathType: ImplementationSpecific
+
+  - name: anvil-stateful
+    patches:
+      - op: add
+        path: deployments.anvil.helm.values.containers[0].volumeMounts
+        value:
+          - containerPath: /data/anvil
+            volume:
+              name: anvil-storage
+              subPath: /data/anvil
+              readOnly: false
+      - op: add
+        path: deployments.anvil.helm.values.volumes
+        value:
+          - name: anvil-storage
+            size: 10Gi
+            storageClassName: gp3
+
+  - name: anvil-load-state
+    patches:
+      - op: replace
+        path: deployments.anvil.helm.values.containers[0].args
+        value:
+          - --host
+          - "0.0.0.0"
+          - --port
+          - "8545"
+          - --chain-id
+          - "31337"
+          - --block-time
+          - "10"
+          - --dump-state
+          - /data/anvil/anvil_state.json
+          - --load-state
+          - /data/anvil/anvil_state.json

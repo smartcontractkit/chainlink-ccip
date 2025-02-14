@@ -1,0 +1,141 @@
+---
+# charts: https://github.com/minio/operator/tree/master/helm
+# deps: minio-operator / cert-manager
+version: v2beta1
+name: cluster-services-minio-tenant
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  # default
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  # switches / activation
+  ENV: # options=[local|stage|prod]
+    source: env
+    default: prod
+  PROVIDER: # options=[kind|aws]
+    source: all
+    default: aws
+  # specific
+  HOST_NAME:
+    source: env
+    default: main.stage.cldev.sh
+  AWS_ACM_CERT_ARN:
+    source: env
+    default: ""
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments minio-tenant
+  purge:
+    run: |-
+      purge_deployments minio-tenant
+
+deployments:
+  minio-tenant:
+    helm:
+      chart:
+        name: tenant
+        repo: https://operator.min.io
+        version: 7.0.0
+      values:
+        tenant:
+          name: chainlink
+
+profiles:
+  - name: tenant-tiny
+    activation:
+      - vars:
+          ENV: local
+    patches:
+      - op: add
+        path: deployments.minio-tenant.helm.values.tenant
+        value:
+          pools:
+            - name: pool-0
+              servers: 1
+              volumesPerServer: 4
+              size: 2Gi
+
+  - name: tenant-ingress-local
+    activation:
+      - vars:
+          PROVIDER: aws
+    patches:
+      - op: add
+        path: deployments.minio-tenant.helm.values.ingress
+        value:
+          api:
+            enabled: true
+            ingressClassName: nginx
+            host: minio-api.${HOST_NAME}
+            path: /
+            pathType: Prefix
+            annotations:
+              cert-manager.io/cluster-issuer: mkcert-issuer
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+              nginx.ingress.kubernetes.io/use-regex: "true"
+              nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+            tls:
+              - hosts:
+                  - minio-api.${HOST_NAME}
+                secretName: minio-api-ingress-tls
+          console:
+            enabled: true
+            ingressClassName: nginx
+            host: minio-console.${HOST_NAME}
+            path: /
+            pathType: Prefix
+            annotations:
+              cert-manager.io/cluster-issuer: mkcert-issuer
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+              nginx.ingress.kubernetes.io/use-regex: "true"
+              nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+            tls:
+              - hosts:
+                  - minio-console.${HOST_NAME}
+                secretName: minio-console-ingress-tls
+
+  - name: tenant-ingress-aws
+    activation:
+      - vars:
+          ENV: local
+    patches:
+      - op: add
+        path: deployments.minio-tenant.helm.values.exposeServices
+        value:
+          console: true
+          minio: true
+      - op: add
+        path: deployments.minio-tenant.helm.values.ingress
+        value:
+          api:
+            enabled: true
+            ingressClassName: alb
+            host: minio-api.${HOST_NAME}
+            path: /*
+            pathType: ImplementationSpecific
+            annotations:
+              alb.ingress.kubernetes.io/certificate-arn: ${AWS_ACM_CERT_ARN}
+              alb.ingress.kubernetes.io/group.name: sandbox
+              alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+              alb.ingress.kubernetes.io/ssl-redirect: "443"
+              alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          console:
+            enabled: true
+            ingressClassName: alb
+            host: minio-console.${HOST_NAME}
+            path: /*
+            pathType: ImplementationSpecific
+            annotations:
+              alb.ingress.kubernetes.io/certificate-arn: ${AWS_ACM_CERT_ARN}
+              alb.ingress.kubernetes.io/group.name: sandbox
+              alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+              alb.ingress.kubernetes.io/ssl-redirect: "443"
+              alb.ingress.kubernetes.io/backend-protocol: HTTPS

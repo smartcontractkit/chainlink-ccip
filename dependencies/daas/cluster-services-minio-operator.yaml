@@ -1,0 +1,33 @@
+---
+# charts: https://github.com/minio/operator/tree/master/helm
+version: v2beta1
+name: cluster-services-minio-operator
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments minio-operator
+  purge:
+    run: |-
+      purge_deployments minio-operator
+
+deployments:
+  minio-operator:
+    helm:
+      chart:
+        name: operator
+        repo: https://operator.min.io
+        version: 7.0.0
+      values:
+        crds:
+          enabled: true
+
+profiles: []
