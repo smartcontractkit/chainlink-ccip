@@ -74,14 +74,17 @@ func NewCCIPChainReader(
 	offrampAddress []byte,
 	extraDataCodec cciptypes.ExtraDataCodec,
 ) CCIPReader {
-	return newCCIPChainReaderInternal(
-		ctx,
-		lggr,
-		contractReaders,
-		contractWriters,
+	return NewObservedCCIPReader(
+		newCCIPChainReaderInternal(
+			ctx,
+			lggr,
+			contractReaders,
+			contractWriters,
+			destChain,
+			offrampAddress,
+			extraDataCodec,
+		),
 		destChain,
-		offrampAddress,
-		extraDataCodec,
 	)
 }
 
