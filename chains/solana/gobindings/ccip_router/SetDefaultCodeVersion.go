@@ -10,15 +10,18 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Updates the fee aggregator in the router configuration.
-// The Admin is the only one able to update the fee aggregator.
+// Config //
+// Sets the default code version to be used. This is then used by the slim routing layer to determine
+// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
+//
+// # Shared func signature with other programs
 //
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for updating the configuration.
-// * `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token).
-type UpdateFeeAggregator struct {
-	FeeAggregator *ag_solanago.PublicKey
+// * `code_version` - The new code version to be set as default.
+type SetDefaultCodeVersion struct {
+	CodeVersion *CodeVersion
 
 	// [0] = [WRITE] config
 	//
@@ -28,75 +31,75 @@ type UpdateFeeAggregator struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewUpdateFeeAggregatorInstructionBuilder creates a new `UpdateFeeAggregator` instruction builder.
-func NewUpdateFeeAggregatorInstructionBuilder() *UpdateFeeAggregator {
-	nd := &UpdateFeeAggregator{
+// NewSetDefaultCodeVersionInstructionBuilder creates a new `SetDefaultCodeVersion` instruction builder.
+func NewSetDefaultCodeVersionInstructionBuilder() *SetDefaultCodeVersion {
+	nd := &SetDefaultCodeVersion{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
 
-// SetFeeAggregator sets the "feeAggregator" parameter.
-func (inst *UpdateFeeAggregator) SetFeeAggregator(feeAggregator ag_solanago.PublicKey) *UpdateFeeAggregator {
-	inst.FeeAggregator = &feeAggregator
+// SetCodeVersion sets the "codeVersion" parameter.
+func (inst *SetDefaultCodeVersion) SetCodeVersion(codeVersion CodeVersion) *SetDefaultCodeVersion {
+	inst.CodeVersion = &codeVersion
 	return inst
 }
 
 // SetConfigAccount sets the "config" account.
-func (inst *UpdateFeeAggregator) SetConfigAccount(config ag_solanago.PublicKey) *UpdateFeeAggregator {
+func (inst *SetDefaultCodeVersion) SetConfigAccount(config ag_solanago.PublicKey) *SetDefaultCodeVersion {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
-func (inst *UpdateFeeAggregator) GetConfigAccount() *ag_solanago.AccountMeta {
+func (inst *SetDefaultCodeVersion) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *UpdateFeeAggregator) SetAuthorityAccount(authority ag_solanago.PublicKey) *UpdateFeeAggregator {
+func (inst *SetDefaultCodeVersion) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetDefaultCodeVersion {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *UpdateFeeAggregator) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *SetDefaultCodeVersion) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *UpdateFeeAggregator) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateFeeAggregator {
+func (inst *SetDefaultCodeVersion) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetDefaultCodeVersion {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *UpdateFeeAggregator) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *SetDefaultCodeVersion) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-func (inst UpdateFeeAggregator) Build() *Instruction {
+func (inst SetDefaultCodeVersion) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_UpdateFeeAggregator,
+		TypeID: Instruction_SetDefaultCodeVersion,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst UpdateFeeAggregator) ValidateAndBuild() (*Instruction, error) {
+func (inst SetDefaultCodeVersion) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *UpdateFeeAggregator) Validate() error {
+func (inst *SetDefaultCodeVersion) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.FeeAggregator == nil {
-			return errors.New("FeeAggregator parameter is not set")
+		if inst.CodeVersion == nil {
+			return errors.New("CodeVersion parameter is not set")
 		}
 	}
 
@@ -115,17 +118,17 @@ func (inst *UpdateFeeAggregator) Validate() error {
 	return nil
 }
 
-func (inst *UpdateFeeAggregator) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *SetDefaultCodeVersion) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("UpdateFeeAggregator")).
+			programBranch.Child(ag_format.Instruction("SetDefaultCodeVersion")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("FeeAggregator", *inst.FeeAggregator))
+						paramsBranch.Child(ag_format.Param("CodeVersion", *inst.CodeVersion))
 					})
 
 					// Accounts of the instruction:
@@ -138,33 +141,33 @@ func (inst *UpdateFeeAggregator) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj UpdateFeeAggregator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `FeeAggregator` param:
-	err = encoder.Encode(obj.FeeAggregator)
+func (obj SetDefaultCodeVersion) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `CodeVersion` param:
+	err = encoder.Encode(obj.CodeVersion)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *UpdateFeeAggregator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `FeeAggregator`:
-	err = decoder.Decode(&obj.FeeAggregator)
+func (obj *SetDefaultCodeVersion) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `CodeVersion`:
+	err = decoder.Decode(&obj.CodeVersion)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewUpdateFeeAggregatorInstruction declares a new UpdateFeeAggregator instruction with the provided parameters and accounts.
-func NewUpdateFeeAggregatorInstruction(
+// NewSetDefaultCodeVersionInstruction declares a new SetDefaultCodeVersion instruction with the provided parameters and accounts.
+func NewSetDefaultCodeVersionInstruction(
 	// Parameters:
-	feeAggregator ag_solanago.PublicKey,
+	codeVersion CodeVersion,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *UpdateFeeAggregator {
-	return NewUpdateFeeAggregatorInstructionBuilder().
-		SetFeeAggregator(feeAggregator).
+	systemProgram ag_solanago.PublicKey) *SetDefaultCodeVersion {
+	return NewSetDefaultCodeVersionInstructionBuilder().
+		SetCodeVersion(codeVersion).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

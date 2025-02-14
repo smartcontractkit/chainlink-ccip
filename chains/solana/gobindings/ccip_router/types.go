@@ -415,11 +415,17 @@ func (obj *DestChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 }
 
 type DestChainConfig struct {
+	LaneCodeVersion  CodeVersion
 	AllowedSenders   []ag_solanago.PublicKey
 	AllowListEnabled bool
 }
 
 func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `LaneCodeVersion` param:
+	err = encoder.Encode(obj.LaneCodeVersion)
+	if err != nil {
+		return err
+	}
 	// Serialize `AllowedSenders` param:
 	err = encoder.Encode(obj.AllowedSenders)
 	if err != nil {
@@ -434,6 +440,11 @@ func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 }
 
 func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `LaneCodeVersion`:
+	err = decoder.Decode(&obj.LaneCodeVersion)
+	if err != nil {
+		return err
+	}
 	// Deserialize `AllowedSenders`:
 	err = decoder.Decode(&obj.AllowedSenders)
 	if err != nil {
@@ -445,6 +456,24 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 		return err
 	}
 	return nil
+}
+
+type CodeVersion ag_binary.BorshEnum
+
+const (
+	Default_CodeVersion CodeVersion = iota
+	V1_CodeVersion
+)
+
+func (value CodeVersion) String() string {
+	switch value {
+	case Default_CodeVersion:
+		return "Default"
+	case V1_CodeVersion:
+		return "V1"
+	default:
+		return ""
+	}
 }
 
 type RestoreOnAction ag_binary.BorshEnum
@@ -495,6 +524,7 @@ const (
 	InvalidTokenAdminRegistryInputsZeroAddress_CcipRouterError
 	InvalidTokenAdminRegistryProposedAdmin_CcipRouterError
 	SenderNotAllowed_CcipRouterError
+	InvalidCodeVersion_CcipRouterError
 	InvalidCcipVersionRollback_CcipRouterError
 )
 
@@ -548,6 +578,8 @@ func (value CcipRouterError) String() string {
 		return "InvalidTokenAdminRegistryProposedAdmin"
 	case SenderNotAllowed_CcipRouterError:
 		return "SenderNotAllowed"
+	case InvalidCodeVersion_CcipRouterError:
+		return "InvalidCodeVersion"
 	case InvalidCcipVersionRollback_CcipRouterError:
 		return "InvalidCcipVersionRollback"
 	default:

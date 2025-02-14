@@ -17,7 +17,7 @@ mod messages;
 use crate::messages::*;
 
 mod instructions;
-use crate::instructions::*;
+use crate::instructions::router;
 
 // Anchor discriminators for CPI calls
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
@@ -52,7 +52,6 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for initialization.
     /// * `svm_chain_selector` - The chain selector for SVM.
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
-    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<InitializeCCIPRouter>,
         svm_chain_selector: u64,
@@ -60,17 +59,16 @@ pub mod ccip_router {
         fee_quoter: Pubkey,
         link_token_mint: Pubkey,
     ) -> Result<()> {
-        let mut config = ctx.accounts.config.load_init()?;
-        require!(config.version == 0, CcipRouterError::InvalidVersion); // assert uninitialized state - AccountLoader doesn't work with constraint
-        config.version = 1;
-        config.svm_chain_selector = svm_chain_selector;
-        config.link_token_mint = link_token_mint;
-
-        config.fee_quoter = fee_quoter;
-
-        config.owner = ctx.accounts.authority.key();
-
-        config.fee_aggregator = fee_aggregator;
+        ctx.accounts.config.set_inner(Config {
+            version: 1,
+            default_code_version: CodeVersion::V1,
+            owner: ctx.accounts.authority.key(),
+            proposed_owner: Pubkey::default(),
+            svm_chain_selector,
+            fee_quoter,
+            link_token_mint,
+            fee_aggregator,
+        });
 
         emit!(events::admin::ConfigSet {
             version: config.version,
@@ -95,7 +93,8 @@ pub mod ccip_router {
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        v1::admin::transfer_ownership(ctx, proposed_owner)
+        router::admin(ctx.accounts.config.default_code_version)
+            .transfer_ownership(ctx, proposed_owner)
     }
 
     /// Accepts the ownership of the router by the proposed owner.
@@ -107,12 +106,29 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for accepting ownership.
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        v1::admin::accept_ownership(ctx)
+        router::admin(ctx.accounts.config.default_code_version).accept_ownership(ctx)
     }
 
     /////////////
     /// Config //
     /////////////
+
+    /// Sets the default code version to be used. This is then used by the slim routing layer to determine
+    /// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
+    ///
+    /// Shared func signature with other programs
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `code_version` - The new code version to be set as default.
+    pub fn set_default_code_version(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        code_version: CodeVersion,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .set_default_code_version(ctx, code_version)
+    }
 
     /// Updates the fee aggregator in the router configuration.
     /// The Admin is the only one able to update the fee aggregator.
@@ -125,7 +141,8 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         fee_aggregator: Pubkey,
     ) -> Result<()> {
-        v1::admin::update_fee_aggregator(ctx, fee_aggregator)
+        router::admin(ctx.accounts.config.default_code_version)
+            .update_fee_aggregator(ctx, fee_aggregator)
     }
 
     /// Adds a new chain selector to the router.
@@ -145,7 +162,11 @@ pub mod ccip_router {
         new_chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::add_chain_selector(ctx, new_chain_selector, dest_chain_config)
+        router::admin(ctx.accounts.config.default_code_version).add_chain_selector(
+            ctx,
+            new_chain_selector,
+            dest_chain_config,
+        )
     }
 
     /// Updates the configuration of the destination chain selector.
@@ -162,7 +183,11 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
+        router::admin(ctx.accounts.config.default_code_version).update_dest_chain_config(
+            ctx,
+            dest_chain_selector,
+            dest_chain_config,
+        )
     }
 
     /// Add an offramp address to the list of offramps allowed by the router, for a
@@ -179,7 +204,11 @@ pub mod ccip_router {
         source_chain_selector: u64,
         offramp: Pubkey,
     ) -> Result<()> {
-        v1::admin::add_offramp(ctx, source_chain_selector, offramp)
+        router::admin(ctx.accounts.config.default_code_version).add_offramp(
+            ctx,
+            source_chain_selector,
+            offramp,
+        )
     }
 
     /// Remove an offramp address from the list of offramps allowed by the router, for a
@@ -196,7 +225,11 @@ pub mod ccip_router {
         source_chain_selector: u64,
         offramp: Pubkey,
     ) -> Result<()> {
-        v1::admin::remove_offramp(ctx, source_chain_selector, offramp)
+        router::admin(ctx.accounts.config.default_code_version).remove_offramp(
+            ctx,
+            source_chain_selector,
+            offramp,
+        )
     }
 
     /// Updates the SVM chain selector in the router configuration.
@@ -211,7 +244,8 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
+        router::admin(ctx.accounts.config.default_code_version)
+            .update_svm_chain_selector(ctx, new_chain_selector)
     }
 
     /// Bumps the CCIP version for a destination chain.
@@ -226,7 +260,8 @@ pub mod ccip_router {
         ctx: Context<UpdateDestChainSelectorConfig>,
         dest_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::bump_ccip_version_for_dest_chain(ctx, dest_chain_selector)
+        router::admin(ctx.accounts.config.default_code_version)
+            .bump_ccip_version_for_dest_chain(ctx, dest_chain_selector)
     }
 
     /// Rolls back the CCIP version for a destination chain.
@@ -241,7 +276,8 @@ pub mod ccip_router {
         ctx: Context<UpdateDestChainSelectorConfig>,
         dest_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::rollback_ccip_version_for_dest_chain(ctx, dest_chain_selector)
+        router::admin(ctx.accounts.config.default_code_version)
+            .rollback_ccip_version_for_dest_chain(ctx, dest_chain_selector)
     }
 
     ///////////////////////////
@@ -258,7 +294,8 @@ pub mod ccip_router {
         ctx: Context<RegisterTokenAdminRegistryByCCIPAdmin>,
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::ccip_admin_propose_administrator(ctx, token_admin_registry_admin)
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .ccip_admin_propose_administrator(ctx, token_admin_registry_admin)
     }
 
     /// Overrides the pending admin of the Token Admin Registry
@@ -271,10 +308,8 @@ pub mod ccip_router {
         ctx: Context<OverridePendingTokenAdminRegistryByCCIPAdmin>,
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::ccip_admin_override_pending_administrator(
-            ctx,
-            token_admin_registry_admin,
-        )
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .ccip_admin_override_pending_administrator(ctx, token_admin_registry_admin)
     }
 
     /// Registers the Token Admin Registry by the token owner.
@@ -289,7 +324,8 @@ pub mod ccip_router {
         ctx: Context<RegisterTokenAdminRegistryByOwner>,
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::owner_propose_administrator(ctx, token_admin_registry_admin)
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .owner_propose_administrator(ctx, token_admin_registry_admin)
     }
 
     /// Overrides the pending admin of the Token Admin Registry by the token owner
@@ -302,10 +338,8 @@ pub mod ccip_router {
         ctx: Context<OverridePendingTokenAdminRegistryByOwner>,
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::owner_override_pending_administrator(
-            ctx,
-            token_admin_registry_admin,
-        )
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .owner_override_pending_administrator(ctx, token_admin_registry_admin)
     }
 
     /// Accepts the admin role of the token admin registry.
@@ -319,7 +353,8 @@ pub mod ccip_router {
     pub fn accept_admin_role_token_admin_registry(
         ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
     ) -> Result<()> {
-        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx)
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .accept_admin_role_token_admin_registry(ctx)
     }
 
     /// Transfers the admin role of the token admin registry to a new admin.
@@ -335,7 +370,8 @@ pub mod ccip_router {
         ctx: Context<ModifyTokenAdminRegistry>,
         new_admin: Pubkey,
     ) -> Result<()> {
-        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, new_admin)
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .transfer_admin_role_token_admin_registry(ctx, new_admin)
     }
 
     /// Sets the pool lookup table for a given token mint.
@@ -350,7 +386,8 @@ pub mod ccip_router {
         ctx: Context<SetPoolTokenAdminRegistry>,
         writable_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::token_admin_registry::set_pool(ctx, writable_indexes)
+        router::token_admin_registry(ctx.accounts.config.default_code_version)
+            .set_pool(ctx, writable_indexes)
     }
 
     //////////////
@@ -370,7 +407,11 @@ pub mod ccip_router {
         transfer_all: bool,
         desired_amount: u64, // if transfer_all is false, this value must be 0
     ) -> Result<()> {
-        v1::admin::withdraw_billed_funds(ctx, transfer_all, desired_amount)
+        router::admin(ctx.accounts.config.default_code_version).withdraw_billed_funds(
+            ctx,
+            transfer_all,
+            desired_amount,
+        )
     }
 
     ///////////////////
@@ -396,7 +437,11 @@ pub mod ccip_router {
         message: SVM2AnyMessage,
         token_indexes: Vec<u8>,
     ) -> Result<[u8; 32]> {
-        v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
+        router::onramp(
+            ctx.accounts.dest_chain_state.config.lane_code_version,
+            ctx.accounts.config.default_code_version,
+        )
+        .ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
 }
 
@@ -458,6 +503,8 @@ pub enum CcipRouterError {
     InvalidTokenAdminRegistryProposedAdmin,
     #[msg("Sender not allowed for that destination chain")]
     SenderNotAllowed,
+    #[msg("Invalid code version")]
+    InvalidCodeVersion,
     #[msg("Invalid rollback attempt on the CCIP version of the onramp to the destination chain")]
     InvalidCcipVersionRollback,
 }

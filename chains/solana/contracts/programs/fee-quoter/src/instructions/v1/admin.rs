@@ -49,6 +49,11 @@ impl Admin for Impl {
         ctx: Context<UpdateConfig>,
         code_version: CodeVersion,
     ) -> Result<()> {
+        require_neq!(
+            code_version,
+            CodeVersion::Default,
+            FeeQuoterError::InvalidCodeVersion
+        );
         let config = &mut ctx.accounts.config;
         config.default_code_version = code_version;
 

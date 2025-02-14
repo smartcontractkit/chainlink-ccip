@@ -61,7 +61,7 @@ func (p *TrackedProcessor[Query, Observation, Outcome]) Observation(
 	obs, err := withTrackedMethod[Observation](p, ObservationMethod, func() (Observation, error) {
 		return p.PluginProcessor.Observation(ctx, prev, query)
 	})
-	if err != nil {
+	if err == nil {
 		p.reporter.TrackProcessorOutput(p.processorName, ObservationMethod, obs)
 	}
 	return obs, err
@@ -76,7 +76,7 @@ func (p *TrackedProcessor[Query, Observation, Outcome]) Outcome(
 	out, err := withTrackedMethod[Outcome](p, OutcomeMethod, func() (Outcome, error) {
 		return p.PluginProcessor.Outcome(ctx, prev, query, aos)
 	})
-	if err != nil {
+	if err == nil {
 		p.reporter.TrackProcessorOutput(p.processorName, OutcomeMethod, out)
 	}
 	return out, err
