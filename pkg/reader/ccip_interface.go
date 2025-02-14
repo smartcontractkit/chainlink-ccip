@@ -31,6 +31,12 @@ type ChainConfigSnapshot struct {
 	RMNProxy  RMNProxyConfig
 	RMNRemote RMNRemoteConfig
 	FeeQuoter FeeQuoterConfig
+	OnRamp    OnRampConfig
+}
+
+type OnRampConfig struct {
+	DynamicConfig   getOnRampDynamicConfigResponse
+	DestChainConfig onRampDestChainConfig
 }
 
 type FeeQuoterConfig struct {
