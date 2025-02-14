@@ -141,6 +141,8 @@ func TestCCIPRouter(t *testing.T) {
 	validFqDestChainConfig := fee_quoter.DestChainConfig{
 		IsEnabled: true,
 
+		LaneCodeVersion: fee_quoter.Default_CodeVersion,
+
 		// minimal valid config
 		DefaultTxGasLimit:           200000,
 		MaxPerMsgGasLimit:           3000000,
@@ -1579,7 +1581,13 @@ func TestCCIPRouter(t *testing.T) {
 
 						ixConfig, cerr := fee_quoter.NewUpdateBillingTokenConfigInstruction(tokenConfig, config.FqConfigPDA, tokenBillingPDA, ccipAdmin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, cerr)
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, ccipAdmin, config.DefaultCommitment)
+						result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, ccipAdmin, config.DefaultCommitment)
+
+						// check event PremiumMultiplierWeiPerEthUpdated
+						premiumMultiplierWeiPerEthUpdatedEvent := ccip.PremiumMultiplierWeiPerEthUpdated{}
+						require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "PremiumMultiplierWeiPerEthUpdated", &premiumMultiplierWeiPerEthUpdatedEvent, config.PrintEvents))
+						require.Equal(t, tokenConfig.Mint, premiumMultiplierWeiPerEthUpdatedEvent.Token)
+						require.Equal(t, tokenConfig.PremiumMultiplierWeiPerEth, premiumMultiplierWeiPerEthUpdatedEvent.PremiumMultiplierWeiPerEth)
 
 						var final fee_quoter.BillingTokenConfigWrapper
 						ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, rpc.CommitmentProcessed, &final)
@@ -2577,7 +2585,27 @@ func TestCCIPRouter(t *testing.T) {
 			// Deliberately not setting configuration for token2, as it exists to test cases where the configuration doesn't exist, given that it can't
 			// be removed (only disabled) after it's initially set.
 
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3}, ccipAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2, ix3}, ccipAdmin, config.DefaultCommitment)
+
+			// check TokenTransferFeeConfigUpdated events
+			parsedEvents, perr := common.ParseMultipleEvents[ccip.TokenTransferFeeConfigUpdated](result.Meta.LogMessages, "TokenTransferFeeConfigUpdated", config.PrintEvents)
+			require.NoError(t, perr)
+
+			require.Equal(t, config.EvmChainSelector, parsedEvents[0].DestinationChainSelector)
+			require.Equal(t, token0.Mint.PublicKey(), parsedEvents[0].Token)
+			require.Equal(t, fee_quoter.TokenTransferFeeConfig{}, parsedEvents[0].TokenTransferFeeConfig)
+
+			require.Equal(t, config.EvmChainSelector, parsedEvents[1].DestinationChainSelector)
+			require.Equal(t, token1.Mint.PublicKey(), parsedEvents[1].Token)
+			require.Equal(t, fee_quoter.TokenTransferFeeConfig{}, parsedEvents[1].TokenTransferFeeConfig)
+
+			require.Equal(t, config.SvmChainSelector, parsedEvents[2].DestinationChainSelector)
+			require.Equal(t, token0.Mint.PublicKey(), parsedEvents[2].Token)
+			require.Equal(t, fee_quoter.TokenTransferFeeConfig{}, parsedEvents[2].TokenTransferFeeConfig)
+
+			require.Equal(t, config.SvmChainSelector, parsedEvents[3].DestinationChainSelector)
+			require.Equal(t, token1.Mint.PublicKey(), parsedEvents[3].Token)
+			require.Equal(t, fee_quoter.TokenTransferFeeConfig{}, parsedEvents[3].TokenTransferFeeConfig)
 		})
 
 		// validate permissions for setting config
@@ -2633,7 +2661,15 @@ func TestCCIPRouter(t *testing.T) {
 			token0PerChainPerConfigPda := getFqPerChainPerTokenConfigBillingPDA(token0.Mint.PublicKey())
 			ix, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), billing, config.FqConfigPDA, token0PerChainPerConfigPda, ccipAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
+
+			// check TokenTransferFeeConfigUpdated event
+			tokenTransferFeeConfigUpdatedEvent := ccip.TokenTransferFeeConfigUpdated{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "TokenTransferFeeConfigUpdated", &tokenTransferFeeConfigUpdatedEvent, config.PrintEvents))
+
+			require.Equal(t, config.EvmChainSelector, tokenTransferFeeConfigUpdatedEvent.DestinationChainSelector)
+			require.Equal(t, token0.Mint.PublicKey(), tokenTransferFeeConfigUpdatedEvent.Token)
+			require.Equal(t, billing.MaxFeeUsdcents, tokenTransferFeeConfigUpdatedEvent.TokenTransferFeeConfig.MaxFeeUsdcents)
 
 			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token0BillingConfigPda))

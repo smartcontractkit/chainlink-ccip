@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use crate::events::admin as events;
+use crate::state::RestoreOnAction;
 use crate::{
     AcceptOwnership, AddChainSelector, CcipRouterError, DestChainConfig, DestChainState,
     TransferOwnership, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, WithdrawBilledFunds,
@@ -55,7 +56,11 @@ pub fn add_chain_selector(
     dest_chain_state.version = 1;
     dest_chain_state.chain_selector = new_chain_selector;
     dest_chain_state.config = dest_chain_config.clone();
-    dest_chain_state.state = DestChainState { sequence_number: 0 };
+    dest_chain_state.state = DestChainState {
+        sequence_number: 0,
+        restore_on_action: RestoreOnAction::None,
+        sequence_number_to_restore: 0,
+    };
 
     emit!(events::DestChainAdded {
         dest_chain_selector: new_chain_selector,
@@ -78,6 +83,44 @@ pub fn update_dest_chain_config(
         dest_chain_selector,
         dest_chain_config,
     });
+    Ok(())
+}
+
+pub fn bump_ccip_version_for_dest_chain(
+    ctx: Context<UpdateDestChainSelectorConfig>,
+    dest_chain_selector: u64,
+) -> Result<()> {
+    let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
+
+    let previous_sequence_number = dest_chain_state.sequence_number;
+
+    upgrade(dest_chain_state)?;
+
+    emit!(events::CcipVersionForDestChainVersionBumped {
+        dest_chain_selector,
+        previous_sequence_number,
+        new_sequence_number: dest_chain_state.sequence_number,
+    });
+
+    Ok(())
+}
+
+pub fn rollback_ccip_version_for_dest_chain(
+    ctx: Context<UpdateDestChainSelectorConfig>,
+    dest_chain_selector: u64,
+) -> Result<()> {
+    let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
+
+    let previous_sequence_number = dest_chain_state.sequence_number;
+
+    rollback(dest_chain_state)?;
+
+    emit!(events::CcipVersionForDestChainVersionRolledBack {
+        dest_chain_selector,
+        previous_sequence_number,
+        new_sequence_number: dest_chain_state.sequence_number,
+    });
+
     Ok(())
 }
 
@@ -171,4 +214,132 @@ fn validate_dest_chain_config(dest_chain_selector: u64, _config: &DestChainConfi
         CcipRouterError::InvalidInputsChainSelector
     );
     Ok(())
+}
+
+// On upgrade, the sequence number is reset to 0 and the previous sequence number is saved for a future rollback.
+// If a rollback has previously occurred, on upgrade the previous sequence number for the current version is restored
+// instead of resetting to 0.
+fn upgrade(dest_chain_state: &mut DestChainState) -> Result<()> {
+    let current_seq_nr = dest_chain_state.sequence_number;
+
+    dest_chain_state.sequence_number = match dest_chain_state.restore_on_action {
+        RestoreOnAction::Upgrade => dest_chain_state.sequence_number_to_restore,
+        _ => 0,
+    };
+    dest_chain_state.sequence_number_to_restore = current_seq_nr;
+
+    // restore on next rollback, as seq nr was of the previous CCIP version
+    dest_chain_state.restore_on_action = RestoreOnAction::Rollback;
+
+    Ok(())
+}
+
+// On rollback, the sequence number is restored to the previous version's sequence number. The current sequence number
+// for the version being rolled back to is saved for a future upgrade, so it can resume from where it was.
+fn rollback(dest_chain_state: &mut DestChainState) -> Result<()> {
+    // If there was loss of information, we can't rollback. We support at most 1 consecutive rollback.
+    // So, once a rollback has happened, the admin must bump the CCIP version before another rollback.
+    require_eq!(
+        dest_chain_state.restore_on_action,
+        RestoreOnAction::Rollback,
+        CcipRouterError::InvalidCcipVersionRollback
+    );
+
+    std::mem::swap(
+        &mut dest_chain_state.sequence_number,
+        &mut dest_chain_state.sequence_number_to_restore,
+    );
+
+    // restore on next upgrade, as seq nr was of the previously-bumped CCIP version
+    dest_chain_state.restore_on_action = RestoreOnAction::Upgrade;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_upgrade() {
+        let state = &mut DestChainState {
+            sequence_number: 5,
+            restore_on_action: RestoreOnAction::None, // initial state
+            sequence_number_to_restore: 0,
+        };
+        upgrade(state).unwrap();
+        assert_eq!(
+            state,
+            &DestChainState {
+                sequence_number: 0,
+                restore_on_action: RestoreOnAction::Rollback,
+                sequence_number_to_restore: 5,
+            }
+        );
+    }
+
+    #[test]
+    fn second_upgrade() {
+        let state = &mut DestChainState {
+            sequence_number: 2,
+            restore_on_action: RestoreOnAction::Rollback,
+            sequence_number_to_restore: 5,
+        };
+        upgrade(state).unwrap();
+        assert_eq!(
+            state,
+            &DestChainState {
+                sequence_number: 0,
+                restore_on_action: RestoreOnAction::Rollback,
+                sequence_number_to_restore: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn first_rollback() {
+        let state = &mut DestChainState {
+            sequence_number: 3,
+            restore_on_action: RestoreOnAction::Rollback,
+            sequence_number_to_restore: 2,
+        };
+        rollback(state).unwrap();
+        assert_eq!(
+            state,
+            &DestChainState {
+                sequence_number: 2,
+                restore_on_action: RestoreOnAction::Upgrade,
+                sequence_number_to_restore: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn second_rollback() {
+        let state = &mut DestChainState {
+            sequence_number: 2,
+            restore_on_action: RestoreOnAction::Upgrade,
+            sequence_number_to_restore: 3,
+        };
+        let result = rollback(state);
+        assert!(result.is_err()); // can't rollback twice in a row
+    }
+
+    #[test]
+    fn upgrade_after_rollback() {
+        let state = &mut DestChainState {
+            sequence_number: 2,
+            restore_on_action: RestoreOnAction::Upgrade,
+            sequence_number_to_restore: 3,
+        };
+        upgrade(state).unwrap();
+        assert_eq!(
+            state,
+            &DestChainState {
+                sequence_number: 3,
+                restore_on_action: RestoreOnAction::Rollback,
+                sequence_number_to_restore: 2,
+            }
+        );
+    }
 }

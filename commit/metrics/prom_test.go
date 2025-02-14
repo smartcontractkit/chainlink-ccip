@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
@@ -412,6 +413,128 @@ func Test_LatencyAndErrors(t *testing.T) {
 		)
 		require.Equal(t, float64(errCounter), errs)
 	})
+}
+
+func Test_SequenceNumbers(t *testing.T) {
+	tt := []struct {
+		name   string
+		obs    committypes.Observation
+		out    committypes.Outcome
+		method plugincommon.MethodType
+		exp    map[cciptypes.ChainSelector]cciptypes.SeqNum
+	}{
+		{
+			name:   "empty observation should not report anything",
+			obs:    committypes.Observation{},
+			method: plugincommon.ObservationMethod,
+			exp:    map[cciptypes.ChainSelector]cciptypes.SeqNum{},
+		},
+		{
+			name: "single chain observation with seq nr",
+			obs: committypes.Observation{
+				MerkleRootObs: merkleroot.Observation{
+					MerkleRoots: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     cciptypes.ChainSelector(123),
+							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
+						},
+					},
+				},
+			},
+			method: plugincommon.ObservationMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+			},
+		},
+		{
+			name: "multiple chain observations with sequence numbers",
+			obs: committypes.Observation{
+				MerkleRootObs: merkleroot.Observation{
+					MerkleRoots: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     cciptypes.ChainSelector(123),
+							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
+						},
+						{
+							ChainSel:     cciptypes.ChainSelector(456),
+							SeqNumsRange: cciptypes.NewSeqNumRange(3, 4),
+						},
+						{
+							ChainSel:     cciptypes.ChainSelector(789),
+							SeqNumsRange: cciptypes.NewSeqNumRange(0, 0),
+						},
+					},
+				},
+			},
+			method: plugincommon.ObservationMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+				456: 4,
+			},
+		},
+		{
+			name: "single chain outcome with seq nr",
+			out: committypes.Outcome{
+				MerkleRootOutcome: merkleroot.Outcome{
+					RootsToReport: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     cciptypes.ChainSelector(123),
+							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
+						},
+					},
+				},
+			},
+			method: plugincommon.OutcomeMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+			},
+		},
+		{
+			name: "multiple chain outcomes with sequence numbers",
+			out: committypes.Outcome{
+				MerkleRootOutcome: merkleroot.Outcome{
+					RootsToReport: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     cciptypes.ChainSelector(123),
+							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
+						},
+						{
+							ChainSel:     cciptypes.ChainSelector(456),
+							SeqNumsRange: cciptypes.NewSeqNumRange(3, 4),
+						},
+					},
+				},
+			},
+			method: plugincommon.OutcomeMethod,
+			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				123: 2,
+				456: 4,
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter, err := NewPromReporter(logger.Test(t), selector)
+			require.NoError(t, err)
+
+			t.Cleanup(cleanupMetrics(reporter))
+
+			switch tc.method {
+			case plugincommon.ObservationMethod:
+				reporter.TrackObservation(tc.obs)
+			case plugincommon.OutcomeMethod:
+				reporter.TrackOutcome(tc.out)
+			}
+
+			for sourceChainSelector, maxSeqNr := range tc.exp {
+				seqNum := testutil.ToFloat64(
+					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChainSelector.String(), tc.method),
+				)
+				require.Equal(t, float64(maxSeqNr), seqNum)
+			}
+		})
+	}
 }
 
 func cleanupMetrics(reporter *PromReporter) func() {
