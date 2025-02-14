@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::context::{
-    AcceptOwnership, AddSourceChain, CommitReportContext, ExecuteReportContext, SetOcrConfig,
-    TransferOwnership, UpdateConfig, UpdateSourceChain,
+    AcceptOwnership, AddSourceChain, CommitReportContext, ExecuteReportContext,
+    PriceOnlyCommitReportContext, SetOcrConfig, TransferOwnership, UpdateConfig, UpdateSourceChain,
 };
 use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChainConfig};
 
@@ -10,6 +10,16 @@ pub trait Commit {
     fn commit<'info>(
         &self,
         ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
+        report_context_byte_words: [[u8; 32]; 2],
+        raw_report: Vec<u8>,
+        rs: Vec<[u8; 32]>,
+        ss: Vec<[u8; 32]>,
+        raw_vs: [u8; 32],
+    ) -> Result<()>;
+
+    fn commit_price_only<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, PriceOnlyCommitReportContext<'info>>,
         report_context_byte_words: [[u8; 32]; 2],
         raw_report: Vec<u8>,
         rs: Vec<[u8; 32]>,
