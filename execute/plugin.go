@@ -2,9 +2,12 @@ package execute
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -37,6 +40,10 @@ import (
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+)
+
+var (
+	errAlreadyExecuted = errors.New("messages already executed")
 )
 
 type ContractDiscoveryInterface plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome]
@@ -537,7 +544,71 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
+	// check that the messages in the report are not already executed onchain.
+	// note that this involves a set of DB queries, hence why its last in the checks.
+	seqNrRangesBySource := getSeqNrRangeBySource(decodedReport.ChainReports)
+	err = p.checkAlreadyExecuted(ctx, lggr, seqNrRangesBySource)
+	if errors.Is(err, errAlreadyExecuted) {
+		// Some messages in the report have already
+		// been executed, so we don't want to re-execute them.
+		// This gives the exec plugin a chance to remedy the situation
+		// by selecting a different set of messages.
+		return false, decodedReport, nil
+	}
+	if err != nil {
+		// TODO: should we return true here if we couldn't check for already executed messages?
+		return false, decodedReport, fmt.Errorf("checking for already executed messages failed: %w", err)
+	}
+
 	return true, decodedReport, nil
+}
+
+// checkAlreadyExecuted checks if the messages in the report have already been executed
+// on the destination chain. It queries the DB for executed messages in the given sequence
+// number range for each source chain in the report.
+func (p *Plugin) checkAlreadyExecuted(
+	ctx context.Context,
+	lggr logger.Logger,
+	seqNrRangesBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange,
+) error {
+	// TODO: batch these queries? these are all DB reads.
+	// maybe some alternative queries exist.
+	for sourceChainSelector, seqNrRange := range seqNrRangesBySource {
+		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange)
+		if err != nil {
+			return fmt.Errorf("couldn't check if messages already executed: %w", err)
+		}
+
+		if len(executed) > 0 {
+			// Some subset of messages have been executed, we can't accept this report.
+			lggr.Warnw("some messages in report already executed",
+				"alreadyExecuted", executed,
+				"reportRange", seqNrRange.String(),
+			)
+			return fmt.Errorf("%w: already executed range %+v", errAlreadyExecuted, seqNrRange)
+		}
+	}
+
+	return nil
+}
+
+// getSeqNrRangeBySource returns a map of source chain selector to
+// the sequence number range of the messages in the report.
+func getSeqNrRangeBySource(
+	chainReports []cciptypes.ExecutePluginReportSingleChain,
+) map[cciptypes.ChainSelector]cciptypes.SeqNumRange {
+	seqNrRangesBySource := make(map[cciptypes.ChainSelector]cciptypes.SeqNumRange)
+	for _, chainReport := range chainReports {
+		cmpr := func(a, b cciptypes.Message) int {
+			return cmp.Compare(a.Header.SequenceNumber, b.Header.SequenceNumber)
+		}
+		minMsg := slices.MinFunc(chainReport.Messages, cmpr)
+		maxMsg := slices.MaxFunc(chainReport.Messages, cmpr)
+		seqNrRangesBySource[chainReport.SourceChainSelector] = cciptypes.NewSeqNumRange(
+			cciptypes.SeqNum(minMsg.Header.SequenceNumber),
+			cciptypes.SeqNum(maxMsg.Header.SequenceNumber))
+	}
+	return seqNrRangesBySource
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(
