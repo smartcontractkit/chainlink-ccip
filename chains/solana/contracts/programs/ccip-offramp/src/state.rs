@@ -1,11 +1,17 @@
+use std::fmt::Display;
+
+use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
+
+use crate::CcipOfframpError;
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct Config {
     pub version: u8,
-    _padding0: [u8; 7],
+    pub default_code_version: u8,
+    _padding0: [u8; 6],
     pub svm_chain_selector: u64,
     pub enable_manual_execution_after: i64, // Expressed as Unix time (i.e. seconds since the Unix epoch).
     _padding1: [u8; 8],
@@ -72,6 +78,9 @@ pub struct ExternalExecutionConfig {}
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct SourceChainConfig {
     pub is_enabled: bool, // Flag whether the source chain is enabled or not
+
+    pub lane_code_version: CodeVersion, // The code version of the lane, which may override the global default code version
+
     // OnRamp addresses supported from the source chain, each of them has a 64 byte address. So this can hold 2 addresses.
     // If only one address is configured, then the space for the second address must be zeroed.
     // Each address must be right padded with zeros if it is less than 64 bytes.
@@ -128,6 +137,40 @@ impl TryFrom<u128> for MessageExecutionState {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+#[repr(u8)]
+pub enum CodeVersion {
+    Default = 0,
+    V1,
+}
+
+impl Display for CodeVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CodeVersion::Default => write!(f, "Default"),
+            CodeVersion::V1 => write!(f, "V1"),
+        }
+    }
+}
+
+impl From<CodeVersion> for u8 {
+    fn from(value: CodeVersion) -> u8 {
+        value as u8
+    }
+}
+
+impl TryFrom<u8> for CodeVersion {
+    type Error = CcipOfframpError;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(CodeVersion::Default),
+            1 => Ok(CodeVersion::V1),
+            _ => Err(CcipOfframpError::InvalidCodeVersion),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -153,5 +196,18 @@ mod tests {
             MessageExecutionState::Failure
         );
         assert!(MessageExecutionState::try_from(4).is_err());
+    }
+
+    #[test]
+    fn test_code_version_try_from_u8() {
+        assert_eq!(CodeVersion::try_from(0).unwrap(), CodeVersion::Default);
+        assert_eq!(CodeVersion::try_from(1).unwrap(), CodeVersion::V1);
+        assert!(CodeVersion::try_from(2).is_err()); // this should be updated if new code versions are added
+    }
+
+    #[test]
+    fn test_u8_from_code_version() {
+        assert_eq!(u8::from(CodeVersion::Default), 0);
+        assert_eq!(u8::from(CodeVersion::V1), 1);
     }
 }

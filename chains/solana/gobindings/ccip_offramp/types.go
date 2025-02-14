@@ -701,13 +701,19 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 }
 
 type SourceChainConfig struct {
-	IsEnabled bool
-	OnRamp    [2][64]uint8
+	IsEnabled       bool
+	LaneCodeVersion CodeVersion
+	OnRamp          [2][64]uint8
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `IsEnabled` param:
 	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `LaneCodeVersion` param:
+	err = encoder.Encode(obj.LaneCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -722,6 +728,11 @@ func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `IsEnabled`:
 	err = decoder.Decode(&obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LaneCodeVersion`:
+	err = decoder.Decode(&obj.LaneCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -797,6 +808,24 @@ func (value MessageExecutionState) String() string {
 	}
 }
 
+type CodeVersion ag_binary.BorshEnum
+
+const (
+	Default_CodeVersion CodeVersion = iota
+	V1_CodeVersion
+)
+
+func (value CodeVersion) String() string {
+	switch value {
+	case Default_CodeVersion:
+		return "Default"
+	case V1_CodeVersion:
+		return "V1"
+	default:
+		return ""
+	}
+}
+
 type CcipOfframpError ag_binary.BorshEnum
 
 const (
@@ -833,6 +862,7 @@ const (
 	OfframpInvalidDataLength_CcipOfframpError
 	StaleCommitReport_CcipOfframpError
 	InvalidWritabilityBitmap_CcipOfframpError
+	InvalidCodeVersion_CcipOfframpError
 )
 
 func (value CcipOfframpError) String() string {
@@ -903,6 +933,8 @@ func (value CcipOfframpError) String() string {
 		return "StaleCommitReport"
 	case InvalidWritabilityBitmap_CcipOfframpError:
 		return "InvalidWritabilityBitmap"
+	case InvalidCodeVersion_CcipOfframpError:
+		return "InvalidCodeVersion"
 	default:
 		return ""
 	}
