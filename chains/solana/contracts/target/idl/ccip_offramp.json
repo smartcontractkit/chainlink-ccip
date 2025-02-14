@@ -1631,6 +1631,41 @@
       ]
     },
     {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "chainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "enableManualExecutionAfter",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ReferenceAddressesSet",
+      "fields": [
+        {
+          "name": "router",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "offrampLookupTable",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "CommitReportAccepted",
       "fields": [
         {

@@ -42,6 +42,14 @@ pub fn update_fee_aggregator(
 ) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
     config.fee_aggregator = fee_aggregator;
+
+    emit!(events::ConfigSet {
+        version: config.version,
+        svm_chain_selector: config.svm_chain_selector,
+        fee_quoter: config.fee_quoter,
+        link_token_mint: config.link_token_mint,
+        fee_aggregator: config.fee_aggregator,
+    });
     Ok(())
 }
 
@@ -155,6 +163,14 @@ pub fn update_svm_chain_selector(
     let mut config = ctx.accounts.config.load_mut()?;
 
     config.svm_chain_selector = new_chain_selector;
+
+    emit!(events::ConfigSet {
+        version: config.version,
+        svm_chain_selector: config.svm_chain_selector,
+        fee_quoter: config.fee_quoter,
+        link_token_mint: config.link_token_mint,
+        fee_aggregator: config.fee_aggregator,
+    });
 
     Ok(())
 }
