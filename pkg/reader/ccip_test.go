@@ -1424,11 +1424,26 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 		count    int
 		chainsIn []cciptypes.ChainSelector
 	}{
-		consts.ContractNameOnRamp:       {count: len(sourceChains), chainsIn: sourceChains},
-		consts.ContractNameRouter:       {count: len(sourceChains) + 1, chainsIn: append(sourceChains, destChain)}, // source + dest
-		consts.ContractNameFeeQuoter:    {count: len(sourceChains) + 1, chainsIn: append(sourceChains, destChain)}, // source + dest
-		consts.ContractNameRMNRemote:    {count: 1, chainsIn: []cciptypes.ChainSelector{destChain}},                // dest only
-		consts.ContractNameNonceManager: {count: 1, chainsIn: []cciptypes.ChainSelector{destChain}},                // dest only
+		consts.ContractNameOnRamp: {
+			count:    len(sourceChains),
+			chainsIn: sourceChains,
+		},
+		consts.ContractNameRouter: {
+			count:    len(sourceChains) + 1,
+			chainsIn: append(sourceChains, destChain),
+		}, // source + dest
+		consts.ContractNameFeeQuoter: {
+			count:    len(sourceChains) + 1,
+			chainsIn: append(sourceChains, destChain),
+		}, // source + dest
+		consts.ContractNameRMNRemote: {
+			count:    1,
+			chainsIn: []cciptypes.ChainSelector{destChain},
+		}, // dest only
+		consts.ContractNameNonceManager: {
+			count:    1,
+			chainsIn: []cciptypes.ChainSelector{destChain},
+		}, // dest only
 	}
 
 	for contractName, expected := range expectedCounts {
