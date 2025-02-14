@@ -7,7 +7,8 @@ use crate::context::{
     UpdateSourceChain,
 };
 use crate::event::admin::{
-    OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded, SourceChainConfigUpdated,
+    ConfigSet, OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded,
+    SourceChainConfigUpdated,
 };
 use crate::instructions::interfaces::Admin;
 use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChain, SourceChainConfig, SourceChainState};
@@ -125,6 +126,11 @@ impl Admin for Impl {
 
         config.svm_chain_selector = new_chain_selector;
 
+        emit!(ConfigSet {
+            svm_chain_selector: new_chain_selector,
+            enable_manual_execution_after: config.enable_manual_execution_after,
+        });
+
         Ok(())
     }
 
@@ -136,6 +142,11 @@ impl Admin for Impl {
         let mut config = ctx.accounts.config.load_mut()?;
 
         config.enable_manual_execution_after = new_enable_manual_execution_after;
+
+        emit!(ConfigSet {
+            svm_chain_selector: config.svm_chain_selector,
+            enable_manual_execution_after: new_enable_manual_execution_after,
+        });
 
         Ok(())
     }
