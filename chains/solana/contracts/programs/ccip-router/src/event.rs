@@ -76,6 +76,20 @@ pub mod events {
             pub source_chain_selector: u64,
             pub offramp: Pubkey,
         }
+
+        #[event]
+        pub struct CcipVersionForDestChainVersionBumped {
+            pub dest_chain_selector: u64,
+            pub previous_sequence_number: u64,
+            pub new_sequence_number: u64,
+        }
+
+        #[event]
+        pub struct CcipVersionForDestChainVersionRolledBack {
+            pub dest_chain_selector: u64,
+            pub previous_sequence_number: u64,
+            pub new_sequence_number: u64,
+        }
     }
 
     pub mod token_admin_registry {
@@ -101,11 +115,4 @@ pub mod events {
             pub new_admin: Pubkey,
         }
     }
-}
-
-#[event]
-// TODO: Check why this is not used
-pub struct PremiumMultiplierWeiPerEthUpdated {
-    pub token: Pubkey,
-    pub premium_multiplier_wei_per_eth: u64,
 }

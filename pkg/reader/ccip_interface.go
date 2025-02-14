@@ -134,6 +134,9 @@ type CCIPReader interface {
 		seqNumRange cciptypes.SeqNumRange,
 	) ([]cciptypes.Message, error)
 
+	// LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
+	LatestMsgSeqNum(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error)
+
 	// GetExpectedNextSequenceNumber reads the destination and returns the expected next onRamp sequence number.
 	GetExpectedNextSequenceNumber(
 		ctx context.Context,

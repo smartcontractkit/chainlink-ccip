@@ -57,11 +57,7 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 }
 
 // NewTokenPool returns token + pool addresses. however, the token still needs to be deployed
-func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey) (TokenPool, error) {
-	mint, err := solana.NewRandomPrivateKey()
-	if err != nil {
-		return TokenPool{}, err
-	}
+func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, mint solana.PrivateKey) (TokenPool, error) {
 	tokenAdminRegistryPDA, _, err := state.FindTokenAdminRegistryPDA(mint.PublicKey(), config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err

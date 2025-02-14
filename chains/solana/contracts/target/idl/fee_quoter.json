@@ -117,6 +117,29 @@
       "args": []
     },
     {
+      "name": "setDefaultCodeVersion",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "codeVersion",
+          "type": {
+            "defined": "CodeVersion"
+          }
+        }
+      ]
+    },
+    {
       "name": "addBillingTokenConfig",
       "docs": [
         "Adds a billing token configuration.",
@@ -642,6 +665,12 @@
           {
             "name": "onramp",
             "type": "publicKey"
+          },
+          {
+            "name": "defaultCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
           }
         ]
       }
@@ -956,6 +985,12 @@
             "type": "bool"
           },
           {
+            "name": "laneCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
+          },
+          {
             "name": "maxNumberOfTokensPerMsg",
             "type": "u16"
           },
@@ -1124,6 +1159,20 @@
           {
             "name": "isEnabled",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CodeVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Default"
+          },
+          {
+            "name": "V1"
           }
         ]
       }
@@ -1423,6 +1472,21 @@
           "type": {
             "defined": "TokenTransferFeeConfig"
           },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PremiumMultiplierWeiPerEthUpdated",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "premiumMultiplierWeiPerEth",
+          "type": "u64",
           "index": false
         }
       ]
