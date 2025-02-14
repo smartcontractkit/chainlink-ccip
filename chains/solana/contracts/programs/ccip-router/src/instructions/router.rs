@@ -17,31 +17,31 @@ use super::v1;
  * that is easy to extend to multiple versions.
  */
 
-pub fn public(
-    lane_code_version: CodeVersion,
-    default_code_version: CodeVersion,
-) -> &'static dyn Public {
-    // The lane-specific code version takes precedence over the default code version.
-    // If the lane just specifies using the default, then we use that one.
-    match lane_code_version {
-        CodeVersion::V1 => &v1::public::Impl,
-        CodeVersion::Default => match default_code_version {
-            CodeVersion::Default => &v1::public::Impl, // can't happen, but default to v1 so the `match` is exhaustive
-            CodeVersion::V1 => &v1::public::Impl,
-        },
-    }
-}
-
-pub fn prices(code_version: CodeVersion) -> &'static dyn Prices {
-    match code_version {
-        CodeVersion::Default => &v1::prices::Impl,
-        CodeVersion::V1 => &v1::prices::Impl,
-    }
-}
-
 pub fn admin(code_version: CodeVersion) -> &'static dyn Admin {
     match code_version {
         CodeVersion::Default => &v1::admin::Impl,
         CodeVersion::V1 => &v1::admin::Impl,
+    }
+}
+
+pub fn token_admin_registry(code_version: CodeVersion) -> &'static dyn TokenAdminRegistry {
+    match code_version {
+        CodeVersion::Default => &v1::token_admin_registry::Impl,
+        CodeVersion::V1 => &v1::token_admin_registry::Impl,
+    }
+}
+
+pub fn onramp(
+    lane_code_version: CodeVersion,
+    default_code_version: CodeVersion,
+) -> &'static dyn OnRamp {
+    // The lane-specific code version takes precedence over the default code version.
+    // If the lane just specifies using the default, then we use that one.
+    match lane_code_version {
+        CodeVersion::V1 => &v1::onramp::Impl,
+        CodeVersion::Default => match default_code_version {
+            CodeVersion::Default => &v1::onramp::Impl, // can't happen, but default to v1 so the `match` is exhaustive
+            CodeVersion::V1 => &v1::onramp::Impl,
+        },
     }
 }
