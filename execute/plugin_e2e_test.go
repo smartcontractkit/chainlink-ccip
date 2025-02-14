@@ -99,9 +99,13 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	// Message1 cost=40000,  fee=10000
 	// Message2 cost=200000, fee=20000
 	// Message3 cost=200000, fee=30000
-	for i := 0; i < 3; i++ {
-		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	}
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetMessages, outcome.State)
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	// empty outcome, everything is too costly
+	require.Equal(t, exectypes.Initialized, outcome.State)
 	require.Len(t, outcome.Report.ChainReports, 0)
 
 	// 4 hours later, we agree to pay higher fee, but only for the first message
@@ -109,9 +113,12 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	// Message2 cost=200000, fee=20000
 	// Message3 cost=200000, fee=30000
 	tm.SetNow(time.Now())
-	for i := 0; i < 3; i++ {
-		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	}
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetMessages, outcome.State)
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Filter, outcome.State)
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100})
 
@@ -121,9 +128,12 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	// Message2 cost=40000,  fee=100000
 	// Message3 cost=200000, fee=150000
 	intTest.UpdateExecutionCost(messages[1].Header.MessageID, 40000)
-	for i := 0; i < 3; i++ {
-		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	}
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetMessages, outcome.State)
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Filter, outcome.State)
 	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{101})
 
@@ -133,9 +143,10 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	// Message2 cost=40000,  fee=160000
 	// Message3 cost=200000, fee=240000
 	tm.SetNow(time.Now().Add(3 * time.Hour))
-	for i := 0; i < 3; i++ {
-		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	}
+	require.Equal(t, exectypes.GetCommitReports, runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner).State)
+	require.Equal(t, exectypes.GetMessages, runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner).State)
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Filter, outcome.State)
 	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102})
 }

@@ -278,8 +278,6 @@ func (p *Plugin) filterMessages(
 	ctx context.Context, lggr logger.Logger, messageObs exectypes.MessageObservations,
 ) exectypes.MessageObservations {
 
-	//p.statusCache.
-	txmStatusChecker := report.NewTXMCheck(p.statusCache, p.offchainCfg.MaxTxmStatusChecks)
 	// TXM Status checking only supports singleton execution because the msgID is used for the transactionID.
 	// Arbitrary txm checking would be much more complex because we don't know which messages are in the same report.
 	isSingletonExecute := p.offchainCfg.MaxReportMessages == 1 && p.offchainCfg.MaxSingleChainReports == 1
@@ -287,11 +285,13 @@ func (p *Plugin) filterMessages(
 		// Reset cache during message observation. It will be referenced again when the report is generated.
 		p.statusCache = report.NewMessageStatusCache(p.statusGetter)
 	}
+	txmStatusChecker := report.NewTXMCheck(p.statusCache, p.offchainCfg.MaxTxmStatusChecks)
 	for chainSelector, msgs := range messageObs {
 		for seqNum, msg := range msgs {
 			// Inflight messages do not need to be observed.
 			if p.inflightMessageCache != nil && p.inflightMessageCache.IsInflight(chainSelector, msg.Header.MessageID) {
 				messageObs[chainSelector][seqNum] = cciptypes.Message{}
+				//delete(messageObs[chainSelector], seqNum)
 				lggr.Infow("skipping message observation - inflight", "msg", msg)
 				continue
 			}
@@ -302,6 +302,7 @@ func (p *Plugin) filterMessages(
 					lggr.Errorw("txm status check error", "msg", msg, "err", err)
 				} else if status != report.None {
 					messageObs[chainSelector][seqNum] = cciptypes.Message{}
+					//delete(messageObs[chainSelector], seqNum)
 					lggr.Infow(fmt.Sprintf("skipping message observation - txm status %s", status),
 						"msg", msg)
 					continue

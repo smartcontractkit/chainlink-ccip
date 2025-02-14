@@ -116,6 +116,10 @@ func (o *observer) Observe(
 
 	costlyMessages := make([]cciptypes.Bytes32, 0)
 	for _, msg := range messages {
+		if msg.IsEmpty() {
+			continue
+		}
+
 		fee, ok := messageFees[msg.Header.MessageID]
 		if !ok {
 			return nil, fmt.Errorf("missing fee for message %s", msg.Header.MessageID)
@@ -335,6 +339,9 @@ func (n *StaticMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	messageExecCosts := make(map[cciptypes.Bytes32]plugintypes.USD18)
 
 	for _, msg := range messages {
+		if msg.IsEmpty() {
+			continue
+		}
 		cost, ok := n.costs[msg.Header.MessageID]
 		if !ok {
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
@@ -397,6 +404,9 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 
 	messageFees := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
+		if msg.IsEmpty() {
+			continue
+		}
 		feeUSD18 := mathslib.CalculateUsdPerUnitGas(msg.FeeValueJuels.Int, linkPriceUSD.Int)
 		timestamp, ok := messageTimeStamps[msg.Header.MessageID]
 		if !ok {
