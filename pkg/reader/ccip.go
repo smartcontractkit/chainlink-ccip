@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -943,6 +944,10 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 
 	myChains := maps.Keys(r.contractReaders)
 
+	// Use wait group for parallel processing
+	var wg sync.WaitGroup
+	mu := new(sync.Mutex)
+
 	// Process each source chain's OnRamp configurations
 	for _, chain := range myChains {
 		if chain == r.destChain {
@@ -955,30 +960,43 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 			continue
 		}
 
-		// Get cached OnRamp configurations
-		config, err := r.configPoller.GetChainConfig(ctx, chain)
-		if err != nil {
-			lggr.Errorw("Failed to get chain config",
-				"chain", chain,
-				"err", err)
-			continue
-		}
+		wg.Add(1)
+		go func(chain cciptypes.ChainSelector) {
+			defer wg.Done()
 
-		// Add FeeQuoter from dynamic config
-		if len(config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter) > 0 {
-			resp = resp.Append(
-				consts.ContractNameFeeQuoter,
-				chain,
-				config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter)
-		}
-		// Add Router from dest chain config
-		if len(config.OnRamp.DestChainConfig.Router) > 0 {
-			resp = resp.Append(
-				consts.ContractNameRouter,
-				chain,
-				config.OnRamp.DestChainConfig.Router)
-		}
+			// Get cached OnRamp configurations
+			config, err := r.configPoller.GetChainConfig(ctx, chain)
+			if err != nil {
+				lggr.Errorw("Failed to get chain config",
+					"chain", chain,
+					"err", err)
+				return
+			}
+
+			// Use mutex to safely update the shared resp
+			mu.Lock()
+			defer mu.Unlock()
+
+			// Add FeeQuoter from dynamic config
+			if len(config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter) > 0 {
+				resp = resp.Append(
+					consts.ContractNameFeeQuoter,
+					chain,
+					config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter)
+			}
+
+			// Add Router from dest chain config
+			if len(config.OnRamp.DestChainConfig.Router) > 0 {
+				resp = resp.Append(
+					consts.ContractNameRouter,
+					chain,
+					config.OnRamp.DestChainConfig.Router)
+			}
+		}(chain)
 	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
 
 	return resp, nil
 }
