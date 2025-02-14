@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
@@ -82,8 +83,12 @@ pub struct WithdrawBilledFunds<'info> {
     )]
     pub config: AccountLoader<'info, Config>,
 
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(mut)]
     pub authority: Signer<'info>,
+
+    pub associated_token_program: Program<'info, AssociatedToken>,
+
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

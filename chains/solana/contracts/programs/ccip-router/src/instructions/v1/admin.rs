@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface;
+use anchor_spl::{associated_token, token_interface};
 
 use crate::events::admin as events;
 use crate::state::RestoreOnAction;
@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{AddOfframp, RemoveOfframp};
 
-use super::fees::do_billing_transfer;
+use super::fees::{create_idempotent_ata, do_billing_transfer};
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
@@ -164,6 +164,19 @@ pub fn withdraw_billed_funds(
     transfer_all: bool,
     desired_amount: u64, // if transfer_all is false, this value must be 0
 ) -> Result<()> {
+    let signer_bump = ctx.bumps.fee_billing_signer;
+    let token_program = ctx.accounts.token_program.to_account_info();
+
+    let ata_create = associated_token::Create {
+        payer: ctx.accounts.authority.to_account_info(),
+        associated_token: ctx.accounts.associated_token_program.to_account_info(),
+        authority: ctx.accounts.fee_billing_signer.to_account_info(),
+        mint: ctx.accounts.fee_token_mint.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
+        token_program: token_program.clone(),
+    };
+    create_idempotent_ata(token_program.clone(), ata_create, signer_bump)?;
+
     let transfer = token_interface::TransferChecked {
         from: ctx.accounts.fee_token_accum.to_account_info(),
         to: ctx.accounts.recipient.to_account_info(),
@@ -194,11 +207,11 @@ pub fn withdraw_billed_funds(
     };
 
     do_billing_transfer(
-        ctx.accounts.token_program.to_account_info(),
+        token_program,
         transfer,
         amount,
         ctx.accounts.fee_token_mint.decimals,
-        ctx.bumps.fee_billing_signer,
+        signer_bump,
     )
 }
 

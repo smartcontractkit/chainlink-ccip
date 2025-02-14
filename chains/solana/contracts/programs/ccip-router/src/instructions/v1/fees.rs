@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface;
+use anchor_spl::{associated_token, token_interface};
 use solana_program::{program::invoke, system_instruction};
 
 use crate::context::{seed, CcipSend};
@@ -125,4 +125,15 @@ pub fn do_billing_transfer<'info>(
     let signer_seeds = &[&seeds[..]];
     let cpi_ctx = CpiContext::new_with_signer(token_program, transfer, signer_seeds);
     token_interface::transfer_checked(cpi_ctx, amount, decimals)
+}
+
+pub fn create_idempotent_ata<'info>(
+    token_program: AccountInfo<'info>,
+    accounts: associated_token::Create<'info>,
+    signer_bump: u8,
+) -> Result<()> {
+    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
+    let signer_seeds = &[&seeds[..]];
+    let cpi_ctx = CpiContext::new_with_signer(token_program, accounts, signer_seeds);
+    associated_token::create_idempotent(cpi_ctx)
 }
