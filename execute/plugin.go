@@ -546,7 +546,7 @@ func (p *Plugin) validateReport(
 
 	// check that the messages in the report are not already executed onchain.
 	// note that this involves a set of DB queries, hence why its last in the checks.
-	seqNrRangesBySource := getSeqNrRangeBySource(decodedReport.ChainReports)
+	seqNrRangesBySource := getSnRangeSetPairsBySource(decodedReport.ChainReports)
 	err = p.checkAlreadyExecuted(ctx, lggr, seqNrRangesBySource)
 	if errors.Is(err, errAlreadyExecuted) {
 		// Some messages in the report have already
@@ -569,44 +569,69 @@ func (p *Plugin) validateReport(
 func (p *Plugin) checkAlreadyExecuted(
 	ctx context.Context,
 	lggr logger.Logger,
-	seqNrRangesBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange,
+	seqNrRangesBySource map[cciptypes.ChainSelector]snRangeSetPair,
 ) error {
 	// TODO: batch these queries? these are all DB reads.
 	// maybe some alternative queries exist.
 	for sourceChainSelector, seqNrRange := range seqNrRangesBySource {
-		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange)
+		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange.snRange)
 		if err != nil {
 			return fmt.Errorf("couldn't check if messages already executed: %w", err)
 		}
 
-		if len(executed) > 0 {
-			// Some subset of messages have been executed, we can't accept this report.
+		if intersection := mapset.NewSet(executed...).Intersect(seqNrRange.set); !intersection.IsEmpty() {
+			// Some messages in the report have been executed, don't accept it.
+			reportSeqNrsSlice := seqNrRange.set.ToSlice()
 			lggr.Warnw("some messages in report already executed",
 				"alreadyExecuted", executed,
-				"reportRange", seqNrRange.String(),
+				"reportSeqNrs", reportSeqNrsSlice,
 			)
-			return fmt.Errorf("%w: already executed range %+v", errAlreadyExecuted, seqNrRange)
+			return fmt.Errorf("%w: already executed messages %+v report seq nrs %+v",
+				errAlreadyExecuted, executed, reportSeqNrsSlice)
 		}
 	}
 
 	return nil
 }
 
-// getSeqNrRangeBySource returns a map of source chain selector to
+// snRangeSetPair is an internal data structure used to store a sequence number range
+// and a set of sequence numbers simultaneously.
+type snRangeSetPair struct {
+	// snRange is a range of [min, max] sequence numbers of the messages in the report for a particular source chain.
+	// it is used to query the CCIPReader for executed messages.
+	snRange cciptypes.SeqNumRange
+	// set is the sequence numbers of the messages in the report for a particular source chain.
+	// it is used to check whether the returned array from CCIPReader has a non-empty intersection
+	// with the set of sequence numbers in the report.
+	set mapset.Set[cciptypes.SeqNum]
+}
+
+// getSnRangeSetPairsBySource returns a map of source chain selector to
 // the sequence number range of the messages in the report.
-func getSeqNrRangeBySource(
+func getSnRangeSetPairsBySource(
 	chainReports []cciptypes.ExecutePluginReportSingleChain,
-) map[cciptypes.ChainSelector]cciptypes.SeqNumRange {
-	seqNrRangesBySource := make(map[cciptypes.ChainSelector]cciptypes.SeqNumRange)
+) map[cciptypes.ChainSelector]snRangeSetPair {
+	seqNrRangesBySource := make(map[cciptypes.ChainSelector]snRangeSetPair)
 	for _, chainReport := range chainReports {
 		cmpr := func(a, b cciptypes.Message) int {
 			return cmp.Compare(a.Header.SequenceNumber, b.Header.SequenceNumber)
 		}
 		minMsg := slices.MinFunc(chainReport.Messages, cmpr)
 		maxMsg := slices.MaxFunc(chainReport.Messages, cmpr)
-		seqNrRangesBySource[chainReport.SourceChainSelector] = cciptypes.NewSeqNumRange(
-			minMsg.Header.SequenceNumber,
-			maxMsg.Header.SequenceNumber)
+		seqNrSet := mapset.NewSet(
+			slicelib.Map(
+				chainReport.Messages,
+				func(msg cciptypes.Message) cciptypes.SeqNum {
+					return msg.Header.SequenceNumber
+				},
+			)...,
+		)
+		seqNrRangesBySource[chainReport.SourceChainSelector] = snRangeSetPair{
+			snRange: cciptypes.NewSeqNumRange(
+				minMsg.Header.SequenceNumber,
+				maxMsg.Header.SequenceNumber),
+			set: seqNrSet,
+		}
 	}
 	return seqNrRangesBySource
 }
