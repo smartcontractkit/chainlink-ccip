@@ -59,7 +59,7 @@ pub mod ccip_router {
         fee_quoter: Pubkey,
         link_token_mint: Pubkey,
     ) -> Result<()> {
-        ctx.accounts.config.set_inner(Config {
+        let config = Config {
             version: 1,
             default_code_version: CodeVersion::V1,
             owner: ctx.accounts.authority.key(),
@@ -68,14 +68,16 @@ pub mod ccip_router {
             fee_quoter,
             link_token_mint,
             fee_aggregator,
-        });
+        };
+
+        ctx.accounts.config.set_inner(config);
 
         emit!(events::admin::ConfigSet {
-            version: config.version,
-            svm_chain_selector: config.svm_chain_selector,
-            fee_quoter: config.fee_quoter,
-            link_token_mint: config.link_token_mint,
-            fee_aggregator: config.fee_aggregator,
+            version: ctx.accounts.config.version,
+            svm_chain_selector: ctx.accounts.config.svm_chain_selector,
+            fee_quoter: ctx.accounts.config.fee_quoter,
+            link_token_mint: ctx.accounts.config.link_token_mint,
+            fee_aggregator: ctx.accounts.config.fee_aggregator,
         });
 
         Ok(())
