@@ -54,4 +54,17 @@ pub mod admin {
         pub from: Pubkey,
         pub to: Pubkey,
     }
+
+    #[event]
+    pub struct ConfigSet {
+        pub svm_chain_selector: u64,
+        pub enable_manual_execution_after: i64,
+    }
+
+    #[event]
+    pub struct ReferenceAddressesSet {
+        pub router: Pubkey,
+        pub fee_quoter: Pubkey,
+        pub offramp_lookup_table: Pubkey,
+    }
 }

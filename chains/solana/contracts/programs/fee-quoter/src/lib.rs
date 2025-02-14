@@ -13,6 +13,7 @@ pub mod state;
 use state::*;
 
 pub mod event;
+use event::*;
 
 pub mod extra_args;
 
@@ -45,6 +46,13 @@ pub mod fee_quoter {
             version: 1,
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
+            max_fee_juels_per_msg,
+            link_token_mint,
+            onramp,
+            default_code_version: CodeVersion::V1,
+        });
+
+        emit!(ConfigSet {
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
