@@ -1834,7 +1834,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					tcResult.finalTxSize = measureInstructionSize(vIx)
 
 					if tc.expectError {
-						testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"solana_sdk::transaction::versioned::VersionedTransaction too large"}, common.AddComputeUnitLimit(1_400_000))
+						testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"solana_sdk::transaction::versioned::VersionedTransaction too large"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
 						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
 						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))

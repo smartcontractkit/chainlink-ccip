@@ -5,9 +5,10 @@ use crate::context::{
     SetTokenTransferFeeConfig, UpdateBillingTokenConfig, UpdateConfig, UpdateDestChainConfig,
 };
 use crate::event::{
-    DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled,
-    OwnershipTransferRequested, OwnershipTransferred, PremiumMultiplierWeiPerEthUpdated,
-    PriceUpdaterAdded, PriceUpdaterRemoved, TokenTransferFeeConfigUpdated,
+    ConfigSet, DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled,
+    FeeTokenEnabled, OwnershipTransferRequested, OwnershipTransferred,
+    PremiumMultiplierWeiPerEthUpdated, PriceUpdaterAdded, PriceUpdaterRemoved,
+    TokenTransferFeeConfigUpdated,
 };
 use crate::instructions::interfaces::Admin;
 use crate::state::{
@@ -53,7 +54,15 @@ impl Admin for Impl {
             CodeVersion::Default,
             FeeQuoterError::InvalidCodeVersion
         );
-        ctx.accounts.config.default_code_version = code_version;
+        let config = &mut ctx.accounts.config;
+        config.default_code_version = code_version;
+
+        emit!(ConfigSet {
+            max_fee_juels_per_msg: config.max_fee_juels_per_msg,
+            link_token_mint: config.link_token_mint,
+            onramp: config.onramp,
+            default_code_version: config.default_code_version
+        });
         Ok(())
     }
 

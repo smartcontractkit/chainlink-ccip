@@ -14,6 +14,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -35,8 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
-
-const MaxCU = 1_400_000 // this is SVM's hard max Compute Unit limit
 
 func TestCCIPRouter(t *testing.T) {
 	t.Parallel()
@@ -478,9 +477,10 @@ func TestCCIPRouter(t *testing.T) {
 			var programData ProgramData
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
+			tempFeeAggregator := anotherUser.PublicKey() // fee aggregator address, will be changed in later test
 			instruction, err := ccip_router.NewInitializeInstruction(
 				invalidSVMChainSelector,
-				anotherUser.PublicKey(), // fee aggregator address, will be changed in later test
+				tempFeeAggregator,
 				config.FeeQuoterProgram,
 				link22.mint,
 				config.RouterConfigPDA,
@@ -494,6 +494,13 @@ func TestCCIPRouter(t *testing.T) {
 
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
+
+			var configSetEvent ccip.EventRouterConfigSet
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+			require.Equal(t, invalidSVMChainSelector, configSetEvent.SvmChainSelector)
+			require.Equal(t, config.FeeQuoterProgram, configSetEvent.FeeQuoter)
+			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, tempFeeAggregator, configSetEvent.FeeAggregator)
 
 			// Fetch account data
 			var configAccount ccip_router.Config
@@ -533,6 +540,13 @@ func TestCCIPRouter(t *testing.T) {
 
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
+
+			var configSetEvent ccip.EventFeeQuoterConfigSet
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+			require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
+			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
+			require.Equal(t, fee_quoter.V1_CodeVersion, configSetEvent.DefaultCodeVersion)
 
 			// Fetch account data
 			var fqConfig fee_quoter.Config
@@ -640,6 +654,17 @@ func TestCCIPRouter(t *testing.T) {
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx, initConfigIx}, legacyAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
+			var refAddrEvent ccip.EventOfframpReferenceAddressesSet
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ReferenceAddressesSet", &refAddrEvent, config.PrintEvents))
+			require.Equal(t, config.CcipRouterProgram, refAddrEvent.Router)
+			require.Equal(t, config.FeeQuoterProgram, refAddrEvent.FeeQuoter)
+			require.Equal(t, lookupTableAddr, refAddrEvent.OfframpLookupTable)
+
+			var configSetEvent ccip.EventOfframpConfigSet
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+			require.Equal(t, invalidSVMChainSelector, configSetEvent.SvmChainSelector)
+			require.Equal(t, config.EnableExecutionAfter, configSetEvent.EnableManualExecutionAfter)
+
 			// Fetch account data
 			var offrampConfig ccip_offramp.Config
 			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &offrampConfig))
@@ -682,6 +707,10 @@ func TestCCIPRouter(t *testing.T) {
 				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
+				var configSetEvent ccip.EventRouterConfigSet
+				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+				require.Equal(t, config.SvmChainSelector, configSetEvent.SvmChainSelector)
+
 				var configAccount ccip_router.Config
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
@@ -697,6 +726,10 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
 				require.NotNil(t, result)
+
+				var configSetEvent ccip.EventOfframpConfigSet
+				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+				require.Equal(t, config.SvmChainSelector, configSetEvent.SvmChainSelector)
 
 				var configAccount ccip_offramp.Config
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpConfigPDA, config.DefaultCommitment, &configAccount)
@@ -1146,6 +1179,10 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
+
+			var configSetEvent ccip.EventRouterConfigSet
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+			require.Equal(t, feeAggregator.PublicKey(), configSetEvent.FeeAggregator)
 
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
@@ -4288,7 +4325,7 @@ func TestCCIPRouter(t *testing.T) {
 						ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, token1.User[user.PublicKey()], token1.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
 						require.NoError(t, err)
 
-						testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(1_400_000))
+						testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					})
 				}
 			})
@@ -4903,7 +4940,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						instruction, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
-						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(MaxCU))
+						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
 						commitEvent := ccip.EventCommitReportAccepted{}
 						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
@@ -5352,7 +5389,7 @@ func TestCCIPRouter(t *testing.T) {
 
 							instruction, err := raw.ValidateAndBuild()
 							require.NoError(t, err)
-							testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, []string{testcase.ExpectedError}, common.AddComputeUnitLimit(MaxCU))
+							testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, []string{testcase.ExpectedError}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 						})
 					}
 				})
@@ -7064,14 +7101,20 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("Given the period of time has passed", func(t *testing.T) {
+					newEnableManualExecutionAfter := int64(-1)
+
 					instruction, err = ccip_offramp.NewUpdateEnableManualExecutionAfterInstruction(
-						-1,
+						newEnableManualExecutionAfter,
 						config.OfframpConfigPDA,
 						ccipAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment)
 					require.NotNil(t, result)
+
+					var configSetEvent ccip.EventOfframpConfigSet
+					require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
+					require.Equal(t, newEnableManualExecutionAfter, configSetEvent.EnableManualExecutionAfter)
 
 					t.Run("When user manually executing after the period of time has passed, it succeeds", func(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{

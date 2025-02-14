@@ -70,6 +70,13 @@ pub mod ccip_router {
             fee_aggregator,
         });
 
+        emit!(events::admin::ConfigSet {
+            svm_chain_selector: ctx.accounts.config.svm_chain_selector,
+            fee_quoter: ctx.accounts.config.fee_quoter,
+            link_token_mint: ctx.accounts.config.link_token_mint,
+            fee_aggregator: ctx.accounts.config.fee_aggregator,
+        });
+
         Ok(())
     }
 

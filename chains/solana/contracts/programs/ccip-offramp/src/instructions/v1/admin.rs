@@ -7,7 +7,8 @@ use crate::context::{
     UpdateSourceChain,
 };
 use crate::event::admin::{
-    OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded, SourceChainConfigUpdated,
+    ConfigSet, OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded,
+    SourceChainConfigUpdated,
 };
 use crate::state::{Ocr3ConfigInfo, SourceChain, SourceChainConfig, SourceChainState};
 use crate::CcipOfframpError;
@@ -100,6 +101,11 @@ pub fn update_svm_chain_selector(
 
     config.svm_chain_selector = new_chain_selector;
 
+    emit!(ConfigSet {
+        svm_chain_selector: new_chain_selector,
+        enable_manual_execution_after: config.enable_manual_execution_after,
+    });
+
     Ok(())
 }
 
@@ -110,6 +116,11 @@ pub fn update_enable_manual_execution_after(
     let mut config = ctx.accounts.config.load_mut()?;
 
     config.enable_manual_execution_after = new_enable_manual_execution_after;
+
+    emit!(ConfigSet {
+        svm_chain_selector: config.svm_chain_selector,
+        enable_manual_execution_after: new_enable_manual_execution_after,
+    });
 
     Ok(())
 }

@@ -1500,6 +1500,31 @@
   ],
   "events": [
     {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "svmChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "feeAggregator",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "FeeTokenAdded",
       "fields": [
         {
