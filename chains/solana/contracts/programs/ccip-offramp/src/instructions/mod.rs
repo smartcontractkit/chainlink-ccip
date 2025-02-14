@@ -1,1 +1,4 @@
-pub mod v1;
+mod interfaces;
+mod v1;
+
+pub mod router;

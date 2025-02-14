@@ -11,7 +11,7 @@ mod context;
 use crate::context::*;
 
 mod instructions;
-use crate::instructions::v1;
+use crate::instructions::router;
 
 mod state;
 use state::*;
@@ -73,6 +73,7 @@ pub mod ccip_offramp {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipOfframpError::InvalidVersion); // assert uninitialized state - AccountLoader doesn't work with constraint
         config.version = 1;
+        config.default_code_version = CodeVersion::V1.into();
         config.svm_chain_selector = svm_chain_selector;
         config.enable_manual_execution_after = enable_execution_after;
         config.owner = ctx.accounts.authority.key();
@@ -101,7 +102,14 @@ pub mod ccip_offramp {
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        v1::admin::transfer_ownership(ctx, proposed_owner)
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version).transfer_ownership(ctx, proposed_owner)
     }
 
     /// Accepts the ownership of the router by the proposed owner.
@@ -113,7 +121,37 @@ pub mod ccip_offramp {
     /// * `ctx` - The context containing the accounts required for accepting ownership.
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        v1::admin::accept_ownership(ctx)
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version).accept_ownership(ctx)
+    }
+
+    /// Sets the default code version to be used. This is then used by the slim routing layer to determine
+    /// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
+    ///
+    /// Shared func signature with other programs
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `code_version` - The new code version to be set as default.
+    pub fn set_default_code_version(
+        ctx: Context<UpdateConfig>,
+        code_version: CodeVersion,
+    ) -> Result<()> {
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version).set_default_code_version(ctx, code_version)
     }
 
     /////////////
@@ -131,7 +169,18 @@ pub mod ccip_offramp {
         new_chain_selector: u64,
         source_chain_config: SourceChainConfig,
     ) -> Result<()> {
-        v1::admin::add_source_chain(ctx, new_chain_selector, source_chain_config)
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version).add_source_chain(
+            ctx,
+            new_chain_selector,
+            source_chain_config,
+        )
     }
 
     /// Disables the source chain selector.
@@ -146,7 +195,15 @@ pub mod ccip_offramp {
         ctx: Context<UpdateSourceChain>,
         source_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version)
+            .disable_source_chain_selector(ctx, source_chain_selector)
     }
 
     /// Updates the configuration of the source chain selector.
@@ -163,7 +220,18 @@ pub mod ccip_offramp {
         source_chain_selector: u64,
         source_chain_config: SourceChainConfig,
     ) -> Result<()> {
-        v1::admin::update_source_chain_config(ctx, source_chain_selector, source_chain_config)
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version).update_source_chain_config(
+            ctx,
+            source_chain_selector,
+            source_chain_config,
+        )
     }
 
     /// Updates the SVM chain selector in the offramp configuration.
@@ -178,7 +246,14 @@ pub mod ccip_offramp {
         ctx: Context<UpdateConfig>,
         new_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version).update_svm_chain_selector(ctx, new_chain_selector)
     }
 
     /// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
@@ -194,7 +269,15 @@ pub mod ccip_offramp {
         ctx: Context<UpdateConfig>,
         new_enable_manual_execution_after: i64,
     ) -> Result<()> {
-        v1::admin::update_enable_manual_execution_after(ctx, new_enable_manual_execution_after)
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version)
+            .update_enable_manual_execution_after(ctx, new_enable_manual_execution_after)
     }
 
     /// Sets the OCR configuration.
@@ -214,7 +297,20 @@ pub mod ccip_offramp {
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
-        v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::admin(default_code_version).set_ocr_config(
+            ctx,
+            plugin_type,
+            config_info,
+            signers,
+            transmitters,
+        )
     }
 
     ////////////////////
@@ -252,7 +348,23 @@ pub mod ccip_offramp {
         ss: Vec<[u8; 32]>,
         raw_vs: [u8; 32],
     ) -> Result<()> {
-        v1::commit::commit(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
+        let lane_code_version = ctx.accounts.source_chain.config.lane_code_version;
+
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::commit(lane_code_version, default_code_version).commit(
+            ctx,
+            report_context_byte_words,
+            raw_report,
+            rs,
+            ss,
+            raw_vs,
+        )
     }
 
     /// Commits a report to the router, with price updates only.
@@ -281,7 +393,24 @@ pub mod ccip_offramp {
         ss: Vec<[u8; 32]>,
         raw_vs: [u8; 32],
     ) -> Result<()> {
-        v1::commit::commit_price_only(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
+        // there is no lane here in this case of commit, so use default code version
+        let lane_code_version = CodeVersion::Default;
+
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::commit(lane_code_version, default_code_version).commit_price_only(
+            ctx,
+            report_context_byte_words,
+            raw_report,
+            rs,
+            ss,
+            raw_vs,
+        )
     }
 
     /// Executes a message on the destination chain.
@@ -310,7 +439,16 @@ pub mod ccip_offramp {
         report_context_byte_words: [[u8; 32]; 2],
         token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::execute::execute(
+        let lane_code_version = ctx.accounts.source_chain.config.lane_code_version;
+
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::execute(lane_code_version, default_code_version).execute(
             ctx,
             raw_execution_report,
             report_context_byte_words,
@@ -333,7 +471,20 @@ pub mod ccip_offramp {
         raw_execution_report: Vec<u8>,
         token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::execute::manually_execute(ctx, raw_execution_report, &token_indexes)
+        let lane_code_version = ctx.accounts.source_chain.config.lane_code_version;
+
+        let default_code_version: CodeVersion = ctx
+            .accounts
+            .config
+            .load()?
+            .default_code_version
+            .try_into()?;
+
+        router::execute(lane_code_version, default_code_version).manually_execute(
+            ctx,
+            raw_execution_report,
+            &token_indexes,
+        )
     }
 }
 
@@ -411,4 +562,6 @@ pub enum CcipOfframpError {
     StaleCommitReport,
     #[msg("Invalid writability bitmap")]
     InvalidWritabilityBitmap,
+    #[msg("Invalid code version")]
+    InvalidCodeVersion,
 }

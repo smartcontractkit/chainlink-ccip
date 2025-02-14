@@ -4,6 +4,7 @@ use solana_program::program::invoke_signed;
 
 use crate::context::{seed, ExecuteReportContext, OcrPluginType};
 use crate::event::{ExecutionStateChanged, SkippedAlreadyExecutedMessage};
+use crate::instructions::interfaces::Execute;
 use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
@@ -20,59 +21,64 @@ use super::pools::{
     validate_and_parse_token_accounts, TokenAccounts, CCIP_POOL_V1_RET_BYTES,
 };
 
-pub fn execute<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    raw_execution_report: Vec<u8>,
-    report_context_byte_words: [[u8; 32]; 2],
-    token_indexes: &[u8],
-) -> Result<()> {
-    let execution_report =
-        ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
-            .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
-    let report_context = ReportContext::from_byte_words(report_context_byte_words);
-    // limit borrowing of ctx
-    {
-        let config = ctx.accounts.config.load()?;
-        ocr3_transmit(
-            &config.ocr3[OcrPluginType::Execution as usize],
-            &ctx.accounts.sysvar_instructions,
-            ctx.accounts.authority.key(),
-            OcrPluginType::Execution as u8,
-            report_context,
-            &Ocr3ReportForExecutionReportSingleChain(&execution_report),
-            Signatures {
-                rs: vec![],
-                ss: vec![],
-                raw_vs: [0u8; 32],
-            },
-        )?;
+pub struct Impl;
+impl Execute for Impl {
+    fn execute<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
+        raw_execution_report: Vec<u8>,
+        report_context_byte_words: [[u8; 32]; 2],
+        token_indexes: &[u8],
+    ) -> Result<()> {
+        let execution_report =
+            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+                .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+        let report_context = ReportContext::from_byte_words(report_context_byte_words);
+        // limit borrowing of ctx
+        {
+            let config = ctx.accounts.config.load()?;
+            ocr3_transmit(
+                &config.ocr3[OcrPluginType::Execution as usize],
+                &ctx.accounts.sysvar_instructions,
+                ctx.accounts.authority.key(),
+                OcrPluginType::Execution as u8,
+                report_context,
+                &Ocr3ReportForExecutionReportSingleChain(&execution_report),
+                Signatures {
+                    rs: vec![],
+                    ss: vec![],
+                    raw_vs: [0u8; 32],
+                },
+            )?;
+        }
+
+        internal_execute(ctx, execution_report, token_indexes)
     }
 
-    internal_execute(ctx, execution_report, token_indexes)
-}
+    fn manually_execute<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
+        raw_execution_report: Vec<u8>,
+        token_indexes: &[u8],
+    ) -> Result<()> {
+        // limit borrowing of ctx
+        {
+            let config = ctx.accounts.config.load()?;
 
-pub fn manually_execute<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    raw_execution_report: Vec<u8>,
-    token_indexes: &[u8],
-) -> Result<()> {
-    // limit borrowing of ctx
-    {
-        let config = ctx.accounts.config.load()?;
-
-        // validate time has passed
-        let clock: Clock = Clock::get()?;
-        let current_timestamp = clock.unix_timestamp;
-        require!(
-            current_timestamp - ctx.accounts.commit_report.timestamp
-                > config.enable_manual_execution_after,
-            CcipOfframpError::ManualExecutionNotAllowed
-        );
+            // validate time has passed
+            let clock: Clock = Clock::get()?;
+            let current_timestamp = clock.unix_timestamp;
+            require!(
+                current_timestamp - ctx.accounts.commit_report.timestamp
+                    > config.enable_manual_execution_after,
+                CcipOfframpError::ManualExecutionNotAllowed
+            );
+        }
+        let execution_report =
+            ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
+                .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+        internal_execute(ctx, execution_report, token_indexes)
     }
-    let execution_report =
-        ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
-            .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
-    internal_execute(ctx, execution_report, token_indexes)
 }
 
 /////////////
