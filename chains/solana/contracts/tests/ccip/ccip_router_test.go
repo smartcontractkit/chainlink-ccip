@@ -4999,7 +4999,8 @@ func TestCCIPRouter(t *testing.T) {
 						commitEvent := ccip.EventCommitReportAccepted{}
 						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
 
-						require.Equal(t, commitEvent.PriceUpdates, testcase.PriceUpdates)
+						require.Equal(t, testcase.PriceUpdates, commitEvent.PriceUpdates)
+						require.Equal(t, ccip_offramp.MerkleRoot{SourceChainSelector: 0x0, OnRampAddress: nil, MinSeqNr: 0x0, MaxSeqNr: 0x0, MerkleRoot: [32]uint8{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}}, commitEvent.Report)
 						testcase.RunEventValidations(t, tx)
 						testcase.RunStateValidations(t)
 					})
