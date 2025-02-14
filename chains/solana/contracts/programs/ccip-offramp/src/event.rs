@@ -55,12 +55,14 @@ pub mod admin {
 
     #[event]
     pub struct ConfigSet {
-        pub chain_selector: u64,
+        pub version: u8,
+        pub svm_chain_selector: u64,
         pub enable_manual_execution_after: i64,
     }
 
     #[event]
     pub struct ReferenceAddressesSet {
+        pub version: u8,
         pub router: Pubkey,
         pub fee_quoter: Pubkey,
         pub offramp_lookup_table: Pubkey,

@@ -98,12 +98,14 @@ type TokenTransferFeeConfigUpdated struct {
 
 type EventOfframpConfigSet struct {
 	Discriminator              [8]byte
-	ChainSelector              uint64
+	Version                    uint8
+	SvmChainSelector           uint64
 	EnableManualExecutionAfter int64
 }
 
 type EventOfframpReferenceAddressesSet struct {
 	Discriminator      [8]byte
+	Version            uint8
 	Router             solana.PublicKey
 	FeeQuoter          solana.PublicKey
 	OfframpLookupTable solana.PublicKey

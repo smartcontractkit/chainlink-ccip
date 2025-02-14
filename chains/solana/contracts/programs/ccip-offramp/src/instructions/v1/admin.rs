@@ -102,7 +102,8 @@ pub fn update_svm_chain_selector(
     config.svm_chain_selector = new_chain_selector;
 
     emit!(ConfigSet {
-        chain_selector: new_chain_selector,
+        version: config.version,
+        svm_chain_selector: new_chain_selector,
         enable_manual_execution_after: config.enable_manual_execution_after,
     });
 
@@ -118,7 +119,8 @@ pub fn update_enable_manual_execution_after(
     config.enable_manual_execution_after = new_enable_manual_execution_after;
 
     emit!(ConfigSet {
-        chain_selector: config.svm_chain_selector,
+        version: config.version,
+        svm_chain_selector: config.svm_chain_selector,
         enable_manual_execution_after: new_enable_manual_execution_after,
     });
 

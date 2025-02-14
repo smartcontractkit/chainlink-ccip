@@ -18,6 +18,9 @@ use state::*;
 
 use crate::event::admin::{ConfigSet, ReferenceAddressesSet};
 
+/// Version of the program
+pub const VERSION: u8 = 1;
+
 #[program]
 pub mod ccip_offramp {
     use super::*;
@@ -38,7 +41,7 @@ pub mod ccip_offramp {
         ctx.accounts
             .reference_addresses
             .set_inner(ReferenceAddresses {
-                version: 1,
+                version: VERSION,
                 router: ctx.accounts.router.key(),
                 fee_quoter: ctx.accounts.fee_quoter.key(),
                 offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
@@ -47,6 +50,7 @@ pub mod ccip_offramp {
         ctx.accounts.state.latest_price_sequence_number = 0;
 
         emit!(ReferenceAddressesSet {
+            version: VERSION,
             router: ctx.accounts.router.key(),
             fee_quoter: ctx.accounts.fee_quoter.key(),
             offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
@@ -72,7 +76,7 @@ pub mod ccip_offramp {
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipOfframpError::InvalidVersion); // assert uninitialized state - AccountLoader doesn't work with constraint
-        config.version = 1;
+        config.version = VERSION;
         config.svm_chain_selector = svm_chain_selector;
         config.enable_manual_execution_after = enable_execution_after;
         config.owner = ctx.accounts.authority.key();
@@ -82,7 +86,8 @@ pub mod ccip_offramp {
         ];
 
         emit!(ConfigSet {
-            chain_selector: svm_chain_selector,
+            version: VERSION,
+            svm_chain_selector,
             enable_manual_execution_after: enable_execution_after,
         });
 
