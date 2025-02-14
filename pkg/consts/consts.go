@@ -79,7 +79,8 @@ const (
 			    bytes32 rawVs // signatures
 			  ) external
 	*/
-	MethodCommit = "Commit"
+	MethodCommit          = "Commit"
+	MethodCommitPriceOnly = "CommitPriceOnly"
 
 	// On EVM:
 	// function execute(bytes32[3] calldata reportContext, bytes calldata report) external

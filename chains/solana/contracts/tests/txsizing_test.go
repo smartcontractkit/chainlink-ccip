@@ -168,7 +168,7 @@ func TestTransactionSizing(t *testing.T) {
 
 	// ccip commit test messages + instruction ------------------------
 	commitNoPrices := ccip_offramp.CommitInput{
-		MerkleRoot: ccip_offramp.MerkleRoot{
+		MerkleRoot: &ccip_offramp.MerkleRoot{
 			SourceChainSelector: 0,
 			OnRampAddress:       make([]byte, 20), // EVM onramp
 			MinSeqNr:            0,
@@ -181,7 +181,7 @@ func TestTransactionSizing(t *testing.T) {
 			TokenPriceUpdates: make([]ccip_offramp.TokenPriceUpdate, 1),
 			GasPriceUpdates:   make([]ccip_offramp.GasPriceUpdate, 1),
 		},
-		MerkleRoot: ccip_offramp.MerkleRoot{
+		MerkleRoot: &ccip_offramp.MerkleRoot{
 			SourceChainSelector: 0,
 			OnRampAddress:       make([]byte, 20),
 			MinSeqNr:            0,

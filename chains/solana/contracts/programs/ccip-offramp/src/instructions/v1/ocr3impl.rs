@@ -20,7 +20,7 @@ impl Ocr3Report for Ocr3ReportForCommit<'_> {
         4 + (32 + 28) * self.0.price_updates.token_price_updates.len() + // token_price_updates
       4 + (8 + 28) * self.0.price_updates.gas_price_updates.len() + // gas_price_updates
       4 + (32 + 32) * self.0.rmn_signatures.len() + // rmn signatures
-      self.0.merkle_root.len()
+      1 + self.0.merkle_root.as_ref().map(|r| r.len()).unwrap_or(0)
         // + 4 + 65 * self.rmn_signatures.len()
     }
 }

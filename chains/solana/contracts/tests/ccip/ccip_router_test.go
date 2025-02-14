@@ -4669,6 +4669,7 @@ func TestCCIPRouter(t *testing.T) {
 					RunStateValidations     func(t *testing.T)
 					ReportContext           *[2][32]byte
 					PriceSequenceComparator Comparator
+					skipWithNoMerkleRoot    bool
 				}{
 					{
 						Name:              "No price updates",
@@ -4680,6 +4681,7 @@ func TestCCIPRouter(t *testing.T) {
 						},
 						RunStateValidations:     func(t *testing.T) {},
 						PriceSequenceComparator: Greater, // it is a newer commit but with no price update
+						skipWithNoMerkleRoot:    true,
 					},
 					{
 						Name: "Single token price update",
@@ -4890,7 +4892,7 @@ func TestCCIPRouter(t *testing.T) {
 						currentMinSeqNr = maxV + 1 // advance the outer sequence counter
 
 						report := ccip_offramp.CommitInput{
-							MerkleRoot: ccip_offramp.MerkleRoot{
+							MerkleRoot: &ccip_offramp.MerkleRoot{
 								SourceChainSelector: config.EvmChainSelector,
 								OnRampAddress:       config.OnRampAddress,
 								MinSeqNr:            minV,
@@ -4983,6 +4985,63 @@ func TestCCIPRouter(t *testing.T) {
 						testcase.RunStateValidations(t)
 					})
 				}
+
+				for _, testcase := range priceUpdatesCases {
+					if testcase.skipWithNoMerkleRoot {
+						continue
+					}
+					t.Run("prices only: "+testcase.Name, func(t *testing.T) {
+						report := ccip_offramp.CommitInput{
+							MerkleRoot:   nil,
+							PriceUpdates: testcase.PriceUpdates,
+						}
+
+						var reportContext [2][32]byte
+						if testcase.ReportContext != nil {
+							reportContext = *testcase.ReportContext
+						} else {
+							reportContext = ccip.NextCommitReportContext()
+						}
+
+						sigs, err := ccip.SignCommitReport(reportContext, report, signers)
+						require.NoError(t, err)
+
+						transmitter := getTransmitter()
+
+						raw := ccip_offramp.NewCommitPriceOnlyInstruction(
+							reportContext,
+							testutils.MustMarshalBorsh(t, report),
+							sigs.Rs,
+							sigs.Ss,
+							sigs.RawVs,
+							config.OfframpConfigPDA,
+							config.OfframpReferenceAddressesPDA,
+							transmitter.PublicKey(),
+							solana.SystemProgramID,
+							solana.SysVarInstructionsPubkey,
+							config.OfframpBillingSignerPDA,
+							config.FeeQuoterProgram,
+							config.FqAllowedPriceUpdaterOfframpPDA,
+							config.FqConfigPDA,
+						)
+
+						for _, pubkey := range testcase.RemainingAccounts {
+							raw.AccountMetaSlice.Append(solana.Meta(pubkey).WRITE())
+						}
+
+						instruction, err := raw.ValidateAndBuild()
+						require.NoError(t, err)
+
+						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						commitEvent := ccip.EventCommitReportAccepted{}
+						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
+
+						require.Equal(t, testcase.PriceUpdates, commitEvent.PriceUpdates)
+						require.Equal(t, ccip_offramp.MerkleRoot{SourceChainSelector: 0x0, OnRampAddress: nil, MinSeqNr: 0x0, MaxSeqNr: 0x0, MerkleRoot: [32]uint8{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}}, commitEvent.Report)
+						testcase.RunEventValidations(t, tx)
+						testcase.RunStateValidations(t)
+					})
+				}
 			})
 
 			t.Run("Edge cases", func(t *testing.T) {
@@ -5000,7 +5059,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := currentMinSeqNr + 4
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: sourceChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5045,7 +5104,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := currentMinSeqNr - 2 // max lower than min
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5089,7 +5148,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := currentMinSeqNr + 65 // max - min > 64
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5133,7 +5192,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := currentMinSeqNr // max = min
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5178,7 +5237,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := currentMinSeqNr + 4
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5224,7 +5283,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := uint64(10)
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5350,7 +5409,7 @@ func TestCCIPRouter(t *testing.T) {
 							transmitter := getTransmitter()
 
 							report := ccip_offramp.CommitInput{
-								MerkleRoot: ccip_offramp.MerkleRoot{
+								MerkleRoot: &ccip_offramp.MerkleRoot{
 									SourceChainSelector: config.EvmChainSelector,
 									OnRampAddress:       config.OnRampAddress,
 									MinSeqNr:            currentMinSeqNr,
@@ -5407,7 +5466,7 @@ func TestCCIPRouter(t *testing.T) {
 				currentMinSeqNr = maxV + 1 // advance the outer sequence counter as this will succeed
 
 				report := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: config.EvmChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            minV,
@@ -5478,7 +5537,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := msg.Header.SequenceNumber
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5524,7 +5583,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := msg.Header.SequenceNumber
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5568,7 +5627,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := msg.Header.SequenceNumber
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5616,7 +5675,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := msg.Header.SequenceNumber
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5659,7 +5718,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := msg.Header.SequenceNumber
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5714,7 +5773,7 @@ func TestCCIPRouter(t *testing.T) {
 					maxV := msg.Header.SequenceNumber
 
 					report := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: config.EvmChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            minV,
@@ -5771,7 +5830,7 @@ func TestCCIPRouter(t *testing.T) {
 				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
 
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: sourceChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            sequenceNumber,
@@ -5868,7 +5927,7 @@ func TestCCIPRouter(t *testing.T) {
 				sequenceNumber := message.Header.SequenceNumber
 
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: config.EvmChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            sequenceNumber,
@@ -5949,7 +6008,7 @@ func TestCCIPRouter(t *testing.T) {
 				sequenceNumber := message.Header.SequenceNumber
 
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: config.EvmChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            sequenceNumber,
@@ -6052,7 +6111,7 @@ func TestCCIPRouter(t *testing.T) {
 				root := [32]byte(hash)
 
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: config.EvmChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            sequenceNumber,
@@ -6233,7 +6292,7 @@ func TestCCIPRouter(t *testing.T) {
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1[:], hash2[:]}))
 
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: config.EvmChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            message1.Header.SequenceNumber,
@@ -6373,7 +6432,7 @@ func TestCCIPRouter(t *testing.T) {
 				root := [32]byte(hash)
 
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: config.EvmChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            sequenceNumber,
@@ -6461,7 +6520,7 @@ func TestCCIPRouter(t *testing.T) {
 				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
 
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: sourceChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            sequenceNumber,
@@ -6559,7 +6618,7 @@ func TestCCIPRouter(t *testing.T) {
 					sequenceNumber := message.Header.SequenceNumber
 
 					commitReport := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: sourceChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            sequenceNumber,
@@ -6681,7 +6740,7 @@ func TestCCIPRouter(t *testing.T) {
 					sequenceNumber := message.Header.SequenceNumber
 
 					commitReport := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: sourceChainSelector,
 							OnRampAddress:       config.OnRampAddress,
 							MinSeqNr:            sequenceNumber,
@@ -6809,7 +6868,7 @@ func TestCCIPRouter(t *testing.T) {
 					sequenceNumber := message.Header.SequenceNumber
 
 					commitReport := ccip_offramp.CommitInput{
-						MerkleRoot: ccip_offramp.MerkleRoot{
+						MerkleRoot: &ccip_offramp.MerkleRoot{
 							SourceChainSelector: args.sourceChainSelector,
 							OnRampAddress:       args.onramp,
 							MinSeqNr:            sequenceNumber,
@@ -6987,7 +7046,7 @@ func TestCCIPRouter(t *testing.T) {
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1, hash2}))
 
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: config.EvmChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            message1.Header.SequenceNumber,
@@ -7019,7 +7078,7 @@ func TestCCIPRouter(t *testing.T) {
 					config.FqConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000))
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 				event := ccip.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
 
@@ -7250,7 +7309,7 @@ func TestCCIPRouter(t *testing.T) {
 				root := [32]byte(rootBytes)
 				sequenceNumber := message.Header.SequenceNumber
 				commitReport := ccip_offramp.CommitInput{
-					MerkleRoot: ccip_offramp.MerkleRoot{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
 						SourceChainSelector: sourceChainSelector,
 						OnRampAddress:       config.OnRampAddress,
 						MinSeqNr:            sequenceNumber,

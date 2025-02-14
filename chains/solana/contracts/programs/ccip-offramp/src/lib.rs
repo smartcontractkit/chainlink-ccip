@@ -221,7 +221,7 @@ pub mod ccip_offramp {
     /// Off Ramp Flow //
     ////////////////////
 
-    /// Commits a report to the router.
+    /// Commits a report to the router, containing a Merkle Root.
     ///
     /// The method name needs to be commit with Anchor encoding.
     ///
@@ -253,6 +253,35 @@ pub mod ccip_offramp {
         raw_vs: [u8; 32],
     ) -> Result<()> {
         v1::commit::commit(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
+    }
+
+    /// Commits a report to the router, with price updates only.
+    ///
+    /// The method name needs to be commit with Anchor encoding.
+    ///
+    /// This function is called by the OffChain when committing one Report to the SVM Router,
+    /// containing only price updates and no merkle root.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the commit.
+    /// * `report_context_byte_words` - consists of:
+    ///     * report_context_byte_words[0]: ConfigDigest
+    ///     * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
+    /// * `raw_report` - The serialized commit input report containing the price updates,
+    ///    with no merkle root.
+    /// * `rs` - slice of R components of signatures
+    /// * `ss` - slice of S components of signatures
+    /// * `raw_vs` - array of V components of signatures
+    pub fn commit_price_only<'info>(
+        ctx: Context<'_, '_, 'info, 'info, PriceOnlyCommitReportContext<'info>>,
+        report_context_byte_words: [[u8; 32]; 2],
+        raw_report: Vec<u8>,
+        rs: Vec<[u8; 32]>,
+        ss: Vec<[u8; 32]>,
+        raw_vs: [u8; 32],
+    ) -> Result<()> {
+        v1::commit::commit_price_only(ctx, report_context_byte_words, raw_report, rs, ss, raw_vs)
     }
 
     /// Executes a message on the destination chain.
@@ -330,6 +359,12 @@ pub enum CcipOfframpError {
     InvalidPluginType,
     #[msg("Invalid version of the onchain state")]
     InvalidVersion,
+    #[msg("Commit report is missing expected price updates")]
+    MissingExpectedPriceUpdates,
+    #[msg("Commit report is missing expected merkle root")]
+    MissingExpectedMerkleRoot,
+    #[msg("Commit report contains unexpected merkle root")]
+    UnexpectedMerkleRoot,
     #[msg("Proposed owner is the current owner")]
     RedundantOwnerProposal,
     #[msg("Source chain selector not supported")]

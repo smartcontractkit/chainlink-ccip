@@ -22,6 +22,7 @@ type EventCCIPMessageSent struct {
 type EventCommitReportAccepted struct {
 	Discriminator [8]byte
 	Report        ccip_offramp.MerkleRoot
+	PriceUpdates  ccip_offramp.PriceUpdates
 }
 
 type EventTransmitted struct {
