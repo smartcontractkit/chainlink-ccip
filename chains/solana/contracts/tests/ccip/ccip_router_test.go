@@ -5032,7 +5032,7 @@ func TestCCIPRouter(t *testing.T) {
 						instruction, err := raw.ValidateAndBuild()
 						require.NoError(t, err)
 
-						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(MaxCU))
+						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 						commitEvent := ccip.EventCommitReportAccepted{}
 						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
 
