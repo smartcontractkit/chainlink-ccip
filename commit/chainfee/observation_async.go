@@ -2,6 +2,7 @@ package chainfee
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -87,6 +88,17 @@ func (o *baseObserver) getSupportedChains(
 	supportedChains, err := cs.SupportedChains(oracleID)
 	if err != nil {
 		return nil, err
+	}
+
+	// filter out disabled chains
+	sourceChainsConfig, err := o.ccipReader.GetOffRampSourceChainsConfig(context.Background(), supportedChains.ToSlice())
+	if err != nil {
+		return nil, fmt.Errorf("get offRamp source chains config: %w", err)
+	}
+	for selector, config := range sourceChainsConfig {
+		if !config.IsEnabled {
+			supportedChains.Remove(selector)
+		}
 	}
 
 	supportedChains.Remove(destChain)
