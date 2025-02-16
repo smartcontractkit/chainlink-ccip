@@ -39,6 +39,17 @@ func (p *processor) Observation(
 		return Observation{}, err
 	}
 
+	// filter out disabled chains
+	sourceChainsConfig, err := p.ccipReader.GetOffRampSourceChainsConfig(ctx, supportedChains.ToSlice())
+	if err != nil {
+		return Observation{}, fmt.Errorf("get offRamp source chains config: %w", err)
+	}
+	for selector, config := range sourceChainsConfig {
+		if !config.IsEnabled {
+			supportedChains.Remove(selector)
+		}
+	}
+
 	supportedChains.Remove(p.destChain)
 	if supportedChains.Cardinality() == 0 {
 		lggr.Info("no supported chains other than dest chain to observe")
