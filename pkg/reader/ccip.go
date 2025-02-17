@@ -1539,72 +1539,77 @@ func (r *ccipChainReader) prepareBatchConfigRequests(
 		onRampDestConfig      onRampDestChainConfig
 	)
 
-	requests := contractreader.ExtendedBatchGetLatestValuesRequest{
-		consts.ContractNameOffRamp: {
-			{
-				ReadName: consts.MethodNameOffRampLatestConfigDetails,
-				Params: map[string]any{
-					"ocrPluginType": consts.PluginTypeCommit,
-				},
-				ReturnVal: &commitLatestOCRConfig,
-			},
-			{
-				ReadName: consts.MethodNameOffRampLatestConfigDetails,
-				Params: map[string]any{
-					"ocrPluginType": consts.PluginTypeExecute,
-				},
-				ReturnVal: &execLatestOCRConfig,
-			},
-			{
-				ReadName:  consts.MethodNameOffRampGetStaticConfig,
-				Params:    map[string]any{},
-				ReturnVal: &staticConfig,
-			},
-			{
-				ReadName:  consts.MethodNameOffRampGetDynamicConfig,
-				Params:    map[string]any{},
-				ReturnVal: &dynamicConfig,
-			},
-		},
-		consts.ContractNameRMNProxy: {{
-			ReadName:  consts.MethodNameGetARM,
-			Params:    map[string]any{},
-			ReturnVal: &rmnRemoteAddress,
-		}},
-		consts.ContractNameRMNRemote: {
-			{
-				ReadName:  consts.MethodNameGetReportDigestHeader,
-				Params:    map[string]any{},
-				ReturnVal: &rmnDigestHeader,
-			},
-			{
-				ReadName:  consts.MethodNameGetVersionedConfig,
-				Params:    map[string]any{},
-				ReturnVal: &rmnVersionConfig,
-			},
-		},
-		consts.ContractNameFeeQuoter: {{
-			ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
-			Params:    map[string]any{},
-			ReturnVal: &feeQuoterConfig,
-		}},
-	}
+	var requests contractreader.ExtendedBatchGetLatestValuesRequest
 
 	// Only add OnRamp config requests if this is a source chain (not destination chain)
 	if chainSel != r.destChain {
-		requests[consts.ContractNameOnRamp] = []types.BatchRead{
-			{
-				ReadName:  consts.MethodNameOnRampGetDynamicConfig,
-				Params:    map[string]any{},
-				ReturnVal: &onRampDynamicConfig,
-			},
-			{
-				ReadName: consts.MethodNameOnRampGetDestChainConfig,
-				Params: map[string]any{
-					"destChainSelector": r.destChain,
+		requests = contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameOnRamp: {
+				{
+					ReadName:  consts.MethodNameOnRampGetDynamicConfig,
+					Params:    map[string]any{},
+					ReturnVal: &onRampDynamicConfig,
 				},
-				ReturnVal: &onRampDestConfig,
+				{
+					ReadName: consts.MethodNameOnRampGetDestChainConfig,
+					Params: map[string]any{
+						"destChainSelector": r.destChain,
+					},
+					ReturnVal: &onRampDestConfig,
+				},
 			},
+		}
+	} else {
+		// Add all other contract requests for the destination chain
+		requests = contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameOffRamp: {
+				{
+					ReadName: consts.MethodNameOffRampLatestConfigDetails,
+					Params: map[string]any{
+						"ocrPluginType": consts.PluginTypeCommit,
+					},
+					ReturnVal: &commitLatestOCRConfig,
+				},
+				{
+					ReadName: consts.MethodNameOffRampLatestConfigDetails,
+					Params: map[string]any{
+						"ocrPluginType": consts.PluginTypeExecute,
+					},
+					ReturnVal: &execLatestOCRConfig,
+				},
+				{
+					ReadName:  consts.MethodNameOffRampGetStaticConfig,
+					Params:    map[string]any{},
+					ReturnVal: &staticConfig,
+				},
+				{
+					ReadName:  consts.MethodNameOffRampGetDynamicConfig,
+					Params:    map[string]any{},
+					ReturnVal: &dynamicConfig,
+				},
+			},
+			consts.ContractNameRMNProxy: {{
+				ReadName:  consts.MethodNameGetARM,
+				Params:    map[string]any{},
+				ReturnVal: &rmnRemoteAddress,
+			}},
+			consts.ContractNameRMNRemote: {
+				{
+					ReadName:  consts.MethodNameGetReportDigestHeader,
+					Params:    map[string]any{},
+					ReturnVal: &rmnDigestHeader,
+				},
+				{
+					ReadName:  consts.MethodNameGetVersionedConfig,
+					Params:    map[string]any{},
+					ReturnVal: &rmnVersionConfig,
+				},
+			},
+			consts.ContractNameFeeQuoter: {{
+				ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
+				Params:    map[string]any{},
+				ReturnVal: &feeQuoterConfig,
+			}},
 		}
 	}
 

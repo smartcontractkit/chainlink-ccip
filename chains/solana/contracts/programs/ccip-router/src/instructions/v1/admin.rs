@@ -64,6 +64,12 @@ impl Admin for Impl {
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
         config.fee_aggregator = fee_aggregator;
+        emit!(events::ConfigSet {
+            svm_chain_selector: config.svm_chain_selector,
+            fee_quoter: config.fee_quoter,
+            link_token_mint: config.link_token_mint,
+            fee_aggregator: config.fee_aggregator,
+        });
         Ok(())
     }
 
@@ -184,6 +190,13 @@ impl Admin for Impl {
         let config = &mut ctx.accounts.config;
 
         config.svm_chain_selector = new_chain_selector;
+
+        emit!(events::ConfigSet {
+            svm_chain_selector: config.svm_chain_selector,
+            fee_quoter: config.fee_quoter,
+            link_token_mint: config.link_token_mint,
+            fee_aggregator: config.fee_aggregator,
+        });
 
         Ok(())
     }
