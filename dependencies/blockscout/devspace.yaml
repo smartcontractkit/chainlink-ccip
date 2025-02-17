@@ -13,16 +13,10 @@ vars:
   BLOCKSCOUT_FRONTEND_IMAGE_TAG:
     source: env
     value: "latest"
-  LOCAL_TEMPLATES_DIR:
-    source: env
-    default: ./templates
-  ETHEREUM_VARIANT:
-    source: env
-    default: besu # or geth
-  CHAIN_NAME:
+  CHAIN_ID:
     source: env
     default: ""
-  CHAIN_ID:
+  CHAIN_NAME:
     source: env
     default: ""
   CHAIN_TYPE:
@@ -31,12 +25,18 @@ vars:
   ENABLE_BASE:
     source: env
     default: true
-  NAMESPACE:
+  ETHEREUM_VARIANT:
     source: env
-    default: ${DEVSPACE_NAMESPACE}
+    default: besu # or geth
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
   LOCAL_VALUES_DIR:
     source: env
     default: ./values
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
 
 pipelines:
   deploy:

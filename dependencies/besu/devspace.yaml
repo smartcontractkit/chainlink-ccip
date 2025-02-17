@@ -26,6 +26,9 @@ vars:
   ENVIRONMENT:
     source: env
     default: sandbox
+  INGRESS_CLASS_NAME:
+    source: env
+    default: "nginx"
   LOCAL_CHARTS_DIR:
     source: env
     default: ./charts
@@ -41,9 +44,6 @@ vars:
   NAMESPACE:
     source: env
     default: ${DEVSPACE_NAMESPACE}
-  INGRESS_CLASS_NAME:
-    source: env
-    default: "nginx"
   RPC_NODE_COUNT:
     source: env
     default: 1

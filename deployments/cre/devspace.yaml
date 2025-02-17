@@ -101,7 +101,6 @@ profiles:
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
 
-
 commands:
   besu:
     command: |-
