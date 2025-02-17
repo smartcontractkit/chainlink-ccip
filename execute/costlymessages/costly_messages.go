@@ -122,13 +122,16 @@ func (o *observer) Observe(
 	costlyMessages := make([]cciptypes.Bytes32, 0)
 	for _, msg := range messages {
 		checkFeeDisabled := o.disableAvailableFeeUsdCheckByChain[msg.Header.SourceChainSelector]
-		fee, feeExists := messageFees[msg.Header.MessageID]
-		if checkFeeDisabled && (!feeExists || fee.Cmp(big.NewInt(0)) >= 0) {
-			// If fee check is disabled and there's no fee, or if there is still a >= 0 fee passed in, then this is
-			// acceptable and we should continue to the next message.
+		if checkFeeDisabled {
+			// If fee check is disabled, then we don't care if there is no fee, a positive fee, or negative fee, we
+			// should continue to the next message.
 			continue
 		}
 
+		fee, ok := messageFees[msg.Header.MessageID]
+		if !ok {
+			return nil, fmt.Errorf("missing fee for message %s", msg.Header.MessageID)
+		}
 		if err := validatePositive(fee); err != nil {
 			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
 		}
