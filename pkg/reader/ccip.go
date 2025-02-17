@@ -880,6 +880,11 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Remo
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get chain config: %w", err)
 	}
 
+	if config.Offramp.DynamicConfig.IsRMNVerificationDisabled {
+		// ObserveRMNRemoteCfg will catch this error and ignore the chain
+		return rmntypes.RemoteConfig{}, ErrContractReaderNotFound
+	}
+
 	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
 	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
 	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, r.destChain)
@@ -1669,8 +1674,18 @@ func (r *ccipChainReader) processConfigResults(
 			config.Offramp, err = r.processOfframpResults(results)
 		case consts.ContractNameRMNProxy:
 			config.RMNProxy, err = r.processRMNProxyResults(results)
+			// HACK: ignore RMN for now
+			err = nil
 		case consts.ContractNameRMNRemote:
 			config.RMNRemote, config.CurseInfo, err = r.processRMNRemoteResults(results)
+
+			// HACK: ignore RMN for now
+			config.CurseInfo = CurseInfo{
+				CursedSourceChains: map[cciptypes.ChainSelector]bool{},
+				CursedDestination:  false,
+				GlobalCurse:        false,
+			}
+			err = nil
 		case consts.ContractNameFeeQuoter:
 			config.FeeQuoter, err = r.processFeeQuoterResults(results)
 		case consts.ContractNameOnRamp:
