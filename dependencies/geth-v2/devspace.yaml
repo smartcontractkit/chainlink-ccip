@@ -60,9 +60,20 @@ profiles:
           ENABLE_BASE_PROFILE: "true"
     merge: |-
       $(
-        pushd ./scripts/generate_base_profile > /dev/null
-        go run main.go -chain-overrides-dir="./../../values/chain-overrides/" \
+        pushd ./scripts/generate_values > /dev/null
+        go run main.go \
           -chain-overrides-file="${CHAIN_OVERRIDES_FILENAME}" \
           -chains-count="${CHAINS_COUNT}" -provider="${PROVIDER}" \
           -product="${CHAINLINK_PRODUCT}" -use-case="${USE_CASE}"
+      )
+  - name: local-charts
+    merge: |-
+      $(
+        if [ "${CHAINS_COUNT}" -gt 0 ]; then
+          pushd ./scripts/generate_values > /dev/null
+          go run main.go -chains-count="${CHAINS_COUNT}" -provider="${PROVIDER}" \
+            -template="local-charts.yaml.tmpl"
+        else
+          echo "deployments:"
+        fi
       )

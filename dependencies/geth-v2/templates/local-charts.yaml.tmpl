@@ -1,0 +1,9 @@
+deployments:
+  {{- range .Chains }}
+  geth-{{ .NetworkId }}:
+    helm:
+      chart:
+        name: crib-geth
+        path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-geth
+        version: null
+  {{- end }}

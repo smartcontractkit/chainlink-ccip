@@ -2,9 +2,4 @@
 Script to generate network configuration for load testing.
 It outputs the config to std out.
 
-Usage:
-```
-TEMPLATES_DIR=./ \
-go run main.go
-```
-
+Usage: see examples in the [devspace.yaml](../../devspace.yaml) 

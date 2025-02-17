@@ -9,7 +9,7 @@ import (
 	"text/template"
 )
 
-const tmplFile = "../../templates/base.yaml.tmpl"
+const templatesPath = "../../templates/"
 
 type chain struct {
 	NetworkId int64 `yaml:"networkId"`
@@ -25,11 +25,12 @@ type ValuesTmplConfig struct {
 func main() {
 	// Define command-line flags
 	chainOverridesDir := flag.String("chain-overrides-dir", "../../values/chain-overrides", "Directory with chain overrides")
-	chainOverridesFileName := flag.String("chain-overrides-file", "", "Chain overrides file name")
+	chainOverridesFileName := flag.String("chain-overrides-file", "default.yaml", "Chain overrides file name")
 	provider := flag.String("provider", "", "CRIB Provider")
-	product := flag.String("product", "", "Product, chainlink or ccip")
+	product := flag.String("product", "chainlink", "Product, chainlink or ccip")
 	useCase := flag.String("use-case", "default", "Use case for an environment")
 	chainsCount := flag.Int("chains-count", 0, "Number of chains to generate")
+	templateFile := flag.String("template", "base.yaml.tmpl", "template file to use for rendering configuration")
 
 	// Parse flags
 	flag.Parse()
@@ -48,12 +49,12 @@ func main() {
 	}
 
 	filePath := path.Join(*chainOverridesDir, *chainOverridesFileName)
-	GenerateConfig(filePath, *chainsCount, *provider, *product, *useCase)
+	GenerateConfig(filePath, *templateFile, *chainsCount, *provider, *product, *useCase)
 }
-func GenerateConfig(overridesFilePath string, chainsCount int, provider string, product string, useCase string) {
+func GenerateConfig(overridesFilePath string, templateFile string, chainsCount int, provider string, product string, useCase string) {
 	tmplConfig, err := BuildTemplateConfig(overridesFilePath, chainsCount, provider, product, useCase)
 
-	tmpl, err := template.New("base.yaml.tmpl").ParseFiles(tmplFile)
+	tmpl, err := template.New(templateFile).ParseFiles(path.Join(templatesPath, templateFile))
 	if err != nil {
 		panic(err)
 	}

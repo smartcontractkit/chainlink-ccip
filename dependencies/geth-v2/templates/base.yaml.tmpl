@@ -7,7 +7,7 @@ deployments:
       chart:
         # todo: Add conditional here for local charts support
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-geth"
-        version: "1.0.0"
+        version: "2.0.0"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy
@@ -36,10 +36,10 @@ deployments:
         version: v1.12.0
         wsRpcPort: 8546
         httpRpcPort: 8544
-        chains:
-          - networkId: "{{ .NetworkId }}"
+        blockchain:
+          networkId: "{{ .NetworkId }}"
           {{- if .BlockTime }}
-            blockTime: {{ .BlockTime }}
+          blockTime: {{ .BlockTime }}
           {{- end }}
         networkPolicyDefault:
           ingress:

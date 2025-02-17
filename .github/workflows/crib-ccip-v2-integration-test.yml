@@ -6,7 +6,9 @@ on:
       - ".github/workflows/crib-ccip-v2-integration-test.yml"
       - "dependencies/donut/**"
       - "dependencies/job-distributor/**"
-      - "dependencies/geth/**"
+      - "dependencies/geth-v2/**"
+      - "dependencies/solana-validator/**"
+      - "dependencies/rmn-v2/**"
       - "dependencies/ccip-v2-scripts/**"
       - "dependencies/postgres/**"
       # Exclude doc updates
