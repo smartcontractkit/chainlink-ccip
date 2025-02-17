@@ -53,9 +53,6 @@ type ExecuteOffchainConfig struct {
 	// When set to 0, this setting is ignored.
 	MaxSingleChainReports uint64 `json:"maxSingleChainReports"`
 
-	// FeeBoostingDisabled is a flag to enable/disable fee boosting for this destination chain.
-	DisableFeeBoosting bool `json:"disableFeeBoosting"`
-
 	// DisableAvailableFeeUsdCheckByChain is a map of source chain selectors to bools indicating whether or not we
 	// should check if the message has sufficient fees in USD to be executed.
 	DisableAvailableFeeUsdCheckByChain map[ccipocr3.ChainSelector]bool `json:"disableAvailableFeeUsdCheckByChain"`

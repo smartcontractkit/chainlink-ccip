@@ -165,7 +165,6 @@ func (p PluginFactory) NewReportingPlugin(
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
 		p.estimateProvider,
-		offchainConfig.DisableFeeBoosting,
 		offchainConfig.DisableAvailableFeeUsdCheckByChain,
 	)
 
