@@ -79,6 +79,11 @@ pipelines:
       # Deploy CCIP enabled fully configured DON
       run_dependency_pipelines ccip-don
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+  ccip-v2-redeploy-don:
+    run: |-
+      # Deploy CCIP enabled fully configured DON
+      run_dependency_pipelines ccip-don --set-flag redeployDONOnly="true"
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
   ccip-v2-infra-only:
     run: |-
       run_pipelines maybe-kind
@@ -191,6 +196,7 @@ profiles:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy-ccip-v2
             profiles:
               - version-from-env
               - network-generated
@@ -215,6 +221,7 @@ profiles:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy-ccip-v2
             profiles:
               - version-from-env
               - network-generated
@@ -240,15 +247,27 @@ profiles:
 commands:
   ccip-v2-kind:
     command: devspace run-pipeline ccip-v2 -p default
-    description: Run the ccip v2 pipeline.
+    description: Deploy full ccip-v2 setup to kind
+    appendArgs: true
+  ccip-v2-kind-redeploy-don:
+    command: devspace run-pipeline ccip-v2-redeploy-don -p default
+    description: Redeploy DON without updating contracts
     appendArgs: true
   ccip-v2-aws:
     command: devspace run-pipeline ccip-v2 -p default-aws
-    description: Run the ccip v2 pipeline.
+    description: Deploy full ccip-v2 setup to AWS
+    appendArgs: true
+  ccip-v2-aws-redeploy-don:
+    command: devspace run-pipeline ccip-v2-redeploy-don -p default-aws
+    description: Redeploy DON without updating contracts
     appendArgs: true
   ccip-v2-load-tests-aws:
     command: devspace run-pipeline ccip-v2 -p load-tests-aws
-    description: Run the ccip v2 pipeline.
+    description: Deploy full ccip-v2 setup to AWS with heavy load test profile
+    appendArgs: true
+  ccip-v2-load-tests-aws-redeploy-don:
+    command: devspace run-pipeline ccip-v2-redeploy-don -p load-tests-aws
+    description: Redeploy DON without updating contracts
     appendArgs: true
   ccip-v2-infra:
     command: devspace run-pipeline ccip-v2-infra-only -p default
@@ -260,27 +279,32 @@ commands:
     appendArgs: true
   deploy-dashboard:
     command: crib dashboard deploy --product=ccip
-    description: Deploy Grafana Dashboards
+    description: Deploy Grafana Dashboards (outdated)
     appendArgs: true
   geth:
     command: devspace run-pipeline geth -p default
-    description: Run the ccip v2 pipeline.
+    description: Deploy geth chains only
     appendArgs: true
   debug-gap:
     command: devspace run-pipeline debug-gap -p debug-gap
-    description: Run the ccip v2 pipeline.
+    description: Debugging command for gap
     appendArgs: true
   job-distributor:
     command: devspace run-pipeline job-distributor -p job-distributor
-    description: Run the job-distributor pipeline.
+    description: Deploy job-distributor
     appendArgs: true
+ # todo: remove these 2 and just rely on the ccip-v2-scripts
   deploy-home-chain:
     command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-home-chain
-    description: Deploy CCIP Contracts and Add lanes.
+    description: Deploy home chain
     appendArgs: true
   deploy-ccip-contracts:
     command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-deploy-ccip
     description: Deploy CCIP Contracts and Add lanes.
+    appendArgs: true
+  ccip-v2-scripts:
+    command: ccip-v2-scripts
+    description: run ccip-v2-scripts cli command within devspace context
     appendArgs: true
   purge:
     command: |

@@ -20,10 +20,8 @@ pipelines:
     tmp_dir="${TMP_DIR}"
     mkdir -p "$tmp_dir"
     task ccip-v2-scripts:build
-    ccip-v2-scripts deploy-home-chain --deploy-home-out "$TMP_DIR"
+    ccip-v2-scripts deploy-home-chain
 
   deploy-ccip: |-
     echo "deploy on chain contracts (tokens, lanes, token pools, price registry, router)"
-    ccip-v2-scripts deploy-ccip \
-      --deploy-ccip-in "$TMP_DIR" \
-      --deploy-ccip-out "$TMP_DIR"
+    ccip-v2-scripts deploy-ccip

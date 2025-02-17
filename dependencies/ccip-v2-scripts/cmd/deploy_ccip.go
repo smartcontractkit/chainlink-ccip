@@ -8,11 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	deployCCIPInputDirPath  string
-	deployCCIPOutputDirPath string
-)
-
 // deployCcipCmd represents the deployCcip command
 var deployCcipCmd = &cobra.Command{
 	Use:   "deploy-ccip",
@@ -28,14 +23,11 @@ to quickly create a Cobra application.`,
 		devspaceEnv := config.NewDevspaceEnvFromEnv()
 
 		fmt.Printf("deployCCIP called with %v\n", devspaceEnv)
-		scripts.DeployCCIPAndAddLanes(logger, devspaceEnv, deployCCIPInputDirPath)
+		scripts.DeployCCIPAndAddLanes(logger, devspaceEnv)
 	},
 }
 
 //nolint:gochecknoinits
 func init() {
-	deployCcipCmd.Flags().StringVar(&deployCCIPOutputDirPath, "deploy-ccip-out", "/tmp", "Specify the output dir path")
-	deployCcipCmd.Flags().StringVar(&deployCCIPInputDirPath, "deploy-ccip-in", "/tmp", "Specify the input dir path")
-
 	rootCmd.AddCommand(deployCcipCmd)
 }

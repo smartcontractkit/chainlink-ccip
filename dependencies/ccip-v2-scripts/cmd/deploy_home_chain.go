@@ -8,8 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var deployHomeOutputDirPath string
-
 // deployHomeChainCmd represents the deployHomeChain command
 var deployHomeChainCmd = &cobra.Command{
 	Use:   "deploy-home-chain",
@@ -32,7 +30,5 @@ to quickly create a Cobra application.`,
 
 //nolint:gochecknoinits
 func init() {
-	deployHomeChainCmd.Flags().StringVar(&deployHomeOutputDirPath, "deploy-home-out", "/tmp", "Specify the output dir path")
-
 	rootCmd.AddCommand(deployHomeChainCmd)
 }

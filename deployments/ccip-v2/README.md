@@ -11,6 +11,19 @@ It includes:
 To get started deploying CCIP v2 setup, please follow [CCIP v2 CRIB - Deploy & Access Instructions ](https://smartcontract-it.atlassian.net/wiki/spaces/CRIB/pages/1024622593/CCIP+v2+CRIB+-+Deploy+Access+Instructions+WIP)
 
 
+## Operating a default ccip-v2 environment
+### 1) Initial Deployment
+To deploy full ccip-v2 setup run `devspace ccip-v2-<provider-type>` where provider type is either kind or aws
+
+### 2) Redeploy DON and configure OCR
+Depending on the use case you can use one of the commands below:
+
+- For kind: `devspace run ccip-v2-kind-redeploy-don`
+- For AWS:
+  - default profile: `devspace run ccip-v2-aws-redeploy-don`
+  - heavy load testing profile: `devspace run ccip-v2-load-tests-aws-redeploy-don`
+
+
 ## Rendering Manifests locally
 There is special devspace run command to render manifests without deploying anything.
 `devspace run ccip-v2-infra-render`

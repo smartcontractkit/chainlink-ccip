@@ -12,11 +12,9 @@ import (
 func TestDeployCCIPAndAddLanes(t *testing.T) {
 	t.Skip()
 	t.Parallel()
-	tmpDir := "/tmp/ccip-v2"
-
 	env := getTestEnv()
 
-	DeployCCIPAndAddLanes(nil, env, tmpDir)
+	DeployCCIPAndAddLanes(nil, env)
 
 	t.Fail()
 }

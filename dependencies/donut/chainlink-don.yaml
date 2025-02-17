@@ -64,40 +64,61 @@ vars:
     default: "true"
 
 pipelines:
+  maybe-kind:
+    run: |-
+      if [[ "$PROVIDER" == "kind" ]]; then
+       ensure_pull_secrets --all
+      fi
   deploy:
+    run: |-
+      run_pipeline maybe-kind
+      create_deployments --all
+  deploy-ccip-v2:
     flags:
       # Determine if it should deply infra-only without onchain deployment
       - name: infraOnly
         type: bool
         default: false
+      - name: redeployDONOnly
+        type: bool
+        default: false
     run: |-
-      if [[ "$PROVIDER" == "kind" ]]; then
-       ensure_pull_secrets --all
-      fi
+      run_pipelines maybe-kind
 
-      create_deployments --all
+      if [ $(get_flag "redeployDONOnly") == "false" ]; then
+        # Deploy full setup for CCIP v2 including
+        echo "Deploying full ccip-v2 setup including contracts deployment"
+        create_deployments --all
 
-      if [[ "$CCIP_TOOLING_VERSION" == "v2" ]]; then
-        echo "Deploying dependencies for CCIP v2 Tooling"
-
+        echo "Deploying app dependencies for CCIP v2"
         run_dependency_pipelines job-distributor
 
         if [ $(get_flag "infraOnly") == "false" ]; then
-          # deploy-home-chain-contracts pipeline write 2 files to temp dir
+          task ccip-v2-scripts:build
+
+          # deploy-home-chain-contracts pipeline writes 2 files to temp dir
           #   - ccip-v2-scripts-node-overrides.toml
           #   - ccip-v2-scripts-address-book.json
           run_dependency_pipelines ccip-v2-scripts-deploy-home-chain
-
-          NODE_TOML_OVERRIDES=$(cat ${TMP_DIR}/ccip-v2-scripts-node-overrides.toml) \
-            gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${TMP_DIR}/ccip-v2-node-overrides.yaml
-          create_deployments chainlink-don --from-file="${TMP_DIR}/ccip-v2-node-overrides.yaml"
+          run_pipelines deploy-ccip-v2-don-with-overrides
 
           # deploy on chain contracts (tokens, lanes, token pools, price registry, router)
           run_dependency_pipelines ccip-v2-scripts-deploy-ccip
         else
           echo "infraOnly=true, skipping on chain deployments and node orchestration"
         fi
+      elif [ $(get_flag "redeployDONOnly") == "true" ]; then
+        echo "redeployDONOnly=true: Redeploying CCIP DON"
+        run_pipelines deploy-ccip-v2-don-with-overrides
+        ccip-v2-scripts configure-ocr
       fi
+
+  deploy-ccip-v2-don-with-overrides:
+    run: |-
+      echo "Redeploying DON with overrides"
+      NODE_TOML_OVERRIDES=$(cat ${TMP_DIR}/ccip-v2-scripts-node-overrides.toml) \
+        gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${TMP_DIR}/ccip-v2-node-overrides.yaml
+      create_deployments chainlink-don --from-file="${TMP_DIR}/ccip-v2-node-overrides.yaml"
 deployments:
   chainlink-don:
     updateImageTags: false
