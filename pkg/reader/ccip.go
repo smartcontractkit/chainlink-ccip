@@ -336,7 +336,7 @@ func (r *ccipChainReader) ExecutedMessages(
 	for _, item := range iter {
 		stateChange, ok := item.Data.(*ExecutionStateChangedEvent)
 		if !ok {
-			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
+			return nil, fmt.Errorf("failed to cast %T to ExecutionStateChangedEvent", item.Data)
 		}
 
 		if err := validateExecutionStateChangedEvent(stateChange, seqNumRange, source); err != nil {
