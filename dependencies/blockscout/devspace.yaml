@@ -112,4 +112,3 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-sandbox.yaml
       )
-

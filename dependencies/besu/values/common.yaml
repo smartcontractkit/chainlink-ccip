@@ -4,4 +4,3 @@ node:
   besu:
     metrics:
       serviceMonitorEnabled: false
-

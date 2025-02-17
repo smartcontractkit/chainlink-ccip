@@ -8,4 +8,3 @@ quorumFlags:
   removeKeysOnDelete: false
   # isBootnode: false    # set this to true if this node is a bootnode
   usesBootnodes: true
-
