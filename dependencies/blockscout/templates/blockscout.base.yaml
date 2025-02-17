@@ -11,7 +11,7 @@ in: |
         values:
           fullnameOverride: blockscout-postgres-{{ .Env.ETHEREUM_VARIANT }}-chain-{{ .Env.CHAIN_NAME }}-{{ .Env.CHAIN_ID }}
         valuesFiles:
-          - ./values/postgress.yaml
+          - ./values/postgres.yaml
 
     blockscout-{{ .Env.ETHEREUM_VARIANT }}-chain-{{ .Env.CHAIN_NAME }}-{{ .Env.CHAIN_ID }}:
       namespace: ${NAMESPACE}
@@ -29,7 +29,9 @@ in: |
               id: {{ .Env.CHAIN_ID }}
               name: {{ .Env.ETHEREUM_VARIANT }}
               shortname: {{ .Env.ETHEREUM_VARIANT }}
-              prometheus:
+            prometheus:
+              enabled: false
+              blackbox:
                 enabled: false
           blockscout:
             enabled: true
@@ -42,7 +44,6 @@ in: |
               ETHEREUM_JSONRPC_TRACE_URL: 'http://besu-node-rpc-1.${NAMESPACE}.svc.cluster.local:8545'
               ECTO_USE_SSL: 'false'
               CHECK_ORIGIN: 'false'
-              # SECRET_KEY_BASE: <replace-me>
             service:
               type: NodePort
             ingress:

@@ -1,6 +1,9 @@
 version: v2beta1
 name: besu
 
+require:
+  devspace: ">= 6.0"
+
 vars:
   BOOT_NODE_COUNT:
     source: env
@@ -14,12 +17,6 @@ vars:
   CHAIN_TYPE:
     source: env
     default: "EVM"
-  CLUSTER_PROVIDER:
-    source: env
-    default: "aws"
-  CREATE_STORAGE_CLASS:
-    source: env
-    default: false
   ENABLE_BESU:
     source: env
     default: true
@@ -44,9 +41,15 @@ vars:
   NAMESPACE:
     source: env
     default: ${DEVSPACE_NAMESPACE}
+  INGRESS_CLASS_NAME:
+    source: env
+    default: "nginx"
   RPC_NODE_COUNT:
     source: env
     default: 1
+  RPC_NODE_INGRESS_ENABLED:
+    source: env
+    default: true
   VALIDATOR_NODE_COUNT:
     source: env
     default: 5
@@ -70,6 +73,9 @@ pipelines:
       # Optionally create RPC and member node deployments
       for i in $(seq 1 ${RPC_NODE_COUNT}); do
         create_deployments rpc-$i
+        if [[ "${RPC_NODE_INGRESS_ENABLED}" == "true" ]]; then
+          create_deployments rpc-$i-ingress
+        fi
       done
 
       for i in $(seq 1 ${MEMBER_NODE_COUNT}); do
@@ -119,7 +125,7 @@ profiles:
         VALIDATOR_NODE_COUNT=${VALIDATOR_NODE_COUNT} \
         RPC_NODE_COUNT=${RPC_NODE_COUNT} \
         MEMBER_NODE_COUNT=${MEMBER_NODE_COUNT} \
-        CREATE_STORAGE_CLASS="${CREATE_STORAGE_CLASS}" \
+        RPC_NODE_INGRESS_ENABLED="true" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/besu-node.yaml
       )
@@ -135,3 +141,28 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/websocket-rpc-exporter.yaml
       )
+
+  - name: aws
+    activation:
+      - vars:
+          PROVIDER: "aws"
+    patches:
+      # avoid issues with duplicate storage classes
+      - op: add
+        path: deployments[*].helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/provider-aws.yaml
+      - op: replace
+        path: vars
+        value:
+          INGRESS_CLASS_NAME: "alb"
+
+  - name: disable-storage
+    activation:
+      - vars:
+          CHAIN_NAME: "beta"
+          PROVIDER: "aws"
+    patches:
+      # avoid issues with duplicate storage classes
+      - op: add
+        path: deployments[*].helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/disable-storage.yaml

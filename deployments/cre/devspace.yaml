@@ -32,11 +32,13 @@ pipelines:
     run: |-
       run_dependency_pipelines chain-alpha
       run_dependency_pipelines blockscout
+      run_pipelines ingress-check
 
   chain-beta:
     run: |-
       run_dependency_pipelines chain-beta
       run_dependency_pipelines blockscout
+      run_pipelines ingress-check
 
 profiles:
   - name: chain-alpha
@@ -57,10 +59,10 @@ profiles:
           CHAIN_ID:
             source: env
             default: 1337
-          CREATE_STORAGE_CLASS: true
           NAMESPACE:
             source: env
             default: "chain-alpha"
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
       - op: add
         path: dependencies
         value:
@@ -90,6 +92,7 @@ profiles:
           NAMESPACE:
             source: env
             default: "chain-beta"
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
       - op: add
         path: dependencies
         value:
@@ -98,10 +101,23 @@ profiles:
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
 
+
 commands:
   besu:
     command: |-
       devspace run-pipeline chain-alpha -p chain-alpha
       devspace run-pipeline chain-beta -p chain-beta
-    description: Run the Besu pipeline.
+    description: Run the Besu pipeline to deploy both alpha and beta chains.
+    appendArgs: true
+
+  chain-alpha:
+    command: |-
+      devspace run-pipeline chain-alpha -p chain-alpha
+    description: Run the pipeline to deploy the alpha chain.
+    appendArgs: true
+
+  chain-beta:
+    command: |-
+      devspace run-pipeline chain-beta -p chain-beta
+    description: Run the pipeline to deploy the beta chain.
     appendArgs: true

@@ -1,6 +1,9 @@
 version: v2beta1
 name: blockscout
 
+require:
+  devspace: ">= 6.0"
+
 vars:
   # Check image versions against compatibility matrix
   #  https://docs.blockscout.com/setup/requirements/back-front-compatibility-matrix
@@ -9,7 +12,7 @@ vars:
     value: "6.10.2"
   BLOCKSCOUT_FRONTEND_IMAGE_TAG:
     source: env
-    value: "v1.37.5"
+    value: "latest"
   LOCAL_TEMPLATES_DIR:
     source: env
     default: ./templates
@@ -28,16 +31,17 @@ vars:
   ENABLE_BASE:
     source: env
     default: true
-  ENVIRONMENT:
-    source: env
-    default: sandbox
   NAMESPACE:
     source: env
     default: ${DEVSPACE_NAMESPACE}
+  LOCAL_VALUES_DIR:
+    source: env
+    default: ./values
 
 pipelines:
   deploy:
     run: |-
+
       echo "DEVSPACE_INGRESS_BASE_DOMAIN: ${DEVSPACE_INGRESS_BASE_DOMAIN}"
       create_deployments blockscout-postgres-${ETHEREUM_VARIANT}-chain-${CHAIN_NAME}-${CHAIN_ID}
       create_deployments blockscout-${ETHEREUM_VARIANT}-chain-${CHAIN_NAME}-${CHAIN_ID}
@@ -62,6 +66,10 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.base.yaml
       )
+    patches:
+      - op: replace
+        path: deployments[*].helm.values.config.prometheus.enabled
+        value: false
 
   - name: kind
     activation:
@@ -90,10 +98,11 @@ profiles:
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-staging.yaml
       )
 
-  - name: aws-sandbox
+  - name: aws-main-fwog
     activation:
       - vars:
-          ENVIRONMENT: "sandbox"
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
+          PROVIDER: "aws"
     merge: |-
       $(
         CHAIN_ID=${CHAIN_ID} \
@@ -103,3 +112,4 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-sandbox.yaml
       )
+
