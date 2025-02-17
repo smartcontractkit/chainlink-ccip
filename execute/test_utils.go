@@ -160,7 +160,6 @@ func (it *IntTest) WithCustomFeeBoosting(
 		it.ccipReader,
 		relativeBoostPerWaitHour,
 		now,
-		false,
 	)
 	it.execCostCalculator = costlymessages.NewStaticMessageExecCostUSD18Calculator(messageCost)
 }

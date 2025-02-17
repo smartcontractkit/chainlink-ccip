@@ -44,7 +44,6 @@ func NewObserverWithDefaults(
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
 	estimateProvider cciptypes.EstimateProvider,
-	disableFeeBoosting bool,
 	disableAvailableFeeUsdCheckByChain map[cciptypes.ChainSelector]bool,
 ) Observer {
 	return NewObserver(
@@ -55,7 +54,6 @@ func NewObserverWithDefaults(
 			ccipReader,
 			relativeBoostPerWaitHour,
 			time.Now,
-			disableFeeBoosting,
 		),
 		&CCIPMessageExecCostUSD18Calculator{
 			lggr:             lggr,
@@ -375,8 +373,6 @@ type CCIPMessageFeeUSD18Calculator struct {
 	relativeBoostPerWaitHour float64
 
 	now func() time.Time
-
-	disableFeeBoosting bool
 }
 
 func NewCCIPMessageFeeUSD18Calculator(
@@ -384,14 +380,12 @@ func NewCCIPMessageFeeUSD18Calculator(
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
 	now func() time.Time,
-	disableFeeBoosting bool,
 ) *CCIPMessageFeeUSD18Calculator {
 	return &CCIPMessageFeeUSD18Calculator{
 		lggr:                     lggr,
 		ccipReader:               ccipReader,
 		relativeBoostPerWaitHour: relativeBoostPerWaitHour,
 		now:                      now,
-		disableFeeBoosting:       disableFeeBoosting,
 	}
 }
 
@@ -418,7 +412,7 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			// If a timestamp is missing we can't do fee boosting, but we still record the fee. In the worst case, the
 			// message will not be executed (as it will be considered too costly).
 			lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
-		} else if !c.disableFeeBoosting {
+		} else {
 			// TODO: What's the blockchain timestamp? Should we use now().UTC instead?
 			feeUSD18 = waitBoostedFee(c.lggr, c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}

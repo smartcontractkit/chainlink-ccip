@@ -318,7 +318,6 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 		messageTimeStamps        map[ccipocr3.Bytes32]time.Time
 		linkPrice                ccipocr3.BigInt
 		relativeBoostPerWaitHour float64
-		disableFeeBoosting       bool
 		want                     map[ccipocr3.Bytes32]plugintypes.USD18
 		wantErr                  assert.ErrorAssertionFunc
 	}{
@@ -352,37 +351,6 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
-		{
-			name: "disable fee boosting for this dest chain",
-			messages: []ccipocr3.Message{
-				{
-					Header:        ccipocr3.RampMessageHeader{MessageID: b1},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(14e14),
-				},
-				{
-					Header:        ccipocr3.RampMessageHeader{MessageID: b2},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(25e14),
-				},
-				{
-					Header:        ccipocr3.RampMessageHeader{MessageID: b3},
-					FeeValueJuels: ccipocr3.NewBigIntFromInt64(36e14),
-				},
-			},
-			messageTimeStamps: map[ccipocr3.Bytes32]time.Time{
-				b1: t1,
-				b2: t2,
-				b3: t3,
-			},
-			linkPrice:                ccipocr3.NewBigIntFromInt64(8e18), // 8 USD
-			relativeBoostPerWaitHour: 0.5,
-			disableFeeBoosting:       true,
-			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18(1.12e16),
-				b2: plugintypes.NewUSD18(2e16),
-				b3: plugintypes.NewUSD18(2.88e16),
-			},
-			wantErr: assert.NoError,
-		},
 	}
 
 	for _, tt := range tests {
@@ -398,7 +366,6 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 				ccipReader:               mockReader,
 				relativeBoostPerWaitHour: tt.relativeBoostPerWaitHour,
 				now:                      mockNow,
-				disableFeeBoosting:       tt.disableFeeBoosting,
 			}
 
 			got, err := calculator.MessageFeeUSD18(ctx, tt.messages, tt.messageTimeStamps)
