@@ -2454,7 +2454,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					require.NoError(t, vErr)
 
 					if tc.expectError {
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
 						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
