@@ -613,6 +613,12 @@ func getSnRangeSetPairsBySource(
 ) map[cciptypes.ChainSelector]snRangeSetPair {
 	seqNrRangesBySource := make(map[cciptypes.ChainSelector]snRangeSetPair)
 	for _, chainReport := range chainReports {
+		// This should never happen, indicates a bug in the report building and accepting process.
+		// But we sanity check since slices.Min/Max will panic on empty slices.
+		if len(chainReport.Messages) == 0 {
+			continue
+		}
+
 		cmpr := func(a, b cciptypes.Message) int {
 			return cmp.Compare(a.Header.SequenceNumber, b.Header.SequenceNumber)
 		}

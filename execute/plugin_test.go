@@ -67,6 +67,12 @@ func genRandomChainReports(numReports, numMsgsPerReport int) []cciptypes.Execute
 	return chainReports
 }
 
+func Test_getMinMaxSeqNrRangesBySource_emptyMsgs(t *testing.T) {
+	chainReports := genRandomChainReports(1, 0)
+	minMaxSeqNrRanges := getSnRangeSetPairsBySource(chainReports)
+	require.Len(t, minMaxSeqNrRanges, 0)
+}
+
 func Test_getMinMaxSeqNrRangesBySource(t *testing.T) {
 	chainReports := genRandomChainReports(10, 15)
 	minMaxSeqNrRanges := getSnRangeSetPairsBySource(chainReports)
