@@ -130,7 +130,7 @@ func NewPlugin(
 		commitRootsCache: cache.NewCommitRootsCache(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
-			time.Minute*5),
+			offchainCfg.RootSnoozeTime.Duration()),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
 		ocrTypeCodec:         ocrtypecodec.NewExecCodecJSON(),
 	}
