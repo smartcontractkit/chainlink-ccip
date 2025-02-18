@@ -139,12 +139,12 @@ func Test_LBTC_USDC_Transfer(t *testing.T) {
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	assert.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 106, 108})
 	//Attestation data added to the USDC
-	assert.Equal(t, internal.MustDecode("0x100001"), outcome.Report.ChainReports[0].OffchainTokenData[2][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x100001"), outcome.Report.ChainReports[0].OffchainTokenData[2][0])
 	//Attestation data added to the LBTC
-	assert.Equal(t, internal.MustDecode("0x200001"), outcome.Report.ChainReports[0].OffchainTokenData[3][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x200001"), outcome.Report.ChainReports[0].OffchainTokenData[3][0])
 	//Attestation data added to the USDC+LBTC
-	assert.Equal(t, internal.MustDecode("0x100003"), outcome.Report.ChainReports[0].OffchainTokenData[4][0])
-	assert.Equal(t, internal.MustDecode("0x200003"), outcome.Report.ChainReports[0].OffchainTokenData[4][1])
+	assert.Equal(t, internal.MustDecodeRaw("0x100003"), outcome.Report.ChainReports[0].OffchainTokenData[4][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x200003"), outcome.Report.ChainReports[0].OffchainTokenData[4][1])
 
 	intTest.usdcServer.AddResponse(
 		"0x70ef528624085241badbff913575c0ab50241e7cb6db183a5614922ab0bcba5d",
@@ -171,7 +171,7 @@ func Test_LBTC_USDC_Transfer(t *testing.T) {
 	// 102, 103 and 104 are in the inflight message cache.
 	assert.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{105, 107})
 	//Attestation data added to the remaining USDC messages
-	assert.Equal(t, internal.MustDecode("0x100002"), outcome.Report.ChainReports[0].OffchainTokenData[0][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x100002"), outcome.Report.ChainReports[0].OffchainTokenData[0][0])
 	//Attestation data added to the remaining LBTC messages
-	assert.Equal(t, internal.MustDecode("0x200002"), outcome.Report.ChainReports[0].OffchainTokenData[1][0])
+	assert.Equal(t, internal.MustDecodeRaw("0x200002"), outcome.Report.ChainReports[0].OffchainTokenData[1][0])
 }

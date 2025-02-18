@@ -57,8 +57,14 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 							  "param": "500ms"
 							}
 				  	],`,
-			wantErr: true,
-			errMsg:  "USDCCCTPObserverConfig is empty",
+			wantErr: false,
+			want: []TokenDataObserverConfig{
+				{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{},
+				},
+			},
 		},
 		{
 			name: "valid config with USDCCCTPObserverConfig",
@@ -153,7 +159,7 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			finalJSON := fmt.Sprintf(baseJSON, tt.json)

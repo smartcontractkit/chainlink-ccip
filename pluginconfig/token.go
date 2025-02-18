@@ -1,7 +1,9 @@
 package pluginconfig
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -56,7 +58,7 @@ type TokenDataObserverConfig struct {
 }
 
 // WellFormed checks that the observer's config is syntactically correct - proper struct is initialized based on type
-func (t TokenDataObserverConfig) WellFormed() error {
+func (t *TokenDataObserverConfig) WellFormed() error {
 	if t.IsUSDC() {
 		if t.USDCCCTPObserverConfig == nil {
 			return errors.New("USDCCCTPObserverConfig is empty")
@@ -74,7 +76,7 @@ func (t TokenDataObserverConfig) WellFormed() error {
 
 // Validate checks that the observer's config is semantically correct - fields are set correctly
 // depending on the config's type
-func (t TokenDataObserverConfig) Validate() error {
+func (t *TokenDataObserverConfig) Validate() error {
 	if t.IsUSDC() {
 		return t.USDCCCTPObserverConfig.Validate()
 	}
@@ -84,23 +86,84 @@ func (t TokenDataObserverConfig) Validate() error {
 	return errors.New("unknown token data observer type " + t.Type)
 }
 
-func (t TokenDataObserverConfig) IsUSDC() bool {
+func (t *TokenDataObserverConfig) IsUSDC() bool {
 	return t.Type == USDCCCTPHandlerType
 }
 
-func (t TokenDataObserverConfig) IsLBTC() bool {
+func (t *TokenDataObserverConfig) IsLBTC() bool {
 	return t.Type == LBTCHandlerType
 }
 
-type USDCCCTPObserverConfig struct {
-	Tokens map[cciptypes.ChainSelector]USDCCCTPTokenConfig `json:"tokens"`
+// UnmarshalJSON is a custom JSON unmarshaller for TokenDataObserverConfig.
+// It first reads top-level fields, then allocates the correct embedded config pointer
+// (USDCCCTPObserverConfig or LBTCObserverConfig) before finally unmarshalling into that pointer.
+func (t *TokenDataObserverConfig) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Type    string `json:"type"`
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("failed to unmarshal top-level fields of TokenDataObserverConfig: %w", err)
+	}
 
+	t.Type = raw.Type
+	t.Version = raw.Version
+
+	switch t.Type {
+	case USDCCCTPHandlerType:
+		t.USDCCCTPObserverConfig = &USDCCCTPObserverConfig{}
+		if err := json.Unmarshal(data, t.USDCCCTPObserverConfig); err != nil {
+			return fmt.Errorf("failed to unmarshal USDCCCTPObserverConfig: %w", err)
+		}
+	case LBTCHandlerType:
+		t.LBTCObserverConfig = &LBTCObserverConfig{}
+		if err := json.Unmarshal(data, t.LBTCObserverConfig); err != nil {
+			return fmt.Errorf("failed to unmarshal LBTCObserverConfig: %w", err)
+		}
+	default:
+		return fmt.Errorf("unknown token data observer type: %q", t.Type)
+	}
+
+	return nil
+}
+
+type AttestationConfig struct {
 	AttestationAPI string `json:"attestationAPI"`
 	// AttestationAPITimeout defines the timeout for the attestation API.
 	AttestationAPITimeout *commonconfig.Duration `json:"attestationAPITimeout"`
 	// AttestationAPIInterval defines the rate in requests per second that the attestation API can be called.
 	// Default set according to the APIs documentated 10 requests per second rate limit.
 	AttestationAPIInterval *commonconfig.Duration `json:"attestationAPIInterval"`
+}
+
+func (p *AttestationConfig) setDefaults() {
+	// Default to 1 second if AttestationAPITimeout is not set
+	if p.AttestationAPITimeout == nil {
+		p.AttestationAPITimeout = commonconfig.MustNewDuration(5 * time.Second)
+	}
+
+	// Default to 100 millis if AttestationAPIInterval is not set this is set according to the APIs documented
+	// 10 requests per second rate limit.
+	if p.AttestationAPIInterval == nil {
+		p.AttestationAPIInterval = commonconfig.MustNewDuration(100 * time.Millisecond)
+	}
+}
+
+func (p *AttestationConfig) Validate() error {
+	p.setDefaults()
+	if p.AttestationAPI == "" {
+		return errors.New("AttestationAPI not set")
+	}
+	if p.AttestationAPIInterval == nil || p.AttestationAPIInterval.Duration() == 0 {
+		return errors.New("AttestationAPIInterval not set")
+	}
+	if p.AttestationAPITimeout == nil || p.AttestationAPITimeout.Duration() == 0 {
+		return errors.New("AttestationAPITimeout not set")
+	}
+	return nil
+}
+
+type WorkerConfig struct {
 	// NumWorkers is the number of concurrent workers.
 	NumWorkers int `json:"numWorkers"`
 	// CacheExpirationInterval is the interval after which the cached token data will expire.
@@ -111,50 +174,31 @@ type USDCCCTPObserverConfig struct {
 	ObserveTimeout *commonconfig.Duration `json:"observeTimeout"`
 }
 
-func (c *USDCCCTPObserverConfig) setDefaults() {
+func (c *WorkerConfig) IsForeground() bool {
+	return c.NumWorkers == 0
+}
+
+func (c *WorkerConfig) setDefaults() {
 	// Default to 10 minutes if CacheExpirationInterval is not set
 	if c.CacheExpirationInterval == nil {
 		c.CacheExpirationInterval = commonconfig.MustNewDuration(10 * time.Minute)
 	}
+
 	// Default to 15 minutes if CacheCleanupInterval is not set
 	if c.CacheCleanupInterval == nil {
 		c.CacheCleanupInterval = commonconfig.MustNewDuration(15 * time.Minute)
 	}
+
 	// Default to 5 seconds if ObserveTimeout is not set
 	if c.ObserveTimeout == nil {
 		c.ObserveTimeout = commonconfig.MustNewDuration(5 * time.Second)
 	}
-	// Default to 1 second if AttestationAPITimeout is not set
-	if p.AttestationAPITimeout == nil {
-		p.AttestationAPITimeout = commonconfig.MustNewDuration(5 * time.Second)
-	}
-	// Default to 100 millis if AttestationAPIInterval is not set this is set according to the APIs documented
-	// 10 requests per second rate limit.
-	if p.AttestationAPIInterval == nil {
-		p.AttestationAPIInterval = commonconfig.MustNewDuration(100 * time.Millisecond)
-	}
 }
 
-func (c *USDCCCTPObserverConfig) Validate() error {
-	if len(p.Tokens) == 0 {
-		return errors.New("tokens not set")
-	}
-	for _, token := range p.Tokens {
-		if err := token.Validate(); err != nil {
-			return err
-		}
-	}
-	if p.AttestationAPI == "" {
-		return errors.New("AttestationAPI not set")
-	}
-	if p.AttestationAPIInterval == nil || p.AttestationAPIInterval.Duration() == 0 {
-		return errors.New("AttestationAPIInterval not set")
-	}
-	if p.AttestationAPITimeout == nil || p.AttestationAPITimeout.Duration() == 0 {
-		return errors.New("AttestationAPITimeout not set")
-	}
-	if err != nil {
-		return err
+func (c *WorkerConfig) Validate() error {
+	c.setDefaults()
+	if c.IsForeground() {
+		return nil
 	}
 	if c.CacheExpirationInterval == nil || c.CacheExpirationInterval.Duration() == 0 {
 		return errors.New("CacheExpirationInterval not set")
@@ -164,6 +208,33 @@ func (c *USDCCCTPObserverConfig) Validate() error {
 	}
 	if c.ObserveTimeout == nil || c.ObserveTimeout.Duration() == 0 {
 		return errors.New("ObserveTimeout not set")
+	}
+	return nil
+}
+
+type USDCCCTPObserverConfig struct {
+	AttestationConfig
+	WorkerConfig
+	Tokens map[cciptypes.ChainSelector]USDCCCTPTokenConfig `json:"tokens"`
+}
+
+func (p *USDCCCTPObserverConfig) Validate() error {
+	err := p.AttestationConfig.Validate()
+	if err != nil {
+		return err
+	}
+	err = p.WorkerConfig.Validate()
+	if err != nil {
+		return err
+	}
+
+	if len(p.Tokens) == 0 {
+		return errors.New("Tokens not set")
+	}
+	for _, token := range p.Tokens {
+		if err := token.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -188,73 +259,28 @@ func (t USDCCCTPTokenConfig) Validate() error {
 }
 
 type LBTCObserverConfig struct {
+	AttestationConfig
+	WorkerConfig
 	SourcePoolAddressByChain map[cciptypes.ChainSelector]string `json:"sourcePoolAddressByChain"`
-
-	AttestationAPI string `json:"attestationAPI"`
-	// AttestationAPITimeout defines the timeout for the attestation API.
-	AttestationAPITimeout *commonconfig.Duration `json:"attestationAPITimeout"`
-	// AttestationAPIInterval defines the rate in requests per second that the attestation API can be called.
-	// Default set according to the APIs documentated 10 requests per second rate limit.
-	AttestationAPIInterval *commonconfig.Duration `json:"attestationAPIInterval"`
-	// AttestationAPITimeout defines size of the batch that can be made in one API request
-	AttestationAPIBatchSize int `json:"attestationAPIBatchSize"`
-	// NumWorkers is the number of concurrent workers.
-	NumWorkers int `json:"numWorkers"`
-	// CacheExpirationInterval is the interval after which the cached token data will expire.
-	CacheExpirationInterval *commonconfig.Duration `json:"cacheExpirationInterval"`
-	// CacheCleanupInterval is the interval after which the cache expired data will be cleaned up.
-	CacheCleanupInterval *commonconfig.Duration `json:"cacheCleanupInterval"`
-	// ObserveTimeout is the timeout for the actual synchronous Observe calls.
-	ObserveTimeout *commonconfig.Duration `json:"observeTimeout"`
+	AttestationAPIBatchSize  int                                `json:"attestationAPIBatchSize"`
 }
 
 func (c *LBTCObserverConfig) setDefaults() {
-	// Default to 10 minutes if CacheExpirationInterval is not set
-	if c.CacheExpirationInterval == nil {
-		c.CacheExpirationInterval = commonconfig.MustNewDuration(10 * time.Minute)
-	}
-	// Default to 15 minutes if CacheCleanupInterval is not set
-	if c.CacheCleanupInterval == nil {
-		c.CacheCleanupInterval = commonconfig.MustNewDuration(15 * time.Minute)
-	}
-	// Default to 5 seconds if ObserveTimeout is not set
-	if c.ObserveTimeout == nil {
-		c.ObserveTimeout = commonconfig.MustNewDuration(5 * time.Second)
-	}
-	// Default to 1 second if AttestationAPITimeout is not set
-	if p.AttestationAPITimeout == nil {
-		p.AttestationAPITimeout = commonconfig.MustNewDuration(5 * time.Second)
-	}
-	// Default to 100 millis if AttestationAPIInterval is not set this is set according to the APIs documented
-	// 10 requests per second rate limit.
-	if p.AttestationAPIInterval == nil {
-		p.AttestationAPIInterval = commonconfig.MustNewDuration(100 * time.Millisecond)
-	}
 	if c.AttestationAPIBatchSize == 0 {
 		c.AttestationAPIBatchSize = 50
 	}
 }
 
 func (c *LBTCObserverConfig) Validate() error {
+	err := c.AttestationConfig.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.WorkerConfig.Validate()
+	if err != nil {
+		return err
+	}
 	c.setDefaults()
-	if p.AttestationAPI == "" {
-		return errors.New("AttestationAPI not set")
-	}
-	if p.AttestationAPIInterval == nil || p.AttestationAPIInterval.Duration() == 0 {
-		return errors.New("AttestationAPIInterval not set")
-	}
-	if p.AttestationAPITimeout == nil || p.AttestationAPITimeout.Duration() == 0 {
-		return errors.New("AttestationAPITimeout not set")
-	}
-	if c.CacheExpirationInterval == nil || c.CacheExpirationInterval.Duration() == 0 {
-		return errors.New("CacheExpirationInterval not set")
-	}
-	if c.CacheCleanupInterval == nil || c.CacheCleanupInterval.Duration() == 0 {
-		return errors.New("CacheCleanupInterval not set")
-	}
-	if c.ObserveTimeout == nil || c.ObserveTimeout.Duration() == 0 {
-		return errors.New("ObserveTimeout not set")
-	}
 	if c.AttestationAPIBatchSize == 0 {
 		return errors.New("AttestationAPIBatchSize is not set")
 	}

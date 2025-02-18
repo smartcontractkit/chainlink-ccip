@@ -58,3 +58,7 @@ func MustDecode(s string) cciptypes.Bytes {
 	}
 	return b
 }
+
+func MustDecodeRaw(s string) []byte {
+	return MustDecode(s)
+}
