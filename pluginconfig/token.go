@@ -94,9 +94,42 @@ func (t *TokenDataObserverConfig) IsLBTC() bool {
 	return t.Type == LBTCHandlerType
 }
 
+// MarshalJSON is a custom JSON marshaller for TokenDataObserverConfig.
+// It constructs raw map based on provided type. Custom marshaller is needed because default golang marshaller
+// doesn't marshal clashing fields of pointer embeddings even if only one pointer is present and rest are set to nil
+func (t *TokenDataObserverConfig) MarshalJSON() ([]byte, error) {
+	raw := map[string]interface{}{
+		"type":    t.Type,
+		"version": t.Version,
+	}
+	var err error
+	var configJsonRaw []byte
+	switch t.Type {
+	case USDCCCTPHandlerType:
+		configJsonRaw, err = json.Marshal(t.USDCCCTPObserverConfig)
+		if err != nil {
+			return nil, err
+		}
+	case LBTCHandlerType:
+		configJsonRaw, err = json.Marshal(t.LBTCObserverConfig)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unknown token data observer type: %q", t.Type)
+	}
+	err = json.Unmarshal(configJsonRaw, &raw)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
 // UnmarshalJSON is a custom JSON unmarshaller for TokenDataObserverConfig.
 // It first reads top-level fields, then allocates the correct embedded config pointer
 // (USDCCCTPObserverConfig or LBTCObserverConfig) before finally unmarshalling into that pointer.
+// Custom unmarshaller is needed because default golang marshaller doesn't unmarshal clashing fields of
+// pointer embeddings
 func (t *TokenDataObserverConfig) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Type    string `json:"type"`

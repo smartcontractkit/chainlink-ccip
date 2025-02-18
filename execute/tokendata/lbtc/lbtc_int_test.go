@@ -2,7 +2,6 @@ package lbtc_test
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -431,14 +430,11 @@ func Test_LBTC_Flow(t *testing.T) {
 }
 
 func createToken(pool string, payloadHash string) cciptypes.RampTokenAmount {
-	sourcePoolAddress, err := hex.DecodeString(pool)
+	sourcePoolAddress, err := cciptypes.NewUnknownAddressFromHex(pool)
 	if err != nil {
 		panic(err)
 	}
-	extraData, err := hex.DecodeString(payloadHash)
-	if err != nil {
-		panic(err)
-	}
+	extraData := internal.MustDecode(payloadHash)
 	return cciptypes.RampTokenAmount{
 		SourcePoolAddress: sourcePoolAddress,
 		ExtraData:         extraData,
@@ -462,8 +458,6 @@ func mockHTTPServerResponse(t *testing.T, messages []lbtcMessage) *httptest.Serv
 			}
 			if matches {
 				w.WriteHeader(message.attestationResponseStatus)
-				//resp, err := json.Marshal(message.attestationResponse)
-				//require.NoError(t, err)
 				_, err = w.Write([]byte(message.attestationResponse))
 				require.NoError(t, err)
 				return
