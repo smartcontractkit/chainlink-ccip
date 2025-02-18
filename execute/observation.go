@@ -8,12 +8,12 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
+	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -278,6 +278,47 @@ func readAllMessages(
 	return messageObs, availableReports, messageTimestamps
 }
 
+// filterMessages according to various caches that we know about.
+func (p *Plugin) filterMessages(
+	ctx context.Context, lggr logger.Logger, messageObs exectypes.MessageObservations,
+) exectypes.MessageObservations {
+
+	// TXM Status checking only supports singleton execution because the msgID is used for the transactionID.
+	// Arbitrary txm checking would be much more complex because we don't know which messages are in the same report.
+	isSingletonExecute := p.offchainCfg.MaxReportMessages == 1 && p.offchainCfg.MaxSingleChainReports == 1
+	if isSingletonExecute {
+		// Reset cache during message observation. It will be referenced again when the report is generated.
+		p.statusCache = report.NewMessageStatusCache(p.statusGetter)
+	}
+	txmStatusChecker := report.NewTXMCheck(p.statusCache, p.offchainCfg.MaxTxmStatusChecks)
+	for chainSelector, msgs := range messageObs {
+		for seqNum, msg := range msgs {
+			// Inflight messages do not need to be observed.
+			if p.inflightMessageCache != nil && p.inflightMessageCache.IsInflight(chainSelector, msg.Header.MessageID) {
+				messageObs[chainSelector][seqNum] = cciptypes.Message{}
+				//delete(messageObs[chainSelector], seqNum)
+				lggr.Infow("skipping message observation - inflight", "msg", msg)
+				continue
+			}
+			// Messages with fatal txm statuses do not need to be observed.
+			if p.statusGetter != nil && isSingletonExecute {
+				status, err := txmStatusChecker(ctx, lggr, msg, 0, exectypes.CommitData{})
+				if err != nil {
+					lggr.Errorw("txm status check error", "msg", msg, "err", err)
+				} else if status != report.None {
+					messageObs[chainSelector][seqNum] = cciptypes.Message{}
+					//delete(messageObs[chainSelector], seqNum)
+					lggr.Infow(fmt.Sprintf("skipping message observation - txm status %s", status),
+						"msg", msg)
+					continue
+				}
+			}
+		}
+	}
+
+	return messageObs
+}
+
 func (p *Plugin) getMessagesObservation(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -301,6 +342,18 @@ func (p *Plugin) getMessagesObservation(
 		previousOutcome.CommitReports,
 	)
 
+	// Compute hashes to allow deleting messages from the observation.
+	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
+	}
+
+	// Remove messages which have failed txm statuses.
+	// This is a roundabout way to remove messages from the observation because it will continue to be
+	// executed by other nodes until >F nodes have failed to execute it.
+	// We cannot form consensus on the TXM state because the fatal status is not recorded onchain.
+	messageObs = p.filterMessages(ctx, lggr, messageObs)
+
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
@@ -315,11 +368,6 @@ func (p *Plugin) getMessagesObservation(
 	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages: %w", err)
-	}
-
-	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
 	}
 
 	observation.CommitReports = commitReportCache

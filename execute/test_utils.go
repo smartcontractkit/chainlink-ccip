@@ -343,6 +343,7 @@ func (it *IntTest) newNode(
 		it.lggr,
 		costlyMessageObserver,
 		&metrics.Noop{},
+		nil,
 	)
 
 	return nodeSetup{
