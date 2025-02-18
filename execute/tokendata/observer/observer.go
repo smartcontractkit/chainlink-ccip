@@ -70,7 +70,7 @@ func NewConfigBasedCompositeObservers(
 				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
 			}
 
-			if c.USDCCCTPObserverConfig.NumWorkers == 0 {
+			if c.USDCCCTPObserverConfig.IsForeground() {
 				lggr.Info("Using foreground observer for USDC/CCTP")
 				observers[i] = observer
 			} else {
@@ -90,7 +90,7 @@ func NewConfigBasedCompositeObservers(
 				return nil, fmt.Errorf("create LBTC token observer: %w", err)
 			}
 
-			if c.LBTCObserverConfig.NumWorkers == 0 {
+			if c.LBTCObserverConfig.IsForeground() {
 				lggr.Info("Using foreground observer for LBTC")
 				observers[i] = observer
 			} else {

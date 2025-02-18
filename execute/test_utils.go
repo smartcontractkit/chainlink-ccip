@@ -208,10 +208,10 @@ func (it *IntTest) WithLBTC(
 				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
 			},
-			AttestationAPIBatchSize: 1,
 			SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
 				it.srcSelector: sourcePoolAddress,
 			},
+			AttestationAPIBatchSize: 1,
 		},
 	})
 }

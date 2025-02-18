@@ -2,7 +2,6 @@ package lbtc
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -85,7 +84,7 @@ func (c *LBTCAttestationClient) Attestations(
 	batch := make([]string, 0, c.config.AttestationAPIBatchSize)
 	for _, tokenDatas := range messages {
 		for _, tokenData := range tokenDatas {
-			batch = append(batch, hex.EncodeToString(tokenData))
+			batch = append(batch, tokenData.String())
 			if len(batch) == c.config.AttestationAPIBatchSize {
 				batchAttestations, err := c.fetchBatch(ctx, batch)
 				if err != nil {
@@ -107,7 +106,7 @@ func (c *LBTCAttestationClient) Attestations(
 	for chainSelector, tokenDatas := range messages {
 		res[chainSelector] = make(map[reader.MessageTokenID]tokendata.AttestationStatus)
 		for messageTokenID, tokenData := range tokenDatas {
-			if attestation, ok := attestations[hex.EncodeToString(tokenData)]; ok {
+			if attestation, ok := attestations[tokenData.String()]; ok {
 				res[chainSelector][messageTokenID] = attestation
 			}
 		}
