@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/ocrtypecodecpb"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -91,319 +89,73 @@ func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
 	return q, nil
 }
 
-//nolint:gocyclo
 func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation) ([]byte, error) {
-	merkleRoots := make([]*ocrtypecodecpb.MerkleRootChain, len(observation.MerkleRootObs.MerkleRoots))
-	for i, mr := range observation.MerkleRootObs.MerkleRoots {
-		merkleRoots[i] = &ocrtypecodecpb.MerkleRootChain{
-			ChainSel:      uint64(mr.ChainSel),
-			OnRampAddress: mr.OnRampAddress,
-			SeqNumsRange: &ocrtypecodecpb.SeqNumRange{
-				MinMsgNr: uint64(mr.SeqNumsRange.Start()),
-				MaxMsgNr: uint64(mr.SeqNumsRange.End()),
-			},
-			MerkleRoot: mr.MerkleRoot[:],
-		}
-	}
-
-	rmnEnabledChains := make(map[uint64]bool, len(observation.MerkleRootObs.RMNEnabledChains))
-	for k, v := range observation.MerkleRootObs.RMNEnabledChains {
-		rmnEnabledChains[uint64(k)] = v
-	}
-
-	onRampMaxSeqNums := make([]*ocrtypecodecpb.SeqNumChain, len(observation.MerkleRootObs.OnRampMaxSeqNums))
-	for i, s := range observation.MerkleRootObs.OnRampMaxSeqNums {
-		onRampMaxSeqNums[i] = &ocrtypecodecpb.SeqNumChain{
-			ChainSel: uint64(s.ChainSel),
-			SeqNum:   uint64(s.SeqNum),
-		}
-	}
-
-	offRampNextSeqNums := make([]*ocrtypecodecpb.SeqNumChain, len(observation.MerkleRootObs.OffRampNextSeqNums))
-	for i, s := range observation.MerkleRootObs.OffRampNextSeqNums {
-		offRampNextSeqNums[i] = &ocrtypecodecpb.SeqNumChain{
-			ChainSel: uint64(s.ChainSel),
-			SeqNum:   uint64(s.SeqNum),
-		}
-	}
-
-	rmnRemoteConfigSigners := make(
-		[]*ocrtypecodecpb.RemoteSignerInfo, len(observation.MerkleRootObs.RMNRemoteConfig.Signers))
-	for i, s := range observation.MerkleRootObs.RMNRemoteConfig.Signers {
-		rmnRemoteConfigSigners[i] = &ocrtypecodecpb.RemoteSignerInfo{
-			OnchainPublicKey: s.OnchainPublicKey,
-			NodeIndex:        s.NodeIndex,
-		}
-	}
-
-	merkleRootsFChain := make(map[uint64]int32, len(observation.FChain))
-	for k, v := range observation.MerkleRootObs.FChain {
-		merkleRootsFChain[uint64(k)] = int32(v)
-	}
-
-	feedTokenPrices := make(map[string][]byte, len(observation.TokenPriceObs.FeedTokenPrices))
-	for k, v := range observation.TokenPriceObs.FeedTokenPrices {
-		feedTokenPrices[string(k)] = v.Bytes()
-	}
-
-	feeQuoterTokenUpdates := make(
-		map[string]*ocrtypecodecpb.TimestampedBig, len(observation.TokenPriceObs.FeeQuoterTokenUpdates))
-	for k, v := range observation.TokenPriceObs.FeeQuoterTokenUpdates {
-		feeQuoterTokenUpdates[string(k)] = &ocrtypecodecpb.TimestampedBig{
-			Value:     v.Value.Bytes(),
-			Timestamp: timestamppb.New(v.Timestamp),
-		}
-	}
-
-	tokenPriceFChain := make(map[uint64]int32, len(observation.TokenPriceObs.FChain))
-	for k, v := range observation.TokenPriceObs.FChain {
-		tokenPriceFChain[uint64(k)] = int32(v)
-	}
-
-	feeComponents := make(map[uint64]*ocrtypecodecpb.ChainFeeComponents, len(observation.ChainFeeObs.FeeComponents))
-	for k, v := range observation.ChainFeeObs.FeeComponents {
-		feeComponents[uint64(k)] = &ocrtypecodecpb.ChainFeeComponents{
-			ExecutionFee:        v.ExecutionFee.Bytes(),
-			DataAvailabilityFee: v.DataAvailabilityFee.Bytes(),
-		}
-	}
-
-	nativeTokenPrices := make(map[uint64][]byte, len(observation.ChainFeeObs.NativeTokenPrices))
-	for k, v := range observation.ChainFeeObs.NativeTokenPrices {
-		nativeTokenPrices[uint64(k)] = v.Bytes()
-	}
-
-	chainFeeUpdates := make(map[uint64]*ocrtypecodecpb.ChainFeeUpdate, len(observation.ChainFeeObs.ChainFeeUpdates))
-	for k, v := range observation.ChainFeeObs.ChainFeeUpdates {
-		chainFeeUpdates[uint64(k)] = &ocrtypecodecpb.ChainFeeUpdate{
-			ChainFee: &ocrtypecodecpb.ComponentsUSDPrices{
-				ExecutionFeePriceUsd: v.ChainFee.ExecutionFeePriceUSD.Bytes(),
-				DataAvFeePriceUsd:    v.ChainFee.DataAvFeePriceUSD.Bytes(),
-			},
-			Timestamp: timestamppb.New(v.Timestamp),
-		}
-	}
-
-	chainFeeFChain := make(map[uint64]int32, len(observation.ChainFeeObs.FChain))
-	for k, v := range observation.ChainFeeObs.FChain {
-		chainFeeFChain[uint64(k)] = int32(v)
-	}
-
-	discoveryFChain := make(map[uint64]int32, len(observation.DiscoveryObs.FChain))
-	for k, v := range observation.DiscoveryObs.FChain {
-		discoveryFChain[uint64(k)] = int32(v)
-	}
-
-	discoveryAddrs := make(map[string]*ocrtypecodecpb.ChainAddressMap, len(observation.DiscoveryObs.Addresses))
-	for contractName, chains := range observation.DiscoveryObs.Addresses {
-		discoveryAddrs[contractName] = &ocrtypecodecpb.ChainAddressMap{
-			ChainAddresses: make(map[uint64][]byte, len(chains))}
-
-		for chain, addr := range chains {
-			discoveryAddrs[contractName].ChainAddresses[uint64(chain)] = addr
-		}
-	}
-
-	mainFChain := make(map[uint64]int32, len(observation.FChain))
-	for k, v := range observation.FChain {
-		mainFChain[uint64(k)] = int32(v)
-	}
-
 	pbObs := &ocrtypecodecpb.CommitObservation{
 		MerkleRootObs: &ocrtypecodecpb.MerkleRootObservation{
-			MerkleRoots:        merkleRoots,
-			RmnEnabledChains:   rmnEnabledChains,
-			OnRampMaxSeqNums:   onRampMaxSeqNums,
-			OffRampNextSeqNums: offRampNextSeqNums,
-			RmnRemoteConfig: &ocrtypecodecpb.RmnRemoteConfig{
-				ContractAddress:  observation.MerkleRootObs.RMNRemoteConfig.ContractAddress,
-				ConfigDigest:     observation.MerkleRootObs.RMNRemoteConfig.ConfigDigest[:],
-				Signers:          rmnRemoteConfigSigners,
-				FSign:            observation.MerkleRootObs.RMNRemoteConfig.FSign,
-				ConfigVersion:    observation.MerkleRootObs.RMNRemoteConfig.ConfigVersion,
-				RmnReportVersion: observation.MerkleRootObs.RMNRemoteConfig.RmnReportVersion[:],
-			},
-			FChain: merkleRootsFChain,
+			MerkleRoots:        c.tr.merkleRootsToProto(observation.MerkleRootObs.MerkleRoots),
+			RmnEnabledChains:   c.tr.rmnEnabledChainsToProto(observation.MerkleRootObs.RMNEnabledChains),
+			OnRampMaxSeqNums:   c.tr.seqNumChainToProto(observation.MerkleRootObs.OnRampMaxSeqNums),
+			OffRampNextSeqNums: c.tr.seqNumChainToProto(observation.MerkleRootObs.OffRampNextSeqNums),
+			RmnRemoteConfig:    c.tr.rmnRemoteConfigToProto(observation.MerkleRootObs.RMNRemoteConfig),
+			FChain:             c.tr.fChainToProto(observation.MerkleRootObs.FChain),
 		},
 		TokenPriceObs: &ocrtypecodecpb.TokenPriceObservation{
-			FeedTokenPrices:       feedTokenPrices,
-			FeeQuoterTokenUpdates: feeQuoterTokenUpdates,
-			FChain:                tokenPriceFChain,
+			FeedTokenPrices:       c.tr.feedTokenPricesToProto(observation.TokenPriceObs.FeedTokenPrices),
+			FeeQuoterTokenUpdates: c.tr.feeQuoterTokenUpdatesToProto(observation.TokenPriceObs.FeeQuoterTokenUpdates),
+			FChain:                c.tr.fChainToProto(observation.TokenPriceObs.FChain),
 			Timestamp:             timestamppb.New(observation.TokenPriceObs.Timestamp),
 		},
 		ChainFeeObs: &ocrtypecodecpb.ChainFeeObservation{
-			FeeComponents:     feeComponents,
-			NativeTokenPrices: nativeTokenPrices,
-			ChainFeeUpdates:   chainFeeUpdates,
-			FChain:            chainFeeFChain,
+			FeeComponents:     c.tr.feeComponentsToProto(observation.ChainFeeObs.FeeComponents),
+			NativeTokenPrices: c.tr.nativeTokenPricesToProto(observation.ChainFeeObs.NativeTokenPrices),
+			ChainFeeUpdates:   c.tr.chainFeeUpdatesToProto(observation.ChainFeeObs.ChainFeeUpdates),
+			FChain:            c.tr.fChainToProto(observation.ChainFeeObs.FChain),
 			TimestampNow:      timestamppb.New(observation.ChainFeeObs.TimestampNow),
 		},
 		DiscoveryObs: &ocrtypecodecpb.DiscoveryObservation{
-			FChain: discoveryFChain,
+			FChain: c.tr.fChainToProto(observation.DiscoveryObs.FChain),
 			ContractNames: &ocrtypecodecpb.ContractNameChainAddresses{
-				Addresses: discoveryAddrs,
+				Addresses: c.tr.discoveryAddressesToProto(observation.DiscoveryObs.Addresses),
 			},
 		},
-		FChain: mainFChain,
+		FChain: c.tr.fChainToProto(observation.FChain),
 	}
-
 	return proto.Marshal(pbObs)
 }
 
-//nolint:gocyclo
 func (c *CommitCodecProto) DecodeObservation(data []byte) (committypes.Observation, error) {
 	pbObs := &ocrtypecodecpb.CommitObservation{}
 	if err := proto.Unmarshal(data, pbObs); err != nil {
 		return committypes.Observation{}, err
 	}
 
-	merkleRoots := make([]cciptypes.MerkleRootChain, len(pbObs.MerkleRootObs.MerkleRoots))
-	for i, mr := range pbObs.MerkleRootObs.MerkleRoots {
-		merkleRoots[i] = cciptypes.MerkleRootChain{
-			ChainSel:      cciptypes.ChainSelector(mr.ChainSel),
-			OnRampAddress: mr.OnRampAddress,
-			SeqNumsRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(mr.SeqNumsRange.MinMsgNr),
-				cciptypes.SeqNum(mr.SeqNumsRange.MaxMsgNr),
-			),
-			MerkleRoot: cciptypes.Bytes32(mr.MerkleRoot),
-		}
-	}
-
-	rmnEnabledChains := make(map[cciptypes.ChainSelector]bool, len(pbObs.MerkleRootObs.RmnEnabledChains))
-	for k, v := range pbObs.MerkleRootObs.RmnEnabledChains {
-		rmnEnabledChains[cciptypes.ChainSelector(k)] = v
-	}
-
-	onRampMaxSeqNums := make([]plugintypes.SeqNumChain, len(pbObs.MerkleRootObs.OnRampMaxSeqNums))
-	for i, s := range pbObs.MerkleRootObs.OnRampMaxSeqNums {
-		onRampMaxSeqNums[i] = plugintypes.SeqNumChain{
-			ChainSel: cciptypes.ChainSelector(s.ChainSel),
-			SeqNum:   cciptypes.SeqNum(s.SeqNum),
-		}
-	}
-
-	offRampNextSeqNums := make([]plugintypes.SeqNumChain, len(pbObs.MerkleRootObs.OffRampNextSeqNums))
-	for i, s := range pbObs.MerkleRootObs.OffRampNextSeqNums {
-		offRampNextSeqNums[i] = plugintypes.SeqNumChain{
-			ChainSel: cciptypes.ChainSelector(s.ChainSel),
-			SeqNum:   cciptypes.SeqNum(s.SeqNum),
-		}
-	}
-
-	rmnSigners := make([]rmntypes.RemoteSignerInfo, len(pbObs.MerkleRootObs.RmnRemoteConfig.Signers))
-	for i, s := range pbObs.MerkleRootObs.RmnRemoteConfig.Signers {
-		rmnSigners[i] = rmntypes.RemoteSignerInfo{
-			OnchainPublicKey: s.OnchainPublicKey,
-			NodeIndex:        s.NodeIndex,
-		}
-	}
-
-	merkleRootsFChain := make(map[cciptypes.ChainSelector]int, len(pbObs.MerkleRootObs.FChain))
-	for k, v := range pbObs.MerkleRootObs.FChain {
-		merkleRootsFChain[cciptypes.ChainSelector(k)] = int(v)
-	}
-
-	feedTokenPrices := make(cciptypes.TokenPriceMap, len(pbObs.TokenPriceObs.FeedTokenPrices))
-	for k, v := range pbObs.TokenPriceObs.FeedTokenPrices {
-		feedTokenPrices[cciptypes.UnknownEncodedAddress(k)] = cciptypes.NewBigInt(big.NewInt(0).SetBytes(v))
-	}
-
-	feeQuoterTokenUpdates := make(
-		map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, len(pbObs.TokenPriceObs.FeeQuoterTokenUpdates))
-	for k, v := range pbObs.TokenPriceObs.FeeQuoterTokenUpdates {
-		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(k)] = plugintypes.TimestampedBig{
-			Value:     cciptypes.NewBigInt(big.NewInt(0).SetBytes(v.Value)),
-			Timestamp: v.Timestamp.AsTime(),
-		}
-	}
-
-	tokenPriceFChain := make(map[cciptypes.ChainSelector]int, len(pbObs.TokenPriceObs.FChain))
-	for k, v := range pbObs.TokenPriceObs.FChain {
-		tokenPriceFChain[cciptypes.ChainSelector(k)] = int(v)
-	}
-
-	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(pbObs.ChainFeeObs.FeeComponents))
-	for k, v := range pbObs.ChainFeeObs.FeeComponents {
-		feeComponents[cciptypes.ChainSelector(k)] = types.ChainFeeComponents{
-			ExecutionFee:        big.NewInt(0).SetBytes(v.ExecutionFee),
-			DataAvailabilityFee: big.NewInt(0).SetBytes(v.DataAvailabilityFee),
-		}
-	}
-
-	nativeTokenPrices := make(map[cciptypes.ChainSelector]cciptypes.BigInt, len(pbObs.ChainFeeObs.NativeTokenPrices))
-	for k, v := range pbObs.ChainFeeObs.NativeTokenPrices {
-		nativeTokenPrices[cciptypes.ChainSelector(k)] = cciptypes.NewBigInt(big.NewInt(0).SetBytes(v))
-	}
-
-	chainFeeUpdates := make(map[cciptypes.ChainSelector]chainfee.Update, len(pbObs.ChainFeeObs.ChainFeeUpdates))
-	for k, v := range pbObs.ChainFeeObs.ChainFeeUpdates {
-		chainFeeUpdates[cciptypes.ChainSelector(k)] = chainfee.Update{
-			ChainFee: chainfee.ComponentsUSDPrices{
-				ExecutionFeePriceUSD: big.NewInt(0).SetBytes(v.ChainFee.ExecutionFeePriceUsd),
-				DataAvFeePriceUSD:    big.NewInt(0).SetBytes(v.ChainFee.DataAvFeePriceUsd),
-			},
-			Timestamp: v.Timestamp.AsTime(),
-		}
-	}
-
-	chainFeeFChain := make(map[cciptypes.ChainSelector]int, len(pbObs.ChainFeeObs.FChain))
-	for k, v := range pbObs.ChainFeeObs.FChain {
-		chainFeeFChain[cciptypes.ChainSelector(k)] = int(v)
-	}
-
-	discoveryFChain := make(map[cciptypes.ChainSelector]int, len(pbObs.DiscoveryObs.FChain))
-	for k, v := range pbObs.DiscoveryObs.FChain {
-		discoveryFChain[cciptypes.ChainSelector(k)] = int(v)
-	}
-
-	discoveryAddrs := make(reader.ContractAddresses, len(pbObs.DiscoveryObs.ContractNames.Addresses))
-	for contractName, chainMap := range pbObs.DiscoveryObs.ContractNames.Addresses {
-		discoveryAddrs[contractName] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress)
-		for chain, addr := range chainMap.ChainAddresses {
-			discoveryAddrs[contractName][cciptypes.ChainSelector(chain)] = addr
-		}
-	}
-
-	mainFChain := make(map[cciptypes.ChainSelector]int, len(pbObs.FChain))
-	for k, v := range pbObs.FChain {
-		mainFChain[cciptypes.ChainSelector(k)] = int(v)
-	}
-
 	return committypes.Observation{
 		MerkleRootObs: merkleroot.Observation{
-			MerkleRoots:        merkleRoots,
-			RMNEnabledChains:   rmnEnabledChains,
-			OnRampMaxSeqNums:   onRampMaxSeqNums,
-			OffRampNextSeqNums: offRampNextSeqNums,
-			RMNRemoteConfig: rmntypes.RemoteConfig{
-				ContractAddress:  pbObs.MerkleRootObs.RmnRemoteConfig.ContractAddress,
-				ConfigDigest:     cciptypes.Bytes32(pbObs.MerkleRootObs.RmnRemoteConfig.ConfigDigest),
-				Signers:          rmnSigners,
-				FSign:            pbObs.MerkleRootObs.RmnRemoteConfig.FSign,
-				ConfigVersion:    pbObs.MerkleRootObs.RmnRemoteConfig.ConfigVersion,
-				RmnReportVersion: cciptypes.Bytes32(pbObs.MerkleRootObs.RmnRemoteConfig.RmnReportVersion),
-			},
-			FChain: merkleRootsFChain,
+			MerkleRoots:        c.tr.merkleRootsFromProto(pbObs.MerkleRootObs.MerkleRoots),
+			RMNEnabledChains:   c.tr.rmnEnabledChainsFromProto(pbObs.MerkleRootObs.RmnEnabledChains),
+			OnRampMaxSeqNums:   c.tr.seqNumChainFromProto(pbObs.MerkleRootObs.OnRampMaxSeqNums),
+			OffRampNextSeqNums: c.tr.seqNumChainFromProto(pbObs.MerkleRootObs.OffRampNextSeqNums),
+			RMNRemoteConfig:    c.tr.rmnRemoteConfigFromProto(pbObs.MerkleRootObs.RmnRemoteConfig),
+			FChain:             c.tr.fChainFromProto(pbObs.MerkleRootObs.FChain),
 		},
 		TokenPriceObs: tokenprice.Observation{
-			FeedTokenPrices:       feedTokenPrices,
-			FeeQuoterTokenUpdates: feeQuoterTokenUpdates,
-			FChain:                tokenPriceFChain,
+			FeedTokenPrices:       c.tr.feedTokenPricesFromProto(pbObs.TokenPriceObs.FeedTokenPrices),
+			FeeQuoterTokenUpdates: c.tr.feeQuoterTokenUpdatesFromProto(pbObs.TokenPriceObs.FeeQuoterTokenUpdates),
+			FChain:                c.tr.fChainFromProto(pbObs.TokenPriceObs.FChain),
 			Timestamp:             pbObs.TokenPriceObs.Timestamp.AsTime(),
 		},
 		ChainFeeObs: chainfee.Observation{
-			FeeComponents:     feeComponents,
-			NativeTokenPrices: nativeTokenPrices,
-			ChainFeeUpdates:   chainFeeUpdates,
-			FChain:            chainFeeFChain,
+			FeeComponents:     c.tr.feeComponentsFromProto(pbObs.ChainFeeObs.FeeComponents),
+			NativeTokenPrices: c.tr.nativeTokenPricesFromProto(pbObs.ChainFeeObs.NativeTokenPrices),
+			ChainFeeUpdates:   c.tr.chainFeeUpdatesFromProto(pbObs.ChainFeeObs.ChainFeeUpdates),
+			FChain:            c.tr.fChainFromProto(pbObs.ChainFeeObs.FChain),
 			TimestampNow:      pbObs.ChainFeeObs.TimestampNow.AsTime(),
 		},
 		DiscoveryObs: discoverytypes.Observation{
-			FChain:    discoveryFChain,
-			Addresses: discoveryAddrs,
+			FChain:    c.tr.fChainFromProto(pbObs.DiscoveryObs.FChain),
+			Addresses: c.tr.discoveryAddressesFromProto(pbObs.DiscoveryObs.ContractNames.Addresses),
 		},
-		FChain: mainFChain,
+		FChain: c.tr.fChainFromProto(pbObs.FChain),
 	}, nil
 }
 
