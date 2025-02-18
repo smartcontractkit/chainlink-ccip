@@ -29,8 +29,8 @@ func TestBuildTemplateConfig(t *testing.T) {
 				chainsCount:       2,
 			}, want: ValuesTmplConfig{
 			Chains: []chain{
-				{NetworkId: 1337, BlockTime: 0},
-				{NetworkId: 2337, BlockTime: 0},
+				{NetworkId: 1337, BlockTime: 2},
+				{NetworkId: 2337, BlockTime: 2},
 			},
 		}},
 		{
@@ -40,7 +40,7 @@ func TestBuildTemplateConfig(t *testing.T) {
 				chainsCount:       1,
 			}, want: ValuesTmplConfig{
 			Chains: []chain{
-				{NetworkId: 1337, BlockTime: 0},
+				{NetworkId: 1337, BlockTime: 2},
 			},
 		}},
 		{
@@ -52,8 +52,8 @@ func TestBuildTemplateConfig(t *testing.T) {
 			Chains: []chain{
 				{NetworkId: 1337, BlockTime: 20},
 				{NetworkId: 2337, BlockTime: 14},
-				{NetworkId: 90000001, BlockTime: 0},
-				{NetworkId: 90000002, BlockTime: 0},
+				{NetworkId: 90000001, BlockTime: 2},
+				{NetworkId: 90000002, BlockTime: 2},
 			},
 		}},
 	}

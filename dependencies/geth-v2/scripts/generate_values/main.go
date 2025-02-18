@@ -10,6 +10,7 @@ import (
 )
 
 const templatesPath = "../../templates/"
+const defaultBlockTime = 2
 
 type chain struct {
 	NetworkId int64 `yaml:"networkId"`
@@ -94,11 +95,17 @@ func BuildTemplateConfig(overridesFilePath string, chainsCount int, provider str
 		chains = append(chains, chain{NetworkId: 2337})
 
 		for i := 1; i < chainsCount-1; i++ {
-			chains = append(chains, chain{NetworkId: int64(90000000 + i)})
+			chains = append(chains, chain{
+				NetworkId: int64(90000000 + i),
+			})
 		}
 	}
 
 	for i := 0; i < chainsCount; i++ {
+		// set defaults for each chain
+		chains[i].BlockTime = defaultBlockTime
+
+		// override the defaults if they are present for the given chain
 		for _, override := range overrides.Chains {
 			if override.NetworkId == chains[i].NetworkId {
 				chains[i].BlockTime = override.BlockTime
