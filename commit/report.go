@@ -79,9 +79,12 @@ func (p *Plugin) Reports(
 		repInfo = cciptypes.CommitReportInfo{
 			RemoteF:     outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
 			MerkleRoots: allRoots,
-			TokenPrices: rep.PriceUpdates.TokenPriceUpdates,
 		}
 	}
+
+	// OutcomeType == ReportGenerated is only true when roots are present, but
+	// reports can also only contain token price updates
+	repInfo.TokenPrices = rep.PriceUpdates.TokenPriceUpdates
 
 	if rep.IsEmpty() {
 		lggr.Infow("empty report", "report", rep)
