@@ -163,7 +163,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
 		logutil.WithComponent(lggr, "CostlyMessages"),
-		true,
+		false,
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
 		p.estimateProvider,
