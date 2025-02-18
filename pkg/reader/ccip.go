@@ -422,6 +422,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			lggr.Errorw("validate send requested event", "err", err, "msg", msg)
 			continue
 		}
+
 		msg.Message.Header.OnRamp = onRampAddress
 		msgs = append(msgs, msg.Message)
 	}
