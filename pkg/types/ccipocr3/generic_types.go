@@ -163,10 +163,6 @@ type Message struct {
 	// such as the gasLimit for EVM chains.
 	// This field is encoded in the source chain encoding scheme.
 	ExtraArgs Bytes `json:"extraArgs"`
-	// ExtraArgsDecoded is same as ExtraArgs,
-	// just decoded into a named collection of arguments in a generic format,
-	// which can be read by any destination chain family.
-	ExtraArgsDecoded map[string]any `json:"extraArgsDecoded,omitempty"`
 	// FeeToken is the fee token address.
 	// i.e if the source chain is EVM, len(FeeToken) == 20 (i.e, is not abi-encoded).
 	FeeToken UnknownAddress `json:"feeToken"`
@@ -240,8 +236,4 @@ type RampTokenAmount struct {
 	// NOTE: this must be decoded before providing it as an execution input to the destination chain
 	// or hashing it. See Internal._hash(Any2EVMRampMessage) for more details as an example.
 	DestExecData Bytes `json:"destExecData"`
-	// DestExecDataDecoded is the same as DestExecData
-	// just decoded into a named collection of arguments in a generic format,
-	// which can be read by any destination chain family.
-	DestExecDataDecoded map[string]any `json:"destExecDataDecoded,omitempty"`
 }
