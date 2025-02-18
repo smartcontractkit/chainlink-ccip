@@ -2203,9 +2203,10 @@ func TestMcmWithTimelock(t *testing.T) {
 					tcResult.timelockTxSize = measureInstructionSize(tivIx)
 
 					if tc.expectError {
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment)
+						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 
 						// verify recipients final balances,
 						// note: we can't verify the exact amount of treasury balance(tests in parallel execution)
@@ -2454,9 +2455,10 @@ func TestMcmWithTimelock(t *testing.T) {
 					require.NoError(t, vErr)
 
 					if tc.expectError {
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 
 						parsedLogs = common.ParseLogMessages(tx.Meta.LogMessages,
 							[]common.EventMapping{
