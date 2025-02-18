@@ -173,7 +173,7 @@ func encodeMessageHeader(header cciptypes.RampMessageHeader) *ocrtypecodecpb.Ram
 func encodeStringToAny(extraArgsDecoded map[string]any) map[string][]byte {
 	result := make(map[string][]byte, len(extraArgsDecoded))
 	for k, v := range extraArgsDecoded {
-		b, err := encodeAnyToBytesJson(v)
+		b, err := encodeAnyToBytesJSON(v)
 		if err != nil {
 			panic(err)
 		}
@@ -408,7 +408,7 @@ func decodeMessageHeader(header *ocrtypecodecpb.RampMessageHeader) cciptypes.Ram
 func decodeStringToAny(encoded map[string][]byte) map[string]any {
 	result := make(map[string]any, len(encoded))
 	for k, v := range encoded {
-		val, err := decodeBytesToAnyJson(v)
+		val, err := decodeBytesToAnyJSON(v)
 		if err != nil {
 			panic(err)
 		}
@@ -471,11 +471,11 @@ func NewExecCodecProto() *ExecCodecProto {
 	return &ExecCodecProto{}
 }
 
-func encodeAnyToBytesJson(data any) ([]byte, error) {
+func encodeAnyToBytesJSON(data any) ([]byte, error) {
 	return json.Marshal(data)
 }
 
-func decodeBytesToAnyJson(data []byte) (any, error) {
+func decodeBytesToAnyJSON(data []byte) (any, error) {
 	var result map[string]any
 	err := json.Unmarshal(data, &result)
 	return result, err

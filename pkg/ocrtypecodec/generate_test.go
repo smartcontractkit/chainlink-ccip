@@ -1,6 +1,7 @@
 package ocrtypecodec
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -17,19 +18,19 @@ func runBenchmark(
 	t *testing.T,
 	name string,
 	obj interface{},
-	decodeJsonFunc func([]byte) (interface{}, error),
-	encodeJsonFunc func(interface{}) ([]byte, error),
+	decodeJSONFunc func([]byte) (interface{}, error),
+	encodeJSONFunc func(interface{}) ([]byte, error),
 	decodeProtoFunc func([]byte) (interface{}, error),
 	encodeProtoFunc func(interface{}) ([]byte, error),
 ) resultData {
 	result := resultData{name: name}
 
 	tStart := time.Now()
-	jsonEnc, err := encodeJsonFunc(obj)
+	jsonEnc, err := encodeJSONFunc(obj)
 	require.NoError(t, err)
 	result.jsonEncodingTime = time.Since(tStart)
 	tStart = time.Now()
-	jsonDec, err := decodeJsonFunc(jsonEnc)
+	jsonDec, err := decodeJSONFunc(jsonEnc)
 	result.jsonDecodingTime = time.Since(tStart)
 	require.NoError(t, err)
 	result.jsonEncodingDataLength = len(jsonEnc)
@@ -165,18 +166,22 @@ func genQuery(numSigs int, numLaneUpdates int) *ocrtypecodecpb.Query {
 }
 
 // genObservation generates a randomized Observation struct.
-func genObservation(numMerkleRoots, numSeqNumChains, numSigners int, numTokenPrices, numFeeQuoterUpdates int, numFeeComponents int, numContractNames int) *ocrtypecodecpb.CommitObservation {
+func genObservation(
+	numMerkleRoots, numSeqNumChains, numSigners int,
+	numTokenPrices, numFeeQuoterUpdates int, numFeeComponents int, numContractNames int,
+) *ocrtypecodecpb.CommitObservation {
 	return &ocrtypecodecpb.CommitObservation{
 		MerkleRootObs: genMerkleRootObservation(numMerkleRoots, numSeqNumChains, numSigners),
 		TokenPriceObs: genTokenPriceObservation(numTokenPrices, numFeeQuoterUpdates),
 		ChainFeeObs:   genChainFeeObservation(numFeeComponents),
 		DiscoveryObs:  genDiscoveryObservation(numContractNames),
-		FChain:        genFChain(5),
+		FChain:        genFChain(6),
 	}
 }
 
 // genOutcome generates a randomized Outcome struct.
-func genOutcome(numRanges, numRoots, numSigners, numSeqNumChains, numGasPrices, numTokenPrices int) *ocrtypecodecpb.CommitOutcome {
+func genOutcome(
+	numRanges, numRoots, numSigners, numSeqNumChains, numGasPrices, numTokenPrices int) *ocrtypecodecpb.CommitOutcome {
 	return &ocrtypecodecpb.CommitOutcome{
 		MerkleRootOutcome: genMerkleRootOutcome(numRanges, numRoots, numSigners, numSeqNumChains),
 		TokenPriceOutcome: genTokenPriceOutcome(numTokenPrices),
@@ -204,7 +209,7 @@ func genChainRanges(n int) []*ocrtypecodecpb.ChainRange {
 	ranges := make([]*ocrtypecodecpb.ChainRange, n)
 	for i := 0; i < n; i++ {
 		ranges[i] = &ocrtypecodecpb.ChainRange{
-			ChainSel: uint64(rand.Uint64()),
+			ChainSel: rand.Uint64(),
 			SeqNumRange: &ocrtypecodecpb.SeqNumRange{
 				MinMsgNr: uint64(rand.Intn(1000)),
 				MaxMsgNr: uint64(rand.Intn(1000) + 100), // Ensure max > min
@@ -254,7 +259,7 @@ func genGasPrices(n int) []*ocrtypecodecpb.GasPriceChain {
 	prices := make([]*ocrtypecodecpb.GasPriceChain, n)
 	for i := 0; i < n; i++ {
 		prices[i] = &ocrtypecodecpb.GasPriceChain{
-			ChainSel: uint64(rand.Uint64()),
+			ChainSel: rand.Uint64(),
 			GasPrice: randomBytes(32),
 		}
 	}
@@ -264,7 +269,7 @@ func genGasPrices(n int) []*ocrtypecodecpb.GasPriceChain {
 // genMainOutcome generates a MainOutcome.
 func genMainOutcome() *ocrtypecodecpb.MainOutcome {
 	return &ocrtypecodecpb.MainOutcome{
-		InflightPriceOcrSequenceNumber: uint64(rand.Uint64()),
+		InflightPriceOcrSequenceNumber: rand.Uint64(),
 		RemainingPriceChecks:           int32(rand.Intn(5)),
 	}
 }
@@ -469,12 +474,17 @@ func genRandomString(n int) string {
 // randomBytes generates a random byte slice of the given length.
 func randomBytes(n int) []byte {
 	b := make([]byte, n)
-	rand.Read(b)
+	_, err := crand.Read(b)
+	if err != nil {
+		panic(err)
+	}
 	return b
 }
 
 // genExecObservation generates a randomized ExecObservation for benchmarking.
-func genExecObservation(numCommitReports, numMessagesPerChain, numTokenDataPerChain, numNoncesPerChain, numCostlyMessages int) *ocrtypecodecpb.ExecObservation {
+func genExecObservation(
+	numCommitReports, numMessagesPerChain, numTokenDataPerChain, numNoncesPerChain, numCostlyMessages int,
+) *ocrtypecodecpb.ExecObservation {
 	return &ocrtypecodecpb.ExecObservation{
 		CommitReports:         genCommitReports(numCommitReports),
 		SeqNumsToMessages:     genMessages(numMessagesPerChain),
@@ -491,7 +501,7 @@ func genExecObservation(numCommitReports, numMessagesPerChain, numTokenDataPerCh
 func genCommitReports(n int) map[uint64]*ocrtypecodecpb.CommitObservations {
 	commitReports := make(map[uint64]*ocrtypecodecpb.CommitObservations, n)
 	for i := 0; i < n; i++ {
-		chainSel := uint64(rand.Uint64())
+		chainSel := rand.Uint64()
 		commitReports[chainSel] = &ocrtypecodecpb.CommitObservations{
 			CommitData: genCommitData(rand.Intn(5) + 1), // 1 to 5 commit reports per chain
 		}
@@ -516,12 +526,12 @@ func genCommitData(n int) []*ocrtypecodecpb.CommitData {
 	commits := make([]*ocrtypecodecpb.CommitData, n)
 	for i := 0; i < n; i++ {
 		commits[i] = &ocrtypecodecpb.CommitData{
-			SourceChain:         uint64(rand.Uint64()),
+			SourceChain:         rand.Uint64(),
 			OnRampAddress:       randomBytes(20),
 			Timestamp:           uint64(time.Now().Unix()),
 			BlockNum:            rand.Uint64(),
 			MerkleRoot:          randomBytes(32),
-			SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{MinMsgNr: uint64(rand.Uint64()), MaxMsgNr: uint64(rand.Uint64() + 100)},
+			SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{MinMsgNr: rand.Uint64(), MaxMsgNr: rand.Uint64() + 100},
 			ExecutedMessages:    genSeqNums(rand.Intn(10)),
 			Messages:            genMessageSlice(rand.Intn(10)),
 			Hashes:              genBytes32Slice(rand.Intn(10)),
@@ -536,7 +546,7 @@ func genCommitData(n int) []*ocrtypecodecpb.CommitData {
 func genSeqNums(n int) []uint64 {
 	seqNums := make([]uint64, n)
 	for i := 0; i < n; i++ {
-		seqNums[i] = uint64(rand.Uint64())
+		seqNums[i] = rand.Uint64()
 	}
 	return seqNums
 }
@@ -563,7 +573,7 @@ func genMessageTokenData(n int) []*ocrtypecodecpb.MessageTokenData {
 func genMessages(n int) map[uint64]*ocrtypecodecpb.SeqNumToMessage {
 	messages := make(map[uint64]*ocrtypecodecpb.SeqNumToMessage, n)
 	for i := 0; i < n; i++ {
-		chainSel := uint64(rand.Uint64())
+		chainSel := rand.Uint64()
 		messages[chainSel] = &ocrtypecodecpb.SeqNumToMessage{Messages: genMessageMap(rand.Intn(10) + 1)}
 	}
 	return messages
@@ -573,7 +583,7 @@ func genMessages(n int) map[uint64]*ocrtypecodecpb.SeqNumToMessage {
 func genMessageMap(n int) map[uint64]*ocrtypecodecpb.Message {
 	msgs := make(map[uint64]*ocrtypecodecpb.Message, n)
 	for i := 0; i < n; i++ {
-		msgs[uint64(rand.Uint64())] = genMessage()
+		msgs[rand.Uint64()] = genMessage()
 	}
 	return msgs
 }
@@ -598,9 +608,9 @@ func genMessage() *ocrtypecodecpb.Message {
 func genMessageHeader() *ocrtypecodecpb.RampMessageHeader {
 	return &ocrtypecodecpb.RampMessageHeader{
 		MessageId:           randomBytes(32),
-		SourceChainSelector: uint64(rand.Uint64()),
-		DestChainSelector:   uint64(rand.Uint64()),
-		SequenceNumber:      uint64(rand.Uint64()),
+		SourceChainSelector: rand.Uint64(),
+		DestChainSelector:   rand.Uint64(),
+		SequenceNumber:      rand.Uint64(),
 		Nonce:               rand.Uint64(),
 		MsgHash:             randomBytes(32),
 		OnRamp:              randomBytes(20),
@@ -626,7 +636,7 @@ func genRampTokenAmounts(n int) []*ocrtypecodecpb.RampTokenAmount {
 func genMessageHashes(n int) map[uint64]*ocrtypecodecpb.SeqNumToBytes {
 	hashes := make(map[uint64]*ocrtypecodecpb.SeqNumToBytes, n)
 	for i := 0; i < n; i++ {
-		chainSel := uint64(rand.Uint64())
+		chainSel := rand.Uint64()
 		hashes[chainSel] = &ocrtypecodecpb.SeqNumToBytes{SeqNumToBytes: genSeqNumToBytes(rand.Intn(10))}
 	}
 	return hashes
@@ -636,7 +646,7 @@ func genMessageHashes(n int) map[uint64]*ocrtypecodecpb.SeqNumToBytes {
 func genSeqNumToBytes(n int) map[uint64][]byte {
 	result := make(map[uint64][]byte, n)
 	for i := 0; i < n; i++ {
-		result[uint64(rand.Uint64())] = randomBytes(32)
+		result[rand.Uint64()] = randomBytes(32)
 	}
 	return result
 }

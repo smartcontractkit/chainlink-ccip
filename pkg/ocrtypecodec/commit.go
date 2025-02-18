@@ -127,6 +127,7 @@ func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
 	return q, nil
 }
 
+//nolint:gocyclo
 func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation) ([]byte, error) {
 	merkleRoots := make([]*ocrtypecodecpb.MerkleRootChain, len(observation.MerkleRootObs.MerkleRoots))
 	for i, mr := range observation.MerkleRootObs.MerkleRoots {
@@ -162,7 +163,8 @@ func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation
 		}
 	}
 
-	rmnRemoteConfigSigners := make([]*ocrtypecodecpb.RemoteSignerInfo, len(observation.MerkleRootObs.RMNRemoteConfig.Signers))
+	rmnRemoteConfigSigners := make(
+		[]*ocrtypecodecpb.RemoteSignerInfo, len(observation.MerkleRootObs.RMNRemoteConfig.Signers))
 	for i, s := range observation.MerkleRootObs.RMNRemoteConfig.Signers {
 		rmnRemoteConfigSigners[i] = &ocrtypecodecpb.RemoteSignerInfo{
 			OnchainPublicKey: s.OnchainPublicKey,
@@ -180,7 +182,8 @@ func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation
 		feedTokenPrices[string(k)] = v.Bytes()
 	}
 
-	feeQuoterTokenUpdates := make(map[string]*ocrtypecodecpb.TimestampedBig, len(observation.TokenPriceObs.FeeQuoterTokenUpdates))
+	feeQuoterTokenUpdates := make(
+		map[string]*ocrtypecodecpb.TimestampedBig, len(observation.TokenPriceObs.FeeQuoterTokenUpdates))
 	for k, v := range observation.TokenPriceObs.FeeQuoterTokenUpdates {
 		feeQuoterTokenUpdates[string(k)] = &ocrtypecodecpb.TimestampedBig{
 			Value:     v.Value.Bytes(),
@@ -283,6 +286,7 @@ func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation
 	return proto.Marshal(pbObs)
 }
 
+//nolint:gocyclo
 func (c *CommitCodecProto) DecodeObservation(data []byte) (committypes.Observation, error) {
 	pbObs := &ocrtypecodecpb.CommitObservation{}
 	if err := proto.Unmarshal(data, pbObs); err != nil {
@@ -341,7 +345,8 @@ func (c *CommitCodecProto) DecodeObservation(data []byte) (committypes.Observati
 		feedTokenPrices[cciptypes.UnknownEncodedAddress(k)] = cciptypes.NewBigInt(big.NewInt(0).SetBytes(v))
 	}
 
-	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, len(pbObs.TokenPriceObs.FeeQuoterTokenUpdates))
+	feeQuoterTokenUpdates := make(
+		map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, len(pbObs.TokenPriceObs.FeeQuoterTokenUpdates))
 	for k, v := range pbObs.TokenPriceObs.FeeQuoterTokenUpdates {
 		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(k)] = plugintypes.TimestampedBig{
 			Value:     cciptypes.NewBigInt(big.NewInt(0).SetBytes(v.Value)),
