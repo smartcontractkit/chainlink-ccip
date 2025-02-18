@@ -88,7 +88,7 @@ profiles:
     activation:
       - vars:
           PROVIDER: "aws"
-          ENVIROMENT: "stage"
+          CRIB_EKS_CLUSTER_NAME: "main-stage-cluster"
     merge: |-
       $(
         CHAIN_ID=${CHAIN_ID} \
