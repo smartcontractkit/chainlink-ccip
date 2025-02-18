@@ -500,7 +500,7 @@ profiles:
       - op: add
         path: dependencies.beholder.pipeline
         value: kind
-  - name: blockscout
+  - name: blockscout-geth-1337
     patches:
       - op: add
         path: dependencies
@@ -509,6 +509,24 @@ profiles:
             path: ${DEPENDENCIES_DIR}/blockscout
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              CHAIN_NAME: "alpha"
+              ETHEREUM_VARIANT: "geth"
+              CHAIN_ID: "1337"
+  - name: blockscout-geth-2337
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          blockscout:
+            path: ${DEPENDENCIES_DIR}/blockscout
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              CHAIN_NAME: "beta"
+              ETHEREUM_VARIANT: "geth"
+              CHAIN_ID: "2337"
+
 commands:
   core:
     command: devspace run-pipeline core -p core
@@ -591,6 +609,8 @@ commands:
     description: Run the Beholder pipeline for Kind.
     appendArgs: true
   blockscout:
-    command: devspace run-pipeline blockscout -p blockscout
+    command: |
+      devspace run-pipeline blockscout -p blockscout-geth-1337
+      devspace run-pipeline blockscout -p blockscout-geth-2337
     description: Run blockscout pipeline
     appendArgs: true

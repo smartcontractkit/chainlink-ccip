@@ -80,6 +80,7 @@ profiles:
         CHAIN_ID=${CHAIN_ID} \
         CHAIN_NAME=${CHAIN_NAME} \
         ETHEREUM_VARIANT=${ETHEREUM_VARIANT} \
+        NAMESPACE=${NAMESPACE} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-kind.yaml
       )
@@ -94,6 +95,7 @@ profiles:
         CHAIN_ID=${CHAIN_ID} \
         CHAIN_NAME=${CHAIN_NAME} \
         ETHEREUM_VARIANT=${ETHEREUM_VARIANT} \
+        NAMESPACE=${NAMESPACE} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-staging.yaml
       )
