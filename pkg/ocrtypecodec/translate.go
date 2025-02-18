@@ -23,7 +23,11 @@ func newProtoTranslator() *protoTranslator {
 }
 
 func (t *protoTranslator) rmnSignaturesToProto(sigs *rmn.ReportSignatures) []*ocrtypecodecpb.SignatureEcdsa {
-	pbSigs := make([]*ocrtypecodecpb.SignatureEcdsa, len(sigs.Signatures))
+	var pbSigs []*ocrtypecodecpb.SignatureEcdsa
+	if len(sigs.Signatures) > 0 {
+		pbSigs = make([]*ocrtypecodecpb.SignatureEcdsa, len(sigs.Signatures))
+	}
+
 	for i, sig := range sigs.Signatures {
 		pbSigs[i] = &ocrtypecodecpb.SignatureEcdsa{
 			R: sig.R,
@@ -44,7 +48,9 @@ func (t *protoTranslator) rmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.Signat
 	return sigs
 }
 
-func (t *protoTranslator) ccipRmnSignaturesToProto(sigs []cciptypes.RMNECDSASignature) []*ocrtypecodecpb.SignatureEcdsa {
+func (t *protoTranslator) ccipRmnSignaturesToProto(
+	sigs []cciptypes.RMNECDSASignature,
+) []*ocrtypecodecpb.SignatureEcdsa {
 	pbSigs := make([]*ocrtypecodecpb.SignatureEcdsa, len(sigs))
 	for i, sig := range sigs {
 		pbSigs[i] = &ocrtypecodecpb.SignatureEcdsa{
@@ -55,8 +61,14 @@ func (t *protoTranslator) ccipRmnSignaturesToProto(sigs []cciptypes.RMNECDSASign
 	return pbSigs
 }
 
-func (t *protoTranslator) ccipRmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.SignatureEcdsa) []cciptypes.RMNECDSASignature {
-	sigs := make([]cciptypes.RMNECDSASignature, len(pbSigs))
+func (t *protoTranslator) ccipRmnSignaturesFromProto(
+	pbSigs []*ocrtypecodecpb.SignatureEcdsa,
+) []cciptypes.RMNECDSASignature {
+	var sigs []cciptypes.RMNECDSASignature
+	if len(pbSigs) > 0 {
+		sigs = make([]cciptypes.RMNECDSASignature, len(pbSigs))
+	}
+
 	for i := range pbSigs {
 		sigs[i] = cciptypes.RMNECDSASignature{
 			R: cciptypes.Bytes32(pbSigs[i].R),
@@ -66,7 +78,9 @@ func (t *protoTranslator) ccipRmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.Si
 	return sigs
 }
 
-func (t *protoTranslator) laneUpdatesToProto(rmnLaneUpdates []*rmnpb.FixedDestLaneUpdate) []*ocrtypecodecpb.DestChainUpdate {
+func (t *protoTranslator) laneUpdatesToProto(
+	rmnLaneUpdates []*rmnpb.FixedDestLaneUpdate,
+) []*ocrtypecodecpb.DestChainUpdate {
 	pbLaneUpdates := make([]*ocrtypecodecpb.DestChainUpdate, len(rmnLaneUpdates))
 	for i, lu := range rmnLaneUpdates {
 		pbLaneUpdates[i] = &ocrtypecodecpb.DestChainUpdate{
@@ -84,7 +98,9 @@ func (t *protoTranslator) laneUpdatesToProto(rmnLaneUpdates []*rmnpb.FixedDestLa
 	return pbLaneUpdates
 }
 
-func (t *protoTranslator) laneUpdatesFromProto(pbLaneUpdates []*ocrtypecodecpb.DestChainUpdate) []*rmnpb.FixedDestLaneUpdate {
+func (t *protoTranslator) laneUpdatesFromProto(
+	pbLaneUpdates []*ocrtypecodecpb.DestChainUpdate,
+) []*rmnpb.FixedDestLaneUpdate {
 	laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, len(pbLaneUpdates))
 	for i := range pbLaneUpdates {
 		laneUpdates[i] = &rmnpb.FixedDestLaneUpdate{
@@ -102,8 +118,13 @@ func (t *protoTranslator) laneUpdatesFromProto(pbLaneUpdates []*ocrtypecodecpb.D
 	return laneUpdates
 }
 
-func (t *protoTranslator) merkleRootsToProto(merkleRoots []cciptypes.MerkleRootChain) []*ocrtypecodecpb.MerkleRootChain {
-	pbMerkleRoots := make([]*ocrtypecodecpb.MerkleRootChain, len(merkleRoots))
+func (t *protoTranslator) merkleRootsToProto(
+	merkleRoots []cciptypes.MerkleRootChain,
+) []*ocrtypecodecpb.MerkleRootChain {
+	var pbMerkleRoots []*ocrtypecodecpb.MerkleRootChain
+	if len(merkleRoots) > 0 {
+		pbMerkleRoots = make([]*ocrtypecodecpb.MerkleRootChain, len(merkleRoots))
+	}
 
 	for i, mr := range merkleRoots {
 		pbMerkleRoots[i] = &ocrtypecodecpb.MerkleRootChain{
@@ -120,8 +141,14 @@ func (t *protoTranslator) merkleRootsToProto(merkleRoots []cciptypes.MerkleRootC
 	return pbMerkleRoots
 }
 
-func (t *protoTranslator) merkleRootsFromProto(pbMerkleRoots []*ocrtypecodecpb.MerkleRootChain) []cciptypes.MerkleRootChain {
-	merkleRoots := make([]cciptypes.MerkleRootChain, len(pbMerkleRoots))
+func (t *protoTranslator) merkleRootsFromProto(
+	pbMerkleRoots []*ocrtypecodecpb.MerkleRootChain,
+) []cciptypes.MerkleRootChain {
+	var merkleRoots []cciptypes.MerkleRootChain
+	if len(pbMerkleRoots) > 0 {
+		merkleRoots = make([]cciptypes.MerkleRootChain, len(pbMerkleRoots))
+	}
+
 	for i, mr := range pbMerkleRoots {
 		merkleRoots[i] = cciptypes.MerkleRootChain{
 			ChainSel:      cciptypes.ChainSelector(mr.ChainSel),
@@ -133,11 +160,16 @@ func (t *protoTranslator) merkleRootsFromProto(pbMerkleRoots []*ocrtypecodecpb.M
 			MerkleRoot: cciptypes.Bytes32(mr.MerkleRoot),
 		}
 	}
+
 	return merkleRoots
 }
 
 func (t *protoTranslator) rmnEnabledChainsToProto(rmnEnabled map[cciptypes.ChainSelector]bool) map[uint64]bool {
-	rmnEnabledChains := make(map[uint64]bool, len(rmnEnabled))
+	var rmnEnabledChains map[uint64]bool
+	if len(rmnEnabled) > 0 {
+		rmnEnabledChains = make(map[uint64]bool, len(rmnEnabled))
+	}
+
 	for k, v := range rmnEnabled {
 		rmnEnabledChains[uint64(k)] = v
 	}
@@ -145,7 +177,11 @@ func (t *protoTranslator) rmnEnabledChainsToProto(rmnEnabled map[cciptypes.Chain
 }
 
 func (t *protoTranslator) rmnEnabledChainsFromProto(rmnEnabledChains map[uint64]bool) map[cciptypes.ChainSelector]bool {
-	rmnEnabled := make(map[cciptypes.ChainSelector]bool, len(rmnEnabledChains))
+	var rmnEnabled map[cciptypes.ChainSelector]bool
+	if len(rmnEnabledChains) > 0 {
+		rmnEnabled = make(map[cciptypes.ChainSelector]bool, len(rmnEnabledChains))
+	}
+
 	for k, v := range rmnEnabledChains {
 		rmnEnabled[cciptypes.ChainSelector(k)] = v
 	}
@@ -164,7 +200,11 @@ func (t *protoTranslator) seqNumChainToProto(snc []plugintypes.SeqNumChain) []*o
 }
 
 func (t *protoTranslator) seqNumChainFromProto(pbSnc []*ocrtypecodecpb.SeqNumChain) []plugintypes.SeqNumChain {
-	snc := make([]plugintypes.SeqNumChain, len(pbSnc))
+	var snc []plugintypes.SeqNumChain
+	if len(pbSnc) > 0 {
+		snc = make([]plugintypes.SeqNumChain, len(pbSnc))
+	}
+
 	for i, s := range pbSnc {
 		snc[i] = plugintypes.SeqNumChain{
 			ChainSel: cciptypes.ChainSelector(s.ChainSel),
@@ -175,7 +215,11 @@ func (t *protoTranslator) seqNumChainFromProto(pbSnc []*ocrtypecodecpb.SeqNumCha
 }
 
 func (t *protoTranslator) rmnRemoteConfigToProto(rmnRemoteCfg rmntypes.RemoteConfig) *ocrtypecodecpb.RmnRemoteConfig {
-	rmnRemoteConfigSignersPB := make([]*ocrtypecodecpb.RemoteSignerInfo, len(rmnRemoteCfg.Signers))
+	var rmnRemoteConfigSignersPB []*ocrtypecodecpb.RemoteSignerInfo
+	if len(rmnRemoteCfg.Signers) > 0 {
+		rmnRemoteConfigSignersPB = make([]*ocrtypecodecpb.RemoteSignerInfo, len(rmnRemoteCfg.Signers))
+	}
+
 	for i, s := range rmnRemoteCfg.Signers {
 		rmnRemoteConfigSignersPB[i] = &ocrtypecodecpb.RemoteSignerInfo{
 			OnchainPublicKey: s.OnchainPublicKey,
@@ -193,9 +237,13 @@ func (t *protoTranslator) rmnRemoteConfigToProto(rmnRemoteCfg rmntypes.RemoteCon
 	}
 }
 
-func (t *protoTranslator) rmnRemoteConfigFromProto(pbRmnRemoteCfg *ocrtypecodecpb.RmnRemoteConfig) rmntypes.RemoteConfig {
-	rmnSigners := make([]rmntypes.RemoteSignerInfo, len(pbRmnRemoteCfg.Signers))
-
+func (t *protoTranslator) rmnRemoteConfigFromProto(
+	pbRmnRemoteCfg *ocrtypecodecpb.RmnRemoteConfig,
+) rmntypes.RemoteConfig {
+	var rmnSigners []rmntypes.RemoteSignerInfo
+	if len(pbRmnRemoteCfg.Signers) > 0 {
+		rmnSigners = make([]rmntypes.RemoteSignerInfo, len(pbRmnRemoteCfg.Signers))
+	}
 	for i, s := range pbRmnRemoteCfg.Signers {
 		rmnSigners[i] = rmntypes.RemoteSignerInfo{
 			OnchainPublicKey: s.OnchainPublicKey,
@@ -230,7 +278,11 @@ func (t *protoTranslator) fChainFromProto(pbFChain map[uint64]int32) map[cciptyp
 }
 
 func (t *protoTranslator) feedTokenPricesToProto(feedPrices cciptypes.TokenPriceMap) map[string][]byte {
-	feedTokenPrices := make(map[string][]byte, len(feedPrices))
+	var feedTokenPrices map[string][]byte
+	if len(feedPrices) > 0 {
+		feedTokenPrices = make(map[string][]byte, len(feedPrices))
+	}
+
 	for k, v := range feedPrices {
 		feedTokenPrices[string(k)] = v.Bytes()
 	}
@@ -238,7 +290,11 @@ func (t *protoTranslator) feedTokenPricesToProto(feedPrices cciptypes.TokenPrice
 }
 
 func (t *protoTranslator) feedTokenPricesFromProto(pbFeedPrices map[string][]byte) cciptypes.TokenPriceMap {
-	feedTokenPrices := make(cciptypes.TokenPriceMap, len(pbFeedPrices))
+	var feedTokenPrices cciptypes.TokenPriceMap
+	if len(pbFeedPrices) > 0 {
+		feedTokenPrices = make(cciptypes.TokenPriceMap, len(pbFeedPrices))
+	}
+
 	for k, v := range pbFeedPrices {
 		feedTokenPrices[cciptypes.UnknownEncodedAddress(k)] = cciptypes.NewBigInt(big.NewInt(0).SetBytes(v))
 	}
@@ -260,7 +316,9 @@ func (t *protoTranslator) feeQuoterTokenUpdatesToProto(
 	return feeQuoterTokenUpdates
 }
 
-func (t *protoTranslator) feeQuoterTokenUpdatesFromProto(pbTokenUpdates map[string]*ocrtypecodecpb.TimestampedBig) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
+func (t *protoTranslator) feeQuoterTokenUpdatesFromProto(
+	pbTokenUpdates map[string]*ocrtypecodecpb.TimestampedBig,
+) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
 	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, len(pbTokenUpdates))
 	for k, v := range pbTokenUpdates {
 		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(k)] = plugintypes.TimestampedBig{
@@ -383,7 +441,11 @@ func (t *protoTranslator) discoveryAddressesFromProto(
 }
 
 func (t *protoTranslator) chainRangeToProto(chainRange []plugintypes.ChainRange) []*ocrtypecodecpb.ChainRange {
-	rangesSelectedForReport := make([]*ocrtypecodecpb.ChainRange, len(chainRange))
+	var rangesSelectedForReport []*ocrtypecodecpb.ChainRange
+	if len(chainRange) > 0 {
+		rangesSelectedForReport = make([]*ocrtypecodecpb.ChainRange, len(chainRange))
+	}
+
 	for i, r := range chainRange {
 		rangesSelectedForReport[i] = &ocrtypecodecpb.ChainRange{
 			ChainSel: uint64(r.ChainSel),
@@ -397,7 +459,11 @@ func (t *protoTranslator) chainRangeToProto(chainRange []plugintypes.ChainRange)
 }
 
 func (t *protoTranslator) chainRangeFromProto(pbChainRange []*ocrtypecodecpb.ChainRange) []plugintypes.ChainRange {
-	rangesSelectedForReport := make([]plugintypes.ChainRange, len(pbChainRange))
+	var rangesSelectedForReport []plugintypes.ChainRange
+	if len(pbChainRange) > 0 {
+		rangesSelectedForReport = make([]plugintypes.ChainRange, len(pbChainRange))
+	}
+
 	for i, r := range pbChainRange {
 		rangesSelectedForReport[i] = plugintypes.ChainRange{
 			ChainSel: cciptypes.ChainSelector(r.ChainSel),
@@ -423,7 +489,11 @@ func (t *protoTranslator) gasPriceChainToProto(gpc []cciptypes.GasPriceChain) []
 }
 
 func (t *protoTranslator) gasPriceChainFromProto(pbGpc []*ocrtypecodecpb.GasPriceChain) []cciptypes.GasPriceChain {
-	gasPrices := make([]cciptypes.GasPriceChain, len(pbGpc))
+	var gasPrices []cciptypes.GasPriceChain
+	if len(pbGpc) > 0 {
+		gasPrices = make([]cciptypes.GasPriceChain, len(pbGpc))
+	}
+
 	for i, gp := range pbGpc {
 		gasPrices[i] = cciptypes.GasPriceChain{
 			ChainSel: cciptypes.ChainSelector(gp.ChainSel),

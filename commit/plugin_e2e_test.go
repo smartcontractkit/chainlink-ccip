@@ -92,6 +92,8 @@ var (
 	}
 )
 
+var ocrTypCodec = ocrtypecodec.NewCommitCodecProto()
+
 func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 	params := defaultNodeParams(t)
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
@@ -126,9 +128,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
-			RMNEnabledChains:    map[ccipocr3.ChainSelector]bool{},
-			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
-			RMNRemoteCfg:        params.rmnReportCfg,
+			RMNRemoteCfg: params.rmnReportCfg,
 		},
 	}
 
@@ -173,7 +173,6 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 					},
 					BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
 					PriceUpdates:       ccipocr3.PriceUpdates{},
-					RMNSignatures:      []ccipocr3.RMNECDSASignature{},
 				},
 			},
 		},
@@ -242,13 +241,13 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				preparePriceReaderMock(n.priceReader)
 			}
 
-			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
+			encodedPrevOutcome, err := ocrTypCodec.EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -444,13 +443,13 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				tc.mockPriceReader(n.priceReader)
 			}
 
-			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
+			encodedPrevOutcome, err := ocrTypCodec.EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -689,13 +688,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				tc.mockCCIPReader(n.ccipReader)
 			}
 
-			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
+			encodedPrevOutcome, err := ocrTypCodec.EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -1007,22 +1006,15 @@ var merkleRoot1 = ccipocr3.Bytes32{0x4a, 0x44, 0xdc, 0x15, 0x36, 0x42, 0x4, 0xa8
 
 func baseMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
 	return merkleroot.Outcome{
-		OutcomeType:             merkleroot.ReportIntervalsSelected,
-		RangesSelectedForReport: []plugintypes.ChainRange{},
-		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
-		RMNRemoteCfg:            r,
+		OutcomeType:  merkleroot.ReportIntervalsSelected,
+		RMNRemoteCfg: r,
 	}
 }
 
 func noReportMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
 	return merkleroot.Outcome{
-		OutcomeType:             merkleroot.ReportEmpty,
-		RangesSelectedForReport: nil,
-		RootsToReport:           []ccipocr3.MerkleRootChain{},
-		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
-		RMNReportSignatures:     []ccipocr3.RMNECDSASignature{},
-		RMNRemoteCfg:            r,
-		RMNEnabledChains:        map[ccipocr3.ChainSelector]bool{},
+		OutcomeType:  merkleroot.ReportEmpty,
+		RMNRemoteCfg: r,
 	}
 }
 

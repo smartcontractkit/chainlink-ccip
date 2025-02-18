@@ -180,7 +180,7 @@ func (c *CommitCodecProto) EncodeOutcome(outcome committypes.Outcome) ([]byte, e
 		},
 	}
 
-	return proto.Marshal(pbOutcome)
+	return proto.MarshalOptions{Deterministic: true}.Marshal(pbOutcome)
 }
 
 func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, error) {
