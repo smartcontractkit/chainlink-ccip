@@ -31,6 +31,12 @@ type ChainConfigSnapshot struct {
 	RMNProxy  RMNProxyConfig
 	RMNRemote RMNRemoteConfig
 	FeeQuoter FeeQuoterConfig
+	OnRamp    OnRampConfig
+}
+
+type OnRampConfig struct {
+	DynamicConfig   getOnRampDynamicConfigResponse
+	DestChainConfig onRampDestChainConfig
 }
 
 type FeeQuoterConfig struct {
@@ -74,14 +80,17 @@ func NewCCIPChainReader(
 	offrampAddress []byte,
 	extraDataCodec cciptypes.ExtraDataCodec,
 ) CCIPReader {
-	return newCCIPChainReaderInternal(
-		ctx,
-		lggr,
-		contractReaders,
-		contractWriters,
+	return NewObservedCCIPReader(
+		newCCIPChainReaderInternal(
+			ctx,
+			lggr,
+			contractReaders,
+			contractWriters,
+			destChain,
+			offrampAddress,
+			extraDataCodec,
+		),
 		destChain,
-		offrampAddress,
-		extraDataCodec,
 	)
 }
 
@@ -127,6 +136,9 @@ type CCIPReader interface {
 		chain cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
 	) ([]cciptypes.Message, error)
+
+	// LatestMsgSeqNum reads the source chain and returns the latest finalized message sequence number.
+	LatestMsgSeqNum(ctx context.Context, chain cciptypes.ChainSelector) (cciptypes.SeqNum, error)
 
 	// GetExpectedNextSequenceNumber reads the destination and returns the expected next onRamp sequence number.
 	GetExpectedNextSequenceNumber(

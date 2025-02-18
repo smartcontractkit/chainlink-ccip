@@ -1,4 +1,23 @@
+use std::fmt::Display;
+
+use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+#[repr(u8)]
+pub enum CodeVersion {
+    Default = 0,
+    V1,
+}
+
+impl Display for CodeVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CodeVersion::Default => write!(f, "Default"),
+            CodeVersion::V1 => write!(f, "V1"),
+        }
+    }
+}
 
 #[account]
 #[derive(InitSpace, Debug)]
@@ -14,11 +33,16 @@ pub struct Config {
     // TODO The following field is unused until the day we integrate with feeds to fetch fresh values
     // pub token_price_staleness_threshold: u32,
     pub onramp: Pubkey,
+
+    pub default_code_version: CodeVersion,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct DestChainConfig {
     pub is_enabled: bool, // Whether this destination chain is enabled
+
+    // The code version of the lane, in case we need to shift traffic to new logic for a single lane to test an upgrade
+    pub lane_code_version: CodeVersion,
 
     pub max_number_of_tokens_per_msg: u16, // Maximum number of distinct ERC20 token transferred per message
     pub max_data_bytes: u32,               // Maximum payload data size in bytes

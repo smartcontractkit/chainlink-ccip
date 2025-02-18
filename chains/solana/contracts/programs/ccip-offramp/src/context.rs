@@ -135,8 +135,16 @@ pub struct Initialize<'info> {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct CommitInput {
     pub price_updates: PriceUpdates,
-    pub merkle_root: MerkleRoot,
+    pub merkle_root: Option<MerkleRoot>,
     pub rmn_signatures: Vec<[u8; 64]>, // placeholder for stable interface; r = 32, s = 32; https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/interfaces/IRMNRemote.sol#L9
+}
+
+impl CommitInput {
+    pub fn root(mut raw: &[u8]) -> Result<MerkleRoot> {
+        CommitInput::deserialize(&mut raw)?
+            .merkle_root
+            .ok_or(CcipOfframpError::MissingExpectedMerkleRoot.into())
+    }
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -159,7 +167,7 @@ pub struct GasPriceUpdate {
 }
 
 /// Struct to hold a merkle root and an interval for a source chain
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Default, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct MerkleRoot {
     pub source_chain_selector: u64, // Remote source chain selector that the Merkle Root is scoped to
     pub on_ramp_address: Vec<u8>,   // Generic onramp address, to support arbitrary sources
@@ -169,12 +177,16 @@ pub struct MerkleRoot {
 }
 
 impl MerkleRoot {
-    pub fn len(&self) -> usize {
-        8  + // source chain selector
-        4 + self.on_ramp_address.len() + // on ramp address
+    pub fn static_len() -> usize {
+        8 + // source chain selector
+        4 + // on ramp address, static
         8 + // min msg nr
         8 + // max msg nr
         32 // root
+    }
+
+    pub fn len(&self) -> usize {
+        Self::static_len() + self.on_ramp_address.len() // on ramp address, dynamic
     }
 }
 
@@ -308,7 +320,7 @@ pub struct CommitReportContext<'info> {
 
     #[account(
         mut,
-        seeds = [seed::SOURCE_CHAIN, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref()],
+        seeds = [seed::SOURCE_CHAIN, CommitInput::root(&raw_report)?.source_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(source_chain.version, MAX_CHAIN_V) @ CcipOfframpError::InvalidVersion,
     )]
@@ -316,12 +328,71 @@ pub struct CommitReportContext<'info> {
 
     #[account(
         init,
-        seeds = [seed::COMMIT_REPORT, CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.source_chain_selector.to_le_bytes().as_ref(), CommitInput::deserialize(&mut raw_report.as_ref())?.merkle_root.merkle_root.as_ref()],
+        seeds = [seed::COMMIT_REPORT, CommitInput::root(&raw_report)?.source_chain_selector.to_le_bytes().as_ref(), CommitInput::root(&raw_report)?.merkle_root.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + CommitReport::INIT_SPACE,
     )]
     pub commit_report: Account<'info, CommitReport>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+
+    /// CHECK: This is the sysvar instructions account
+    #[account(address = instructions::ID @ CcipOfframpError::InvalidInputsSysvarAccount)]
+    pub sysvar_instructions: UncheckedAccount<'info>,
+
+    /// CHECK: This is the signer for the billing CPIs, used here to invoke fee quoter with price updates
+    #[account(
+        seeds = [seed::FEE_BILLING_SIGNER],
+        bump
+    )]
+    pub fee_billing_signer: UncheckedAccount<'info>,
+
+    /// CHECK: fee quoter program account, used to invoke fee quoter with price updates
+    #[account(
+        address = reference_addresses.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
+    )]
+    pub fee_quoter: UncheckedAccount<'info>,
+
+    /// CHECK: fee quoter allowed price updater account, used to invoke fee quoter with price updates
+    /// so that it can authorize the call made by this offramp
+    #[account(
+        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
+        bump,
+        seeds::program = fee_quoter.key(),
+    )]
+    pub fee_quoter_allowed_price_updater: UncheckedAccount<'info>,
+
+    /// CHECK: fee quoter config account, used to invoke fee quoter with price updates
+    #[account(
+        seeds = [fee_quoter::context::seed::CONFIG],
+        bump,
+        seeds::program = reference_addresses.fee_quoter,
+    )]
+    pub fee_quoter_config: UncheckedAccount<'info>,
+    // remaining accounts
+    // global state account (to update the last seen price sequence number)
+    // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
+    // [...chainConfig accounts] fee quoter accounts used to store gas prices
+}
+
+#[derive(Accounts)]
+pub struct PriceOnlyCommitReportContext<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub reference_addresses: Account<'info, ReferenceAddresses>,
 
     #[account(mut)]
     pub authority: Signer<'info>,

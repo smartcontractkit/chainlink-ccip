@@ -5,6 +5,8 @@ use crate::state::MessageExecutionState;
 
 #[event]
 pub struct CommitReportAccepted {
+    // Will be zero'd (MerkleRoot::Default() in case the commit report included no
+    // merkle root. This is to circumvent a Go deserialization issue.)
     pub merkle_root: MerkleRoot,
     pub price_updates: PriceUpdates,
 }
@@ -51,5 +53,18 @@ pub mod admin {
     pub struct OwnershipTransferred {
         pub from: Pubkey,
         pub to: Pubkey,
+    }
+
+    #[event]
+    pub struct ConfigSet {
+        pub svm_chain_selector: u64,
+        pub enable_manual_execution_after: i64,
+    }
+
+    #[event]
+    pub struct ReferenceAddressesSet {
+        pub router: Pubkey,
+        pub fee_quoter: Pubkey,
+        pub offramp_lookup_table: Pubkey,
     }
 }

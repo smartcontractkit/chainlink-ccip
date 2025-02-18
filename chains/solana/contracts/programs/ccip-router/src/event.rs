@@ -3,11 +3,9 @@ use anchor_lang::prelude::*;
 use crate::{DestChainConfig, SVM2AnyRampMessage};
 
 pub mod events {
-
     use super::*;
 
     pub mod on_ramp {
-
         use super::*;
         #[event]
         pub struct CCIPMessageSent {
@@ -19,6 +17,15 @@ pub mod events {
 
     pub mod admin {
         use super::*;
+
+        // NOTE: ownership update events can be found in OwnershipTransferRequested, OwnershipTransferred
+        #[event]
+        pub struct ConfigSet {
+            pub svm_chain_selector: u64,
+            pub fee_quoter: Pubkey,
+            pub link_token_mint: Pubkey,
+            pub fee_aggregator: Pubkey,
+        }
 
         #[event]
         pub struct FeeTokenAdded {
@@ -76,10 +83,23 @@ pub mod events {
             pub source_chain_selector: u64,
             pub offramp: Pubkey,
         }
+
+        #[event]
+        pub struct CcipVersionForDestChainVersionBumped {
+            pub dest_chain_selector: u64,
+            pub previous_sequence_number: u64,
+            pub new_sequence_number: u64,
+        }
+
+        #[event]
+        pub struct CcipVersionForDestChainVersionRolledBack {
+            pub dest_chain_selector: u64,
+            pub previous_sequence_number: u64,
+            pub new_sequence_number: u64,
+        }
     }
 
     pub mod token_admin_registry {
-
         use super::*;
         #[event]
         pub struct PoolSet {
@@ -101,11 +121,4 @@ pub mod events {
             pub new_admin: Pubkey,
         }
     }
-}
-
-#[event]
-// TODO: Check why this is not used
-pub struct PremiumMultiplierWeiPerEthUpdated {
-    pub token: Pubkey,
-    pub premium_multiplier_wei_per_eth: u64,
 }

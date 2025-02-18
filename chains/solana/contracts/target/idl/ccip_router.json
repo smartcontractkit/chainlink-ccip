@@ -135,9 +135,48 @@
       "args": []
     },
     {
-      "name": "updateFeeAggregator",
+      "name": "setDefaultCodeVersion",
       "docs": [
         "Config //",
+        "Sets the default code version to be used. This is then used by the slim routing layer to determine",
+        "which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.",
+        "",
+        "Shared func signature with other programs",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `code_version` - The new code version to be set as default."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "codeVersion",
+          "type": {
+            "defined": "CodeVersion"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateFeeAggregator",
+      "docs": [
         "Updates the fee aggregator in the router configuration.",
         "The Admin is the only one able to update the fee aggregator.",
         "",
@@ -393,6 +432,88 @@
       "args": [
         {
           "name": "newChainSelector",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "bumpCcipVersionForDestChain",
+      "docs": [
+        "Bumps the CCIP version for a destination chain.",
+        "This effectively just resets the sequence number of the destination chain state.",
+        "If there had been a previous rollback, on re-upgrade the sequence number will resume from where it was",
+        "prior to the rollback.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context containing the accounts required for the bump.",
+        "* `dest_chain_selector` - The destination chain selector to bump version for."
+      ],
+      "accounts": [
+        {
+          "name": "destChainState",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "rollbackCcipVersionForDestChain",
+      "docs": [
+        "Rolls back the CCIP version for a destination chain.",
+        "This effectively just restores the old version's sequence number of the destination chain state.",
+        "We only support 1 consecutive rollback. If a rollback has occurred for that lane, the version can't",
+        "be rolled back again without bumping the version first.",
+        "",
+        "# Arguments",
+        "* `ctx` - The context containing the accounts required for the rollback.",
+        "* `dest_chain_selector` - The destination chain selector to rollback the version for."
+      ],
+      "accounts": [
+        {
+          "name": "destChainState",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
           "type": "u64"
         }
       ]
@@ -909,26 +1030,14 @@
             "type": "u8"
           },
           {
-            "name": "padding0",
+            "name": "defaultCodeVersion",
             "type": {
-              "array": [
-                "u8",
-                7
-              ]
+              "defined": "CodeVersion"
             }
           },
           {
             "name": "svmChainSelector",
             "type": "u64"
-          },
-          {
-            "name": "padding1",
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
           },
           {
             "name": "owner",
@@ -937,15 +1046,6 @@
           {
             "name": "proposedOwner",
             "type": "publicKey"
-          },
-          {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
           },
           {
             "name": "feeQuoter",
@@ -1242,6 +1342,16 @@
           {
             "name": "sequenceNumber",
             "type": "u64"
+          },
+          {
+            "name": "sequenceNumberToRestore",
+            "type": "u64"
+          },
+          {
+            "name": "restoreOnAction",
+            "type": {
+              "defined": "RestoreOnAction"
+            }
           }
         ]
       }
@@ -1252,6 +1362,12 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "laneCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
+          },
+          {
             "name": "allowedSenders",
             "type": {
               "vec": "publicKey"
@@ -1260,6 +1376,37 @@
           {
             "name": "allowListEnabled",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CodeVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Default"
+          },
+          {
+            "name": "V1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RestoreOnAction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Upgrade"
+          },
+          {
+            "name": "Rollback"
           }
         ]
       }
@@ -1340,12 +1487,43 @@
           },
           {
             "name": "SenderNotAllowed"
+          },
+          {
+            "name": "InvalidCodeVersion"
+          },
+          {
+            "name": "InvalidCcipVersionRollback"
           }
         ]
       }
     }
   ],
   "events": [
+    {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "svmChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "feeAggregator",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
     {
       "name": "FeeTokenAdded",
       "fields": [
@@ -1486,6 +1664,46 @@
       ]
     },
     {
+      "name": "CcipVersionForDestChainVersionBumped",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "previousSequenceNumber",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "newSequenceNumber",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CcipVersionForDestChainVersionRolledBack",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "previousSequenceNumber",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "newSequenceNumber",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "CCIPMessageSent",
       "fields": [
         {
@@ -1558,21 +1776,6 @@
         {
           "name": "newAdmin",
           "type": "publicKey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "PremiumMultiplierWeiPerEthUpdated",
-      "fields": [
-        {
-          "name": "token",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "premiumMultiplierWeiPerEth",
-          "type": "u64",
           "index": false
         }
       ]

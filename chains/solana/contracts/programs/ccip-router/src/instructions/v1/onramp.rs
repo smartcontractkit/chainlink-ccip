@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use fee_quoter::messages::TokenTransferAdditionalData;
 
+use super::super::interfaces::OnRamp;
 use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
@@ -18,200 +19,204 @@ use crate::{
 
 use helpers::*;
 
-pub fn ccip_send<'info>(
-    ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
-    dest_chain_selector: u64,
-    message: SVM2AnyMessage,
-    token_indexes: Vec<u8>,
-) -> Result<[u8; 32]> {
-    // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
-    let config = ctx.accounts.config.load()?;
+pub struct Impl;
+impl OnRamp for Impl {
+    fn ccip_send<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+        token_indexes: Vec<u8>,
+    ) -> Result<[u8; 32]> {
+        let sender = ctx.accounts.authority.key.to_owned();
+        let dest_chain = &mut ctx.accounts.dest_chain_state;
 
-    let sender = ctx.accounts.authority.key.to_owned();
-    let dest_chain = &mut ctx.accounts.dest_chain_state;
-
-    require!(
-        !dest_chain.config.allow_list_enabled
-            || dest_chain.config.allowed_senders.contains(&sender),
-        CcipRouterError::SenderNotAllowed
-    );
-
-    let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
-
-    for (i, token_amount) in message.token_amounts.iter().enumerate() {
         require!(
-            token_amount.amount != 0,
-            CcipRouterError::InvalidInputsTokenAmount
+            !dest_chain.config.allow_list_enabled
+                || dest_chain.config.allowed_senders.contains(&sender),
+            CcipRouterError::SenderNotAllowed
         );
 
-        // Calculate the indexes for the additional accounts of the current token index `i`
-        let (start, end) =
-            calculate_token_pool_account_indices(i, &token_indexes, ctx.remaining_accounts.len())?;
+        let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
 
-        let current_token_accounts = validate_and_parse_token_accounts(
-            ctx.accounts.authority.key(),
+        for (i, token_amount) in message.token_amounts.iter().enumerate() {
+            require!(
+                token_amount.amount != 0,
+                CcipRouterError::InvalidInputsTokenAmount
+            );
+
+            // Calculate the indexes for the additional accounts of the current token index `i`
+            let (start, end) = calculate_token_pool_account_indices(
+                i,
+                &token_indexes,
+                ctx.remaining_accounts.len(),
+            )?;
+
+            let current_token_accounts = validate_and_parse_token_accounts(
+                ctx.accounts.authority.key(),
+                dest_chain_selector,
+                ctx.program_id.key(),
+                &ctx.remaining_accounts[start..end],
+            )?;
+
+            accounts_per_sent_token.push(current_token_accounts);
+        }
+
+        let get_fee_result = get_fee_cpi(
+            &ctx,
             dest_chain_selector,
-            ctx.program_id.key(),
-            &ctx.remaining_accounts[start..end],
+            &message,
+            &accounts_per_sent_token,
         )?;
 
-        accounts_per_sent_token.push(current_token_accounts);
-    }
-
-    let get_fee_result = get_fee_cpi(
-        &ctx,
-        dest_chain_selector,
-        &message,
-        &accounts_per_sent_token,
-    )?;
-
-    let is_paying_with_native_sol = message.fee_token == Pubkey::default();
-    if is_paying_with_native_sol {
-        transfer_and_wrap_native_sol(
-            &ctx.accounts.fee_token_program.to_account_info(),
-            &mut ctx.accounts.authority,
-            &mut ctx.accounts.fee_token_receiver,
-            get_fee_result.amount,
-            ctx.bumps.fee_billing_signer,
-        )?;
-    } else {
-        let transfer = token_interface::TransferChecked {
-            from: ctx
-                .accounts
-                .fee_token_user_associated_account
-                .to_account_info(),
-            to: ctx.accounts.fee_token_receiver.to_account_info(),
-            mint: ctx.accounts.fee_token_mint.to_account_info(),
-            authority: ctx.accounts.fee_billing_signer.to_account_info(),
-        };
-
-        let transferable_fee = SVMTokenAmount {
-            token: get_fee_result.token,
-            amount: get_fee_result.amount,
-        };
-
-        transfer_fee(
-            &transferable_fee,
-            ctx.accounts.fee_token_program.to_account_info(),
-            transfer,
-            ctx.accounts.fee_token_mint.decimals,
-            ctx.bumps.fee_billing_signer,
-        )?;
-    }
-
-    let dest_chain = &mut ctx.accounts.dest_chain_state;
-
-    let overflow_add = dest_chain.state.sequence_number.checked_add(1);
-    require!(
-        overflow_add.is_some(),
-        CcipRouterError::ReachedMaxSequenceNumber
-    );
-    dest_chain.state.sequence_number = overflow_add.unwrap();
-
-    let receiver = message.receiver.clone();
-    let source_chain_selector = config.svm_chain_selector;
-
-    let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
-    let final_nonce = bump_nonce(
-        nonce_counter_account,
-        get_fee_result
-            .processed_extra_args
-            .allow_out_of_order_execution,
-    )
-    .unwrap();
-
-    let token_count = message.token_amounts.len();
-    require!(
-        token_indexes.len() == token_count,
-        CcipRouterError::InvalidInputsTokenIndices,
-    );
-
-    let mut new_message: SVM2AnyRampMessage = SVM2AnyRampMessage {
-        sender,
-        receiver,
-        data: message.data,
-        header: RampMessageHeader {
-            message_id: [0; 32],
-            source_chain_selector,
-            dest_chain_selector,
-            sequence_number: dest_chain.state.sequence_number,
-            nonce: final_nonce,
-        },
-        extra_args: get_fee_result.processed_extra_args.bytes,
-        fee_token: message.fee_token,
-        fee_token_amount: get_fee_result.amount.into(),
-        fee_value_juels: get_fee_result.juels.into(),
-        token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count], // this will be set later
-    };
-
-    let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
-    for (i, (current_token_accounts, token_amount)) in accounts_per_sent_token
-        .iter()
-        .zip(message.token_amounts.iter())
-        .enumerate()
-    {
-        let router_token_pool_signer = &ctx.accounts.token_pools_signer;
-
-        // CPI: transfer token amount from user to token pool
-        transfer_token(
-            token_amount.amount,
-            current_token_accounts.token_program,
-            current_token_accounts.mint,
-            current_token_accounts.user_token_account,
-            current_token_accounts.pool_token_account,
-            router_token_pool_signer,
-            seeds,
-        )?;
-
-        // CPI: call lockOrBurn on token pool
-        {
-            let lock_or_burn = LockOrBurnInV1 {
-                receiver: message.receiver.clone(),
-                remote_chain_selector: dest_chain_selector,
-                original_sender: ctx.accounts.authority.key(),
-                amount: token_amount.amount,
-                local_token: token_amount.token,
+        let is_paying_with_native_sol = message.fee_token == Pubkey::default();
+        if is_paying_with_native_sol {
+            transfer_and_wrap_native_sol(
+                &ctx.accounts.fee_token_program.to_account_info(),
+                &mut ctx.accounts.authority,
+                &mut ctx.accounts.fee_token_receiver,
+                get_fee_result.amount,
+                ctx.bumps.fee_billing_signer,
+            )?;
+        } else {
+            let transfer = token_interface::TransferChecked {
+                from: ctx
+                    .accounts
+                    .fee_token_user_associated_account
+                    .to_account_info(),
+                to: ctx.accounts.fee_token_receiver.to_account_info(),
+                mint: ctx.accounts.fee_token_mint.to_account_info(),
+                authority: ctx.accounts.fee_billing_signer.to_account_info(),
             };
 
-            let mut acc_infos = router_token_pool_signer.to_account_infos();
-            acc_infos.extend_from_slice(&[
-                current_token_accounts.pool_config.to_account_info(),
-                current_token_accounts.token_program.to_account_info(),
-                current_token_accounts.mint.to_account_info(),
-                current_token_accounts.pool_signer.to_account_info(),
-                current_token_accounts.pool_token_account.to_account_info(),
-                current_token_accounts.pool_chain_config.to_account_info(),
-            ]);
-            acc_infos.extend_from_slice(current_token_accounts.remaining_accounts);
+            let transferable_fee = SVMTokenAmount {
+                token: get_fee_result.token,
+                amount: get_fee_result.amount,
+            };
 
-            let return_data = interact_with_pool(
-                current_token_accounts.pool_program.key(),
-                router_token_pool_signer.key(),
-                acc_infos,
-                lock_or_burn,
+            transfer_fee(
+                &transferable_fee,
+                ctx.accounts.fee_token_program.to_account_info(),
+                transfer,
+                ctx.accounts.fee_token_mint.decimals,
+                ctx.bumps.fee_billing_signer,
+            )?;
+        }
+
+        let dest_chain = &mut ctx.accounts.dest_chain_state;
+
+        let overflow_add = dest_chain.state.sequence_number.checked_add(1);
+        require!(
+            overflow_add.is_some(),
+            CcipRouterError::ReachedMaxSequenceNumber
+        );
+        dest_chain.state.sequence_number = overflow_add.unwrap();
+
+        let receiver = message.receiver.clone();
+        let source_chain_selector = ctx.accounts.config.svm_chain_selector;
+
+        let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
+        let final_nonce = bump_nonce(
+            nonce_counter_account,
+            get_fee_result
+                .processed_extra_args
+                .allow_out_of_order_execution,
+        )
+        .unwrap();
+
+        let token_count = message.token_amounts.len();
+        require!(
+            token_indexes.len() == token_count,
+            CcipRouterError::InvalidInputsTokenIndices,
+        );
+
+        let mut new_message: SVM2AnyRampMessage = SVM2AnyRampMessage {
+            sender,
+            receiver,
+            data: message.data,
+            header: RampMessageHeader {
+                message_id: [0; 32],
+                source_chain_selector,
+                dest_chain_selector,
+                sequence_number: dest_chain.state.sequence_number,
+                nonce: final_nonce,
+            },
+            extra_args: get_fee_result.processed_extra_args.bytes,
+            fee_token: message.fee_token,
+            fee_token_amount: get_fee_result.amount.into(),
+            fee_value_juels: get_fee_result.juels.into(),
+            token_amounts: vec![SVM2AnyTokenTransfer::default(); token_count], // this will be set later
+        };
+
+        let seeds = &[seed::EXTERNAL_TOKEN_POOL, &[ctx.bumps.token_pools_signer]];
+        for (i, (current_token_accounts, token_amount)) in accounts_per_sent_token
+            .iter()
+            .zip(message.token_amounts.iter())
+            .enumerate()
+        {
+            let router_token_pool_signer = &ctx.accounts.token_pools_signer;
+
+            // CPI: transfer token amount from user to token pool
+            transfer_token(
+                token_amount.amount,
+                current_token_accounts.token_program,
+                current_token_accounts.mint,
+                current_token_accounts.user_token_account,
+                current_token_accounts.pool_token_account,
+                router_token_pool_signer,
                 seeds,
             )?;
 
-            let lock_or_burn_out_data = LockOrBurnOutV1::try_from_slice(&return_data)?;
-            new_message.token_amounts[i] = token_transfer(
-                lock_or_burn_out_data,
-                current_token_accounts.pool_config.key(),
-                token_amount,
-                &get_fee_result.token_transfer_additional_data[i],
-            )?;
+            // CPI: call lockOrBurn on token pool
+            {
+                let lock_or_burn = LockOrBurnInV1 {
+                    receiver: message.receiver.clone(),
+                    remote_chain_selector: dest_chain_selector,
+                    original_sender: ctx.accounts.authority.key(),
+                    amount: token_amount.amount,
+                    local_token: token_amount.token,
+                };
+
+                let mut acc_infos = router_token_pool_signer.to_account_infos();
+                acc_infos.extend_from_slice(&[
+                    current_token_accounts.pool_config.to_account_info(),
+                    current_token_accounts.token_program.to_account_info(),
+                    current_token_accounts.mint.to_account_info(),
+                    current_token_accounts.pool_signer.to_account_info(),
+                    current_token_accounts.pool_token_account.to_account_info(),
+                    current_token_accounts.pool_chain_config.to_account_info(),
+                ]);
+                acc_infos.extend_from_slice(current_token_accounts.remaining_accounts);
+
+                let return_data = interact_with_pool(
+                    current_token_accounts.pool_program.key(),
+                    router_token_pool_signer.key(),
+                    acc_infos,
+                    lock_or_burn,
+                    seeds,
+                )?;
+
+                let lock_or_burn_out_data = LockOrBurnOutV1::try_from_slice(&return_data)?;
+                new_message.token_amounts[i] = token_transfer(
+                    lock_or_burn_out_data,
+                    current_token_accounts.pool_config.key(),
+                    token_amount,
+                    &get_fee_result.token_transfer_additional_data[i],
+                )?;
+            }
         }
+
+        let message_id = &helpers::hash(&new_message);
+        new_message.header.message_id.clone_from(message_id);
+
+        emit!(events::CCIPMessageSent {
+            dest_chain_selector,
+            sequence_number: new_message.header.sequence_number,
+            message: new_message,
+        });
+
+        Ok(*message_id)
     }
-
-    let message_id = &helpers::hash(&new_message);
-    new_message.header.message_id.clone_from(message_id);
-
-    emit!(events::CCIPMessageSent {
-        dest_chain_selector,
-        sequence_number: new_message.header.sequence_number,
-        message: new_message,
-    });
-
-    Ok(*message_id)
 }
 
 mod helpers {

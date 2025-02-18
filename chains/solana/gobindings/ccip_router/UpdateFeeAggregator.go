@@ -10,7 +10,6 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Config //
 // Updates the fee aggregator in the router configuration.
 // The Admin is the only one able to update the fee aggregator.
 //

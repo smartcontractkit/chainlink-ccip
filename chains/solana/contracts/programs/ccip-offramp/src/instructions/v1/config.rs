@@ -33,6 +33,7 @@ fn trim_trailing_zeros(input: &[u8]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
+    use crate::state::CodeVersion;
 
     use super::*;
 
@@ -81,6 +82,7 @@ mod tests {
             let config = SourceChainConfig {
                 is_enabled: true,
                 on_ramp: case.on_ramp,
+                lane_code_version: CodeVersion::Default,
             };
             let result = get_on_ramps(&config);
             assert_eq!(
@@ -199,6 +201,7 @@ mod tests {
             let config = SourceChainConfig {
                 is_enabled: true,
                 on_ramp: case.config_on_ramps,
+                lane_code_version: CodeVersion::Default,
             };
             let result = is_on_ramp_configured(&config, &case.given_on_ramp);
             assert_eq!(

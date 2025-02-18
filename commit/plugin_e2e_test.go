@@ -930,8 +930,8 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	ccipReader.EXPECT().NextSeqNum(mock.Anything, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
 
 	for _, ch := range sourceChains {
-		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
-			mock.Anything, ch).Return(params.offRampNextSeqNum[ch]+1, nil).Maybe()
+		ccipReader.EXPECT().LatestMsgSeqNum(
+			mock.Anything, ch).Return(params.offRampNextSeqNum[ch], nil).Maybe()
 	}
 
 	ccipReader.EXPECT().
