@@ -3,7 +3,6 @@ package ocrtypecodec
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -12,10 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/ocrtypecodecpb"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -68,7 +65,7 @@ func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) 
 func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
 	pbQ := &ocrtypecodecpb.Query{}
 	if err := proto.Unmarshal(data, pbQ); err != nil {
-		return committypes.Query{}, fmt.Errorf("decode query: %w", err)
+		return committypes.Query{}, fmt.Errorf("proto unmarshal query: %w", err)
 	}
 
 	sigs := c.tr.rmnSignaturesFromProto(pbQ.MerkleRootQuery.RmnSignatures.Signatures)
@@ -126,7 +123,7 @@ func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation
 func (c *CommitCodecProto) DecodeObservation(data []byte) (committypes.Observation, error) {
 	pbObs := &ocrtypecodecpb.CommitObservation{}
 	if err := proto.Unmarshal(data, pbObs); err != nil {
-		return committypes.Observation{}, err
+		return committypes.Observation{}, fmt.Errorf("proto unmarshal observation: %w", err)
 	}
 
 	return committypes.Observation{
@@ -160,229 +157,60 @@ func (c *CommitCodecProto) DecodeObservation(data []byte) (committypes.Observati
 }
 
 func (c *CommitCodecProto) EncodeOutcome(outcome committypes.Outcome) ([]byte, error) {
-	rangesSelectedForReport := make([]*ocrtypecodecpb.ChainRange, len(outcome.MerkleRootOutcome.RangesSelectedForReport))
-	for i, r := range outcome.MerkleRootOutcome.RangesSelectedForReport {
-		rangesSelectedForReport[i] = &ocrtypecodecpb.ChainRange{
-			ChainSel: uint64(r.ChainSel),
-			SeqNumRange: &ocrtypecodecpb.SeqNumRange{
-				MinMsgNr: uint64(r.SeqNumRange.Start()),
-				MaxMsgNr: uint64(r.SeqNumRange.End()),
-			},
-		}
-	}
-
-	rootsToReport := make([]*ocrtypecodecpb.MerkleRootChain, len(outcome.MerkleRootOutcome.RootsToReport))
-	for i, root := range outcome.MerkleRootOutcome.RootsToReport {
-		rootsToReport[i] = &ocrtypecodecpb.MerkleRootChain{
-			ChainSel:      uint64(root.ChainSel),
-			OnRampAddress: root.OnRampAddress,
-			SeqNumsRange: &ocrtypecodecpb.SeqNumRange{
-				MinMsgNr: uint64(root.SeqNumsRange.Start()),
-				MaxMsgNr: uint64(root.SeqNumsRange.End()),
-			},
-			MerkleRoot: root.MerkleRoot[:],
-		}
-	}
-
-	rmnEnabledChains := make(map[uint64]bool, len(outcome.MerkleRootOutcome.RMNEnabledChains))
-	for k, v := range outcome.MerkleRootOutcome.RMNEnabledChains {
-		rmnEnabledChains[uint64(k)] = v
-	}
-
-	offRampNextSeqNums := make([]*ocrtypecodecpb.SeqNumChain, len(outcome.MerkleRootOutcome.OffRampNextSeqNums))
-	for i, s := range outcome.MerkleRootOutcome.OffRampNextSeqNums {
-		offRampNextSeqNums[i] = &ocrtypecodecpb.SeqNumChain{
-			ChainSel: uint64(s.ChainSel),
-			SeqNum:   uint64(s.SeqNum),
-		}
-	}
-
-	rmnReportSignatures := make([]*ocrtypecodecpb.SignatureEcdsa, len(outcome.MerkleRootOutcome.RMNReportSignatures))
-	for i, sig := range outcome.MerkleRootOutcome.RMNReportSignatures {
-		rmnReportSignatures[i] = &ocrtypecodecpb.SignatureEcdsa{
-			R: sig.R[:],
-			S: sig.S[:],
-		}
-	}
-
-	pbMerkleRootOutcome := &ocrtypecodecpb.MerkleRootOutcome{
-		OutcomeType:                     int32(outcome.MerkleRootOutcome.OutcomeType),
-		RangesSelectedForReport:         rangesSelectedForReport,
-		RootsToReport:                   rootsToReport,
-		RmnEnabledChains:                rmnEnabledChains,
-		OffRampNextSeqNums:              offRampNextSeqNums,
-		ReportTransmissionCheckAttempts: uint32(outcome.MerkleRootOutcome.ReportTransmissionCheckAttempts),
-		RmnReportSignatures:             rmnReportSignatures,
-		RmnRemoteCfg: &ocrtypecodecpb.RmnRemoteConfig{
-			ContractAddress:  outcome.MerkleRootOutcome.RMNRemoteCfg.ContractAddress,
-			ConfigDigest:     outcome.MerkleRootOutcome.RMNRemoteCfg.ConfigDigest[:],
-			Signers:          encodeRemoteSigners(outcome.MerkleRootOutcome.RMNRemoteCfg.Signers),
-			FSign:            outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
-			ConfigVersion:    outcome.MerkleRootOutcome.RMNRemoteCfg.ConfigVersion,
-			RmnReportVersion: outcome.MerkleRootOutcome.RMNRemoteCfg.RmnReportVersion[:],
-		},
-	}
-
-	// Encode TokenPriceOutcome
-	tokenPrices := make(map[string][]byte, len(outcome.TokenPriceOutcome.TokenPrices))
-	for k, v := range outcome.TokenPriceOutcome.TokenPrices {
-		tokenPrices[string(k)] = v.Bytes()
-	}
-
-	pbTokenPriceOutcome := &ocrtypecodecpb.TokenPriceOutcome{
-		TokenPrices: tokenPrices,
-	}
-
-	// Encode ChainFeeOutcome
-	gasPrices := make([]*ocrtypecodecpb.GasPriceChain, len(outcome.ChainFeeOutcome.GasPrices))
-	for i, gp := range outcome.ChainFeeOutcome.GasPrices {
-		gasPrices[i] = &ocrtypecodecpb.GasPriceChain{
-			ChainSel: uint64(gp.ChainSel),
-			GasPrice: gp.GasPrice.Bytes(),
-		}
-	}
-
-	pbChainFeeOutcome := &ocrtypecodecpb.ChainFeeOutcome{
-		GasPrices: gasPrices,
-	}
-
-	// Encode MainOutcome
-	pbMainOutcome := &ocrtypecodecpb.MainOutcome{
-		InflightPriceOcrSequenceNumber: uint64(outcome.MainOutcome.InflightPriceOcrSequenceNumber),
-		RemainingPriceChecks:           int32(outcome.MainOutcome.RemainingPriceChecks),
-	}
-
 	pbOutcome := &ocrtypecodecpb.CommitOutcome{
-		MerkleRootOutcome: pbMerkleRootOutcome,
-		TokenPriceOutcome: pbTokenPriceOutcome,
-		ChainFeeOutcome:   pbChainFeeOutcome,
-		MainOutcome:       pbMainOutcome,
+		MerkleRootOutcome: &ocrtypecodecpb.MerkleRootOutcome{
+			OutcomeType:                     int32(outcome.MerkleRootOutcome.OutcomeType),
+			RangesSelectedForReport:         c.tr.chainRangeToProto(outcome.MerkleRootOutcome.RangesSelectedForReport),
+			RootsToReport:                   c.tr.merkleRootsToProto(outcome.MerkleRootOutcome.RootsToReport),
+			RmnEnabledChains:                c.tr.rmnEnabledChainsToProto(outcome.MerkleRootOutcome.RMNEnabledChains),
+			OffRampNextSeqNums:              c.tr.seqNumChainToProto(outcome.MerkleRootOutcome.OffRampNextSeqNums),
+			ReportTransmissionCheckAttempts: uint32(outcome.MerkleRootOutcome.ReportTransmissionCheckAttempts),
+			RmnReportSignatures:             c.tr.ccipRmnSignaturesToProto(outcome.MerkleRootOutcome.RMNReportSignatures),
+			RmnRemoteCfg:                    c.tr.rmnRemoteConfigToProto(outcome.MerkleRootOutcome.RMNRemoteCfg),
+		},
+		TokenPriceOutcome: &ocrtypecodecpb.TokenPriceOutcome{
+			TokenPrices: c.tr.feedTokenPricesToProto(outcome.TokenPriceOutcome.TokenPrices),
+		},
+		ChainFeeOutcome: &ocrtypecodecpb.ChainFeeOutcome{
+			GasPrices: c.tr.gasPriceChainToProto(outcome.ChainFeeOutcome.GasPrices),
+		},
+		MainOutcome: &ocrtypecodecpb.MainOutcome{
+			InflightPriceOcrSequenceNumber: uint64(outcome.MainOutcome.InflightPriceOcrSequenceNumber),
+			RemainingPriceChecks:           int32(outcome.MainOutcome.RemainingPriceChecks),
+		},
 	}
 
 	return proto.Marshal(pbOutcome)
 }
 
-// Helper function to encode RemoteSignerInfo
-func encodeRemoteSigners(signers []rmntypes.RemoteSignerInfo) []*ocrtypecodecpb.RemoteSignerInfo {
-	pbSigners := make([]*ocrtypecodecpb.RemoteSignerInfo, len(signers))
-	for i, s := range signers {
-		pbSigners[i] = &ocrtypecodecpb.RemoteSignerInfo{
-			OnchainPublicKey: s.OnchainPublicKey,
-			NodeIndex:        s.NodeIndex,
-		}
-	}
-	return pbSigners
-}
-
 func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, error) {
 	pbOutcome := &ocrtypecodecpb.CommitOutcome{}
 	if err := proto.Unmarshal(data, pbOutcome); err != nil {
-		return committypes.Outcome{}, err
-	}
-
-	rangesSelectedForReport := make([]plugintypes.ChainRange, len(pbOutcome.MerkleRootOutcome.RangesSelectedForReport))
-	for i, r := range pbOutcome.MerkleRootOutcome.RangesSelectedForReport {
-		rangesSelectedForReport[i] = plugintypes.ChainRange{
-			ChainSel: cciptypes.ChainSelector(r.ChainSel),
-			SeqNumRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(r.SeqNumRange.MinMsgNr),
-				cciptypes.SeqNum(r.SeqNumRange.MaxMsgNr),
-			),
-		}
-	}
-
-	rootsToReport := make([]cciptypes.MerkleRootChain, len(pbOutcome.MerkleRootOutcome.RootsToReport))
-	for i, root := range pbOutcome.MerkleRootOutcome.RootsToReport {
-		rootsToReport[i] = cciptypes.MerkleRootChain{
-			ChainSel:      cciptypes.ChainSelector(root.ChainSel),
-			OnRampAddress: root.OnRampAddress,
-			SeqNumsRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(root.SeqNumsRange.MinMsgNr),
-				cciptypes.SeqNum(root.SeqNumsRange.MaxMsgNr),
-			),
-			MerkleRoot: cciptypes.Bytes32(root.MerkleRoot),
-		}
-	}
-
-	rmnEnabledChains := make(map[cciptypes.ChainSelector]bool, len(pbOutcome.MerkleRootOutcome.RmnEnabledChains))
-	for k, v := range pbOutcome.MerkleRootOutcome.RmnEnabledChains {
-		rmnEnabledChains[cciptypes.ChainSelector(k)] = v
-	}
-
-	offRampNextSeqNums := make([]plugintypes.SeqNumChain, len(pbOutcome.MerkleRootOutcome.OffRampNextSeqNums))
-	for i, s := range pbOutcome.MerkleRootOutcome.OffRampNextSeqNums {
-		offRampNextSeqNums[i] = plugintypes.SeqNumChain{
-			ChainSel: cciptypes.ChainSelector(s.ChainSel),
-			SeqNum:   cciptypes.SeqNum(s.SeqNum),
-		}
-	}
-
-	rmnReportSignatures := make([]cciptypes.RMNECDSASignature, len(pbOutcome.MerkleRootOutcome.RmnReportSignatures))
-	for i, sig := range pbOutcome.MerkleRootOutcome.RmnReportSignatures {
-		rmnReportSignatures[i] = cciptypes.RMNECDSASignature{
-			R: cciptypes.Bytes32(sig.R),
-			S: cciptypes.Bytes32(sig.S),
-		}
-	}
-
-	merkleRootOutcome := merkleroot.Outcome{
-		OutcomeType:                     merkleroot.OutcomeType(pbOutcome.MerkleRootOutcome.OutcomeType),
-		RangesSelectedForReport:         rangesSelectedForReport,
-		RootsToReport:                   rootsToReport,
-		RMNEnabledChains:                rmnEnabledChains,
-		OffRampNextSeqNums:              offRampNextSeqNums,
-		ReportTransmissionCheckAttempts: uint(pbOutcome.MerkleRootOutcome.ReportTransmissionCheckAttempts),
-		RMNReportSignatures:             rmnReportSignatures,
-		RMNRemoteCfg: rmntypes.RemoteConfig{
-			ContractAddress: pbOutcome.MerkleRootOutcome.RmnRemoteCfg.ContractAddress,
-			ConfigDigest:    cciptypes.Bytes32(pbOutcome.MerkleRootOutcome.RmnRemoteCfg.ConfigDigest),
-			Signers:         decodeRemoteSigners(pbOutcome.MerkleRootOutcome.RmnRemoteCfg.Signers),
-			FSign:           pbOutcome.MerkleRootOutcome.RmnRemoteCfg.FSign,
-			ConfigVersion:   pbOutcome.MerkleRootOutcome.RmnRemoteCfg.ConfigVersion,
-			RmnReportVersion: cciptypes.Bytes32(
-				pbOutcome.MerkleRootOutcome.RmnRemoteCfg.RmnReportVersion,
-			),
-		},
-	}
-
-	tokenPrices := make(cciptypes.TokenPriceMap, len(pbOutcome.TokenPriceOutcome.TokenPrices))
-	for k, v := range pbOutcome.TokenPriceOutcome.TokenPrices {
-		tokenPrices[cciptypes.UnknownEncodedAddress(k)] = cciptypes.NewBigInt(big.NewInt(0).SetBytes(v))
-	}
-
-	gasPrices := make([]cciptypes.GasPriceChain, len(pbOutcome.ChainFeeOutcome.GasPrices))
-	for i, gp := range pbOutcome.ChainFeeOutcome.GasPrices {
-		gasPrices[i] = cciptypes.GasPriceChain{
-			ChainSel: cciptypes.ChainSelector(gp.ChainSel),
-			GasPrice: cciptypes.NewBigInt(big.NewInt(0).SetBytes(gp.GasPrice)),
-		}
+		return committypes.Outcome{}, fmt.Errorf("proto unmarshal outcome: %w", err)
 	}
 
 	return committypes.Outcome{
-		MerkleRootOutcome: merkleRootOutcome,
+		MerkleRootOutcome: merkleroot.Outcome{
+			OutcomeType:                     merkleroot.OutcomeType(pbOutcome.MerkleRootOutcome.OutcomeType),
+			RangesSelectedForReport:         c.tr.chainRangeFromProto(pbOutcome.MerkleRootOutcome.RangesSelectedForReport),
+			RootsToReport:                   c.tr.merkleRootsFromProto(pbOutcome.MerkleRootOutcome.RootsToReport),
+			RMNEnabledChains:                c.tr.rmnEnabledChainsFromProto(pbOutcome.MerkleRootOutcome.RmnEnabledChains),
+			OffRampNextSeqNums:              c.tr.seqNumChainFromProto(pbOutcome.MerkleRootOutcome.OffRampNextSeqNums),
+			ReportTransmissionCheckAttempts: uint(pbOutcome.MerkleRootOutcome.ReportTransmissionCheckAttempts),
+			RMNReportSignatures:             c.tr.ccipRmnSignaturesFromProto(pbOutcome.MerkleRootOutcome.RmnReportSignatures),
+			RMNRemoteCfg:                    c.tr.rmnRemoteConfigFromProto(pbOutcome.MerkleRootOutcome.RmnRemoteCfg),
+		},
 		TokenPriceOutcome: tokenprice.Outcome{
-			TokenPrices: tokenPrices,
+			TokenPrices: c.tr.feedTokenPricesFromProto(pbOutcome.TokenPriceOutcome.TokenPrices),
 		},
 		ChainFeeOutcome: chainfee.Outcome{
-			GasPrices: gasPrices,
+			GasPrices: c.tr.gasPriceChainFromProto(pbOutcome.ChainFeeOutcome.GasPrices),
 		},
 		MainOutcome: committypes.MainOutcome{
 			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(pbOutcome.MainOutcome.InflightPriceOcrSequenceNumber),
 			RemainingPriceChecks:           int(pbOutcome.MainOutcome.RemainingPriceChecks),
 		},
 	}, nil
-}
-
-// Helper function to decode RemoteSignerInfo
-func decodeRemoteSigners(signers []*ocrtypecodecpb.RemoteSignerInfo) []rmntypes.RemoteSignerInfo {
-	decoded := make([]rmntypes.RemoteSignerInfo, len(signers))
-	for i, s := range signers {
-		decoded[i] = rmntypes.RemoteSignerInfo{
-			OnchainPublicKey: s.OnchainPublicKey,
-			NodeIndex:        s.NodeIndex,
-		}
-	}
-	return decoded
 }
 
 // CommitCodecJSON is an implementation of CommitCodec that uses JSON.

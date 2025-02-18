@@ -44,6 +44,28 @@ func (t *protoTranslator) rmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.Signat
 	return sigs
 }
 
+func (t *protoTranslator) ccipRmnSignaturesToProto(sigs []cciptypes.RMNECDSASignature) []*ocrtypecodecpb.SignatureEcdsa {
+	pbSigs := make([]*ocrtypecodecpb.SignatureEcdsa, len(sigs))
+	for i, sig := range sigs {
+		pbSigs[i] = &ocrtypecodecpb.SignatureEcdsa{
+			R: sig.R[:],
+			S: sig.S[:],
+		}
+	}
+	return pbSigs
+}
+
+func (t *protoTranslator) ccipRmnSignaturesFromProto(pbSigs []*ocrtypecodecpb.SignatureEcdsa) []cciptypes.RMNECDSASignature {
+	sigs := make([]cciptypes.RMNECDSASignature, len(pbSigs))
+	for i := range pbSigs {
+		sigs[i] = cciptypes.RMNECDSASignature{
+			R: cciptypes.Bytes32(pbSigs[i].R),
+			S: cciptypes.Bytes32(pbSigs[i].S),
+		}
+	}
+	return sigs
+}
+
 func (t *protoTranslator) laneUpdatesToProto(rmnLaneUpdates []*rmnpb.FixedDestLaneUpdate) []*ocrtypecodecpb.DestChainUpdate {
 	pbLaneUpdates := make([]*ocrtypecodecpb.DestChainUpdate, len(rmnLaneUpdates))
 	for i, lu := range rmnLaneUpdates {
@@ -358,4 +380,56 @@ func (t *protoTranslator) discoveryAddressesFromProto(
 		}
 	}
 	return discoveryAddrs
+}
+
+func (t *protoTranslator) chainRangeToProto(chainRange []plugintypes.ChainRange) []*ocrtypecodecpb.ChainRange {
+	rangesSelectedForReport := make([]*ocrtypecodecpb.ChainRange, len(chainRange))
+	for i, r := range chainRange {
+		rangesSelectedForReport[i] = &ocrtypecodecpb.ChainRange{
+			ChainSel: uint64(r.ChainSel),
+			SeqNumRange: &ocrtypecodecpb.SeqNumRange{
+				MinMsgNr: uint64(r.SeqNumRange.Start()),
+				MaxMsgNr: uint64(r.SeqNumRange.End()),
+			},
+		}
+	}
+	return rangesSelectedForReport
+}
+
+func (t *protoTranslator) chainRangeFromProto(pbChainRange []*ocrtypecodecpb.ChainRange) []plugintypes.ChainRange {
+	rangesSelectedForReport := make([]plugintypes.ChainRange, len(pbChainRange))
+	for i, r := range pbChainRange {
+		rangesSelectedForReport[i] = plugintypes.ChainRange{
+			ChainSel: cciptypes.ChainSelector(r.ChainSel),
+			SeqNumRange: cciptypes.NewSeqNumRange(
+				cciptypes.SeqNum(r.SeqNumRange.MinMsgNr),
+				cciptypes.SeqNum(r.SeqNumRange.MaxMsgNr),
+			),
+		}
+	}
+	return rangesSelectedForReport
+}
+
+func (t *protoTranslator) gasPriceChainToProto(gpc []cciptypes.GasPriceChain) []*ocrtypecodecpb.GasPriceChain {
+	gasPrices := make([]*ocrtypecodecpb.GasPriceChain, len(gpc))
+	for i, gp := range gpc {
+		gasPrices[i] = &ocrtypecodecpb.GasPriceChain{
+			ChainSel: uint64(gp.ChainSel),
+			GasPrice: gp.GasPrice.Bytes(),
+		}
+	}
+
+	return gasPrices
+}
+
+func (t *protoTranslator) gasPriceChainFromProto(pbGpc []*ocrtypecodecpb.GasPriceChain) []cciptypes.GasPriceChain {
+	gasPrices := make([]cciptypes.GasPriceChain, len(pbGpc))
+	for i, gp := range pbGpc {
+		gasPrices[i] = cciptypes.GasPriceChain{
+			ChainSel: cciptypes.ChainSelector(gp.ChainSel),
+			GasPrice: cciptypes.NewBigInt(big.NewInt(0).SetBytes(gp.GasPrice)),
+		}
+	}
+
+	return gasPrices
 }
