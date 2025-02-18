@@ -1459,6 +1459,180 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 	}
 }
 
+func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
+	ctx := tests.Context(t)
+	destChain := cciptypes.ChainSelector(1)
+	sourceChain1 := cciptypes.ChainSelector(2)
+	sourceChain2 := cciptypes.ChainSelector(3)
+
+	wrappedNative1 := cciptypes.Bytes{0x1}
+	wrappedNative2 := cciptypes.Bytes{0x2}
+
+	t.Run("happy path - gets prices for all chains", func(t *testing.T) {
+		// Setup mock cache with configs containing wrapped native addresses
+		mockCache := new(mockConfigCache)
+		sourceChain1Config := ChainConfigSnapshot{
+			Router: RouterConfig{
+				WrappedNativeAddress: wrappedNative1,
+			},
+		}
+		sourceChain2Config := ChainConfigSnapshot{
+			Router: RouterConfig{
+				WrappedNativeAddress: wrappedNative2,
+			},
+		}
+
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(sourceChain1Config, nil)
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(sourceChain2Config, nil)
+
+		// Setup readers with price responses
+		sourceReader1 := reader_mocks.NewMockExtended(t)
+		price1 := &plugintypes.TimestampedUnixBig{
+			Value:     big.NewInt(100),
+			Timestamp: uint32(time.Now().Unix()),
+		}
+		sourceReader1.EXPECT().ExtendedGetLatestValue(
+			mock.Anything,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameFeeQuoterGetTokenPrice,
+			primitives.Unconfirmed,
+			map[string]interface{}{"token": wrappedNative1},
+			mock.Anything,
+		).Run(
+			func(
+				ctx context.Context,
+				contractName, methodName string,
+				confidence primitives.ConfidenceLevel,
+				params any,
+				returnVal any) {
+				pricePtr := returnVal.(**plugintypes.TimestampedUnixBig)
+				*pricePtr = price1
+			}).Return(nil)
+
+		sourceReader2 := reader_mocks.NewMockExtended(t)
+		price2 := &plugintypes.TimestampedUnixBig{
+			Value:     big.NewInt(200),
+			Timestamp: uint32(time.Now().Unix()),
+		}
+		sourceReader2.EXPECT().ExtendedGetLatestValue(
+			mock.Anything,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameFeeQuoterGetTokenPrice,
+			primitives.Unconfirmed,
+			map[string]interface{}{"token": wrappedNative2},
+			mock.Anything,
+		).Run(
+			func(
+				ctx context.Context,
+				contractName, methodName string,
+				confidence primitives.ConfidenceLevel,
+				params any,
+				returnVal any) {
+				pricePtr := returnVal.(**plugintypes.TimestampedUnixBig)
+				*pricePtr = price2
+			}).Return(nil)
+
+		ccipReader := &ccipChainReader{
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				sourceChain1: sourceReader1,
+				sourceChain2: sourceReader2,
+			},
+			configPoller: mockCache,
+			lggr:         logger.Test(t),
+		}
+
+		prices := ccipReader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
+		require.Len(t, prices, 2)
+		assert.Equal(t, cciptypes.NewBigInt(big.NewInt(100)), prices[sourceChain1])
+		assert.Equal(t, cciptypes.NewBigInt(big.NewInt(200)), prices[sourceChain2])
+
+		mockCache.AssertExpectations(t)
+	})
+
+	t.Run("handles missing chain configs", func(t *testing.T) {
+		mockCache := new(mockConfigCache)
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(ChainConfigSnapshot{}, fmt.Errorf("not found"))
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain2).Return(ChainConfigSnapshot{
+			Router: RouterConfig{
+				WrappedNativeAddress: wrappedNative2,
+			},
+		}, nil)
+
+		sourceReader2 := reader_mocks.NewMockExtended(t)
+		price2 := &plugintypes.TimestampedUnixBig{
+			Value:     big.NewInt(200),
+			Timestamp: uint32(time.Now().Unix()),
+		}
+		sourceReader2.EXPECT().ExtendedGetLatestValue(
+			mock.Anything,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameFeeQuoterGetTokenPrice,
+			primitives.Unconfirmed,
+			map[string]interface{}{"token": wrappedNative2},
+			mock.Anything,
+		).Run(func(
+			ctx context.Context,
+			contractName, methodName string,
+			confidence primitives.ConfidenceLevel,
+			params any,
+			returnVal any) {
+			pricePtr := returnVal.(**plugintypes.TimestampedUnixBig)
+			*pricePtr = price2
+		}).Return(nil)
+
+		ccipReader := &ccipChainReader{
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				sourceChain1: reader_mocks.NewMockExtended(t),
+				sourceChain2: sourceReader2,
+			},
+			configPoller: mockCache,
+			lggr:         logger.Test(t),
+		}
+
+		prices := ccipReader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{sourceChain1, sourceChain2})
+		require.Len(t, prices, 1)
+		assert.Equal(t, cciptypes.NewBigInt(big.NewInt(200)), prices[sourceChain2])
+
+		mockCache.AssertExpectations(t)
+	})
+
+	t.Run("handles price fetch error", func(t *testing.T) {
+		mockCache := new(mockConfigCache)
+		sourceConfig := ChainConfigSnapshot{
+			Router: RouterConfig{
+				WrappedNativeAddress: wrappedNative1,
+			},
+		}
+		mockCache.On("GetChainConfig", mock.Anything, sourceChain1).Return(sourceConfig, nil)
+
+		sourceReader := reader_mocks.NewMockExtended(t)
+		sourceReader.EXPECT().ExtendedGetLatestValue(
+			mock.Anything,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameFeeQuoterGetTokenPrice,
+			primitives.Unconfirmed,
+			map[string]interface{}{"token": wrappedNative1},
+			mock.Anything,
+		).Return(fmt.Errorf("price fetch failed"))
+
+		ccipReader := &ccipChainReader{
+			destChain: destChain,
+			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+				sourceChain1: sourceReader,
+			},
+			configPoller: mockCache,
+			lggr:         logger.Test(t),
+		}
+
+		prices := ccipReader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{sourceChain1})
+		require.Empty(t, prices)
+
+		mockCache.AssertExpectations(t)
+	})
+}
+
 func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain := cciptypes.ChainSelector(2)
@@ -1470,9 +1644,10 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 	t.Run("source chain requests", func(t *testing.T) {
 		requests := ccipReader.prepareBatchConfigRequests(sourceChain)
 
-		// Should only contain OnRamp requests
-		require.Len(t, requests, 1)
+		// Should contain OnRamp and Router requests
+		require.Len(t, requests, 2)
 		require.Contains(t, requests, consts.ContractNameOnRamp)
+		require.Contains(t, requests, consts.ContractNameRouter)
 
 		onRampRequests := requests[consts.ContractNameOnRamp]
 		require.Len(t, onRampRequests, 2)
@@ -1486,18 +1661,26 @@ func TestCCIPChainReader_prepareBatchConfigRequests(t *testing.T) {
 		require.Equal(t, consts.MethodNameOnRampGetDestChainConfig, onRampRequests[1].ReadName)
 		require.Equal(t, map[string]any{"destChainSelector": destChain}, onRampRequests[1].Params)
 		require.IsType(t, &onRampDestChainConfig{}, onRampRequests[1].ReturnVal)
+
+		// Verify Router requests
+		routerRequests := requests[consts.ContractNameRouter]
+		require.Len(t, routerRequests, 1)
+		require.Equal(t, consts.MethodNameRouterGetWrappedNative, routerRequests[0].ReadName)
+		require.Empty(t, routerRequests[0].Params)
+		require.IsType(t, &[]byte{}, routerRequests[0].ReturnVal)
 	})
 
 	t.Run("destination chain requests", func(t *testing.T) {
 		requests := ccipReader.prepareBatchConfigRequests(destChain)
 
-		// Should contain all contract requests except OnRamp
+		// Should contain all contract requests except OnRamp and Router
 		require.Len(t, requests, 4)
 		require.Contains(t, requests, consts.ContractNameOffRamp)
 		require.Contains(t, requests, consts.ContractNameRMNProxy)
 		require.Contains(t, requests, consts.ContractNameRMNRemote)
 		require.Contains(t, requests, consts.ContractNameFeeQuoter)
 		require.NotContains(t, requests, consts.ContractNameOnRamp)
+		require.NotContains(t, requests, consts.ContractNameRouter)
 
 		// Verify OffRamp requests
 		offRampRequests := requests[consts.ContractNameOffRamp]
