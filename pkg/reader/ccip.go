@@ -426,22 +426,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			continue
 		}
 
-		msg.Message.ExtraArgsDecoded, err = r.extraDataCodec.DecodeExtraArgs(msg.Message.ExtraArgs, sourceChainSelector)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode the ExtraArgs: %w", err)
-		}
-
 		msg.Message.Header.OnRamp = onRampAddress
-
-		for i, tokenAmount := range msg.Message.TokenAmounts {
-			msg.Message.TokenAmounts[i].DestExecDataDecoded, err = r.extraDataCodec.DecodeTokenAmountDestExecData(
-				tokenAmount.DestExecData,
-				sourceChainSelector,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode token amount destExecData (%v): %w", tokenAmount.DestExecData, err)
-			}
-		}
 		msgs = append(msgs, msg.Message)
 	}
 
@@ -728,19 +713,12 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		//TODO: Use batching in the future
-		var nativeTokenAddress cciptypes.Bytes
-		err := reader.ExtendedGetLatestValue(
-			ctx,
-			consts.ContractNameRouter,
-			consts.MethodNameRouterGetWrappedNative,
-			primitives.Unconfirmed,
-			nil,
-			&nativeTokenAddress)
+		config, err := r.configPoller.GetChainConfig(ctx, chain)
 		if err != nil {
-			lggr.Warnw("failed to get native token address", "chain", chain, "err", err)
+			lggr.Warnw("failed to get chain config for native token address", "chain", chain, "err", err)
 			continue
 		}
+		nativeTokenAddress := config.Router.WrappedNativeAddress
 
 		if nativeTokenAddress.String() == "0x" {
 			lggr.Errorw("native token address is empty", "chain", chain)
@@ -1537,6 +1515,7 @@ func (r *ccipChainReader) prepareBatchConfigRequests(
 		feeQuoterConfig       feeQuoterStaticConfig
 		onRampDynamicConfig   getOnRampDynamicConfigResponse
 		onRampDestConfig      onRampDestChainConfig
+		wrappedNativeAddress  []byte
 	)
 
 	var requests contractreader.ExtendedBatchGetLatestValuesRequest
@@ -1556,6 +1535,13 @@ func (r *ccipChainReader) prepareBatchConfigRequests(
 						"destChainSelector": r.destChain,
 					},
 					ReturnVal: &onRampDestConfig,
+				},
+			},
+			consts.ContractNameRouter: {
+				{
+					ReadName:  consts.MethodNameRouterGetWrappedNative,
+					Params:    map[string]any{},
+					ReturnVal: &wrappedNativeAddress,
 				},
 			},
 		}
@@ -1637,6 +1623,11 @@ func (r *ccipChainReader) processConfigResults(
 			if chainSel != r.destChain {
 				config.OnRamp, err = r.processOnRampResults(results)
 			}
+		case consts.ContractNameRouter:
+			// Only process Router results for source chains
+			if chainSel != r.destChain {
+				config.Router, err = r.processRouterResults(results)
+			}
 		default:
 			r.lggr.Warnw("Unhandled contract in batch results", "contract", contract.Name)
 		}
@@ -1646,6 +1637,25 @@ func (r *ccipChainReader) processConfigResults(
 	}
 
 	return config, nil
+}
+
+func (r *ccipChainReader) processRouterResults(results []types.BatchReadResult) (RouterConfig, error) {
+	if len(results) != 1 {
+		return RouterConfig{}, fmt.Errorf("expected 1 router result, got %d", len(results))
+	}
+
+	val, err := results[0].GetResult()
+	if err != nil {
+		return RouterConfig{}, fmt.Errorf("get router wrapped native result: %w", err)
+	}
+
+	if bytes, ok := val.(*[]byte); ok {
+		return RouterConfig{
+			WrappedNativeAddress: cciptypes.Bytes(*bytes),
+		}, nil
+	}
+
+	return RouterConfig{}, fmt.Errorf("invalid type for router wrapped native address: %T", val)
 }
 
 func (r *ccipChainReader) processOnRampResults(results []types.BatchReadResult) (OnRampConfig, error) {
@@ -1683,12 +1693,12 @@ func (r *ccipChainReader) processOnRampResults(results []types.BatchReadResult) 
 }
 
 // GetOnRampConfig returns the cached OnRamp configurations for a source chain
-func (c *configPoller) GetOnRampConfig(ctx context.Context, srcChain cciptypes.ChainSelector) (OnRampConfig, error) {
-	if srcChain == c.reader.destChain {
+func (r *ccipChainReader) GetOnRampConfig(ctx context.Context, srcChain cciptypes.ChainSelector) (OnRampConfig, error) {
+	if srcChain == r.destChain {
 		return OnRampConfig{}, fmt.Errorf("cannot get OnRamp configs for destination chain %d", srcChain)
 	}
 
-	config, err := c.GetChainConfig(ctx, srcChain)
+	config, err := r.configPoller.GetChainConfig(ctx, srcChain)
 	if err != nil {
 		return OnRampConfig{}, fmt.Errorf("get chain config: %w", err)
 	}

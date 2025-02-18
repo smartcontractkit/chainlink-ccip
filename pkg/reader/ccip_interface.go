@@ -32,6 +32,7 @@ type ChainConfigSnapshot struct {
 	RMNRemote RMNRemoteConfig
 	FeeQuoter FeeQuoterConfig
 	OnRamp    OnRampConfig
+	Router    RouterConfig
 }
 
 type OnRampConfig struct {
@@ -57,6 +58,10 @@ type OfframpConfig struct {
 
 type RMNProxyConfig struct {
 	RemoteAddress []byte
+}
+
+type RouterConfig struct {
+	WrappedNativeAddress cciptypes.Bytes
 }
 
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
