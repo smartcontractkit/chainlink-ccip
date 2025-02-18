@@ -44,7 +44,6 @@ type ccipChainReader struct {
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
-	extraDataCodec  cciptypes.ExtraDataCodec
 	configPoller    ConfigPoller
 }
 
@@ -55,7 +54,6 @@ func newCCIPChainReaderInternal(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
-	extraDataCodec cciptypes.ExtraDataCodec,
 ) *ccipChainReader {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
@@ -68,7 +66,6 @@ func newCCIPChainReaderInternal(
 		contractWriters: contractWriters,
 		destChain:       destChain,
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
-		extraDataCodec:  extraDataCodec,
 	}
 
 	// Initialize cache with readers
@@ -426,22 +423,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			continue
 		}
 
-		msg.Message.ExtraArgsDecoded, err = r.extraDataCodec.DecodeExtraArgs(msg.Message.ExtraArgs, sourceChainSelector)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode the ExtraArgs: %w", err)
-		}
-
 		msg.Message.Header.OnRamp = onRampAddress
-
-		for i, tokenAmount := range msg.Message.TokenAmounts {
-			msg.Message.TokenAmounts[i].DestExecDataDecoded, err = r.extraDataCodec.DecodeTokenAmountDestExecData(
-				tokenAmount.DestExecData,
-				sourceChainSelector,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode token amount destExecData (%v): %w", tokenAmount.DestExecData, err)
-			}
-		}
 		msgs = append(msgs, msg.Message)
 	}
 

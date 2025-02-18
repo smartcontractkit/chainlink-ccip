@@ -147,7 +147,6 @@ func (p PluginFactory) NewReportingPlugin(
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
-		p.extraDataCodec,
 	)
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
