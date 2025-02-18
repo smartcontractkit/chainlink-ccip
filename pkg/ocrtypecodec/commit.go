@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -35,38 +34,23 @@ type CommitCodec interface {
 	DecodeOutcome(data []byte) (committypes.Outcome, error)
 }
 
-type CommitCodecProto struct{}
+type CommitCodecProto struct {
+	tr *protoTranslator
+}
 
 func NewCommitCodecProto() *CommitCodecProto {
-	return &CommitCodecProto{}
+	return &CommitCodecProto{
+		tr: newProtoTranslator(),
+	}
 }
 
 func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) {
-	sigs := make([]*ocrtypecodecpb.SignatureEcdsa, 0)
-	if query.MerkleRootQuery.RMNSignatures != nil {
-		sigs = make([]*ocrtypecodecpb.SignatureEcdsa, len(query.MerkleRootQuery.RMNSignatures.Signatures))
-		for i, sig := range query.MerkleRootQuery.RMNSignatures.Signatures {
-			sigs[i] = &ocrtypecodecpb.SignatureEcdsa{R: sig.R, S: sig.S}
-		}
+	if query.MerkleRootQuery.RMNSignatures == nil {
+		query.MerkleRootQuery.RMNSignatures = &rmn.ReportSignatures{}
 	}
 
-	laneUpdates := make([]*ocrtypecodecpb.DestChainUpdate, 0)
-	if query.MerkleRootQuery.RMNSignatures != nil {
-		laneUpdates = make([]*ocrtypecodecpb.DestChainUpdate, len(query.MerkleRootQuery.RMNSignatures.LaneUpdates))
-		for i, lu := range query.MerkleRootQuery.RMNSignatures.LaneUpdates {
-			laneUpdates[i] = &ocrtypecodecpb.DestChainUpdate{
-				LaneSource: &ocrtypecodecpb.SourceChainMeta{
-					SourceChainSelector: lu.LaneSource.SourceChainSelector,
-					OnrampAddress:       lu.LaneSource.OnrampAddress,
-				},
-				SeqNumRange: &ocrtypecodecpb.SeqNumRange{
-					MinMsgNr: lu.ClosedInterval.MinMsgNr,
-					MaxMsgNr: lu.ClosedInterval.MaxMsgNr,
-				},
-				Root: lu.Root,
-			}
-		}
-	}
+	sigs := c.tr.rmnSignaturesToProto(query.MerkleRootQuery.RMNSignatures)
+	laneUpdates := c.tr.laneUpdatesToProto(query.MerkleRootQuery.RMNSignatures.LaneUpdates)
 
 	pbQ := &ocrtypecodecpb.Query{
 		MerkleRootQuery: &ocrtypecodecpb.MerkleRootQuery{
@@ -76,8 +60,8 @@ func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) 
 				LaneUpdates: laneUpdates,
 			},
 		},
-		TokenPriceQuery: &ocrtypecodecpb.TokenPriceQuery{},
-		ChainFeeQuery:   &ocrtypecodecpb.ChainFeeQuery{},
+		TokenPriceQuery: &ocrtypecodecpb.TokenPriceQuery{}, // always empty
+		ChainFeeQuery:   &ocrtypecodecpb.ChainFeeQuery{},   // always empty
 	}
 
 	return proto.Marshal(pbQ)
@@ -89,28 +73,8 @@ func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
 		return committypes.Query{}, fmt.Errorf("decode query: %w", err)
 	}
 
-	sigs := make([]*rmnpb.EcdsaSignature, len(pbQ.MerkleRootQuery.RmnSignatures.Signatures))
-	for i := range pbQ.MerkleRootQuery.RmnSignatures.Signatures {
-		sigs[i] = &rmnpb.EcdsaSignature{
-			R: pbQ.MerkleRootQuery.RmnSignatures.Signatures[i].R,
-			S: pbQ.MerkleRootQuery.RmnSignatures.Signatures[i].S,
-		}
-	}
-
-	laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, len(pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates))
-	for i := range pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates {
-		laneUpdates[i] = &rmnpb.FixedDestLaneUpdate{
-			LaneSource: &rmnpb.LaneSource{
-				SourceChainSelector: pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates[i].LaneSource.SourceChainSelector,
-				OnrampAddress:       pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates[i].LaneSource.OnrampAddress,
-			},
-			ClosedInterval: &rmnpb.ClosedInterval{
-				MinMsgNr: pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates[i].SeqNumRange.MinMsgNr,
-				MaxMsgNr: pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates[i].SeqNumRange.MaxMsgNr,
-			},
-			Root: pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates[i].Root,
-		}
-	}
+	sigs := c.tr.rmnSignaturesFromProto(pbQ.MerkleRootQuery.RmnSignatures.Signatures)
+	laneUpdates := c.tr.laneUpdatesFromProto(pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates)
 
 	q := committypes.Query{
 		MerkleRootQuery: merkleroot.Query{
