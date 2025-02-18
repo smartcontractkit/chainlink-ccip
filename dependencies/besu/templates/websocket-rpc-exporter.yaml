@@ -1,0 +1,109 @@
+in: |
+  deployments:
+    ws-rpc-exporter-chain-{{ .Env.CHAIN_NAME }}:
+      namespace: ${NAMESPACE}
+      helm:
+        chart:
+          name: component-chart
+          repo: https://charts.devspace.sh
+        values:
+          name: ws-rpc-exporter-chain-{{ .Env.CHAIN_NAME }}
+          volumes:
+            - name: config-volume
+              configMap:
+                name: websocket-rpc-exporter-chain-{{ .Env.CHAIN_NAME }}
+                defaultMode: 420
+          containers:
+            - resources:
+                limits:
+                  cpu: 500m
+                  memory: 500Mi
+                requests:
+                  cpu: 500m
+                  memory: 500Mi
+              terminationMessagePath: /dev/termination-log
+              volumeMounts:
+                - containerPath: /config/config.yml
+                  volume:
+                    name: config-volume
+                    subPath: config.yaml
+                - containerPath: /config/validation.yml
+                  volume:
+                    name: config-volume
+                    subPath: validation.yaml
+              livenessProbe:
+                httpGet:
+                  path: /liveness
+                  port: liveness-port
+                  scheme: HTTP
+                timeoutSeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              env:
+                - name: LISTEN_PORT
+                  value: '8000'
+              securityContext:
+                capabilities:
+                  drop:
+                    - ALL
+                runAsUser: 1001  # Use the numeric user ID
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+              ports:
+                - name: http
+                  containerPort: 8000
+                  protocol: TCP
+                - name: liveness-port
+                  containerPort: 8001
+                  protocol: TCP
+              imagePullPolicy: IfNotPresent
+              startupProbe:
+                httpGet:
+                  path: /liveness
+                  port: liveness-port
+                  scheme: HTTP
+                timeoutSeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 10
+              terminationMessagePolicy: File
+              image: 'ghcr.io/smartcontractkit/blockchain-rpc-exporter:v5.0.6'
+          service:
+            type: ClusterIP
+            name: ws-rpc-exporter-chain-{{ .Env.CHAIN_NAME }}
+            selector:
+              app.kubernetes.io/name: websocket-rpc-exporter
+            ports:
+              - port: 8000
+                targetPort: http
+                protocol: TCP
+                name: http
+
+    websocket-rpc-exporter-chain-{{ .Env.CHAIN_NAME }}:
+      kubectl:
+        inlineManifest: |-
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: websocket-rpc-exporter-chain-{{ .Env.CHAIN_NAME }}
+            namespace: ${NAMESPACE}
+          data:
+            config.yaml: |
+              blockchain: "Besu"
+              chain_id: {{ .Env.CHAIN_ID | conv.ToInt}}
+              network_name: {{ .Env.CHAIN_NAME | strings.Title }}
+              network_type: "Testnet"
+              connection_parameters:
+                open_timeout: 6
+                close_timeout: 1
+                ping_interval: 6
+                ping_timeout: 3
+              collector: "evm"
+              endpoints:
+                - url: ws://besu-node-rpc-1.chain-{{ .Env.CHAIN_NAME }}.svc.cluster.local:8546
+                  provider: Chainlink
+            validation.yaml: |
+              allowed_providers:
+                - Chainlink

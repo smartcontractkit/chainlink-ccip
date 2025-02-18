@@ -1,0 +1,56 @@
+in: |
+  deployments:
+    {{- define "createDeployment" }}
+    {{- $type := .type }}
+    {{- $count := .count }}
+    {{- $ingressEnabled := .ingressEnabled }}
+    {{- $valuesFile := .valuesFile }}
+    {{- if gt (conv.ToInt $count) 0 }}
+    {{- range $i := seq 1 $count }}
+    {{ $type }}-{{ $i }}:
+      namespace: ${NAMESPACE}
+      helm:
+        displayOutput: true
+        chart:
+          name: oci://ghcr.io/ajgrande924/registry/besu-node
+          version: 0.1.1
+        valuesFiles:
+          - {{ $valuesFile }}
+
+    {{ $type }}-{{ $i }}-ingress:
+      namespace: ${NAMESPACE}
+      helm:
+        displayOutput: true
+        chart:
+          name: component-chart
+          repo: https://charts.devspace.sh
+        values:
+          ingress:
+            name: {{ $type }}-{{ $i }}
+            rules:
+              - host: {{ $type }}-{{ $i }}.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                path: /
+                servicePort: 8545
+                serviceName: besu-node-{{ $type }}-{{ $i }}
+            ingressClassName: "${INGRESS_CLASS_NAME}"
+            annotations:
+              alb.ingress.kubernetes.io/certificate-arn: ${AWS_ACM_CERT_ARN}
+              alb.ingress.kubernetes.io/group.name: sandbox
+              alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+              alb.ingress.kubernetes.io/ssl-redirect: "443"
+              alb.ingress.kubernetes.io/target-type: ip
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{- $bootNodeCount := .Env.BOOT_NODE_COUNT }}
+    {{- $validatorNodeCount := .Env.VALIDATOR_NODE_COUNT }}
+    {{- $rpcNodeCount := .Env.RPC_NODE_COUNT }}
+    {{- $memberNodeCount := .Env.MEMBER_NODE_COUNT }}
+    {{- $rpcNodeIngressEnabled := true }}
+
+    {{- template "createDeployment" (dict "type" "bootnode" "count" $bootNodeCount "valuesFile" "${LOCAL_VALUES_DIR}/bootnode.yaml" "ingressEnabled" "false") }}
+    {{- template "createDeployment" (dict "type" "validator" "count" $validatorNodeCount "valuesFile" "${LOCAL_VALUES_DIR}/common.yaml" "ingressEnabled" "false") }}
+    {{- template "createDeployment" (dict "type" "rpc" "count" $rpcNodeCount "valuesFile" "${LOCAL_VALUES_DIR}/common.yaml" "ingressEnabled" $rpcNodeIngressEnabled) }}
+    {{- template "createDeployment" (dict "type" "member" "count" $memberNodeCount "valuesFile" "${LOCAL_VALUES_DIR}/member.yaml" "ingressEnabled" "false") }}
+

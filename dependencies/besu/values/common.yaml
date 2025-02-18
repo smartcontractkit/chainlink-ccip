@@ -1,0 +1,6 @@
+quorumFlags:
+  usesBootnodes: true
+node:
+  besu:
+    metrics:
+      serviceMonitorEnabled: false

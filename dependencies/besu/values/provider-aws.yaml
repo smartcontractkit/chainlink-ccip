@@ -1,0 +1,2 @@
+cluster:
+  provider: aws  # choose from: local | aws | azure

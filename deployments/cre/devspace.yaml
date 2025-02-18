@@ -1,0 +1,122 @@
+---
+version: v2beta1
+name: cre
+
+vars:
+  CHAINLINK_CODE_DIR:
+    source: env
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
+  DEPENDENCIES_DIR:
+    source: env
+    default: "${CRIB_DIR}/dependencies"
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  IMPORTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/imports"
+  PROVIDER:
+    source: all
+    default: "aws"
+  SCRIPTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/scripts"
+
+imports:
+  - path: ${IMPORTS_DIR}/lib-common
+  - path: ${IMPORTS_DIR}/lib-aws
+  - path: ${IMPORTS_DIR}/lib-kind
+
+pipelines:
+  chain-alpha:
+    run: |-
+      run_dependency_pipelines chain-alpha
+      run_dependency_pipelines blockscout
+      run_pipelines ingress-check
+
+  chain-beta:
+    run: |-
+      run_dependency_pipelines chain-beta
+      run_dependency_pipelines blockscout
+      run_pipelines ingress-check
+
+profiles:
+  - name: chain-alpha
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          chain-alpha:
+            path: ${DEPENDENCIES_DIR}/besu/devspace.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+      - op: add
+        path: vars
+        value:
+          CHAIN_NAME:
+            source: env
+            default: "alpha"
+          CHAIN_ID:
+            source: env
+            default: 1337
+          NAMESPACE:
+            source: env
+            default: "chain-alpha"
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
+      - op: add
+        path: dependencies
+        value:
+          blockscout:
+            path: ${DEPENDENCIES_DIR}/blockscout/devspace.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+
+  - name: chain-beta
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          chain-beta:
+            path: ${DEPENDENCIES_DIR}/besu/devspace.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+      - op: add
+        path: vars
+        value:
+          CHAIN_NAME:
+            source: env
+            default: "beta"
+          CHAIN_ID:
+            source: env
+            default: 2337
+          NAMESPACE:
+            source: env
+            default: "chain-beta"
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
+      - op: add
+        path: dependencies
+        value:
+          blockscout:
+            path: ${DEPENDENCIES_DIR}/blockscout/devspace.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+
+commands:
+  besu:
+    command: |-
+      devspace run-pipeline chain-alpha -p chain-alpha
+      devspace run-pipeline chain-beta -p chain-beta
+    description: Run the Besu pipeline to deploy both alpha and beta chains.
+    appendArgs: true
+
+  chain-alpha:
+    command: |-
+      devspace run-pipeline chain-alpha -p chain-alpha
+    description: Run the pipeline to deploy the alpha chain.
+    appendArgs: true
+
+  chain-beta:
+    command: |-
+      devspace run-pipeline chain-beta -p chain-beta
+    description: Run the pipeline to deploy the beta chain.
+    appendArgs: true

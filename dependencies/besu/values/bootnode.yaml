@@ -1,0 +1,10 @@
+quorumFlags:
+  privacy: false
+  removeKeysOnDelete: true
+  isBootnode: true    # Besu only, set this to true if this node is a bootnode
+  usesBootnodes: true # Besu only, set this to true if the network you are connecting to use a bootnode/s that are deployed in the cluster
+
+node:
+  besu:
+    metrics:
+      serviceMonitorEnabled: false

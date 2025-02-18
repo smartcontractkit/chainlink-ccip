@@ -1,0 +1,168 @@
+version: v2beta1
+name: besu
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  BOOT_NODE_COUNT:
+    source: env
+    default: 2
+  CHAIN_ID:
+    source: env
+    default: ""
+  CHAIN_NAME:
+    source: env
+    default: ""
+  CHAIN_TYPE:
+    source: env
+    default: "EVM"
+  ENABLE_BESU:
+    source: env
+    default: true
+  ENABLE_WS_RPC_EXPORTER:
+    source: env
+    default: true
+  ENVIRONMENT:
+    source: env
+    default: sandbox
+  INGRESS_CLASS_NAME:
+    source: env
+    default: "nginx"
+  LOCAL_CHARTS_DIR:
+    source: env
+    default: ./charts
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  LOCAL_VALUES_DIR:
+    source: env
+    default: ./values
+  MEMBER_NODE_COUNT:
+    source: env
+    default: 1
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
+  RPC_NODE_COUNT:
+    source: env
+    default: 1
+  RPC_NODE_INGRESS_ENABLED:
+    source: env
+    default: true
+  VALIDATOR_NODE_COUNT:
+    source: env
+    default: 5
+
+pipelines:
+  deploy:
+    run: |-
+      # Create besu-genesis deployment
+      create_deployments besu-genesis
+
+      # Create bootnode deployments
+      for i in $(seq 1 ${BOOT_NODE_COUNT}); do
+        create_deployments bootnode-$i
+      done
+
+      # Create validator deployments
+      for i in $(seq 1 ${VALIDATOR_NODE_COUNT}); do
+        create_deployments validator-$i
+      done
+
+      # Optionally create RPC and member node deployments
+      for i in $(seq 1 ${RPC_NODE_COUNT}); do
+        create_deployments rpc-$i
+        if [[ "${RPC_NODE_INGRESS_ENABLED}" == "true" ]]; then
+          create_deployments rpc-$i-ingress
+        fi
+      done
+
+      for i in $(seq 1 ${MEMBER_NODE_COUNT}); do
+        create_deployments member-$i
+      done
+
+      create_deployments websocket-rpc-exporter-chain-${CHAIN_NAME}
+      create_deployments ws-rpc-exporter-chain-${CHAIN_NAME}
+
+hooks:
+  - name: create-and-set-namespace
+    command: |-
+      if ! kubectl get namespace ${NAMESPACE}; then
+        kubectl create namespace ${NAMESPACE}
+      fi
+      devspace use namespace ${NAMESPACE}
+    events: ["before:deploy:besu-genesis"]
+
+  - name: wait-for-besu-genesis-init
+    command: kubectl
+    args: ["wait", "--for=condition=complete", "--timeout=20m", "job/besu-genesis-init"]
+    events: ["after:deploy:besu-genesis"]
+
+deployments:
+  besu-genesis:
+    namespace: ${NAMESPACE}
+    helm:
+      displayOutput: true
+      chart:
+        name: oci://ghcr.io/ajgrande924/registry/besu-genesis
+        version: 0.1.1
+      values:
+        cluster:
+          provider: ${CLUSTER_PROVIDER}
+      valuesFiles:
+        - ./values/besu-genesis.yaml
+
+profiles:
+  - name: default
+    activation:
+      - vars:
+          ENABLE_BESU: "true"
+    merge: |-
+      $(
+        CHAIN_NAME=${CHAIN_NAME} \
+        BOOT_NODE_COUNT=${BOOT_NODE_COUNT} \
+        VALIDATOR_NODE_COUNT=${VALIDATOR_NODE_COUNT} \
+        RPC_NODE_COUNT=${RPC_NODE_COUNT} \
+        MEMBER_NODE_COUNT=${MEMBER_NODE_COUNT} \
+        RPC_NODE_INGRESS_ENABLED="true" \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/besu-node.yaml
+      )
+
+  - name: websocket-rpc-exporter
+    activation:
+      - vars:
+          ENABLE_WS_RPC_EXPORTER: "true"
+    merge: |-
+      $(
+        CHAIN_NAME=${CHAIN_NAME} \
+        CHAIN_ID=${CHAIN_ID} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/websocket-rpc-exporter.yaml
+      )
+
+  - name: aws
+    activation:
+      - vars:
+          PROVIDER: "aws"
+    patches:
+      # avoid issues with duplicate storage classes
+      - op: add
+        path: deployments[*].helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/provider-aws.yaml
+      - op: replace
+        path: vars
+        value:
+          INGRESS_CLASS_NAME: "alb"
+
+  - name: disable-storage
+    activation:
+      - vars:
+          CHAIN_NAME: "beta"
+          PROVIDER: "aws"
+    patches:
+      # avoid issues with duplicate storage classes
+      - op: add
+        path: deployments[*].helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/disable-storage.yaml
