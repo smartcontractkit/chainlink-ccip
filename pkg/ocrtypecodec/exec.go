@@ -54,6 +54,10 @@ func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([
 }
 
 func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, error) {
+	if len(data) == 0 {
+		return exectypes.Observation{}, nil
+	}
+
 	pbObs := &ocrtypecodecpb.ExecObservation{}
 	if err := proto.Unmarshal(data, pbObs); err != nil {
 		return exectypes.Observation{}, err

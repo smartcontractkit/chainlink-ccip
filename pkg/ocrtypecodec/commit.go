@@ -63,6 +63,10 @@ func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) 
 }
 
 func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
+	if len(data) == 0 {
+		return committypes.Query{}, nil
+	}
+
 	pbQ := &ocrtypecodecpb.Query{}
 	if err := proto.Unmarshal(data, pbQ); err != nil {
 		return committypes.Query{}, fmt.Errorf("proto unmarshal query: %w", err)
@@ -121,6 +125,10 @@ func (c *CommitCodecProto) EncodeObservation(observation committypes.Observation
 }
 
 func (c *CommitCodecProto) DecodeObservation(data []byte) (committypes.Observation, error) {
+	if len(data) == 0 {
+		return committypes.Observation{}, nil
+	}
+
 	pbObs := &ocrtypecodecpb.CommitObservation{}
 	if err := proto.Unmarshal(data, pbObs); err != nil {
 		return committypes.Observation{}, fmt.Errorf("proto unmarshal observation: %w", err)
@@ -184,6 +192,10 @@ func (c *CommitCodecProto) EncodeOutcome(outcome committypes.Outcome) ([]byte, e
 }
 
 func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, error) {
+	if len(data) == 0 {
+		return committypes.Outcome{}, nil
+	}
+
 	pbOutcome := &ocrtypecodecpb.CommitOutcome{}
 	if err := proto.Unmarshal(data, pbOutcome); err != nil {
 		return committypes.Outcome{}, fmt.Errorf("proto unmarshal outcome: %w", err)

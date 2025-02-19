@@ -11,7 +11,6 @@ import (
 )
 
 func TestExecObservation(t *testing.T) {
-	t.Skipf("wip")
 	jsonCodec := NewExecCodecJSON()
 	protoCodec := NewExecCodecProto()
 
