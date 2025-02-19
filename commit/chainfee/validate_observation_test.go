@@ -149,7 +149,7 @@ func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
 					},
 				},
 			},
-			expectedChainFeeUpdatesError: "zero timestamp",
+			expectedChainFeeUpdatesError: "timestamp cannot be zero",
 		},
 	}
 
