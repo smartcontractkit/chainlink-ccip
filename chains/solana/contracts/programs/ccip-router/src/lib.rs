@@ -444,18 +444,12 @@ pub mod ccip_router {
     }
 }
 
-// TODO this is a hack because Anchor + Anchor-Go fail to include all errors in the IDL and the gobindings.
-// By having this first (though unused) error enum here, it does pick up the actual (second) error enum
-#[error_code]
-pub enum AnchorErrorHack {
-    Something,
-    Else,
-}
-
 #[error_code]
 pub enum CcipRouterError {
     #[msg("The signer is unauthorized")]
-    Unauthorized,
+    // offset error code so that they don't clash with other programs
+    // (Anchor's base custom error code 6000 + offset 1000 = start at 7000)
+    Unauthorized = 1000,
     #[msg("Mint account input is invalid")]
     InvalidInputsMint,
     #[msg("Invalid version of the onchain state")]
