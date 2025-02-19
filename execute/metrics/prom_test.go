@@ -283,51 +283,56 @@ func Test_TrackingOutcomes(t *testing.T) {
 }
 
 func Test_SequenceNumbers(t *testing.T) {
+	chain1 := "2337"
+	selector1 := cciptypes.ChainSelector(12922642891491394802)
+	chain2 := "3337"
+	selector2 := cciptypes.ChainSelector(4793464827907405086)
+
 	tt := []struct {
 		name   string
 		obs    exectypes.Observation
 		out    exectypes.Outcome
 		method plugincommon.MethodType
-		exp    map[cciptypes.ChainSelector]cciptypes.SeqNum
+		exp    map[string]cciptypes.SeqNum
 	}{
 		{
 			name:   "empty observation should not report anything",
 			obs:    exectypes.Observation{},
 			method: plugincommon.ObservationMethod,
-			exp:    map[cciptypes.ChainSelector]cciptypes.SeqNum{},
+			exp:    map[string]cciptypes.SeqNum{},
 		},
 		{
 			name: "single chain observation with seq nr",
 			obs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{
-					123: {
+					selector1: {
 						1: {},
 						4: {},
 					},
 				},
 			},
 			method: plugincommon.ObservationMethod,
-			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				123: 4,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 4,
 			},
 		},
 		{
 			name: "multiple chain observations with sequence numbers",
 			obs: exectypes.Observation{
 				Messages: exectypes.MessageObservations{
-					123: {
+					selector1: {
 						1: {},
 						2: {},
 					},
-					456: {
+					selector2: {
 						4: {},
 					},
 				},
 			},
 			method: plugincommon.ObservationMethod,
-			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				123: 2,
-				456: 4,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
+				chain2: 4,
 			},
 		},
 		{
@@ -335,7 +340,7 @@ func Test_SequenceNumbers(t *testing.T) {
 			out: exectypes.Outcome{
 				CommitReports: []exectypes.CommitData{
 					{
-						SourceChain: 123,
+						SourceChain: selector1,
 						Messages: []cciptypes.Message{
 							{
 								Header: cciptypes.RampMessageHeader{
@@ -347,8 +352,8 @@ func Test_SequenceNumbers(t *testing.T) {
 				},
 			},
 			method: plugincommon.OutcomeMethod,
-			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				123: 2,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
 			},
 		},
 		{
@@ -356,7 +361,7 @@ func Test_SequenceNumbers(t *testing.T) {
 			out: exectypes.Outcome{
 				CommitReports: []exectypes.CommitData{
 					{
-						SourceChain: 123,
+						SourceChain: selector1,
 						Messages: []cciptypes.Message{
 							{
 								Header: cciptypes.RampMessageHeader{
@@ -366,7 +371,7 @@ func Test_SequenceNumbers(t *testing.T) {
 						},
 					},
 					{
-						SourceChain: 456,
+						SourceChain: selector2,
 						Messages: []cciptypes.Message{
 							{
 								Header: cciptypes.RampMessageHeader{
@@ -383,9 +388,9 @@ func Test_SequenceNumbers(t *testing.T) {
 				},
 			},
 			method: plugincommon.OutcomeMethod,
-			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				123: 2,
-				456: 4,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
+				chain2: 4,
 			},
 		},
 	}
@@ -404,9 +409,9 @@ func Test_SequenceNumbers(t *testing.T) {
 				reporter.TrackOutcome(tc.out, exectypes.GetCommitReports)
 			}
 
-			for sourceChainSelector, maxSeqNr := range tc.exp {
+			for sourceChain, maxSeqNr := range tc.exp {
 				seqNum := testutil.ToFloat64(
-					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChainSelector.String(), tc.method),
+					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChain, tc.method),
 				)
 				require.Equal(t, float64(maxSeqNr), seqNum)
 			}

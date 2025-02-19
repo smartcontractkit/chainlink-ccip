@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/exp/maps"
@@ -15,19 +17,38 @@ import (
 )
 
 var (
-	promProcessorOutputCounter = promauto.NewCounterVec(
+	promExecOutputCounter = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ccip_exec_output_sizes",
-			Help: "This metric tracks the number of different items in the commit processor",
+			Help: "This metric tracks the number of different items in the exec plugin",
 		},
 		[]string{"chainID", "method", "state", "type"},
+	)
+	promExecLatencyHistogram = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "ccip_exec_latency",
+			Help: "This metric tracks the client-observed latency of a single exec plugin method",
+			Buckets: []float64{
+				float64(50 * time.Millisecond),
+				float64(100 * time.Millisecond),
+				float64(200 * time.Millisecond),
+				float64(500 * time.Millisecond),
+				float64(700 * time.Millisecond),
+				float64(time.Second),
+				float64(2 * time.Second),
+				float64(5 * time.Second),
+				float64(7 * time.Second),
+				float64(10 * time.Second),
+			},
+		},
+		[]string{"chainID", "method", "state"},
 	)
 	promSequenceNumbers = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ccip_exec_max_sequence_number",
 			Help: "This metric tracks the max sequence number observed by the commit processor",
 		},
-		[]string{"chainID", "sourceChainSelector", "method"},
+		[]string{"chainID", "sourceChain", "method"},
 	)
 )
 
@@ -36,6 +57,7 @@ type PromReporter struct {
 	chainID string
 
 	// Prometheus reporters
+	latencyHistogram     *prometheus.HistogramVec
 	outputDetailsCounter *prometheus.CounterVec
 	sequenceNumbers      *prometheus.GaugeVec
 }
@@ -50,7 +72,8 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 		lggr:    lggr,
 		chainID: chainID,
 
-		outputDetailsCounter: promProcessorOutputCounter,
+		latencyHistogram:     promExecLatencyHistogram,
+		outputDetailsCounter: promExecOutputCounter,
 		sequenceNumbers:      promSequenceNumbers,
 	}, nil
 }
@@ -83,9 +106,23 @@ func (p *PromReporter) trackMaxSequenceNumber(
 		return
 	}
 
+	sourceChain, err := sel.GetChainIDFromSelector(uint64(sourceChainSelector))
+	if err != nil {
+		p.lggr.Errorw("failed to get chain ID from selector", "err", err)
+		return
+	}
+
 	p.sequenceNumbers.
-		WithLabelValues(p.chainID, sourceChainSelector.String(), method).
+		WithLabelValues(p.chainID, sourceChain, method).
 		Set(float64(maxSeqNr))
+
+	p.lggr.Debugw(
+		"commit latest max seq num",
+		"method", method,
+		"sourceChain", sourceChain,
+		"destChain", p.chainID,
+		"maxSeqNr", maxSeqNr,
+	)
 }
 
 func (p *PromReporter) trackOutputStats(
