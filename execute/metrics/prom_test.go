@@ -3,12 +3,14 @@ package metrics
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -420,7 +422,39 @@ func Test_SequenceNumbers(t *testing.T) {
 }
 
 func Test_ExecLatency(t *testing.T) {
+	reporter, err := NewPromReporter(logger.Test(t), selector)
+	require.NoError(t, err)
 
+	t.Run("single latency observation", func(t *testing.T) {
+		reporter.TrackLatency(exectypes.GetCommitReports, plugincommon.ObservationMethod, 100, nil)
+		l1 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, chainID, "observation", "GetCommitReports")
+		require.Equal(t, 1, l1)
+
+		errs := testutil.ToFloat64(
+			reporter.execErrors.WithLabelValues(chainID, "observation", "GetCommitReports"),
+		)
+		require.Equal(t, float64(0), errs)
+	})
+
+	t.Run("multiple latency outcomes", func(t *testing.T) {
+		passCounter := 10
+		for i := 0; i < passCounter; i++ {
+			reporter.TrackLatency(exectypes.Filter, plugincommon.OutcomeMethod, time.Second, nil)
+		}
+		l2 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, chainID, "outcome", "Filter")
+		require.Equal(t, passCounter, l2)
+	})
+
+	t.Run("multiple latency observation with errors", func(t *testing.T) {
+		errCounter := 5
+		for i := 0; i < errCounter; i++ {
+			reporter.TrackLatency(exectypes.GetMessages, plugincommon.ObservationMethod, time.Second, fmt.Errorf("error"))
+		}
+		errs := testutil.ToFloat64(
+			reporter.execErrors.WithLabelValues(chainID, "observation", "GetMessages"),
+		)
+		require.Equal(t, float64(errCounter), errs)
+	})
 }
 
 func cleanupMetrics(p *PromReporter) func() {
