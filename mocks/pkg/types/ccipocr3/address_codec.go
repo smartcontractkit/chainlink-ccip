@@ -21,7 +21,7 @@ func (_m *MockAddressCodec) EXPECT() *MockAddressCodec_Expecter {
 }
 
 // AddressBytesToString provides a mock function with given fields: _a0, _a1
-func (_m *MockAddressCodec) AddressBytesToString(_a0 ccipocr3.UnknownAddress, _a1 uint64) (string, error) {
+func (_m *MockAddressCodec) AddressBytesToString(_a0 ccipocr3.UnknownAddress, _a1 ccipocr3.ChainSelector) (string, error) {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
@@ -30,16 +30,16 @@ func (_m *MockAddressCodec) AddressBytesToString(_a0 ccipocr3.UnknownAddress, _a
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(ccipocr3.UnknownAddress, uint64) (string, error)); ok {
+	if rf, ok := ret.Get(0).(func(ccipocr3.UnknownAddress, ccipocr3.ChainSelector) (string, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(ccipocr3.UnknownAddress, uint64) string); ok {
+	if rf, ok := ret.Get(0).(func(ccipocr3.UnknownAddress, ccipocr3.ChainSelector) string); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(ccipocr3.UnknownAddress, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(ccipocr3.UnknownAddress, ccipocr3.ChainSelector) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
@@ -55,14 +55,14 @@ type MockAddressCodec_AddressBytesToString_Call struct {
 
 // AddressBytesToString is a helper method to define mock.On call
 //   - _a0 ccipocr3.UnknownAddress
-//   - _a1 uint64
+//   - _a1 ccipocr3.ChainSelector
 func (_e *MockAddressCodec_Expecter) AddressBytesToString(_a0 interface{}, _a1 interface{}) *MockAddressCodec_AddressBytesToString_Call {
 	return &MockAddressCodec_AddressBytesToString_Call{Call: _e.mock.On("AddressBytesToString", _a0, _a1)}
 }
 
-func (_c *MockAddressCodec_AddressBytesToString_Call) Run(run func(_a0 ccipocr3.UnknownAddress, _a1 uint64)) *MockAddressCodec_AddressBytesToString_Call {
+func (_c *MockAddressCodec_AddressBytesToString_Call) Run(run func(_a0 ccipocr3.UnknownAddress, _a1 ccipocr3.ChainSelector)) *MockAddressCodec_AddressBytesToString_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(ccipocr3.UnknownAddress), args[1].(uint64))
+		run(args[0].(ccipocr3.UnknownAddress), args[1].(ccipocr3.ChainSelector))
 	})
 	return _c
 }
@@ -72,13 +72,13 @@ func (_c *MockAddressCodec_AddressBytesToString_Call) Return(_a0 string, _a1 err
 	return _c
 }
 
-func (_c *MockAddressCodec_AddressBytesToString_Call) RunAndReturn(run func(ccipocr3.UnknownAddress, uint64) (string, error)) *MockAddressCodec_AddressBytesToString_Call {
+func (_c *MockAddressCodec_AddressBytesToString_Call) RunAndReturn(run func(ccipocr3.UnknownAddress, ccipocr3.ChainSelector) (string, error)) *MockAddressCodec_AddressBytesToString_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // AddressStringToBytes provides a mock function with given fields: _a0, _a1
-func (_m *MockAddressCodec) AddressStringToBytes(_a0 string, _a1 uint64) (ccipocr3.UnknownAddress, error) {
+func (_m *MockAddressCodec) AddressStringToBytes(_a0 string, _a1 ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error) {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
@@ -87,10 +87,10 @@ func (_m *MockAddressCodec) AddressStringToBytes(_a0 string, _a1 uint64) (ccipoc
 
 	var r0 ccipocr3.UnknownAddress
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, uint64) (ccipocr3.UnknownAddress, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(string, uint64) ccipocr3.UnknownAddress); ok {
+	if rf, ok := ret.Get(0).(func(string, ccipocr3.ChainSelector) ccipocr3.UnknownAddress); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -98,7 +98,7 @@ func (_m *MockAddressCodec) AddressStringToBytes(_a0 string, _a1 uint64) (ccipoc
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(string, ccipocr3.ChainSelector) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
@@ -114,14 +114,14 @@ type MockAddressCodec_AddressStringToBytes_Call struct {
 
 // AddressStringToBytes is a helper method to define mock.On call
 //   - _a0 string
-//   - _a1 uint64
+//   - _a1 ccipocr3.ChainSelector
 func (_e *MockAddressCodec_Expecter) AddressStringToBytes(_a0 interface{}, _a1 interface{}) *MockAddressCodec_AddressStringToBytes_Call {
 	return &MockAddressCodec_AddressStringToBytes_Call{Call: _e.mock.On("AddressStringToBytes", _a0, _a1)}
 }
 
-func (_c *MockAddressCodec_AddressStringToBytes_Call) Run(run func(_a0 string, _a1 uint64)) *MockAddressCodec_AddressStringToBytes_Call {
+func (_c *MockAddressCodec_AddressStringToBytes_Call) Run(run func(_a0 string, _a1 ccipocr3.ChainSelector)) *MockAddressCodec_AddressStringToBytes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(uint64))
+		run(args[0].(string), args[1].(ccipocr3.ChainSelector))
 	})
 	return _c
 }
@@ -131,7 +131,7 @@ func (_c *MockAddressCodec_AddressStringToBytes_Call) Return(_a0 ccipocr3.Unknow
 	return _c
 }
 
-func (_c *MockAddressCodec_AddressStringToBytes_Call) RunAndReturn(run func(string, uint64) (ccipocr3.UnknownAddress, error)) *MockAddressCodec_AddressStringToBytes_Call {
+func (_c *MockAddressCodec_AddressStringToBytes_Call) RunAndReturn(run func(string, ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error)) *MockAddressCodec_AddressStringToBytes_Call {
 	_c.Call.Return(run)
 	return _c
 }
