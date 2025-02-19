@@ -139,14 +139,9 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
-	decodedReport, err := p.decodeReport(ctx, lggr, r.Report)
+	decodedReport, err := p.decodeReport(ctx, r.Report)
 	if err != nil {
 		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report: %w, report: %x", err, r.Report)
-	}
-
-	if decodedReport.IsEmpty() {
-		lggr.Warnw("empty report after decoding", "decodedReport", decodedReport)
-		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
 	var reportInfo cciptypes.CommitReportInfo
@@ -269,7 +264,6 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 func (p *Plugin) decodeReport(
 	ctx context.Context,
-	lggr logger.Logger,
 	report []byte,
 ) (cciptypes.CommitPluginReport, error) {
 	decodedReport, err := p.reportCodec.Decode(ctx, report)
@@ -278,7 +272,8 @@ func (p *Plugin) decodeReport(
 			fmt.Errorf("decode commit plugin report: %w", err)
 	}
 	if decodedReport.IsEmpty() {
-		lggr.Infow("empty report")
+		return cciptypes.CommitPluginReport{},
+			fmt.Errorf("empty report after decoding")
 	}
 	return decodedReport, nil
 }
