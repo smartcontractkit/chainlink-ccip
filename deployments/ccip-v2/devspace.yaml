@@ -203,6 +203,8 @@ profiles:
               # Uncomment this to enable overrides from overrides.ccip-v2.yaml file
               # - overrides-ccip-v2
   - name: load-tests
+    parents:
+      - profile: default
     patches:
       - op: add
         path: vars
@@ -210,21 +212,6 @@ profiles:
           USE_CASE:
             source: env
             default: ccip-load-tests
-      - op: add
-        path: dependencies
-        value:
-          geth-chains:
-            path: ${DEPENDENCIES_DIR}/geth-v2
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-          ccip-don:
-            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-            pipeline: deploy-ccip-v2
-            profiles:
-              - version-from-env
-              - network-generated
 
   - name: default-aws
     parents:
@@ -233,6 +220,7 @@ profiles:
       - op: add
         path: dependencies.ccip-don.profiles
         value: monitoring-service-monitor
+
   - name: load-tests-aws
     parents:
       - profile: load-tests
