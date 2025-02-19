@@ -139,19 +139,46 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
-	decodedReport, err := p.decodeReport(ctx, lggr, r.Report)
+	decodedReport, err := p.decodeReport(ctx, r.Report)
 	if err != nil {
 		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report: %w, report: %x", err, r.Report)
-	}
-
-	if decodedReport.IsEmpty() {
-		lggr.Warnw("empty report after decoding", "decodedReport", decodedReport)
-		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
 	var reportInfo cciptypes.CommitReportInfo
 	if reportInfo, err = cciptypes.DecodeCommitReportInfo(r.Info); err != nil {
 		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report info: %w", err)
+	}
+
+	for _, root := range decodedReport.BlessedMerkleRoots {
+		if root.MerkleRoot == (cciptypes.Bytes32{}) {
+			lggr.Warnw("empty blessed merkle root", "root", root)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
+		if root.SeqNumsRange.Start() > root.SeqNumsRange.End() {
+			lggr.Warnw("invalid seqNumsRange", "blessed root", root)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
+	}
+
+	for _, root := range decodedReport.UnblessedMerkleRoots {
+		if root.MerkleRoot == (cciptypes.Bytes32{}) {
+			lggr.Warnw("empty unblessed merkle root", "root", root)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
+		if root.SeqNumsRange.Start() > root.SeqNumsRange.End() {
+			lggr.Warnw("invalid seqNumsRange", "unblessed root", root)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
+	}
+
+	seen := make(map[cciptypes.RMNECDSASignature]struct{})
+	for _, sig := range decodedReport.RMNSignatures {
+
+		if _, ok := seen[sig]; ok {
+			lggr.Warnw("duplicate RMN signature", "sig", sig)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
+		seen[sig] = struct{}{}
 	}
 
 	if p.offchainCfg.RMNEnabled &&
@@ -162,6 +189,9 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
+	if isCursed, err := p.checkReportCursed(ctx, lggr, decodedReport); err != nil || isCursed {
+		return false, cciptypes.CommitPluginReport{}, err
+	}
 	// check if we support the dest, if not we can't do the checks needed.
 	supports, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
@@ -227,12 +257,6 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	// TODO: consider doing this in validateReport,
-	// will end up doing it in both ShouldAccept and ShouldTransmit.
-	if isCursed, err := p.checkReportCursed(ctx, lggr, decodedReport); err != nil || isCursed {
-		return false, err
-	}
-
 	lggr.Infow("ShouldAcceptedAttestedReport passed checks",
 		"timestamp", time.Now().UTC(),
 		"blessedRootsLen", len(decodedReport.BlessedMerkleRoots),
@@ -245,7 +269,6 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 func (p *Plugin) decodeReport(
 	ctx context.Context,
-	lggr logger.Logger,
 	report []byte,
 ) (cciptypes.CommitPluginReport, error) {
 	decodedReport, err := p.reportCodec.Decode(ctx, report)
@@ -254,7 +277,8 @@ func (p *Plugin) decodeReport(
 			fmt.Errorf("decode commit plugin report: %w", err)
 	}
 	if decodedReport.IsEmpty() {
-		lggr.Infow("empty report")
+		return cciptypes.CommitPluginReport{},
+			fmt.Errorf("empty report after decoding")
 	}
 	return decodedReport, nil
 }
