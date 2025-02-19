@@ -2,7 +2,6 @@ package reader
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 	sel "github.com/smartcontractkit/chain-selectors"
@@ -74,8 +73,8 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 	for k, v := range components {
 		selector, err := sel.GetChainIDFromSelector(uint64(k))
 		if err != nil {
-			selector = strconv.FormatUint(uint64(k), 10)
 			o.lggr.Error("failed to get chainID from selector", "err", err)
+			continue
 		}
 
 		if v.ExecutionFee != nil {
