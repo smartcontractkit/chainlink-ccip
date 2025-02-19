@@ -17,14 +17,14 @@ import (
 )
 
 var (
-	promExecOutputCounter = promauto.NewCounterVec(
+	PromExecOutputCounter = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ccip_exec_output_sizes",
 			Help: "This metric tracks the number of different items in the exec plugin",
 		},
 		[]string{"chainID", "method", "state", "type"},
 	)
-	promExecLatencyHistogram = promauto.NewHistogramVec(
+	PromExecLatencyHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "ccip_exec_latency",
 			Help: "This metric tracks the client-observed latency of a single exec plugin method",
@@ -44,14 +44,14 @@ var (
 		},
 		[]string{"chainID", "method", "state"},
 	)
-	promExecErrors = promauto.NewCounterVec(
+	PromExecErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ccip_exec_errors",
 			Help: "This metric tracks the number of errors in the exec plugin",
 		},
 		[]string{"chainID", "method", "state"},
 	)
-	promSequenceNumbers = promauto.NewGaugeVec(
+	PromSequenceNumbers = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ccip_exec_max_sequence_number",
 			Help: "This metric tracks the max sequence number observed by the commit processor",
@@ -81,10 +81,10 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 		lggr:    lggr,
 		chainID: chainID,
 
-		latencyHistogram:     promExecLatencyHistogram,
-		execErrors:           promExecErrors,
-		outputDetailsCounter: promExecOutputCounter,
-		sequenceNumbers:      promSequenceNumbers,
+		latencyHistogram:     PromExecLatencyHistogram,
+		execErrors:           PromExecErrors,
+		outputDetailsCounter: PromExecOutputCounter,
+		sequenceNumbers:      PromSequenceNumbers,
 	}, nil
 }
 
