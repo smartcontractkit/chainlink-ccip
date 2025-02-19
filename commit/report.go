@@ -154,6 +154,30 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report info: %w", err)
 	}
 
+	for _, root := range decodedReport.BlessedMerkleRoots {
+		if root.MerkleRoot == (cciptypes.Bytes32{}) {
+			lggr.Warnw("empty blessed merkle root", "root", root)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
+	}
+
+	for _, root := range decodedReport.BlessedMerkleRoots {
+		if root.SeqNumsRange.Start() > root.SeqNumsRange.End() {
+			lggr.Warnw("invalid seqNumsRange", "root", root)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
+	}
+
+	seen := make(map[cciptypes.RMNECDSASignature]struct{})
+	for _, sig := range decodedReport.RMNSignatures {
+
+		if _, ok := seen[sig]; ok {
+			lggr.Warnw("duplicate RMN signature", "sig", sig)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
+		seen[sig] = struct{}{}
+	}
+
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.BlessedMerkleRoots) > 0 &&
 		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
