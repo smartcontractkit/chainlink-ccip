@@ -419,9 +419,15 @@ func Test_SequenceNumbers(t *testing.T) {
 	}
 }
 
+func Test_ExecLatency(t *testing.T) {
+
+}
+
 func cleanupMetrics(p *PromReporter) func() {
 	return func() {
 		p.sequenceNumbers.Reset()
 		p.outputDetailsCounter.Reset()
+		p.latencyHistogram.Reset()
+		p.execErrors.Reset()
 	}
 }

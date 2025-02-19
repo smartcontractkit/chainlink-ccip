@@ -42,6 +42,7 @@ var (
 				float64(5 * time.Second),
 				float64(7 * time.Second),
 				float64(10 * time.Second),
+				float64(20 * time.Second),
 			},
 		},
 		[]string{"chainID", "processor", "method"},

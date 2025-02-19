@@ -39,7 +39,15 @@ var (
 				float64(5 * time.Second),
 				float64(7 * time.Second),
 				float64(10 * time.Second),
+				float64(20 * time.Second),
 			},
+		},
+		[]string{"chainID", "method", "state"},
+	)
+	promExecErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ccip_exec_errors",
+			Help: "This metric tracks the number of errors in the exec plugin",
 		},
 		[]string{"chainID", "method", "state"},
 	)
@@ -74,6 +82,7 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 		chainID: chainID,
 
 		latencyHistogram:     promExecLatencyHistogram,
+		execErrors:           promExecErrors,
 		outputDetailsCounter: promExecOutputCounter,
 		sequenceNumbers:      promSequenceNumbers,
 	}, nil
