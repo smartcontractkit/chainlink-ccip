@@ -154,11 +154,19 @@ func (p *Plugin) validateReport(
 			lggr.Warnw("empty blessed merkle root", "root", root)
 			return false, cciptypes.CommitPluginReport{}, nil
 		}
+		if root.SeqNumsRange.Start() > root.SeqNumsRange.End() {
+			lggr.Warnw("invalid seqNumsRange", "blessed root", root)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
 	}
 
-	for _, root := range decodedReport.BlessedMerkleRoots {
+	for _, root := range decodedReport.UnblessedMerkleRoots {
+		if root.MerkleRoot == (cciptypes.Bytes32{}) {
+			lggr.Warnw("empty unblessed merkle root", "root", root)
+			return false, cciptypes.CommitPluginReport{}, nil
+		}
 		if root.SeqNumsRange.Start() > root.SeqNumsRange.End() {
-			lggr.Warnw("invalid seqNumsRange", "root", root)
+			lggr.Warnw("invalid seqNumsRange", "unblessed root", root)
 			return false, cciptypes.CommitPluginReport{}, nil
 		}
 	}
