@@ -693,8 +693,6 @@ func genExecOutcome(
 	numProofs int,
 	numTokenDataEntries int,
 ) *ocrtypecodecpb.ExecOutcome {
-	rand.Seed(time.Now().UnixNano())
-
 	execOutcome := &ocrtypecodecpb.ExecOutcome{
 		PluginState:   "ACTIVE", // Example plugin state
 		CommitReports: make([]*ocrtypecodecpb.CommitData, numCommitReports),
@@ -705,14 +703,14 @@ func genExecOutcome(
 
 	for i := 0; i < numCommitReports; i++ {
 		commitData := &ocrtypecodecpb.CommitData{
-			SourceChain:   randomUint64(1, 1000),
+			SourceChain:   rand.Uint64(),
 			OnRampAddress: randomBytes(32),
 			Timestamp:     uint64(time.Now().Unix()),
-			BlockNum:      randomUint64(1000, 100000),
+			BlockNum:      rand.Uint64(),
 			MerkleRoot:    randomBytes(32),
 			SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{
-				MinMsgNr: randomUint64(1, 500),
-				MaxMsgNr: randomUint64(500, 1000),
+				MinMsgNr: rand.Uint64(),
+				MaxMsgNr: rand.Uint64(),
 			},
 			ExecutedMessages: make([]uint64, numMessagesPerCommit),
 			Messages:         make([]*ocrtypecodecpb.Message, numMessagesPerCommit),
@@ -722,14 +720,14 @@ func genExecOutcome(
 		}
 
 		for j := 0; j < numMessagesPerCommit; j++ {
-			commitData.ExecutedMessages[j] = randomUint64(1, 1000)
+			commitData.ExecutedMessages[j] = rand.Uint64()
 			commitData.Messages[j] = &ocrtypecodecpb.Message{
 				Header: &ocrtypecodecpb.RampMessageHeader{
 					MessageId:           randomBytes(32),
-					SourceChainSelector: randomUint64(1, 100000),
-					DestChainSelector:   randomUint64(1, 100),
-					SequenceNumber:      randomUint64(1, 1000),
-					Nonce:               randomUint64(1, 1000),
+					SourceChainSelector: rand.Uint64(),
+					DestChainSelector:   rand.Uint64(),
+					SequenceNumber:      rand.Uint64(),
+					Nonce:               rand.Uint64(),
 					MsgHash:             randomBytes(32),
 					OnRamp:              randomBytes(32),
 				},
@@ -766,7 +764,7 @@ func genExecOutcome(
 
 		// Create corresponding ChainReport
 		execOutcome.ExecutePluginReport.ChainReports[i] = &ocrtypecodecpb.ChainReport{
-			SourceChainSelector: randomUint64(1, 100),
+			SourceChainSelector: rand.Uint64(),
 			Messages:            commitData.Messages,
 			OffchainTokenData:   generateTokenData(numTokenDataEntries),
 			Proofs:              generateProofs(numProofs),
@@ -775,10 +773,6 @@ func genExecOutcome(
 	}
 
 	return execOutcome
-}
-
-func randomUint64(min, max int) uint64 {
-	return uint64(rand.Intn(max-min) + min)
 }
 
 // generateTokenData creates a list of token data entries.

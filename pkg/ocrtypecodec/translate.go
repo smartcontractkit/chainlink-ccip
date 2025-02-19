@@ -863,7 +863,9 @@ func (t *protoTranslator) nonceObservationsFromProto(
 	return nonces
 }
 
-func (t *protoTranslator) chainReportsToProto(reports []cciptypes.ExecutePluginReportSingleChain) []*ocrtypecodecpb.ChainReport {
+func (t *protoTranslator) chainReportsToProto(
+	reports []cciptypes.ExecutePluginReportSingleChain,
+) []*ocrtypecodecpb.ChainReport {
 	pbReports := make([]*ocrtypecodecpb.ChainReport, len(reports))
 
 	for i, r := range reports {
@@ -883,7 +885,9 @@ func (t *protoTranslator) chainReportsToProto(reports []cciptypes.ExecutePluginR
 	return pbReports
 }
 
-func (t *protoTranslator) chainReportsFromProto(pbReports []*ocrtypecodecpb.ChainReport) []cciptypes.ExecutePluginReportSingleChain {
+func (t *protoTranslator) chainReportsFromProto(
+	pbReports []*ocrtypecodecpb.ChainReport,
+) []cciptypes.ExecutePluginReportSingleChain {
 	reports := make([]cciptypes.ExecutePluginReportSingleChain, len(pbReports))
 
 	for i, r := range pbReports {

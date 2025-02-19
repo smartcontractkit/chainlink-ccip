@@ -29,7 +29,7 @@ generate-mocks: ensure_go_version
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
 # make generate-protobuf PROTOC_BIN=/path/to/protoc
 generate-protobuf: ensure_go_version ensure_protoc_28_0
-	$(PROTOC_BIN) --go_out=./pkg/ocrtypecodec/ocrtypecodecpb ./pkg/ocrtypecodec/commit.proto
+	$(PROTOC_BIN) --go_out=./pkg/ocrtypecodec/ocrtypecodecpb ./pkg/ocrtypecodec/ocrtypes.proto
 
 clean-generate: ensure_go_version
 	rm -rf ./mocks/
