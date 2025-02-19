@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/ocrtypecodecpb"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -502,4 +503,230 @@ func (t *protoTranslator) gasPriceChainFromProto(pbGpc []*ocrtypecodecpb.GasPric
 	}
 
 	return gasPrices
+}
+
+func (t *protoTranslator) commitReportsToProto(
+	observations exectypes.CommitObservations,
+) map[uint64]*ocrtypecodecpb.CommitObservations {
+	var commitReports map[uint64]*ocrtypecodecpb.CommitObservations
+	if len(observations) > 0 {
+		commitReports = make(map[uint64]*ocrtypecodecpb.CommitObservations, len(observations))
+	}
+
+	for chainSel, commits := range observations {
+		var commitData []*ocrtypecodecpb.CommitData
+		if len(commits) > 0 {
+			commitData = make([]*ocrtypecodecpb.CommitData, len(commits))
+		}
+
+		for i, commit := range commits {
+			commitData[i] = &ocrtypecodecpb.CommitData{
+				SourceChain:   uint64(commit.SourceChain),
+				OnRampAddress: commit.OnRampAddress,
+				Timestamp:     uint64(commit.Timestamp.Unix()),
+				BlockNum:      commit.BlockNum,
+				MerkleRoot:    commit.MerkleRoot[:],
+				SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{
+					MinMsgNr: uint64(commit.SequenceNumberRange.Start()),
+					MaxMsgNr: uint64(commit.SequenceNumberRange.End()),
+				},
+				ExecutedMessages: t.seqNumsToProto(commit.ExecutedMessages),
+				Messages:         t.messagesToProto(commit.Messages),
+				Hashes:           t.bytes32SliceToProto(commit.Hashes),
+				CostlyMessages:   t.bytes32SliceToProto(commit.CostlyMessages),
+				MessageTokenData: t.messageTokenDataSliceToProto(commit.MessageTokenData),
+			}
+		}
+		commitReports[uint64(chainSel)] = &ocrtypecodecpb.CommitObservations{
+			CommitData: commitData,
+		}
+	}
+
+	return commitReports
+}
+
+func (t *protoTranslator) messagesToProto(messages []cciptypes.Message) []*ocrtypecodecpb.Message {
+	var pbMessages []*ocrtypecodecpb.Message
+	if len(messages) > 0 {
+		pbMessages = make([]*ocrtypecodecpb.Message, len(messages))
+	}
+
+	for i, msg := range messages {
+		pbMessages[i] = t.encodeMessage(msg)
+	}
+	return pbMessages
+}
+
+func (t *protoTranslator) encodeMessage(msg cciptypes.Message) *ocrtypecodecpb.Message {
+	return &ocrtypecodecpb.Message{
+		Header: &ocrtypecodecpb.RampMessageHeader{
+			MessageId:           msg.Header.MessageID[:],
+			SourceChainSelector: uint64(msg.Header.SourceChainSelector),
+			DestChainSelector:   uint64(msg.Header.DestChainSelector),
+			SequenceNumber:      uint64(msg.Header.SequenceNumber),
+			Nonce:               msg.Header.Nonce,
+			MsgHash:             msg.Header.MsgHash[:],
+			OnRamp:              msg.Header.OnRamp,
+		},
+		Sender:         msg.Sender,
+		Data:           msg.Data,
+		Receiver:       msg.Receiver,
+		ExtraArgs:      msg.ExtraArgs,
+		FeeToken:       msg.FeeToken,
+		FeeTokenAmount: msg.FeeTokenAmount.Bytes(),
+		FeeValueJuels:  msg.FeeValueJuels.Bytes(),
+		TokenAmounts:   t.encodeRampTokenAmounts(msg.TokenAmounts),
+	}
+}
+
+func (t *protoTranslator) encodeRampTokenAmounts(
+	tokenAmounts []cciptypes.RampTokenAmount,
+) []*ocrtypecodecpb.RampTokenAmount {
+	var result []*ocrtypecodecpb.RampTokenAmount
+	if len(tokenAmounts) > 0 {
+		result = make([]*ocrtypecodecpb.RampTokenAmount, len(tokenAmounts))
+	}
+
+	for i, token := range tokenAmounts {
+		result[i] = &ocrtypecodecpb.RampTokenAmount{
+			SourcePoolAddress: token.SourcePoolAddress,
+			DestTokenAddress:  token.DestTokenAddress,
+			ExtraData:         token.ExtraData,
+			Amount:            token.Amount.Bytes(),
+			DestExecData:      token.DestExecData,
+		}
+	}
+
+	return result
+}
+
+func (t *protoTranslator) seqNumsToProto(seqNums []cciptypes.SeqNum) []uint64 {
+	var result []uint64
+	if len(seqNums) > 0 {
+		result = make([]uint64, len(seqNums))
+	}
+
+	for i, num := range seqNums {
+		result[i] = uint64(num)
+	}
+	return result
+}
+
+func (t *protoTranslator) bytes32SliceToProto(slice []cciptypes.Bytes32) [][]byte {
+	var result [][]byte
+	if len(slice) > 0 {
+		result = make([][]byte, len(slice))
+	}
+	for i, val := range slice {
+		result[i] = val[:]
+	}
+	return result
+}
+
+func (t *protoTranslator) messageTokenDataSliceToProto(
+	data []exectypes.MessageTokenData,
+) []*ocrtypecodecpb.MessageTokenData {
+	var result []*ocrtypecodecpb.MessageTokenData
+	if len(data) > 0 {
+		result = make([]*ocrtypecodecpb.MessageTokenData, len(data))
+	}
+
+	for i, item := range data {
+		result[i] = t.messageTokenDataToProto(item)
+	}
+	return result
+}
+
+func (t *protoTranslator) messageTokenDataToProto(data exectypes.MessageTokenData) *ocrtypecodecpb.MessageTokenData {
+	tokenData := make([]*ocrtypecodecpb.TokenData, len(data.TokenData))
+	for i, td := range data.TokenData {
+		tokenData[i] = &ocrtypecodecpb.TokenData{
+			Ready: td.Ready,
+			Data:  td.Data,
+		}
+	}
+	return &ocrtypecodecpb.MessageTokenData{
+		TokenData: tokenData,
+	}
+}
+
+func (t *protoTranslator) messageObservationsToProto(
+	msgs exectypes.MessageObservations,
+) map[uint64]*ocrtypecodecpb.SeqNumToMessage {
+	var pbMsgs map[uint64]*ocrtypecodecpb.SeqNumToMessage
+	if len(msgs) > 0 {
+		pbMsgs = make(map[uint64]*ocrtypecodecpb.SeqNumToMessage, len(msgs))
+	}
+
+	for chainSel, seqNums := range msgs {
+		seqNumToMsg := make(map[uint64]*ocrtypecodecpb.Message, len(seqNums))
+		for seqNum, msg := range seqNums {
+			seqNumToMsg[uint64(seqNum)] = t.encodeMessage(msg)
+		}
+
+		pbMsgs[uint64(chainSel)] = &ocrtypecodecpb.SeqNumToMessage{
+			Messages: seqNumToMsg,
+		}
+	}
+
+	return pbMsgs
+}
+
+func (t *protoTranslator) messageHashesToProto(
+	hashes exectypes.MessageHashes,
+) map[uint64]*ocrtypecodecpb.SeqNumToBytes {
+	var messageHashes map[uint64]*ocrtypecodecpb.SeqNumToBytes
+	if len(hashes) > 0 {
+		messageHashes = make(map[uint64]*ocrtypecodecpb.SeqNumToBytes, len(hashes))
+	}
+
+	for chainSel, hashMap := range hashes {
+		seqNumToBytes := &ocrtypecodecpb.SeqNumToBytes{SeqNumToBytes: make(map[uint64][]byte, len(hashMap))}
+		for seqNum, hash := range hashMap {
+			seqNumToBytes.SeqNumToBytes[uint64(seqNum)] = hash[:]
+		}
+		messageHashes[uint64(chainSel)] = seqNumToBytes
+	}
+
+	return messageHashes
+}
+
+func (t *protoTranslator) tokenDataObservationsToProto(
+	observations exectypes.TokenDataObservations,
+) map[uint64]*ocrtypecodecpb.SeqNumToTokenData {
+	var tokenDataObservations map[uint64]*ocrtypecodecpb.SeqNumToTokenData
+	if len(observations) > 0 {
+		tokenDataObservations = make(map[uint64]*ocrtypecodecpb.SeqNumToTokenData, len(observations))
+	}
+
+	for chainSel, tokenMap := range observations {
+		seqNumToTokenData := &ocrtypecodecpb.SeqNumToTokenData{
+			TokenData: make(map[uint64]*ocrtypecodecpb.MessageTokenData),
+		}
+		for seqNum, tokenData := range tokenMap {
+			seqNumToTokenData.TokenData[uint64(seqNum)] = t.messageTokenDataToProto(tokenData)
+		}
+		tokenDataObservations[uint64(chainSel)] = seqNumToTokenData
+	}
+
+	return tokenDataObservations
+}
+
+func (t *protoTranslator) nonceObservationsToProto(
+	observations exectypes.NonceObservations,
+) map[uint64]*ocrtypecodecpb.StringAddrToNonce {
+	var nonceObservations map[uint64]*ocrtypecodecpb.StringAddrToNonce
+	if len(observations) > 0 {
+		nonceObservations = make(map[uint64]*ocrtypecodecpb.StringAddrToNonce, len(observations))
+	}
+
+	for chainSel, nonceMap := range observations {
+		addrToNonce := make(map[string]uint64, len(nonceMap))
+		for addr, nonce := range nonceMap {
+			addrToNonce[addr] = nonce
+		}
+		nonceObservations[uint64(chainSel)] = &ocrtypecodecpb.StringAddrToNonce{Nonces: addrToNonce}
+	}
+
+	return nonceObservations
 }
