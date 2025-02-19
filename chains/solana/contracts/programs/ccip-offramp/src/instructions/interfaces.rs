@@ -5,7 +5,9 @@ use crate::context::{
     PriceOnlyCommitReportContext, SetOcrConfig, TransferOwnership, UpdateConfig, UpdateSourceChain,
 };
 use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChainConfig};
+use crate::OcrPluginType;
 
+/// To be called by the commit DON.
 pub trait Commit {
     fn commit<'info>(
         &self,
@@ -28,6 +30,7 @@ pub trait Commit {
     ) -> Result<()>;
 }
 
+/// To be called by the execute DON.
 pub trait Execute {
     fn execute<'info>(
         &self,
@@ -45,6 +48,7 @@ pub trait Execute {
     ) -> Result<()>;
 }
 
+/// To be called by the offramp administrator.
 pub trait Admin {
     fn transfer_ownership(
         &self,
@@ -95,7 +99,7 @@ pub trait Admin {
     fn set_ocr_config(
         &self,
         ctx: Context<SetOcrConfig>,
-        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
+        plugin_type: OcrPluginType,
         config_info: Ocr3ConfigInfo,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
