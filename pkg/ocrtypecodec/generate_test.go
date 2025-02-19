@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -46,7 +47,9 @@ func runBenchmark(
 	result.protoEncodingDataLength = len(protoEnc)
 
 	// sanity check
-	require.Equal(t, jsonDec, protoDec)
+	if !reflect.DeepEqual(jsonDec, protoDec) {
+		t.Errorf("Decoded JSON and Protobuf objects differ %#v != %#v", jsonDec, protoDec)
+	}
 	return result
 }
 
@@ -681,4 +684,119 @@ func genBytes32Slice(n int) [][]byte {
 		result[i] = randomBytes(32)
 	}
 	return result
+}
+
+// genExecOutcome generates an ExecOutcome with configurable sizes for nested elements.
+func genExecOutcome(
+	numCommitReports int,
+	numMessagesPerCommit int,
+	numProofs int,
+	numTokenDataEntries int,
+) *ocrtypecodecpb.ExecOutcome {
+	rand.Seed(time.Now().UnixNano())
+
+	execOutcome := &ocrtypecodecpb.ExecOutcome{
+		PluginState:   "ACTIVE", // Example plugin state
+		CommitReports: make([]*ocrtypecodecpb.CommitData, numCommitReports),
+		ExecutePluginReport: &ocrtypecodecpb.ExecutePluginReport{
+			ChainReports: make([]*ocrtypecodecpb.ChainReport, numCommitReports),
+		},
+	}
+
+	for i := 0; i < numCommitReports; i++ {
+		commitData := &ocrtypecodecpb.CommitData{
+			SourceChain:   randomUint64(1, 1000),
+			OnRampAddress: randomBytes(32),
+			Timestamp:     uint64(time.Now().Unix()),
+			BlockNum:      randomUint64(1000, 100000),
+			MerkleRoot:    randomBytes(32),
+			SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{
+				MinMsgNr: randomUint64(1, 500),
+				MaxMsgNr: randomUint64(500, 1000),
+			},
+			ExecutedMessages: make([]uint64, numMessagesPerCommit),
+			Messages:         make([]*ocrtypecodecpb.Message, numMessagesPerCommit),
+			Hashes:           make([][]byte, numMessagesPerCommit),
+			CostlyMessages:   make([][]byte, numMessagesPerCommit),
+			MessageTokenData: make([]*ocrtypecodecpb.MessageTokenData, numMessagesPerCommit),
+		}
+
+		for j := 0; j < numMessagesPerCommit; j++ {
+			commitData.ExecutedMessages[j] = randomUint64(1, 1000)
+			commitData.Messages[j] = &ocrtypecodecpb.Message{
+				Header: &ocrtypecodecpb.RampMessageHeader{
+					MessageId:           randomBytes(32),
+					SourceChainSelector: randomUint64(1, 100000),
+					DestChainSelector:   randomUint64(1, 100),
+					SequenceNumber:      randomUint64(1, 1000),
+					Nonce:               randomUint64(1, 1000),
+					MsgHash:             randomBytes(32),
+					OnRamp:              randomBytes(32),
+				},
+				Sender:         randomBytes(20),
+				Data:           randomBytes(64),
+				Receiver:       randomBytes(20),
+				ExtraArgs:      randomBytes(16),
+				FeeToken:       randomBytes(20),
+				FeeTokenAmount: randomBytes(8),
+				FeeValueJuels:  randomBytes(8),
+				TokenAmounts: []*ocrtypecodecpb.RampTokenAmount{
+					{
+						SourcePoolAddress: randomBytes(20),
+						DestTokenAddress:  randomBytes(20),
+						ExtraData:         randomBytes(10),
+						Amount:            randomBytes(8),
+						DestExecData:      randomBytes(10),
+					},
+				},
+			}
+			commitData.Hashes[j] = randomBytes(32)
+			commitData.CostlyMessages[j] = randomBytes(32)
+			commitData.MessageTokenData[j] = &ocrtypecodecpb.MessageTokenData{
+				TokenData: []*ocrtypecodecpb.TokenData{
+					{
+						Ready: true,
+						Data:  randomBytes(32),
+					},
+				},
+			}
+		}
+
+		execOutcome.CommitReports[i] = commitData
+
+		// Create corresponding ChainReport
+		execOutcome.ExecutePluginReport.ChainReports[i] = &ocrtypecodecpb.ChainReport{
+			SourceChainSelector: randomUint64(1, 100),
+			Messages:            commitData.Messages,
+			OffchainTokenData:   generateTokenData(numTokenDataEntries),
+			Proofs:              generateProofs(numProofs),
+			ProofFlagBits:       randomBytes(8),
+		}
+	}
+
+	return execOutcome
+}
+
+func randomUint64(min, max int) uint64 {
+	return uint64(rand.Intn(max-min) + min)
+}
+
+// generateTokenData creates a list of token data entries.
+func generateTokenData(numEntries int) []*ocrtypecodecpb.RepeatedBytes {
+	tokenData := make([]*ocrtypecodecpb.RepeatedBytes, numEntries)
+	for i := 0; i < numEntries; i++ {
+		tokenData[i] = &ocrtypecodecpb.RepeatedBytes{
+			Items: [][]byte{randomBytes(32)},
+		}
+	}
+	return tokenData
+}
+
+// generateProofs creates a list of random proofs.
+func generateProofs(numProofs int) [][]byte {
+	proofs := make([][]byte, numProofs)
+	for i := 0; i < numProofs; i++ {
+		proofs[i] = randomBytes(32)
+	}
+	return proofs
 }

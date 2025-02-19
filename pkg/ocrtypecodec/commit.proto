@@ -273,3 +273,25 @@ message RampTokenAmount {
 message StringAddrToNonce {
   map<string, uint64> nonces = 1;
 }
+
+message ExecOutcome {
+  string plugin_state = 1;
+  repeated CommitData commit_reports = 2;
+  ExecutePluginReport execute_plugin_report = 3;
+}
+
+message ExecutePluginReport {
+  repeated ChainReport chain_reports = 1;
+}
+
+message ChainReport {
+  uint64 source_chain_selector = 1;
+  repeated Message messages = 2;
+  repeated RepeatedBytes offchain_token_data = 3;
+  repeated bytes proofs = 4;
+  bytes proof_flag_bits = 5;
+}
+
+message RepeatedBytes {
+  repeated bytes items = 1;
+}

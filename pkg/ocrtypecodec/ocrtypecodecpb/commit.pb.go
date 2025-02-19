@@ -2783,6 +2783,242 @@ func (x *StringAddrToNonce) GetNonces() map[string]uint64 {
 	return nil
 }
 
+type ExecOutcome struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	PluginState         string               `protobuf:"bytes,1,opt,name=plugin_state,json=pluginState,proto3" json:"plugin_state,omitempty"`
+	CommitReports       []*CommitData        `protobuf:"bytes,2,rep,name=commit_reports,json=commitReports,proto3" json:"commit_reports,omitempty"`
+	ExecutePluginReport *ExecutePluginReport `protobuf:"bytes,3,opt,name=execute_plugin_report,json=executePluginReport,proto3" json:"execute_plugin_report,omitempty"`
+}
+
+func (x *ExecOutcome) Reset() {
+	*x = ExecOutcome{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_ocrtypecodec_commit_proto_msgTypes[44]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ExecOutcome) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecOutcome) ProtoMessage() {}
+
+func (x *ExecOutcome) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_ocrtypecodec_commit_proto_msgTypes[44]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecOutcome.ProtoReflect.Descriptor instead.
+func (*ExecOutcome) Descriptor() ([]byte, []int) {
+	return file_pkg_ocrtypecodec_commit_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ExecOutcome) GetPluginState() string {
+	if x != nil {
+		return x.PluginState
+	}
+	return ""
+}
+
+func (x *ExecOutcome) GetCommitReports() []*CommitData {
+	if x != nil {
+		return x.CommitReports
+	}
+	return nil
+}
+
+func (x *ExecOutcome) GetExecutePluginReport() *ExecutePluginReport {
+	if x != nil {
+		return x.ExecutePluginReport
+	}
+	return nil
+}
+
+type ExecutePluginReport struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ChainReports []*ChainReport `protobuf:"bytes,1,rep,name=chain_reports,json=chainReports,proto3" json:"chain_reports,omitempty"`
+}
+
+func (x *ExecutePluginReport) Reset() {
+	*x = ExecutePluginReport{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_ocrtypecodec_commit_proto_msgTypes[45]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ExecutePluginReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutePluginReport) ProtoMessage() {}
+
+func (x *ExecutePluginReport) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_ocrtypecodec_commit_proto_msgTypes[45]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutePluginReport.ProtoReflect.Descriptor instead.
+func (*ExecutePluginReport) Descriptor() ([]byte, []int) {
+	return file_pkg_ocrtypecodec_commit_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ExecutePluginReport) GetChainReports() []*ChainReport {
+	if x != nil {
+		return x.ChainReports
+	}
+	return nil
+}
+
+type ChainReport struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SourceChainSelector uint64           `protobuf:"varint,1,opt,name=source_chain_selector,json=sourceChainSelector,proto3" json:"source_chain_selector,omitempty"`
+	Messages            []*Message       `protobuf:"bytes,2,rep,name=messages,proto3" json:"messages,omitempty"`
+	OffchainTokenData   []*RepeatedBytes `protobuf:"bytes,3,rep,name=offchain_token_data,json=offchainTokenData,proto3" json:"offchain_token_data,omitempty"`
+	Proofs              [][]byte         `protobuf:"bytes,4,rep,name=proofs,proto3" json:"proofs,omitempty"`
+	ProofFlagBits       []byte           `protobuf:"bytes,5,opt,name=proof_flag_bits,json=proofFlagBits,proto3" json:"proof_flag_bits,omitempty"`
+}
+
+func (x *ChainReport) Reset() {
+	*x = ChainReport{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_ocrtypecodec_commit_proto_msgTypes[46]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ChainReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChainReport) ProtoMessage() {}
+
+func (x *ChainReport) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_ocrtypecodec_commit_proto_msgTypes[46]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChainReport.ProtoReflect.Descriptor instead.
+func (*ChainReport) Descriptor() ([]byte, []int) {
+	return file_pkg_ocrtypecodec_commit_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *ChainReport) GetSourceChainSelector() uint64 {
+	if x != nil {
+		return x.SourceChainSelector
+	}
+	return 0
+}
+
+func (x *ChainReport) GetMessages() []*Message {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+func (x *ChainReport) GetOffchainTokenData() []*RepeatedBytes {
+	if x != nil {
+		return x.OffchainTokenData
+	}
+	return nil
+}
+
+func (x *ChainReport) GetProofs() [][]byte {
+	if x != nil {
+		return x.Proofs
+	}
+	return nil
+}
+
+func (x *ChainReport) GetProofFlagBits() []byte {
+	if x != nil {
+		return x.ProofFlagBits
+	}
+	return nil
+}
+
+type RepeatedBytes struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Items [][]byte `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+}
+
+func (x *RepeatedBytes) Reset() {
+	*x = RepeatedBytes{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_ocrtypecodec_commit_proto_msgTypes[47]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RepeatedBytes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RepeatedBytes) ProtoMessage() {}
+
+func (x *RepeatedBytes) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_ocrtypecodec_commit_proto_msgTypes[47]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RepeatedBytes.ProtoReflect.Descriptor instead.
+func (*RepeatedBytes) Descriptor() ([]byte, []int) {
+	return file_pkg_ocrtypecodec_commit_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *RepeatedBytes) GetItems() [][]byte {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 var File_pkg_ocrtypecodec_commit_proto protoreflect.FileDescriptor
 
 var file_pkg_ocrtypecodec_commit_proto_rawDesc = []byte{
@@ -3431,9 +3667,46 @@ var file_pkg_ocrtypecodec_commit_proto_rawDesc = []byte{
 	0x1a, 0x39, 0x0a, 0x0b, 0x4e, 0x6f, 0x6e, 0x63, 0x65, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12,
 	0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65,
 	0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04,
-	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0x13, 0x5a, 0x11, 0x2e,
-	0x2f, 0x3b, 0x6f, 0x63, 0x72, 0x74, 0x79, 0x70, 0x65, 0x63, 0x6f, 0x64, 0x65, 0x63, 0x70, 0x62,
-	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0xc8, 0x01, 0x0a, 0x0b,
+	0x45, 0x78, 0x65, 0x63, 0x4f, 0x75, 0x74, 0x63, 0x6f, 0x6d, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x70,
+	0x6c, 0x75, 0x67, 0x69, 0x6e, 0x5f, 0x73, 0x74, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x0b, 0x70, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x3f,
+	0x0a, 0x0e, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x73,
+	0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x72, 0x6d, 0x6e, 0x5f, 0x6f, 0x66, 0x66,
+	0x63, 0x68, 0x61, 0x69, 0x6e, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x44, 0x61, 0x74, 0x61,
+	0x52, 0x0d, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x73, 0x12,
+	0x55, 0x0a, 0x15, 0x65, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65, 0x5f, 0x70, 0x6c, 0x75, 0x67, 0x69,
+	0x6e, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x21,
+	0x2e, 0x72, 0x6d, 0x6e, 0x5f, 0x6f, 0x66, 0x66, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x2e, 0x45, 0x78,
+	0x65, 0x63, 0x75, 0x74, 0x65, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72,
+	0x74, 0x52, 0x13, 0x65, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e,
+	0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x22, 0x55, 0x0a, 0x13, 0x45, 0x78, 0x65, 0x63, 0x75, 0x74,
+	0x65, 0x50, 0x6c, 0x75, 0x67, 0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x12, 0x3e, 0x0a,
+	0x0d, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x73, 0x18, 0x01,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x72, 0x6d, 0x6e, 0x5f, 0x6f, 0x66, 0x66, 0x63, 0x68,
+	0x61, 0x69, 0x6e, 0x2e, 0x43, 0x68, 0x61, 0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x52,
+	0x0c, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x73, 0x22, 0x81, 0x02,
+	0x0a, 0x0b, 0x43, 0x68, 0x61, 0x69, 0x6e, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x12, 0x32, 0x0a,
+	0x15, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x5f, 0x73, 0x65,
+	0x6c, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x13, 0x73, 0x6f,
+	0x75, 0x72, 0x63, 0x65, 0x43, 0x68, 0x61, 0x69, 0x6e, 0x53, 0x65, 0x6c, 0x65, 0x63, 0x74, 0x6f,
+	0x72, 0x12, 0x31, 0x0a, 0x08, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x18, 0x02, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x15, 0x2e, 0x72, 0x6d, 0x6e, 0x5f, 0x6f, 0x66, 0x66, 0x63, 0x68, 0x61,
+	0x69, 0x6e, 0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x08, 0x6d, 0x65, 0x73, 0x73,
+	0x61, 0x67, 0x65, 0x73, 0x12, 0x4b, 0x0a, 0x13, 0x6f, 0x66, 0x66, 0x63, 0x68, 0x61, 0x69, 0x6e,
+	0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x5f, 0x64, 0x61, 0x74, 0x61, 0x18, 0x03, 0x20, 0x03, 0x28,
+	0x0b, 0x32, 0x1b, 0x2e, 0x72, 0x6d, 0x6e, 0x5f, 0x6f, 0x66, 0x66, 0x63, 0x68, 0x61, 0x69, 0x6e,
+	0x2e, 0x52, 0x65, 0x70, 0x65, 0x61, 0x74, 0x65, 0x64, 0x42, 0x79, 0x74, 0x65, 0x73, 0x52, 0x11,
+	0x6f, 0x66, 0x66, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x44, 0x61, 0x74,
+	0x61, 0x12, 0x16, 0x0a, 0x06, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28,
+	0x0c, 0x52, 0x06, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x73, 0x12, 0x26, 0x0a, 0x0f, 0x70, 0x72, 0x6f,
+	0x6f, 0x66, 0x5f, 0x66, 0x6c, 0x61, 0x67, 0x5f, 0x62, 0x69, 0x74, 0x73, 0x18, 0x05, 0x20, 0x01,
+	0x28, 0x0c, 0x52, 0x0d, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x46, 0x6c, 0x61, 0x67, 0x42, 0x69, 0x74,
+	0x73, 0x22, 0x25, 0x0a, 0x0d, 0x52, 0x65, 0x70, 0x65, 0x61, 0x74, 0x65, 0x64, 0x42, 0x79, 0x74,
+	0x65, 0x73, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28,
+	0x0c, 0x52, 0x05, 0x69, 0x74, 0x65, 0x6d, 0x73, 0x42, 0x13, 0x5a, 0x11, 0x2e, 0x2f, 0x3b, 0x6f,
+	0x63, 0x72, 0x74, 0x79, 0x70, 0x65, 0x63, 0x6f, 0x64, 0x65, 0x63, 0x70, 0x62, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -3448,7 +3721,7 @@ func file_pkg_ocrtypecodec_commit_proto_rawDescGZIP() []byte {
 	return file_pkg_ocrtypecodec_commit_proto_rawDescData
 }
 
-var file_pkg_ocrtypecodec_commit_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
+var file_pkg_ocrtypecodec_commit_proto_msgTypes = make([]protoimpl.MessageInfo, 73)
 var file_pkg_ocrtypecodec_commit_proto_goTypes = []interface{}{
 	(*Query)(nil),                      // 0: rmn_offchain.Query
 	(*MerkleRootQuery)(nil),            // 1: rmn_offchain.MerkleRootQuery
@@ -3494,32 +3767,36 @@ var file_pkg_ocrtypecodec_commit_proto_goTypes = []interface{}{
 	(*RampMessageHeader)(nil),          // 41: rmn_offchain.RampMessageHeader
 	(*RampTokenAmount)(nil),            // 42: rmn_offchain.RampTokenAmount
 	(*StringAddrToNonce)(nil),          // 43: rmn_offchain.StringAddrToNonce
-	nil,                                // 44: rmn_offchain.CommitObservation.FChainEntry
-	nil,                                // 45: rmn_offchain.MerkleRootObservation.RmnEnabledChainsEntry
-	nil,                                // 46: rmn_offchain.MerkleRootObservation.FChainEntry
-	nil,                                // 47: rmn_offchain.TokenPriceObservation.FeedTokenPricesEntry
-	nil,                                // 48: rmn_offchain.TokenPriceObservation.FeeQuoterTokenUpdatesEntry
-	nil,                                // 49: rmn_offchain.TokenPriceObservation.FChainEntry
-	nil,                                // 50: rmn_offchain.ChainFeeObservation.FeeComponentsEntry
-	nil,                                // 51: rmn_offchain.ChainFeeObservation.NativeTokenPricesEntry
-	nil,                                // 52: rmn_offchain.ChainFeeObservation.ChainFeeUpdatesEntry
-	nil,                                // 53: rmn_offchain.ChainFeeObservation.FChainEntry
-	nil,                                // 54: rmn_offchain.DiscoveryObservation.FChainEntry
-	nil,                                // 55: rmn_offchain.ContractNameChainAddresses.AddressesEntry
-	nil,                                // 56: rmn_offchain.ChainAddressMap.ChainAddressesEntry
-	nil,                                // 57: rmn_offchain.MerkleRootOutcome.RmnEnabledChainsEntry
-	nil,                                // 58: rmn_offchain.TokenPriceOutcome.TokenPricesEntry
-	nil,                                // 59: rmn_offchain.ExecObservation.CommitReportsEntry
-	nil,                                // 60: rmn_offchain.ExecObservation.SeqNumsToMessagesEntry
-	nil,                                // 61: rmn_offchain.ExecObservation.MessageHashesEntry
-	nil,                                // 62: rmn_offchain.ExecObservation.NoncesEntry
-	nil,                                // 63: rmn_offchain.ExecObservation.FChainEntry
-	nil,                                // 64: rmn_offchain.SeqNumToMessage.MessagesEntry
-	nil,                                // 65: rmn_offchain.SeqNumToBytes.SeqNumToBytesEntry
-	nil,                                // 66: rmn_offchain.TokenDataObservations.TokenDataEntry
-	nil,                                // 67: rmn_offchain.SeqNumToTokenData.TokenDataEntry
-	nil,                                // 68: rmn_offchain.StringAddrToNonce.NoncesEntry
-	(*timestamppb.Timestamp)(nil),      // 69: google.protobuf.Timestamp
+	(*ExecOutcome)(nil),                // 44: rmn_offchain.ExecOutcome
+	(*ExecutePluginReport)(nil),        // 45: rmn_offchain.ExecutePluginReport
+	(*ChainReport)(nil),                // 46: rmn_offchain.ChainReport
+	(*RepeatedBytes)(nil),              // 47: rmn_offchain.RepeatedBytes
+	nil,                                // 48: rmn_offchain.CommitObservation.FChainEntry
+	nil,                                // 49: rmn_offchain.MerkleRootObservation.RmnEnabledChainsEntry
+	nil,                                // 50: rmn_offchain.MerkleRootObservation.FChainEntry
+	nil,                                // 51: rmn_offchain.TokenPriceObservation.FeedTokenPricesEntry
+	nil,                                // 52: rmn_offchain.TokenPriceObservation.FeeQuoterTokenUpdatesEntry
+	nil,                                // 53: rmn_offchain.TokenPriceObservation.FChainEntry
+	nil,                                // 54: rmn_offchain.ChainFeeObservation.FeeComponentsEntry
+	nil,                                // 55: rmn_offchain.ChainFeeObservation.NativeTokenPricesEntry
+	nil,                                // 56: rmn_offchain.ChainFeeObservation.ChainFeeUpdatesEntry
+	nil,                                // 57: rmn_offchain.ChainFeeObservation.FChainEntry
+	nil,                                // 58: rmn_offchain.DiscoveryObservation.FChainEntry
+	nil,                                // 59: rmn_offchain.ContractNameChainAddresses.AddressesEntry
+	nil,                                // 60: rmn_offchain.ChainAddressMap.ChainAddressesEntry
+	nil,                                // 61: rmn_offchain.MerkleRootOutcome.RmnEnabledChainsEntry
+	nil,                                // 62: rmn_offchain.TokenPriceOutcome.TokenPricesEntry
+	nil,                                // 63: rmn_offchain.ExecObservation.CommitReportsEntry
+	nil,                                // 64: rmn_offchain.ExecObservation.SeqNumsToMessagesEntry
+	nil,                                // 65: rmn_offchain.ExecObservation.MessageHashesEntry
+	nil,                                // 66: rmn_offchain.ExecObservation.NoncesEntry
+	nil,                                // 67: rmn_offchain.ExecObservation.FChainEntry
+	nil,                                // 68: rmn_offchain.SeqNumToMessage.MessagesEntry
+	nil,                                // 69: rmn_offchain.SeqNumToBytes.SeqNumToBytesEntry
+	nil,                                // 70: rmn_offchain.TokenDataObservations.TokenDataEntry
+	nil,                                // 71: rmn_offchain.SeqNumToTokenData.TokenDataEntry
+	nil,                                // 72: rmn_offchain.StringAddrToNonce.NoncesEntry
+	(*timestamppb.Timestamp)(nil),      // 73: google.protobuf.Timestamp
 }
 var file_pkg_ocrtypecodec_commit_proto_depIdxs = []int32{
 	1,  // 0: rmn_offchain.Query.merkle_root_query:type_name -> rmn_offchain.MerkleRootQuery
@@ -3534,79 +3811,84 @@ var file_pkg_ocrtypecodec_commit_proto_depIdxs = []int32{
 	15, // 9: rmn_offchain.CommitObservation.token_price_obs:type_name -> rmn_offchain.TokenPriceObservation
 	17, // 10: rmn_offchain.CommitObservation.chain_fee_obs:type_name -> rmn_offchain.ChainFeeObservation
 	21, // 11: rmn_offchain.CommitObservation.discovery_obs:type_name -> rmn_offchain.DiscoveryObservation
-	44, // 12: rmn_offchain.CommitObservation.f_chain:type_name -> rmn_offchain.CommitObservation.FChainEntry
+	48, // 12: rmn_offchain.CommitObservation.f_chain:type_name -> rmn_offchain.CommitObservation.FChainEntry
 	11, // 13: rmn_offchain.MerkleRootObservation.merkle_roots:type_name -> rmn_offchain.MerkleRootChain
-	45, // 14: rmn_offchain.MerkleRootObservation.rmn_enabled_chains:type_name -> rmn_offchain.MerkleRootObservation.RmnEnabledChainsEntry
+	49, // 14: rmn_offchain.MerkleRootObservation.rmn_enabled_chains:type_name -> rmn_offchain.MerkleRootObservation.RmnEnabledChainsEntry
 	12, // 15: rmn_offchain.MerkleRootObservation.on_ramp_max_seq_nums:type_name -> rmn_offchain.SeqNumChain
 	12, // 16: rmn_offchain.MerkleRootObservation.off_ramp_next_seq_nums:type_name -> rmn_offchain.SeqNumChain
 	13, // 17: rmn_offchain.MerkleRootObservation.rmn_remote_config:type_name -> rmn_offchain.RmnRemoteConfig
-	46, // 18: rmn_offchain.MerkleRootObservation.f_chain:type_name -> rmn_offchain.MerkleRootObservation.FChainEntry
+	50, // 18: rmn_offchain.MerkleRootObservation.f_chain:type_name -> rmn_offchain.MerkleRootObservation.FChainEntry
 	6,  // 19: rmn_offchain.MerkleRootChain.seq_nums_range:type_name -> rmn_offchain.SeqNumRange
 	14, // 20: rmn_offchain.RmnRemoteConfig.signers:type_name -> rmn_offchain.RemoteSignerInfo
-	47, // 21: rmn_offchain.TokenPriceObservation.feed_token_prices:type_name -> rmn_offchain.TokenPriceObservation.FeedTokenPricesEntry
-	48, // 22: rmn_offchain.TokenPriceObservation.fee_quoter_token_updates:type_name -> rmn_offchain.TokenPriceObservation.FeeQuoterTokenUpdatesEntry
-	49, // 23: rmn_offchain.TokenPriceObservation.f_chain:type_name -> rmn_offchain.TokenPriceObservation.FChainEntry
-	69, // 24: rmn_offchain.TokenPriceObservation.timestamp:type_name -> google.protobuf.Timestamp
-	69, // 25: rmn_offchain.TimestampedBig.timestamp:type_name -> google.protobuf.Timestamp
-	50, // 26: rmn_offchain.ChainFeeObservation.fee_components:type_name -> rmn_offchain.ChainFeeObservation.FeeComponentsEntry
-	51, // 27: rmn_offchain.ChainFeeObservation.native_token_prices:type_name -> rmn_offchain.ChainFeeObservation.NativeTokenPricesEntry
-	52, // 28: rmn_offchain.ChainFeeObservation.chain_fee_updates:type_name -> rmn_offchain.ChainFeeObservation.ChainFeeUpdatesEntry
-	53, // 29: rmn_offchain.ChainFeeObservation.f_chain:type_name -> rmn_offchain.ChainFeeObservation.FChainEntry
-	69, // 30: rmn_offchain.ChainFeeObservation.timestamp_now:type_name -> google.protobuf.Timestamp
+	51, // 21: rmn_offchain.TokenPriceObservation.feed_token_prices:type_name -> rmn_offchain.TokenPriceObservation.FeedTokenPricesEntry
+	52, // 22: rmn_offchain.TokenPriceObservation.fee_quoter_token_updates:type_name -> rmn_offchain.TokenPriceObservation.FeeQuoterTokenUpdatesEntry
+	53, // 23: rmn_offchain.TokenPriceObservation.f_chain:type_name -> rmn_offchain.TokenPriceObservation.FChainEntry
+	73, // 24: rmn_offchain.TokenPriceObservation.timestamp:type_name -> google.protobuf.Timestamp
+	73, // 25: rmn_offchain.TimestampedBig.timestamp:type_name -> google.protobuf.Timestamp
+	54, // 26: rmn_offchain.ChainFeeObservation.fee_components:type_name -> rmn_offchain.ChainFeeObservation.FeeComponentsEntry
+	55, // 27: rmn_offchain.ChainFeeObservation.native_token_prices:type_name -> rmn_offchain.ChainFeeObservation.NativeTokenPricesEntry
+	56, // 28: rmn_offchain.ChainFeeObservation.chain_fee_updates:type_name -> rmn_offchain.ChainFeeObservation.ChainFeeUpdatesEntry
+	57, // 29: rmn_offchain.ChainFeeObservation.f_chain:type_name -> rmn_offchain.ChainFeeObservation.FChainEntry
+	73, // 30: rmn_offchain.ChainFeeObservation.timestamp_now:type_name -> google.protobuf.Timestamp
 	20, // 31: rmn_offchain.ChainFeeUpdate.chain_fee:type_name -> rmn_offchain.ComponentsUSDPrices
-	69, // 32: rmn_offchain.ChainFeeUpdate.timestamp:type_name -> google.protobuf.Timestamp
-	54, // 33: rmn_offchain.DiscoveryObservation.f_chain:type_name -> rmn_offchain.DiscoveryObservation.FChainEntry
+	73, // 32: rmn_offchain.ChainFeeUpdate.timestamp:type_name -> google.protobuf.Timestamp
+	58, // 33: rmn_offchain.DiscoveryObservation.f_chain:type_name -> rmn_offchain.DiscoveryObservation.FChainEntry
 	22, // 34: rmn_offchain.DiscoveryObservation.contract_names:type_name -> rmn_offchain.ContractNameChainAddresses
-	55, // 35: rmn_offchain.ContractNameChainAddresses.addresses:type_name -> rmn_offchain.ContractNameChainAddresses.AddressesEntry
-	56, // 36: rmn_offchain.ChainAddressMap.chain_addresses:type_name -> rmn_offchain.ChainAddressMap.ChainAddressesEntry
+	59, // 35: rmn_offchain.ContractNameChainAddresses.addresses:type_name -> rmn_offchain.ContractNameChainAddresses.AddressesEntry
+	60, // 36: rmn_offchain.ChainAddressMap.chain_addresses:type_name -> rmn_offchain.ChainAddressMap.ChainAddressesEntry
 	25, // 37: rmn_offchain.CommitOutcome.merkle_root_outcome:type_name -> rmn_offchain.MerkleRootOutcome
 	27, // 38: rmn_offchain.CommitOutcome.token_price_outcome:type_name -> rmn_offchain.TokenPriceOutcome
 	28, // 39: rmn_offchain.CommitOutcome.chain_fee_outcome:type_name -> rmn_offchain.ChainFeeOutcome
 	30, // 40: rmn_offchain.CommitOutcome.main_outcome:type_name -> rmn_offchain.MainOutcome
 	26, // 41: rmn_offchain.MerkleRootOutcome.ranges_selected_for_report:type_name -> rmn_offchain.ChainRange
 	11, // 42: rmn_offchain.MerkleRootOutcome.roots_to_report:type_name -> rmn_offchain.MerkleRootChain
-	57, // 43: rmn_offchain.MerkleRootOutcome.rmn_enabled_chains:type_name -> rmn_offchain.MerkleRootOutcome.RmnEnabledChainsEntry
+	61, // 43: rmn_offchain.MerkleRootOutcome.rmn_enabled_chains:type_name -> rmn_offchain.MerkleRootOutcome.RmnEnabledChainsEntry
 	12, // 44: rmn_offchain.MerkleRootOutcome.off_ramp_next_seq_nums:type_name -> rmn_offchain.SeqNumChain
 	3,  // 45: rmn_offchain.MerkleRootOutcome.rmn_report_signatures:type_name -> rmn_offchain.SignatureEcdsa
 	13, // 46: rmn_offchain.MerkleRootOutcome.rmn_remote_cfg:type_name -> rmn_offchain.RmnRemoteConfig
 	6,  // 47: rmn_offchain.ChainRange.seq_num_range:type_name -> rmn_offchain.SeqNumRange
-	58, // 48: rmn_offchain.TokenPriceOutcome.token_prices:type_name -> rmn_offchain.TokenPriceOutcome.TokenPricesEntry
+	62, // 48: rmn_offchain.TokenPriceOutcome.token_prices:type_name -> rmn_offchain.TokenPriceOutcome.TokenPricesEntry
 	29, // 49: rmn_offchain.ChainFeeOutcome.gas_prices:type_name -> rmn_offchain.GasPriceChain
-	59, // 50: rmn_offchain.ExecObservation.commit_reports:type_name -> rmn_offchain.ExecObservation.CommitReportsEntry
-	60, // 51: rmn_offchain.ExecObservation.seqNumsToMessages:type_name -> rmn_offchain.ExecObservation.SeqNumsToMessagesEntry
-	61, // 52: rmn_offchain.ExecObservation.messageHashes:type_name -> rmn_offchain.ExecObservation.MessageHashesEntry
+	63, // 50: rmn_offchain.ExecObservation.commit_reports:type_name -> rmn_offchain.ExecObservation.CommitReportsEntry
+	64, // 51: rmn_offchain.ExecObservation.seqNumsToMessages:type_name -> rmn_offchain.ExecObservation.SeqNumsToMessagesEntry
+	65, // 52: rmn_offchain.ExecObservation.messageHashes:type_name -> rmn_offchain.ExecObservation.MessageHashesEntry
 	38, // 53: rmn_offchain.ExecObservation.token_data_observations:type_name -> rmn_offchain.TokenDataObservations
-	62, // 54: rmn_offchain.ExecObservation.nonces:type_name -> rmn_offchain.ExecObservation.NoncesEntry
+	66, // 54: rmn_offchain.ExecObservation.nonces:type_name -> rmn_offchain.ExecObservation.NoncesEntry
 	21, // 55: rmn_offchain.ExecObservation.contracts:type_name -> rmn_offchain.DiscoveryObservation
-	63, // 56: rmn_offchain.ExecObservation.f_chain:type_name -> rmn_offchain.ExecObservation.FChainEntry
+	67, // 56: rmn_offchain.ExecObservation.f_chain:type_name -> rmn_offchain.ExecObservation.FChainEntry
 	33, // 57: rmn_offchain.CommitObservations.commit_data:type_name -> rmn_offchain.CommitData
 	6,  // 58: rmn_offchain.CommitData.sequence_number_range:type_name -> rmn_offchain.SeqNumRange
 	40, // 59: rmn_offchain.CommitData.messages:type_name -> rmn_offchain.Message
 	34, // 60: rmn_offchain.CommitData.message_token_data:type_name -> rmn_offchain.MessageTokenData
 	35, // 61: rmn_offchain.MessageTokenData.token_data:type_name -> rmn_offchain.TokenData
-	64, // 62: rmn_offchain.SeqNumToMessage.messages:type_name -> rmn_offchain.SeqNumToMessage.MessagesEntry
-	65, // 63: rmn_offchain.SeqNumToBytes.seqNumToBytes:type_name -> rmn_offchain.SeqNumToBytes.SeqNumToBytesEntry
-	66, // 64: rmn_offchain.TokenDataObservations.token_data:type_name -> rmn_offchain.TokenDataObservations.TokenDataEntry
-	67, // 65: rmn_offchain.SeqNumToTokenData.token_data:type_name -> rmn_offchain.SeqNumToTokenData.TokenDataEntry
+	68, // 62: rmn_offchain.SeqNumToMessage.messages:type_name -> rmn_offchain.SeqNumToMessage.MessagesEntry
+	69, // 63: rmn_offchain.SeqNumToBytes.seqNumToBytes:type_name -> rmn_offchain.SeqNumToBytes.SeqNumToBytesEntry
+	70, // 64: rmn_offchain.TokenDataObservations.token_data:type_name -> rmn_offchain.TokenDataObservations.TokenDataEntry
+	71, // 65: rmn_offchain.SeqNumToTokenData.token_data:type_name -> rmn_offchain.SeqNumToTokenData.TokenDataEntry
 	41, // 66: rmn_offchain.Message.header:type_name -> rmn_offchain.RampMessageHeader
 	42, // 67: rmn_offchain.Message.token_amounts:type_name -> rmn_offchain.RampTokenAmount
-	68, // 68: rmn_offchain.StringAddrToNonce.nonces:type_name -> rmn_offchain.StringAddrToNonce.NoncesEntry
-	16, // 69: rmn_offchain.TokenPriceObservation.FeeQuoterTokenUpdatesEntry.value:type_name -> rmn_offchain.TimestampedBig
-	18, // 70: rmn_offchain.ChainFeeObservation.FeeComponentsEntry.value:type_name -> rmn_offchain.ChainFeeComponents
-	19, // 71: rmn_offchain.ChainFeeObservation.ChainFeeUpdatesEntry.value:type_name -> rmn_offchain.ChainFeeUpdate
-	23, // 72: rmn_offchain.ContractNameChainAddresses.AddressesEntry.value:type_name -> rmn_offchain.ChainAddressMap
-	32, // 73: rmn_offchain.ExecObservation.CommitReportsEntry.value:type_name -> rmn_offchain.CommitObservations
-	36, // 74: rmn_offchain.ExecObservation.SeqNumsToMessagesEntry.value:type_name -> rmn_offchain.SeqNumToMessage
-	37, // 75: rmn_offchain.ExecObservation.MessageHashesEntry.value:type_name -> rmn_offchain.SeqNumToBytes
-	43, // 76: rmn_offchain.ExecObservation.NoncesEntry.value:type_name -> rmn_offchain.StringAddrToNonce
-	40, // 77: rmn_offchain.SeqNumToMessage.MessagesEntry.value:type_name -> rmn_offchain.Message
-	39, // 78: rmn_offchain.TokenDataObservations.TokenDataEntry.value:type_name -> rmn_offchain.SeqNumToTokenData
-	34, // 79: rmn_offchain.SeqNumToTokenData.TokenDataEntry.value:type_name -> rmn_offchain.MessageTokenData
-	80, // [80:80] is the sub-list for method output_type
-	80, // [80:80] is the sub-list for method input_type
-	80, // [80:80] is the sub-list for extension type_name
-	80, // [80:80] is the sub-list for extension extendee
-	0,  // [0:80] is the sub-list for field type_name
+	72, // 68: rmn_offchain.StringAddrToNonce.nonces:type_name -> rmn_offchain.StringAddrToNonce.NoncesEntry
+	33, // 69: rmn_offchain.ExecOutcome.commit_reports:type_name -> rmn_offchain.CommitData
+	45, // 70: rmn_offchain.ExecOutcome.execute_plugin_report:type_name -> rmn_offchain.ExecutePluginReport
+	46, // 71: rmn_offchain.ExecutePluginReport.chain_reports:type_name -> rmn_offchain.ChainReport
+	40, // 72: rmn_offchain.ChainReport.messages:type_name -> rmn_offchain.Message
+	47, // 73: rmn_offchain.ChainReport.offchain_token_data:type_name -> rmn_offchain.RepeatedBytes
+	16, // 74: rmn_offchain.TokenPriceObservation.FeeQuoterTokenUpdatesEntry.value:type_name -> rmn_offchain.TimestampedBig
+	18, // 75: rmn_offchain.ChainFeeObservation.FeeComponentsEntry.value:type_name -> rmn_offchain.ChainFeeComponents
+	19, // 76: rmn_offchain.ChainFeeObservation.ChainFeeUpdatesEntry.value:type_name -> rmn_offchain.ChainFeeUpdate
+	23, // 77: rmn_offchain.ContractNameChainAddresses.AddressesEntry.value:type_name -> rmn_offchain.ChainAddressMap
+	32, // 78: rmn_offchain.ExecObservation.CommitReportsEntry.value:type_name -> rmn_offchain.CommitObservations
+	36, // 79: rmn_offchain.ExecObservation.SeqNumsToMessagesEntry.value:type_name -> rmn_offchain.SeqNumToMessage
+	37, // 80: rmn_offchain.ExecObservation.MessageHashesEntry.value:type_name -> rmn_offchain.SeqNumToBytes
+	43, // 81: rmn_offchain.ExecObservation.NoncesEntry.value:type_name -> rmn_offchain.StringAddrToNonce
+	40, // 82: rmn_offchain.SeqNumToMessage.MessagesEntry.value:type_name -> rmn_offchain.Message
+	39, // 83: rmn_offchain.TokenDataObservations.TokenDataEntry.value:type_name -> rmn_offchain.SeqNumToTokenData
+	34, // 84: rmn_offchain.SeqNumToTokenData.TokenDataEntry.value:type_name -> rmn_offchain.MessageTokenData
+	85, // [85:85] is the sub-list for method output_type
+	85, // [85:85] is the sub-list for method input_type
+	85, // [85:85] is the sub-list for extension type_name
+	85, // [85:85] is the sub-list for extension extendee
+	0,  // [0:85] is the sub-list for field type_name
 }
 
 func init() { file_pkg_ocrtypecodec_commit_proto_init() }
@@ -4143,6 +4425,54 @@ func file_pkg_ocrtypecodec_commit_proto_init() {
 				return nil
 			}
 		}
+		file_pkg_ocrtypecodec_commit_proto_msgTypes[44].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ExecOutcome); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_pkg_ocrtypecodec_commit_proto_msgTypes[45].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ExecutePluginReport); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_pkg_ocrtypecodec_commit_proto_msgTypes[46].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ChainReport); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_pkg_ocrtypecodec_commit_proto_msgTypes[47].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RepeatedBytes); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -4150,7 +4480,7 @@ func file_pkg_ocrtypecodec_commit_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_pkg_ocrtypecodec_commit_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   69,
+			NumMessages:   73,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

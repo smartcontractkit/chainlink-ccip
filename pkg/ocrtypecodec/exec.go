@@ -2,7 +2,7 @@ package ocrtypecodec
 
 import (
 	"encoding/json"
-	"math/big"
+	"fmt"
 
 	"google.golang.org/protobuf/proto"
 
@@ -60,7 +60,7 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 
 	pbObs := &ocrtypecodecpb.ExecObservation{}
 	if err := proto.Unmarshal(data, pbObs); err != nil {
-		return exectypes.Observation{}, err
+		return exectypes.Observation{}, fmt.Errorf("proto unmarshal ExecObservation: %w", err)
 	}
 
 	return exectypes.Observation{
@@ -78,87 +78,39 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 	}, nil
 }
 
-func decodeMessageTokenData(data []*ocrtypecodecpb.MessageTokenData) []exectypes.MessageTokenData {
-	result := make([]exectypes.MessageTokenData, len(data))
-	for i, item := range data {
-		result[i] = decodeMessageTokenDataEntry(item)
-	}
-	return result
-}
-
-func decodeSeqNums(seqNums []uint64) []cciptypes.SeqNum {
-	result := make([]cciptypes.SeqNum, len(seqNums))
-	for i, num := range seqNums {
-		result[i] = cciptypes.SeqNum(num)
-	}
-	return result
-}
-
-func decodeMessages(messages []*ocrtypecodecpb.Message) []cciptypes.Message {
-	result := make([]cciptypes.Message, len(messages))
-	for i, msg := range messages {
-		result[i] = decodeMessage(msg)
-	}
-	return result
-}
-
-func decodeMessage(msg *ocrtypecodecpb.Message) cciptypes.Message {
-	return cciptypes.Message{
-		Header:         decodeMessageHeader(msg.Header),
-		Sender:         msg.Sender,
-		Data:           msg.Data,
-		Receiver:       msg.Receiver,
-		ExtraArgs:      msg.ExtraArgs,
-		FeeToken:       msg.FeeToken,
-		FeeTokenAmount: cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeTokenAmount)),
-		FeeValueJuels:  cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeValueJuels)),
-		TokenAmounts:   decodeRampTokenAmounts(msg.TokenAmounts),
-	}
-}
-
-func decodeMessageHeader(header *ocrtypecodecpb.RampMessageHeader) cciptypes.RampMessageHeader {
-	return cciptypes.RampMessageHeader{
-		MessageID:           cciptypes.Bytes32(header.MessageId),
-		SourceChainSelector: cciptypes.ChainSelector(header.SourceChainSelector),
-		DestChainSelector:   cciptypes.ChainSelector(header.DestChainSelector),
-		SequenceNumber:      cciptypes.SeqNum(header.SequenceNumber),
-		Nonce:               header.Nonce,
-		MsgHash:             cciptypes.Bytes32(header.MsgHash),
-		OnRamp:              header.OnRamp,
-	}
-}
-
-func decodeRampTokenAmounts(tokenAmounts []*ocrtypecodecpb.RampTokenAmount) []cciptypes.RampTokenAmount {
-	result := make([]cciptypes.RampTokenAmount, len(tokenAmounts))
-	for i, token := range tokenAmounts {
-		result[i] = cciptypes.RampTokenAmount{
-			SourcePoolAddress: token.SourcePoolAddress,
-			DestTokenAddress:  token.DestTokenAddress,
-			ExtraData:         token.ExtraData,
-			Amount:            cciptypes.NewBigInt(big.NewInt(0).SetBytes(token.Amount)),
-			DestExecData:      token.DestExecData,
-		}
-	}
-	return result
-}
-
-func decodeMessageTokenDataEntry(data *ocrtypecodecpb.MessageTokenData) exectypes.MessageTokenData {
-	tokenData := make([]exectypes.TokenData, len(data.TokenData))
-	for i, td := range data.TokenData {
-		tokenData[i] = exectypes.TokenData{
-			Ready: td.Ready,
-			Data:  td.Data,
-		}
-	}
-	return exectypes.MessageTokenData{TokenData: tokenData}
-}
-
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
-	return nil, nil
+	outcome = exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report)
+
+	pbObs := &ocrtypecodecpb.ExecOutcome{
+		PluginState:   string(outcome.State),
+		CommitReports: e.tr.commitDataSliceToProto(outcome.CommitReports),
+		ExecutePluginReport: &ocrtypecodecpb.ExecutePluginReport{
+			ChainReports: e.tr.chainReportsToProto(outcome.Report.ChainReports),
+		},
+	}
+
+	return proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)
 }
 
 func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
-	return exectypes.Outcome{}, nil
+	if len(data) == 0 {
+		return exectypes.Outcome{}, nil
+	}
+
+	pbOutc := &ocrtypecodecpb.ExecOutcome{}
+	if err := proto.Unmarshal(data, pbOutc); err != nil {
+		return exectypes.Outcome{}, fmt.Errorf("proto unmarshal ExecOutcome: %w", err)
+	}
+
+	outc := exectypes.Outcome{
+		State:         exectypes.PluginState(pbOutc.PluginState),
+		CommitReports: e.tr.commitDataSliceFromProto(pbOutc.CommitReports),
+		Report: cciptypes.ExecutePluginReport{
+			ChainReports: e.tr.chainReportsFromProto(pbOutc.ExecutePluginReport.ChainReports),
+		},
+	}
+
+	return outc, nil
 }
 
 type ExecCodecJSON struct{}

@@ -73,3 +73,63 @@ func TestExecObservation(t *testing.T) {
 
 	fmt.Println(resultDataArray(results))
 }
+
+func TestExecOutcome(t *testing.T) {
+	jsonCodec := NewExecCodecJSON()
+	protoCodec := NewExecCodecProto()
+
+	queriesVector := []struct {
+		name                 string
+		numCommitReports     int
+		numMessagesPerCommit int
+		numProofs            int
+		numTokenDataEntries  int
+	}{
+		{name: "empty outcome"},
+		{
+			name:                 "small outcome",
+			numCommitReports:     2,
+			numMessagesPerCommit: 2,
+			numProofs:            2,
+			numTokenDataEntries:  2,
+		},
+		{
+			name:                 "medium outcome",
+			numCommitReports:     40,
+			numMessagesPerCommit: 30,
+			numProofs:            13,
+			numTokenDataEntries:  15,
+		},
+		{
+			name:                 "large outcome",
+			numCommitReports:     128,
+			numMessagesPerCommit: 128,
+			numProofs:            128,
+			numTokenDataEntries:  128,
+		},
+	}
+
+	results := make([]resultData, 0, len(queriesVector))
+
+	for _, qv := range queriesVector {
+		pbOutcBytes, err := proto.Marshal(
+			genExecOutcome(qv.numCommitReports, qv.numMessagesPerCommit, qv.numProofs, qv.numTokenDataEntries))
+		require.NoError(t, err)
+
+		outc, err := protoCodec.DecodeOutcome(pbOutcBytes)
+		require.NoError(t, err)
+
+		result := runBenchmark(
+			t,
+			qv.name,
+			outc,
+			func(b []byte) (interface{}, error) { return jsonCodec.DecodeOutcome(b) },
+			func(i interface{}) ([]byte, error) { return jsonCodec.EncodeOutcome(i.(exectypes.Outcome)) },
+			func(b []byte) (interface{}, error) { return protoCodec.DecodeOutcome(b) },
+			func(i interface{}) ([]byte, error) { return protoCodec.EncodeOutcome(i.(exectypes.Outcome)) },
+		)
+		results = append(results, result)
+	}
+
+	fmt.Println(resultDataArray(results))
+}
