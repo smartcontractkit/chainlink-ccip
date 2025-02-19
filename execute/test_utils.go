@@ -345,8 +345,13 @@ func (it *IntTest) newNode(
 		&metrics.Noop{},
 	)
 
+	// FIXME: Test should not rely on the specific type of the plugin but rather than that on
+	// the interface type
+	p := node1.(*TrackedPlugin)
+	pp := p.ReportingPlugin.(*Plugin)
+
 	return nodeSetup{
-		node:        node1,
+		node:        pp,
 		reportCodec: reportCodec,
 		msgHasher:   it.msgHasher,
 	}

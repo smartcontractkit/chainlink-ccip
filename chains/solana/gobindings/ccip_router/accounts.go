@@ -39,16 +39,14 @@ func (obj *AllowedOfframp) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 }
 
 type Config struct {
-	Version          uint8
-	Padding0         [7]uint8
-	SvmChainSelector uint64
-	Padding1         [8]uint8
-	Owner            ag_solanago.PublicKey
-	ProposedOwner    ag_solanago.PublicKey
-	Padding2         [8]uint8
-	FeeQuoter        ag_solanago.PublicKey
-	LinkTokenMint    ag_solanago.PublicKey
-	FeeAggregator    ag_solanago.PublicKey
+	Version            uint8
+	DefaultCodeVersion CodeVersion
+	SvmChainSelector   uint64
+	Owner              ag_solanago.PublicKey
+	ProposedOwner      ag_solanago.PublicKey
+	FeeQuoter          ag_solanago.PublicKey
+	LinkTokenMint      ag_solanago.PublicKey
+	FeeAggregator      ag_solanago.PublicKey
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -64,18 +62,13 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `Padding0` param:
-	err = encoder.Encode(obj.Padding0)
+	// Serialize `DefaultCodeVersion` param:
+	err = encoder.Encode(obj.DefaultCodeVersion)
 	if err != nil {
 		return err
 	}
 	// Serialize `SvmChainSelector` param:
 	err = encoder.Encode(obj.SvmChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `Padding1` param:
-	err = encoder.Encode(obj.Padding1)
 	if err != nil {
 		return err
 	}
@@ -86,11 +79,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `ProposedOwner` param:
 	err = encoder.Encode(obj.ProposedOwner)
-	if err != nil {
-		return err
-	}
-	// Serialize `Padding2` param:
-	err = encoder.Encode(obj.Padding2)
 	if err != nil {
 		return err
 	}
@@ -131,18 +119,13 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Padding0`:
-	err = decoder.Decode(&obj.Padding0)
+	// Deserialize `DefaultCodeVersion`:
+	err = decoder.Decode(&obj.DefaultCodeVersion)
 	if err != nil {
 		return err
 	}
 	// Deserialize `SvmChainSelector`:
 	err = decoder.Decode(&obj.SvmChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Padding1`:
-	err = decoder.Decode(&obj.Padding1)
 	if err != nil {
 		return err
 	}
@@ -153,11 +136,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `ProposedOwner`:
 	err = decoder.Decode(&obj.ProposedOwner)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Padding2`:
-	err = decoder.Decode(&obj.Padding2)
 	if err != nil {
 		return err
 	}

@@ -68,6 +68,21 @@ func (o Outcome) IsEmpty() bool {
 	return len(o.CommitReports) == 0 && len(o.Report.ChainReports) == 0
 }
 
+func (o *Outcome) Stats() map[string]int {
+	counters := map[string]int{
+		messagesLabel:     0,
+		tokenDataLabel:    0,
+		sourceChainsLabel: 0,
+	}
+
+	for _, report := range o.Report.ChainReports {
+		counters[sourceChainsLabel]++
+		counters[messagesLabel] += len(report.Messages)
+		counters[tokenDataLabel] += len(report.OffchainTokenData)
+	}
+	return counters
+}
+
 // NewOutcome creates a new Outcome with the pending commit reports and the chain reports sorted.
 func NewOutcome(
 	state PluginState,

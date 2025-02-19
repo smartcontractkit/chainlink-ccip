@@ -117,6 +117,40 @@
       "args": []
     },
     {
+      "name": "setDefaultCodeVersion",
+      "docs": [
+        "Sets the default code version to be used. This is then used by the slim routing layer to determine",
+        "which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.",
+        "",
+        "Shared func signature with other programs",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `code_version` - The new code version to be set as default."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "codeVersion",
+          "type": {
+            "defined": "CodeVersion"
+          }
+        }
+      ]
+    },
+    {
       "name": "addBillingTokenConfig",
       "docs": [
         "Adds a billing token configuration.",
@@ -642,6 +676,12 @@
           {
             "name": "onramp",
             "type": "publicKey"
+          },
+          {
+            "name": "defaultCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
           }
         ]
       }
@@ -956,6 +996,12 @@
             "type": "bool"
           },
           {
+            "name": "laneCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
+          },
+          {
             "name": "maxNumberOfTokensPerMsg",
             "type": "u16"
           },
@@ -1129,6 +1175,20 @@
       }
     },
     {
+      "name": "CodeVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Default"
+          },
+          {
+            "name": "V1"
+          }
+        ]
+      }
+    },
+    {
       "name": "FeeQuoterError",
       "type": {
         "kind": "enum",
@@ -1240,12 +1300,42 @@
           },
           {
             "name": "UnauthorizedPriceUpdater"
+          },
+          {
+            "name": "InvalidCodeVersion"
           }
         ]
       }
     }
   ],
   "events": [
+    {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128",
+          "index": false
+        },
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "onramp",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "defaultCodeVersion",
+          "type": {
+            "defined": "CodeVersion"
+          },
+          "index": false
+        }
+      ]
+    },
     {
       "name": "FeeTokenAdded",
       "fields": [
@@ -1423,6 +1513,21 @@
           "type": {
             "defined": "TokenTransferFeeConfig"
           },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PremiumMultiplierWeiPerEthUpdated",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "premiumMultiplierWeiPerEth",
+          "type": "u64",
           "index": false
         }
       ]

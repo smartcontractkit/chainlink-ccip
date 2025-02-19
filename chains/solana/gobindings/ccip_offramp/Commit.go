@@ -11,7 +11,7 @@ import (
 )
 
 // Off Ramp Flow //
-// Commits a report to the router.
+// Commits a report to the router, containing a Merkle Root.
 //
 // The method name needs to be commit with Anchor encoding.
 //

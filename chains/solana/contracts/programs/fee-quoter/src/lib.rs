@@ -13,11 +13,12 @@ pub mod state;
 use state::*;
 
 pub mod event;
+use event::*;
 
 pub mod extra_args;
 
 mod instructions;
-use instructions::v1;
+use instructions::router;
 
 #[program]
 pub mod fee_quoter {
@@ -48,6 +49,14 @@ pub mod fee_quoter {
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
+            default_code_version: CodeVersion::V1,
+        });
+
+        emit!(ConfigSet {
+            max_fee_juels_per_msg,
+            link_token_mint,
+            onramp,
+            default_code_version: CodeVersion::V1,
         });
 
         Ok(())
@@ -62,7 +71,7 @@ pub mod fee_quoter {
     /// * `ctx` - The context containing the accounts required for the transfer.
     /// * `proposed_owner` - The public key of the new proposed owner.
     pub fn transfer_ownership(ctx: Context<UpdateConfig>, new_owner: Pubkey) -> Result<()> {
-        v1::admin::transfer_ownership(ctx, new_owner)
+        router::admin(ctx.accounts.config.default_code_version).transfer_ownership(ctx, new_owner)
     }
 
     /// Accepts the ownership of the fee quoter by the proposed owner.
@@ -74,7 +83,24 @@ pub mod fee_quoter {
     /// * `ctx` - The context containing the accounts required for accepting ownership.
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        v1::admin::accept_ownership(ctx)
+        router::admin(ctx.accounts.config.default_code_version).accept_ownership(ctx)
+    }
+
+    /// Sets the default code version to be used. This is then used by the slim routing layer to determine
+    /// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
+    ///
+    /// Shared func signature with other programs
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `code_version` - The new code version to be set as default.
+    pub fn set_default_code_version(
+        ctx: Context<UpdateConfig>,
+        code_version: CodeVersion,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version)
+            .set_default_code_version(ctx, code_version)
     }
 
     /// Adds a billing token configuration.
@@ -88,7 +114,8 @@ pub mod fee_quoter {
         ctx: Context<AddBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        v1::admin::add_billing_token_config(ctx, config)
+        router::admin(ctx.accounts.config.default_code_version)
+            .add_billing_token_config(ctx, config)
     }
 
     /// Updates the billing token configuration.
@@ -102,7 +129,8 @@ pub mod fee_quoter {
         ctx: Context<UpdateBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        v1::admin::update_billing_token_config(ctx, config)
+        router::admin(ctx.accounts.config.default_code_version)
+            .update_billing_token_config(ctx, config)
     }
 
     /// Adds a new destination chain selector to the fee quoter.
@@ -120,7 +148,11 @@ pub mod fee_quoter {
         chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::add_dest_chain(ctx, chain_selector, dest_chain_config)
+        router::admin(ctx.accounts.config.default_code_version).add_dest_chain(
+            ctx,
+            chain_selector,
+            dest_chain_config,
+        )
     }
 
     /// Disables the destination chain selector.
@@ -135,7 +167,8 @@ pub mod fee_quoter {
         ctx: Context<UpdateDestChainConfig>,
         chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::disable_dest_chain(ctx, chain_selector)
+        router::admin(ctx.accounts.config.default_code_version)
+            .disable_dest_chain(ctx, chain_selector)
     }
 
     /// Updates the configuration of the destination chain selector.
@@ -152,7 +185,11 @@ pub mod fee_quoter {
         chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        v1::admin::update_dest_chain_config(ctx, chain_selector, dest_chain_config)
+        router::admin(ctx.accounts.config.default_code_version).update_dest_chain_config(
+            ctx,
+            chain_selector,
+            dest_chain_config,
+        )
     }
 
     /// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
@@ -173,7 +210,12 @@ pub mod fee_quoter {
         mint: Pubkey,
         cfg: TokenTransferFeeConfig,
     ) -> Result<()> {
-        v1::admin::set_token_transfer_fee_config(ctx, chain_selector, mint, cfg)
+        router::admin(ctx.accounts.config.default_code_version).set_token_transfer_fee_config(
+            ctx,
+            chain_selector,
+            mint,
+            cfg,
+        )
     }
 
     /// Add a price updater address to the list of allowed price updaters.
@@ -184,7 +226,8 @@ pub mod fee_quoter {
     /// * `ctx` - The context containing the accounts required for this operation.
     /// * `price_updater` - The price updater address.
     pub fn add_price_updater(ctx: Context<AddPriceUpdater>, price_updater: Pubkey) -> Result<()> {
-        v1::admin::add_price_updater(ctx, price_updater)
+        router::admin(ctx.accounts.config.default_code_version)
+            .add_price_updater(ctx, price_updater)
     }
 
     /// Remove a price updater address from the list of allowed price updaters.
@@ -197,7 +240,8 @@ pub mod fee_quoter {
         ctx: Context<RemovePriceUpdater>,
         price_updater: Pubkey,
     ) -> Result<()> {
-        v1::admin::remove_price_updater(ctx, price_updater)
+        router::admin(ctx.accounts.config.default_code_version)
+            .remove_price_updater(ctx, price_updater)
     }
 
     /// Calculates the fee for sending a message to the destination chain.
@@ -232,7 +276,13 @@ pub mod fee_quoter {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<GetFeeResult> {
-        v1::public::get_fee(ctx, dest_chain_selector, message)
+        let default_code_version = ctx.accounts.config.default_code_version;
+        let lane_code_version = ctx.accounts.dest_chain.config.lane_code_version;
+        router::public(lane_code_version, default_code_version).get_fee(
+            ctx,
+            dest_chain_selector,
+            message,
+        )
     }
 
     /// Updates prices for tokens and gas. This method may only be called by an allowed price updater.
@@ -257,7 +307,11 @@ pub mod fee_quoter {
         token_updates: Vec<TokenPriceUpdate>,
         gas_updates: Vec<GasPriceUpdate>,
     ) -> Result<()> {
-        v1::prices::update_prices(ctx, token_updates, gas_updates)
+        router::prices(ctx.accounts.config.default_code_version).update_prices(
+            ctx,
+            token_updates,
+            gas_updates,
+        )
     }
 }
 
@@ -343,4 +397,6 @@ pub enum FeeQuoterError {
     InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
+    #[msg("Invalid code version")]
+    InvalidCodeVersion,
 }

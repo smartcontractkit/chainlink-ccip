@@ -1,6 +1,14 @@
 use anchor_lang::prelude::*;
 
-use crate::state::{DestChainConfig, TokenTransferFeeConfig};
+use crate::state::{CodeVersion, DestChainConfig, TokenTransferFeeConfig};
+
+#[event]
+pub struct ConfigSet {
+    pub max_fee_juels_per_msg: u128,
+    pub link_token_mint: Pubkey,
+    pub onramp: Pubkey,
+    pub default_code_version: CodeVersion,
+}
 
 #[event]
 pub struct FeeTokenAdded {
@@ -66,6 +74,12 @@ pub struct TokenTransferFeeConfigUpdated {
     pub dest_chain_selector: u64,
     pub token: Pubkey,
     pub token_transfer_fee_config: TokenTransferFeeConfig,
+}
+
+#[event]
+pub struct PremiumMultiplierWeiPerEthUpdated {
+    pub token: Pubkey,
+    pub premium_multiplier_wei_per_eth: u64,
 }
 
 #[event]

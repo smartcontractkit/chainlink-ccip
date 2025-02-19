@@ -3,12 +3,15 @@ package metrics
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -62,12 +65,16 @@ func Test_TrackingTokenReadiness(t *testing.T) {
 			reporter.TrackObservation(exectypes.Observation{TokenData: tc.observation}, tc.state)
 
 			readyTokens := testutil.ToFloat64(
-				reporter.tokenDataReadinessCounter.WithLabelValues(chainID, string(tc.state), "ready"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "tokenReady",
+				),
 			)
 			require.Equal(t, tc.expectedReadyTokens, int(readyTokens))
 
 			waitingTokens := testutil.ToFloat64(
-				reporter.tokenDataReadinessCounter.WithLabelValues(chainID, string(tc.state), "waiting"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "tokenWaiting",
+				),
 			)
 			require.Equal(t, tc.expectedWaitingTokens, int(waitingTokens))
 		})
@@ -149,21 +156,31 @@ func Test_TrackingObservations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			reporter.TrackObservation(tc.observation, tc.state)
 
-			costlyMsgs := testutil.ToFloat64(reporter.costlyMessagesCounter.WithLabelValues(chainID, string(tc.state)))
+			costlyMsgs := testutil.ToFloat64(
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "costlyMessages",
+				),
+			)
 			require.Equal(t, tc.expectedCostlyMessages, int(costlyMsgs))
 
 			nonces := testutil.ToFloat64(
-				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "nonces"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "nonces",
+				),
 			)
 			require.Equal(t, tc.expectedNonces, int(nonces))
 
 			commitReports := testutil.ToFloat64(
-				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "commitReports"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "commitReports",
+				),
 			)
 			require.Equal(t, tc.expectedCommitReports, int(commitReports))
 
 			messages := testutil.ToFloat64(
-				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "messages"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.ObservationMethod, string(tc.state), "messages",
+				),
 			)
 			require.Equal(t, tc.expectedMessageCount, int(messages))
 		})
@@ -244,28 +261,207 @@ func Test_TrackingOutcomes(t *testing.T) {
 			reporter.TrackOutcome(tc.outcome, tc.state)
 
 			messages := testutil.ToFloat64(
-				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "messages"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.OutcomeMethod, string(tc.state), "messages",
+				),
 			)
 			require.Equal(t, tc.expectedMessagesCount, int(messages))
 
 			sourceChains := testutil.ToFloat64(
-				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "sourceChains"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.OutcomeMethod, string(tc.state), "sourceChains",
+				),
 			)
 			require.Equal(t, tc.expectedSourceChainCount, int(sourceChains))
 
 			tokenData := testutil.ToFloat64(
-				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "tokenData"),
+				reporter.outputDetailsCounter.WithLabelValues(
+					chainID, plugincommon.OutcomeMethod, string(tc.state), "tokenData",
+				),
 			)
 			require.Equal(t, tc.expectedTokenDataCount, int(tokenData))
 		})
 	}
 }
 
+func Test_SequenceNumbers(t *testing.T) {
+	chain1 := "2337"
+	selector1 := cciptypes.ChainSelector(12922642891491394802)
+	chain2 := "3337"
+	selector2 := cciptypes.ChainSelector(4793464827907405086)
+
+	tt := []struct {
+		name   string
+		obs    exectypes.Observation
+		out    exectypes.Outcome
+		method plugincommon.MethodType
+		exp    map[string]cciptypes.SeqNum
+	}{
+		{
+			name:   "empty observation should not report anything",
+			obs:    exectypes.Observation{},
+			method: plugincommon.ObservationMethod,
+			exp:    map[string]cciptypes.SeqNum{},
+		},
+		{
+			name: "single chain observation with seq nr",
+			obs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					selector1: {
+						1: {},
+						4: {},
+					},
+				},
+			},
+			method: plugincommon.ObservationMethod,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 4,
+			},
+		},
+		{
+			name: "multiple chain observations with sequence numbers",
+			obs: exectypes.Observation{
+				Messages: exectypes.MessageObservations{
+					selector1: {
+						1: {},
+						2: {},
+					},
+					selector2: {
+						4: {},
+					},
+				},
+			},
+			method: plugincommon.ObservationMethod,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
+				chain2: 4,
+			},
+		},
+		{
+			name: "single chain outcome with seq nr",
+			out: exectypes.Outcome{
+				CommitReports: []exectypes.CommitData{
+					{
+						SourceChain: selector1,
+						Messages: []cciptypes.Message{
+							{
+								Header: cciptypes.RampMessageHeader{
+									SequenceNumber: 2,
+								},
+							},
+						},
+					},
+				},
+			},
+			method: plugincommon.OutcomeMethod,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
+			},
+		},
+		{
+			name: "multiple chain outcomes with sequence numbers",
+			out: exectypes.Outcome{
+				CommitReports: []exectypes.CommitData{
+					{
+						SourceChain: selector1,
+						Messages: []cciptypes.Message{
+							{
+								Header: cciptypes.RampMessageHeader{
+									SequenceNumber: 2,
+								},
+							},
+						},
+					},
+					{
+						SourceChain: selector2,
+						Messages: []cciptypes.Message{
+							{
+								Header: cciptypes.RampMessageHeader{
+									SequenceNumber: 4,
+								},
+							},
+							{
+								Header: cciptypes.RampMessageHeader{
+									SequenceNumber: 2,
+								},
+							},
+						},
+					},
+				},
+			},
+			method: plugincommon.OutcomeMethod,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
+				chain2: 4,
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter, err := NewPromReporter(logger.Test(t), selector)
+			require.NoError(t, err)
+
+			t.Cleanup(cleanupMetrics(reporter))
+
+			switch tc.method {
+			case plugincommon.ObservationMethod:
+				reporter.TrackObservation(tc.obs, exectypes.GetCommitReports)
+			case plugincommon.OutcomeMethod:
+				reporter.TrackOutcome(tc.out, exectypes.GetCommitReports)
+			}
+
+			for sourceChain, maxSeqNr := range tc.exp {
+				seqNum := testutil.ToFloat64(
+					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChain, tc.method),
+				)
+				require.Equal(t, float64(maxSeqNr), seqNum)
+			}
+		})
+	}
+}
+
+func Test_ExecLatency(t *testing.T) {
+	reporter, err := NewPromReporter(logger.Test(t), selector)
+	require.NoError(t, err)
+
+	t.Run("single latency observation", func(t *testing.T) {
+		reporter.TrackLatency(exectypes.GetCommitReports, plugincommon.ObservationMethod, 100, nil)
+		l1 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, chainID, "observation", "GetCommitReports")
+		require.Equal(t, 1, l1)
+
+		errs := testutil.ToFloat64(
+			reporter.execErrors.WithLabelValues(chainID, "observation", "GetCommitReports"),
+		)
+		require.Equal(t, float64(0), errs)
+	})
+
+	t.Run("multiple latency outcomes", func(t *testing.T) {
+		passCounter := 10
+		for i := 0; i < passCounter; i++ {
+			reporter.TrackLatency(exectypes.Filter, plugincommon.OutcomeMethod, time.Second, nil)
+		}
+		l2 := internal.CounterFromHistogramByLabels(t, reporter.latencyHistogram, chainID, "outcome", "Filter")
+		require.Equal(t, passCounter, l2)
+	})
+
+	t.Run("multiple latency observation with errors", func(t *testing.T) {
+		errCounter := 5
+		for i := 0; i < errCounter; i++ {
+			reporter.TrackLatency(exectypes.GetMessages, plugincommon.ObservationMethod, time.Second, fmt.Errorf("error"))
+		}
+		errs := testutil.ToFloat64(
+			reporter.execErrors.WithLabelValues(chainID, "observation", "GetMessages"),
+		)
+		require.Equal(t, float64(errCounter), errs)
+	})
+}
+
 func cleanupMetrics(p *PromReporter) func() {
 	return func() {
-		p.costlyMessagesCounter.Reset()
-		p.tokenDataReadinessCounter.Reset()
-		p.outcomeDetailsCounter.Reset()
-		p.observationDetailsCounter.Reset()
+		p.sequenceNumbers.Reset()
+		p.outputDetailsCounter.Reset()
+		p.latencyHistogram.Reset()
+		p.execErrors.Reset()
 	}
 }

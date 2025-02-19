@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -18,7 +17,7 @@ import (
 )
 
 var (
-	RequestLatencyBucketsMilliseconds = []float64{
+	rmnLatencyBucketsMilliseconds = []float64{
 		5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
 	}
 	promProcessorOutputCounter = promauto.NewCounterVec(
@@ -30,9 +29,21 @@ var (
 	)
 	promProcessorLatencyHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "ccip_commit_processor_latency_ms",
-			Help:    "This metric tracks the client-observed latency of a single processor method",
-			Buckets: RequestLatencyBucketsMilliseconds,
+			Name: "ccip_commit_processor_latency",
+			Help: "This metric tracks the client-observed latency of a single processor method",
+			Buckets: []float64{
+				float64(50 * time.Millisecond),
+				float64(100 * time.Millisecond),
+				float64(200 * time.Millisecond),
+				float64(500 * time.Millisecond),
+				float64(700 * time.Millisecond),
+				float64(time.Second),
+				float64(2 * time.Second),
+				float64(5 * time.Second),
+				float64(7 * time.Second),
+				float64(10 * time.Second),
+				float64(20 * time.Second),
+			},
 		},
 		[]string{"chainID", "processor", "method"},
 	)
@@ -43,11 +54,18 @@ var (
 		},
 		[]string{"chainID", "processor", "method"},
 	)
+	promSequenceNumbers = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "ccip_commit_max_sequence_number",
+			Help: "This metric tracks the max sequence number observed by the commit processor",
+		},
+		[]string{"chainID", "sourceChain", "method"},
+	)
 	promMerkleProcessorRmnReportLatency = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "ccip_commit_merkle_processor_rmn_report_latency_ms",
 			Help:    "This metric tracks the client-observed latency of building an full RMN report with signatures",
-			Buckets: RequestLatencyBucketsMilliseconds,
+			Buckets: rmnLatencyBucketsMilliseconds,
 		},
 		[]string{"chainID", "success"},
 	)
@@ -55,7 +73,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "ccip_commit_rmn_controller_rmn_request_latency_ms",
 			Help:    "This metric tracks the client-observed latency of a single RMN request",
-			Buckets: RequestLatencyBucketsMilliseconds,
+			Buckets: rmnLatencyBucketsMilliseconds,
 		},
 		[]string{"method", "nodeID", "error"},
 	)
@@ -70,6 +88,7 @@ type PromReporter struct {
 	processorLatencyHistogram         *prometheus.HistogramVec
 	processorOutputCounter            *prometheus.CounterVec
 	processorErrors                   *prometheus.CounterVec
+	sequenceNumbers                   *prometheus.GaugeVec
 }
 
 func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*PromReporter, error) {
@@ -85,6 +104,8 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 		merkleProcessorRmnReportHistogram: promMerkleProcessorRmnReportLatency,
 		rmnControllerRmnRequestHistogram:  promRmnControllerRmnRequestLatency,
 
+		sequenceNumbers: promSequenceNumbers,
+
 		processorLatencyHistogram: promProcessorLatencyHistogram,
 		processorOutputCounter:    promProcessorOutputCounter,
 		processorErrors:           promProcessorErrors,
@@ -96,8 +117,7 @@ func (p *PromReporter) TrackObservation(obs committypes.Observation) {
 		sourceChainSelector := root.ChainSel
 		maxSeqNr := root.SeqNumsRange.End()
 
-		// TODO Implement me in next PR!
-		fmt.Println(sourceChainSelector, maxSeqNr)
+		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.ObservationMethod)
 	}
 }
 
@@ -106,9 +126,36 @@ func (p *PromReporter) TrackOutcome(outcome committypes.Outcome) {
 		sourceChainSelector := root.ChainSel
 		maxSeqNr := root.SeqNumsRange.End()
 
-		// TODO Implement me in next PR!
-		fmt.Println(sourceChainSelector, maxSeqNr)
+		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.OutcomeMethod)
 	}
+}
+
+func (p *PromReporter) trackMaxSequenceNumber(
+	sourceChainSelector cciptypes.ChainSelector,
+	maxSeqNr cciptypes.SeqNum,
+	method string,
+) {
+	if maxSeqNr == 0 {
+		return
+	}
+
+	sourceChain, err := sel.GetChainIDFromSelector(uint64(sourceChainSelector))
+	if err != nil {
+		p.lggr.Errorw("failed to get chain ID from selector", "err", err)
+		return
+	}
+
+	p.sequenceNumbers.
+		WithLabelValues(p.chainID, sourceChain, method).
+		Set(float64(maxSeqNr))
+
+	p.lggr.Debugw(
+		"exec latest max seq num",
+		"method", method,
+		"sourceChain", sourceChain,
+		"destChain", p.chainID,
+		"maxSeqNr", maxSeqNr,
+	)
 }
 
 func (p *PromReporter) TrackRmnReport(latency float64, success bool) {
@@ -136,7 +183,7 @@ func (p *PromReporter) TrackProcessorLatency(
 
 	p.processorLatencyHistogram.
 		WithLabelValues(p.chainID, processor, method).
-		Observe(float64(latency.Milliseconds()))
+		Observe(float64(latency))
 }
 
 func (p *PromReporter) TrackProcessorOutput(

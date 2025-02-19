@@ -10,7 +10,8 @@ import (
 
 type Config struct {
 	Version                    uint8
-	Padding0                   [7]uint8
+	DefaultCodeVersion         uint8
+	Padding0                   [6]uint8
 	SvmChainSelector           uint64
 	EnableManualExecutionAfter int64
 	Padding1                   [8]uint8
@@ -30,6 +31,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `DefaultCodeVersion` param:
+	err = encoder.Encode(obj.DefaultCodeVersion)
 	if err != nil {
 		return err
 	}
@@ -92,6 +98,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DefaultCodeVersion`:
+	err = decoder.Decode(&obj.DefaultCodeVersion)
 	if err != nil {
 		return err
 	}

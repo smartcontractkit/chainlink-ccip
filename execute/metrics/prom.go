@@ -1,57 +1,62 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"golang.org/x/exp/maps"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-const (
-	sourceChainsLabel  = "sourceChains"
-	messagesLabel      = "messages"
-	tokenDataLabel     = "tokenData"
-	commitReportsLabel = "commitReports"
-	noncesLabel        = "nonces"
-
-	tokenStateReady   = "ready"
-	tokenStateWaiting = "waiting"
-)
-
 var (
-	promObservationDetails = promauto.NewCounterVec(
+	PromExecOutputCounter = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ccip_exec_observation_components_sizes",
-			Help: "This metric tracks the number of different items in the observation of the execute plugin " +
-				"(e.g. number of messages, number of token data etc.)",
+			Name: "ccip_exec_output_sizes",
+			Help: "This metric tracks the number of different items in the exec plugin",
 		},
-		[]string{"chainID", "state", "type"},
+		[]string{"chainID", "method", "state", "type"},
 	)
-	promOutcomeDetails = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ccip_exec_outcome_components_sizes",
-			Help: "This metric tracks the number of different items in the outcome of the execute plugin " +
-				"(e.g. number of messages, number of source chains used etc.)",
+	PromExecLatencyHistogram = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "ccip_exec_latency",
+			Help: "This metric tracks the client-observed latency of a single exec plugin method",
+			Buckets: []float64{
+				float64(50 * time.Millisecond),
+				float64(100 * time.Millisecond),
+				float64(200 * time.Millisecond),
+				float64(500 * time.Millisecond),
+				float64(700 * time.Millisecond),
+				float64(time.Second),
+				float64(2 * time.Second),
+				float64(5 * time.Second),
+				float64(7 * time.Second),
+				float64(10 * time.Second),
+				float64(20 * time.Second),
+			},
 		},
-		[]string{"chainID", "state", "type"},
+		[]string{"chainID", "method", "state"},
 	)
-	promCostlyMessages = promauto.NewCounterVec(
+	PromExecErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ccip_exec_costly_messages",
-			Help: "This metric tracks the number of costly messages observed by the execute plugin",
+			Name: "ccip_exec_errors",
+			Help: "This metric tracks the number of errors in the exec plugin",
 		},
-		[]string{"chainID", "state"},
+		[]string{"chainID", "method", "state"},
 	)
-	promTokenDataReadiness = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ccip_exec_token_data_readiness",
-			Help: "This metric tracks the readiness of the token data observed by the execute plugin",
+	PromSequenceNumbers = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "ccip_exec_max_sequence_number",
+			Help: "This metric tracks the max sequence number observed by the commit processor",
 		},
-		[]string{"chainID", "state", "status"},
+		[]string{"chainID", "sourceChain", "method"},
 	)
 )
 
@@ -60,10 +65,10 @@ type PromReporter struct {
 	chainID string
 
 	// Prometheus reporters
-	observationDetailsCounter *prometheus.CounterVec
-	outcomeDetailsCounter     *prometheus.CounterVec
-	costlyMessagesCounter     *prometheus.CounterVec
-	tokenDataReadinessCounter *prometheus.CounterVec
+	latencyHistogram     *prometheus.HistogramVec
+	execErrors           *prometheus.CounterVec
+	outputDetailsCounter *prometheus.CounterVec
+	sequenceNumbers      *prometheus.GaugeVec
 }
 
 func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*PromReporter, error) {
@@ -76,114 +81,105 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 		lggr:    lggr,
 		chainID: chainID,
 
-		observationDetailsCounter: promObservationDetails,
-		outcomeDetailsCounter:     promOutcomeDetails,
-		costlyMessagesCounter:     promCostlyMessages,
-		tokenDataReadinessCounter: promTokenDataReadiness,
+		latencyHistogram:     PromExecLatencyHistogram,
+		execErrors:           PromExecErrors,
+		outputDetailsCounter: PromExecOutputCounter,
+		sequenceNumbers:      PromSequenceNumbers,
 	}, nil
 }
 
 func (p *PromReporter) TrackObservation(obs exectypes.Observation, state exectypes.PluginState) {
-	castedState := string(state)
-	p.trackCommitReports(obs.CommitReports, castedState)
-	p.trackMessages(obs.Messages, castedState)
-	p.trackTokenData(obs.TokenData, castedState)
-	p.trackNonceData(obs.Nonces, castedState)
-	p.trackCostlyMessages(obs.CostlyMessages, castedState)
+	p.trackOutputStats(obs, state, plugincommon.ObservationMethod)
+
+	for sourceChainSelector, cr := range obs.Messages {
+		maxSeqNr := pickHighestSeqNr(maps.Keys(cr))
+		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.ObservationMethod)
+	}
 }
 
 func (p *PromReporter) TrackOutcome(outcome exectypes.Outcome, state exectypes.PluginState) {
-	p.trackOutcomeComponents(outcome, string(state))
-}
+	p.trackOutputStats(&outcome, state, plugincommon.OutcomeMethod)
 
-func (p *PromReporter) trackOutcomeComponents(outcome exectypes.Outcome, state string) {
-	counters := map[string]int{
-		messagesLabel:     0,
-		tokenDataLabel:    0,
-		sourceChainsLabel: 0,
-	}
-
-	for chainSelector, report := range outcome.Report.ChainReports {
-		counters[sourceChainsLabel]++
-		counters[messagesLabel] += len(report.Messages)
-		counters[tokenDataLabel] += len(report.OffchainTokenData)
-
-		p.lggr.Debugw("Execute plugin reporting outcome",
-			"state", state,
-			"sourceChainSelector", chainSelector,
-			"destChainSelector", p.chainID,
-			"messagesCount", len(report.Messages),
-			"tokenDataCount", len(report.OffchainTokenData),
-		)
-	}
-
-	for key, count := range counters {
-		p.outcomeDetailsCounter.
-			WithLabelValues(p.chainID, state, key).
-			Add(float64(count))
+	for _, cr := range outcome.CommitReports {
+		sourceChainSelector := cr.SourceChain
+		maxSeqNr := pickHighestSeqNrInMessages(cr.Messages)
+		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.OutcomeMethod)
 	}
 }
 
-func (p *PromReporter) trackCommitReports(commits exectypes.CommitObservations, state string) {
-	commitReportsCount := 0
-	for _, commit := range commits {
-		commitReportsCount += len(commit)
+func (p *PromReporter) TrackLatency(
+	state exectypes.PluginState,
+	method plugincommon.MethodType,
+	latency time.Duration,
+	err error,
+) {
+	if err != nil {
+		p.execErrors.
+			WithLabelValues(p.chainID, method, string(state)).
+			Inc()
+		return
 	}
 
-	p.observationDetailsCounter.
-		WithLabelValues(p.chainID, state, commitReportsLabel).
-		Add(float64(commitReportsCount))
+	p.latencyHistogram.
+		WithLabelValues(p.chainID, method, string(state)).
+		Observe(float64(latency))
 }
 
-func (p *PromReporter) trackMessages(messages exectypes.MessageObservations, state string) {
-	messagesCount := 0
-	for _, chainMessages := range messages {
-		messagesCount += len(chainMessages)
+func (p *PromReporter) trackMaxSequenceNumber(
+	sourceChainSelector cciptypes.ChainSelector,
+	maxSeqNr int,
+	method plugincommon.MethodType,
+) {
+	if maxSeqNr == 0 {
+		return
 	}
 
-	p.observationDetailsCounter.
-		WithLabelValues(p.chainID, state, messagesLabel).
-		Add(float64(messagesCount))
+	sourceChain, err := sel.GetChainIDFromSelector(uint64(sourceChainSelector))
+	if err != nil {
+		p.lggr.Errorw("failed to get chain ID from selector", "err", err)
+		return
+	}
+
+	p.sequenceNumbers.
+		WithLabelValues(p.chainID, sourceChain, method).
+		Set(float64(maxSeqNr))
+
+	p.lggr.Debugw(
+		"commit latest max seq num",
+		"method", method,
+		"sourceChain", sourceChain,
+		"destChain", p.chainID,
+		"maxSeqNr", maxSeqNr,
+	)
 }
 
-func (p *PromReporter) trackTokenData(tokens exectypes.TokenDataObservations, state string) {
-	tokenCounters := map[string]int{
-		tokenStateReady:   0,
-		tokenStateWaiting: 0,
+func (p *PromReporter) trackOutputStats(
+	output plugintypes.Trackable,
+	state exectypes.PluginState,
+	method plugincommon.MethodType,
+) {
+	stringState := string(state)
+	for key, val := range output.Stats() {
+		p.outputDetailsCounter.
+			WithLabelValues(p.chainID, method, stringState, key).
+			Add(float64(val))
 	}
+}
 
-	for _, chainTokens := range tokens {
-		for _, tokenData := range chainTokens {
-			for _, token := range tokenData.TokenData {
-				counterKey := tokenStateWaiting
-				if token.IsReady() {
-					counterKey = tokenStateReady
-				}
-				tokenCounters[counterKey]++
-			}
+func pickHighestSeqNrInMessages(messages []cciptypes.Message) int {
+	seqNrs := make([]cciptypes.SeqNum, len(messages))
+	for i, m := range messages {
+		seqNrs[i] = m.Header.SequenceNumber
+	}
+	return pickHighestSeqNr(seqNrs)
+}
+
+func pickHighestSeqNr(seqNrs []cciptypes.SeqNum) int {
+	seqNr := cciptypes.SeqNum(0)
+	for _, s := range seqNrs {
+		if s > seqNr {
+			seqNr = s
 		}
 	}
-
-	for key, count := range tokenCounters {
-		p.tokenDataReadinessCounter.
-			WithLabelValues(p.chainID, state, key).
-			Add(float64(count))
-	}
-}
-
-func (p *PromReporter) trackNonceData(nonces exectypes.NonceObservations, state string) {
-	noncesCount := 0
-	for _, chainNonces := range nonces {
-		noncesCount += len(chainNonces)
-	}
-
-	p.observationDetailsCounter.
-		WithLabelValues(p.chainID, state, noncesLabel).
-		Add(float64(noncesCount))
-}
-
-func (p *PromReporter) trackCostlyMessages(costlyMessages []cciptypes.Bytes32, state string) {
-	p.costlyMessagesCounter.
-		WithLabelValues(p.chainID, state).
-		Add(float64(len(costlyMessages)))
+	return int(seqNr)
 }
