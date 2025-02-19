@@ -101,10 +101,10 @@ func NewPlugin(
 	lggr logger.Logger,
 	costlyMessageObserver costlymessages.Observer,
 	metricsReporter metrics.Reporter,
-) *Plugin {
+) ocr3types.ReportingPlugin[[]byte] {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
-	return &Plugin{
+	p := Plugin{
 		donID:                 donID,
 		reportingCfg:          reportingCfg,
 		offchainCfg:           offchainCfg,
@@ -141,6 +141,7 @@ func NewPlugin(
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
 		ocrTypeCodec:         ocrtypecodec.NewExecCodecJSON(),
 	}
+	return NewTrackedPlugin(p, metricsReporter)
 }
 
 func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (types.Query, error) {

@@ -58,6 +58,7 @@ type PromReporter struct {
 
 	// Prometheus reporters
 	latencyHistogram     *prometheus.HistogramVec
+	execErrors           *prometheus.CounterVec
 	outputDetailsCounter *prometheus.CounterVec
 	sequenceNumbers      *prometheus.GaugeVec
 }
@@ -95,6 +96,24 @@ func (p *PromReporter) TrackOutcome(outcome exectypes.Outcome, state exectypes.P
 		maxSeqNr := pickHighestSeqNrInMessages(cr.Messages)
 		p.trackMaxSequenceNumber(sourceChainSelector, maxSeqNr, plugincommon.OutcomeMethod)
 	}
+}
+
+func (p *PromReporter) TrackLatency(
+	state exectypes.PluginState,
+	method plugincommon.MethodType,
+	latency time.Duration,
+	err error,
+) {
+	if err != nil {
+		p.execErrors.
+			WithLabelValues(p.chainID, method, string(state)).
+			Inc()
+		return
+	}
+
+	p.latencyHistogram.
+		WithLabelValues(p.chainID, method, string(state)).
+		Observe(float64(latency))
 }
 
 func (p *PromReporter) trackMaxSequenceNumber(

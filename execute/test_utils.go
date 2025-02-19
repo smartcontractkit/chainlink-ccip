@@ -345,8 +345,10 @@ func (it *IntTest) newNode(
 		&metrics.Noop{},
 	)
 
+	p := node1.(*TrackedPlugin)
+
 	return nodeSetup{
-		node:        node1,
+		node:        &p.Plugin,
 		reportCodec: reportCodec,
 		msgHasher:   it.msgHasher,
 	}
