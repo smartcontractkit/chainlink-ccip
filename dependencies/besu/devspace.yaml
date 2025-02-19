@@ -28,7 +28,7 @@ vars:
     default: sandbox
   INGRESS_CLASS_NAME:
     source: env
-    default: "nginx"
+    default: ""
   LOCAL_CHARTS_DIR:
     source: env
     default: ./charts
@@ -110,6 +110,10 @@ deployments:
       values:
         cluster:
           provider: ${CLUSTER_PROVIDER}
+        rawGenesisConfig:
+          genesis:
+            config:
+              chainId: ${CHAIN_ID}
       valuesFiles:
         - ./values/besu-genesis.yaml
 
@@ -125,7 +129,7 @@ profiles:
         VALIDATOR_NODE_COUNT=${VALIDATOR_NODE_COUNT} \
         RPC_NODE_COUNT=${RPC_NODE_COUNT} \
         MEMBER_NODE_COUNT=${MEMBER_NODE_COUNT} \
-        RPC_NODE_INGRESS_ENABLED="true" \
+        RPC_NODE_INGRESS_ENABLED=${RPC_NODE_INGRESS_ENABLED} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/besu-node.yaml
       )
@@ -151,10 +155,6 @@ profiles:
       - op: add
         path: deployments[*].helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/provider-aws.yaml
-      - op: replace
-        path: vars
-        value:
-          INGRESS_CLASS_NAME: "alb"
 
   - name: disable-storage
     activation:

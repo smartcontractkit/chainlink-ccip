@@ -7,6 +7,7 @@ in: |
     {{- $valuesFile := .valuesFile }}
     {{- if gt (conv.ToInt $count) 0 }}
     {{- range $i := seq 1 $count }}
+    # Create the node deployment
     {{ $type }}-{{ $i }}:
       namespace: ${NAMESPACE}
       helm:
@@ -16,7 +17,8 @@ in: |
           version: 0.1.1
         valuesFiles:
           - {{ $valuesFile }}
-
+    {{- if $ingressEnabled }}
+    # Create the node ingress using the Devspace component-chart
     {{ $type }}-{{ $i }}-ingress:
       namespace: ${NAMESPACE}
       helm:
@@ -42,12 +44,13 @@ in: |
     {{- end }}
     {{- end }}
     {{- end }}
+    {{- end }}
 
     {{- $bootNodeCount := .Env.BOOT_NODE_COUNT }}
     {{- $validatorNodeCount := .Env.VALIDATOR_NODE_COUNT }}
     {{- $rpcNodeCount := .Env.RPC_NODE_COUNT }}
     {{- $memberNodeCount := .Env.MEMBER_NODE_COUNT }}
-    {{- $rpcNodeIngressEnabled := true }}
+    {{- $rpcNodeIngressEnabled := .Env.RPC_NODE_INGRESS_ENABLED }}
 
     {{- template "createDeployment" (dict "type" "bootnode" "count" $bootNodeCount "valuesFile" "${LOCAL_VALUES_DIR}/bootnode.yaml" "ingressEnabled" "false") }}
     {{- template "createDeployment" (dict "type" "validator" "count" $validatorNodeCount "valuesFile" "${LOCAL_VALUES_DIR}/common.yaml" "ingressEnabled" "false") }}
