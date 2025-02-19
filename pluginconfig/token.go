@@ -103,22 +103,22 @@ func (t *TokenDataObserverConfig) MarshalJSON() ([]byte, error) {
 		"version": t.Version,
 	}
 	var err error
-	var configJsonRaw []byte
+	var configJSONRaw []byte
 	switch t.Type {
 	case USDCCCTPHandlerType:
-		configJsonRaw, err = json.Marshal(t.USDCCCTPObserverConfig)
+		configJSONRaw, err = json.Marshal(t.USDCCCTPObserverConfig)
 		if err != nil {
 			return nil, err
 		}
 	case LBTCHandlerType:
-		configJsonRaw, err = json.Marshal(t.LBTCObserverConfig)
+		configJSONRaw, err = json.Marshal(t.LBTCObserverConfig)
 		if err != nil {
 			return nil, err
 		}
 	default:
 		return nil, fmt.Errorf("unknown token data observer type: %q", t.Type)
 	}
-	err = json.Unmarshal(configJsonRaw, &raw)
+	err = json.Unmarshal(configJSONRaw, &raw)
 	if err != nil {
 		return nil, err
 	}

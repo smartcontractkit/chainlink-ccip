@@ -58,10 +58,6 @@ func (b Bytes) String() string {
 	return "0x" + hex.EncodeToString(b)
 }
 
-func (b Bytes) Raw() []byte {
-	return b
-}
-
 func (b Bytes) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, b.String())), nil
 }
