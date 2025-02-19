@@ -7,7 +7,7 @@ deployments:
       chart:
         # todo: Add conditional here for local charts support
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-geth"
-        version: "2.1.0"
+        version: "2.2.0"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy
@@ -41,6 +41,8 @@ deployments:
           {{- if .BlockTime }}
           blockTime: {{ .BlockTime }}
           {{- end }}
+          genesis:
+            balance: "115792089237316195423570985008687907853269984665640564039457584007913129639935"
         networkPolicyDefault:
           ingress:
             allowCustomCidrs: true
