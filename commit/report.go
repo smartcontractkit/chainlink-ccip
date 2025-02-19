@@ -181,6 +181,9 @@ func (p *Plugin) validateReport(
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
+	if isCursed, err := p.checkReportCursed(ctx, lggr, decodedReport); err != nil || isCursed {
+		return false, cciptypes.CommitPluginReport{}, err
+	}
 	// check if we support the dest, if not we can't do the checks needed.
 	supports, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
@@ -244,12 +247,6 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	if !valid {
 		lggr.Infow("report is not accepted")
 		return false, nil
-	}
-
-	// TODO: consider doing this in validateReport,
-	// will end up doing it in both ShouldAccept and ShouldTransmit.
-	if isCursed, err := p.checkReportCursed(ctx, lggr, decodedReport); err != nil || isCursed {
-		return false, err
 	}
 
 	lggr.Infow("ShouldAcceptedAttestedReport passed checks",
