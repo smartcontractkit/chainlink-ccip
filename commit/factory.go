@@ -69,7 +69,6 @@ type PluginFactory struct {
 	ocrConfig         reader.OCR3ConfigWithMeta
 	commitCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
-	extraDataCodec    cciptypes.ExtraDataCodec
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -84,7 +83,6 @@ type CommitPluginFactoryParams struct {
 	OcrConfig         reader.OCR3ConfigWithMeta
 	CommitCodec       cciptypes.CommitPluginCodec
 	MsgHasher         cciptypes.MessageHasher
-	ExtraDataCodec    cciptypes.ExtraDataCodec
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
 	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -102,7 +100,6 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		ocrConfig:         params.OcrConfig,
 		commitCodec:       params.CommitCodec,
 		msgHasher:         params.MsgHasher,
-		extraDataCodec:    params.ExtraDataCodec,
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
 		contractReaders:   params.ContractReaders,
@@ -183,7 +180,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
-		p.extraDataCodec,
 	)
 
 	// The node supports the chain that the token prices are on.
