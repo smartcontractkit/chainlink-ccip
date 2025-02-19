@@ -44,7 +44,6 @@ type ccipChainReader struct {
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
-	extraDataCodec  cciptypes.ExtraDataCodec
 	configPoller    ConfigPoller
 }
 
@@ -55,7 +54,6 @@ func newCCIPChainReaderInternal(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
-	extraDataCodec cciptypes.ExtraDataCodec,
 ) *ccipChainReader {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
@@ -68,7 +66,6 @@ func newCCIPChainReaderInternal(
 		contractWriters: contractWriters,
 		destChain:       destChain,
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
-		extraDataCodec:  extraDataCodec,
 	}
 
 	// Initialize cache with readers
