@@ -68,6 +68,7 @@ type PluginFactory struct {
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
 	msgHasher        cciptypes.MessageHasher
+	addrCodec        cciptypes.AddressCodec
 	homeChainReader  reader.HomeChain
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
@@ -81,6 +82,7 @@ type PluginFactoryParams struct {
 	OcrConfig        reader.OCR3ConfigWithMeta
 	ExecCodec        cciptypes.ExecutePluginCodec
 	MsgHasher        cciptypes.MessageHasher
+	AddrCodec        cciptypes.AddressCodec
 	HomeChainReader  reader.HomeChain
 	TokenDataEncoder cciptypes.TokenDataEncoder
 	EstimateProvider cciptypes.EstimateProvider
@@ -97,6 +99,7 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		ocrConfig:        params.OcrConfig,
 		execCodec:        params.ExecCodec,
 		msgHasher:        params.MsgHasher,
+		addrCodec:        params.AddrCodec,
 		homeChainReader:  params.HomeChainReader,
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
@@ -144,6 +147,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
+		p.addrCodec,
 	)
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
