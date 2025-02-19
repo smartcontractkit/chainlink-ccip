@@ -1680,7 +1680,7 @@ func TestCCIPRouter(t *testing.T) {
 			for _, v := range inputs {
 				t.Run(v.plugin.String(), func(t *testing.T) {
 					instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-						uint8(v.plugin),
+						ccip_offramp.OcrPluginType(v.plugin),
 						ccip_offramp.Ocr3ConfigInfo{
 							ConfigDigest:                   config.ConfigDigest,
 							F:                              config.OcrF,
@@ -1741,7 +1741,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("It rejects an invalid plugin type", func(t *testing.T) {
 				t.Parallel()
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(100),
+					ccip_offramp.OcrPluginType(100),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1754,13 +1754,13 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.InvalidPluginType_CcipOfframpError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: InstructionDidNotDeserialize"})
 			})
 
 			t.Run("It rejects F = 0", func(t *testing.T) {
 				t.Parallel()
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            0,
@@ -1783,7 +1783,7 @@ func TestCCIPRouter(t *testing.T) {
 					invalidTransmitters[i] = getTransmitter().PublicKey()
 				}
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1807,7 +1807,7 @@ func TestCCIPRouter(t *testing.T) {
 				}
 
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1829,7 +1829,7 @@ func TestCCIPRouter(t *testing.T) {
 				invalidSigners[0] = signerAddresses[0]
 
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1854,7 +1854,7 @@ func TestCCIPRouter(t *testing.T) {
 					invalidTransmitters[i] = transmitter
 				}
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1879,7 +1879,7 @@ func TestCCIPRouter(t *testing.T) {
 				oneTransmitter := []solana.PublicKey{transmitterPubKeys[0]}
 
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1900,7 +1900,7 @@ func TestCCIPRouter(t *testing.T) {
 				invalidTransmitterPubKeys := []solana.PublicKey{transmitterPubKeys[0], common.ZeroAddress}
 
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1923,7 +1923,7 @@ func TestCCIPRouter(t *testing.T) {
 					invalidSignerAddresses = append(invalidSignerAddresses, v.Address)
 				}
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
