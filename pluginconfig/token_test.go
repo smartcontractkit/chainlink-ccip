@@ -213,10 +213,30 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 		}
 	}
 
+	withLBTCConfig := func() *LBTCObserverConfig {
+		return &LBTCObserverConfig{
+			AttestationConfig: AttestationConfig{
+				AttestationAPI:         "http://localhost:8080",
+				AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+				AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+			},
+			WorkerConfig: WorkerConfig{
+				NumWorkers:              10,
+				CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+				CacheCleanupInterval:    commonconfig.MustNewDuration(5 * time.Second),
+				ObserveTimeout:          commonconfig.MustNewDuration(5 * time.Second),
+			},
+			SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
+				1: "0xabc",
+			},
+		}
+	}
+
 	tests := []struct {
 		name        string
 		config      ExecuteOffchainConfig
 		usdcEnabled bool
+		lbtcEnabled bool
 		wantErr     bool
 		errMsg      string
 	}{
@@ -232,6 +252,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					Version: "1.0",
 				}),
 			usdcEnabled: false,
+			lbtcEnabled: false,
 			wantErr:     true,
 			errMsg:      "unknown token data observer type",
 		},
@@ -244,6 +265,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{},
 				}),
 			usdcEnabled: true,
+			lbtcEnabled: false,
 			wantErr:     true,
 			errMsg:      "AttestationAPI not set",
 		},
@@ -262,8 +284,28 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					},
 				}),
 			usdcEnabled: true,
+			lbtcEnabled: false,
 			wantErr:     true,
 			errMsg:      "Tokens not set",
+		},
+		{
+			name: "lbtc type is set but tokens are missing",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:    "lbtc",
+					Version: "1.0",
+					LBTCObserverConfig: &LBTCObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+					},
+				}),
+			usdcEnabled: false,
+			lbtcEnabled: true,
+			wantErr:     true,
+			errMsg:      "SourcePoolAddressByChain is not set",
 		},
 		{
 			name: "the same observer can't bet set twice",
@@ -279,6 +321,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					USDCCCTPObserverConfig: withUSDCConfig(),
 				}),
 			usdcEnabled: true,
+			lbtcEnabled: false,
 			wantErr:     true,
 			errMsg:      "duplicate token data observer type",
 		},
@@ -297,6 +340,24 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 				},
 			),
 			usdcEnabled: true,
+			lbtcEnabled: false,
+		},
+		{
+			name: "valid config with usdc & lbtc observers",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: withUSDCConfig(),
+				},
+				TokenDataObserverConfig{
+					Type:               "lbtc",
+					Version:            "1.0",
+					LBTCObserverConfig: withLBTCConfig(),
+				},
+			),
+			usdcEnabled: true,
+			lbtcEnabled: true,
 		},
 		{
 			name: "valid config with single usdc observer",
@@ -307,6 +368,18 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					USDCCCTPObserverConfig: withUSDCConfig(),
 				}),
 			usdcEnabled: true,
+			lbtcEnabled: false,
+		},
+		{
+			name: "valid config with single lbtc observer",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:               "lbtc",
+					Version:            "1.0",
+					LBTCObserverConfig: withLBTCConfig(),
+				}),
+			usdcEnabled: false,
+			lbtcEnabled: true,
 		},
 	}
 
@@ -320,6 +393,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 				require.NoError(t, err)
 			}
 			require.Equal(t, tt.usdcEnabled, tt.config.IsUSDCEnabled())
+			require.Equal(t, tt.lbtcEnabled, tt.config.IsLBTCEnabled())
 		})
 	}
 }
