@@ -5,10 +5,40 @@ option go_package = "./;ocrtypecodecpb";
 
 import "google/protobuf/timestamp.proto";
 
-message Query {
+message CommitQuery {
   MerkleRootQuery merkle_root_query = 1;
-  TokenPriceQuery token_price_query = 2;
-  ChainFeeQuery chain_fee_query = 3;
+}
+
+message CommitObservation {
+  MerkleRootObservation merkle_root_obs = 1;
+  TokenPriceObservation token_price_obs = 2;
+  ChainFeeObservation chain_fee_obs = 3;
+  DiscoveryObservation discovery_obs = 4;
+  map<uint64, int32> f_chain = 5;
+}
+
+message CommitOutcome {
+  MerkleRootOutcome merkle_root_outcome = 1;
+  TokenPriceOutcome token_price_outcome = 2;
+  ChainFeeOutcome chain_fee_outcome = 3;
+  MainOutcome main_outcome = 4;
+}
+
+message ExecObservation {
+  map<uint64, CommitObservations> commit_reports = 1;
+  map<uint64, SeqNumToMessage> seqNumsToMessages = 2;
+  map<uint64, SeqNumToBytes> messageHashes = 3;
+  TokenDataObservations token_data_observations = 4;
+  repeated bytes costly_messages = 5;
+  map<uint64, StringAddrToNonce> nonces = 6;
+  DiscoveryObservation contracts = 7;
+  map<uint64, int32> f_chain = 8;
+}
+
+message ExecOutcome {
+  string plugin_state = 1;
+  repeated CommitData commit_reports = 2;
+  ExecutePluginReport execute_plugin_report = 3;
 }
 
 message MerkleRootQuery {
@@ -32,49 +62,13 @@ message DestChainUpdate {
   bytes root = 3;
 }
 
-message SourceChainMeta {
-  uint64 source_chain_selector = 1;
-  bytes onramp_address = 2;
-}
-
-message SeqNumRange {
-  uint64 min_msg_nr = 1;
-  uint64 max_msg_nr = 2;
-}
-
-message TokenPriceQuery {}
-
-message ChainFeeQuery {}
-
-// ----------------------------------------------------------------
-
-message CommitObservation {
-  MerkleRootObservation merkle_root_obs = 1;
-  TokenPriceObservation token_price_obs = 2;
-  ChainFeeObservation chain_fee_obs = 3;
-  DiscoveryObservation discovery_obs = 4;
-  map<uint64, int32> f_chain = 5;
-}
-
 message MerkleRootObservation {
   repeated MerkleRootChain merkle_roots = 1;
   map<uint64, bool> rmn_enabled_chains = 2;
   repeated SeqNumChain on_ramp_max_seq_nums = 3;
   repeated SeqNumChain off_ramp_next_seq_nums = 4;
   RmnRemoteConfig rmn_remote_config = 5;
-  map<uint64, int32> f_chain = 6; // todo: remove
-}
-
-message MerkleRootChain {
-  uint64 chain_sel = 1;
-  bytes on_ramp_address = 2;
-  SeqNumRange seq_nums_range = 3;
-  bytes merkle_root = 4;
-}
-
-message SeqNumChain {
-  uint64 chain_sel = 1;
-  uint64 seq_num = 2;
+  map<uint64, int32> f_chain = 6;
 }
 
 message RmnRemoteConfig {
@@ -97,12 +91,6 @@ message TokenPriceObservation {
   map<uint64, int32> f_chain = 3;
   google.protobuf.Timestamp timestamp = 4;
 }
-
-message TimestampedBig {
-  google.protobuf.Timestamp timestamp = 1;
-  bytes value = 2;
-}
-
 
 message ChainFeeObservation {
   map<uint64, ChainFeeComponents> fee_components = 1;
@@ -140,15 +128,6 @@ message ChainAddressMap {
   map<uint64, bytes> chain_addresses = 1;
 }
 
-// --------------------------------------------------------
-
-message CommitOutcome {
-  MerkleRootOutcome merkle_root_outcome = 1;
-  TokenPriceOutcome token_price_outcome = 2;
-  ChainFeeOutcome chain_fee_outcome = 3;
-  MainOutcome main_outcome = 4;
-}
-
 message MerkleRootOutcome {
   int32 outcome_type = 1;
   repeated ChainRange ranges_selected_for_report = 2;
@@ -158,11 +137,6 @@ message MerkleRootOutcome {
   uint32 report_transmission_check_attempts = 6;
   repeated SignatureEcdsa rmn_report_signatures = 7;
   RmnRemoteConfig rmn_remote_cfg = 8;
-}
-
-message ChainRange {
-  uint64 chain_sel = 1;
-  SeqNumRange seq_num_range = 2;
 }
 
 message TokenPriceOutcome {
@@ -181,19 +155,6 @@ message GasPriceChain {
 message MainOutcome {
   uint64 inflight_price_ocr_sequence_number = 1;
   int32 remaining_price_checks = 2;
-}
-
-// ------------------------------------------------------------
-
-message ExecObservation {
-  map<uint64, CommitObservations> commit_reports = 1;
-  map<uint64, SeqNumToMessage> seqNumsToMessages = 2; // chain to SeqNumToMessage
-  map<uint64, SeqNumToBytes> messageHashes = 3; // chain to seqNum to bytes
-  TokenDataObservations token_data_observations = 4;
-  repeated bytes costly_messages = 5;
-  map<uint64, StringAddrToNonce> nonces = 6; // chain to stringSenderAddr to nonce
-  DiscoveryObservation contracts = 7;
-  map<uint64, int32> f_chain = 8;
 }
 
 message CommitObservations {
@@ -274,11 +235,6 @@ message StringAddrToNonce {
   map<string, uint64> nonces = 1;
 }
 
-message ExecOutcome {
-  string plugin_state = 1;
-  repeated CommitData commit_reports = 2;
-  ExecutePluginReport execute_plugin_report = 3;
-}
 
 message ExecutePluginReport {
   repeated ChainReport chain_reports = 1;
@@ -294,4 +250,36 @@ message ChainReport {
 
 message RepeatedBytes {
   repeated bytes items = 1;
+}
+
+message SeqNumRange {
+  uint64 min_msg_nr = 1;
+  uint64 max_msg_nr = 2;
+}
+
+message SeqNumChain {
+  uint64 chain_sel = 1;
+  uint64 seq_num = 2;
+}
+
+message ChainRange {
+  uint64 chain_sel = 1;
+  SeqNumRange seq_num_range = 2;
+}
+
+message SourceChainMeta {
+  uint64 source_chain_selector = 1;
+  bytes onramp_address = 2;
+}
+
+message MerkleRootChain {
+  uint64 chain_sel = 1;
+  bytes on_ramp_address = 2;
+  SeqNumRange seq_nums_range = 3;
+  bytes merkle_root = 4;
+}
+
+message TimestampedBig {
+  google.protobuf.Timestamp timestamp = 1;
+  bytes value = 2;
 }

@@ -47,7 +47,7 @@ func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) 
 	sigs := c.tr.rmnSignaturesToProto(query.MerkleRootQuery.RMNSignatures)
 	laneUpdates := c.tr.laneUpdatesToProto(query.MerkleRootQuery.RMNSignatures.LaneUpdates)
 
-	pbQ := &ocrtypecodecpb.Query{
+	pbQ := &ocrtypecodecpb.CommitQuery{
 		MerkleRootQuery: &ocrtypecodecpb.MerkleRootQuery{
 			RetryRmnSignatures: query.MerkleRootQuery.RetryRMNSignatures,
 			RmnSignatures: &ocrtypecodecpb.ReportSignatures{
@@ -55,8 +55,6 @@ func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) 
 				LaneUpdates: laneUpdates,
 			},
 		},
-		TokenPriceQuery: &ocrtypecodecpb.TokenPriceQuery{}, // always empty
-		ChainFeeQuery:   &ocrtypecodecpb.ChainFeeQuery{},   // always empty
 	}
 
 	return proto.Marshal(pbQ)
@@ -67,7 +65,7 @@ func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
 		return committypes.Query{}, nil
 	}
 
-	pbQ := &ocrtypecodecpb.Query{}
+	pbQ := &ocrtypecodecpb.CommitQuery{}
 	if err := proto.Unmarshal(data, pbQ); err != nil {
 		return committypes.Query{}, fmt.Errorf("proto unmarshal query: %w", err)
 	}

@@ -113,6 +113,8 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 	return outc, nil
 }
 
+// ExecCodecJSON is an implementation of ExecCodec that uses JSON.
+// DEPRECATED: Use ExecCodecProto instead.
 type ExecCodecJSON struct{}
 
 func NewExecCodecJSON() *ExecCodecJSON {

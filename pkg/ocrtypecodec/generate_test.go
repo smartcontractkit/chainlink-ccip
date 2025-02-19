@@ -128,7 +128,7 @@ type resultData struct {
 }
 
 // genQuery generates a Protobuf Query object with the specified number of signatures and lane updates.
-func genQuery(numSigs int, numLaneUpdates int) *ocrtypecodecpb.Query {
+func genQuery(numSigs int, numLaneUpdates int) *ocrtypecodecpb.CommitQuery {
 	// Generate ECDSA Signatures
 	signatures := make([]*ocrtypecodecpb.SignatureEcdsa, numSigs)
 	for i := 0; i < numSigs; i++ {
@@ -155,7 +155,7 @@ func genQuery(numSigs int, numLaneUpdates int) *ocrtypecodecpb.Query {
 	}
 
 	// Construct the Protobuf Query object
-	query := &ocrtypecodecpb.Query{
+	query := &ocrtypecodecpb.CommitQuery{
 		MerkleRootQuery: &ocrtypecodecpb.MerkleRootQuery{
 			RetryRmnSignatures: true,
 			RmnSignatures: &ocrtypecodecpb.ReportSignatures{
