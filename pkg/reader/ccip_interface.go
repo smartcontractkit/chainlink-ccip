@@ -93,6 +93,7 @@ func NewCCIPChainReader(
 			destChain,
 			offrampAddress,
 		),
+		lggr,
 		destChain,
 	)
 }
