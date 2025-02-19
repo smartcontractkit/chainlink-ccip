@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
@@ -35,7 +36,7 @@ func Test_GetChainsFeeComponents(t *testing.T) {
 	}
 
 	origin := mock_reader.NewMockCCIPReader(t)
-	r := reader.NewObservedCCIPReader(origin, cs1)
+	r := reader.NewObservedCCIPReader(origin, logger.Test(t), cs1)
 
 	origin.EXPECT().
 		GetChainsFeeComponents(mock.Anything, mock.Anything).
@@ -118,7 +119,7 @@ func Test_GetDestChainFeeComponents(t *testing.T) {
 			t.Cleanup(func() { reader.PromChainFeeGauge.Reset() })
 
 			origin := mock_reader.NewMockCCIPReader(t)
-			r := reader.NewObservedCCIPReader(origin, chainSelector)
+			r := reader.NewObservedCCIPReader(origin, logger.Test(t), chainSelector)
 
 			origin.EXPECT().
 				GetDestChainFeeComponents(ctx).

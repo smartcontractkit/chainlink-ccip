@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
+	sel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -21,23 +23,26 @@ var (
 			Name: "ccip_chain_fee_components",
 			Help: "This metric tracks the chain fee components for a given chain",
 		},
-		[]string{"chainSelector", "feeType"},
+		[]string{"chainID", "feeType"},
 	)
 )
 
 type observedCCIPReader struct {
 	CCIPReader
+	lggr           logger.Logger
 	destChain      cciptypes.ChainSelector
 	chainFeesGauge *prometheus.GaugeVec
 }
 
 func NewObservedCCIPReader(
 	reader CCIPReader,
-	destChain cciptypes.ChainSelector,
+	lggr logger.Logger,
+	destChainSelector cciptypes.ChainSelector,
 ) CCIPReader {
 	return &observedCCIPReader{
 		CCIPReader:     reader,
-		destChain:      destChain,
+		lggr:           lggr,
+		destChain:      destChainSelector,
 		chainFeesGauge: PromChainFeeGauge,
 	}
 }
@@ -67,17 +72,28 @@ func (o *observedCCIPReader) trackChainFeeComponents(
 	components map[cciptypes.ChainSelector]types.ChainFeeComponents,
 ) {
 	for k, v := range components {
-		stringSelector := strconv.FormatUint(uint64(k), 10)
+		selector, err := sel.GetChainIDFromSelector(uint64(k))
+		if err != nil {
+			selector = strconv.FormatUint(uint64(k), 10)
+			o.lggr.Error("failed to get chainID from selector", "err", err)
+		}
 
 		if v.ExecutionFee != nil {
 			o.chainFeesGauge.
-				WithLabelValues(stringSelector, execCostLabel).
+				WithLabelValues(selector, execCostLabel).
 				Set(float64(v.ExecutionFee.Int64()))
 		}
 		if v.DataAvailabilityFee != nil {
 			o.chainFeesGauge.
-				WithLabelValues(stringSelector, dataCostLabel).
+				WithLabelValues(selector, dataCostLabel).
 				Set(float64(v.DataAvailabilityFee.Int64()))
 		}
+
+		o.lggr.Debugw(
+			"observed chain fee components",
+			"destChainID", selector,
+			"executionFee", v.ExecutionFee,
+			"dataAvailabilityFee", v.DataAvailabilityFee,
+		)
 	}
 }
