@@ -139,6 +139,12 @@ type CommitOffchainConfig struct {
 
 	// MerkleRootAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch seqNums).
 	MerkleRootAsyncObserverSyncTimeout time.Duration `json:"merkleRootAsyncObserverSyncTimeout"`
+
+	// MaxRootsPerReport is the maximum number of roots to include in a single report.
+	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
+
+	// MultipleReports is a flag to enable/disable multiple reports per round.
+	MultipleReports bool `json:"multipleReports"`
 }
 
 func (c *CommitOffchainConfig) applyDefaults() {

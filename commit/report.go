@@ -13,7 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -22,39 +25,20 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func (p *Plugin) Reports(
-	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
-) ([]ocr3types.ReportPlus[[]byte], error) {
-	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseReports)
-
-	outcome, err := p.ocrTypeCodec.DecodeOutcome(outcomeBytes)
-	if err != nil {
-		lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
-		return nil, fmt.Errorf("decode outcome: %w", err)
-	}
-
-	lggr.Infow("generating report",
-		"roots", outcome.MerkleRootOutcome.RootsToReport,
-		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
-		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
-		"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
-	)
-
+// buildOneReport is the common logic for building a report.
+func buildOneReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	reportCodec cciptypes.CommitPluginCodec,
+	transmissionSchedule *ocr3types.TransmissionSchedule,
+	outcome committypes.Outcome,
+	blessedMerkleRoots []cciptypes.MerkleRootChain,
+	unblessedMerkleRoots []cciptypes.MerkleRootChain,
+) (ocr3types.ReportPlus[[]byte], error) {
 	var (
 		rep     cciptypes.CommitPluginReport
 		repInfo cciptypes.CommitReportInfo
 	)
-
-	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
-	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
-
-	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
-		if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
-			blessedMerkleRoots = append(blessedMerkleRoots, r)
-		} else {
-			unblessedMerkleRoots = append(unblessedMerkleRoots, r)
-		}
-	}
 
 	// MerkleRoots and RMNSignatures will be empty arrays if there is nothing to report
 	rep = cciptypes.CommitPluginReport{
@@ -85,18 +69,146 @@ func (p *Plugin) Reports(
 
 	if rep.IsEmpty() {
 		lggr.Infow("empty report", "report", rep)
-		return []ocr3types.ReportPlus[[]byte]{}, nil
+		return ocr3types.ReportPlus[[]byte]{}, nil
 	}
 
-	encodedReport, err := p.reportCodec.Encode(ctx, rep)
+	encodedReport, err := reportCodec.Encode(ctx, rep)
 	if err != nil {
-		return nil, fmt.Errorf("encode commit plugin report: %w", err)
+		return ocr3types.ReportPlus[[]byte]{}, fmt.Errorf("encode commit plugin report: %w", err)
 	}
 
 	encodedInfo, err := repInfo.Encode()
 	if err != nil {
-		return nil, fmt.Errorf("encode commit plugin report info: %w", err)
+		return ocr3types.ReportPlus[[]byte]{}, fmt.Errorf("encode commit plugin report info: %w", err)
 	}
+
+	lggr.Infow("commit plugin generated reports", "report", rep, "reportInfo", repInfo)
+
+	return ocr3types.ReportPlus[[]byte]{
+		ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+			Report: encodedReport,
+			Info:   encodedInfo,
+		},
+		TransmissionScheduleOverride: transmissionSchedule,
+	}, nil
+}
+
+func buildStandardReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	reportCodec cciptypes.CommitPluginCodec,
+	transmission *ocr3types.TransmissionSchedule,
+	outcome committypes.Outcome,
+) ([]ocr3types.ReportPlus[[]byte], error) {
+
+	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
+	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
+
+	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
+		if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
+			blessedMerkleRoots = append(blessedMerkleRoots, r)
+		} else {
+			unblessedMerkleRoots = append(unblessedMerkleRoots, r)
+		}
+	}
+
+	report, err := buildOneReport(ctx, lggr, reportCodec, transmission, outcome, blessedMerkleRoots, unblessedMerkleRoots)
+	if err != nil {
+		return nil, err
+	}
+	return []ocr3types.ReportPlus[[]byte]{report}, nil
+}
+
+// buildMultipleReports builds many reports of with at most maxMerkleRootsPerReport roots.
+func buildMultipleReports(
+	ctx context.Context,
+	lggr logger.Logger,
+	reportCodec cciptypes.CommitPluginCodec,
+	transmissionSchedule *ocr3types.TransmissionSchedule,
+	outcome committypes.Outcome,
+	maxMerkleRootsPerReport uint64,
+) ([]ocr3types.ReportPlus[[]byte], error) {
+	var reports []ocr3types.ReportPlus[[]byte]
+
+	numRoots := uint64(0)
+	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
+	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
+	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
+
+		if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
+			blessedMerkleRoots = append(blessedMerkleRoots, r)
+		} else {
+			unblessedMerkleRoots = append(unblessedMerkleRoots, r)
+		}
+
+		if numRoots == maxMerkleRootsPerReport {
+			// build it.
+			report, err := buildOneReport(ctx, lggr, reportCodec, transmissionSchedule, outcome, blessedMerkleRoots, unblessedMerkleRoots)
+			if err != nil {
+				return nil, err
+			}
+			reports = append(reports, report)
+
+			// reset accumulators for next report.
+			numRoots = 0
+			blessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0)
+			unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0)
+
+			// price updates are only included in the first report.
+			outcome.TokenPriceOutcome = tokenprice.Outcome{}
+			outcome.ChainFeeOutcome = chainfee.Outcome{}
+		}
+	}
+
+	// check for final partial report.
+	if numRoots > 0 {
+		// build it.
+		report, err := buildOneReport(ctx, lggr, reportCodec, transmissionSchedule, outcome, blessedMerkleRoots, unblessedMerkleRoots)
+		if err != nil {
+			return nil, err
+		}
+		reports = append(reports, report)
+	}
+
+	return reports, nil
+}
+
+// buildTruncatedReport returns a single truncated report.
+func buildTruncatedReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	reportCodec cciptypes.CommitPluginCodec,
+	transmissionSchedule *ocr3types.TransmissionSchedule,
+	outcome committypes.Outcome,
+	maxMerkleRootsPerReport uint64,
+) ([]ocr3types.ReportPlus[[]byte], error) {
+	reports, err := buildMultipleReports(ctx, lggr, reportCodec, transmissionSchedule, outcome, maxMerkleRootsPerReport)
+	if err != nil {
+		return nil, err
+	}
+	if len(reports) > 1 {
+		return reports[:1], nil
+	}
+	return reports, nil
+}
+
+func (p *Plugin) Reports(
+	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
+) ([]ocr3types.ReportPlus[[]byte], error) {
+	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseReports)
+
+	outcome, err := p.ocrTypeCodec.DecodeOutcome(outcomeBytes)
+	if err != nil {
+		lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
+		return nil, fmt.Errorf("decode outcome: %w", err)
+	}
+
+	lggr.Infow("generating report",
+		"roots", outcome.MerkleRootOutcome.RootsToReport,
+		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
+		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
+		"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
+	)
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
 		p.chainSupport,
@@ -109,17 +221,23 @@ func (p *Plugin) Reports(
 	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2PID)
 
-	lggr.Infow("commit plugin generated reports", "report", rep, "reportInfo", repInfo)
+	// The Solana report has some special limitations. Those limitations can be used if the offchain
+	maxRoots := p.offchainCfg.MaxMerkleRootsPerReport
+	if !p.offchainCfg.RMNEnabled && maxRoots != 0 {
+		if p.offchainCfg.MultipleReports {
+			return buildMultipleReports(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, maxRoots)
+		} else {
+			return buildTruncatedReport(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, maxRoots)
+		}
+	}
 
-	return []ocr3types.ReportPlus[[]byte]{
-		{
-			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-				Report: encodedReport,
-				Info:   encodedInfo,
-			},
-			TransmissionScheduleOverride: transmissionSchedule,
-		},
-	}, nil
+	if p.offchainCfg.MultipleReports {
+		lggr.Warnw("maxMerkleRootsPerReport is set but RMN is enabled, ignoring the setting")
+	}
+	if maxRoots != 0 {
+		lggr.Warnw("maxMerkleRootsPerReport is set but RMN is enabled, ignoring the setting")
+	}
+	return buildStandardReport(ctx, lggr, p.reportCodec, transmissionSchedule, outcome)
 }
 
 // validateReport validates various aspects of the report.
