@@ -81,7 +81,6 @@ type PluginFactoryParams struct {
 	OcrConfig        reader.OCR3ConfigWithMeta
 	ExecCodec        cciptypes.ExecutePluginCodec
 	MsgHasher        cciptypes.MessageHasher
-	ExtraDataCodec   cciptypes.ExtraDataCodec
 	HomeChainReader  reader.HomeChain
 	TokenDataEncoder cciptypes.TokenDataEncoder
 	EstimateProvider cciptypes.EstimateProvider

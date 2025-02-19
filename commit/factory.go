@@ -69,6 +69,7 @@ type PluginFactory struct {
 	ocrConfig         reader.OCR3ConfigWithMeta
 	commitCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
+	addrCodec         cciptypes.AddressCodec
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -83,6 +84,7 @@ type CommitPluginFactoryParams struct {
 	OcrConfig         reader.OCR3ConfigWithMeta
 	CommitCodec       cciptypes.CommitPluginCodec
 	MsgHasher         cciptypes.MessageHasher
+	AddrCodec         cciptypes.AddressCodec
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
 	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -100,6 +102,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		ocrConfig:         params.OcrConfig,
 		commitCodec:       params.CommitCodec,
 		msgHasher:         params.MsgHasher,
+		addrCodec:         params.AddrCodec,
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
 		contractReaders:   params.ContractReaders,
