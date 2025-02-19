@@ -591,16 +591,15 @@ func genMessageMap(n int) map[uint64]*ocrtypecodecpb.Message {
 // genMessage generates a single Message.
 func genMessage() *ocrtypecodecpb.Message {
 	return &ocrtypecodecpb.Message{
-		Header:           genMessageHeader(),
-		Sender:           randomBytes(20),
-		Data:             randomBytes(50),
-		Receiver:         randomBytes(20),
-		ExtraArgs:        randomBytes(20),
-		ExtraArgsDecoded: genStringToBytesMap(3),
-		FeeToken:         randomBytes(20),
-		FeeTokenAmount:   randomBytes(32),
-		FeeValueJuels:    randomBytes(32),
-		TokenAmounts:     genRampTokenAmounts(rand.Intn(5)),
+		Header:         genMessageHeader(),
+		Sender:         randomBytes(20),
+		Data:           randomBytes(50),
+		Receiver:       randomBytes(20),
+		ExtraArgs:      randomBytes(20),
+		FeeToken:       randomBytes(20),
+		FeeTokenAmount: randomBytes(32),
+		FeeValueJuels:  randomBytes(32),
+		TokenAmounts:   genRampTokenAmounts(rand.Intn(5)),
 	}
 }
 
@@ -621,12 +620,11 @@ func genRampTokenAmounts(n int) []*ocrtypecodecpb.RampTokenAmount {
 	amounts := make([]*ocrtypecodecpb.RampTokenAmount, n)
 	for i := 0; i < n; i++ {
 		amounts[i] = &ocrtypecodecpb.RampTokenAmount{
-			SourcePoolAddress:   randomBytes(20),
-			DestTokenAddress:    randomBytes(20),
-			ExtraData:           randomBytes(32),
-			Amount:              randomBytes(32),
-			DestExecData:        randomBytes(32),
-			DestExecDataDecoded: genStringToBytesMap(3),
+			SourcePoolAddress: randomBytes(20),
+			DestTokenAddress:  randomBytes(20),
+			ExtraData:         randomBytes(32),
+			Amount:            randomBytes(32),
+			DestExecData:      randomBytes(32),
 		}
 	}
 	return amounts
@@ -683,12 +681,4 @@ func genBytes32Slice(n int) [][]byte {
 		result[i] = randomBytes(32)
 	}
 	return result
-}
-
-func genStringToBytesMap(n int) map[string][]byte {
-	m := make(map[string][]byte, n)
-	for i := 0; i < n; i++ {
-		m[genRandomString(5)] = randomBytes(32)
-	}
-	return m
 }

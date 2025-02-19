@@ -145,16 +145,15 @@ func encodeMessages(messages []cciptypes.Message) []*ocrtypecodecpb.Message {
 
 func encodeMessage(msg cciptypes.Message) *ocrtypecodecpb.Message {
 	return &ocrtypecodecpb.Message{
-		Header:           encodeMessageHeader(msg.Header),
-		Sender:           msg.Sender,
-		Data:             msg.Data,
-		Receiver:         msg.Receiver,
-		ExtraArgs:        msg.ExtraArgs,
-		ExtraArgsDecoded: encodeStringToAny(msg.ExtraArgsDecoded),
-		FeeToken:         msg.FeeToken,
-		FeeTokenAmount:   msg.FeeTokenAmount.Bytes(),
-		FeeValueJuels:    msg.FeeValueJuels.Bytes(),
-		TokenAmounts:     encodeRampTokenAmounts(msg.TokenAmounts),
+		Header:         encodeMessageHeader(msg.Header),
+		Sender:         msg.Sender,
+		Data:           msg.Data,
+		Receiver:       msg.Receiver,
+		ExtraArgs:      msg.ExtraArgs,
+		FeeToken:       msg.FeeToken,
+		FeeTokenAmount: msg.FeeTokenAmount.Bytes(),
+		FeeValueJuels:  msg.FeeValueJuels.Bytes(),
+		TokenAmounts:   encodeRampTokenAmounts(msg.TokenAmounts),
 	}
 }
 
@@ -170,28 +169,15 @@ func encodeMessageHeader(header cciptypes.RampMessageHeader) *ocrtypecodecpb.Ram
 	}
 }
 
-func encodeStringToAny(extraArgsDecoded map[string]any) map[string][]byte {
-	result := make(map[string][]byte, len(extraArgsDecoded))
-	for k, v := range extraArgsDecoded {
-		b, err := encodeAnyToBytesJSON(v)
-		if err != nil {
-			panic(err)
-		}
-		result[k] = b
-	}
-	return result
-}
-
 func encodeRampTokenAmounts(tokenAmounts []cciptypes.RampTokenAmount) []*ocrtypecodecpb.RampTokenAmount {
 	result := make([]*ocrtypecodecpb.RampTokenAmount, len(tokenAmounts))
 	for i, token := range tokenAmounts {
 		result[i] = &ocrtypecodecpb.RampTokenAmount{
-			SourcePoolAddress:   token.SourcePoolAddress,
-			DestTokenAddress:    token.DestTokenAddress,
-			ExtraData:           token.ExtraData,
-			Amount:              token.Amount.Bytes(),
-			DestExecData:        token.DestExecData,
-			DestExecDataDecoded: encodeStringToAny(token.DestExecDataDecoded),
+			SourcePoolAddress: token.SourcePoolAddress,
+			DestTokenAddress:  token.DestTokenAddress,
+			ExtraData:         token.ExtraData,
+			Amount:            token.Amount.Bytes(),
+			DestExecData:      token.DestExecData,
 		}
 	}
 	return result
@@ -380,16 +366,15 @@ func decodeMessages(messages []*ocrtypecodecpb.Message) []cciptypes.Message {
 
 func decodeMessage(msg *ocrtypecodecpb.Message) cciptypes.Message {
 	return cciptypes.Message{
-		Header:           decodeMessageHeader(msg.Header),
-		Sender:           msg.Sender,
-		Data:             msg.Data,
-		Receiver:         msg.Receiver,
-		ExtraArgs:        msg.ExtraArgs,
-		ExtraArgsDecoded: decodeStringToAny(msg.ExtraArgsDecoded),
-		FeeToken:         msg.FeeToken,
-		FeeTokenAmount:   cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeTokenAmount)),
-		FeeValueJuels:    cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeValueJuels)),
-		TokenAmounts:     decodeRampTokenAmounts(msg.TokenAmounts),
+		Header:         decodeMessageHeader(msg.Header),
+		Sender:         msg.Sender,
+		Data:           msg.Data,
+		Receiver:       msg.Receiver,
+		ExtraArgs:      msg.ExtraArgs,
+		FeeToken:       msg.FeeToken,
+		FeeTokenAmount: cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeTokenAmount)),
+		FeeValueJuels:  cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeValueJuels)),
+		TokenAmounts:   decodeRampTokenAmounts(msg.TokenAmounts),
 	}
 }
 
@@ -405,28 +390,15 @@ func decodeMessageHeader(header *ocrtypecodecpb.RampMessageHeader) cciptypes.Ram
 	}
 }
 
-func decodeStringToAny(encoded map[string][]byte) map[string]any {
-	result := make(map[string]any, len(encoded))
-	for k, v := range encoded {
-		val, err := decodeBytesToAnyJSON(v)
-		if err != nil {
-			panic(err)
-		}
-		result[k] = val
-	}
-	return result
-}
-
 func decodeRampTokenAmounts(tokenAmounts []*ocrtypecodecpb.RampTokenAmount) []cciptypes.RampTokenAmount {
 	result := make([]cciptypes.RampTokenAmount, len(tokenAmounts))
 	for i, token := range tokenAmounts {
 		result[i] = cciptypes.RampTokenAmount{
-			SourcePoolAddress:   token.SourcePoolAddress,
-			DestTokenAddress:    token.DestTokenAddress,
-			ExtraData:           token.ExtraData,
-			Amount:              cciptypes.NewBigInt(big.NewInt(0).SetBytes(token.Amount)),
-			DestExecData:        token.DestExecData,
-			DestExecDataDecoded: decodeStringToAny(token.DestExecDataDecoded),
+			SourcePoolAddress: token.SourcePoolAddress,
+			DestTokenAddress:  token.DestTokenAddress,
+			ExtraData:         token.ExtraData,
+			Amount:            cciptypes.NewBigInt(big.NewInt(0).SetBytes(token.Amount)),
+			DestExecData:      token.DestExecData,
 		}
 	}
 	return result
@@ -469,16 +441,6 @@ func (e ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 
 func NewExecCodecProto() *ExecCodecProto {
 	return &ExecCodecProto{}
-}
-
-func encodeAnyToBytesJSON(data any) ([]byte, error) {
-	return json.Marshal(data)
-}
-
-func decodeBytesToAnyJSON(data []byte) (any, error) {
-	var result map[string]any
-	err := json.Unmarshal(data, &result)
-	return result, err
 }
 
 type ExecCodecJSON struct{}

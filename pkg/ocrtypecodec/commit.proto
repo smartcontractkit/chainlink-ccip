@@ -246,7 +246,6 @@ message Message {
   bytes data = 3;
   bytes receiver = 4;
   bytes extra_args = 5;
-  map<string, bytes> extra_args_decoded = 6;
   bytes fee_token = 7;
   bytes fee_token_amount = 8;
   bytes fee_value_juels = 9;
@@ -269,7 +268,6 @@ message RampTokenAmount {
   bytes extra_data = 3;
   bytes amount = 4;
   bytes dest_exec_data = 5;
-  map<string, bytes> dest_exec_data_decoded = 6;
 }
 
 message StringAddrToNonce {
