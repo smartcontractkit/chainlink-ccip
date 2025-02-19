@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
@@ -6,6 +8,15 @@ use anchor_lang::prelude::*;
 pub enum CodeVersion {
     Default = 0,
     V1,
+}
+
+impl Display for CodeVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CodeVersion::Default => write!(f, "Default"),
+            CodeVersion::V1 => write!(f, "V1"),
+        }
+    }
 }
 
 #[account]

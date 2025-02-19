@@ -155,13 +155,22 @@ func TestConfigCache_GetChainConfig_Error(t *testing.T) {
 		true,
 	).Return(nil, nil, expectedErr)
 
-	// First call with no cached data should return error
 	_, err := cache.GetChainConfig(ctx, chainA)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
 }
 
-func TestConfigCache_GetChainConfig_ErrorWithCachedData(t *testing.T) {
+func TestConfigCache_NoReader(t *testing.T) {
+	cache, _ := setupBasicCache(t)
+	ctx := tests.Context(t)
+
+	// Test with a chain that has no reader
+	_, err := cache.GetChainConfig(ctx, chainB)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no contract reader for chain")
+}
+
+func TestConfigCache_ErrorWithCachedData(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
@@ -200,14 +209,14 @@ func TestConfigCache_GetChainConfig_ErrorWithCachedData(t *testing.T) {
 	// Wait for cache to expire
 	time.Sleep(1100 * time.Millisecond)
 
-	// Setup error for second fetch
+	// Setup error for second fetch attempt
 	reader.On("ExtendedBatchGetLatestValues",
 		mock.Anything,
 		mock.Anything,
 		true,
 	).Return(nil, nil, errors.New("fetch error"))
 
-	// Second call should return cached data despite fetch error
+	// Second call should return cached data despite error
 	config2, err := cache.GetChainConfig(ctx, chainA)
 	require.NoError(t, err)
 	assert.Equal(t, config1, config2)
@@ -365,12 +374,10 @@ func TestConfigCache_Initialization(t *testing.T) {
 			cache := newConfigPoller(lggr, reader, tc.refreshPeriod)
 			require.NotNil(t, cache, "cache should never be nil after initialization")
 
-			// Verify the cache's internal state
 			require.NotNil(t, cache.chainCaches, "chainCaches map should never be nil")
 			assert.Equal(t, tc.refreshPeriod, cache.refreshPeriod)
 			assert.Equal(t, reader, cache.reader)
 
-			// Test getting config for a chain
 			_, err := cache.GetChainConfig(ctx, tc.chainToTest)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expectedErr)

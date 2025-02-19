@@ -889,6 +889,7 @@ const (
 	InvalidTokenReceiver_FeeQuoterError
 	InvalidSVMAddress_FeeQuoterError
 	UnauthorizedPriceUpdater_FeeQuoterError
+	InvalidCodeVersion_FeeQuoterError
 )
 
 func (value FeeQuoterError) String() string {
@@ -965,6 +966,8 @@ func (value FeeQuoterError) String() string {
 		return "InvalidSVMAddress"
 	case UnauthorizedPriceUpdater_FeeQuoterError:
 		return "UnauthorizedPriceUpdater"
+	case InvalidCodeVersion_FeeQuoterError:
+		return "InvalidCodeVersion"
 	default:
 		return ""
 	}

@@ -26,7 +26,7 @@ pub fn public(
     match lane_code_version {
         CodeVersion::V1 => &v1::public::Impl,
         CodeVersion::Default => match default_code_version {
-            CodeVersion::Default => &v1::public::Impl,
+            CodeVersion::Default => &v1::public::Impl, // can't happen, but default to v1 so the `match` is exhaustive
             CodeVersion::V1 => &v1::public::Impl,
         },
     }

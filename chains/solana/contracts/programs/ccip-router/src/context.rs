@@ -61,7 +61,7 @@ pub struct WithdrawBilledFunds<'info> {
     #[account(
         mut,
         constraint = recipient.key() == get_associated_token_address_with_program_id(
-            &config.load()?.fee_aggregator.key(), &fee_token_mint.key(), &token_program.key()
+            &config.fee_aggregator.key(), &fee_token_mint.key(), &token_program.key()
         ) @ CcipRouterError::InvalidInputsAtaAddress,
     )]
     pub recipient: InterfaceAccount<'info, TokenAccount>,
@@ -78,11 +78,11 @@ pub struct WithdrawBilledFunds<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -95,7 +95,7 @@ pub struct InitializeCCIPRouter<'info> {
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -124,11 +124,11 @@ pub struct TransferOwnership<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -138,11 +138,11 @@ pub struct AcceptOwnership<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    #[account(address = config.load()?.proposed_owner @ CcipRouterError::Unauthorized)]
+    #[account(address = config.proposed_owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -162,11 +162,11 @@ pub struct AddChainSelector<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -191,11 +191,11 @@ pub struct UpdateDestChainSelectorConfig<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -206,11 +206,11 @@ pub struct UpdateConfigCCIPRouter<'info> {
         mut,
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    #[account(address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -230,11 +230,11 @@ pub struct AddOfframp<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
@@ -254,11 +254,11 @@ pub struct RemoveOfframp<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
-    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
@@ -274,9 +274,9 @@ pub struct CcipSend<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
     )]
-    pub config: AccountLoader<'info, Config>,
+    pub config: Account<'info, Config>,
 
     #[account(
         mut,
@@ -349,7 +349,7 @@ pub struct CcipSend<'info> {
     ////////////////////
     /// CHECK: This is the account for the Fee Quoter program
     #[account(
-        address = config.load()?.fee_quoter @ CcipRouterError::InvalidVersion,
+        address = config.fee_quoter @ CcipRouterError::InvalidVersion,
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
@@ -357,7 +357,7 @@ pub struct CcipSend<'info> {
     #[account(
         seeds = [fee_quoter::context::seed::CONFIG],
         bump,
-        seeds::program = config.load()?.fee_quoter,
+        seeds::program = config.fee_quoter,
     )]
     pub fee_quoter_config: UncheckedAccount<'info>,
 
@@ -365,7 +365,7 @@ pub struct CcipSend<'info> {
     #[account(
         seeds = [fee_quoter::context::seed::DEST_CHAIN, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
-        seeds::program = config.load()?.fee_quoter,
+        seeds::program = config.fee_quoter,
     )]
     pub fee_quoter_dest_chain: UncheckedAccount<'info>,
 
@@ -379,17 +379,17 @@ pub struct CcipSend<'info> {
             },
         ],
         bump,
-        seeds::program = config.load()?.fee_quoter,
+        seeds::program = config.fee_quoter,
     )]
     pub fee_quoter_billing_token_config: UncheckedAccount<'info>,
 
     /// CHECK: This account is just used in the CPI to the Fee Quoter program
     #[account(
         seeds = [fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
-            config.load()?.link_token_mint.key().as_ref(),
+            config.link_token_mint.key().as_ref(),
         ],
         bump,
-        seeds::program = config.load()?.fee_quoter,
+        seeds::program = config.fee_quoter,
     )]
     pub fee_quoter_link_token_config: UncheckedAccount<'info>,
 

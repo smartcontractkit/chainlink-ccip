@@ -36,13 +36,10 @@ func TestTokenPool(t *testing.T) {
 	dumbRamp := config.CcipInvalidReceiverProgram
 	dumbRampPoolSigner, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, dumbRamp)
 
-	admin, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	anotherAdmin, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
+	admin := solana.MustPrivateKeyFromBase58("4whgxZhpxcArYWzM1iTmokruAzws9YVi2f9M7pWwchQniaFXBr1WGSGXgadeqHtiRooxNiPosdLj2g2ohbtkWtu5")
+	anotherAdmin := solana.MustPrivateKeyFromBase58("3T3TwgX851KixNcZ2nJDftvXb5gMckHg8zzonKXpSthdDQEtttP4iY5VwetMRmoJkMDUPqSbrypFHVV2aC9FWHKE")
+	user := solana.MustPrivateKeyFromBase58("iVu6VhFc44zTZx6LceYup18rQfxqFvKWFWzJtrNpFcWHCNnbmDfSMYFbDrj9R7RZon4t6YHHmFU8Fh6461PBvfC")
 
-	user, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
 	ctx := tests.Context(t)
 
 	allowedOfframpPDA, err := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
@@ -89,7 +86,9 @@ func TestTokenPool(t *testing.T) {
 			amount := uint64(1000)
 
 			for _, poolType := range []test_token_pool.PoolType{test_token_pool.LockAndRelease_PoolType, test_token_pool.BurnAndMint_PoolType} {
-				p, err := tokens.NewTokenPool(v.tokenProgram, config.CcipTokenPoolProgram)
+				mintPriv, err := solana.NewRandomPrivateKey()
+				require.NoError(t, err)
+				p, err := tokens.NewTokenPool(v.tokenProgram, config.CcipTokenPoolProgram, mintPriv)
 				require.NoError(t, err)
 				mint := p.Mint.PublicKey()
 
@@ -482,7 +481,8 @@ func TestTokenPool(t *testing.T) {
 	// test functionality with arbitrary wrapped program
 	t.Run("Wrapped", func(t *testing.T) {
 		t.Parallel()
-		p, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram)
+		mintPriv := solana.MustPrivateKeyFromBase58("5PMQ49JibQPVBFneTzixstoS2z888CoUgej1PoYgvmKXZcKw4b3Zd8vhCjKQcUDSjLnR9M1tUrzCCXLrPBZoqjJm")
+		p, err := tokens.NewTokenPool(solana.TokenProgramID, config.CcipTokenPoolProgram, mintPriv)
 		require.NoError(t, err)
 		mint := p.Mint.PublicKey()
 

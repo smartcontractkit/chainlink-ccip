@@ -31,6 +31,13 @@ type ChainConfigSnapshot struct {
 	RMNProxy  RMNProxyConfig
 	RMNRemote RMNRemoteConfig
 	FeeQuoter FeeQuoterConfig
+	OnRamp    OnRampConfig
+	Router    RouterConfig
+}
+
+type OnRampConfig struct {
+	DynamicConfig   getOnRampDynamicConfigResponse
+	DestChainConfig onRampDestChainConfig
 }
 
 type FeeQuoterConfig struct {
@@ -53,6 +60,10 @@ type RMNProxyConfig struct {
 	RemoteAddress []byte
 }
 
+type RouterConfig struct {
+	WrappedNativeAddress cciptypes.Bytes
+}
+
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
 	if resp == nil {
@@ -72,16 +83,18 @@ func NewCCIPChainReader(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
-	extraDataCodec cciptypes.ExtraDataCodec,
 ) CCIPReader {
-	return newCCIPChainReaderInternal(
-		ctx,
+	return NewObservedCCIPReader(
+		newCCIPChainReaderInternal(
+			ctx,
+			lggr,
+			contractReaders,
+			contractWriters,
+			destChain,
+			offrampAddress,
+		),
 		lggr,
-		contractReaders,
-		contractWriters,
 		destChain,
-		offrampAddress,
-		extraDataCodec,
 	)
 }
 
@@ -93,9 +106,8 @@ func NewCCIPReaderWithExtendedContractReaders(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
-	extraDataCodec cciptypes.ExtraDataCodec,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, extraDataCodec)
+	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress)
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}

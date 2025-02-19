@@ -71,6 +71,17 @@ var (
 	// The new owner must be a signer of the transaction.
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
+	// Sets the default code version to be used. This is then used by the slim routing layer to determine
+	// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
+	//
+	// Shared func signature with other programs
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `code_version` - The new code version to be set as default.
+	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
+
 	// Config //
 	// Adds a new source chain selector with its config to the offramp.
 	//
@@ -135,7 +146,7 @@ var (
 	Instruction_SetOcrConfig = ag_binary.TypeID([8]byte{4, 131, 107, 110, 250, 158, 244, 200})
 
 	// Off Ramp Flow //
-	// Commits a report to the router.
+	// Commits a report to the router, containing a Merkle Root.
 	//
 	// The method name needs to be commit with Anchor encoding.
 	//
@@ -159,6 +170,26 @@ var (
 	// * `ss` - slice of S components of signatures
 	// * `raw_vs` - array of V components of signatures
 	Instruction_Commit = ag_binary.TypeID([8]byte{223, 140, 142, 165, 229, 208, 156, 74})
+
+	// Commits a report to the router, with price updates only.
+	//
+	// The method name needs to be commit with Anchor encoding.
+	//
+	// This function is called by the OffChain when committing one Report to the SVM Router,
+	// containing only price updates and no merkle root.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for the commit.
+	// * `report_context_byte_words` - consists of:
+	// * report_context_byte_words[0]: ConfigDigest
+	// * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
+	// * `raw_report` - The serialized commit input report containing the price updates,
+	// with no merkle root.
+	// * `rs` - slice of R components of signatures
+	// * `ss` - slice of S components of signatures
+	// * `raw_vs` - array of V components of signatures
+	Instruction_CommitPriceOnly = ag_binary.TypeID([8]byte{186, 145, 195, 227, 207, 211, 226, 134})
 
 	// Executes a message on the destination chain.
 	//
@@ -206,6 +237,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_SetDefaultCodeVersion:
+		return "SetDefaultCodeVersion"
 	case Instruction_AddSourceChain:
 		return "AddSourceChain"
 	case Instruction_DisableSourceChainSelector:
@@ -220,6 +253,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "SetOcrConfig"
 	case Instruction_Commit:
 		return "Commit"
+	case Instruction_CommitPriceOnly:
+		return "CommitPriceOnly"
 	case Instruction_Execute:
 		return "Execute"
 	case Instruction_ManuallyExecute:
@@ -257,6 +292,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"accept_ownership", (*AcceptOwnership)(nil),
 		},
 		{
+			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
+		},
+		{
 			"add_source_chain", (*AddSourceChain)(nil),
 		},
 		{
@@ -276,6 +314,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"commit", (*Commit)(nil),
+		},
+		{
+			"commit_price_only", (*CommitPriceOnly)(nil),
 		},
 		{
 			"execute", (*Execute)(nil),

@@ -13,6 +13,7 @@ pub mod state;
 use state::*;
 
 pub mod event;
+use event::*;
 
 pub mod extra_args;
 
@@ -51,6 +52,13 @@ pub mod fee_quoter {
             default_code_version: CodeVersion::V1,
         });
 
+        emit!(ConfigSet {
+            max_fee_juels_per_msg,
+            link_token_mint,
+            onramp,
+            default_code_version: CodeVersion::V1,
+        });
+
         Ok(())
     }
 
@@ -78,6 +86,15 @@ pub mod fee_quoter {
         router::admin(ctx.accounts.config.default_code_version).accept_ownership(ctx)
     }
 
+    /// Sets the default code version to be used. This is then used by the slim routing layer to determine
+    /// which version of the versioned business logic module (`instructions`) to use. Only the admin may set this.
+    ///
+    /// Shared func signature with other programs
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `code_version` - The new code version to be set as default.
     pub fn set_default_code_version(
         ctx: Context<UpdateConfig>,
         code_version: CodeVersion,
@@ -380,4 +397,6 @@ pub enum FeeQuoterError {
     InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
+    #[msg("Invalid code version")]
+    InvalidCodeVersion,
 }
