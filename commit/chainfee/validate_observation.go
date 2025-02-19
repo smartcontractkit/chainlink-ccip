@@ -19,7 +19,6 @@ func (p *processor) ValidateObservation(
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
 	obs := ao.Observation
-	zero := big.NewInt(0)
 
 	if obs.IsEmpty() {
 		return nil
@@ -45,13 +44,19 @@ func (p *processor) ValidateObservation(
 	}
 
 	for _, token := range obs.NativeTokenPrices {
-		if token.Int == nil || token.Int.Cmp(zero) <= 0 {
-			return fmt.Errorf("nil or non-positive %s", "execution fee")
+		if token.Int == nil {
+			return fmt.Errorf("nil token price: %+v", token)
+		}
+		if token.Int.Cmp(big.NewInt(0)) <= 0 {
+			return fmt.Errorf("non-positive token price: %+v", token)
 		}
 	}
 
-	if obs.TimestampNow.IsZero() || obs.TimestampNow.After(time.Now().UTC()) {
-		return fmt.Errorf("invalid timestamp now value %s", obs.TimestampNow.String())
+	if obs.TimestampNow.IsZero() {
+		return fmt.Errorf("timestamp now cannot be zero")
+	}
+	if obs.TimestampNow.After(time.Now().UTC()) {
+		return fmt.Errorf("timestamp now %s cannot be in the future", obs.TimestampNow.String())
 	}
 	return nil
 }
@@ -68,7 +73,10 @@ func validateChainFeeUpdates(
 			return fmt.Errorf("nil or negative %s", "data availability fee price")
 		}
 		if update.Timestamp.IsZero() {
-			return fmt.Errorf("zero timestamp")
+			return fmt.Errorf("timestamp cannot be zero")
+		}
+		if update.Timestamp.After(time.Now().UTC()) {
+			return fmt.Errorf("timestamp %s cannot be in the future", update.Timestamp.String())
 		}
 	}
 	return nil
