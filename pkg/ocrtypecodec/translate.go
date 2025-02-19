@@ -2,6 +2,7 @@ package ocrtypecodec
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
@@ -545,6 +546,44 @@ func (t *protoTranslator) commitReportsToProto(
 	return commitReports
 }
 
+func (t *protoTranslator) commitReportsFromProto(
+	pbObservations map[uint64]*ocrtypecodecpb.CommitObservations,
+) exectypes.CommitObservations {
+	var commitReports exectypes.CommitObservations
+	if len(pbObservations) > 0 {
+		commitReports = make(exectypes.CommitObservations, len(pbObservations))
+	}
+
+	for chainSel, commitObs := range pbObservations {
+		var commitData []exectypes.CommitData
+		if len(commitObs.CommitData) > 0 {
+			commitData = make([]exectypes.CommitData, len(commitObs.CommitData))
+		}
+
+		for i, commit := range commitObs.CommitData {
+			commitData[i] = exectypes.CommitData{
+				SourceChain:   cciptypes.ChainSelector(commit.SourceChain),
+				OnRampAddress: commit.OnRampAddress,
+				Timestamp:     time.Unix(int64(commit.Timestamp), 0),
+				BlockNum:      commit.BlockNum,
+				MerkleRoot:    cciptypes.Bytes32(commit.MerkleRoot),
+				SequenceNumberRange: cciptypes.NewSeqNumRange(
+					cciptypes.SeqNum(commit.SequenceNumberRange.MinMsgNr),
+					cciptypes.SeqNum(commit.SequenceNumberRange.MaxMsgNr),
+				),
+				ExecutedMessages: decodeSeqNums(commit.ExecutedMessages),
+				Messages:         decodeMessages(commit.Messages),
+				Hashes:           t.bytes32SliceFromProto(commit.Hashes),
+				CostlyMessages:   t.bytes32SliceFromProto(commit.CostlyMessages),
+				MessageTokenData: decodeMessageTokenData(commit.MessageTokenData),
+			}
+		}
+		commitReports[cciptypes.ChainSelector(chainSel)] = commitData
+	}
+
+	return commitReports
+}
+
 func (t *protoTranslator) messagesToProto(messages []cciptypes.Message) []*ocrtypecodecpb.Message {
 	var pbMessages []*ocrtypecodecpb.Message
 	if len(messages) > 0 {
@@ -623,6 +662,19 @@ func (t *protoTranslator) bytes32SliceToProto(slice []cciptypes.Bytes32) [][]byt
 	return result
 }
 
+func (t *protoTranslator) bytes32SliceFromProto(pbSlice [][]byte) []cciptypes.Bytes32 {
+	var result []cciptypes.Bytes32
+	if len(pbSlice) > 0 {
+		result = make([]cciptypes.Bytes32, len(pbSlice))
+	}
+
+	for i, val := range pbSlice {
+		result[i] = cciptypes.Bytes32(val)
+	}
+
+	return result
+}
+
 func (t *protoTranslator) messageTokenDataSliceToProto(
 	data []exectypes.MessageTokenData,
 ) []*ocrtypecodecpb.MessageTokenData {
@@ -672,6 +724,25 @@ func (t *protoTranslator) messageObservationsToProto(
 	return pbMsgs
 }
 
+func (t *protoTranslator) messageObservationsFromProto(
+	pbMsgs map[uint64]*ocrtypecodecpb.SeqNumToMessage,
+) exectypes.MessageObservations {
+	var messages exectypes.MessageObservations
+	if len(pbMsgs) > 0 {
+		messages = make(exectypes.MessageObservations, len(pbMsgs))
+	}
+
+	for chainSel, msgMap := range pbMsgs {
+		innerMap := make(map[cciptypes.SeqNum]cciptypes.Message, len(msgMap.Messages))
+		for seqNum, msg := range msgMap.Messages {
+			innerMap[cciptypes.SeqNum(seqNum)] = decodeMessage(msg)
+		}
+		messages[cciptypes.ChainSelector(chainSel)] = innerMap
+	}
+
+	return messages
+}
+
 func (t *protoTranslator) messageHashesToProto(
 	hashes exectypes.MessageHashes,
 ) map[uint64]*ocrtypecodecpb.SeqNumToBytes {
@@ -689,6 +760,25 @@ func (t *protoTranslator) messageHashesToProto(
 	}
 
 	return messageHashes
+}
+
+func (t *protoTranslator) messageHashesFromProto(
+	pbHashes map[uint64]*ocrtypecodecpb.SeqNumToBytes,
+) exectypes.MessageHashes {
+	var hashes exectypes.MessageHashes
+	if len(pbHashes) > 0 {
+		hashes = make(exectypes.MessageHashes, len(pbHashes))
+	}
+
+	for chainSel, hashMap := range pbHashes {
+		innerMap := make(map[cciptypes.SeqNum]cciptypes.Bytes32, len(hashMap.SeqNumToBytes))
+		for seqNum, hash := range hashMap.SeqNumToBytes {
+			innerMap[cciptypes.SeqNum(seqNum)] = cciptypes.Bytes32(hash)
+		}
+		hashes[cciptypes.ChainSelector(chainSel)] = innerMap
+	}
+
+	return hashes
 }
 
 func (t *protoTranslator) tokenDataObservationsToProto(
@@ -712,6 +802,25 @@ func (t *protoTranslator) tokenDataObservationsToProto(
 	return tokenDataObservations
 }
 
+func (t *protoTranslator) tokenDataObservationsFromProto(
+	pbObservations map[uint64]*ocrtypecodecpb.SeqNumToTokenData,
+) exectypes.TokenDataObservations {
+	var tokenDataObservations exectypes.TokenDataObservations
+	if len(pbObservations) > 0 {
+		tokenDataObservations = make(exectypes.TokenDataObservations, len(pbObservations))
+	}
+
+	for chainSel, tokenMap := range pbObservations {
+		innerMap := make(map[cciptypes.SeqNum]exectypes.MessageTokenData, len(tokenMap.TokenData))
+		for seqNum, tokenData := range tokenMap.TokenData {
+			innerMap[cciptypes.SeqNum(seqNum)] = decodeMessageTokenDataEntry(tokenData)
+		}
+		tokenDataObservations[cciptypes.ChainSelector(chainSel)] = innerMap
+	}
+
+	return tokenDataObservations
+}
+
 func (t *protoTranslator) nonceObservationsToProto(
 	observations exectypes.NonceObservations,
 ) map[uint64]*ocrtypecodecpb.StringAddrToNonce {
@@ -729,4 +838,23 @@ func (t *protoTranslator) nonceObservationsToProto(
 	}
 
 	return nonceObservations
+}
+
+func (t *protoTranslator) nonceObservationsFromProto(
+	pbObservations map[uint64]*ocrtypecodecpb.StringAddrToNonce,
+) exectypes.NonceObservations {
+	var nonces exectypes.NonceObservations
+	if len(pbObservations) > 0 {
+		nonces = make(exectypes.NonceObservations, len(pbObservations))
+	}
+
+	for chainSel, nonceMap := range pbObservations {
+		innerMap := make(map[string]uint64, len(nonceMap.Nonces))
+		for addr, nonce := range nonceMap.Nonces {
+			innerMap[addr] = nonce
+		}
+		nonces[cciptypes.ChainSelector(chainSel)] = innerMap
+	}
+
+	return nonces
 }

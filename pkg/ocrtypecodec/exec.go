@@ -3,14 +3,12 @@ package ocrtypecodec
 import (
 	"encoding/json"
 	"math/big"
-	"time"
 
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/ocrtypecodecpb"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -61,108 +59,19 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 		return exectypes.Observation{}, err
 	}
 
-	// Decode CommitReports
-	commitReports := make(exectypes.CommitObservations, len(pbObs.CommitReports))
-	for chainSel, commitObs := range pbObs.CommitReports {
-		commitData := make([]exectypes.CommitData, len(commitObs.CommitData))
-		for i, commit := range commitObs.CommitData {
-			commitData[i] = exectypes.CommitData{
-				SourceChain:   cciptypes.ChainSelector(commit.SourceChain),
-				OnRampAddress: commit.OnRampAddress,
-				Timestamp:     time.Unix(int64(commit.Timestamp), 0),
-				BlockNum:      commit.BlockNum,
-				MerkleRoot:    cciptypes.Bytes32(commit.MerkleRoot),
-				SequenceNumberRange: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(commit.SequenceNumberRange.MinMsgNr),
-					cciptypes.SeqNum(commit.SequenceNumberRange.MaxMsgNr),
-				),
-				ExecutedMessages: decodeSeqNums(commit.ExecutedMessages),
-				Messages:         decodeMessages(commit.Messages),
-				Hashes:           decodeBytes32Slice(commit.Hashes),
-				CostlyMessages:   decodeBytes32Slice(commit.CostlyMessages),
-				MessageTokenData: decodeMessageTokenData(commit.MessageTokenData),
-			}
-		}
-		commitReports[cciptypes.ChainSelector(chainSel)] = commitData
-	}
-
-	// Decode Messages
-	messages := make(exectypes.MessageObservations, len(pbObs.SeqNumsToMessages))
-	for chainSel, msgMap := range pbObs.SeqNumsToMessages {
-		innerMap := make(map[cciptypes.SeqNum]cciptypes.Message, len(msgMap.Messages))
-		for seqNum, msg := range msgMap.Messages {
-			innerMap[cciptypes.SeqNum(seqNum)] = decodeMessage(msg)
-		}
-		messages[cciptypes.ChainSelector(chainSel)] = innerMap
-	}
-
-	// Decode Hashes
-	hashes := make(exectypes.MessageHashes, len(pbObs.MessageHashes))
-	for chainSel, hashMap := range pbObs.MessageHashes {
-		innerMap := make(map[cciptypes.SeqNum]cciptypes.Bytes32, len(hashMap.SeqNumToBytes))
-		for seqNum, hash := range hashMap.SeqNumToBytes {
-			innerMap[cciptypes.SeqNum(seqNum)] = cciptypes.Bytes32(hash)
-		}
-		hashes[cciptypes.ChainSelector(chainSel)] = innerMap
-	}
-
-	// Decode TokenDataObservations
-	tokenDataObservations := make(exectypes.TokenDataObservations, len(pbObs.TokenDataObservations.TokenData))
-	for chainSel, tokenMap := range pbObs.TokenDataObservations.TokenData {
-		innerMap := make(map[cciptypes.SeqNum]exectypes.MessageTokenData, len(tokenMap.TokenData))
-		for seqNum, tokenData := range tokenMap.TokenData {
-			innerMap[cciptypes.SeqNum(seqNum)] = decodeMessageTokenDataEntry(tokenData)
-		}
-		tokenDataObservations[cciptypes.ChainSelector(chainSel)] = innerMap
-	}
-
-	// Decode Costly Messages
-	costlyMessages := decodeBytes32Slice(pbObs.CostlyMessages)
-
-	// Decode Nonces
-	nonces := make(exectypes.NonceObservations, len(pbObs.Nonces))
-	for chainSel, nonceMap := range pbObs.Nonces {
-		innerMap := make(map[string]uint64, len(nonceMap.Nonces))
-		for addr, nonce := range nonceMap.Nonces {
-			innerMap[addr] = nonce
-		}
-		nonces[cciptypes.ChainSelector(chainSel)] = innerMap
-	}
-
-	// Decode Contracts (DiscoveryObservation)
-	contracts := discoverytypes.Observation{
-		FChain:    decodeFChain(pbObs.Contracts.FChain),
-		Addresses: decodeContractAddresses(pbObs.Contracts.ContractNames),
-	}
-
-	// Decode FChain
-	fChain := decodeFChain(pbObs.FChain)
-
 	return exectypes.Observation{
-		CommitReports:  commitReports,
-		Messages:       messages,
-		Hashes:         hashes,
-		TokenData:      tokenDataObservations,
-		CostlyMessages: costlyMessages,
-		Nonces:         nonces,
-		Contracts:      contracts,
-		FChain:         fChain,
+		CommitReports:  e.tr.commitReportsFromProto(pbObs.CommitReports),
+		Messages:       e.tr.messageObservationsFromProto(pbObs.SeqNumsToMessages),
+		Hashes:         e.tr.messageHashesFromProto(pbObs.MessageHashes),
+		TokenData:      e.tr.tokenDataObservationsFromProto(pbObs.TokenDataObservations.TokenData),
+		CostlyMessages: e.tr.bytes32SliceFromProto(pbObs.CostlyMessages),
+		Nonces:         e.tr.nonceObservationsFromProto(pbObs.Nonces),
+		Contracts: discoverytypes.Observation{
+			FChain:    e.tr.fChainFromProto(pbObs.Contracts.FChain),
+			Addresses: e.tr.discoveryAddressesFromProto(pbObs.Contracts.ContractNames.Addresses),
+		},
+		FChain: e.tr.fChainFromProto(pbObs.FChain),
 	}, nil
-}
-
-// Helper Functions
-
-func decodeContractAddresses(addresses *ocrtypecodecpb.ContractNameChainAddresses) reader.ContractAddresses {
-	result := make(reader.ContractAddresses, len(addresses.Addresses))
-
-	for name, chainMap := range addresses.Addresses {
-		chainAddrs := make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress, len(chainMap.ChainAddresses))
-		for chain, addr := range chainMap.ChainAddresses {
-			chainAddrs[cciptypes.ChainSelector(chain)] = addr
-		}
-		result[name] = chainAddrs
-	}
-	return result
 }
 
 func decodeMessageTokenData(data []*ocrtypecodecpb.MessageTokenData) []exectypes.MessageTokenData {
@@ -229,14 +138,6 @@ func decodeRampTokenAmounts(tokenAmounts []*ocrtypecodecpb.RampTokenAmount) []cc
 	return result
 }
 
-func decodeBytes32Slice(slice [][]byte) []cciptypes.Bytes32 {
-	result := make([]cciptypes.Bytes32, len(slice))
-	for i, val := range slice {
-		result[i] = cciptypes.Bytes32(val)
-	}
-	return result
-}
-
 func decodeMessageTokenDataEntry(data *ocrtypecodecpb.MessageTokenData) exectypes.MessageTokenData {
 	tokenData := make([]exectypes.TokenData, len(data.TokenData))
 	for i, td := range data.TokenData {
@@ -246,14 +147,6 @@ func decodeMessageTokenDataEntry(data *ocrtypecodecpb.MessageTokenData) exectype
 		}
 	}
 	return exectypes.MessageTokenData{TokenData: tokenData}
-}
-
-func decodeFChain(fChain map[uint64]int32) map[cciptypes.ChainSelector]int {
-	result := make(map[cciptypes.ChainSelector]int, len(fChain))
-	for k, v := range fChain {
-		result[cciptypes.ChainSelector(k)] = int(v)
-	}
-	return result
 }
 
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
