@@ -85,6 +85,7 @@ func (p *Plugin) Reports(
 	// OutcomeType == ReportGenerated is only true when roots are present, but
 	// reports can also only contain token price updates
 	repInfo.TokenPrices = rep.PriceUpdates.TokenPriceUpdates
+	repInfo.GasPrices = rep.PriceUpdates.GasPriceUpdates
 
 	if rep.IsEmpty() {
 		lggr.Infow("empty report", "report", rep)
