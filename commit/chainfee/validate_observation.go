@@ -19,7 +19,6 @@ func (p *processor) ValidateObservation(
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
 	obs := ao.Observation
-	zero := big.NewInt(0)
 
 	if obs.IsEmpty() {
 		return nil
@@ -45,7 +44,7 @@ func (p *processor) ValidateObservation(
 	}
 
 	for _, token := range obs.NativeTokenPrices {
-		if token.Int == nil || token.Int.Cmp(zero) <= 0 {
+		if token.Int == nil || token.Int.Cmp(big.NewInt(0)) <= 0 {
 			return fmt.Errorf("nil or non-positive %s", "execution fee")
 		}
 	}
