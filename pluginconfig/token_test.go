@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -13,7 +14,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func Test_TokenDataObserver_Unmarshall(t *testing.T) {
+func Test_TokenDataObserver_Unmarshal(t *testing.T) {
 	baseJSON := `{
 					  %s
 					  "batchGasLimit": 1,
@@ -166,13 +167,311 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 			e, err := DecodeExecuteOffchainConfig([]byte(finalJSON))
 
 			if tt.wantErr {
-				require.Error(t, err)
-				require.ErrorContains(t, err, tt.errMsg)
+				assert.Error(t, err)
+				assert.ErrorContains(t, err, tt.errMsg)
 			} else {
-				marshal, err := json.Marshal(e.TokenDataObservers)
-				fmt.Println(string(marshal))
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, e.TokenDataObservers)
+			}
+		})
+	}
+}
+
+func Test_TokenDataObserver_Marshal(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   []TokenDataObserverConfig
+		wantJSON string
+		wantErr  bool
+		errMsg   string
+	}{
+		{
+			name:     "valid empty config",
+			config:   []TokenDataObserverConfig{},
+			wantJSON: `[]`,
+		},
+		{
+			name: "invalid config with unknown token data observer type",
+			config: []TokenDataObserverConfig{
+				{
+					Type:    "usdc-but-different",
+					Version: "1.0",
+				},
+			},
+			wantErr: true,
+			errMsg:  "unknown token data observer type",
+		},
+		{
+			name: "empty usdc is set",
+			config: []TokenDataObserverConfig{
+				{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{},
+				},
+			},
+			wantJSON: `[
+							{
+							  "type": "usdc-cctp",
+							  "version": "1.0",
+							  "attestationAPI": "",
+							  "attestationAPIInterval": null,
+							  "attestationAPITimeout": null,
+							  "numWorkers": 0,
+							  "observeTimeout": null,
+							  "cacheCleanupInterval": null,
+							  "cacheExpirationInterval": null,
+							  "tokens": null
+							}
+				  	   ]`,
+			wantErr: false,
+		},
+		{
+			name: "valid config with USDCCCTPObserverConfig",
+			config: []TokenDataObserverConfig{
+				{
+					Type:    "usdc-cctp",
+					Version: "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						WorkerConfig: WorkerConfig{
+							NumWorkers:              10,
+							CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+							CacheCleanupInterval:    commonconfig.MustNewDuration(6 * time.Second),
+							ObserveTimeout:          commonconfig.MustNewDuration(7 * time.Second),
+						},
+						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
+							1: {
+								SourcePoolAddress:            "0xabc",
+								SourceMessageTransmitterAddr: "0xefg",
+							},
+						},
+					},
+				},
+			},
+			wantJSON: `[
+							{
+							  "type": "usdc-cctp",
+							  "version": "1.0",
+							  "tokens": {
+								"1": {
+								  "sourceTokenAddress": "0xabc",
+								  "sourceMessageTransmitterAddress": "0xefg"
+								}
+							  },
+							  "attestationAPI": "http://localhost:8080",
+							  "attestationAPITimeout": "1s",
+							  "attestationAPIInterval": "500ms",
+							  "numWorkers": 10,
+							  "cacheExpirationInterval": "5s",
+							  "cacheCleanupInterval": "6s",	
+							  "observeTimeout": "7s"		
+							}
+				  		]`,
+		},
+		{
+			name: "valid config with multiple tokens per USDCCCTPObserverConfig",
+			config: []TokenDataObserverConfig{
+				{
+					Type:    "usdc-cctp",
+					Version: "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
+							1: {
+								SourcePoolAddress:            "0xabc",
+								SourceMessageTransmitterAddr: "0xefg",
+							},
+							20: {
+								SourcePoolAddress:            "0x123",
+								SourceMessageTransmitterAddr: "0x456",
+							},
+						},
+					},
+				},
+			},
+			wantJSON: `[
+					   	{
+					   	  "type": "usdc-cctp",
+					   	  "version": "1.0",
+					   	  "tokens": {
+					   		"1": {
+					   		  "sourceTokenAddress": "0xabc",
+					   		  "sourceMessageTransmitterAddress": "0xefg"
+					   		},
+					   		"20": {
+					   		  "sourceTokenAddress": "0x123",
+					   		  "sourceMessageTransmitterAddress": "0x456"
+					   		}
+					   	  },
+					   	  "attestationAPI": "http://localhost:8080",
+					   	  "attestationAPITimeout": "1s",
+					   	  "attestationAPIInterval": "500ms",
+						  "numWorkers": 0,
+						  "observeTimeout": null,
+						  "cacheCleanupInterval": null,
+						  "cacheExpirationInterval": null
+					   	}
+				  	   ]`,
+		},
+		{
+			name: "valid config with LBTCObserverConfig",
+			config: []TokenDataObserverConfig{
+				{
+					Type:    "lbtc",
+					Version: "1.0",
+					LBTCObserverConfig: &LBTCObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						WorkerConfig: WorkerConfig{
+							NumWorkers:              10,
+							CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+							CacheCleanupInterval:    commonconfig.MustNewDuration(6 * time.Second),
+							ObserveTimeout:          commonconfig.MustNewDuration(7 * time.Second),
+						},
+						SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
+							1: "0xabc", 2: "0xdef",
+						},
+					},
+				},
+			},
+			wantJSON: `[
+							{
+							  "type": "lbtc",
+							  "version": "1.0",
+							  "sourcePoolAddressByChain": {
+								"1": "0xabc", "2": "0xdef"
+							  },
+							  "attestationAPI": "http://localhost:8080",
+							  "attestationAPITimeout": "1s",
+							  "attestationAPIInterval": "500ms",
+							  "attestationAPIBatchSize": 0,
+							  "numWorkers": 10,
+							  "cacheExpirationInterval": "5s",
+							  "cacheCleanupInterval": "6s",	
+							  "observeTimeout": "7s"		
+							}
+				  		]`,
+		},
+		{
+			name: "valid config with USDCCCTPObserverConfig and LBTCObserverConfig",
+			config: []TokenDataObserverConfig{
+				{
+					Type:    "usdc-cctp",
+					Version: "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						WorkerConfig: WorkerConfig{
+							NumWorkers:              10,
+							CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+							CacheCleanupInterval:    commonconfig.MustNewDuration(6 * time.Second),
+							ObserveTimeout:          commonconfig.MustNewDuration(7 * time.Second),
+						},
+						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
+							1: {
+								SourcePoolAddress:            "0xabc",
+								SourceMessageTransmitterAddr: "0xefg",
+							},
+							20: {
+								SourcePoolAddress:            "0x123",
+								SourceMessageTransmitterAddr: "0x456",
+							},
+						},
+					},
+				},
+				{
+					Type:    "lbtc",
+					Version: "1.0",
+					LBTCObserverConfig: &LBTCObserverConfig{
+						AttestationConfig: AttestationConfig{
+							AttestationAPI:         "http://localhost:8080",
+							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						},
+						WorkerConfig: WorkerConfig{
+							NumWorkers:              10,
+							CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+							CacheCleanupInterval:    commonconfig.MustNewDuration(6 * time.Second),
+							ObserveTimeout:          commonconfig.MustNewDuration(7 * time.Second),
+						},
+						SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
+							1: "0xabc", 2: "0xdef",
+						},
+					},
+				},
+			},
+			wantJSON: `[
+							{
+							  "type": "usdc-cctp",
+							  "version": "1.0",
+						      "tokens": {
+								"1": {
+						        	"sourceTokenAddress": "0xabc",
+						        	"sourceMessageTransmitterAddress": "0xefg"
+								},
+						        "20": {
+						        	"sourceTokenAddress": "0x123",
+						        	"sourceMessageTransmitterAddress": "0x456"
+						        }
+						      },
+							  "attestationAPI": "http://localhost:8080",
+							  "attestationAPITimeout": "1s",
+							  "attestationAPIInterval": "500ms",
+							  "numWorkers": 10,
+							  "cacheExpirationInterval": "5s",
+							  "cacheCleanupInterval": "6s",	
+							  "observeTimeout": "7s"		
+							},
+							{
+							  "type": "lbtc",
+							  "version": "1.0",
+							  "sourcePoolAddressByChain": {
+								"1": "0xabc", "2": "0xdef"
+							  },
+							  "attestationAPI": "http://localhost:8080",
+							  "attestationAPITimeout": "1s",
+							  "attestationAPIInterval": "500ms",
+							  "attestationAPIBatchSize": 0,
+							  "numWorkers": 10,
+							  "cacheExpirationInterval": "5s",
+							  "cacheCleanupInterval": "6s",	
+							  "observeTimeout": "7s"		
+							}
+				  		]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualJSON, err := json.Marshal(tt.config)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.ErrorContains(t, err, tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+				var expected []map[string]interface{}
+				err := json.Unmarshal([]byte(tt.wantJSON), &expected)
 				require.NoError(t, err)
-				require.Equal(t, tt.want, e.TokenDataObservers)
+				var actual []map[string]interface{}
+				err = json.Unmarshal(actualJSON, &actual)
+				require.NoError(t, err)
+				assert.Equal(t, actual, expected)
 			}
 		})
 	}
