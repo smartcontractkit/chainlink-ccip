@@ -18,7 +18,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-var ocrTypeCodec = ocrtypecodec.NewExecCodecJSON()
+var ocrTypeCodec = ocrtypecodec.NewExecCodecProto()
 
 func TestPlugin(t *testing.T) {
 	ctx := tests.Context(t)
@@ -192,13 +192,13 @@ func TestExceedSizeObservation(t *testing.T) {
 	// Only 1 pending report from previous round.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.CommitReports, 1)
+	require.Len(t, outcome.CommitReports, 2)
 	require.Len(t, outcome.CommitReports[0].Messages, maxMsgsPerReport)
 
 	// Round 3 - Filter
 	// An execute report with the messages executed until the max per report
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 1)
+	require.Len(t, outcome.Report.ChainReports, 2)
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.Len(t, sequenceNumbers, maxMsgsPerReport)
 }

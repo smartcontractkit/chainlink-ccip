@@ -628,7 +628,7 @@ func Test_combineReportsAndMessages(t *testing.T) {
 
 func Test_decodeAttributedObservations(t *testing.T) {
 	mustEncode := func(obs exectypes.Observation) []byte {
-		enc, err := jsonOcrTypeCodec.EncodeObservation(obs)
+		enc, err := ocrTypeCodec.EncodeObservation(obs)
 		if err != nil {
 			t.Fatal("Unable to encode")
 		}
@@ -663,7 +663,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							1: {{MerkleRoot: cciptypes.Bytes32{1}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
 						},
 					},
 				},
@@ -695,7 +695,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							1: {{MerkleRoot: cciptypes.Bytes32{1}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
 						},
 					},
 				},
@@ -703,7 +703,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(2),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							2: {{MerkleRoot: cciptypes.Bytes32{2}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
 						},
 					},
 				},
@@ -724,7 +724,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := decodeAttributedObservations(tt.args, jsonOcrTypeCodec)
+			got, err := decodeAttributedObservations(tt.args, ocrTypeCodec)
 			if !tt.wantErr(t, err, fmt.Sprintf("decodeAttributedObservations(%v)", tt.args)) {
 				return
 			}

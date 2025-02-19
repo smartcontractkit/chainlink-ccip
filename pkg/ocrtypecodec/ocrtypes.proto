@@ -164,7 +164,7 @@ message CommitObservations {
 message CommitData {
   uint64 source_chain = 1;
   bytes on_ramp_address = 2;
-  uint64 timestamp = 3;
+  google.protobuf.Timestamp timestamp = 3;
   uint64 block_num = 4;
   bytes merkle_root = 5;
   SeqNumRange sequence_number_range = 6;

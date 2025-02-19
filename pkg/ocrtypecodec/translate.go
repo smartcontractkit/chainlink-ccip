@@ -2,7 +2,6 @@ package ocrtypecodec
 
 import (
 	"math/big"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
@@ -264,7 +263,11 @@ func (t *protoTranslator) rmnRemoteConfigFromProto(
 }
 
 func (t *protoTranslator) fChainToProto(fChain map[cciptypes.ChainSelector]int) map[uint64]int32 {
-	pbFChain := make(map[uint64]int32, len(fChain))
+	var pbFChain map[uint64]int32
+	if len(fChain) > 0 {
+		pbFChain = make(map[uint64]int32, len(fChain))
+	}
+
 	for k, v := range fChain {
 		pbFChain[uint64(k)] = int32(v)
 	}
@@ -272,7 +275,11 @@ func (t *protoTranslator) fChainToProto(fChain map[cciptypes.ChainSelector]int) 
 }
 
 func (t *protoTranslator) fChainFromProto(pbFChain map[uint64]int32) map[cciptypes.ChainSelector]int {
-	fChain := make(map[cciptypes.ChainSelector]int, len(pbFChain))
+	var fChain map[cciptypes.ChainSelector]int
+	if len(pbFChain) > 0 {
+		fChain = make(map[cciptypes.ChainSelector]int, len(pbFChain))
+	}
+
 	for k, v := range pbFChain {
 		fChain[cciptypes.ChainSelector(k)] = int(v)
 	}
@@ -414,11 +421,18 @@ func (t *protoTranslator) chainFeeUpdatesFromProto(
 func (t *protoTranslator) discoveryAddressesToProto(
 	addrs reader.ContractAddresses,
 ) map[string]*ocrtypecodecpb.ChainAddressMap {
-	pbAddrs := make(map[string]*ocrtypecodecpb.ChainAddressMap, len(addrs))
+	var pbAddrs map[string]*ocrtypecodecpb.ChainAddressMap
+	if len(addrs) > 0 {
+		pbAddrs = make(map[string]*ocrtypecodecpb.ChainAddressMap, len(addrs))
+	}
 
 	for contractName, chains := range addrs {
+		var chainAddrs map[uint64][]byte
+		if len(chains) > 0 {
+			chainAddrs = make(map[uint64][]byte, len(chains))
+		}
 		pbAddrs[contractName] = &ocrtypecodecpb.ChainAddressMap{
-			ChainAddresses: make(map[uint64][]byte, len(chains)),
+			ChainAddresses: chainAddrs,
 		}
 
 		for chain, addr := range chains {
@@ -432,13 +446,18 @@ func (t *protoTranslator) discoveryAddressesToProto(
 func (t *protoTranslator) discoveryAddressesFromProto(
 	pbAddrs map[string]*ocrtypecodecpb.ChainAddressMap,
 ) reader.ContractAddresses {
-	discoveryAddrs := make(reader.ContractAddresses, len(pbAddrs))
+	var discoveryAddrs reader.ContractAddresses
+	if len(pbAddrs) > 0 {
+		discoveryAddrs = make(reader.ContractAddresses, len(pbAddrs))
+	}
+
 	for contractName, chainMap := range pbAddrs {
 		discoveryAddrs[contractName] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress)
 		for chain, addr := range chainMap.ChainAddresses {
 			discoveryAddrs[contractName][cciptypes.ChainSelector(chain)] = addr
 		}
 	}
+
 	return discoveryAddrs
 }
 
@@ -530,7 +549,7 @@ func (t *protoTranslator) commitDataSliceToProto(commits []exectypes.CommitData)
 		commitData[i] = &ocrtypecodecpb.CommitData{
 			SourceChain:   uint64(commit.SourceChain),
 			OnRampAddress: commit.OnRampAddress,
-			Timestamp:     uint64(commit.Timestamp.Unix()),
+			Timestamp:     timestamppb.New(commit.Timestamp),
 			BlockNum:      commit.BlockNum,
 			MerkleRoot:    commit.MerkleRoot[:],
 			SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{
@@ -570,7 +589,7 @@ func (t *protoTranslator) commitDataSliceFromProto(pbCommits []*ocrtypecodecpb.C
 		commitData[i] = exectypes.CommitData{
 			SourceChain:   cciptypes.ChainSelector(commit.SourceChain),
 			OnRampAddress: commit.OnRampAddress,
-			Timestamp:     time.Unix(int64(commit.Timestamp), 0),
+			Timestamp:     commit.Timestamp.AsTime(),
 			BlockNum:      commit.BlockNum,
 			MerkleRoot:    cciptypes.Bytes32(commit.MerkleRoot),
 			SequenceNumberRange: cciptypes.NewSeqNumRange(
@@ -909,7 +928,11 @@ func (t *protoTranslator) chainReportsFromProto(
 }
 
 func decodeMessageTokenData(data []*ocrtypecodecpb.MessageTokenData) []exectypes.MessageTokenData {
-	result := make([]exectypes.MessageTokenData, len(data))
+	var result []exectypes.MessageTokenData
+	if len(data) > 0 {
+		result = make([]exectypes.MessageTokenData, len(data))
+	}
+
 	for i, item := range data {
 		result[i] = decodeMessageTokenDataEntry(item)
 	}
@@ -917,7 +940,11 @@ func decodeMessageTokenData(data []*ocrtypecodecpb.MessageTokenData) []exectypes
 }
 
 func decodeSeqNums(seqNums []uint64) []cciptypes.SeqNum {
-	result := make([]cciptypes.SeqNum, len(seqNums))
+	var result []cciptypes.SeqNum
+	if len(seqNums) > 0 {
+		result = make([]cciptypes.SeqNum, len(seqNums))
+	}
+
 	for i, num := range seqNums {
 		result[i] = cciptypes.SeqNum(num)
 	}
@@ -925,7 +952,11 @@ func decodeSeqNums(seqNums []uint64) []cciptypes.SeqNum {
 }
 
 func decodeMessages(messages []*ocrtypecodecpb.Message) []cciptypes.Message {
-	result := make([]cciptypes.Message, len(messages))
+	var result []cciptypes.Message
+	if len(messages) > 0 {
+		result = make([]cciptypes.Message, len(messages))
+	}
+
 	for i, msg := range messages {
 		result[i] = decodeMessage(msg)
 	}

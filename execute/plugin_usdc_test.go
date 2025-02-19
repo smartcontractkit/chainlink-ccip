@@ -30,7 +30,7 @@ func runRoundAndGetOutcome(ctx context.Context, ocrTypeCodec ocrtypecodec.ExecCo
 }
 
 func Test_USDC_Transfer(t *testing.T) {
-	ocrTypeCodec := ocrtypecodec.NewExecCodecJSON()
+	ocrTypeCodec := ocrtypecodec.NewExecCodecProto()
 	ctx := tests.Context(t)
 	randomEthAddress := string(rand.RandomAddress())
 

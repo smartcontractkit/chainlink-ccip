@@ -531,7 +531,7 @@ func genCommitData(n int) []*ocrtypecodecpb.CommitData {
 		commits[i] = &ocrtypecodecpb.CommitData{
 			SourceChain:         rand.Uint64(),
 			OnRampAddress:       randomBytes(20),
-			Timestamp:           uint64(time.Now().Unix()),
+			Timestamp:           timestamppb.Now(),
 			BlockNum:            rand.Uint64(),
 			MerkleRoot:          randomBytes(32),
 			SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{MinMsgNr: rand.Uint64(), MaxMsgNr: rand.Uint64() + 100},
@@ -705,7 +705,7 @@ func genExecOutcome(
 		commitData := &ocrtypecodecpb.CommitData{
 			SourceChain:   rand.Uint64(),
 			OnRampAddress: randomBytes(32),
-			Timestamp:     uint64(time.Now().Unix()),
+			Timestamp:     timestamppb.Now(),
 			BlockNum:      rand.Uint64(),
 			MerkleRoot:    randomBytes(32),
 			SequenceNumberRange: &ocrtypecodecpb.SeqNumRange{
