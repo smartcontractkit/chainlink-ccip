@@ -1,6 +1,11 @@
 package metrics
 
-import "github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+import (
+	"time"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+)
 
 // Reporter is a simple interface used for tracking observations and outcomes of the execution plugin.
 // Default implementation is based on the Prometheus metrics, but it can be extended to support other metrics systems.
@@ -10,6 +15,7 @@ import "github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 type Reporter interface {
 	TrackObservation(obs exectypes.Observation, state exectypes.PluginState)
 	TrackOutcome(outcome exectypes.Outcome, state exectypes.PluginState)
+	TrackLatency(state exectypes.PluginState, method plugincommon.MethodType, latency time.Duration, err error)
 }
 
 type Noop struct{}
@@ -17,6 +23,8 @@ type Noop struct{}
 func (n *Noop) TrackObservation(exectypes.Observation, exectypes.PluginState) {}
 
 func (n *Noop) TrackOutcome(exectypes.Outcome, exectypes.PluginState) {}
+
+func (n *Noop) TrackLatency(exectypes.PluginState, plugincommon.MethodType, time.Duration, error) {}
 
 var _ Reporter = &Noop{}
 var _ Reporter = &PromReporter{}
