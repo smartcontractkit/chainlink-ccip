@@ -67,7 +67,7 @@ func validateChainFeeUpdates(
 		if update.ChainFee.DataAvFeePriceUSD == nil || update.ChainFee.DataAvFeePriceUSD.Cmp(big.NewInt(0)) < 0 {
 			return fmt.Errorf("nil or negative %s", "data availability fee price")
 		}
-		if update.Timestamp.IsZero() {
+		if update.Timestamp.IsZero() || update.Timestamp.After(time.Now().UTC()) {
 			return fmt.Errorf("zero timestamp")
 		}
 	}
