@@ -37,7 +37,8 @@ type Observation struct {
 }
 
 func (obs Observation) IsEmpty() bool {
-	return len(obs.FeedTokenPrices) == 0 && len(obs.FeeQuoterTokenUpdates) == 0 && len(obs.FChain) == 0
+	return len(obs.FeedTokenPrices) == 0 && len(obs.FeeQuoterTokenUpdates) == 0 &&
+		len(obs.FChain) == 0 && obs.Timestamp.IsZero()
 }
 
 func (obs Observation) Stats() map[string]int {
