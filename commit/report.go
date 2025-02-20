@@ -24,8 +24,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-var errEmptyReport = errors.New("empty report")
-
 // buildOneReport is the common logic for building a report. Different report building
 // algorithms can reassemble reports by selecting which blessed and unblessed merkle
 // roots to include in the report, and which price updates and rmn signatures to use.
@@ -41,7 +39,7 @@ func buildOneReport(
 	rmnSignatures []cciptypes.RMNECDSASignature,
 	rmnRemoteFSign uint64,
 	priceUpdates cciptypes.PriceUpdates,
-) (ocr3types.ReportPlus[[]byte], error) {
+) (*ocr3types.ReportPlus[[]byte], error) {
 	var (
 		rep     cciptypes.CommitPluginReport
 		repInfo cciptypes.CommitReportInfo
@@ -73,22 +71,22 @@ func buildOneReport(
 
 	if rep.IsEmpty() {
 		lggr.Infow("empty report", "report", rep)
-		return ocr3types.ReportPlus[[]byte]{}, errEmptyReport
+		return nil, nil
 	}
 
 	encodedReport, err := reportCodec.Encode(ctx, rep)
 	if err != nil {
-		return ocr3types.ReportPlus[[]byte]{}, fmt.Errorf("encode commit plugin report: %w", err)
+		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
 
 	encodedInfo, err := repInfo.Encode()
 	if err != nil {
-		return ocr3types.ReportPlus[[]byte]{}, fmt.Errorf("encode commit plugin report info: %w", err)
+		return nil, fmt.Errorf("encode commit plugin report info: %w", err)
 	}
 
 	lggr.Infow("commit plugin generated reports", "report", rep, "reportInfo", repInfo)
 
-	return ocr3types.ReportPlus[[]byte]{
+	return &ocr3types.ReportPlus[[]byte]{
 		ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
 			Report: encodedReport,
 			Info:   encodedInfo,
@@ -133,13 +131,13 @@ func buildStandardReport(
 		outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
 		priceUpdates,
 	)
-	if errors.Is(err, errEmptyReport) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
-	return []ocr3types.ReportPlus[[]byte]{report}, nil
+	if report != nil {
+		return []ocr3types.ReportPlus[[]byte]{*report}, nil
+	}
+	return nil, nil
 }
 
 // buildMultipleReports builds many reports of with at most maxMerkleRootsPerReport roots.
@@ -170,8 +168,8 @@ func buildMultipleReports(
 			unblessedMerkleRoots = append(unblessedMerkleRoots, r)
 		}
 
-		// Build a report when we have the desired number of merkle roots.
 		if numRoots == maxMerkleRootsPerReport {
+			// build it.
 			report, err := buildOneReport(
 				ctx,
 				lggr,
@@ -184,13 +182,11 @@ func buildMultipleReports(
 				0,   // no RMN for partial reports.
 				priceUpdates,
 			)
-			isEmpty := errors.Is(err, errEmptyReport)
-			if err != nil && !isEmpty {
+			if err != nil {
 				return nil, err
 			}
-			// don't add empty reports.
-			if !isEmpty {
-				reports = append(reports, report)
+			if report != nil {
+				reports = append(reports, *report)
 			}
 
 			// reset accumulators for next report.
@@ -218,13 +214,11 @@ func buildMultipleReports(
 			0,   // no RMN for partial reports.
 			priceUpdates,
 		)
-		isEmpty := errors.Is(err, errEmptyReport)
-		if err != nil && !isEmpty {
+		if err != nil {
 			return nil, err
 		}
-		// don't add empty reports.
-		if !isEmpty {
-			reports = append(reports, report)
+		if report != nil {
+			reports = append(reports, *report)
 		}
 	}
 
