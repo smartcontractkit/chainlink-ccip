@@ -15,6 +15,9 @@ endif
 PROTOC_URL := https://github.com/protocolbuffers/protobuf/releases/download/v28.0/$(PROTOC_ZIP)
 PROTOC_BIN ?= /usr/local/bin/protoc
 
+BUF_BIN := $(shell go env GOPATH)/bin/buf
+COMPARE_AGAINST_BRANCH := main
+
 build: ensure_go_version
 	go build -v ./...
 
@@ -28,8 +31,14 @@ generate-mocks: ensure_go_version
 
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
 # make generate-protobuf PROTOC_BIN=/path/to/protoc
-generate-protobuf: ensure_go_version ensure_protoc_28_0
+proto-generate: ensure_go_version ensure_protoc_28_0
 	$(PROTOC_BIN) --go_out=./pkg/ocrtypecodec/ocrtypecodecpb ./pkg/ocrtypecodec/ocrtypes.proto
+
+proto-lint: ensure_go_version ensure_buf_version
+	$(BUF_BIN) lint
+
+proto-check-breaking: ensure_go_version ensure_buf_version
+	$(BUF_BIN) breaking --against '.git#branch=$(COMPARE_AGAINST_BRANCH)'
 
 clean-generate: ensure_go_version
 	rm -rf ./mocks/
@@ -68,3 +77,9 @@ ensure_golangcilint_1_62_2:
 
 ensure_protoc_28_0:
 	@$(PROTOC_BIN) --version | grep -q 'libprotoc 28.0' || (echo "Please use protoc 28.0, (make install-protoc)" && exit 1)
+
+install_buf:
+	go install github.com/bufbuild/buf/cmd/buf@v1.50.0
+
+ensure_buf_version:
+	@$(BUF_BIN) --version | grep -q '1.50.0' || (echo "Please use buf 1.50.0" && exit 1)
