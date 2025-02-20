@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -13,10 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -25,15 +24,21 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// buildOneReport is the common logic for building a report.
+// buildOneReport is the common logic for building a report. Different report building
+// algorithms can reassemble reports by selecting which blessed and unblessed merkle
+// roots to include in the report, and which price updates and rmn signatures to use.
 func buildOneReport(
 	ctx context.Context,
 	lggr logger.Logger,
 	reportCodec cciptypes.CommitPluginCodec,
 	transmissionSchedule *ocr3types.TransmissionSchedule,
-	outcome committypes.Outcome,
+	//outcome committypes.Outcome,
+	outcomeType merkleroot.OutcomeType,
 	blessedMerkleRoots []cciptypes.MerkleRootChain,
 	unblessedMerkleRoots []cciptypes.MerkleRootChain,
+	rmnSignatures []cciptypes.RMNECDSASignature,
+	rmnRemoteFSign uint64,
+	priceUpdates cciptypes.PriceUpdates,
 ) (ocr3types.ReportPlus[[]byte], error) {
 	var (
 		rep     cciptypes.CommitPluginReport
@@ -44,24 +49,21 @@ func buildOneReport(
 	rep = cciptypes.CommitPluginReport{
 		BlessedMerkleRoots:   blessedMerkleRoots,
 		UnblessedMerkleRoots: unblessedMerkleRoots,
-		PriceUpdates: cciptypes.PriceUpdates{
-			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
-			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
-		},
-		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
+		PriceUpdates:         priceUpdates,
+		RMNSignatures:        rmnSignatures,
 	}
 
-	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportEmpty {
+	if outcomeType == merkleroot.ReportEmpty {
 		rep.BlessedMerkleRoots = []cciptypes.MerkleRootChain{}
 		rep.UnblessedMerkleRoots = []cciptypes.MerkleRootChain{}
 		rep.RMNSignatures = []cciptypes.RMNECDSASignature{}
 	}
 
-	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
+	if outcomeType == merkleroot.ReportGenerated {
 		allRoots := append(blessedMerkleRoots, unblessedMerkleRoots...)
 		sort.Slice(allRoots, func(i, j int) bool { return allRoots[i].ChainSel < allRoots[j].ChainSel })
 		repInfo = cciptypes.CommitReportInfo{
-			RemoteF:     outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
+			RemoteF:     rmnRemoteFSign,
 			MerkleRoots: allRoots,
 			TokenPrices: rep.PriceUpdates.TokenPriceUpdates,
 		}
@@ -112,7 +114,23 @@ func buildStandardReport(
 		}
 	}
 
-	report, err := buildOneReport(ctx, lggr, reportCodec, transmission, outcome, blessedMerkleRoots, unblessedMerkleRoots)
+	priceUpdates := cciptypes.PriceUpdates{
+		TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
+		GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
+	}
+
+	report, err := buildOneReport(
+		ctx,
+		lggr,
+		reportCodec,
+		transmission,
+		outcome.MerkleRootOutcome.OutcomeType,
+		blessedMerkleRoots,
+		unblessedMerkleRoots,
+		outcome.MerkleRootOutcome.RMNReportSignatures,
+		outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
+		priceUpdates,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +151,12 @@ func buildMultipleReports(
 	numRoots := uint64(0)
 	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
 	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
+
+	priceUpdates := cciptypes.PriceUpdates{
+		TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
+		GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
+	}
+
 	for _, r := range outcome.MerkleRootOutcome.RootsToReport {
 
 		if outcome.MerkleRootOutcome.RMNEnabledChains[r.ChainSel] {
@@ -143,7 +167,18 @@ func buildMultipleReports(
 
 		if numRoots == maxMerkleRootsPerReport {
 			// build it.
-			report, err := buildOneReport(ctx, lggr, reportCodec, transmissionSchedule, outcome, blessedMerkleRoots, unblessedMerkleRoots)
+			report, err := buildOneReport(
+				ctx,
+				lggr,
+				reportCodec,
+				transmissionSchedule,
+				outcome.MerkleRootOutcome.OutcomeType,
+				blessedMerkleRoots,
+				unblessedMerkleRoots,
+				nil, // no RMN for partial reports.
+				0,   // no RMN for partial reports.
+				priceUpdates,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -155,15 +190,25 @@ func buildMultipleReports(
 			unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0)
 
 			// price updates are only included in the first report.
-			outcome.TokenPriceOutcome = tokenprice.Outcome{}
-			outcome.ChainFeeOutcome = chainfee.Outcome{}
+			priceUpdates = cciptypes.PriceUpdates{}
 		}
 	}
 
 	// check for final partial report.
 	if numRoots > 0 {
 		// build it.
-		report, err := buildOneReport(ctx, lggr, reportCodec, transmissionSchedule, outcome, blessedMerkleRoots, unblessedMerkleRoots)
+		report, err := buildOneReport(
+			ctx,
+			lggr,
+			reportCodec,
+			transmissionSchedule,
+			outcome.MerkleRootOutcome.OutcomeType,
+			blessedMerkleRoots,
+			unblessedMerkleRoots,
+			nil, // no RMN for partial reports.
+			0,   // no RMN for partial reports.
+			priceUpdates,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -231,12 +276,20 @@ func (p *Plugin) Reports(
 		}
 	}
 
+	// TODO: Is there a validate config function somewhere?
+	// Check for config errors before building a standard report.
+	var errs []error
 	if p.offchainCfg.MultipleReports {
-		lggr.Warnw("maxMerkleRootsPerReport is set but RMN is enabled, ignoring the setting")
+		errs = append(errs, fmt.Errorf("bad configuration: MultipleReports is set with RMN enabled"))
 	}
 	if maxRoots != 0 {
-		lggr.Warnw("maxMerkleRootsPerReport is set but RMN is enabled, ignoring the setting")
+		errs = append(errs, fmt.Errorf("bad configuration: MaxMerkleRootsPerReport is set with RMN enabled"))
 	}
+	if len(errs) > 0 {
+		lggr.Errorw("bad configuration", "errors", errs)
+		return nil, errors.Join(errs...)
+	}
+
 	return buildStandardReport(ctx, lggr, p.reportCodec, transmissionSchedule, outcome)
 }
 
