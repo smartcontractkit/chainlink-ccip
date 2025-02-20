@@ -1,0 +1,78 @@
+use anchor_lang::prelude::*;
+
+use crate::{program::RmnRemote, Config, RmnRemoteError};
+
+/// Static space allocated to any account: must always be added to space calculations.
+pub const ANCHOR_DISCRIMINATOR: usize = 8;
+
+// valid_version validates that the passed in version is not 0 (uninitialized)
+// and it is within the expected maximum supported version bounds
+pub fn valid_version(v: u8, max_v: u8) -> bool {
+    !uninitialized(v) && v <= max_v
+}
+pub fn uninitialized(v: u8) -> bool {
+    v == 0
+}
+
+/// Maximum acceptable config version accepted by this module: any accounts with higher
+/// version numbers than this will be rejected.
+pub const MAX_CONFIG_V: u8 = 1;
+const MAX_CHAINSTATE_V: u8 = 1;
+
+pub mod seed {
+    pub const CONFIG: &[u8] = b"config";
+}
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(
+        init,
+        seeds = [seed::CONFIG],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, RmnRemote>,
+
+    // Initialization only allowed by program upgrade authority
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ RmnRemoteError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateConfig<'info> {
+    #[account(
+        mut,
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    // validate signer is registered admin
+    #[account(address = config.owner @ RmnRemoteError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptOwnership<'info> {
+    #[account(
+        mut,
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    // validate signer is the new admin, accepting ownership of the contract
+    #[account(address = config.proposed_owner @ RmnRemoteError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
