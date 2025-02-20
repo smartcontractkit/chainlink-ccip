@@ -65,9 +65,10 @@ func buildOneReport(
 		repInfo = cciptypes.CommitReportInfo{
 			RemoteF:     rmnRemoteFSign,
 			MerkleRoots: allRoots,
-			TokenPrices: rep.PriceUpdates.TokenPriceUpdates,
 		}
 	}
+	// in case of a price-only update, add prices regardless of outcome type.
+	repInfo.PriceUpdates = rep.PriceUpdates
 
 	if rep.IsEmpty() {
 		lggr.Infow("empty report", "report", rep)
