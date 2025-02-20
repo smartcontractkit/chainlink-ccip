@@ -419,46 +419,46 @@ func (t *protoTranslator) chainFeeUpdatesFromProto(
 }
 
 func (t *protoTranslator) discoveryAddressesToProto(
-	addrs reader.ContractAddresses,
+	addresses reader.ContractAddresses,
 ) map[string]*ocrtypecodecpb.ChainAddressMap {
-	var pbAddrs map[string]*ocrtypecodecpb.ChainAddressMap
-	if len(addrs) > 0 {
-		pbAddrs = make(map[string]*ocrtypecodecpb.ChainAddressMap, len(addrs))
+	var pbAddresses map[string]*ocrtypecodecpb.ChainAddressMap
+	if len(addresses) > 0 {
+		pbAddresses = make(map[string]*ocrtypecodecpb.ChainAddressMap, len(addresses))
 	}
 
-	for contractName, chains := range addrs {
-		var chainAddrs map[uint64][]byte
+	for contractName, chains := range addresses {
+		var chainAddresses map[uint64][]byte
 		if len(chains) > 0 {
-			chainAddrs = make(map[uint64][]byte, len(chains))
+			chainAddresses = make(map[uint64][]byte, len(chains))
 		}
-		pbAddrs[contractName] = &ocrtypecodecpb.ChainAddressMap{
-			ChainAddresses: chainAddrs,
+		pbAddresses[contractName] = &ocrtypecodecpb.ChainAddressMap{
+			ChainAddresses: chainAddresses,
 		}
 
 		for chain, addr := range chains {
-			pbAddrs[contractName].ChainAddresses[uint64(chain)] = addr
+			pbAddresses[contractName].ChainAddresses[uint64(chain)] = addr
 		}
 	}
 
-	return pbAddrs
+	return pbAddresses
 }
 
 func (t *protoTranslator) discoveryAddressesFromProto(
-	pbAddrs map[string]*ocrtypecodecpb.ChainAddressMap,
+	pbAddresses map[string]*ocrtypecodecpb.ChainAddressMap,
 ) reader.ContractAddresses {
-	var discoveryAddrs reader.ContractAddresses
-	if len(pbAddrs) > 0 {
-		discoveryAddrs = make(reader.ContractAddresses, len(pbAddrs))
+	var discoveryAddresses reader.ContractAddresses
+	if len(pbAddresses) > 0 {
+		discoveryAddresses = make(reader.ContractAddresses, len(pbAddresses))
 	}
 
-	for contractName, chainMap := range pbAddrs {
-		discoveryAddrs[contractName] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress)
+	for contractName, chainMap := range pbAddresses {
+		discoveryAddresses[contractName] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress)
 		for chain, addr := range chainMap.ChainAddresses {
-			discoveryAddrs[contractName][cciptypes.ChainSelector(chain)] = addr
+			discoveryAddresses[contractName][cciptypes.ChainSelector(chain)] = addr
 		}
 	}
 
-	return discoveryAddrs
+	return discoveryAddresses
 }
 
 func (t *protoTranslator) chainRangeToProto(chainRange []plugintypes.ChainRange) []*ocrtypecodecpb.ChainRange {
@@ -596,11 +596,11 @@ func (t *protoTranslator) commitDataSliceFromProto(pbCommits []*ocrtypecodecpb.C
 				cciptypes.SeqNum(commit.SequenceNumberRange.MinMsgNr),
 				cciptypes.SeqNum(commit.SequenceNumberRange.MaxMsgNr),
 			),
-			ExecutedMessages: decodeSeqNums(commit.ExecutedMessages),
-			Messages:         decodeMessages(commit.Messages),
+			ExecutedMessages: t.decodeSeqNums(commit.ExecutedMessages),
+			Messages:         t.decodeMessages(commit.Messages),
 			Hashes:           t.bytes32SliceFromProto(commit.Hashes),
 			CostlyMessages:   t.bytes32SliceFromProto(commit.CostlyMessages),
-			MessageTokenData: decodeMessageTokenData(commit.MessageTokenData),
+			MessageTokenData: t.decodeMessageTokenData(commit.MessageTokenData),
 		}
 	}
 
@@ -758,7 +758,7 @@ func (t *protoTranslator) messageObservationsFromProto(
 	for chainSel, msgMap := range pbMsgs {
 		innerMap := make(map[cciptypes.SeqNum]cciptypes.Message, len(msgMap.Messages))
 		for seqNum, msg := range msgMap.Messages {
-			innerMap[cciptypes.SeqNum(seqNum)] = decodeMessage(msg)
+			innerMap[cciptypes.SeqNum(seqNum)] = t.decodeMessage(msg)
 		}
 		messages[cciptypes.ChainSelector(chainSel)] = innerMap
 	}
@@ -836,7 +836,7 @@ func (t *protoTranslator) tokenDataObservationsFromProto(
 	for chainSel, tokenMap := range pbObservations {
 		innerMap := make(map[cciptypes.SeqNum]exectypes.MessageTokenData, len(tokenMap.TokenData))
 		for seqNum, tokenData := range tokenMap.TokenData {
-			innerMap[cciptypes.SeqNum(seqNum)] = decodeMessageTokenDataEntry(tokenData)
+			innerMap[cciptypes.SeqNum(seqNum)] = t.decodeMessageTokenDataEntry(tokenData)
 		}
 		tokenDataObservations[cciptypes.ChainSelector(chainSel)] = innerMap
 	}
@@ -917,7 +917,7 @@ func (t *protoTranslator) chainReportsFromProto(
 
 		reports[i] = cciptypes.ExecutePluginReportSingleChain{
 			SourceChainSelector: cciptypes.ChainSelector(r.SourceChainSelector),
-			Messages:            decodeMessages(r.Messages),
+			Messages:            t.decodeMessages(r.Messages),
 			OffchainTokenData:   offchainTokenData,
 			Proofs:              t.bytes32SliceFromProto(r.Proofs),
 			ProofFlagBits:       cciptypes.NewBigInt(big.NewInt(0).SetBytes(r.ProofFlagBits)),
@@ -927,19 +927,19 @@ func (t *protoTranslator) chainReportsFromProto(
 	return reports
 }
 
-func decodeMessageTokenData(data []*ocrtypecodecpb.MessageTokenData) []exectypes.MessageTokenData {
+func (t *protoTranslator) decodeMessageTokenData(data []*ocrtypecodecpb.MessageTokenData) []exectypes.MessageTokenData {
 	var result []exectypes.MessageTokenData
 	if len(data) > 0 {
 		result = make([]exectypes.MessageTokenData, len(data))
 	}
 
 	for i, item := range data {
-		result[i] = decodeMessageTokenDataEntry(item)
+		result[i] = t.decodeMessageTokenDataEntry(item)
 	}
 	return result
 }
 
-func decodeSeqNums(seqNums []uint64) []cciptypes.SeqNum {
+func (t *protoTranslator) decodeSeqNums(seqNums []uint64) []cciptypes.SeqNum {
 	var result []cciptypes.SeqNum
 	if len(seqNums) > 0 {
 		result = make([]cciptypes.SeqNum, len(seqNums))
@@ -951,21 +951,21 @@ func decodeSeqNums(seqNums []uint64) []cciptypes.SeqNum {
 	return result
 }
 
-func decodeMessages(messages []*ocrtypecodecpb.Message) []cciptypes.Message {
+func (t *protoTranslator) decodeMessages(messages []*ocrtypecodecpb.Message) []cciptypes.Message {
 	var result []cciptypes.Message
 	if len(messages) > 0 {
 		result = make([]cciptypes.Message, len(messages))
 	}
 
 	for i, msg := range messages {
-		result[i] = decodeMessage(msg)
+		result[i] = t.decodeMessage(msg)
 	}
 	return result
 }
 
-func decodeMessage(msg *ocrtypecodecpb.Message) cciptypes.Message {
+func (t *protoTranslator) decodeMessage(msg *ocrtypecodecpb.Message) cciptypes.Message {
 	return cciptypes.Message{
-		Header:         decodeMessageHeader(msg.Header),
+		Header:         t.decodeMessageHeader(msg.Header),
 		Sender:         msg.Sender,
 		Data:           msg.Data,
 		Receiver:       msg.Receiver,
@@ -973,11 +973,11 @@ func decodeMessage(msg *ocrtypecodecpb.Message) cciptypes.Message {
 		FeeToken:       msg.FeeToken,
 		FeeTokenAmount: cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeTokenAmount)),
 		FeeValueJuels:  cciptypes.NewBigInt(big.NewInt(0).SetBytes(msg.FeeValueJuels)),
-		TokenAmounts:   decodeRampTokenAmounts(msg.TokenAmounts),
+		TokenAmounts:   t.decodeRampTokenAmounts(msg.TokenAmounts),
 	}
 }
 
-func decodeMessageHeader(header *ocrtypecodecpb.RampMessageHeader) cciptypes.RampMessageHeader {
+func (t *protoTranslator) decodeMessageHeader(header *ocrtypecodecpb.RampMessageHeader) cciptypes.RampMessageHeader {
 	return cciptypes.RampMessageHeader{
 		MessageID:           cciptypes.Bytes32(header.MessageId),
 		SourceChainSelector: cciptypes.ChainSelector(header.SourceChainSelector),
@@ -989,7 +989,9 @@ func decodeMessageHeader(header *ocrtypecodecpb.RampMessageHeader) cciptypes.Ram
 	}
 }
 
-func decodeRampTokenAmounts(tokenAmounts []*ocrtypecodecpb.RampTokenAmount) []cciptypes.RampTokenAmount {
+func (t *protoTranslator) decodeRampTokenAmounts(
+	tokenAmounts []*ocrtypecodecpb.RampTokenAmount,
+) []cciptypes.RampTokenAmount {
 	result := make([]cciptypes.RampTokenAmount, len(tokenAmounts))
 	for i, token := range tokenAmounts {
 		result[i] = cciptypes.RampTokenAmount{
@@ -1003,7 +1005,9 @@ func decodeRampTokenAmounts(tokenAmounts []*ocrtypecodecpb.RampTokenAmount) []cc
 	return result
 }
 
-func decodeMessageTokenDataEntry(data *ocrtypecodecpb.MessageTokenData) exectypes.MessageTokenData {
+func (t *protoTranslator) decodeMessageTokenDataEntry(
+	data *ocrtypecodecpb.MessageTokenData,
+) exectypes.MessageTokenData {
 	tokenData := make([]exectypes.TokenData, len(data.TokenData))
 	for i, td := range data.TokenData {
 		tokenData[i] = exectypes.TokenData{

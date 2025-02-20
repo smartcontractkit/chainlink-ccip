@@ -49,7 +49,7 @@ const (
 
 	// maxObservationLength is set to the maximum size of an observation
 	// check factory_test for the calculation
-	maxObservationLength = 650_311
+	maxObservationLength = 650_307
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
