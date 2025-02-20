@@ -26,8 +26,8 @@ message CommitOutcome {
 
 message ExecObservation {
   map<uint64, CommitObservations> commit_reports = 1;
-  map<uint64, SeqNumToMessage> seqNumsToMessages = 2;
-  map<uint64, SeqNumToBytes> messageHashes = 3;
+  map<uint64, SeqNumToMessage> seq_nums_to_msgs = 2;
+  map<uint64, SeqNumToBytes> msg_hashes = 3;
   TokenDataObservations token_data_observations = 4;
   repeated bytes costly_messages = 5;
   map<uint64, StringAddrToNonce> nonces = 6;
@@ -189,7 +189,7 @@ message SeqNumToMessage {
 }
 
 message SeqNumToBytes {
-  map<uint64, bytes> seqNumToBytes = 1;
+  map<uint64, bytes> seq_num_to_bytes = 1;
 }
 
 message TokenDataObservations {

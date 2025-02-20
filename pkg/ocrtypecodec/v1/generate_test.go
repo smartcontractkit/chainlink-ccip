@@ -490,8 +490,8 @@ func genExecObservation(
 ) *ocrtypecodecpb.ExecObservation {
 	return &ocrtypecodecpb.ExecObservation{
 		CommitReports:         genCommitReports(numCommitReports),
-		SeqNumsToMessages:     genMessages(numMessagesPerChain),
-		MessageHashes:         genMessageHashes(numMessagesPerChain),
+		SeqNumsToMsgs:         genMessages(numMessagesPerChain),
+		MsgHashes:             genMessageHashes(numMessagesPerChain),
 		TokenDataObservations: genTokenDataObservations(numTokenDataPerChain),
 		CostlyMessages:        genBytes32Slice(numCostlyMessages),
 		Nonces:                genNonces(numNoncesPerChain),

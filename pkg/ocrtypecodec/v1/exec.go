@@ -33,9 +33,9 @@ func NewExecCodecProto() *ExecCodecProto {
 
 func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([]byte, error) {
 	pbObs := &ocrtypecodecpb.ExecObservation{
-		CommitReports:     e.tr.commitReportsToProto(observation.CommitReports),
-		SeqNumsToMessages: e.tr.messageObservationsToProto(observation.Messages),
-		MessageHashes:     e.tr.messageHashesToProto(observation.Hashes),
+		CommitReports: e.tr.commitReportsToProto(observation.CommitReports),
+		SeqNumsToMsgs: e.tr.messageObservationsToProto(observation.Messages),
+		MsgHashes:     e.tr.messageHashesToProto(observation.Hashes),
 		TokenDataObservations: &ocrtypecodecpb.TokenDataObservations{
 			TokenData: e.tr.tokenDataObservationsToProto(observation.TokenData),
 		},
@@ -65,8 +65,8 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 
 	return exectypes.Observation{
 		CommitReports:  e.tr.commitReportsFromProto(pbObs.CommitReports),
-		Messages:       e.tr.messageObservationsFromProto(pbObs.SeqNumsToMessages),
-		Hashes:         e.tr.messageHashesFromProto(pbObs.MessageHashes),
+		Messages:       e.tr.messageObservationsFromProto(pbObs.SeqNumsToMsgs),
+		Hashes:         e.tr.messageHashesFromProto(pbObs.MsgHashes),
 		TokenData:      e.tr.tokenDataObservationsFromProto(pbObs.TokenDataObservations.TokenData),
 		CostlyMessages: e.tr.bytes32SliceFromProto(pbObs.CostlyMessages),
 		Nonces:         e.tr.nonceObservationsFromProto(pbObs.Nonces),
