@@ -30,6 +30,11 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.62.2
       - name: Run linter
         run: make lint
+      - name: Run protobuf linter and backwards compatibility checker
+        run: |
+          make install_buf
+          make proto-lint
+          make proto-check-breaking COMPARE_AGAINST_BRANCH=${{ github.base_ref }}
       - name: Run tests
         run: TEST_COUNT=20 COVERAGE_FILE=coverage.out make test
       - name: Generate coverage report
