@@ -127,6 +127,8 @@ type resultData struct {
 	protoEncodingDataLength int
 }
 
+// ----------------
+
 // genQuery generates a Protobuf Query object with the specified number of signatures and lane updates.
 func genQuery(numSigs int, numLaneUpdates int) *ocrtypecodecpb.CommitQuery {
 	// Generate ECDSA Signatures

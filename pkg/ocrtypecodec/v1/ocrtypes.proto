@@ -200,7 +200,6 @@ message SeqNumToTokenData {
   map<uint64, MessageTokenData> token_data = 1;
 }
 
-
 message Message {
   RampMessageHeader header = 1;
   bytes sender = 2;
@@ -234,7 +233,6 @@ message RampTokenAmount {
 message StringAddrToNonce {
   map<string, uint64> nonces = 1;
 }
-
 
 message ExecutePluginReport {
   repeated ChainReport chain_reports = 1;

@@ -23,14 +23,14 @@ build: ensure_go_version
 
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
 # make generate PROTOC_BIN=/path/to/protoc
-generate: ensure_go_version clean-generate generate-protobuf generate-mocks
+generate: ensure_go_version clean-generate proto-generate generate-mocks
 
 generate-mocks: ensure_go_version
 	go install github.com/vektra/mockery/v2@v2.43.2
 	mockery
 
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
-# make generate-protobuf PROTOC_BIN=/path/to/protoc
+# make proto-generate PROTOC_BIN=/path/to/protoc
 proto-generate: ensure_go_version ensure_protoc_28_0
 	$(PROTOC_BIN) --go_out=./pkg/ocrtypecodec/v1/ocrtypecodecpb ./pkg/ocrtypecodec/v1/ocrtypes.proto
 
