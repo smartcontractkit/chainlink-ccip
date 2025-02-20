@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{program::RmnRemote, Config, RmnRemoteError};
+use crate::{program::RmnRemote, Config, Curses, RmnRemoteError, Subject};
 
 /// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -21,6 +21,7 @@ const MAX_CHAINSTATE_V: u8 = 1;
 
 pub mod seed {
     pub const CONFIG: &[u8] = b"config";
+    pub const CURSES: &[u8] = b"curses";
 }
 
 #[derive(Accounts)]
@@ -33,6 +34,15 @@ pub struct Initialize<'info> {
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
     )]
     pub config: Account<'info, Config>,
+
+    #[account(
+        init,
+        seeds = [seed::CURSES],
+        bump,
+        payer = authority,
+        space = ANCHOR_DISCRIMINATOR + Curses::INIT_SPACE,
+    )]
+    pub curses: Account<'info, Curses>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -75,4 +85,63 @@ pub struct AcceptOwnership<'info> {
     // validate signer is the new admin, accepting ownership of the contract
     #[account(address = config.proposed_owner @ RmnRemoteError::Unauthorized)]
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CurseSubject<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut, address = config.proposed_owner @ RmnRemoteError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [seed::CURSES],
+        bump,
+        realloc = ANCHOR_DISCRIMINATOR + curses.dynamic_len() + Subject::INIT_SPACE,
+        realloc::payer = authority,
+        realloc::zero = false,
+    )]
+    pub curses: Account<'info, Curses>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UncurseSubject<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut, address = config.proposed_owner @ RmnRemoteError::Unauthorized)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [seed::CURSES],
+        bump,
+        realloc = (ANCHOR_DISCRIMINATOR + curses.dynamic_len()).saturating_sub(Subject::INIT_SPACE),
+        realloc::payer = authority,
+        realloc::zero = false,
+    )]
+    pub curses: Account<'info, Curses>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct VerifyCurse<'info> {
+    #[account(
+        seeds = [seed::CURSES],
+        bump,
+    )]
+    pub curses: Account<'info, Curses>,
 }
