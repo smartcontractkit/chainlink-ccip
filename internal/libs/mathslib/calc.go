@@ -5,12 +5,6 @@ import (
 	"math/big"
 )
 
-const (
-	// CurveBasedDeviationPPB is the deviation threshold when writing to Ethereum's PriceRegistry and is the trigger for
-	// using curve-based deviation logic.
-	CurveBasedDeviationPPB = 4e9
-)
-
 // Deviates checks if x1 and x2 deviates based on the provided ppb (parts per billion)
 // ppb is calculated based on the smaller value of the two
 // e.g, if x1 > x2, deviation_parts_per_billion = ((x1 - x2) / x2) * 1e9
@@ -40,13 +34,7 @@ func CalculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *bi
 // DeviatesOnCurve calculates a deviation threshold on the fly using xNew. For now it's only used for gas price
 // deviation calculation. It's important to make sure the order of xNew and xOld is correct when passed into this
 // function to get an accurate deviation threshold.
-func DeviatesOnCurve(xNew, xOld, noDeviationLowerBound *big.Int, ppb int64) bool {
-	// This is a temporary gating mechanism that ensures we only apply the gas curve deviation logic to eth-bound price
-	// updates. If ppb from config is not equal to 4000000000, do not apply the gas curve.
-	if ppb != CurveBasedDeviationPPB {
-		return Deviates(xOld, xNew, ppb)
-	}
-
+func DeviatesOnCurve(xNew, xOld, noDeviationLowerBound *big.Int) bool {
 	// If xNew < noDeviationLowerBound, Deviates should never be true
 	if xNew.Cmp(noDeviationLowerBound) < 0 {
 		return false

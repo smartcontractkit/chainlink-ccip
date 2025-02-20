@@ -135,7 +135,6 @@ func TestDeviatesOnCurve(t *testing.T) {
 		xNew  *big.Int
 		xOld  *big.Int
 		noDev *big.Int
-		ppb   int64
 	}
 	tests := []struct {
 		name string
@@ -144,37 +143,32 @@ func TestDeviatesOnCurve(t *testing.T) {
 	}{
 		{
 			name: "base case deviates from increase",
-			args: args{xNew: big.NewInt(4e14), xOld: big.NewInt(1e13), noDev: big.NewInt(3e13), ppb: CurveBasedDeviationPPB},
+			args: args{xNew: big.NewInt(4e14), xOld: big.NewInt(1e13), noDev: big.NewInt(3e13)},
 			want: true,
 		},
 		{
 			name: "base case deviates from decrease",
-			args: args{xNew: big.NewInt(1e13), xOld: big.NewInt(4e15), noDev: big.NewInt(1), ppb: CurveBasedDeviationPPB},
+			args: args{xNew: big.NewInt(1e13), xOld: big.NewInt(4e15), noDev: big.NewInt(1)},
 			want: true,
 		},
 		{
 			name: "does not deviate when equal",
-			args: args{xNew: big.NewInt(3e14), xOld: big.NewInt(3e14), noDev: big.NewInt(3e13), ppb: CurveBasedDeviationPPB},
+			args: args{xNew: big.NewInt(3e14), xOld: big.NewInt(3e14), noDev: big.NewInt(3e13)},
 			want: false,
 		},
 		{
 			name: "does not deviate with small difference when xNew is bigger",
-			args: args{xNew: big.NewInt(3e14 + 1), xOld: big.NewInt(3e14), noDev: big.NewInt(3e13), ppb: CurveBasedDeviationPPB},
+			args: args{xNew: big.NewInt(3e14 + 1), xOld: big.NewInt(3e14), noDev: big.NewInt(3e13)},
 			want: false,
 		},
 		{
 			name: "does not deviate with small difference when xOld is bigger",
-			args: args{xNew: big.NewInt(3e14), xOld: big.NewInt(3e14 + 1), noDev: big.NewInt(3e13), ppb: CurveBasedDeviationPPB},
+			args: args{xNew: big.NewInt(3e14), xOld: big.NewInt(3e14 + 1), noDev: big.NewInt(3e13)},
 			want: false,
 		},
 		{
-			name: "deviates when ppb is not equal to CurveBasedDeviationPPB",
-			args: args{xNew: big.NewInt(1e9), xOld: big.NewInt(2e9), noDev: big.NewInt(1), ppb: 1},
-			want: true,
-		},
-		{
 			name: "does not deviate when xNew is below noDeviationLowerBound",
-			args: args{xNew: big.NewInt(2e13), xOld: big.NewInt(1e13), noDev: big.NewInt(3e13), ppb: CurveBasedDeviationPPB},
+			args: args{xNew: big.NewInt(2e13), xOld: big.NewInt(1e13), noDev: big.NewInt(3e13)},
 			want: false,
 		},
 		// thresholdPPB = (10e11) / (xNew^0.665) * 1e7
@@ -186,7 +180,6 @@ func TestDeviatesOnCurve(t *testing.T) {
 				xNew:  big.NewInt(3e13),
 				xOld:  big.NewInt(2.519478222838e12),
 				noDev: big.NewInt(1),
-				ppb:   CurveBasedDeviationPPB,
 			},
 			want: false,
 		},
@@ -196,7 +189,6 @@ func TestDeviatesOnCurve(t *testing.T) {
 				xNew:  big.NewInt(3e13),
 				xOld:  big.NewInt(2.519478222838e12 - 30),
 				noDev: big.NewInt(1),
-				ppb:   CurveBasedDeviationPPB,
 			},
 			want: true,
 		},
@@ -206,8 +198,8 @@ func TestDeviatesOnCurve(t *testing.T) {
 			assert.Equalf(
 				t,
 				tt.want,
-				DeviatesOnCurve(tt.args.xNew, tt.args.xOld, tt.args.noDev, tt.args.ppb),
-				"DeviatesOnCurve(%v, %v, %v, %v)", tt.args.xNew, tt.args.xOld, tt.args.noDev, tt.args.ppb)
+				DeviatesOnCurve(tt.args.xNew, tt.args.xOld, tt.args.noDev),
+				"DeviatesOnCurve(%v, %v, %v)", tt.args.xNew, tt.args.xOld, tt.args.noDev)
 		})
 	}
 }
