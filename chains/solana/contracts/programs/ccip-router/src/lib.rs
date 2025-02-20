@@ -14,7 +14,7 @@ mod event;
 use crate::event::*;
 
 mod messages;
-use crate::messages::*;
+pub use crate::messages::*;
 
 mod instructions;
 use crate::instructions::router;

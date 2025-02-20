@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 use program::PingPongDemo;
 
+use ccip_router::cpi;
+use example_ccip_receiver::Any2SVMMessage;
+
 declare_id!("PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU");
 
 const ANCHOR_DISCRIMINATOR: usize = 8; // nr of bytes for the anchor discriminator.
@@ -9,12 +12,9 @@ use crate::context::*;
 
 #[program]
 pub mod ping_pong_demo {
-    use anchor_spl::{
-        token,
-        token_2022::{spl_token_2022::instruction::approve_checked, Approve},
-        token_interface,
-    };
-    use solana_program::program::invoke_signed;
+    use anchor_spl::token_interface;
+
+    use crate::helpers::BigEndianU256;
 
     use super::*;
 
@@ -47,43 +47,18 @@ pub mod ping_pong_demo {
             version: "1.5.0".to_string(), // TODO confirm if we keep EVM version here
         });
 
-        // TODO approve the router to transfer max of the fee token
-        {
-            let approve_ctx: CpiContext<'_, '_, '_, 'info, Approve<'info>> = CpiContext::new(
-                ctx.accounts.fee_token_program.to_account_info(),
-                token_interface::Approve {
-                    to: todo!(),
-                    delegate: todo!(),
-                    authority: todo!(),
-                },
-            );
-            token_interface::approve(approve_ctx, 1000)?;
-            // let mut ix = approve_checked(
-            //     &ctx.accounts.fee_token_program.key(),
-            //     &ctx.accounts.fee_token_ata.key(),
-            //     &ctx.accounts.fee_token_mint.key(),
-            //     &ctx.accounts.router_fee_billing_signer.key(),
-            //     &ctx.accounts.ccip_send_signer.key(),
-            //     &[&ctx.accounts.ccip_send_signer.key()],
-            //     u64::MAX,
-            //     ctx.accounts.fee_token_mint.decimals,
-            // )?;
-            // invoke_signed(
-            //     &ix,
-            //     &[
-            //         ctx.accounts.fee_token_ata.to_account_info(),
-            //         // self_ata.clone(),
-            //         ctx.accounts.fee_token_mint.to_account_info(),
-            //         // token_mint.clone(),
-            //         ctx.accounts.,
-            //         to_signer.clone(),
-            //         self_signer.clone(),
-            //     ],
-            //     &[seeds],
-            // )?;
-        }
-
-        helpers::approve_router_debits()
+        let seeds = &[seeds::CCIP_SEND_SIGNER, &[ctx.bumps.ccip_send_signer]];
+        let signer_seeds = &[&seeds[..]];
+        let approve_ctx = CpiContext::new_with_signer(
+            ctx.accounts.fee_token_program.to_account_info(),
+            token_interface::Approve {
+                to: ctx.accounts.fee_token_ata.to_account_info(), // ATA from which transfers are approved
+                delegate: ctx.accounts.router_fee_billing_signer.to_account_info(), // delegate who can transfer
+                authority: ctx.accounts.ccip_send_signer.to_account_info(), // owner of the ATA
+            },
+            signer_seeds,
+        );
+        token_interface::approve(approve_ctx, u64::MAX)
     }
 
     ////////////////////////////
@@ -113,28 +88,178 @@ pub mod ping_pong_demo {
         Ok(())
     }
 
-    pub fn start_ping_pong(ctx: Context<UpdateConfig>) -> Result<()> {
-        ctx.accounts.config.is_paused = false;
-        helpers::respond(1)
+    pub fn start_ping_pong<'info>(ctx: Context<Start>) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.is_paused = false;
+        let accounts = cpi::accounts::CcipSend {
+            config: ctx.accounts.ccip_router_config.to_account_info(),
+            dest_chain_state: ctx.accounts.ccip_router_dest_chain_state.to_account_info(),
+            nonce: ctx.accounts.ccip_router_nonce.to_account_info(),
+            authority: ctx.accounts.ccip_send_signer.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+            fee_token_mint: ctx.accounts.fee_token_mint.to_account_info(),
+            fee_token_user_associated_account: ctx.accounts.fee_token_ata.to_account_info(),
+            fee_token_receiver: ctx.accounts.ccip_router_fee_receiver.to_account_info(),
+            fee_billing_signer: ctx
+                .accounts
+                .ccip_router_fee_billing_signer
+                .to_account_info(),
+            fee_quoter: ctx.accounts.fee_quoter.to_account_info(),
+            fee_quoter_config: ctx.accounts.fee_quoter_config.to_account_info(),
+            fee_quoter_dest_chain: ctx.accounts.fee_quoter_dest_chain.to_account_info(),
+            fee_quoter_billing_token_config: ctx
+                .accounts
+                .fee_quoter_billing_token_config
+                .to_account_info(),
+            fee_quoter_link_token_config: ctx
+                .accounts
+                .fee_quoter_link_token_config
+                .to_account_info(),
+            token_pools_signer: ctx.accounts.token_pools_signer.to_account_info(),
+            fee_token_program: ctx.accounts.fee_token_program.to_account_info(),
+        };
+        helpers::respond(
+            *ctx.accounts.config,
+            ctx.accounts.ccip_router_program.to_account_info(),
+            accounts,
+            BigEndianU256::from(1),
+            ctx.bumps.ccip_send_signer,
+        )
     }
 
     ///////////////////////////
     // Only callable by CCIP //
     ///////////////////////////
+    pub fn ccip_receive(ctx: Context<PingPong>, message: Any2SVMMessage) -> Result<()> {
+        if ctx.accounts.config.is_paused {
+            return Ok(()); // stop ping-ponging as it is paused, but do not fail
+        }
+        let next_count = BigEndianU256::try_from(message.data)?.incr();
+        let accounts = cpi::accounts::CcipSend {
+            config: ctx.accounts.ccip_router_config.to_account_info(),
+            dest_chain_state: ctx.accounts.ccip_router_dest_chain_state.to_account_info(),
+            nonce: ctx.accounts.ccip_router_nonce.to_account_info(),
+            authority: ctx.accounts.ccip_send_signer.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+            fee_token_mint: ctx.accounts.fee_token_mint.to_account_info(),
+            fee_token_user_associated_account: ctx.accounts.fee_token_ata.to_account_info(),
+            fee_token_receiver: ctx.accounts.ccip_router_fee_receiver.to_account_info(),
+            fee_billing_signer: ctx
+                .accounts
+                .ccip_router_fee_billing_signer
+                .to_account_info(),
+            fee_quoter: ctx.accounts.fee_quoter.to_account_info(),
+            fee_quoter_config: ctx.accounts.fee_quoter_config.to_account_info(),
+            fee_quoter_dest_chain: ctx.accounts.fee_quoter_dest_chain.to_account_info(),
+            fee_quoter_billing_token_config: ctx
+                .accounts
+                .fee_quoter_billing_token_config
+                .to_account_info(),
+            fee_quoter_link_token_config: ctx
+                .accounts
+                .fee_quoter_link_token_config
+                .to_account_info(),
+            token_pools_signer: ctx.accounts.token_pools_signer.to_account_info(),
+            fee_token_program: ctx.accounts.fee_token_program.to_account_info(),
+        };
+        helpers::respond(
+            *ctx.accounts.config,
+            ctx.accounts.ccip_router_program.to_account_info(),
+            accounts,
+            next_count,
+            ctx.bumps.ccip_send_signer,
+        )
+    }
 }
 
 mod helpers {
+
     use super::*;
 
     // TODO EVM uses u256
-    pub fn respond(ping_pong_count: u128) -> Result<()> {
-        // TODO implement
+    pub fn respond<'info>(
+        config: state::Config,
+        router_program: AccountInfo<'info>,
+        accounts: cpi::accounts::CcipSend<'info>,
+        ping_pong_count: BigEndianU256,
+        signer_bump: u8,
+    ) -> Result<()> {
+        let data_bytes: [u8; 32] = ping_pong_count.into();
+        let message = ccip_router::SVM2AnyMessage {
+            receiver: config.counterpart_address.to_vec(), // TODO trim address here
+            data: data_bytes.to_vec(),
+            token_amounts: vec![], // no token transfer
+            fee_token: config.fee_token_mint,
+            extra_args: vec![], // no extra args
+        };
+
+        let seeds = &[seeds::CCIP_SEND_SIGNER, &[signer_bump]];
+        let signer_seeds = &[&seeds[..]];
+
+        let cpi_ctx = CpiContext::new_with_signer(router_program, accounts, signer_seeds);
+        cpi::ccip_send(cpi_ctx, config.counterpart_chain_selector, message, vec![])?;
+
         Ok(())
     }
 
-    pub fn approve_router_debits() -> Result<()> {
-        // TODO implement
-        Ok(())
+    // The ping-pong count value is transmitted as an abi-encoded u256.
+    // This means that it's an unsigned integer, 32 bytes long, big-endian encoded.
+    pub struct BigEndianU256 {
+        high: u128,
+        low: u128,
+    }
+
+    impl BigEndianU256 {
+        pub fn incr(&self) -> Self {
+            if self.low == u128::MAX {
+                BigEndianU256 {
+                    high: self.high + 1,
+                    low: 0,
+                }
+            } else {
+                BigEndianU256 {
+                    high: self.high,
+                    low: self.low + 1,
+                }
+            }
+        }
+    }
+
+    impl TryFrom<Vec<u8>> for BigEndianU256 {
+        type Error = anchor_lang::error::Error;
+
+        fn try_from(value: Vec<u8>) -> std::result::Result<Self, Self::Error> {
+            require_eq!(value.len(), 32, PingPongDemoError::InvalidMessageDataLength);
+            let bytes: [u8; 32] = value.try_into().unwrap();
+            Ok(BigEndianU256::from(bytes))
+        }
+    }
+
+    impl From<u128> for BigEndianU256 {
+        fn from(value: u128) -> Self {
+            BigEndianU256 {
+                high: 0,
+                low: value,
+            }
+        }
+    }
+
+    impl From<[u8; 32]> for BigEndianU256 {
+        fn from(value: [u8; 32]) -> Self {
+            BigEndianU256 {
+                high: u128::from_be_bytes(value[..16].try_into().unwrap()),
+                low: u128::from_be_bytes(value[16..].try_into().unwrap()),
+            }
+        }
+    }
+
+    impl From<BigEndianU256> for [u8; 32] {
+        fn from(value: BigEndianU256) -> Self {
+            let mut bytes = [0u8; 32];
+            bytes[..16].copy_from_slice(&value.high.to_be_bytes());
+            bytes[16..].copy_from_slice(&value.low.to_be_bytes());
+            bytes
+        }
     }
 }
 
@@ -146,7 +271,7 @@ pub mod context {
 
     use crate::state::*;
 
-    mod seeds {
+    pub mod seeds {
         pub const CONFIG: &[u8] = b"config";
         pub const NAME_VERSION: &[u8] = b"name_version";
         pub const CCIP_SEND_SIGNER: &[u8] = b"ccip_send_signer";
@@ -154,6 +279,8 @@ pub mod context {
 
     mod ccip_seeds {
         pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
+        pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
+        pub const ALLOWED_OFFRAMP: &[u8] = b"allowed_offramp";
     }
 
     #[derive(Accounts)]
@@ -182,15 +309,9 @@ pub mod context {
             bump,
             seeds::program = router,
         )]
+        /// CHECK
         pub router_fee_billing_signer: UncheckedAccount<'info>,
 
-        // #[account(
-        //     mut,
-        //     associated_token::authority = router_fee_billing_signer.key(),
-        //     associated_token::mint = fee_token_mint.key(),
-        //     associated_token::token_program = fee_token_program.key(),
-        // )]
-        // pub ccip_fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
         pub fee_token_program: Interface<'info, TokenInterface>,
 
         pub fee_token_mint: InterfaceAccount<'info, Mint>,
@@ -208,6 +329,7 @@ pub mod context {
             seeds = [seeds::CCIP_SEND_SIGNER],
             bump,
         )]
+        /// CHECK
         pub ccip_send_signer: UncheckedAccount<'info>,
 
         #[account(mut)]
@@ -240,13 +362,168 @@ pub mod context {
         )]
         pub authority: Signer<'info>,
     }
+
+    #[derive(Accounts)]
+    pub struct Start<'info> {
+        #[account(
+            mut,
+            seeds = [seeds::CONFIG],
+            bump,
+        )]
+        pub config: Account<'info, Config>,
+
+        #[account(
+            mut,
+            address = config.owner @ PingPongDemoError::Unauthorized,
+        )]
+        pub authority: Signer<'info>,
+
+        #[account(
+            seeds = [seeds::CCIP_SEND_SIGNER],
+            bump,
+        )]
+        /// CHECK
+        pub ccip_send_signer: UncheckedAccount<'info>,
+
+        pub fee_token_program: Interface<'info, TokenInterface>,
+
+        pub fee_token_mint: InterfaceAccount<'info, Mint>,
+
+        #[account(
+            mut,
+            associated_token::mint = fee_token_mint,
+            associated_token::authority = ccip_send_signer,
+            associated_token::token_program = fee_token_program,
+        )]
+        pub fee_token_ata: InterfaceAccount<'info, TokenAccount>,
+
+        #[account(
+            address = config.router,
+        )]
+        /// CHECK
+        pub ccip_router_program: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_dest_chain_state: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_nonce: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_fee_receiver: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_fee_billing_signer: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter_dest_chain: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter_billing_token_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter_link_token_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub token_pools_signer: UncheckedAccount<'info>,
+
+        pub system_program: Program<'info, System>,
+    }
+
+    #[derive(Accounts)]
+    #[instruction(message: Any2SVMMessage)]
+    pub struct PingPong<'info> {
+        // Offramp CPI signer PDA must be first
+        // It is not mutable, and thus cannot be used as payer of init/realloc of other PDAs.
+        #[account(
+            seeds = [ccip_seeds::EXTERNAL_EXECUTION_CONFIG],
+            bump,
+            seeds::program = offramp_program.key(),
+        )]
+        pub authority: Signer<'info>,
+
+        /// CHECK offramp program: exists only to derive the allowed offramp PDA
+        /// and the authority PDA. Must be second.
+        pub offramp_program: UncheckedAccount<'info>,
+
+        // PDA to verify that calling offramp is valid. Must be third. It is left up to the implementer to decide
+        // how they want to persist the router address to verify that this is the correct account (e.g. in the top level of
+        // a global config/state account for the receiver, which is what this example does, or hard-coded,
+        // or stored in any other way in any other account).
+        /// CHECK PDA of the router program verifying the signer is an allowed offramp.
+        /// If PDA does not exist, the router doesn't allow this offramp
+        #[account(
+        owner = config.router, // this guarantees that it was initialized
+        seeds = [
+            ccip_seeds::ALLOWED_OFFRAMP,
+            message.source_chain_selector.to_le_bytes().as_ref(),
+            offramp_program.key().as_ref()
+        ],
+        bump,
+        seeds::program = config.router,
+    )]
+        pub allowed_offramp: UncheckedAccount<'info>,
+
+        #[account(
+            seeds = [seeds::CONFIG],
+            bump,
+        )]
+        pub config: Account<'info, Config>,
+
+        #[account(
+            seeds = [seeds::CCIP_SEND_SIGNER],
+            bump,
+        )]
+        /// CHECK
+        pub ccip_send_signer: UncheckedAccount<'info>,
+
+        pub fee_token_program: Interface<'info, TokenInterface>,
+
+        pub fee_token_mint: InterfaceAccount<'info, Mint>,
+
+        #[account(
+            mut,
+            associated_token::mint = fee_token_mint,
+            associated_token::authority = ccip_send_signer,
+            associated_token::token_program = fee_token_program,
+        )]
+        pub fee_token_ata: InterfaceAccount<'info, TokenAccount>,
+
+        #[account(
+            address = config.router,
+        )]
+        /// CHECK
+        pub ccip_router_program: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_dest_chain_state: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_nonce: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_fee_receiver: UncheckedAccount<'info>,
+        /// CHECK
+        pub ccip_router_fee_billing_signer: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter_dest_chain: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter_billing_token_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub fee_quoter_link_token_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub token_pools_signer: UncheckedAccount<'info>,
+
+        pub system_program: Program<'info, System>,
+    }
 }
 
 pub mod state {
     use super::*;
 
     #[account]
-    #[derive(InitSpace)]
+    #[derive(InitSpace, Copy)]
     pub struct Config {
         pub owner: Pubkey, // The owner of the contract.
 
@@ -276,4 +553,6 @@ pub mod state {
 pub enum PingPongDemoError {
     #[msg("Unauthorized")]
     Unauthorized,
+    #[msg("Invalid message data length")]
+    InvalidMessageDataLength,
 }

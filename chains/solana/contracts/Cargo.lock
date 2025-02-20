@@ -1521,6 +1521,8 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "ccip_router",
+ "example_ccip_receiver",
  "solana-program",
 ]
 
