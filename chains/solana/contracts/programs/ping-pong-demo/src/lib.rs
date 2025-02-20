@@ -89,8 +89,8 @@ pub mod ping_pong_demo {
     }
 
     pub fn start_ping_pong<'info>(ctx: Context<Start>) -> Result<()> {
-        let config = &mut ctx.accounts.config;
-        config.is_paused = false;
+        ctx.accounts.config.is_paused = false;
+
         let accounts = cpi::accounts::CcipSend {
             config: ctx.accounts.ccip_router_config.to_account_info(),
             dest_chain_state: ctx.accounts.ccip_router_dest_chain_state.to_account_info(),
@@ -118,11 +118,12 @@ pub mod ping_pong_demo {
             token_pools_signer: ctx.accounts.token_pools_signer.to_account_info(),
             fee_token_program: ctx.accounts.fee_token_program.to_account_info(),
         };
+
         helpers::respond(
             *ctx.accounts.config,
             ctx.accounts.ccip_router_program.to_account_info(),
             accounts,
-            BigEndianU256::from(1),
+            BigEndianU256::from(1), // start ping-ponging from the beginning
             ctx.bumps.ccip_send_signer,
         )
     }
@@ -134,7 +135,9 @@ pub mod ping_pong_demo {
         if ctx.accounts.config.is_paused {
             return Ok(()); // stop ping-ponging as it is paused, but do not fail
         }
+
         let next_count = BigEndianU256::try_from(message.data)?.incr();
+
         let accounts = cpi::accounts::CcipSend {
             config: ctx.accounts.ccip_router_config.to_account_info(),
             dest_chain_state: ctx.accounts.ccip_router_dest_chain_state.to_account_info(),
@@ -162,6 +165,7 @@ pub mod ping_pong_demo {
             token_pools_signer: ctx.accounts.token_pools_signer.to_account_info(),
             fee_token_program: ctx.accounts.fee_token_program.to_account_info(),
         };
+
         helpers::respond(
             *ctx.accounts.config,
             ctx.accounts.ccip_router_program.to_account_info(),
@@ -173,10 +177,8 @@ pub mod ping_pong_demo {
 }
 
 mod helpers {
-
     use super::*;
 
-    // TODO EVM uses u256
     pub fn respond<'info>(
         config: state::Config,
         router_program: AccountInfo<'info>,
@@ -212,6 +214,11 @@ mod helpers {
     impl BigEndianU256 {
         pub fn incr(&self) -> Self {
             if self.low == u128::MAX {
+                if self.high == u128::MAX {
+                    // Overflow, just wrap around.
+                    // u256 is so big though that this should never happen.
+                    return BigEndianU256 { high: 0, low: 0 };
+                }
                 BigEndianU256 {
                     high: self.high + 1,
                     low: 0,
@@ -225,6 +232,15 @@ mod helpers {
         }
     }
 
+    impl From<u128> for BigEndianU256 {
+        fn from(value: u128) -> Self {
+            BigEndianU256 {
+                high: 0,
+                low: value,
+            }
+        }
+    }
+
     impl TryFrom<Vec<u8>> for BigEndianU256 {
         type Error = anchor_lang::error::Error;
 
@@ -232,15 +248,6 @@ mod helpers {
             require_eq!(value.len(), 32, PingPongDemoError::InvalidMessageDataLength);
             let bytes: [u8; 32] = value.try_into().unwrap();
             Ok(BigEndianU256::from(bytes))
-        }
-    }
-
-    impl From<u128> for BigEndianU256 {
-        fn from(value: u128) -> Self {
-            BigEndianU256 {
-                high: 0,
-                low: value,
-            }
         }
     }
 
