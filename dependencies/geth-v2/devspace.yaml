@@ -33,14 +33,15 @@ vars:
     default: 2
 
 pipelines:
-  kind:
+  maybe-kind:
     run: |-
-      ensure_pull_secrets --all
-      run_pipelines deploy
+      if [ "$PROVIDER" == "kind" ]; then
+        ensure_pull_secrets --all
+      fi
   deploy:
     run: |-
+      run_pipelines maybe-kind
       create_deployments --all
-
 hooks:
   - wait:
       running: true

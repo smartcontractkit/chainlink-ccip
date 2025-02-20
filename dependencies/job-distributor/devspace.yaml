@@ -116,6 +116,7 @@ profiles:
               noderpc:
                 annotations:
                   external-dns.alpha.kubernetes.io/hostname: ${DEVSPACE_NAMESPACE}-job-distributor-node-rpc.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                  external-dns.alpha.kubernetes.io/ttl: "120"
                   service.beta.kubernetes.io/aws-load-balancer-scheme: internal
                   service.beta.kubernetes.io/load-balancer-source-ranges: "10.0.0.0/8"
                   service.beta.kubernetes.io/aws-load-balancer-type: external
@@ -127,6 +128,7 @@ profiles:
                 className: nginx-internal
                 annotations:
                   nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+                  external-dns.alpha.kubernetes.io/ttl: "120"
   - name: size-medium
     merge:
       dependencies:

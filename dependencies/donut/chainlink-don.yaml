@@ -110,7 +110,10 @@ pipelines:
       elif [ $(get_flag "redeployDONOnly") == "true" ]; then
         echo "redeployDONOnly=true: Redeploying CCIP DON"
         run_pipelines deploy-ccip-v2-don-with-overrides
-        ccip-v2-scripts configure-ocr
+        # todo: at the moment we can't configure-ocr directly here as we need to wait for the nodes to be up and running
+        # The ingress check is not sufficient to ensure that node is up, it takes more time to boot especially when
+        # we're resuming existing deployment
+        # ccip-v2-scripts configure-ocr
       fi
 
   deploy-ccip-v2-don-with-overrides:

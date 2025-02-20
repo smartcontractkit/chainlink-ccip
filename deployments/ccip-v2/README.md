@@ -13,16 +13,25 @@ To get started deploying CCIP v2 setup, please follow [CCIP v2 CRIB - Deploy & A
 
 ## Operating a default ccip-v2 environment
 ### 1) Initial Deployment
-To deploy full ccip-v2 setup run `devspace ccip-v2-<provider-type>` where provider type is either kind or aws
+To deploy full ccip-v2 setup run `devspace run ccip-v2`
 
 ### 2) Redeploy DON and configure OCR
 Depending on the use case you can use one of the commands below:
 
-- For kind: `devspace run ccip-v2-kind-redeploy-don`
-- For AWS:
-  - default profile: `devspace run ccip-v2-aws-redeploy-don`
-  - heavy load testing profile: `devspace run ccip-v2-load-tests-aws-redeploy-don`
+- default profile: `devspace run ccip-v2-redeploy-don`
+- heavy load testing profile: `devspace run ccip-v2-load-tests-redeploy-don`
 
+### Pausing and Resuming workloads
+In ccip-v2 we have an option to scale down Stateful Sets deployed to AWS to save on Compute resources in long-running tests.
+
+Example Scenario:
+* Create a large scale load testing environment.
+* Run some tests
+* At the end of the day, scale down environment using `devspace run ccip-v2-pause-pods` command
+  * The pipeline will delete some of the resource intensive pods like Geth or Oracle Nodes, but it will keep PVCs, so the persistence layer is retained.
+* The next day you can use `devspace run ccip-v2-resume-pods` command to resume pods and redeploy DON
+  * After re-deploying, it is necessary to reconfigure OCR. Use `devspace run ccip-v2-scripts configure-ocr` to do that. 
+  * Now you can continue running the tests using the same data, without the need to re-provision entire environment from scratch.
 
 ## Rendering Manifests locally
 There is special devspace run command to render manifests without deploying anything.

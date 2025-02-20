@@ -84,6 +84,32 @@ pipelines:
       # Deploy CCIP enabled fully configured DON
       run_dependency_pipelines ccip-don --set-flag redeployDONOnly="true"
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+  ccip-v2-pause-pods:
+    run: |-
+      if [ "$PROVIDER" == "kind" ]; then
+        echo "ccip-v2-resume-pods is not supported in kind provider"
+        exit 1
+      fi
+      # Stop geth pods without deleting PVCs
+
+      kubectl delete sts -l app.kubernetes.io/name=geth --cascade=orphan
+      kubectl delete pod -l app.kubernetes.io/name=geth
+
+      # Uninstall chainlink-don app
+      helm uninstall chainlink-don
+
+  # Resume pods stopped by ccip-v2-pause-pods pipeline
+  # Make sure to run that pipeline with --force-deploy flag
+  ccip-v2-resume-pods:
+    run: |-
+      if [ "$PROVIDER" == "kind" ]; then
+        echo "ccip-v2-resume-pods is not supported in kind provider"
+        exit 1
+      fi
+
+      run_dependency_pipelines geth-chains
+      run_pipelines ccip-v2-redeploy-don
+
   ccip-v2-infra-only:
     run: |-
       run_pipelines maybe-kind
@@ -116,20 +142,40 @@ pipelines:
       run_dependency_pipelines solana-chains
       task ccip-v2-scripts:build
       run_dependency_pipelines ccip-v2-scripts --pipeline deploy-home-chain-contracts
-  ccip-v2-scripts-home-chain:
-    run: |-
-      run_dependency_pipelines ccip-v2-scripts --pipeline deploy-home-chain-contracts
-  ccip-v2-scripts-deploy-ccip:
-    run: |-
-      run_dependency_pipelines ccip-v2-scripts --pipeline deploy-ccip
   job-distributor:
     run: |-
       run_dependency_pipelines job-distributor
 profiles:
+  - name: base
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          geth-chains:
+            path: ${DEPENDENCIES_DIR}/geth-v2
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              CHAINS_COUNT: ${GETH_CHAINS_COUNT}
+          solana-chains:
+            path: ${DEPENDENCIES_DIR}/solana-validator
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              CHAINS_COUNT: ${SOLANA_CHAINS_COUNT}
+          ccip-don:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy-ccip-v2
+            profiles:
+              - version-from-env
+              - network-generated
+              # Uncomment this to enable overrides from overrides.ccip-v2.yaml file
+              # - overrides-ccip-v2
   - name: kind
-    activation:
-      - vars:
-          PROVIDER: "kind"
+    parents:
+      - profile: base
     patches:
       - op: add
         path: dependencies
@@ -142,6 +188,26 @@ profiles:
             path: ${DEPENDENCIES_DIR}/kind-monitoring
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+  - name: aws
+    parents:
+      - profile: base
+    patches:
+      - op: add
+        path: dependencies.ccip-don.profiles
+        value: monitoring-service-monitor
+
+  - name: load-tests-aws
+    parents:
+      - profile: load-tests
+    patches:
+      - op: add
+        path: dependencies.ccip-don.profiles
+        value: monitoring-service-monitor
+      - op: add
+        path: dependencies.ccip-don.profiles
+        value: ccip-load-testing-aws-staging
+
+  ### Misc profiles for testing individual dependencies in isolation
   - name: ccip-v2-scripts
     patches:
       - op: add
@@ -175,90 +241,35 @@ profiles:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-  - name: default
-    patches:
-      - op: add
-        path: dependencies
-        value:
-          geth-chains:
-            path: ${DEPENDENCIES_DIR}/geth-v2
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-            vars:
-              CHAINS_COUNT: ${GETH_CHAINS_COUNT}
-          solana-chains:
-            path: ${DEPENDENCIES_DIR}/solana-validator
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-            vars:
-              CHAINS_COUNT: ${SOLANA_CHAINS_COUNT}
-          ccip-don:
-            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-            pipeline: deploy-ccip-v2
-            profiles:
-              - version-from-env
-              - network-generated
-              # Uncomment this to enable overrides from overrides.ccip-v2.yaml file
-              # - overrides-ccip-v2
-  - name: load-tests
-    parents:
-      - profile: default
-    patches:
-      - op: add
-        path: vars
-        value:
-          USE_CASE:
-            source: env
-            default: ccip-load-tests
-
-  - name: default-aws
-    parents:
-      - profile: default
-    patches:
-      - op: add
-        path: dependencies.ccip-don.profiles
-        value: monitoring-service-monitor
-
-  - name: load-tests-aws
-    parents:
-      - profile: load-tests
-    patches:
-      - op: add
-        path: dependencies.ccip-don.profiles
-        value: monitoring-service-monitor
-      - op: add
-        path: dependencies.ccip-don.profiles
-        value: ccip-load-testing-aws-staging
 
 commands:
-  ccip-v2-kind:
-    command: devspace run-pipeline ccip-v2 -p default
-    description: Deploy full ccip-v2 setup to kind
+  ccip-v2:
+    command: devspace run-pipeline ccip-v2 -p ${PROVIDER}
+    description: Deploy full ccip-v2 setup
     appendArgs: true
-  ccip-v2-kind-redeploy-don:
-    command: devspace run-pipeline ccip-v2-redeploy-don -p default
+  purge:
+    command: |
+      rm -rf ${TMP_DIR}/*
+      devspace purge
+    description: Cleanup temp files and purge devspace env
+  ccip-v2-redeploy-don:
+    command: devspace run-pipeline ccip-v2-redeploy-don -p ${PROVIDER}
     description: Redeploy DON without updating contracts
     appendArgs: true
-  ccip-v2-aws:
-    command: devspace run-pipeline ccip-v2 -p default-aws
-    description: Deploy full ccip-v2 setup to AWS
+  ccip-v2-pause-pods:
+    command: devspace run-pipeline ccip-v2-pause-pods -p ${PROVIDER}
+    description: Pause all pods, but keep PVCs with persistence
     appendArgs: true
-  ccip-v2-aws-redeploy-don:
-    command: devspace run-pipeline ccip-v2-redeploy-don -p default-aws
-    description: Redeploy DON without updating contracts
+  ccip-v2-resume-pods:
+    command: devspace run-pipeline ccip-v2-resume-pods -p ${PROVIDER} --force-deploy
+    description: Un-Pause paused pods and reuse existing PVCs
     appendArgs: true
-  ccip-v2-load-tests-aws:
+  ccip-v2-load-tests:
     command: devspace run-pipeline ccip-v2 -p load-tests-aws
-    description: Deploy full ccip-v2 setup to AWS with heavy load test profile
-    appendArgs: true
-  ccip-v2-load-tests-aws-redeploy-don:
-    command: devspace run-pipeline ccip-v2-redeploy-don -p load-tests-aws
-    description: Redeploy DON without updating contracts
+    description: Deploy full ccip-v2 setup to AWS with heavy load test profile. (aws only)
     appendArgs: true
   ccip-v2-infra:
-    command: devspace run-pipeline ccip-v2-infra-only -p default
+    command: devspace run-pipeline ccip-v2-infra-only -p ${PROVIDER}
     description: Run the ccip v2 pipeline without onchain deployment, just infra.
     appendArgs: true
   ccip-v2-infra-render:
@@ -270,7 +281,7 @@ commands:
     description: Deploy Grafana Dashboards (outdated)
     appendArgs: true
   geth:
-    command: devspace run-pipeline geth -p default
+    command: devspace run-pipeline geth -p ${PROVIDER}
     description: Deploy geth chains only
     appendArgs: true
   debug-gap:
@@ -281,21 +292,9 @@ commands:
     command: devspace run-pipeline job-distributor -p job-distributor
     description: Deploy job-distributor
     appendArgs: true
- # todo: remove these 2 and just rely on the ccip-v2-scripts
-  deploy-home-chain:
-    command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-home-chain
-    description: Deploy home chain
-    appendArgs: true
-  deploy-ccip-contracts:
-    command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-deploy-ccip
-    description: Deploy CCIP Contracts and Add lanes.
-    appendArgs: true
   ccip-v2-scripts:
     command: ccip-v2-scripts
-    description: run ccip-v2-scripts cli command within devspace context
+    description: |
+      run ccip-v2-scripts cli command within devspace context, you can use it to deploy home chain
+      or any other command available within ccip-v2-scripts binary.
     appendArgs: true
-  purge:
-    command: |
-      rm -f ${TMP_DIR}/*
-      devspace purge
-    description: Cleanup temp files and purge devspace env
