@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::{
     instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet,
-    OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, UpdateConfig,
+    OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, Subject, Subject,
+    SubjectCursed, SubjectUncursed, UncurseSubject, UpdateConfig,
 };
 
 pub struct Impl;
@@ -49,5 +50,39 @@ impl Admin for Impl {
             default_code_version: config.default_code_version
         });
         Ok(())
+    }
+
+    fn curse_subject(&self, ctx: Context<Subject>, subject: Subject) -> Result<()> {
+        let curses = &mut ctx.accounts.curses;
+
+        require!(
+            !curses.subjects.contains(&subject),
+            RmnRemoteError::SubjectIsAlreadyCursed
+        );
+
+        curses.subjects.push(subject);
+        emit!(SubjectCursed { subject });
+        Ok(())
+    }
+
+    fn uncurse_subject(&self, ctx: Context<UncurseSubject>, subject: Subject) -> Result<()> {
+        let curses = &mut ctx.accounts.curses;
+
+        require!(
+            curses.subjects.contains(&subject),
+            RmnRemoteError::SubjectWasNotCursed
+        );
+
+        curses.subjects.retain(|c| c != &subject);
+        emit!(SubjectUncursed { subject });
+        Ok(())
+    }
+
+    fn curse(&self, ctx: Context<crate::CurseSubject>) -> Result<()> {
+        todo!()
+    }
+
+    fn uncurse(&self, ctx: Context<crate::CurseSubject>) -> Result<()> {
+        todo!()
     }
 }

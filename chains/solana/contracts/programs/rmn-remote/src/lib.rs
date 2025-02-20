@@ -36,8 +36,10 @@ pub enum RmnRemoteError {
     // offset error code so that they don't clash with other programs
     // (Anchor's base custom error code 6000 + offset 3000 = start at 9000)
     Unauthorized = 3000,
-    #[msg("Invalid inputs")]
-    InvalidInputs,
+    #[msg("Subject is already cursed")]
+    SubjectIsAlreadyCursed,
+    #[msg("Subject was not cursed")]
+    SubjectWasNotCursed,
     #[msg("Proposed owner is the current owner")]
     RedundantOwnerProposal,
     #[msg("Invalid version of the onchain state")]

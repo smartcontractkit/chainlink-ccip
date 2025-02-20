@@ -4,6 +4,15 @@ use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+pub struct Subject {
+    value: u64,
+}
+
+impl Subject {
+    pub const SOLANA: Self = Self { value: 900 };
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
 #[repr(u8)]
 pub enum CodeVersion {
     Default = 0,
@@ -27,4 +36,17 @@ pub struct Config {
 
     pub proposed_owner: Pubkey,
     pub default_code_version: CodeVersion,
+}
+
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct Curses {
+    #[max_len(0)]
+    pub subjects: Vec<Subject>,
+}
+
+impl Curses {
+    pub fn dynamic_len(&self) -> usize {
+        Self::INIT_SPACE + self.subjects.len() * Subject::INIT_SPACE
+    }
 }
