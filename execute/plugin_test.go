@@ -1,10 +1,9 @@
 package execute
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"slices"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -43,204 +41,12 @@ import (
 
 var jsonOcrTypeCodec = ocrtypecodec.NewExecCodecJSON()
 
-func genRandomChainReports(numReports, numMsgsPerReport int) []cciptypes.ExecutePluginReportSingleChain {
-	// generate random chain reports with unique (random) source
-	// chain selectors and unique (random) sequence number ranges.
-	// don't need to set anything else.
-	chainReports := make([]cciptypes.ExecutePluginReportSingleChain, numReports)
-	for i := 0; i < numReports; i++ {
-		scc := cciptypes.ChainSelector(rand.RandomUint64())
-		chainReports[i] = cciptypes.ExecutePluginReportSingleChain{
-			SourceChainSelector: scc,
-			Messages:            make([]cciptypes.Message, 0, numMsgsPerReport),
-		}
-		start := rand.RandomUint32()
-		for j := 0; j < numMsgsPerReport; j++ {
-			chainReports[i].Messages = append(chainReports[i].Messages, cciptypes.Message{
-				Header: cciptypes.RampMessageHeader{
-					SequenceNumber:      cciptypes.SeqNum(start + uint32(j)),
-					SourceChainSelector: scc,
-				},
-			})
-		}
-	}
-	return chainReports
-}
-
-func Test_getMinMaxSeqNrRangesBySource_emptyMsgs(t *testing.T) {
-	chainReports := genRandomChainReports(1, 0)
-	minMaxSeqNrRanges := getSnRangeSetPairsBySource(chainReports)
-	require.Len(t, minMaxSeqNrRanges, 0)
-}
-
-func Test_getMinMaxSeqNrRangesBySource(t *testing.T) {
-	chainReports := genRandomChainReports(10, 15)
-	minMaxSeqNrRanges := getSnRangeSetPairsBySource(chainReports)
-	require.Len(t, minMaxSeqNrRanges, len(chainReports))
-	for _, chainReport := range chainReports {
-		seqNrRange, ok := minMaxSeqNrRanges[chainReport.SourceChainSelector]
-		require.True(t, ok)
-		require.NotNil(t, seqNrRange)
-
-		// check the range.
-		expectedMin := chainReport.Messages[0].Header.SequenceNumber
-		expectedMax := chainReport.Messages[len(chainReport.Messages)-1].Header.SequenceNumber
-		require.Equal(t, expectedMin, seqNrRange.snRange.Start())
-		require.Equal(t, expectedMax, seqNrRange.snRange.End())
-
-		// check the set.
-		expectedSet := make(map[cciptypes.SeqNum]struct{})
-		for _, msg := range chainReport.Messages {
-			expectedSet[msg.Header.SequenceNumber] = struct{}{}
-		}
-		expectedSetSlice := maps.Keys(expectedSet)
-		actualSetSlice := seqNrRange.set.ToSlice()
-		sort.Slice(expectedSetSlice, func(i, j int) bool {
-			return expectedSetSlice[i] < expectedSetSlice[j]
-		})
-		sort.Slice(actualSetSlice, func(i, j int) bool {
-			return actualSetSlice[i] < actualSetSlice[j]
-		})
-		require.Equal(t, expectedSetSlice, actualSetSlice)
-	}
-}
-
-func Test_checkAlreadyExecuted(t *testing.T) {
-	testCases := []struct {
-		name           string
-		mockReaderFunc func(
-			t *testing.T,
-			snRangeSetPairBySource map[cciptypes.ChainSelector]snRangeSetPair,
-		) *readerpkg_mock.MockCCIPReader
-		shouldErr bool
-	}{
-		{
-			name: "full range executed",
-			mockReaderFunc: func(
-				t *testing.T,
-				snRangeSetPairBySource map[cciptypes.ChainSelector]snRangeSetPair) *readerpkg_mock.MockCCIPReader {
-				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-				// need to setup assertions like this because map iteration
-				// order is undefined.
-				// Basically there is one chain report that is executed and the
-				// rest are not.
-				midPoint := len(snRangeSetPairBySource) / 2
-				i := 0
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
-					if i == midPoint {
-						ccipReaderMock.
-							EXPECT().
-							ExecutedMessages(
-								mock.Anything,
-								sourceSel,
-								seqNrRangePair.snRange,
-							).Return(
-							seqNrRangePair.snRange.ToSlice(),
-							nil,
-						)
-					} else {
-						ccipReaderMock.
-							EXPECT().
-							ExecutedMessages(
-								mock.Anything,
-								sourceSel,
-								seqNrRangePair.snRange,
-							).Return(nil, nil). // not executed
-							Maybe()
-					}
-					i++
-				}
-				return ccipReaderMock
-			},
-			shouldErr: true,
-		},
-		{
-			name: "subset of range executed",
-			mockReaderFunc: func(
-				t *testing.T,
-				snRangeSetPairBySource map[cciptypes.ChainSelector]snRangeSetPair) *readerpkg_mock.MockCCIPReader {
-				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-				// need to setup assertions like this because map iteration
-				// order is undefined.
-				// Basically there is one chain report that is executed and the
-				// rest are not.
-				midPoint := len(snRangeSetPairBySource) / 2
-				i := 0
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
-					if i == midPoint {
-						fullRange := seqNrRangePair.snRange.ToSlice()
-						ccipReaderMock.
-							EXPECT().
-							ExecutedMessages(
-								mock.Anything,
-								sourceSel,
-								seqNrRangePair.snRange,
-							).Return(
-							fullRange[:len(fullRange)/2],
-							nil,
-						)
-					} else {
-						ccipReaderMock.
-							EXPECT().
-							ExecutedMessages(
-								mock.Anything,
-								sourceSel,
-								seqNrRangePair.snRange,
-							).Return(nil, nil).Maybe() // not executed
-					}
-					i++
-				}
-				return ccipReaderMock
-			},
-			shouldErr: true,
-		},
-		{
-			name: "none executed",
-			mockReaderFunc: func(
-				t *testing.T,
-				snRangeSetPairBySource map[cciptypes.ChainSelector]snRangeSetPair) *readerpkg_mock.MockCCIPReader {
-				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
-					ccipReaderMock.
-						EXPECT().
-						ExecutedMessages(
-							mock.Anything,
-							sourceSel,
-							seqNrRangePair.snRange,
-						).Return(nil, nil)
-				}
-				return ccipReaderMock
-			},
-			shouldErr: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			chainReports := genRandomChainReports(10, 15)
-			snRangeSetPairs := getSnRangeSetPairsBySource(chainReports)
-			ccipReaderMock := tc.mockReaderFunc(t, snRangeSetPairs)
-			p := &Plugin{
-				lggr:       logger.Test(t),
-				ccipReader: ccipReaderMock,
-			}
-			err := p.checkAlreadyExecuted(tests.Context(t), p.lggr, snRangeSetPairs)
-			if tc.shouldErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "already executed")
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
 func Test_getPendingExecutedReports(t *testing.T) {
 	canExecute := func(ret bool) CanExecuteHandle {
 		return func(cciptypes.ChainSelector, cciptypes.Bytes32) bool { return ret }
 	}
 
-	tcs := []struct {
+	tests := []struct {
 		name         string
 		reports      []plugintypes2.CommitPluginReportWithMeta
 		ranges       map[cciptypes.ChainSelector][]cciptypes.SeqNum
@@ -394,7 +200,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			wantErr:      assert.NoError,
 		},
 	}
-	for _, tt := range tcs {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -415,7 +221,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			// for each chain selector:
 			//      ExecutedMessages(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNum, error)
 			got, got2, err := getPendingExecutedReports(
-				tests.Context(t),
+				context.Background(),
 				mockReader,
 				tt.canExec,
 				time.Now(),
@@ -437,7 +243,7 @@ func TestPlugin_Close(t *testing.T) {
 
 func TestPlugin_Query(t *testing.T) {
 	p := &Plugin{}
-	q, err := p.Query(tests.Context(t), ocr3types.OutcomeContext{})
+	q, err := p.Query(context.Background(), ocr3types.OutcomeContext{})
 	require.NoError(t, err)
 	require.Equal(t, types.Query{}, q)
 }
@@ -637,7 +443,7 @@ func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
 		lggr:         logger.Test(t),
 		ocrTypeCodec: jsonOcrTypeCodec,
 	}
-	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{
+	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{
 		PreviousOutcome: []byte("not a valid observation"),
 	}, nil)
 	require.Error(t, err)
@@ -657,7 +463,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 		ocrTypeCodec:    jsonOcrTypeCodec,
 	}
 
-	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{}, nil)
+	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{}, nil)
 	require.Error(t, err)
 	//nolint:lll // error message
 	assert.Contains(t, err.Error(), "unable to determine if the destination chain is supported: error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
@@ -832,7 +638,7 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 		lggr:        logger.Test(t),
 	}
 
-	_, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -848,7 +654,7 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 		lggr:        logger.Test(t),
 		reportCodec: codec,
 	}
-	result, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("empty report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -857,8 +663,6 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 
 func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 	destChain := rand.RandomInt64()
-	sourceChain := rand.RandomInt64()
-	seqNum := cciptypes.SeqNum(1)
 	configDigest := [32]byte{0xde, 0xad, 0xbe, 0xef}
 
 	type depFunc func() (
@@ -872,15 +676,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			Return(cciptypes.ExecutePluginReport{
 				ChainReports: []cciptypes.ExecutePluginReportSingleChain{
 					{
-						SourceChainSelector: cciptypes.ChainSelector(sourceChain),
-						Messages: []cciptypes.Message{
-							{
-								Header: cciptypes.RampMessageHeader{
-									SequenceNumber:      seqNum,
-									SourceChainSelector: cciptypes.ChainSelector(sourceChain),
-								},
-							},
-						},
+						SourceChainSelector: 1,
 					},
 				},
 			}, nil)
@@ -897,23 +693,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 
 	basicCCIPReader := func() *readerpkg_mock.MockCCIPReader {
 		ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-		ccipReaderMock.
-			EXPECT().
-			GetOffRampConfigDigest(
-				mock.Anything,
-				consts.PluginTypeExecute,
-			).Return(
-			configDigest,
-			nil,
-		)
-		ccipReaderMock.
-			EXPECT().
-			ExecutedMessages(
-				mock.Anything,
-				cciptypes.ChainSelector(sourceChain),
-				cciptypes.NewSeqNumRange(seqNum, seqNum),
-			).
-			Return(nil, nil)
+		ccipReaderMock.EXPECT().GetOffRampConfigDigest(mock.Anything, consts.PluginTypeExecute).Return(configDigest, nil)
 		return ccipReaderMock
 	}
 
@@ -933,7 +713,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
 					Return(&reader2.CurseInfo{
 						CursedSourceChains: map[cciptypes.ChainSelector]bool{
-							cciptypes.ChainSelector(sourceChain): false,
+							1: false,
 						}}, nil)
 
 				homeChain := basicHomeChain()
@@ -1013,10 +793,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
-					Return(&reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{
-						cciptypes.ChainSelector(sourceChain): true,
-					},
-					}, nil)
+					Return(&reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{1: true}}, nil)
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1027,41 +804,6 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				require.False(t, b)
 			},
 			logsContain: []string{"source chains were cursed during report generation"},
-		},
-		{
-			name: "message already executed",
-			getDeps: func() (*codec_mocks.MockExecutePluginCodec,
-				*reader_mock.MockHomeChain,
-				*readerpkg_mock.MockCCIPReader,
-			) {
-				mockReader := basicCCIPReader()
-
-				// remove the call from index idx from the expected calls slice
-				// so that we can override the expectation from the basicCCIPReader call.
-				idx := slices.IndexFunc(mockReader.ExpectedCalls, func(e *mock.Call) bool {
-					return e.Method == "ExecutedMessages"
-				})
-				require.GreaterOrEqual(t, idx, 0)
-				mockReader.ExpectedCalls = append(mockReader.ExpectedCalls[:idx], mockReader.ExpectedCalls[idx+1:]...)
-
-				mockReader.EXPECT().
-					ExecutedMessages(
-						mock.Anything,
-						cciptypes.ChainSelector(sourceChain),
-						cciptypes.NewSeqNumRange(seqNum, seqNum),
-					).Return(
-					[]cciptypes.SeqNum{seqNum},
-					nil)
-
-				homeChain := basicHomeChain()
-				codec := basicMockCodec()
-				return codec, homeChain, mockReader
-			},
-			assertions: func(t *testing.T, b bool, err error) {
-				require.NoError(t, err) // error is logged, but not returned
-				require.False(t, b)
-			},
-			logsContain: []string{"some messages in report already executed"},
 		},
 	}
 	for _, tc := range testcases {
@@ -1088,7 +830,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				},
 			}
 
-			result, err := p.ShouldAcceptAttestedReport(tests.Context(t), 0, ocr3types.ReportWithInfo[[]byte]{
+			result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{
 				Report: []byte("report"), // faked out, see mock above
 			})
 
@@ -1117,7 +859,7 @@ func TestPlugin_ShouldTransmitAcceptReport_NilReport(t *testing.T) {
 		lggr: lggr,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{})
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{})
 	require.NoError(t, err)
 	require.False(t, shouldTransmit)
 }
@@ -1133,7 +875,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_DecodeFailure(t *testing.T) {
 		reportCodec: codec,
 	}
 
-	_, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -1163,7 +905,7 @@ func TestPlugin_ShouldTransmitAcceptReport_SupportsDestChainCheckFails(t *testin
 		reportCodec: codec,
 	}
 
-	_, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	_, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.Error(t, err)
@@ -1193,7 +935,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DontSupportDestChain(t *testing.T) {
 		reportCodec: codec,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1246,7 +988,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_MismatchingConfigDigests(t *testing
 		ccipReader:  ccipReaderMock,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
@@ -1265,29 +1007,15 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 		SupportedNodes: mapset.NewSet(peerID),
 	}, nil)
 
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	reports := genRandomChainReports(1, 1)
-	codec.EXPECT().Decode(mock.Anything, mock.Anything).Return(cciptypes.ExecutePluginReport{
-		ChainReports: reports,
-	}, nil)
-
 	ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-	ccipReaderMock.
-		EXPECT().
-		GetOffRampConfigDigest(
-			mock.Anything,
-			consts.PluginTypeExecute).
-		Return(configDigest, nil)
-	ccipReaderMock.
-		EXPECT().
-		ExecutedMessages(
-			mock.Anything,
-			reports[0].SourceChainSelector,
-			cciptypes.NewSeqNumRange(
-				reports[0].Messages[0].Header.SequenceNumber,
-				reports[0].Messages[0].Header.SequenceNumber,
-			),
-		).Return(nil, nil)
+	ccipReaderMock.EXPECT().GetOffRampConfigDigest(mock.Anything, consts.PluginTypeExecute).Return(configDigest, nil)
+
+	codec := codec_mocks.NewMockExecutePluginCodec(t)
+	codec.EXPECT().Decode(mock.Anything, mock.Anything).Return(cciptypes.ExecutePluginReport{
+		ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+			{}, {},
+		},
+	}, nil)
 
 	p := &Plugin{
 		lggr:      lggr,
@@ -1309,74 +1037,9 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 		ccipReader:  ccipReaderMock,
 	}
 
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("report"), // faked out, see mock above
 	})
 	require.NoError(t, err)
 	require.True(t, shouldTransmit)
-}
-
-func TestPlugin_ShouldTransmitAcceptReport_Failure_AlreadyExecuted(t *testing.T) {
-	lggr := logger.Test(t)
-	destChain := rand.RandomInt64()
-	configDigest := [32]byte{0xde, 0xad, 0xbe, 0xef}
-	oracleID := commontypes.OracleID(1)
-	peerID := libocrtypes.PeerID{1}
-
-	homeChainMock := reader_mock.NewMockHomeChain(t)
-	homeChainMock.EXPECT().GetChainConfig(cciptypes.ChainSelector(destChain)).Return(reader.ChainConfig{
-		SupportedNodes: mapset.NewSet(peerID),
-	}, nil)
-
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	reports := genRandomChainReports(1, 1)
-	codec.EXPECT().Decode(mock.Anything, mock.Anything).Return(cciptypes.ExecutePluginReport{
-		ChainReports: reports,
-	}, nil)
-
-	ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-	ccipReaderMock.
-		EXPECT().
-		GetOffRampConfigDigest(
-			mock.Anything,
-			consts.PluginTypeExecute).
-		Return(configDigest, nil)
-	ccipReaderMock.
-		EXPECT().
-		ExecutedMessages(
-			mock.Anything,
-			reports[0].SourceChainSelector,
-			cciptypes.NewSeqNumRange(
-				reports[0].Messages[0].Header.SequenceNumber,
-				reports[0].Messages[0].Header.SequenceNumber,
-			),
-		).Return([]cciptypes.SeqNum{
-		reports[0].Messages[0].Header.SequenceNumber,
-	}, nil)
-
-	p := &Plugin{
-		lggr:      lggr,
-		homeChain: homeChainMock,
-		chainSupport: plugincommon.NewChainSupport(
-			logger.Test(t),
-			homeChainMock,
-			map[commontypes.OracleID]libocrtypes.PeerID{
-				oracleID: peerID,
-			},
-			oracleID,
-			cciptypes.ChainSelector(destChain),
-		),
-		reportingCfg: ocr3types.ReportingPluginConfig{
-			OracleID:     oracleID,
-			ConfigDigest: configDigest,
-		},
-		reportCodec: codec,
-		ccipReader:  ccipReaderMock,
-	}
-
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(tests.Context(t), 1, ocr3types.ReportWithInfo[[]byte]{
-		Report: []byte("report"), // faked out, see mock above
-	})
-	require.NoError(t, err)
-	require.False(t, shouldTransmit)
 }
