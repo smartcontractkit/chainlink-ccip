@@ -171,6 +171,18 @@ type CommitOffchainConfig struct {
 	// in order to avoid delays when there are reports from multiple sources.
 	// NOTE: this can only be used if RMNEnabled == false.
 	MultipleReportsEnabled bool `json:"multipleReports"`
+
+	// ExecNoDeviationThresholdUSDWei is the lower bound *no* deviation threshold for exec gas. If the exec gas price is
+	// less than this value, we should never trigger a deviation. A value of 5e9 would correspond to 0.000000005 USD.
+	ExecNoDeviationThresholdUSDWei cciptypes.BigInt `json:"execNoDeviationThresholdUSDWei"`
+
+	// DataAvNoDeviationThresholdUSDWei is the lower bound *no* deviation threshold for DA gas. If the DA gas price is
+	// less than this value, we should never trigger a deviation. A value of 5e9 would correspond to 0.000000005 USD.
+	DataAvNoDeviationThresholdUSDWei cciptypes.BigInt `json:"dataAvNoDeviationThresholdUSDWei"`
+
+	// CurveBasedGasDeviationEnabled determines whether or not we should use the deviation curve or the fixed PPB values
+	// when determining whether or not the gas price has deviated.
+	CurveBasedGasDeviationEnabled bool `json:"curveBasedGasDeviationEnabled"`
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
