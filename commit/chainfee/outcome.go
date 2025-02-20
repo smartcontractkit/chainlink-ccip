@@ -11,21 +11,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-)
-
-const (
-	// ExecNoDeviationThresholdUSD is the lower bound no deviation threshold for exec gas. If the exec gas price is
-	// less than this value, we should never trigger a deviation. This is set to 10 gwei in USD terms.
-	ExecNoDeviationThresholdUSD = 10e9
-
-	// DataAvNoDeviationThresholdUSD is the lower bound no deviation threshold for DA gas. If the DA gas price is less
-	// than this value, we should never trigger a deviation. This is set to 20 gwei in USD terms.
-	DataAvNoDeviationThresholdUSD = 20e9
 )
 
 func (p *processor) Outcome(
@@ -265,21 +256,8 @@ func (p *processor) getGasPricesToUpdate(
 			continue
 		}
 
-		executionFeeDeviates := mathslib.DeviatesOnCurve(
-			currentChainFee.ExecutionFeePriceUSD,
-			lastUpdate.ChainFee.ExecutionFeePriceUSD,
-			big.NewInt(ExecNoDeviationThresholdUSD),
-			ci.ExecDeviationPPB.Int64(),
-		)
-
-		dataAvFeeDeviates := mathslib.DeviatesOnCurve(
-			currentChainFee.DataAvFeePriceUSD,
-			lastUpdate.ChainFee.DataAvFeePriceUSD,
-			big.NewInt(DataAvNoDeviationThresholdUSD),
-			ci.DataAvailabilityDeviationPPB.Int64(),
-		)
-
-		if executionFeeDeviates || dataAvFeeDeviates {
+		gasDeviates := p.gasComponentsDeviate(currentChainFee, lastUpdate, ci)
+		if gasDeviates {
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
@@ -288,6 +266,38 @@ func (p *processor) getGasPricesToUpdate(
 	}
 
 	return gasPrices
+}
+
+func (p *processor) gasComponentsDeviate(
+	currentChainFee ComponentsUSDPrices,
+	lastUpdate Update,
+	ci pluginconfig.FeeInfo,
+) bool {
+	var executionFeeDeviates, dataAvFeeDeviates bool
+	if p.cfg.CurveBasedGasDeviationEnabled {
+		executionFeeDeviates = mathslib.DeviatesOnCurve(
+			currentChainFee.ExecutionFeePriceUSD,
+			lastUpdate.ChainFee.ExecutionFeePriceUSD,
+			p.cfg.ExecNoDeviationThresholdUSDWei.Int,
+		)
+		dataAvFeeDeviates = mathslib.DeviatesOnCurve(
+			currentChainFee.DataAvFeePriceUSD,
+			lastUpdate.ChainFee.DataAvFeePriceUSD,
+			p.cfg.DataAvNoDeviationThresholdUSDWei.Int,
+		)
+	} else {
+		executionFeeDeviates = mathslib.Deviates(
+			currentChainFee.ExecutionFeePriceUSD,
+			lastUpdate.ChainFee.ExecutionFeePriceUSD,
+			ci.ExecDeviationPPB.Int64(),
+		)
+		dataAvFeeDeviates = mathslib.Deviates(
+			currentChainFee.DataAvFeePriceUSD,
+			lastUpdate.ChainFee.DataAvFeePriceUSD,
+			ci.DataAvailabilityDeviationPPB.Int64(),
+		)
+	}
+	return executionFeeDeviates || dataAvFeeDeviates
 }
 
 // chainFeeUpdateAggregator aggregates a slice of ChainFeeUpdates into a single Update
