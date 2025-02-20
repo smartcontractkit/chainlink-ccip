@@ -497,6 +497,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 			}
 		} else {
 			// this message didn't work, continue to the next one
+			b.lggr.Infow("skipping message in buildSingleChainReport", "index", i)
 			delete(msgs, i)
 		}
 	}
