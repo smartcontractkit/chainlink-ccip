@@ -49,7 +49,7 @@ jobs:
         run: |
           git fetch origin ${{ github.base_ref }}
           git branch -a
-          make proto-check-breaking COMPARE_AGAINST_BRANCH=${{ github.base_ref }}
+          make proto-check-breaking COMPARE_AGAINST_BRANCH=origin/${{ github.base_ref }}
           git checkout ${{ github.base_ref }}
           TEST_COUNT=1 COVERAGE_FILE=coverage_target.out make test
           total=$(go tool cover -func=coverage_target.out | grep total | awk '{print $3}')
