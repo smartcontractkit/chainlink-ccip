@@ -37,7 +37,6 @@ jobs:
         run: |
           make install_buf
           make proto-lint
-          git fetch origin ${{ github.base_ref }}
           make proto-check-breaking COMPARE_AGAINST_BRANCH=${{ github.base_ref }}
       - name: Run tests
         run: TEST_COUNT=20 COVERAGE_FILE=coverage.out make test
