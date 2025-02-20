@@ -400,6 +400,7 @@ func selectReport(
 	for i, commitReport := range commitReports {
 		// handle incomplete observations.
 		if len(commitReport.Messages) == 0 {
+			lggr.Debugw("selectReport: skipping commit report with no messages")
 			pendingReports++
 			continue
 		}
