@@ -1187,125 +1187,6 @@ export type FeeQuoter = {
           }
         ]
       }
-    },
-    {
-      "name": "FeeQuoterError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Unauthorized"
-          },
-          {
-            "name": "InvalidInputs"
-          },
-          {
-            "name": "ZeroGasLimit"
-          },
-          {
-            "name": "DefaultGasLimitExceedsMaximum"
-          },
-          {
-            "name": "InvalidVersion"
-          },
-          {
-            "name": "RedundantOwnerProposal"
-          },
-          {
-            "name": "InvalidInputsMissingWritable"
-          },
-          {
-            "name": "InvalidInputsChainSelector"
-          },
-          {
-            "name": "InvalidInputsMint"
-          },
-          {
-            "name": "InvalidInputsMintOwner"
-          },
-          {
-            "name": "InvalidInputsTokenConfigAccount"
-          },
-          {
-            "name": "InvalidInputsMissingExtraArgs"
-          },
-          {
-            "name": "InvalidInputsMissingDataAfterExtraArgs"
-          },
-          {
-            "name": "InvalidInputsDestChainStateAccount"
-          },
-          {
-            "name": "InvalidInputsPerChainPerTokenConfig"
-          },
-          {
-            "name": "InvalidInputsBillingTokenConfig"
-          },
-          {
-            "name": "InvalidInputsAccountCount"
-          },
-          {
-            "name": "InvalidInputsNoUpdates"
-          },
-          {
-            "name": "InvalidInputsTokenAccounts"
-          },
-          {
-            "name": "DestinationChainDisabled"
-          },
-          {
-            "name": "FeeTokenDisabled"
-          },
-          {
-            "name": "MessageTooLarge"
-          },
-          {
-            "name": "UnsupportedNumberOfTokens"
-          },
-          {
-            "name": "InvalidEVMAddress"
-          },
-          {
-            "name": "InvalidEncoding"
-          },
-          {
-            "name": "InvalidTokenPrice"
-          },
-          {
-            "name": "StaleGasPrice"
-          },
-          {
-            "name": "InvalidInputsMissingTokenConfig"
-          },
-          {
-            "name": "MessageFeeTooHigh"
-          },
-          {
-            "name": "MessageGasLimitTooHigh"
-          },
-          {
-            "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
-          },
-          {
-            "name": "InvalidExtraArgsTag"
-          },
-          {
-            "name": "InvalidChainFamilySelector"
-          },
-          {
-            "name": "InvalidTokenReceiver"
-          },
-          {
-            "name": "InvalidSVMAddress"
-          },
-          {
-            "name": "UnauthorizedPriceUpdater"
-          },
-          {
-            "name": "InvalidCodeVersion"
-          }
-        ]
-      }
     }
   ],
   "events": [
@@ -1555,12 +1436,189 @@ export type FeeQuoter = {
   ],
   "errors": [
     {
-      "code": 6000,
-      "name": "Something"
+      "code": 8000,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
     },
     {
-      "code": 6001,
-      "name": "Else"
+      "code": 8001,
+      "name": "InvalidInputs",
+      "msg": "Invalid inputs"
+    },
+    {
+      "code": 8002,
+      "name": "ZeroGasLimit",
+      "msg": "Gas limit is zero"
+    },
+    {
+      "code": 8003,
+      "name": "DefaultGasLimitExceedsMaximum",
+      "msg": "Default gas limit exceeds the maximum"
+    },
+    {
+      "code": 8004,
+      "name": "InvalidVersion",
+      "msg": "Invalid version of the onchain state"
+    },
+    {
+      "code": 8005,
+      "name": "RedundantOwnerProposal",
+      "msg": "Proposed owner is the current owner"
+    },
+    {
+      "code": 8006,
+      "name": "InvalidInputsMissingWritable",
+      "msg": "Account should be writable"
+    },
+    {
+      "code": 8007,
+      "name": "InvalidInputsChainSelector",
+      "msg": "Chain selector is invalid"
+    },
+    {
+      "code": 8008,
+      "name": "InvalidInputsMint",
+      "msg": "Mint account input is invalid"
+    },
+    {
+      "code": 8009,
+      "name": "InvalidInputsMintOwner",
+      "msg": "Mint account input has an invalid owner"
+    },
+    {
+      "code": 8010,
+      "name": "InvalidInputsTokenConfigAccount",
+      "msg": "Token config account is invalid"
+    },
+    {
+      "code": 8011,
+      "name": "InvalidInputsMissingExtraArgs",
+      "msg": "Missing extra args in message to SVM receiver"
+    },
+    {
+      "code": 8012,
+      "name": "InvalidInputsMissingDataAfterExtraArgs",
+      "msg": "Missing data after extra args tag"
+    },
+    {
+      "code": 8013,
+      "name": "InvalidInputsDestChainStateAccount",
+      "msg": "Destination chain state account is invalid"
+    },
+    {
+      "code": 8014,
+      "name": "InvalidInputsPerChainPerTokenConfig",
+      "msg": "Per chain per token config account is invalid"
+    },
+    {
+      "code": 8015,
+      "name": "InvalidInputsBillingTokenConfig",
+      "msg": "Billing token config account is invalid"
+    },
+    {
+      "code": 8016,
+      "name": "InvalidInputsAccountCount",
+      "msg": "Number of accounts provided is incorrect"
+    },
+    {
+      "code": 8017,
+      "name": "InvalidInputsNoUpdates",
+      "msg": "No price or gas update provided"
+    },
+    {
+      "code": 8018,
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
+    },
+    {
+      "code": 8019,
+      "name": "DestinationChainDisabled",
+      "msg": "Destination chain disabled"
+    },
+    {
+      "code": 8020,
+      "name": "FeeTokenDisabled",
+      "msg": "Fee token disabled"
+    },
+    {
+      "code": 8021,
+      "name": "MessageTooLarge",
+      "msg": "Message exceeds maximum data size"
+    },
+    {
+      "code": 8022,
+      "name": "UnsupportedNumberOfTokens",
+      "msg": "Message contains an unsupported number of tokens"
+    },
+    {
+      "code": 8023,
+      "name": "InvalidEVMAddress",
+      "msg": "Invalid EVM address"
+    },
+    {
+      "code": 8024,
+      "name": "InvalidEncoding",
+      "msg": "Invalid encoding"
+    },
+    {
+      "code": 8025,
+      "name": "InvalidTokenPrice",
+      "msg": "Invalid token price"
+    },
+    {
+      "code": 8026,
+      "name": "StaleGasPrice",
+      "msg": "Stale gas price"
+    },
+    {
+      "code": 8027,
+      "name": "InvalidInputsMissingTokenConfig",
+      "msg": "Inputs are missing token configuration"
+    },
+    {
+      "code": 8028,
+      "name": "MessageFeeTooHigh",
+      "msg": "Message fee is too high"
+    },
+    {
+      "code": 8029,
+      "name": "MessageGasLimitTooHigh",
+      "msg": "Message gas limit too high"
+    },
+    {
+      "code": 8030,
+      "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
+      "msg": "Extra arg out of order execution must be true"
+    },
+    {
+      "code": 8031,
+      "name": "InvalidExtraArgsTag",
+      "msg": "Invalid extra args tag"
+    },
+    {
+      "code": 8032,
+      "name": "InvalidChainFamilySelector",
+      "msg": "Invalid chain family selector"
+    },
+    {
+      "code": 8033,
+      "name": "InvalidTokenReceiver",
+      "msg": "Invalid token receiver"
+    },
+    {
+      "code": 8034,
+      "name": "InvalidSVMAddress",
+      "msg": "Invalid SVM address"
+    },
+    {
+      "code": 8035,
+      "name": "UnauthorizedPriceUpdater",
+      "msg": "The caller is not an authorized price updater"
+    },
+    {
+      "code": 8036,
+      "name": "InvalidCodeVersion",
+      "msg": "Invalid code version"
     }
   ]
 };
@@ -2754,125 +2812,6 @@ export const IDL: FeeQuoter = {
           }
         ]
       }
-    },
-    {
-      "name": "FeeQuoterError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Unauthorized"
-          },
-          {
-            "name": "InvalidInputs"
-          },
-          {
-            "name": "ZeroGasLimit"
-          },
-          {
-            "name": "DefaultGasLimitExceedsMaximum"
-          },
-          {
-            "name": "InvalidVersion"
-          },
-          {
-            "name": "RedundantOwnerProposal"
-          },
-          {
-            "name": "InvalidInputsMissingWritable"
-          },
-          {
-            "name": "InvalidInputsChainSelector"
-          },
-          {
-            "name": "InvalidInputsMint"
-          },
-          {
-            "name": "InvalidInputsMintOwner"
-          },
-          {
-            "name": "InvalidInputsTokenConfigAccount"
-          },
-          {
-            "name": "InvalidInputsMissingExtraArgs"
-          },
-          {
-            "name": "InvalidInputsMissingDataAfterExtraArgs"
-          },
-          {
-            "name": "InvalidInputsDestChainStateAccount"
-          },
-          {
-            "name": "InvalidInputsPerChainPerTokenConfig"
-          },
-          {
-            "name": "InvalidInputsBillingTokenConfig"
-          },
-          {
-            "name": "InvalidInputsAccountCount"
-          },
-          {
-            "name": "InvalidInputsNoUpdates"
-          },
-          {
-            "name": "InvalidInputsTokenAccounts"
-          },
-          {
-            "name": "DestinationChainDisabled"
-          },
-          {
-            "name": "FeeTokenDisabled"
-          },
-          {
-            "name": "MessageTooLarge"
-          },
-          {
-            "name": "UnsupportedNumberOfTokens"
-          },
-          {
-            "name": "InvalidEVMAddress"
-          },
-          {
-            "name": "InvalidEncoding"
-          },
-          {
-            "name": "InvalidTokenPrice"
-          },
-          {
-            "name": "StaleGasPrice"
-          },
-          {
-            "name": "InvalidInputsMissingTokenConfig"
-          },
-          {
-            "name": "MessageFeeTooHigh"
-          },
-          {
-            "name": "MessageGasLimitTooHigh"
-          },
-          {
-            "name": "ExtraArgOutOfOrderExecutionMustBeTrue"
-          },
-          {
-            "name": "InvalidExtraArgsTag"
-          },
-          {
-            "name": "InvalidChainFamilySelector"
-          },
-          {
-            "name": "InvalidTokenReceiver"
-          },
-          {
-            "name": "InvalidSVMAddress"
-          },
-          {
-            "name": "UnauthorizedPriceUpdater"
-          },
-          {
-            "name": "InvalidCodeVersion"
-          }
-        ]
-      }
     }
   ],
   "events": [
@@ -3122,12 +3061,189 @@ export const IDL: FeeQuoter = {
   ],
   "errors": [
     {
-      "code": 6000,
-      "name": "Something"
+      "code": 8000,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
     },
     {
-      "code": 6001,
-      "name": "Else"
+      "code": 8001,
+      "name": "InvalidInputs",
+      "msg": "Invalid inputs"
+    },
+    {
+      "code": 8002,
+      "name": "ZeroGasLimit",
+      "msg": "Gas limit is zero"
+    },
+    {
+      "code": 8003,
+      "name": "DefaultGasLimitExceedsMaximum",
+      "msg": "Default gas limit exceeds the maximum"
+    },
+    {
+      "code": 8004,
+      "name": "InvalidVersion",
+      "msg": "Invalid version of the onchain state"
+    },
+    {
+      "code": 8005,
+      "name": "RedundantOwnerProposal",
+      "msg": "Proposed owner is the current owner"
+    },
+    {
+      "code": 8006,
+      "name": "InvalidInputsMissingWritable",
+      "msg": "Account should be writable"
+    },
+    {
+      "code": 8007,
+      "name": "InvalidInputsChainSelector",
+      "msg": "Chain selector is invalid"
+    },
+    {
+      "code": 8008,
+      "name": "InvalidInputsMint",
+      "msg": "Mint account input is invalid"
+    },
+    {
+      "code": 8009,
+      "name": "InvalidInputsMintOwner",
+      "msg": "Mint account input has an invalid owner"
+    },
+    {
+      "code": 8010,
+      "name": "InvalidInputsTokenConfigAccount",
+      "msg": "Token config account is invalid"
+    },
+    {
+      "code": 8011,
+      "name": "InvalidInputsMissingExtraArgs",
+      "msg": "Missing extra args in message to SVM receiver"
+    },
+    {
+      "code": 8012,
+      "name": "InvalidInputsMissingDataAfterExtraArgs",
+      "msg": "Missing data after extra args tag"
+    },
+    {
+      "code": 8013,
+      "name": "InvalidInputsDestChainStateAccount",
+      "msg": "Destination chain state account is invalid"
+    },
+    {
+      "code": 8014,
+      "name": "InvalidInputsPerChainPerTokenConfig",
+      "msg": "Per chain per token config account is invalid"
+    },
+    {
+      "code": 8015,
+      "name": "InvalidInputsBillingTokenConfig",
+      "msg": "Billing token config account is invalid"
+    },
+    {
+      "code": 8016,
+      "name": "InvalidInputsAccountCount",
+      "msg": "Number of accounts provided is incorrect"
+    },
+    {
+      "code": 8017,
+      "name": "InvalidInputsNoUpdates",
+      "msg": "No price or gas update provided"
+    },
+    {
+      "code": 8018,
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
+    },
+    {
+      "code": 8019,
+      "name": "DestinationChainDisabled",
+      "msg": "Destination chain disabled"
+    },
+    {
+      "code": 8020,
+      "name": "FeeTokenDisabled",
+      "msg": "Fee token disabled"
+    },
+    {
+      "code": 8021,
+      "name": "MessageTooLarge",
+      "msg": "Message exceeds maximum data size"
+    },
+    {
+      "code": 8022,
+      "name": "UnsupportedNumberOfTokens",
+      "msg": "Message contains an unsupported number of tokens"
+    },
+    {
+      "code": 8023,
+      "name": "InvalidEVMAddress",
+      "msg": "Invalid EVM address"
+    },
+    {
+      "code": 8024,
+      "name": "InvalidEncoding",
+      "msg": "Invalid encoding"
+    },
+    {
+      "code": 8025,
+      "name": "InvalidTokenPrice",
+      "msg": "Invalid token price"
+    },
+    {
+      "code": 8026,
+      "name": "StaleGasPrice",
+      "msg": "Stale gas price"
+    },
+    {
+      "code": 8027,
+      "name": "InvalidInputsMissingTokenConfig",
+      "msg": "Inputs are missing token configuration"
+    },
+    {
+      "code": 8028,
+      "name": "MessageFeeTooHigh",
+      "msg": "Message fee is too high"
+    },
+    {
+      "code": 8029,
+      "name": "MessageGasLimitTooHigh",
+      "msg": "Message gas limit too high"
+    },
+    {
+      "code": 8030,
+      "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
+      "msg": "Extra arg out of order execution must be true"
+    },
+    {
+      "code": 8031,
+      "name": "InvalidExtraArgsTag",
+      "msg": "Invalid extra args tag"
+    },
+    {
+      "code": 8032,
+      "name": "InvalidChainFamilySelector",
+      "msg": "Invalid chain family selector"
+    },
+    {
+      "code": 8033,
+      "name": "InvalidTokenReceiver",
+      "msg": "Invalid token receiver"
+    },
+    {
+      "code": 8034,
+      "name": "InvalidSVMAddress",
+      "msg": "Invalid SVM address"
+    },
+    {
+      "code": 8035,
+      "name": "UnauthorizedPriceUpdater",
+      "msg": "The caller is not an authorized price updater"
+    },
+    {
+      "code": 8036,
+      "name": "InvalidCodeVersion",
+      "msg": "Invalid code version"
     }
   ]
 };

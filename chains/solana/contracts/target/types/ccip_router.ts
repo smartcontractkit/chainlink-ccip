@@ -1410,92 +1410,6 @@ export type CcipRouter = {
           }
         ]
       }
-    },
-    {
-      "name": "CcipRouterError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Unauthorized"
-          },
-          {
-            "name": "InvalidInputsMint"
-          },
-          {
-            "name": "InvalidVersion"
-          },
-          {
-            "name": "FeeTokenMismatch"
-          },
-          {
-            "name": "RedundantOwnerProposal"
-          },
-          {
-            "name": "ReachedMaxSequenceNumber"
-          },
-          {
-            "name": "InvalidInputsTokenIndices"
-          },
-          {
-            "name": "InvalidInputsPoolAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAccounts"
-          },
-          {
-            "name": "InvalidInputsConfigAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAdminRegistryAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccountWritable"
-          },
-          {
-            "name": "InvalidInputsTokenAmount"
-          },
-          {
-            "name": "InvalidInputsTransferAllAmount"
-          },
-          {
-            "name": "InvalidInputsAtaAddress"
-          },
-          {
-            "name": "InvalidInputsAtaWritable"
-          },
-          {
-            "name": "InvalidInputsChainSelector"
-          },
-          {
-            "name": "InsufficientLamports"
-          },
-          {
-            "name": "InsufficientFunds"
-          },
-          {
-            "name": "SourceTokenDataTooLarge"
-          },
-          {
-            "name": "InvalidTokenAdminRegistryInputsZeroAddress"
-          },
-          {
-            "name": "InvalidTokenAdminRegistryProposedAdmin"
-          },
-          {
-            "name": "SenderNotAllowed"
-          },
-          {
-            "name": "InvalidCodeVersion"
-          },
-          {
-            "name": "InvalidCcipVersionRollback"
-          }
-        ]
-      }
     }
   ],
   "events": [
@@ -1783,12 +1697,134 @@ export type CcipRouter = {
   ],
   "errors": [
     {
-      "code": 6000,
-      "name": "Something"
+      "code": 7000,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
     },
     {
-      "code": 6001,
-      "name": "Else"
+      "code": 7001,
+      "name": "InvalidInputsMint",
+      "msg": "Mint account input is invalid"
+    },
+    {
+      "code": 7002,
+      "name": "InvalidVersion",
+      "msg": "Invalid version of the onchain state"
+    },
+    {
+      "code": 7003,
+      "name": "FeeTokenMismatch",
+      "msg": "Fee token doesn't match transfer token"
+    },
+    {
+      "code": 7004,
+      "name": "RedundantOwnerProposal",
+      "msg": "Proposed owner is the current owner"
+    },
+    {
+      "code": 7005,
+      "name": "ReachedMaxSequenceNumber",
+      "msg": "Reached max sequence number"
+    },
+    {
+      "code": 7006,
+      "name": "InvalidInputsTokenIndices",
+      "msg": "Invalid pool account account indices"
+    },
+    {
+      "code": 7007,
+      "name": "InvalidInputsPoolAccounts",
+      "msg": "Invalid pool accounts"
+    },
+    {
+      "code": 7008,
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
+    },
+    {
+      "code": 7009,
+      "name": "InvalidInputsConfigAccounts",
+      "msg": "Invalid config account"
+    },
+    {
+      "code": 7010,
+      "name": "InvalidInputsTokenAdminRegistryAccounts",
+      "msg": "Invalid Token Admin Registry account"
+    },
+    {
+      "code": 7011,
+      "name": "InvalidInputsLookupTableAccounts",
+      "msg": "Invalid LookupTable account"
+    },
+    {
+      "code": 7012,
+      "name": "InvalidInputsLookupTableAccountWritable",
+      "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 7013,
+      "name": "InvalidInputsTokenAmount",
+      "msg": "Cannot send zero tokens"
+    },
+    {
+      "code": 7014,
+      "name": "InvalidInputsTransferAllAmount",
+      "msg": "Must specify zero amount to send alongside transfer_all"
+    },
+    {
+      "code": 7015,
+      "name": "InvalidInputsAtaAddress",
+      "msg": "Invalid Associated Token Account address"
+    },
+    {
+      "code": 7016,
+      "name": "InvalidInputsAtaWritable",
+      "msg": "Invalid Associated Token Account writable flag"
+    },
+    {
+      "code": 7017,
+      "name": "InvalidInputsChainSelector",
+      "msg": "Chain selector is invalid"
+    },
+    {
+      "code": 7018,
+      "name": "InsufficientLamports",
+      "msg": "Insufficient lamports"
+    },
+    {
+      "code": 7019,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 7020,
+      "name": "SourceTokenDataTooLarge",
+      "msg": "Source token data is too large"
+    },
+    {
+      "code": 7021,
+      "name": "InvalidTokenAdminRegistryInputsZeroAddress",
+      "msg": "New Admin can not be zero address"
+    },
+    {
+      "code": 7022,
+      "name": "InvalidTokenAdminRegistryProposedAdmin",
+      "msg": "An already owned registry can not be proposed"
+    },
+    {
+      "code": 7023,
+      "name": "SenderNotAllowed",
+      "msg": "Sender not allowed for that destination chain"
+    },
+    {
+      "code": 7024,
+      "name": "InvalidCodeVersion",
+      "msg": "Invalid code version"
+    },
+    {
+      "code": 7025,
+      "name": "InvalidCcipVersionRollback",
+      "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
     }
   ]
 };
@@ -3205,92 +3241,6 @@ export const IDL: CcipRouter = {
           }
         ]
       }
-    },
-    {
-      "name": "CcipRouterError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Unauthorized"
-          },
-          {
-            "name": "InvalidInputsMint"
-          },
-          {
-            "name": "InvalidVersion"
-          },
-          {
-            "name": "FeeTokenMismatch"
-          },
-          {
-            "name": "RedundantOwnerProposal"
-          },
-          {
-            "name": "ReachedMaxSequenceNumber"
-          },
-          {
-            "name": "InvalidInputsTokenIndices"
-          },
-          {
-            "name": "InvalidInputsPoolAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAccounts"
-          },
-          {
-            "name": "InvalidInputsConfigAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAdminRegistryAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccountWritable"
-          },
-          {
-            "name": "InvalidInputsTokenAmount"
-          },
-          {
-            "name": "InvalidInputsTransferAllAmount"
-          },
-          {
-            "name": "InvalidInputsAtaAddress"
-          },
-          {
-            "name": "InvalidInputsAtaWritable"
-          },
-          {
-            "name": "InvalidInputsChainSelector"
-          },
-          {
-            "name": "InsufficientLamports"
-          },
-          {
-            "name": "InsufficientFunds"
-          },
-          {
-            "name": "SourceTokenDataTooLarge"
-          },
-          {
-            "name": "InvalidTokenAdminRegistryInputsZeroAddress"
-          },
-          {
-            "name": "InvalidTokenAdminRegistryProposedAdmin"
-          },
-          {
-            "name": "SenderNotAllowed"
-          },
-          {
-            "name": "InvalidCodeVersion"
-          },
-          {
-            "name": "InvalidCcipVersionRollback"
-          }
-        ]
-      }
     }
   ],
   "events": [
@@ -3578,12 +3528,134 @@ export const IDL: CcipRouter = {
   ],
   "errors": [
     {
-      "code": 6000,
-      "name": "Something"
+      "code": 7000,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
     },
     {
-      "code": 6001,
-      "name": "Else"
+      "code": 7001,
+      "name": "InvalidInputsMint",
+      "msg": "Mint account input is invalid"
+    },
+    {
+      "code": 7002,
+      "name": "InvalidVersion",
+      "msg": "Invalid version of the onchain state"
+    },
+    {
+      "code": 7003,
+      "name": "FeeTokenMismatch",
+      "msg": "Fee token doesn't match transfer token"
+    },
+    {
+      "code": 7004,
+      "name": "RedundantOwnerProposal",
+      "msg": "Proposed owner is the current owner"
+    },
+    {
+      "code": 7005,
+      "name": "ReachedMaxSequenceNumber",
+      "msg": "Reached max sequence number"
+    },
+    {
+      "code": 7006,
+      "name": "InvalidInputsTokenIndices",
+      "msg": "Invalid pool account account indices"
+    },
+    {
+      "code": 7007,
+      "name": "InvalidInputsPoolAccounts",
+      "msg": "Invalid pool accounts"
+    },
+    {
+      "code": 7008,
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
+    },
+    {
+      "code": 7009,
+      "name": "InvalidInputsConfigAccounts",
+      "msg": "Invalid config account"
+    },
+    {
+      "code": 7010,
+      "name": "InvalidInputsTokenAdminRegistryAccounts",
+      "msg": "Invalid Token Admin Registry account"
+    },
+    {
+      "code": 7011,
+      "name": "InvalidInputsLookupTableAccounts",
+      "msg": "Invalid LookupTable account"
+    },
+    {
+      "code": 7012,
+      "name": "InvalidInputsLookupTableAccountWritable",
+      "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 7013,
+      "name": "InvalidInputsTokenAmount",
+      "msg": "Cannot send zero tokens"
+    },
+    {
+      "code": 7014,
+      "name": "InvalidInputsTransferAllAmount",
+      "msg": "Must specify zero amount to send alongside transfer_all"
+    },
+    {
+      "code": 7015,
+      "name": "InvalidInputsAtaAddress",
+      "msg": "Invalid Associated Token Account address"
+    },
+    {
+      "code": 7016,
+      "name": "InvalidInputsAtaWritable",
+      "msg": "Invalid Associated Token Account writable flag"
+    },
+    {
+      "code": 7017,
+      "name": "InvalidInputsChainSelector",
+      "msg": "Chain selector is invalid"
+    },
+    {
+      "code": 7018,
+      "name": "InsufficientLamports",
+      "msg": "Insufficient lamports"
+    },
+    {
+      "code": 7019,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 7020,
+      "name": "SourceTokenDataTooLarge",
+      "msg": "Source token data is too large"
+    },
+    {
+      "code": 7021,
+      "name": "InvalidTokenAdminRegistryInputsZeroAddress",
+      "msg": "New Admin can not be zero address"
+    },
+    {
+      "code": 7022,
+      "name": "InvalidTokenAdminRegistryProposedAdmin",
+      "msg": "An already owned registry can not be proposed"
+    },
+    {
+      "code": 7023,
+      "name": "SenderNotAllowed",
+      "msg": "Sender not allowed for that destination chain"
+    },
+    {
+      "code": 7024,
+      "name": "InvalidCodeVersion",
+      "msg": "Invalid code version"
+    },
+    {
+      "code": 7025,
+      "name": "InvalidCcipVersionRollback",
+      "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
     }
   ]
 };
