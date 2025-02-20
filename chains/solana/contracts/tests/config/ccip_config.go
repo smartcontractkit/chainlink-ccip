@@ -23,6 +23,7 @@ var (
 	Token2022Program           = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 	FeeQuoterProgram           = solana.MustPublicKeyFromBase58("FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw")
 	CcipOfframpProgram         = solana.MustPublicKeyFromBase58("offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5")
+	PingPongProgram            = solana.MustPublicKeyFromBase58("PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU")
 
 	// test values
 	OnRampAddress                   = []byte{1, 2, 3}
