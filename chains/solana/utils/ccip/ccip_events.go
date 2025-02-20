@@ -21,7 +21,7 @@ type EventCCIPMessageSent struct {
 
 type EventCommitReportAccepted struct {
 	Discriminator [8]byte
-	Report        ccip_offramp.MerkleRoot
+	Report        *ccip_offramp.MerkleRoot `bin:"optional"`
 	PriceUpdates  ccip_offramp.PriceUpdates
 }
 

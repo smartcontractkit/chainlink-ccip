@@ -1748,7 +1748,9 @@
         {
           "name": "merkleRoot",
           "type": {
-            "defined": "MerkleRoot"
+            "option": {
+              "defined": "MerkleRoot"
+            }
           },
           "index": false
         },
