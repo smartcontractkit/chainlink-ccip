@@ -32,6 +32,7 @@ jobs:
         run: make lint
       - name: Run protobuf linter and backwards compatibility checker
         run: |
+          git fetch origin ${{ github.base_ref }}
           make install_buf
           make proto-lint
           make proto-check-breaking COMPARE_AGAINST_BRANCH=${{ github.base_ref }}
