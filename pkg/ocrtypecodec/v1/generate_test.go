@@ -2,17 +2,31 @@ package v1
 
 import (
 	crand "crypto/rand"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func runBenchmark(
@@ -48,8 +62,11 @@ func runBenchmark(
 
 	// sanity check
 	if !reflect.DeepEqual(jsonDec, protoDec) {
-		t.Errorf("Decoded JSON and Protobuf objects differ %#v != %#v", jsonDec, protoDec)
+		jsonDecStr, _ := json.Marshal(jsonDec)
+		protoDecStr, _ := json.Marshal(protoDec)
+		require.JSONEq(t, string(jsonDecStr), string(protoDecStr))
 	}
+
 	return result
 }
 
@@ -127,98 +144,280 @@ type resultData struct {
 	protoEncodingDataLength int
 }
 
-// ----------------
+type dataGenerator struct {
+	name                 string
+	numRmnNodes          int
+	numSourceChains      int
+	numPricedTokens      int
+	numContractsPerChain int
+}
 
-// genQuery generates a Protobuf Query object with the specified number of signatures and lane updates.
-func genQuery(numSigs int, numLaneUpdates int) *ocrtypecodecpb.CommitQuery {
-	// Generate ECDSA Signatures
-	signatures := make([]*ocrtypecodecpb.SignatureEcdsa, numSigs)
-	for i := 0; i < numSigs; i++ {
-		signatures[i] = &ocrtypecodecpb.SignatureEcdsa{
-			R: randomBytes(32), // Simulating 32-byte ECDSA R value
-			S: randomBytes(32), // Simulating 32-byte ECDSA S value
+var (
+	smallGen = dataGenerator{
+		name:                 "small",
+		numRmnNodes:          4,
+		numSourceChains:      8,
+		numPricedTokens:      8,
+		numContractsPerChain: 12,
+	}
+
+	medGen = dataGenerator{
+		name:                 "medium",
+		numRmnNodes:          16,
+		numSourceChains:      64,
+		numPricedTokens:      28,
+		numContractsPerChain: 18,
+	}
+
+	largeGen = dataGenerator{
+		name:                 "large",
+		numRmnNodes:          32,
+		numSourceChains:      256,
+		numPricedTokens:      64,
+		numContractsPerChain: 18,
+	}
+
+	xLargeGen = dataGenerator{
+		name:                 "xlarge",
+		numRmnNodes:          64,
+		numSourceChains:      512,
+		numPricedTokens:      128,
+		numContractsPerChain: 32,
+	}
+)
+
+var dataGenerators = []dataGenerator{smallGen, medGen, largeGen, xLargeGen}
+
+func (d *dataGenerator) commitQuery() committypes.Query {
+	sigs := make([]*serialization.EcdsaSignature, d.numRmnNodes)
+	for i := 0; i < d.numRmnNodes; i++ {
+		sigs[i] = &serialization.EcdsaSignature{
+			R: randomBytes(32),
+			S: randomBytes(32),
 		}
 	}
 
-	// Generate Lane Updates
-	laneUpdates := make([]*ocrtypecodecpb.DestChainUpdate, numLaneUpdates)
-	for i := 0; i < numLaneUpdates; i++ {
-		laneUpdates[i] = &ocrtypecodecpb.DestChainUpdate{
-			LaneSource: &ocrtypecodecpb.SourceChainMeta{
-				SourceChainSelector: uint64(rand.Intn(1000)), // Random chain selector
-				OnrampAddress:       randomBytes(20),         // Simulated 20-byte address
+	laneUpdates := make([]*serialization.FixedDestLaneUpdate, d.numSourceChains)
+	for i := 0; i < d.numSourceChains; i++ {
+		laneUpdates[i] = &serialization.FixedDestLaneUpdate{
+			LaneSource: &serialization.LaneSource{
+				SourceChainSelector: rand.Uint64(),
+				OnrampAddress:       randomBytes(40),
 			},
-			SeqNumRange: &ocrtypecodecpb.SeqNumRange{
-				MinMsgNr: uint64(rand.Intn(10000)),
-				MaxMsgNr: uint64(rand.Intn(10000) + 100), // Ensure max > min
+			ClosedInterval: &serialization.ClosedInterval{
+				MinMsgNr: rand.Uint64(),
+				MaxMsgNr: rand.Uint64(),
 			},
-			Root: randomBytes(32), // Simulated 32-byte Merkle root
+			Root: randomBytes(32),
 		}
 	}
 
-	// Construct the Protobuf Query object
-	query := &ocrtypecodecpb.CommitQuery{
-		MerkleRootQuery: &ocrtypecodecpb.MerkleRootQuery{
-			RetryRmnSignatures: true,
-			RmnSignatures: &ocrtypecodecpb.ReportSignatures{
-				Signatures:  signatures,
+	return committypes.Query{
+		MerkleRootQuery: merkleroot.Query{
+			RetryRMNSignatures: rand.Uint32()%2 == 0,
+			RMNSignatures: &rmn.ReportSignatures{
+				Signatures:  sigs,
 				LaneUpdates: laneUpdates,
 			},
 		},
-	}
-
-	return query
-}
-
-// genObservation generates a randomized Observation struct.
-func genObservation(
-	numMerkleRoots, numSeqNumChains, numSigners int,
-	numTokenPrices, numFeeQuoterUpdates int, numFeeComponents int, numContractNames int,
-) *ocrtypecodecpb.CommitObservation {
-	return &ocrtypecodecpb.CommitObservation{
-		MerkleRootObs: genMerkleRootObservation(numMerkleRoots, numSeqNumChains, numSigners),
-		TokenPriceObs: genTokenPriceObservation(numTokenPrices, numFeeQuoterUpdates),
-		ChainFeeObs:   genChainFeeObservation(numFeeComponents),
-		DiscoveryObs:  genDiscoveryObservation(numContractNames),
-		FChain:        genFChain(6),
+		TokenPriceQuery: tokenprice.Query{},
+		ChainFeeQuery:   chainfee.Query{},
 	}
 }
 
-// genOutcome generates a randomized Outcome struct.
-func genOutcome(
-	numRanges, numRoots, numSigners, numSeqNumChains, numGasPrices, numTokenPrices int) *ocrtypecodecpb.CommitOutcome {
-	return &ocrtypecodecpb.CommitOutcome{
-		MerkleRootOutcome: genMerkleRootOutcome(numRanges, numRoots, numSigners, numSeqNumChains),
-		TokenPriceOutcome: genTokenPriceOutcome(numTokenPrices),
-		ChainFeeOutcome:   genChainFeeOutcome(numGasPrices),
-		MainOutcome:       genMainOutcome(),
+func (d *dataGenerator) commitObservation() committypes.Observation {
+	fChain := make(map[cciptypes.ChainSelector]int, d.numSourceChains)
+	merkleRoots := genMerkleRootChain(d.numSourceChains)
+	rmnEnabledChains := genRmnEnabledChains(d.numSourceChains)
+	onRampMaxSeqNums := genSeqNumChain(d.numSourceChains)
+	offRampNextSeqNums := genSeqNumChain(d.numSourceChains)
+	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, d.numSourceChains)
+	nativeTokenPrices := make(map[cciptypes.ChainSelector]cciptypes.BigInt, d.numSourceChains)
+	chainFeeUpdates := make(map[cciptypes.ChainSelector]chainfee.Update, d.numSourceChains)
+
+	for i := 0; i < d.numSourceChains; i++ {
+		fChain[cciptypes.ChainSelector(rand.Uint64())] = rand.Intn(256)
+
+		feeComponents[cciptypes.ChainSelector(rand.Uint64())] = types.ChainFeeComponents{
+			ExecutionFee:        randBigInt().Int,
+			DataAvailabilityFee: randBigInt().Int,
+		}
+
+		nativeTokenPrices[cciptypes.ChainSelector(rand.Uint64())] = randBigInt()
+
+		chainFeeUpdates[cciptypes.ChainSelector(rand.Uint64())] = chainfee.Update{
+			ChainFee: chainfee.ComponentsUSDPrices{
+				ExecutionFeePriceUSD: randBigInt().Int,
+				DataAvFeePriceUSD:    randBigInt().Int,
+			},
+			Timestamp: time.Now().UTC(),
+		}
+	}
+
+	feedTokenPrices := make(map[cciptypes.UnknownEncodedAddress]cciptypes.BigInt, d.numPricedTokens)
+	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, d.numPricedTokens)
+
+	for i := 0; i < d.numPricedTokens; i++ {
+		feedTokenPrices[cciptypes.UnknownEncodedAddress(genRandomString(40))] = randBigInt()
+
+		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(genRandomString(40))] = plugintypes.TimestampedBig{
+			Timestamp: time.Now().UTC(),
+			Value:     randBigInt(),
+		}
+	}
+
+	contractAddresses := make(reader.ContractAddresses, d.numContractsPerChain)
+	for i := 0; i < d.numContractsPerChain; i++ {
+		contractName := fmt.Sprintf("contract-%d", i)
+		contractAddresses[contractName] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress, d.numSourceChains)
+		for j := 0; j < d.numSourceChains; j++ {
+			contractAddresses[contractName][cciptypes.ChainSelector(rand.Uint64())] = randomBytes(40)
+		}
+	}
+
+	return committypes.Observation{
+		MerkleRootObs: merkleroot.Observation{
+			MerkleRoots:        merkleRoots,
+			RMNEnabledChains:   rmnEnabledChains,
+			OnRampMaxSeqNums:   onRampMaxSeqNums,
+			OffRampNextSeqNums: offRampNextSeqNums,
+			RMNRemoteConfig:    genRmnRemoteConfig(d.numRmnNodes),
+			FChain:             fChain,
+		},
+		TokenPriceObs: tokenprice.Observation{
+			FeedTokenPrices:       feedTokenPrices,
+			FeeQuoterTokenUpdates: feeQuoterTokenUpdates,
+			FChain:                fChain,
+			Timestamp:             time.Now().UTC(),
+		},
+		ChainFeeObs: chainfee.Observation{
+			FeeComponents:     feeComponents,
+			NativeTokenPrices: nativeTokenPrices,
+			ChainFeeUpdates:   chainFeeUpdates,
+			FChain:            fChain,
+			TimestampNow:      time.Now().UTC(),
+		},
+		DiscoveryObs: dt.Observation{
+			FChain:    fChain,
+			Addresses: contractAddresses,
+		},
+		FChain: fChain,
 	}
 }
 
-// genMerkleRootOutcome generates a MerkleRootOutcome.
-func genMerkleRootOutcome(numRanges, numRoots, numSigners, numSeqNumChains int) *ocrtypecodecpb.MerkleRootOutcome {
-	return &ocrtypecodecpb.MerkleRootOutcome{
-		OutcomeType:                     int32(rand.Intn(10)),
-		RangesSelectedForReport:         genChainRanges(numRanges),
-		RootsToReport:                   genMerkleRootChains(numRoots),
-		RmnEnabledChains:                genBoolMap(5),
-		OffRampNextSeqNums:              genSeqNumChains(numSeqNumChains),
-		ReportTransmissionCheckAttempts: uint32(rand.Intn(10)),
-		RmnReportSignatures:             genEcdsaSignatures(3),
-		RmnRemoteCfg:                    genRemoteConfig(numSigners),
+func (d *dataGenerator) commitOutcome() committypes.Outcome {
+	rmnReportSigs := make([]cciptypes.RMNECDSASignature, d.numRmnNodes)
+	for i := 0; i < d.numRmnNodes; i++ {
+		rmnReportSigs[i] = cciptypes.RMNECDSASignature{
+			R: randomBytes32(),
+			S: randomBytes32(),
+		}
+	}
+
+	tokenPrices := make(cciptypes.TokenPriceMap)
+	for i := 0; i < d.numPricedTokens; i++ {
+		tokenPrices[cciptypes.UnknownEncodedAddress(genRandomString(40))] = randBigInt()
+	}
+
+	gasPrices := make([]cciptypes.GasPriceChain, d.numSourceChains)
+	for i := 0; i < d.numSourceChains; i++ {
+		gasPrices[i] = cciptypes.GasPriceChain{
+			ChainSel: cciptypes.ChainSelector(rand.Uint64()),
+			GasPrice: randBigInt(),
+		}
+	}
+
+	return committypes.Outcome{
+		MerkleRootOutcome: merkleroot.Outcome{
+			OutcomeType:                     merkleroot.OutcomeType(rand.Int() % 128),
+			RangesSelectedForReport:         genChainRanges(d.numSourceChains),
+			RootsToReport:                   genMerkleRootChain(d.numSourceChains),
+			RMNEnabledChains:                genRmnEnabledChains(d.numSourceChains),
+			OffRampNextSeqNums:              genSeqNumChain(d.numSourceChains),
+			ReportTransmissionCheckAttempts: uint(rand.Intn(128)),
+			RMNReportSignatures:             rmnReportSigs,
+			RMNRemoteCfg:                    genRmnRemoteConfig(d.numRmnNodes),
+		},
+		TokenPriceOutcome: tokenprice.Outcome{
+			TokenPrices: tokenPrices,
+		},
+		ChainFeeOutcome: chainfee.Outcome{
+			GasPrices: gasPrices,
+		},
+		MainOutcome: committypes.MainOutcome{
+			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(rand.Uint64()),
+			RemainingPriceChecks:           rand.Int() % 256,
+		},
 	}
 }
+
+func genMerkleRootChain(n int) []cciptypes.MerkleRootChain {
+	mrcs := make([]cciptypes.MerkleRootChain, n)
+	for i := 0; i < n; i++ {
+		mrcs[i] = cciptypes.MerkleRootChain{
+			ChainSel:      cciptypes.ChainSelector(rand.Uint64()),
+			OnRampAddress: randomBytes(40),
+			SeqNumsRange:  cciptypes.NewSeqNumRange(cciptypes.SeqNum(rand.Uint64()), cciptypes.SeqNum(rand.Uint64())),
+			MerkleRoot:    randomBytes32(),
+		}
+	}
+	return mrcs
+}
+
+func genRmnEnabledChains(n int) map[cciptypes.ChainSelector]bool {
+	m := make(map[cciptypes.ChainSelector]bool)
+	for i := 0; i < n; i++ {
+		m[cciptypes.ChainSelector(rand.Uint64())] = rand.Int()%2 == 0
+	}
+	return m
+}
+
+func genSeqNumChain(n int) []plugintypes.SeqNumChain {
+	chains := make([]plugintypes.SeqNumChain, n)
+	for i := 0; i < n; i++ {
+		chains[i] = plugintypes.SeqNumChain{
+			ChainSel: cciptypes.ChainSelector(rand.Uint64()),
+			SeqNum:   cciptypes.SeqNum(rand.Uint64()),
+		}
+	}
+	return chains
+}
+
+func genRmnRemoteConfig(numSigners int) rmntypes.RemoteConfig {
+	rmnSigners := make([]rmntypes.RemoteSignerInfo, numSigners)
+	for i := 0; i < numSigners; i++ {
+		rmnSigners[i] = rmntypes.RemoteSignerInfo{
+			OnchainPublicKey: randomBytes(20),
+			NodeIndex:        rand.Uint64(),
+		}
+	}
+
+	return rmntypes.RemoteConfig{
+		ContractAddress:  randomBytes(40),
+		ConfigDigest:     randomBytes32(),
+		Signers:          rmnSigners,
+		FSign:            rand.Uint64(),
+		ConfigVersion:    rand.Uint32(),
+		RmnReportVersion: randomBytes32(),
+	}
+}
+
+func randBigInt() cciptypes.BigInt {
+	return cciptypes.NewBigInt(big.NewInt(rand.Int63()))
+}
+
+// ----------
 
 // genChainRanges generates a slice of ChainRange.
-func genChainRanges(n int) []*ocrtypecodecpb.ChainRange {
-	ranges := make([]*ocrtypecodecpb.ChainRange, n)
+func genChainRanges(n int) []plugintypes.ChainRange {
+	ranges := make([]plugintypes.ChainRange, n)
 	for i := 0; i < n; i++ {
-		ranges[i] = &ocrtypecodecpb.ChainRange{
-			ChainSel: rand.Uint64(),
-			SeqNumRange: &ocrtypecodecpb.SeqNumRange{
-				MinMsgNr: uint64(rand.Intn(1000)),
-				MaxMsgNr: uint64(rand.Intn(1000) + 100), // Ensure max > min
-			},
+		ranges[i] = plugintypes.ChainRange{
+			ChainSel: cciptypes.ChainSelector(rand.Uint64()),
+			SeqNumRange: cciptypes.NewSeqNumRange(
+				cciptypes.SeqNum(rand.Uint64()),
+				cciptypes.SeqNum(rand.Uint64()),
+			),
 		}
 	}
 	return ranges
@@ -484,6 +683,11 @@ func randomBytes(n int) []byte {
 		panic(err)
 	}
 	return b
+}
+
+// randomBytes32 generates a random byte32 slice.
+func randomBytes32() [32]byte {
+	return [32]byte(randomBytes(32))
 }
 
 // genExecObservation generates a randomized ExecObservation for benchmarking.
