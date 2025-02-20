@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	bin "github.com/gagliardetto/binary"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 )
 
@@ -91,7 +92,6 @@ func ParseEventCommitReportAccepted(logs []string, event string, obj *EventCommi
 				return err
 			}
 			if IsEvent(event, data) {
-
 				decoder := bin.NewBorshDecoder(data)
 
 				// Deserialize `Discriminator`:
@@ -102,14 +102,14 @@ func ParseEventCommitReportAccepted(logs []string, event string, obj *EventCommi
 
 				// Deserialize `Report` (optional):
 				{
-					ok, err := decoder.ReadBool()
-					if err != nil {
-						return err
+					ok, dErr := decoder.ReadBool()
+					if dErr != nil {
+						return dErr
 					}
 					if ok {
-						err = decoder.Decode(&obj.Report)
-						if err != nil {
-							return err
+						dErr = decoder.Decode(&obj.Report)
+						if dErr != nil {
+							return dErr
 						}
 					}
 				}
