@@ -24,6 +24,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+var errEmptyReport = errors.New("empty report")
+
 // buildOneReport is the common logic for building a report. Different report building
 // algorithms can reassemble reports by selecting which blessed and unblessed merkle
 // roots to include in the report, and which price updates and rmn signatures to use.
@@ -71,7 +73,7 @@ func buildOneReport(
 
 	if rep.IsEmpty() {
 		lggr.Infow("empty report", "report", rep)
-		return ocr3types.ReportPlus[[]byte]{}, nil
+		return ocr3types.ReportPlus[[]byte]{}, errEmptyReport
 	}
 
 	encodedReport, err := reportCodec.Encode(ctx, rep)
@@ -131,6 +133,9 @@ func buildStandardReport(
 		outcome.MerkleRootOutcome.RMNRemoteCfg.FSign,
 		priceUpdates,
 	)
+	if errors.Is(err, errEmptyReport) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +170,8 @@ func buildMultipleReports(
 			unblessedMerkleRoots = append(unblessedMerkleRoots, r)
 		}
 
+		// Build a report when we have the desired number of merkle roots.
 		if numRoots == maxMerkleRootsPerReport {
-			// build it.
 			report, err := buildOneReport(
 				ctx,
 				lggr,
@@ -179,10 +184,14 @@ func buildMultipleReports(
 				0,   // no RMN for partial reports.
 				priceUpdates,
 			)
-			if err != nil {
+			isEmpty := errors.Is(err, errEmptyReport)
+			if err != nil && !isEmpty {
 				return nil, err
 			}
-			reports = append(reports, report)
+			// don't add empty reports.
+			if !isEmpty {
+				reports = append(reports, report)
+			}
 
 			// reset accumulators for next report.
 			numRoots = 0
@@ -209,10 +218,14 @@ func buildMultipleReports(
 			0,   // no RMN for partial reports.
 			priceUpdates,
 		)
-		if err != nil {
+		isEmpty := errors.Is(err, errEmptyReport)
+		if err != nil && !isEmpty {
 			return nil, err
 		}
-		reports = append(reports, report)
+		// don't add empty reports.
+		if !isEmpty {
+			reports = append(reports, report)
+		}
 	}
 
 	return reports, nil
