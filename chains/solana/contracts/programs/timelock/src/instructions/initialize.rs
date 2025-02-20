@@ -15,7 +15,7 @@ pub fn initialize(
     min_delay: u64,
 ) -> Result<()> {
     // assign owner(owner is admin)
-    let config = &mut ctx.accounts.config;
+    let mut config = ctx.accounts.config.load_init()?;
     config.timelock_id = timelock_id;
     config.owner = ctx.accounts.authority.key();
     config.min_delay = min_delay;
@@ -66,7 +66,7 @@ pub struct Initialize<'info> {
         bump,
         payer = authority,
     )]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -98,7 +98,7 @@ pub struct BatchAddAccess<'info> {
         seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()],
         bump,
     )]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     pub access_controller_program: Program<'info, access_controller::program::AccessController>,
 
@@ -106,10 +106,10 @@ pub struct BatchAddAccess<'info> {
     #[account(
         mut,
         owner = access_controller_program.key(),
-        address = config.get_role_controller(&role) @ TimelockError::InvalidAccessController,
+        address = config.load()?.get_role_controller(&role) @ TimelockError::InvalidAccessController,
     )]
     pub role_access_controller: AccountLoader<'info, AccessController>,
 
-    #[account(mut, address = config.owner)]
+    #[account(mut, address = config.load()?.owner)]
     pub authority: Signer<'info>,
 }
