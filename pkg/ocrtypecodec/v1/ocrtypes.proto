@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package rmn_offchain;
+package pkg.ocrtypecodec.v1;
 option go_package = "./;ocrtypecodecpb";
 
 import "google/protobuf/timestamp.proto";

@@ -1,4 +1,4 @@
-package ocrtypecodec
+package v1
 
 import (
 	"fmt"
