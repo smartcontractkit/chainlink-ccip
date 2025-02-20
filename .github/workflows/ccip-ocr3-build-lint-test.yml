@@ -33,11 +33,10 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.62.2
       - name: Run linter
         run: make lint
-      - name: Run protobuf linter and backwards compatibility checker
+      - name: Run protobuf linter
         run: |
           make install_buf
           make proto-lint
-          make proto-check-breaking COMPARE_AGAINST_BRANCH="HEAD"
       - name: Run tests
         run: TEST_COUNT=20 COVERAGE_FILE=coverage.out make test
       - name: Generate coverage report
@@ -45,10 +44,12 @@ jobs:
         run: |
           total=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
           echo "coverage=$total" >> $GITHUB_ENV
-      - name: Coverage on target branch
+      - name: Coverage on target branch and proto breaking change check
         if: github.event_name == 'pull_request'
         run: |
           git fetch origin ${{ github.base_ref }}
+          git branch -a
+          make proto-check-breaking COMPARE_AGAINST_BRANCH=${{ github.base_ref }}
           git checkout ${{ github.base_ref }}
           TEST_COUNT=1 COVERAGE_FILE=coverage_target.out make test
           total=$(go tool cover -func=coverage_target.out | grep total | awk '{print $3}')
