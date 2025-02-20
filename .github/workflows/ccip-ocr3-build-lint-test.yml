@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
-          fetch-depth: 1
+          fetch-depth: 0
       - name: Determine Go version
         id: go_version
         run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
@@ -37,7 +37,7 @@ jobs:
         run: |
           make install_buf
           make proto-lint
-          make proto-check-breaking COMPARE_AGAINST_BRANCH=${{ github.base_ref }}
+          make proto-check-breaking COMPARE_AGAINST_BRANCH="HEAD"
       - name: Run tests
         run: TEST_COUNT=20 COVERAGE_FILE=coverage.out make test
       - name: Generate coverage report
