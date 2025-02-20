@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
-          fetch-depth: 0  # Ensures a full clone
+          fetch-depth: 1
       - name: Determine Go version
         id: go_version
         run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
