@@ -45,7 +45,7 @@ clean-generate: ensure_go_version
 
 test:
 	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) \
-		`go list ./... | grep -Ev 'chainlink-ccip/internal/mocks|chainlink-ccip/mocks'`
+		`go list ./... | grep -Ev 'chainlink-ccip/internal/mocks|chainlink-ccip/mocks|chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb'`
 
 lint: ensure_go_version ensure_golangcilint_1_62_2
 	golangci-lint run -c .golangci.yml
