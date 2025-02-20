@@ -73,7 +73,7 @@ Contracts: 274962
 */
 func TestObservationSize(t *testing.T) {
 	t.Skip("This test is for estimating message sizes, not for running in CI")
-	ocrTypeCodec := ocrtypecodec.NewExecCodecJSON()
+	ocrTypeCodec := ocrtypecodec.DefaultExecCodec
 
 	maxCommitReports := 100
 	maxMessages := 1100

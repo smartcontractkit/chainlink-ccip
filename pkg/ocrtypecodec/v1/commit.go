@@ -17,6 +17,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+var DefaultCommitCodec CommitCodec = NewCommitCodecProto()
+
 // CommitCodec is an interface for encoding and decoding OCR related commit plugin types.
 type CommitCodec interface {
 	EncodeQuery(query committypes.Query) ([]byte, error)

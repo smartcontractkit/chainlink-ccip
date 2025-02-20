@@ -41,7 +41,7 @@ func Test_LatencyIsTracked(t *testing.T) {
 	}
 	reporter, err := metrics.NewPromReporter(lggr, selector)
 	require.NoError(t, err)
-	tracked := NewTrackedPlugin(origin, lggr, reporter, ocrtypecodec.NewExecCodecJSON())
+	tracked := NewTrackedPlugin(origin, lggr, reporter, ocrtypecodec.DefaultExecCodec)
 
 	count := 100
 	for i := 0; i < count; i++ {
@@ -84,7 +84,7 @@ func Test_ErrorIsTrackedWhenOriginReturns(t *testing.T) {
 	origin := FakePlugin{err: fmt.Errorf("error")}
 	reporter, err := metrics.NewPromReporter(lggr, selector)
 	require.NoError(t, err)
-	tracked := NewTrackedPlugin(origin, lggr, reporter, ocrtypecodec.NewExecCodecJSON())
+	tracked := NewTrackedPlugin(origin, lggr, reporter, ocrtypecodec.DefaultExecCodec)
 
 	count := 100
 	for i := 0; i < count; i++ {

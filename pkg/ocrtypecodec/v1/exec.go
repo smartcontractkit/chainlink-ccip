@@ -12,6 +12,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+var DefaultExecCodec ExecCodec = NewExecCodecProto()
+
 // ExecCodec is an interface for encoding and decoding OCR related exec plugin types.
 type ExecCodec interface {
 	EncodeObservation(observation exectypes.Observation) ([]byte, error)

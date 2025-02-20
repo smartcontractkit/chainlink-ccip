@@ -104,7 +104,7 @@ func NewPlugin(
 ) ocr3types.ReportingPlugin[[]byte] {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
-	ocrTypCodec := ocrtypecodec.NewExecCodecProto()
+	ocrTypCodec := ocrtypecodec.DefaultExecCodec
 	p := &Plugin{
 		donID:                 donID,
 		reportingCfg:          reportingCfg,

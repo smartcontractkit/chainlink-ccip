@@ -92,7 +92,7 @@ var (
 	}
 )
 
-var ocrTypCodec = ocrtypecodec.NewCommitCodecProto()
+var ocrTypCodec = ocrtypecodec.DefaultCommitCodec
 
 func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 	params := defaultNodeParams(t)

@@ -68,7 +68,7 @@ func Test_maxQueryLength(t *testing.T) {
 		ChainFeeQuery:   chainfee.Query{},
 	}
 
-	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeQuery(q)
+	b, err := ocrtypecodec.DefaultCommitCodec.EncodeQuery(q)
 	require.NoError(t, err)
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
@@ -154,7 +154,7 @@ func Test_maxObservationLength(t *testing.T) {
 		maxObs.TokenPriceObs.FeedTokenPrices[tokenID] = ccipocr3.NewBigIntFromInt64(math.MaxInt64)
 	}
 
-	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeObservation(maxObs)
+	b, err := ocrtypecodec.DefaultCommitCodec.EncodeObservation(maxObs)
 	require.NoError(t, err)
 
 	const testOffset = 50
@@ -240,7 +240,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 		}
 	}
 
-	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(maxOutc)
+	b, err := ocrtypecodec.DefaultCommitCodec.EncodeOutcome(maxOutc)
 	require.NoError(t, err)
 
 	const testOffset = 50

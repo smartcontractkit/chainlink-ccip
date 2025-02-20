@@ -200,7 +200,7 @@ func TestPluginReports(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ocrTypeCodec := ocrtypecodec.NewCommitCodecJSON()
+			ocrTypeCodec := ocrtypecodec.DefaultCommitCodec
 
 			cs := plugincommon.NewMockChainSupport(t)
 			p := Plugin{
@@ -240,7 +240,7 @@ func TestPluginReports_InvalidOutcome(t *testing.T) {
 	lggr := logger.Test(t)
 	p := Plugin{
 		lggr:         lggr,
-		ocrTypeCodec: ocrtypecodec.NewCommitCodecJSON(),
+		ocrTypeCodec: ocrtypecodec.DefaultCommitCodec,
 	}
 	_, err := p.Reports(tests.Context(t), 0, []byte("invalid json"))
 	require.Error(t, err)

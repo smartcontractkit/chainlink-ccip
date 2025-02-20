@@ -177,7 +177,7 @@ func NewPlugin(
 		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
 		metricsReporter:     reporter,
-		ocrTypeCodec:        ocrtypecodec.NewCommitCodecProto(),
+		ocrTypeCodec:        ocrtypecodec.DefaultCommitCodec,
 	}
 }
 

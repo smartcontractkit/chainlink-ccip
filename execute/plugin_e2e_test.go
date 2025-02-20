@@ -18,7 +18,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-var ocrTypeCodec = ocrtypecodec.NewExecCodecProto()
+var ocrTypeCodec = ocrtypecodec.DefaultExecCodec
 
 func TestPlugin(t *testing.T) {
 	ctx := tests.Context(t)
