@@ -1,34 +1,16 @@
 use crate::state::SourceChainConfig;
 
-pub fn get_on_ramps(config: &SourceChainConfig) -> Vec<&[u8]> {
-    let first_item = trim_trailing_zeros(&config.on_ramp[0]);
-    let second_item = trim_trailing_zeros(&config.on_ramp[1]);
-
-    let mut on_ramps: Vec<&[u8]> = Vec::new();
-
-    // filter out empty values
-    if !first_item.is_empty() {
-        on_ramps.push(first_item);
-    }
-    if !second_item.is_empty() {
-        on_ramps.push(second_item);
-    }
-
-    on_ramps
+pub fn get_on_ramps(config: &SourceChainConfig) -> impl Iterator<Item = &[u8; 64]> {
+    config.on_ramp.iter().filter(|i| *i != &[0u8; 64])
 }
 
 pub fn is_on_ramp_configured(config: &SourceChainConfig, on_ramp: &[u8]) -> bool {
-    let valid_on_ramps = get_on_ramps(config);
-
-    valid_on_ramps.contains(&on_ramp)
-}
-
-fn trim_trailing_zeros(input: &[u8]) -> &[u8] {
-    let end = input
-        .iter()
-        .rposition(|&byte| byte != 0)
-        .map_or(0, |pos| pos + 1);
-    &input[..end]
+    if on_ramp.len() > 64 {
+        return false;
+    }
+    let prefix_matches = |long: &[u8], short: &[u8]| &long[0..short.len()] == short;
+    let suffix_is_zero = |a: &[u8], start: usize| a[start..].iter().all(|b| *b == 0);
+    get_on_ramps(config).any(|o| prefix_matches(o, on_ramp) && suffix_is_zero(o, on_ramp.len()))
 }
 
 #[cfg(test)]
@@ -70,11 +52,11 @@ mod tests {
             },
             TestCase {
                 on_ramp: [address_4, [0; 64]],
-                expected: vec![&[4; 32]],
+                expected: vec![&address_4],
             },
             TestCase {
                 on_ramp: [[0; 64], address_4],
-                expected: vec![&[4; 32]],
+                expected: vec![&address_4],
             },
         ];
 
@@ -84,7 +66,7 @@ mod tests {
                 on_ramp: case.on_ramp,
                 lane_code_version: CodeVersion::Default,
             };
-            let result = get_on_ramps(&config);
+            let result = get_on_ramps(&config).collect::<Vec<_>>();
             assert_eq!(
                 result, case.expected,
                 "Failed on get_on_ramps for config: {:?}",
@@ -210,29 +192,5 @@ mod tests {
                 case.given_on_ramp
             );
         }
-    }
-
-    #[test]
-    fn test_trim_trailing_zeros() {
-        // only right padding is removed
-        let input = vec![0, 0, 0, 1, 2, 3];
-        let expected_output = &[0, 0, 0, 1, 2, 3];
-        assert_eq!(trim_trailing_zeros(&input), expected_output);
-
-        let input = vec![1, 2, 3, 0, 0, 0];
-        let expected_output = &[1, 2, 3];
-        assert_eq!(trim_trailing_zeros(&input), expected_output);
-
-        let input = vec![1, 2, 3];
-        let expected_output = &[1, 2, 3];
-        assert_eq!(trim_trailing_zeros(&input), expected_output);
-
-        let input = vec![0, 0, 0];
-        let expected_output: &[u8] = &[];
-        assert_eq!(trim_trailing_zeros(&input), expected_output);
-
-        let input = vec![];
-        let expected_output: &[u8] = &[];
-        assert_eq!(trim_trailing_zeros(&input), expected_output);
     }
 }
