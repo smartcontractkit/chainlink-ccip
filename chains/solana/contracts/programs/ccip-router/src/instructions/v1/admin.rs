@@ -67,6 +67,7 @@ impl Admin for Impl {
         emit!(events::ConfigSet {
             svm_chain_selector: config.svm_chain_selector,
             fee_quoter: config.fee_quoter,
+            rmn_remote: config.rmn_remote,
             link_token_mint: config.link_token_mint,
             fee_aggregator: config.fee_aggregator,
         });
@@ -194,6 +195,7 @@ impl Admin for Impl {
         emit!(events::ConfigSet {
             svm_chain_selector: config.svm_chain_selector,
             fee_quoter: config.fee_quoter,
+            rmn_remote: config.rmn_remote,
             link_token_mint: config.link_token_mint,
             fee_aggregator: config.fee_aggregator,
         });
