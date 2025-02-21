@@ -227,9 +227,12 @@ func filterRootsBasedOnRmnSigs(
 	// Create a set of signed roots for quick lookup.
 	signedRoots := mapset.NewSet[rootKey]()
 	for _, laneUpdate := range signedLaneUpdates {
-		addrStr, err := addressCodec.AddressBytesToString(laneUpdate.LaneSource.OnrampAddress, cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector))
+		addrStr, err := addressCodec.AddressBytesToString(
+			laneUpdate.LaneSource.OnrampAddress,
+			cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector))
 		if err != nil {
-			lggr.Errorw("can't convert Onramp address to string", "err", err, "sourceChainSelector", laneUpdate.LaneSource.SourceChainSelector, "onrampAddress", laneUpdate.LaneSource.OnrampAddress)
+			lggr.Errorw("can't convert Onramp address to string",
+				"err", err, "sourceChainSelector", laneUpdate.LaneSource.SourceChainSelector, "onrampAddress", laneUpdate.LaneSource.OnrampAddress)
 			continue
 		}
 		rk := rootKey{
@@ -250,7 +253,8 @@ func filterRootsBasedOnRmnSigs(
 	for _, root := range roots {
 		addrStr, err := addressCodec.AddressBytesToString(root.OnRampAddress, root.ChainSel)
 		if err != nil {
-			lggr.Errorw("can't convert Onramp address to string", "err", err, "sourceChainSelector", root.ChainSel, "onrampAddress", root.OnRampAddress)
+			lggr.Errorw("can't convert Onramp address to string",
+				"err", err, "sourceChainSelector", root.ChainSel, "onrampAddress", root.OnRampAddress)
 			continue
 		}
 		rk := rootKey{
