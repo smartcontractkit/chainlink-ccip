@@ -172,10 +172,11 @@ profiles:
           ENABLE_DON_BASE: "true"
     merge: |-
       $(
-        DON_NODE_COUNT=${DON_NODE_COUNT} \
+        CRIB_EKS_CLUSTER_NAME="$CRIB_EKS_CLUSTER_NAME" \
         DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
-        PROVIDER=${PROVIDER} \
+        DON_NODE_COUNT=${DON_NODE_COUNT} \
         POSTGRES_CHART_VERSION="15.5.9" \
+        PROVIDER=${PROVIDER} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.base.yaml
       )
@@ -301,6 +302,7 @@ profiles:
     activation:
       - vars:
           PROVIDER: "aws"
+          CRIB_EKS_CLUSTER_NAME: "main-stage-cluster"
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
@@ -313,6 +315,28 @@ profiles:
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip.yaml
+      )
+  - name: crib-aws-main-fwog
+    activation:
+      - vars:
+          PROVIDER: "aws"
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-main-fwog.yaml
+      )
+  - name: crib-aws-sandbox
+    activation:
+      - vars:
+          PROVIDER: "aws"
+          ENV: "sand"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-sandbox.yaml
       )
   - name: ccip-load-testing-aws-staging
     merge: |-

@@ -20,12 +20,13 @@ type SolanaChain struct {
 }
 
 type Config struct {
+	BesuChains   []EVMChain
 	GethChains   []EVMChain
 	SolanaChains []SolanaChain
 }
 
 func main() {
-
+	besuChainsCountPtr := flag.Int("besu-chains-count", 0, "Number of network configs to generate")
 	gethChainsCountPtr := flag.Int("geth-chains-count", 0, "Number of network configs to generate")
 	solanaChainsCountPtr := flag.Int("solana-chains-count", 0, "Number of network configs to generate")
 	flag.Parse()
@@ -35,11 +36,11 @@ func main() {
 		flag.Usage()
 		return
 	}
-
+	besuChainsCount := *besuChainsCountPtr
 	gethChainsCount := *gethChainsCountPtr
 	solanaChainsCount := *solanaChainsCountPtr
 
-	c := BuildNetworkConfigs(gethChainsCount, solanaChainsCount)
+	c := BuildNetworkConfigs(besuChainsCount, gethChainsCount, solanaChainsCount)
 
 	tmpl, err := template.New("values.yaml.tmpl").ParseFiles(tmplFile)
 	if err != nil {
@@ -52,11 +53,15 @@ func main() {
 	}
 }
 
-func BuildNetworkConfigs(gethChainsCount int, solanaChainsCount int) Config {
-	gethChains := BuildGethNetworkConfigs(gethChainsCount)
+func BuildNetworkConfigs(besuChainsCount int, gethChainsCount int, solanaChainsCount int) Config {
+
+	besuChains := BuildEVMNetworkConfigs(besuChainsCount)
+	gethChains := BuildEVMNetworkConfigs(gethChainsCount)
 	solanaChains := BuildSolanaNetworkConfigs(solanaChainsCount)
 
+
 	c := Config{
+		BesuChains:   besuChains,
 		GethChains:   gethChains,
 		SolanaChains: solanaChains,
 	}
@@ -71,18 +76,14 @@ func BuildSolanaNetworkConfigs(count int) []SolanaChain {
 	return chains
 }
 
-func BuildGethNetworkConfigs(chainsCount int) []EVMChain {
-	chains := []EVMChain{
-		{NetworkId: 1337, FinalityDepth: defaultFinalityDepth},
+func BuildEVMNetworkConfigs(chainsCount int) []EVMChain {
+	chains := make([]EVMChain{}, 0)
+
+	// Generate chains starting from NetworkId 1337
+	for i := 0; i < chainsCount; i++ {
+		networkId := int64(1337 + i) // The first chain will have NetworkId 1337
+		chains = append(chains, EVMChain{NetworkId: networkId, FinalityDepth: defaultFinalityDepth})
 	}
 
-	if chainsCount > 1 {
-		chains = append(chains, EVMChain{NetworkId: 2337, FinalityDepth: defaultFinalityDepth})
-
-		for i := 1; i < chainsCount-1; i++ {
-
-			chains = append(chains, EVMChain{NetworkId: int64(90000000 + i), FinalityDepth: defaultFinalityDepth})
-		}
-	}
 	return chains
 }

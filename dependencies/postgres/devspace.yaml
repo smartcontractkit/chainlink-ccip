@@ -69,9 +69,10 @@ profiles:
                     memory: 512Mi
                     ephemeral-storage: 2Gi
 
-  - name: aws
+  - name: aws-main-stage-cluster
     activation:
       - vars:
+          CRIB_EKS_CLUSTER_NAME: "main-stage-cluster"
           PROVIDER: "aws"
     merge:
       deployments:

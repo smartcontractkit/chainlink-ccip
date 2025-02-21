@@ -21,6 +21,42 @@ vars:
   SCRIPTS_DIR:
     source: env
     default: "${CRIB_DIR}/scripts"
+  TMP_DIR:
+    source: env
+    default: "${CRIB_DIR}/deployments/ccip-v2/.tmp"
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  DON_TYPE:
+    source: env
+    default: ccip
+  DON_VERSION:
+    source: env
+    default: ccip-dev
+  CCIP_TOOLING_VERSION:
+    source: env
+    default: v2
+  DON_NODE_COUNT:
+    source: env
+    default: 4
+  DON_BOOT_NODE_COUNT:
+    source: env
+    default: 1
+  GETH_CHAINS_COUNT:
+    source: env
+    default: 0
+  BESU_CHAINS_COUNT:
+    source: env
+    default: 2
+  SOLANA_CHAINS_COUNT:
+    source: env
+    default: 0
+  ENABLE_MONITORING:
+    source: env
+    default: false
+  CHAINLINK_PRODUCT:
+    source: env
+    default: ccip
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -39,6 +75,12 @@ pipelines:
       run_dependency_pipelines chain-beta
       run_dependency_pipelines blockscout
       run_pipelines ingress-check
+
+  ccip:
+    run: |-
+      # Deploy CCIP enabled fully configured DON
+      run_dependency_pipelines ccip-don --set-flag infraOnly="true"
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
 profiles:
   - name: chain-alpha
@@ -93,6 +135,7 @@ profiles:
             source: env
             default: "chain-beta"
           CRIB_EKS_CLUSTER_NAME: "main-fwog"
+          INGRESS_CLASS_NAME: "alb"
       - op: add
         path: dependencies
         value:
@@ -101,6 +144,22 @@ profiles:
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
 
+  - name: ccip
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          ccip-don:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy-ccip-v2
+            profiles:
+              - crib-aws-main-fwog
+              - network-besu-chain-alpha
+              - network-besu-chain-beta
+              - version-from-env
+
 commands:
   besu:
     command: |-
@@ -108,15 +167,18 @@ commands:
       devspace run-pipeline chain-beta -p chain-beta
     description: Run the Besu pipeline to deploy both alpha and beta chains.
     appendArgs: true
-
   chain-alpha:
     command: |-
       devspace run-pipeline chain-alpha -p chain-alpha
     description: Run the pipeline to deploy the alpha chain.
     appendArgs: true
-
   chain-beta:
     command: |-
       devspace run-pipeline chain-beta -p chain-beta
     description: Run the pipeline to deploy the beta chain.
+    appendArgs: true
+  ccip:
+    command: |-
+      devspace run-pipeline ccip -p ccip
+    description: Deploy CCIP v1.6 DON
     appendArgs: true
