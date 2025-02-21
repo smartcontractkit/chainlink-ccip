@@ -183,7 +183,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
-          rm -rf target/idl &&\
+          rm -rf target/idl target/types &&\
           anchor build"
 
           go install github.com/gagliardetto/anchor-go@v0.2.3

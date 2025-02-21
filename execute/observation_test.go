@@ -67,7 +67,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 
 	// No state, report only generated in Filter state so cache is not updated.
 	{
-		enc, err := jsonOcrTypeCodec.EncodeOutcome(outcome)
+		enc, err := ocrTypeCodec.EncodeOutcome(outcome)
 		require.NoError(t, err)
 
 		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
@@ -85,7 +85,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 	// Filter state, cache is updated.
 	{
 		outcome.State = exectypes.Filter
-		enc, err := jsonOcrTypeCodec.EncodeOutcome(outcome)
+		enc, err := ocrTypeCodec.EncodeOutcome(outcome)
 		require.NoError(t, err)
 
 		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
@@ -119,7 +119,7 @@ func Test_getMessagesObservation(t *testing.T) {
 		msgHasher:             msgHasher,
 		tokenDataObserver:     &tokenDataObserver,
 		costlyMessageObserver: &costlyMessageObserver,
-		ocrTypeCodec:          jsonOcrTypeCodec,
+		ocrTypeCodec:          ocrTypeCodec,
 	}
 
 	tests := []struct {

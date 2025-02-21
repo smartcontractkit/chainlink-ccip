@@ -38,7 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -106,7 +106,7 @@ func NewPlugin(
 ) ocr3types.ReportingPlugin[[]byte] {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
-	codec := ocrtypecodec.NewExecCodecJSON()
+	ocrTypCodec := ocrtypecodec.DefaultExecCodec
 	p := &Plugin{
 		donID:                 donID,
 		reportingCfg:          reportingCfg,
@@ -142,9 +142,9 @@ func NewPlugin(
 			offchainCfg.MessageVisibilityInterval.Duration(),
 			time.Minute*5),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
-		ocrTypeCodec:         codec,
+		ocrTypeCodec:         ocrTypCodec,
 	}
-	return NewTrackedPlugin(p, lggr, metricsReporter, codec)
+	return NewTrackedPlugin(p, lggr, metricsReporter, ocrTypCodec)
 }
 
 func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (types.Query, error) {
