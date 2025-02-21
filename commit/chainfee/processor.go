@@ -2,7 +2,6 @@ package chainfee
 
 import (
 	"context"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -49,14 +48,12 @@ func NewProcessor(
 		chainSupport:    chainSupport,
 		cfg:             offChainConfig,
 		metricsReporter: metricsReporter,
-		obs: newAsyncObserver(
+		obs: newBaseObserver(
 			lggr,
 			ccipReader,
 			destChain,
 			oracleID,
 			chainSupport,
-			5*time.Second,
-			10*time.Second,
 		),
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, processorLabel, metricsReporter)

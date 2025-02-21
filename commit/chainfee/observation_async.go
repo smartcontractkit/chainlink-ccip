@@ -16,47 +16,115 @@ import (
 )
 
 type observer interface {
-	getChainsFeeComponents() map[cciptypes.ChainSelector]types.ChainFeeComponents
-	getNativeTokenPrices() map[cciptypes.ChainSelector]cciptypes.BigInt
-	getChainFeePriceUpdates() map[cciptypes.ChainSelector]Update
+	getChainsFeeComponents(ctx context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents
+	getNativeTokenPrices(ctx context.Context) map[cciptypes.ChainSelector]cciptypes.BigInt
+	getChainFeePriceUpdates(ctx context.Context) map[cciptypes.ChainSelector]Update
 	close()
 }
 
-type asyncObserver struct {
+type baseObserver struct {
 	cs         plugincommon.ChainSupport
 	oracleID   commontypes.OracleID
 	destChain  cciptypes.ChainSelector
 	ccipReader ccipreader.CCIPReader
 	lggr       logger.Logger
-	cancelFunc func()
-	mu         *sync.RWMutex
+}
+
+func newBaseObserver(
+	lggr logger.Logger,
+	ccipReader ccipreader.CCIPReader,
+	destChain cciptypes.ChainSelector,
+	oracleID commontypes.OracleID,
+	cs plugincommon.ChainSupport,
+) *baseObserver {
+	return &baseObserver{
+		cs:         cs,
+		oracleID:   oracleID,
+		destChain:  destChain,
+		ccipReader: ccipReader,
+		lggr:       lggr,
+	}
+}
+
+func (o *baseObserver) getChainsFeeComponents(ctx context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents {
+	supportedChains, err := o.getSupportedChains(o.lggr, o.cs, o.oracleID, o.destChain)
+	if err != nil {
+		o.lggr.Errorw("failed to get supported chains unable to get chains fee components", "err", err)
+		return map[cciptypes.ChainSelector]types.ChainFeeComponents{}
+	}
+	return o.ccipReader.GetChainsFeeComponents(ctx, supportedChains)
+}
+
+func (o *baseObserver) getNativeTokenPrices(ctx context.Context) map[cciptypes.ChainSelector]cciptypes.BigInt {
+	supportedChains, err := o.getSupportedChains(o.lggr, o.cs, o.oracleID, o.destChain)
+	if err != nil {
+		o.lggr.Errorw("failed to get supported chains unable to get native token prices", "err", err)
+		return map[cciptypes.ChainSelector]cciptypes.BigInt{}
+	}
+	return o.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedChains)
+}
+
+func (o *baseObserver) getChainFeePriceUpdates(ctx context.Context) map[cciptypes.ChainSelector]Update {
+	supportedChains, err := o.getSupportedChains(o.lggr, o.cs, o.oracleID, o.destChain)
+	if err != nil {
+		o.lggr.Errorw("failed to get supported chains unable to get chain fee price updates", "err", err)
+		return map[cciptypes.ChainSelector]Update{}
+	}
+	return feeUpdatesFromTimestampedBig(o.ccipReader.GetChainFeePriceUpdate(ctx, supportedChains))
+}
+
+func (o *baseObserver) close() {
+}
+
+func (o *baseObserver) getSupportedChains(
+	lggr logger.Logger,
+	cs plugincommon.ChainSupport,
+	oracleID commontypes.OracleID,
+	destChain cciptypes.ChainSelector,
+) ([]cciptypes.ChainSelector, error) {
+	supportedChains, err := cs.SupportedChains(oracleID)
+	if err != nil {
+		return nil, err
+	}
+
+	supportedChains.Remove(destChain)
+	if supportedChains.Cardinality() == 0 {
+		lggr.Info("no supported chains other than dest chain to observe")
+		return nil, nil
+	}
+
+	supportedChainsSlice := supportedChains.ToSlice()
+	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
+
+	return supportedChainsSlice, nil
+}
+
+type asyncObserver struct {
+	cs           plugincommon.ChainSupport
+	baseObserver *baseObserver
+	lggr         logger.Logger
+	cancelFunc   func()
+	mu           *sync.RWMutex
 
 	chainsFeeComponents  map[cciptypes.ChainSelector]types.ChainFeeComponents
 	nativeTokenPrices    map[cciptypes.ChainSelector]cciptypes.BigInt
 	chainFeePriceUpdates map[cciptypes.ChainSelector]Update
 }
 
-// newAsyncObserver creates a new asyncObserver.
-// It fetches the data from the base observer asynchronously and caches the results.
-// It fetches the data every tickDur and uses a timeout of syncTimeout to kill long RPC calls.
 func newAsyncObserver(
 	lggr logger.Logger,
-	ccipReader ccipreader.CCIPReader,
-	destChain cciptypes.ChainSelector,
-	oracleID commontypes.OracleID,
+	baseObserver *baseObserver,
 	cs plugincommon.ChainSupport,
 	tickDur, syncTimeout time.Duration,
 ) *asyncObserver {
 	ctx, cf := context.WithCancel(context.Background())
 
 	obs := &asyncObserver{
-		cs:         cs,
-		oracleID:   oracleID,
-		destChain:  destChain,
-		ccipReader: ccipReader,
-		lggr:       lggr,
-		cancelFunc: nil,
-		mu:         &sync.RWMutex{},
+		cs:           cs,
+		baseObserver: baseObserver,
+		lggr:         lggr,
+		cancelFunc:   nil,
+		mu:           &sync.RWMutex{},
 	}
 
 	ticker := time.NewTicker(tickDur)
@@ -89,12 +157,6 @@ func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 	ctxSync, cf := context.WithTimeout(ctx, syncTimeout)
 	defer cf()
 
-	supportedChains, err := o.getSupportedChains()
-	if err != nil {
-		o.lggr.Errorw("failed to get supported chains unable to sync", "err", err)
-		return
-	}
-
 	syncOps := []struct {
 		id string
 		op func(context.Context)
@@ -102,7 +164,7 @@ func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 		{
 			id: "chainsFeeComponents",
 			op: func(ctx context.Context) {
-				chainsFeeComponents := o.ccipReader.GetChainsFeeComponents(ctx, supportedChains)
+				chainsFeeComponents := o.baseObserver.getChainsFeeComponents(ctx)
 				o.mu.Lock()
 				o.chainsFeeComponents = chainsFeeComponents
 				o.mu.Unlock()
@@ -111,7 +173,7 @@ func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 		{
 			id: "nativeTokenPrices",
 			op: func(ctx context.Context) {
-				nativeTokenPrices := o.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedChains)
+				nativeTokenPrices := o.baseObserver.getNativeTokenPrices(ctx)
 				o.mu.Lock()
 				o.nativeTokenPrices = nativeTokenPrices
 				o.mu.Unlock()
@@ -120,8 +182,7 @@ func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 		{
 			id: "chainFeePriceUpdates",
 			op: func(ctx context.Context) {
-				chainFeePriceUpdates := feeUpdatesFromTimestampedBig(
-					o.ccipReader.GetChainFeePriceUpdate(ctx, supportedChains))
+				chainFeePriceUpdates := o.baseObserver.getChainFeePriceUpdates(ctx)
 				o.mu.Lock()
 				o.chainFeePriceUpdates = chainFeePriceUpdates
 				o.mu.Unlock()
@@ -148,19 +209,19 @@ func (o *asyncObserver) applySyncOp(
 		"id", id, "duration", time.Since(tStart))
 }
 
-func (o *asyncObserver) getChainsFeeComponents() map[cciptypes.ChainSelector]types.ChainFeeComponents {
+func (o *asyncObserver) getChainsFeeComponents(_ context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	return o.chainsFeeComponents
 }
 
-func (o *asyncObserver) getNativeTokenPrices() map[cciptypes.ChainSelector]cciptypes.BigInt {
+func (o *asyncObserver) getNativeTokenPrices(_ context.Context) map[cciptypes.ChainSelector]cciptypes.BigInt {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	return o.nativeTokenPrices
 }
 
-func (o *asyncObserver) getChainFeePriceUpdates() map[cciptypes.ChainSelector]Update {
+func (o *asyncObserver) getChainFeePriceUpdates(_ context.Context) map[cciptypes.ChainSelector]Update {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	return o.chainFeePriceUpdates
@@ -171,22 +232,4 @@ func (o *asyncObserver) close() {
 		o.cancelFunc()
 		o.cancelFunc = nil
 	}
-}
-
-func (o *asyncObserver) getSupportedChains() ([]cciptypes.ChainSelector, error) {
-	supportedChains, err := o.cs.SupportedChains(o.oracleID)
-	if err != nil {
-		return nil, err
-	}
-
-	supportedChains.Remove(o.destChain)
-	if supportedChains.Cardinality() == 0 {
-		o.lggr.Info("no supported chains other than dest chain to observe")
-		return nil, nil
-	}
-
-	supportedChainsSlice := supportedChains.ToSlice()
-	sort.Slice(supportedChainsSlice, func(i, j int) bool { return supportedChainsSlice[i] < supportedChainsSlice[j] })
-
-	return supportedChainsSlice, nil
 }
