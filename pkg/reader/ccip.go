@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
@@ -190,7 +191,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		ev, err := validateCommitReportAcceptedEvent(item, ts)
+		ev, err := validateCommitReportAcceptedEvent(item, ts, r.destChain)
 		if err != nil {
 			lggr.Errorw("validate commit report accepted event", "err", err, "ev", ev)
 			continue
@@ -408,6 +409,14 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
 	}
 
+	onRampAddressAfterQuery, err := r.GetContractAddress(consts.ContractNameOnRamp, sourceChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("get onRamp address after query: %w", err)
+	}
+	if !bytes.Equal(onRampAddress, onRampAddressAfterQuery) {
+		return nil, fmt.Errorf("onRamp address has changed from %s to %s", onRampAddress, onRampAddressAfterQuery)
+	}
+
 	lggr.Infow("queried messages between sequence numbers",
 		"numMsgs", len(seq),
 		"sourceChainSelector", sourceChainSelector,
@@ -621,15 +630,20 @@ func (r *ccipChainReader) Nonces(
 		for i, readResult := range results {
 			address := getAddressByIndex(addressToIndex, i)
 
+			if address == "" {
+				lggr.Errorw("critical error, address not found for index", "index", i)
+				continue
+			}
+
 			returnVal, err := readResult.GetResult()
 			if err != nil {
-				r.lggr.Errorw("failed to get nonce for address", "address", address, "err", err)
+				lggr.Errorw("failed to get nonce for address", "address", address, "err", err)
 				continue
 			}
 
 			val, ok := returnVal.(*uint64)
 			if !ok || val == nil {
-				r.lggr.Errorw("invalid nonce value returned", "address", address)
+				lggr.Errorw("invalid nonce value returned", "address", address)
 				continue
 			}
 
@@ -1842,10 +1856,16 @@ func (r *ccipChainReader) processFeeQuoterResults(results []types.BatchReadResul
 	return FeeQuoterConfig{}, fmt.Errorf("invalid type for fee quoter static config: %T", val)
 }
 
-func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
+func validateCommitReportAcceptedEvent(
+	seq types.Sequence, gteTimestamp time.Time, destChain cciptypes.ChainSelector,
+) (*CommitReportAcceptedEvent, error) {
 	ev, is := (seq.Data).(*CommitReportAcceptedEvent)
 	if !is {
 		return nil, fmt.Errorf("unexpected type %T while expecting a commit report", seq)
+	}
+
+	if ev == nil {
+		return nil, fmt.Errorf("commit report accepted event is nil")
 	}
 
 	if seq.Timestamp < uint64(gteTimestamp.Unix()) {
@@ -1858,8 +1878,8 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 	}
 
 	for _, tpus := range ev.PriceUpdates.TokenPriceUpdates {
-		if len(tpus.SourceToken) == 0 {
-			return nil, fmt.Errorf("empty source token")
+		if tpus.SourceToken.IsZeroOrEmpty() {
+			return nil, fmt.Errorf("invalid source token address: %s", tpus.SourceToken.String())
 		}
 		if tpus.UsdPerToken == nil || tpus.UsdPerToken.Cmp(big.NewInt(0)) <= 0 {
 			return nil, fmt.Errorf("nil or non-positive usd per token")
@@ -1867,8 +1887,9 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 	}
 
 	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
-		if gpus.DestChainSelector == 0 {
-			return nil, fmt.Errorf("dest chain is zero")
+		if gpus.DestChainSelector != uint64(destChain) {
+			return nil, fmt.Errorf("dest chain does not match the reader's one %d != %d",
+				gpus.DestChainSelector, destChain)
 		}
 		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
 			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
@@ -1902,8 +1923,8 @@ func validateMerkleRoots(merkleRoots []MerkleRoot) error {
 		if mr.MerkleRoot.IsEmpty() {
 			return fmt.Errorf("empty merkle root")
 		}
-		if len(mr.OnRampAddress) == 0 {
-			return fmt.Errorf("empty onramp address")
+		if mr.OnRampAddress.IsZeroOrEmpty() {
+			return fmt.Errorf("invalid onramp address: %s", mr.OnRampAddress.String())
 		}
 	}
 
@@ -1939,18 +1960,27 @@ func validateExecutionStateChangedEvent(
 	return nil
 }
 
+//nolint:gocyclo // This function is not complex enough to warrant a refactor.
 func validateSendRequestedEvent(
 	ev *SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) error {
 	if ev == nil {
 		return fmt.Errorf("send requested event is nil")
 	}
 
+	if ev.Message.Header.DestChainSelector != dest {
+		return fmt.Errorf("msg dest chain is not the expected queried one")
+	}
 	if ev.DestChainSelector != dest {
 		return fmt.Errorf("dest chain is not the expected queried one")
 	}
 
 	if ev.Message.Header.SourceChainSelector != source {
 		return fmt.Errorf("source chain is not the expected queried one")
+	}
+
+	if ev.SequenceNumber != ev.Message.Header.SequenceNumber {
+		return fmt.Errorf("event sequence number does not match the message sequence number %d != %d",
+			ev.SequenceNumber, ev.Message.Header.SequenceNumber)
 	}
 
 	if ev.SequenceNumber < seqNumRange.Start() || ev.SequenceNumber > seqNumRange.End() {
@@ -1961,20 +1991,24 @@ func validateSendRequestedEvent(
 		return fmt.Errorf("message ID is zero")
 	}
 
-	if len(ev.Message.Receiver) == 0 {
-		return fmt.Errorf("empty receiver address")
+	if ev.Message.Receiver.IsZeroOrEmpty() {
+		return fmt.Errorf("invalid receiver address: %s", ev.Message.Receiver.String())
 	}
 
-	if len(ev.Message.Sender) == 0 {
-		return fmt.Errorf("empty sender address")
+	if ev.Message.Sender.IsZeroOrEmpty() {
+		return fmt.Errorf("invalid sender address: %s", ev.Message.Sender.String())
 	}
 
 	if ev.Message.FeeTokenAmount.IsEmpty() {
 		return fmt.Errorf("fee token amount is zero")
 	}
 
-	if len(ev.Message.FeeToken) == 0 {
-		return fmt.Errorf("empty fee token")
+	if ev.Message.FeeToken.IsZeroOrEmpty() {
+		return fmt.Errorf("invalid fee token: %s", ev.Message.FeeToken.String())
+	}
+
+	if ev.Message.Header.OnRamp.IsZeroOrEmpty() {
+		return fmt.Errorf("invalid onramp address: %s", ev.Message.Header.OnRamp.String())
 	}
 
 	return nil
