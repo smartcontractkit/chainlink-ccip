@@ -102,11 +102,10 @@ func (o *baseObserver) getSupportedChains(
 }
 
 type asyncObserver struct {
-	baseObserver *baseObserver
-	lggr         logger.Logger
-	cancelFunc   func()
-	mu           *sync.RWMutex
-
+	baseObserver         *baseObserver
+	lggr                 logger.Logger
+	cancelFunc           func()
+	mu                   *sync.RWMutex
 	chainsFeeComponents  map[cciptypes.ChainSelector]types.ChainFeeComponents
 	nativeTokenPrices    map[cciptypes.ChainSelector]cciptypes.BigInt
 	chainFeePriceUpdates map[cciptypes.ChainSelector]Update
