@@ -3,10 +3,10 @@ package reader_test
 import (
 	"errors"
 	"math/big"
-	"strconv"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
@@ -21,21 +21,24 @@ func Test_GetChainsFeeComponents(t *testing.T) {
 	t.Cleanup(func() { reader.PromChainFeeGauge.Reset() })
 
 	ctx := tests.Context(t)
-	cs1 := cciptypes.ChainSelector(1)
-	cs2 := cciptypes.ChainSelector(2)
+	chain1 := "2337"
+	selector1 := cciptypes.ChainSelector(12922642891491394802)
+	chain2 := "3337"
+	selector2 := cciptypes.ChainSelector(4793464827907405086)
+
 	fees := map[cciptypes.ChainSelector]types.ChainFeeComponents{
-		cs1: {
+		selector1: {
 			ExecutionFee:        big.NewInt(10),
 			DataAvailabilityFee: big.NewInt(15),
 		},
-		cs2: {
+		selector2: {
 			ExecutionFee:        nil,
 			DataAvailabilityFee: big.NewInt(2),
 		},
 	}
 
 	origin := mock_reader.NewMockCCIPReader(t)
-	r := reader.NewObservedCCIPReader(origin, cs1)
+	r := reader.NewObservedCCIPReader(origin, logger.Test(t), selector1)
 
 	origin.EXPECT().
 		GetChainsFeeComponents(mock.Anything, mock.Anything).
@@ -46,30 +49,29 @@ func Test_GetChainsFeeComponents(t *testing.T) {
 	require.Equal(
 		t,
 		10.0,
-		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(strconv.FormatUint(uint64(cs1), 10), "execCost")),
+		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chain1, "execCost")),
 	)
 	require.Equal(
 		t,
 		15.0,
-		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(strconv.FormatUint(uint64(cs1), 10), "daCost")),
+		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chain1, "daCost")),
 	)
 	require.Equal(
 		t,
 		0.0,
-		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(strconv.FormatUint(uint64(cs2), 10), "execCost")),
+		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chain2, "execCost")),
 	)
 	require.Equal(
 		t,
 		2.0,
-		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(strconv.FormatUint(uint64(cs2), 10), "daCost")),
+		testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chain2, "daCost")),
 	)
-
 }
 
 func Test_GetDestChainFeeComponents(t *testing.T) {
 	ctx := tests.Context(t)
-	chainSelector := cciptypes.ChainSelector(1)
-	stringChainSelector := strconv.Itoa(int(chainSelector))
+	chainID := "2337"
+	chainSelector := cciptypes.ChainSelector(12922642891491394802)
 
 	tt := []struct {
 		name          string
@@ -118,7 +120,7 @@ func Test_GetDestChainFeeComponents(t *testing.T) {
 			t.Cleanup(func() { reader.PromChainFeeGauge.Reset() })
 
 			origin := mock_reader.NewMockCCIPReader(t)
-			r := reader.NewObservedCCIPReader(origin, chainSelector)
+			r := reader.NewObservedCCIPReader(origin, logger.Test(t), chainSelector)
 
 			origin.EXPECT().
 				GetDestChainFeeComponents(ctx).
@@ -134,12 +136,12 @@ func Test_GetDestChainFeeComponents(t *testing.T) {
 			require.Equal(
 				t,
 				tc.expExec,
-				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(stringChainSelector, "execCost")),
+				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chainID, "execCost")),
 			)
 			require.Equal(
 				t,
 				tc.expDa,
-				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(stringChainSelector, "daCost")),
+				testutil.ToFloat64(reader.PromChainFeeGauge.WithLabelValues(chainID, "daCost")),
 			)
 		})
 	}
