@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
