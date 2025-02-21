@@ -69,12 +69,12 @@ type Plugin struct {
 	chainSupport plugincommon.ChainSupport
 	observer     metrics.Reporter
 
-	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataObserver     tokendata.TokenDataObserver
-	estimateProvider      cciptypes.EstimateProvider
-	lggr                  logger.Logger
-	ocrTypeCodec          ocrtypecodec.ExecCodec
-	addrCodec             cciptypes.AddressCodec
+	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
+	tokenDataObserver tokendata.TokenDataObserver
+	estimateProvider  cciptypes.EstimateProvider
+	lggr              logger.Logger
+	ocrTypeCodec      ocrtypecodec.ExecCodec
+	addrCodec         cciptypes.AddressCodec
 
 	// state
 
