@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::solana_program::keccak::{hashv, HASH_BYTES};
 
+use crate::constants::ANCHOR_DISCRIMINATOR;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, PartialOrd)]
 pub enum OperationState {
     /// Operation is created but not yet finalized.
@@ -31,6 +33,22 @@ impl Space for Operation {
 }
 
 impl Operation {
+    pub fn space_after_init_instruction(&self, new_accounts: &[InstructionAccount]) -> usize {
+        ANCHOR_DISCRIMINATOR + Self::INIT_SPACE
+            // space for existing instructions
+            + self.instructions.iter().map(|ix| ix.space()).sum::<usize>()
+            // space for new instruction(program_id + data vec prefix + accounts vec prefix + account metas(pubkey + is_signer + is_writable))
+            + (32 + 4 + 4 + new_accounts.len() * (32 + 1 + 1))
+    }
+
+    pub fn space_after_append_instruction(&self, new_data: &[u8]) -> usize {
+        ANCHOR_DISCRIMINATOR + Self::INIT_SPACE
+            // space for existing instructions
+            + self.instructions.iter().map(|ix| ix.space()).sum::<usize>()
+            // space for new instruction data
+            + new_data.len()
+    }
+
     // before scheduling, timestamp should be 0
     pub fn is_scheduled(&self) -> bool {
         self.state >= OperationState::Scheduled
@@ -70,7 +88,7 @@ impl Operation {
     pub fn hash_instructions(&self, salt: [u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
         let total_size = self.instructions.iter().map(|ix| ix.space()).sum::<usize>()
             + HASH_BYTES * 2 // predecessor and salt
-            + 4; // instruction array prefix
+            + 4; // instruction array vector prefix
 
         let mut encoded_data = Vec::with_capacity(total_size);
 
