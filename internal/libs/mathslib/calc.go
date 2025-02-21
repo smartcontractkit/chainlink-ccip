@@ -69,7 +69,3 @@ func calculateCurveThresholdPPB(x float64) int64 {
 	thresholdPPB := int64(threshold * 1e7)
 	return thresholdPPB
 }
-
-func MergeEpochAndRound(epoch uint32, round uint8) uint64 {
-	return uint64(epoch)<<8 + uint64(round)
-}
