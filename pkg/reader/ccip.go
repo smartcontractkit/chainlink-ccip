@@ -190,7 +190,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		ev, err := validateCommitReportAcceptedEvent(item, ts)
+		ev, err := validateCommitReportAcceptedEvent(item, ts, r.destChain)
 		if err != nil {
 			lggr.Errorw("validate commit report accepted event", "err", err, "ev", ev)
 			continue
@@ -1842,10 +1842,16 @@ func (r *ccipChainReader) processFeeQuoterResults(results []types.BatchReadResul
 	return FeeQuoterConfig{}, fmt.Errorf("invalid type for fee quoter static config: %T", val)
 }
 
-func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
+func validateCommitReportAcceptedEvent(
+	seq types.Sequence, gteTimestamp time.Time, destChain cciptypes.ChainSelector,
+) (*CommitReportAcceptedEvent, error) {
 	ev, is := (seq.Data).(*CommitReportAcceptedEvent)
 	if !is {
 		return nil, fmt.Errorf("unexpected type %T while expecting a commit report", seq)
+	}
+
+	if ev == nil {
+		return nil, fmt.Errorf("commit report accepted event is nil")
 	}
 
 	if seq.Timestamp < uint64(gteTimestamp.Unix()) {
@@ -1867,8 +1873,9 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 	}
 
 	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
-		if gpus.DestChainSelector == 0 {
-			return nil, fmt.Errorf("dest chain is zero")
+		if gpus.DestChainSelector != uint64(destChain) {
+			return nil, fmt.Errorf("dest chain does not match the reader's one %d != %d",
+				gpus.DestChainSelector, destChain)
 		}
 		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
 			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
@@ -1939,18 +1946,27 @@ func validateExecutionStateChangedEvent(
 	return nil
 }
 
+//nolint:gocyclo // This function is not complex enough to warrant a refactor.
 func validateSendRequestedEvent(
 	ev *SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) error {
 	if ev == nil {
 		return fmt.Errorf("send requested event is nil")
 	}
 
+	if ev.Message.Header.DestChainSelector != dest {
+		return fmt.Errorf("msg dest chain is not the expected queried one")
+	}
 	if ev.DestChainSelector != dest {
 		return fmt.Errorf("dest chain is not the expected queried one")
 	}
 
 	if ev.Message.Header.SourceChainSelector != source {
 		return fmt.Errorf("source chain is not the expected queried one")
+	}
+
+	if ev.SequenceNumber != ev.Message.Header.SequenceNumber {
+		return fmt.Errorf("event sequence number does not match the message sequence number %d != %d",
+			ev.SequenceNumber, ev.Message.Header.SequenceNumber)
 	}
 
 	if ev.SequenceNumber < seqNumRange.Start() || ev.SequenceNumber > seqNumRange.End() {
@@ -1975,6 +1991,10 @@ func validateSendRequestedEvent(
 
 	if ev.Message.FeeToken.IsZeroOrEmpty() {
 		return fmt.Errorf("invalid fee token: %s", ev.Message.FeeToken.String())
+	}
+
+	if ev.Message.Header.OnRamp.IsZeroOrEmpty() {
+		return fmt.Errorf("invalid onramp address: %s", ev.Message.Header.OnRamp.String())
 	}
 
 	return nil
