@@ -359,7 +359,7 @@ func (p *Plugin) getFilterObservation(
 		}
 
 		for _, msg := range commitReport.Messages {
-			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.destChain))
+			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(commitReport.SourceChain))
 			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
 		}
 	}
