@@ -32,6 +32,20 @@ func (a *UnknownAddress) UnmarshalJSON(data []byte) error {
 	return (*Bytes)(a).UnmarshalJSON(data)
 }
 
+// IsZeroOrEmpty returns true if the address contains 0 bytes or if all the bytes are 0.
+func (a UnknownAddress) IsZeroOrEmpty() bool {
+	if len(a) == 0 {
+		return true // empty
+	}
+
+	for _, b := range a {
+		if b != 0 {
+			return false // zero
+		}
+	}
+	return true
+}
+
 // UnknownEncodedAddress represents an encoded address with an unknown encoding.
 type UnknownEncodedAddress string
 

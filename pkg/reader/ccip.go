@@ -1858,8 +1858,8 @@ func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Tim
 	}
 
 	for _, tpus := range ev.PriceUpdates.TokenPriceUpdates {
-		if len(tpus.SourceToken) == 0 {
-			return nil, fmt.Errorf("empty source token")
+		if tpus.SourceToken.IsZeroOrEmpty() {
+			return nil, fmt.Errorf("invalid source token address: %s", tpus.SourceToken.String())
 		}
 		if tpus.UsdPerToken == nil || tpus.UsdPerToken.Cmp(big.NewInt(0)) <= 0 {
 			return nil, fmt.Errorf("nil or non-positive usd per token")
@@ -1902,8 +1902,8 @@ func validateMerkleRoots(merkleRoots []MerkleRoot) error {
 		if mr.MerkleRoot.IsEmpty() {
 			return fmt.Errorf("empty merkle root")
 		}
-		if len(mr.OnRampAddress) == 0 {
-			return fmt.Errorf("empty onramp address")
+		if mr.OnRampAddress.IsZeroOrEmpty() {
+			return fmt.Errorf("invalid onramp address: %s", mr.OnRampAddress.String())
 		}
 	}
 
@@ -1961,20 +1961,20 @@ func validateSendRequestedEvent(
 		return fmt.Errorf("message ID is zero")
 	}
 
-	if len(ev.Message.Receiver) == 0 {
-		return fmt.Errorf("empty receiver address")
+	if ev.Message.Receiver.IsZeroOrEmpty() {
+		return fmt.Errorf("invalid receiver address: %s", ev.Message.Receiver.String())
 	}
 
-	if len(ev.Message.Sender) == 0 {
-		return fmt.Errorf("empty sender address")
+	if ev.Message.Sender.IsZeroOrEmpty() {
+		return fmt.Errorf("invalid sender address: %s", ev.Message.Sender.String())
 	}
 
 	if ev.Message.FeeTokenAmount.IsEmpty() {
 		return fmt.Errorf("fee token amount is zero")
 	}
 
-	if len(ev.Message.FeeToken) == 0 {
-		return fmt.Errorf("empty fee token")
+	if ev.Message.FeeToken.IsZeroOrEmpty() {
+		return fmt.Errorf("invalid fee token: %s", ev.Message.FeeToken.String())
 	}
 
 	return nil
