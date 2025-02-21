@@ -1483,5 +1483,5 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 	for _, commitReport := range decodedOutcome.CommitReports {
 		merkleRoots[commitReport.MerkleRoot.String()] = struct{}{}
 	}
-	require.Equal(t, len(decodedOutcome.CommitReports), len(merkleRoots))
+	require.Equal(t, len(merkleRoots), len(decodedOutcome.CommitReports))
 }
