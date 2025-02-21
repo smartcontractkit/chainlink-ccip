@@ -138,7 +138,7 @@ pub struct Uncurse<'info> {
 }
 
 #[derive(Accounts)]
-pub struct VerifyUncursed<'info> {
+pub struct InspectCurses<'info> {
     #[account(
         seeds = [seed::CURSES],
         bump,
@@ -151,13 +151,4 @@ pub struct VerifyUncursed<'info> {
         constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
-}
-
-#[derive(Accounts)]
-pub struct GetCursedSubjects<'info> {
-    #[account(
-        seeds = [seed::CURSES],
-        bump,
-    )]
-    pub cursed: Account<'info, Cursed>,
 }

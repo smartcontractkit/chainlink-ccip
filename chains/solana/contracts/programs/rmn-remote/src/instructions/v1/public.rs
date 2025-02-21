@@ -1,16 +1,13 @@
 use anchor_lang::prelude::*;
 
-use crate::{
-    instructions::interfaces::Public, CurseSubject, GetCursedSubjects, RmnRemoteError,
-    VerifyUncursed,
-};
+use crate::{instructions::interfaces::Public, CurseSubject, InspectCurses, RmnRemoteError};
 
 pub struct Impl;
 
 impl Public for Impl {
     fn verify_not_cursed<'info>(
         &self,
-        ctx: Context<VerifyUncursed>,
+        ctx: Context<InspectCurses>,
         subject: CurseSubject,
     ) -> Result<()> {
         let cursed_subjects = &ctx.accounts.cursed.subjects;
@@ -30,7 +27,7 @@ impl Public for Impl {
         Ok(())
     }
 
-    fn get_cursed_subjects(&self, ctx: Context<GetCursedSubjects>) -> Result<Vec<CurseSubject>> {
+    fn get_cursed_subjects(&self, ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>> {
         Ok(ctx.accounts.cursed.subjects.clone())
     }
 }

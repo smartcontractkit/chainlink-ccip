@@ -1,13 +1,12 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    state::CodeVersion, AcceptOwnership, Curse, CurseSubject, GetCursedSubjects, Uncurse,
-    UpdateConfig, VerifyUncursed,
+    state::CodeVersion, AcceptOwnership, Curse, CurseSubject, InspectCurses, Uncurse, UpdateConfig,
 };
 
 pub trait Public {
-    fn verify_not_cursed(&self, ctx: Context<VerifyUncursed>, subject: CurseSubject) -> Result<()>;
-    fn get_cursed_subjects(&self, ctx: Context<GetCursedSubjects>) -> Result<Vec<CurseSubject>>;
+    fn verify_not_cursed(&self, ctx: Context<InspectCurses>, subject: CurseSubject) -> Result<()>;
+    fn get_cursed_subjects(&self, ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>>;
 }
 
 pub trait Admin {
