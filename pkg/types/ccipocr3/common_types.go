@@ -65,7 +65,7 @@ func (b Bytes) MarshalJSON() ([]byte, error) {
 func (b *Bytes) UnmarshalJSON(data []byte) error {
 	v := string(data)
 	if len(v) < 4 {
-		return fmt.Errorf("bytes must be of at least length 2 (i.e, '\"0x\"'): %s", v)
+		return fmt.Errorf("bytes must be of at least length 4 (i.e, '\"0x\"'): %s", v)
 	}
 
 	// trim the start and end double quotes
