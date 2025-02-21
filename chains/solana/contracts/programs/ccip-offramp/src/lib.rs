@@ -491,7 +491,9 @@ pub mod ccip_offramp {
 #[error_code]
 pub enum CcipOfframpError {
     #[msg("The given sequence interval is invalid")]
-    InvalidSequenceInterval,
+    // offset error code so that they don't clash with other programs
+    // (Anchor's base custom error code 6000 + offset 3000 = start at 9000)
+    InvalidSequenceInterval = 3000,
     #[msg("The given Merkle Root is missing")]
     RootNotCommitted,
     #[msg("The given Merkle Root is already committed")]
@@ -564,4 +566,36 @@ pub enum CcipOfframpError {
     InvalidWritabilityBitmap,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
+    #[msg("Invalid config: F must be positive")]
+    Ocr3InvalidConfigFMustBePositive,
+    #[msg("Invalid config: Too many transmitters")]
+    Ocr3InvalidConfigTooManyTransmitters,
+    #[msg("Invalid config: Too many signers")]
+    Ocr3InvalidConfigTooManySigners,
+    #[msg("Invalid config: F is too high")]
+    Ocr3InvalidConfigFIsTooHigh,
+    #[msg("Invalid config: Repeated oracle address")]
+    Ocr3InvalidConfigRepeatedOracle,
+    #[msg("Wrong message length")]
+    Ocr3WrongMessageLength,
+    #[msg("Config digest mismatch")]
+    Ocr3ConfigDigestMismatch,
+    #[msg("Wrong number signatures")]
+    Ocr3WrongNumberOfSignatures,
+    #[msg("Unauthorized transmitter")]
+    Ocr3UnauthorizedTransmitter,
+    #[msg("Unauthorized signer")]
+    Ocr3UnauthorizedSigner,
+    #[msg("Non unique signatures")]
+    Ocr3NonUniqueSignatures,
+    #[msg("Oracle cannot be zero address")]
+    Ocr3OracleCannotBeZeroAddress,
+    #[msg("Static config cannot be changed")]
+    Ocr3StaticConfigCannotBeChanged,
+    #[msg("Incorrect plugin type")]
+    Ocr3InvalidPluginType,
+    #[msg("Invalid signature")]
+    Ocr3InvalidSignature,
+    #[msg("Signatures out of registration")]
+    Ocr3SignaturesOutOfRegistration,
 }

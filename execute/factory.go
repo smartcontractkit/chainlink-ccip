@@ -68,7 +68,7 @@ type PluginFactory struct {
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
 	msgHasher        cciptypes.MessageHasher
-	extraDataCodec   cciptypes.ExtraDataCodec
+	addrCodec        cciptypes.AddressCodec
 	homeChainReader  reader.HomeChain
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
@@ -82,7 +82,7 @@ type PluginFactoryParams struct {
 	OcrConfig        reader.OCR3ConfigWithMeta
 	ExecCodec        cciptypes.ExecutePluginCodec
 	MsgHasher        cciptypes.MessageHasher
-	ExtraDataCodec   cciptypes.ExtraDataCodec
+	AddrCodec        cciptypes.AddressCodec
 	HomeChainReader  reader.HomeChain
 	TokenDataEncoder cciptypes.TokenDataEncoder
 	EstimateProvider cciptypes.EstimateProvider
@@ -99,7 +99,7 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		ocrConfig:        params.OcrConfig,
 		execCodec:        params.ExecCodec,
 		msgHasher:        params.MsgHasher,
-		extraDataCodec:   params.ExtraDataCodec,
+		addrCodec:        params.AddrCodec,
 		homeChainReader:  params.HomeChainReader,
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
@@ -147,7 +147,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
-		p.extraDataCodec,
+		p.addrCodec,
 	)
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
@@ -164,7 +164,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
 		logutil.WithComponent(lggr, "CostlyMessages"),
-		true,
+		false,
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
 		p.estimateProvider,

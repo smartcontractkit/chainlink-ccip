@@ -609,7 +609,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{badInitIx}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{badInitIx}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 
 			badInitConfigIx, err := ccip_offramp.NewInitializeConfigInstruction(
 				invalidSVMChainSelector,
@@ -622,7 +622,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{badInitConfigIx}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{badInitConfigIx}, ccipAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 
 			// Now, actually initialize the offramp
 			initIx, err := ccip_offramp.NewInitializeInstruction(
@@ -754,14 +754,14 @@ func TestCCIPRouter(t *testing.T) {
 					MaxPerMsgGasLimit:   validFqDestChainConfig.MaxPerMsgGasLimit,
 					ChainFamilySelector: validFqDestChainConfig.ChainFamilySelector,
 				},
-				Error: fee_quoter.ZeroGasLimit_FeeQuoterError.String(),
+				Error: ccip.ZeroGasLimit_FeeQuoterError.String(),
 			},
 			{
 				Name:         "Zero DestChainSelector",
 				Selector:     0,
 				Conf:         validFqDestChainConfig,
 				SkipOnUpdate: true, // as the 0-selector is invalid, the config account can never be initialized
-				Error:        fee_quoter.InvalidInputsChainSelector_FeeQuoterError.String(),
+				Error:        ccip.InvalidInputsChainSelector_FeeQuoterError.String(),
 			},
 			{
 				Name:     "Zero ChainFamilySelector",
@@ -771,7 +771,7 @@ func TestCCIPRouter(t *testing.T) {
 					MaxPerMsgGasLimit:   validFqDestChainConfig.MaxPerMsgGasLimit,
 					ChainFamilySelector: [4]uint8{0, 0, 0, 0},
 				},
-				Error: fee_quoter.InvalidChainFamilySelector_FeeQuoterError.String(),
+				Error: ccip.InvalidChainFamilySelector_FeeQuoterError.String(),
 			},
 			{
 				Name:     "DefaultTxGasLimit > MaxPerMsgGasLimit",
@@ -781,7 +781,7 @@ func TestCCIPRouter(t *testing.T) {
 					MaxPerMsgGasLimit:   1,
 					ChainFamilySelector: validFqDestChainConfig.ChainFamilySelector,
 				},
-				Error: fee_quoter.DefaultGasLimitExceedsMaximum_FeeQuoterError.String(),
+				Error: ccip.DefaultGasLimitExceedsMaximum_FeeQuoterError.String(),
 			},
 		}
 
@@ -817,7 +817,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.Unauthorized_FeeQuoterError.String()})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_FeeQuoterError.String()})
 				require.NotNil(t, result)
 			})
 
@@ -831,7 +831,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.Unauthorized_FeeQuoterError.String()})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_FeeQuoterError.String()})
 				require.NotNil(t, result)
 			})
 		})
@@ -987,7 +987,7 @@ func TestCCIPRouter(t *testing.T) {
 					user.PublicKey(),
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 				require.NotNil(t, result)
 			})
 
@@ -999,7 +999,7 @@ func TestCCIPRouter(t *testing.T) {
 					user.PublicKey(),
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 				require.NotNil(t, result)
 			})
 		})
@@ -1080,7 +1080,7 @@ func TestCCIPRouter(t *testing.T) {
 					user.PublicKey(), // unauthorized
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 				require.NotNil(t, result)
 			})
 
@@ -1093,7 +1093,7 @@ func TestCCIPRouter(t *testing.T) {
 					user.PublicKey(), // unauthorized
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 				require.NotNil(t, result)
 			})
 		})
@@ -1160,7 +1160,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 			require.NotNil(t, result)
 		})
 
@@ -1197,7 +1197,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 			require.NotNil(t, result)
 
 			// successfully transfer ownership
@@ -1221,7 +1221,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 			require.NotNil(t, result)
 
 			// Successfully accept ownership
@@ -1245,7 +1245,7 @@ func TestCCIPRouter(t *testing.T) {
 				ccipAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_router.RedundantOwnerProposal_CcipRouterError.String()})
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.RedundantOwnerProposal_CcipRouterError.String()})
 			require.NotNil(t, result)
 
 			// Validate proposed set to 0-address
@@ -1265,7 +1265,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 			require.NotNil(t, result)
 
 			// successfully transfer ownership
@@ -1289,7 +1289,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 			require.NotNil(t, result)
 
 			// Successfully accept ownership
@@ -1313,7 +1313,7 @@ func TestCCIPRouter(t *testing.T) {
 				ccipAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + fee_quoter.RedundantOwnerProposal_FeeQuoterError.String()})
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.RedundantOwnerProposal_FeeQuoterError.String()})
 			require.NotNil(t, result)
 
 			// Validate proposed set to 0-address
@@ -1333,7 +1333,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.Unauthorized_CcipOfframpError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipOfframpError.String()})
 			require.NotNil(t, result)
 
 			// successfully transfer ownership
@@ -1357,7 +1357,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.Unauthorized_CcipOfframpError.String()})
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipOfframpError.String()})
 			require.NotNil(t, result)
 
 			// Successfully accept ownership
@@ -1381,7 +1381,7 @@ func TestCCIPRouter(t *testing.T) {
 				ccipAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.RedundantOwnerProposal_CcipOfframpError.String()})
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.RedundantOwnerProposal_CcipOfframpError.String()})
 			require.NotNil(t, result)
 
 			// Validate proposed set to 0-address
@@ -1598,7 +1598,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						ixConfig, cerr := fee_quoter.NewUpdateBillingTokenConfigInstruction(tokenConfig, config.FqConfigPDA, tokenBillingPDA, legacyAdmin.PublicKey()).ValidateAndBuild() // wrong admin
 						require.NoError(t, cerr)
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, legacyAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, legacyAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 
 						var final fee_quoter.BillingTokenConfigWrapper
 						ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, tokenBillingPDA, config.DefaultCommitment, &final)
@@ -1655,7 +1655,7 @@ func TestCCIPRouter(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
 
 			inputs := []struct {
 				plugin       testutils.OcrPlugin
@@ -1754,7 +1754,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.InvalidPluginType_CcipOfframpError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidPluginType_CcipOfframpError.String()})
 			})
 
 			t.Run("It rejects F = 0", func(t *testing.T) {
@@ -1773,7 +1773,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorInvalidConfigFMustBePositive.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3InvalidConfigFMustBePositive_CcipOfframpError.String()})
 			})
 
 			t.Run("It rejects too many transmitters", func(t *testing.T) {
@@ -1796,7 +1796,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorInvalidConfigTooManyTransmitters.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3InvalidConfigTooManyTransmitters_CcipOfframpError.String()})
 			})
 
 			t.Run("It rejects too many signers", func(t *testing.T) {
@@ -1820,7 +1820,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorInvalidConfigTooManySigners.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3InvalidConfigTooManySigners_CcipOfframpError.String()})
 			})
 
 			t.Run("It rejects too high of F for signers", func(t *testing.T) {
@@ -1842,7 +1842,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorInvalidConfigFIsTooHigh.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3InvalidConfigFIsTooHigh_CcipOfframpError.String()})
 			})
 
 			t.Run("It rejects duplicate transmitters", func(t *testing.T) {
@@ -1867,7 +1867,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorInvalidConfigRepeatedOracle.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3InvalidConfigRepeatedOracle_CcipOfframpError.String()})
 			})
 
 			t.Run("It rejects duplicate signers", func(t *testing.T) {
@@ -1892,7 +1892,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorInvalidConfigRepeatedOracle.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3InvalidConfigRepeatedOracle_CcipOfframpError.String()})
 			})
 
 			t.Run("It rejects zero transmitter address", func(t *testing.T) {
@@ -1913,7 +1913,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorOracleCannotBeZeroAddress.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3OracleCannotBeZeroAddress_CcipOfframpError.String()})
 			})
 
 			t.Run("It rejects zero signer address", func(t *testing.T) {
@@ -1936,7 +1936,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorOracleCannotBeZeroAddress.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3OracleCannotBeZeroAddress_CcipOfframpError.String()})
 			})
 		})
 	})
@@ -1959,7 +1959,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When transmitter wants to set up the token admin registry, it fails", func(t *testing.T) {
@@ -1974,7 +1974,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When admin wants to set up the token admin registry, it succeeds", func(t *testing.T) {
@@ -2011,7 +2011,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When ccip admin wants to accept the token admin registry, it fails", func(t *testing.T) {
@@ -2023,7 +2023,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When proposed admin wants to accept the token admin registry, it succeeds", func(t *testing.T) {
@@ -2059,7 +2059,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.InvalidTokenAdminRegistryProposedAdmin_CcipRouterError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip.InvalidTokenAdminRegistryProposedAdmin_CcipRouterError.String()})
 			})
 
 			t.Run("set pool", func(t *testing.T) {
@@ -2074,7 +2074,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When transmitter wants to set up the pool, it fails", func(t *testing.T) {
@@ -2089,7 +2089,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When admin wants to set up the pool, it fails", func(t *testing.T) {
@@ -2103,7 +2103,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When setting pool to incorrect addresses in lookup table, it fails", func(t *testing.T) {
@@ -2117,7 +2117,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When Token Pool Admin wants to set up the pool, it succeeds", func(t *testing.T) {
@@ -2194,7 +2194,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When admin wants to transfer the token admin registry, it succeeds and permissions stay with no changes", func(t *testing.T) {
@@ -2242,7 +2242,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When new admin accepts the token admin registry, it succeeds and permissions are updated", func(t *testing.T) {
@@ -2276,7 +2276,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 
 					// new one can make changes now
 					instruction, err = ccip_router.NewSetPoolInstruction(
@@ -2307,7 +2307,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When transmitter wants to set up the token admin registry, it fails", func(t *testing.T) {
@@ -2322,7 +2322,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When ccip admin wants to set up the token admin registry, it fails", func(t *testing.T) {
@@ -2336,7 +2336,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When token mint_authority wants to set up the token admin registry, it succeeds", func(t *testing.T) {
@@ -2373,7 +2373,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When ccip admin wants to accept the token admin registry, it fails", func(t *testing.T) {
@@ -2385,7 +2385,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When proposed admin wants to accept the token admin registry, it succeeds", func(t *testing.T) {
@@ -2421,7 +2421,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment, []string{ccip_router.InvalidTokenAdminRegistryProposedAdmin_CcipRouterError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment, []string{ccip.InvalidTokenAdminRegistryProposedAdmin_CcipRouterError.String()})
 			})
 
 			t.Run("set pool", func(t *testing.T) {
@@ -2464,7 +2464,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 				t.Run("When mint authority wants to transfer the token admin registry, it succeeds and permissions stay with no changes", func(t *testing.T) {
 					instruction, err := ccip_router.NewTransferAdminRoleTokenAdminRegistryInstruction(
@@ -2511,7 +2511,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 				})
 
 				t.Run("When new admin accepts the token admin registry, it succeeds and permissions are updated", func(t *testing.T) {
@@ -2545,7 +2545,7 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 
 					// new one can make changes now
 					instruction, err = ccip_router.NewSetPoolInstruction(
@@ -2651,7 +2651,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("Billing can only be set by CCIP admin", func(t *testing.T) {
 				ix, err := fee_quoter.NewSetTokenTransferFeeConfigInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), fee_quoter.TokenTransferFeeConfig{}, config.FqConfigPDA, token0.Billing[config.EvmChainSelector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, token1PoolAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, token1PoolAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 			})
 		})
 	})
@@ -3334,7 +3334,7 @@ func TestCCIPRouter(t *testing.T) {
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_router.InvalidInputsAtaWritable_CcipRouterError.String()})
+			testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.InvalidInputsAtaWritable_CcipRouterError.String()})
 		})
 
 		t.Run("When sending a message and paying with inconsistent fee token accounts, it fails", func(t *testing.T) {
@@ -3433,7 +3433,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherUser, config.DefaultCommitment, []string{ccip_router.InvalidInputsAtaAddress_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherUser, config.DefaultCommitment, []string{ccip.InvalidInputsAtaAddress_CcipRouterError.String()})
 		})
 
 		t.Run("When another user sending a Valid CCIP Message Emits CCIPMessageSent", func(t *testing.T) {
@@ -3792,81 +3792,81 @@ func TestCCIPRouter(t *testing.T) {
 				name        string
 				index       uint
 				replaceWith *solana.AccountMeta // default to zero address
-				errorStr    ccip_router.CcipRouterError
+				errorStr    ccip.CcipRouterError
 			}{
 				{
 					name:     "incorrect user token account",
 					index:    0,
-					errorStr: ccip_router.InvalidInputsTokenAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError,
 				},
 				{
 					name:     "invalid billing config",
 					index:    1,
-					errorStr: ccip_router.InvalidInputsConfigAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsConfigAccounts_CcipRouterError,
 				},
 				{
 					name:     "invalid token pool chain config",
 					index:    2,
-					errorStr: ccip_router.InvalidInputsConfigAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsConfigAccounts_CcipRouterError,
 				},
 				{
 					name:     "pool config is not owned by pool program",
 					index:    6,
-					errorStr: ccip_router.InvalidInputsPoolAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsPoolAccounts_CcipRouterError,
 				},
 				{
 					name:        "is pool config but for wrong token",
 					index:       6,
 					replaceWith: solana.Meta(token1.PoolConfig),
-					errorStr:    ccip_router.InvalidInputsPoolAccounts_CcipRouterError,
+					errorStr:    ccip.InvalidInputsPoolAccounts_CcipRouterError,
 				},
 				{
 					name:        "is pool config but missing write permissions",
 					index:       6,
 					replaceWith: solana.Meta(token0.PoolConfig),
-					errorStr:    ccip_router.InvalidInputsLookupTableAccountWritable_CcipRouterError,
+					errorStr:    ccip.InvalidInputsLookupTableAccountWritable_CcipRouterError,
 				},
 				{
 					name:        "is pool lookup table but has write permissions",
 					index:       3,
 					replaceWith: solana.Meta(token0.PoolLookupTable).WRITE(),
-					errorStr:    ccip_router.InvalidInputsLookupTableAccountWritable_CcipRouterError,
+					errorStr:    ccip.InvalidInputsLookupTableAccountWritable_CcipRouterError,
 				},
 				{
 					name:     "incorrect pool signer",
 					index:    8,
-					errorStr: ccip_router.InvalidInputsPoolAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsPoolAccounts_CcipRouterError,
 				},
 				{
 					name:     "invalid token program",
 					index:    9,
-					errorStr: ccip_router.InvalidInputsTokenAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError,
 				},
 				{
 					name:     "incorrect pool token account",
 					index:    7,
-					errorStr: ccip_router.InvalidInputsTokenAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError,
 				},
 				{
 					name:        "incorrect token pool lookup table",
 					index:       3,
 					replaceWith: solana.Meta(token1.PoolLookupTable),
-					errorStr:    ccip_router.InvalidInputsLookupTableAccounts_CcipRouterError,
+					errorStr:    ccip.InvalidInputsLookupTableAccounts_CcipRouterError,
 				},
 				{
 					name:     "invalid fee token config",
 					index:    11,
-					errorStr: ccip_router.InvalidInputsConfigAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsConfigAccounts_CcipRouterError,
 				},
 				{
 					name:     "extra accounts not in lookup table",
 					index:    1_000, // large number to indicate append
-					errorStr: ccip_router.InvalidInputsLookupTableAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError,
 				},
 				{
 					name:     "remaining accounts mismatch",
 					index:    12, // only works with token0
-					errorStr: ccip_router.InvalidInputsLookupTableAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError,
 				},
 			}
 
@@ -4355,7 +4355,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 		})
 
 		t.Run("When withdrawing funds but sending them to the token account for a wrong token, it fails", func(t *testing.T) {
@@ -4372,7 +4372,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.InvalidInputsAtaAddress_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip.InvalidInputsAtaAddress_CcipRouterError.String()})
 		})
 
 		t.Run("When withdrawing funds from a token account that does not belong to billing, it fails", func(t *testing.T) {
@@ -4406,7 +4406,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.InvalidInputsAtaAddress_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip.InvalidInputsAtaAddress_CcipRouterError.String()})
 		})
 
 		t.Run("When trying to withdraw more funds than what's available, it fails", func(t *testing.T) {
@@ -4423,7 +4423,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.InsufficientFunds_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip.InsufficientFunds_CcipRouterError.String()})
 		})
 
 		t.Run("When withdrawing a specific amount of funds, it succeeds", func(t *testing.T) {
@@ -4495,7 +4495,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip_router.InsufficientFunds_CcipRouterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{ccip.InsufficientFunds_CcipRouterError.String()})
 		})
 	})
 
@@ -4521,7 +4521,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{fee_quoter.Unauthorized_FeeQuoterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_FeeQuoterError.String()})
 		})
 
 		t.Run("When an admin adds a price updater, it succeeds", func(t *testing.T) {
@@ -4550,7 +4550,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{fee_quoter.UnauthorizedPriceUpdater_FeeQuoterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.UnauthorizedPriceUpdater_FeeQuoterError.String()})
 		})
 
 		t.Run("When the caller is not allowed to update the price but tries to trick fee quoter to check an allowed caller, it fails", func(t *testing.T) {
@@ -4623,7 +4623,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{fee_quoter.Unauthorized_FeeQuoterError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_FeeQuoterError.String()})
 		})
 
 		t.Run("When an admin removes a price updater, it succeeds and the caller can no longer update prices", func(t *testing.T) {
@@ -5135,7 +5135,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.InvalidSequenceInterval_CcipOfframpError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidSequenceInterval_CcipOfframpError.String()})
 				})
 
 				t.Run("When committing a report with an interval size bigger than supported it fails", func(t *testing.T) {
@@ -5179,7 +5179,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.InvalidSequenceInterval_CcipOfframpError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidSequenceInterval_CcipOfframpError.String()})
 				})
 
 				t.Run("When committing a report with a zero merkle root it fails", func(t *testing.T) {
@@ -5223,7 +5223,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.InvalidProof_CcipOfframpError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidProof_CcipOfframpError.String()})
 				})
 
 				t.Run("When committing a report with a repeated merkle root, it fails", func(t *testing.T) {
@@ -5314,7 +5314,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.InvalidSequenceInterval_CcipOfframpError.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidSequenceInterval_CcipOfframpError.String()})
 				})
 
 				t.Run("Invalid price updates", func(t *testing.T) {
@@ -5347,7 +5347,7 @@ func TestCCIPRouter(t *testing.T) {
 							Name:             "with a non-writable billing token config account",
 							Tokens:           []solana.PublicKey{wsol.mint},
 							AccountMetaSlice: solana.AccountMetaSlice{solana.Meta(wsol.fqBillingConfigPDA)}, // not writable
-							ExpectedError:    ccip_offramp.InvalidInputsMissingWritable_CcipOfframpError.String(),
+							ExpectedError:    ccip.InvalidInputsMissingWritable_CcipOfframpError.String(),
 						},
 						{
 							// when the message source chain is the same as the chain whose gas is updated, then the same chain state is passed
@@ -5356,26 +5356,26 @@ func TestCCIPRouter(t *testing.T) {
 							Name:              "with a non-writable chain state account (different from the message source chain)",
 							GasChainSelectors: []uint64{config.SvmChainSelector},                                 // the message source chain is EVM
 							AccountMetaSlice:  solana.AccountMetaSlice{solana.Meta(config.SvmDestChainStatePDA)}, // not writable
-							ExpectedError:     fee_quoter.InvalidInputsDestChainStateAccount_FeeQuoterError.String(),
+							ExpectedError:     ccip.InvalidInputsDestChainStateAccount_FeeQuoterError.String(),
 						},
 						{
 							Name:             "with the wrong billing token config account for a valid token",
 							Tokens:           []solana.PublicKey{wsol.mint},
 							AccountMetaSlice: solana.AccountMetaSlice{solana.Meta(link22.fqBillingConfigPDA).WRITE()}, // mismatch token
-							ExpectedError:    fee_quoter.InvalidInputsTokenConfigAccount_FeeQuoterError.String(),
+							ExpectedError:    ccip.InvalidInputsTokenConfigAccount_FeeQuoterError.String(),
 						},
 						{
 							Name:              "with the wrong chain state account for a valid gas update",
 							GasChainSelectors: []uint64{config.SvmChainSelector},
 							AccountMetaSlice:  solana.AccountMetaSlice{solana.Meta(config.EvmDestChainStatePDA).WRITE()}, // mismatch chain
-							ExpectedError:     fee_quoter.InvalidInputsDestChainStateAccount_FeeQuoterError.String(),
+							ExpectedError:     ccip.InvalidInputsDestChainStateAccount_FeeQuoterError.String(),
 						},
 						{
 							Name:              "with too few accounts",
 							Tokens:            []solana.PublicKey{wsol.mint},
 							GasChainSelectors: []uint64{config.EvmChainSelector},
 							AccountMetaSlice:  solana.AccountMetaSlice{solana.Meta(wsol.fqBillingConfigPDA).WRITE()}, // missing chain state account
-							ExpectedError:     ccip_offramp.InvalidInputsNumberOfAccounts_CcipOfframpError.String(),
+							ExpectedError:     ccip.InvalidInputsNumberOfAccounts_CcipOfframpError.String(),
 						},
 						// TODO right now I'm allowing sending too many remaining_accounts, but if we want to be restrictive with that we can add a test here
 					}
@@ -5570,7 +5570,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorConfigDigestMismatch.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ConfigDigestMismatch_CcipOfframpError.String()})
 				})
 
 				t.Run("It rejects unauthorized transmitter", func(t *testing.T) {
@@ -5614,7 +5614,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorUnauthorizedTransmitter.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3UnauthorizedTransmitter_CcipOfframpError.String()})
 				})
 
 				t.Run("It rejects incorrect signature count", func(t *testing.T) {
@@ -5662,7 +5662,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorWrongNumberOfSignatures.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3WrongNumberOfSignatures_CcipOfframpError.String()})
 				})
 
 				t.Run("It rejects invalid signature", func(t *testing.T) {
@@ -5705,7 +5705,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorWrongNumberOfSignatures.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3WrongNumberOfSignatures_CcipOfframpError.String()})
 				})
 
 				t.Run("It rejects unauthorized signer", func(t *testing.T) {
@@ -5760,7 +5760,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorUnauthorizedSigner.String()})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3UnauthorizedSigner_CcipOfframpError.String()})
 				})
 
 				t.Run("It rejects duplicate signatures", func(t *testing.T) {
@@ -5808,7 +5808,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ErrorNonUniqueSignatures.String()}, common.AddComputeUnitLimit(210_000))
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3NonUniqueSignatures_CcipOfframpError.String()}, common.AddComputeUnitLimit(210_000))
 				})
 			})
 		})
@@ -6179,7 +6179,7 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip_offramp.UnsupportedDestinationChainSelector_CcipOfframpError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.UnsupportedDestinationChainSelector_CcipOfframpError.String()})
 			})
 
 			t.Run("When executing a report with nonexisting PDA for the Merkle Root, it fails", func(t *testing.T) {
@@ -6971,7 +6971,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 
 					// It fails here as the offramp isn't registered in the router for that lane
-					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, setup.transmitter, config.DefaultCommitment, addressTables, []string{ccip_offramp.InvalidInputsAllowedOfframpAccount_CcipOfframpError.String()})
+					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{executeIx}, setup.transmitter, config.DefaultCommitment, addressTables, []string{ccip.InvalidInputsAllowedOfframpAccount_CcipOfframpError.String()})
 
 					// Allow that offramp for SVM
 					allowIx, err := ccip_router.NewAddOfframpInstruction(
@@ -7119,7 +7119,7 @@ func TestCCIPRouter(t *testing.T) {
 						fmt.Printf("User: %s\n", user.PublicKey().String())
 						fmt.Printf("Transmitter: %s\n", transmitter.PublicKey().String())
 
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip_offramp.ManualExecutionNotAllowed_CcipOfframpError.String()})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{ccip.ManualExecutionNotAllowed_CcipOfframpError.String()})
 					})
 
 					t.Run("When transmitter manually executing before the period of time has passed, it fails", func(t *testing.T) {
@@ -7155,7 +7155,7 @@ func TestCCIPRouter(t *testing.T) {
 						instruction, err = raw.ValidateAndBuild()
 						require.NoError(t, err)
 
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip_offramp.ManualExecutionNotAllowed_CcipOfframpError.String()})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{ccip.ManualExecutionNotAllowed_CcipOfframpError.String()})
 					})
 				})
 
