@@ -196,6 +196,8 @@ func (r *ccipChainReader) queryCommitReports(
 			Key: consts.EventNameCommitReportAccepted,
 			Expressions: []query.Expression{
 				query.Timestamp(uint64(ts.Unix()), primitives.Gte),
+				// We don't need to wait for the commit report accepted event to be finalized
+				// before we can start optimistically processing it.
 				query.Confidence(primitives.Unconfirmed),
 			},
 		},

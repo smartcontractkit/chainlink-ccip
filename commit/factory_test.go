@@ -1,6 +1,7 @@
 package commit
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -8,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
@@ -303,6 +306,11 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
+		mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
+		mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+			Return(func(addr ccipocr3.UnknownAddress, _ ccipocr3.ChainSelector) string {
+				return "0x" + hex.EncodeToString(addr)
+			}, nil)
 		p := &PluginFactory{
 			baseLggr: lggr,
 			ocrConfig: reader.OCR3ConfigWithMeta{
@@ -315,6 +323,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 					ChainSelector: 12922642891491394802,
 				},
 			},
+			addrCodec: mockAddrCodec,
 		}
 
 		plugin, pluginInfo, err := p.NewReportingPlugin(ctx, ocr3types.ReportingPluginConfig{
