@@ -503,7 +503,7 @@ func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 				},
 			},
 		},
-	}, nil, nil, nil, dt.Observation{}, nil)
+	}, nil, nil, dt.Observation{}, nil)
 	encoded, err := ocrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
 
@@ -547,7 +547,7 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 		},
 	}
 	observation := exectypes.NewObservation(
-		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+		commitReports, nil, nil, nil, dt.Observation{}, nil,
 	)
 	encoded, err := ocrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
@@ -585,7 +585,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 		},
 	}
 	observation := exectypes.NewObservation(
-		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+		commitReports, nil, nil, nil, dt.Observation{}, nil,
 	)
 	encoded, err := ocrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
@@ -623,7 +623,7 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 		},
 	}
 	observation := exectypes.NewObservation(
-		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+		commitReports, nil, nil, nil, dt.Observation{}, nil,
 	)
 	encoded, err := ocrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)

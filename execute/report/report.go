@@ -132,7 +132,6 @@ const (
 	MissingNoncesForChain         messageStatus = "missing_nonces_for_chain"
 	MissingNonce                  messageStatus = "missing_nonce"
 	InvalidNonce                  messageStatus = "invalid_nonce"
-	TooCostly                     messageStatus = "tooCostly"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
 		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
@@ -216,24 +215,6 @@ func CheckTokenData() Check {
 			"sourceChain", report.SourceChain,
 			"seqNum", msg.Header.SequenceNumber,
 			"data", messageTokenData.ToByteSlice())
-
-		return None, nil
-	}
-}
-
-// CheckTooCostly compares the costly list for a given message.
-func CheckTooCostly() Check {
-	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
-		// 4. Check if the message is too costly to execute.
-		if slices.Contains(report.CostlyMessages, msg.Header.MessageID) {
-			lggr.Infow(
-				"message too costly to execute",
-				"messageID", msg.Header.MessageID,
-				"sourceChain", report.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"messageState", TooCostly)
-			return TooCostly, nil
-		}
 
 		return None, nil
 	}

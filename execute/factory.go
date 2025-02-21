@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -163,14 +162,6 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
 
-	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
-		logutil.WithComponent(lggr, "CostlyMessages"),
-		false,
-		ccipReader,
-		offchainConfig.RelativeBoostPerWaitHour,
-		p.estimateProvider,
-	)
-
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
@@ -189,7 +180,6 @@ func (p PluginFactory) NewReportingPlugin(
 			tokenDataObserver,
 			p.estimateProvider,
 			lggr,
-			costlyMessageObserver,
 			metricsReporter,
 			p.addrCodec,
 		), ocr3types.ReportingPluginInfo{

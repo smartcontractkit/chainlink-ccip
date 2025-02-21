@@ -22,7 +22,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
@@ -72,7 +71,6 @@ type Plugin struct {
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
-	costlyMessageObserver costlymessages.Observer
 	estimateProvider      cciptypes.EstimateProvider
 	lggr                  logger.Logger
 	ocrTypeCodec          ocrtypecodec.ExecCodec
@@ -100,7 +98,6 @@ func NewPlugin(
 	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider cciptypes.EstimateProvider,
 	lggr logger.Logger,
-	costlyMessageObserver costlymessages.Observer,
 	metricsReporter metrics.Reporter,
 	addrCodec cciptypes.AddressCodec,
 ) ocr3types.ReportingPlugin[[]byte] {
@@ -108,19 +105,18 @@ func NewPlugin(
 
 	ocrTypCodec := ocrtypecodec.DefaultExecCodec
 	p := &Plugin{
-		donID:                 donID,
-		reportingCfg:          reportingCfg,
-		offchainCfg:           offchainCfg,
-		destChain:             destChain,
-		oracleIDToP2pID:       oracleIDToP2pID,
-		ccipReader:            ccipReader,
-		reportCodec:           reportCodec,
-		msgHasher:             msgHasher,
-		homeChain:             homeChain,
-		tokenDataObserver:     tokenDataObserver,
-		estimateProvider:      estimateProvider,
-		lggr:                  logutil.WithComponent(lggr, "ExecutePlugin"),
-		costlyMessageObserver: costlyMessageObserver,
+		donID:             donID,
+		reportingCfg:      reportingCfg,
+		offchainCfg:       offchainCfg,
+		destChain:         destChain,
+		oracleIDToP2pID:   oracleIDToP2pID,
+		ccipReader:        ccipReader,
+		reportCodec:       reportCodec,
+		msgHasher:         msgHasher,
+		homeChain:         homeChain,
+		tokenDataObserver: tokenDataObserver,
+		estimateProvider:  estimateProvider,
+		lggr:              logutil.WithComponent(lggr, "ExecutePlugin"),
 		discovery: discovery.NewContractDiscoveryProcessor(
 			logutil.WithComponent(lggr, "Discovery"),
 			&ccipReader,
@@ -266,7 +262,6 @@ func (p *Plugin) ValidateObservation(
 			decodedObservation.Messages,
 			decodedObservation.TokenData,
 			decodedObservation.Hashes,
-			decodedObservation.CostlyMessages,
 		)
 		if err != nil {
 			return err
@@ -288,7 +283,6 @@ func (p *Plugin) ValidateObservation(
 			decodedObservation.Messages,
 			decodedObservation.TokenData,
 			decodedObservation.Hashes,
-			decodedObservation.CostlyMessages,
 		)
 		if err != nil {
 			return err
@@ -335,16 +329,12 @@ func validateNoMessageRelatedObservations(
 	messages exectypes.MessageObservations,
 	tokenData exectypes.TokenDataObservations,
 	hashes exectypes.MessageHashes,
-	costlyMessages []cciptypes.Bytes32,
 ) error {
 	if len(messages) > 0 {
 		return fmt.Errorf("messages are not expected in initial or GetCommitRerports states")
 	}
 	if len(tokenData) > 0 {
 		return fmt.Errorf("token data is not expected in initial or GetCommitRerports states")
-	}
-	if len(costlyMessages) > 0 {
-		return fmt.Errorf("costly messages are not expected in initial or GetCommitRerports states")
 	}
 	if len(hashes) > 0 {
 		return fmt.Errorf("hashes are not expected in initial or GetCommitRerports states")
@@ -358,7 +348,6 @@ func validateMessagesRelatedObservations(
 	messages exectypes.MessageObservations,
 	tokenData exectypes.TokenDataObservations,
 	hashes exectypes.MessageHashes,
-	costlyMessages []cciptypes.Bytes32,
 ) error {
 
 	if err := validateMessagesConformToCommitReports(commitReports, messages); err != nil {
@@ -369,9 +358,6 @@ func validateMessagesRelatedObservations(
 	}
 	if err := validateTokenDataObservations(messages, tokenData); err != nil {
 		return fmt.Errorf("validate token data observations: %w", err)
-	}
-	if err := validateCostlyMessagesObservations(messages, costlyMessages); err != nil {
-		return fmt.Errorf("validate costly messages: %w", err)
 	}
 
 	return nil
