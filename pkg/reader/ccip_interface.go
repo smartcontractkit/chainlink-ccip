@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -126,6 +127,7 @@ type CCIPReader interface {
 		ctx context.Context,
 		source cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
+		confidence primitives.ConfidenceLevel,
 	) ([]cciptypes.SeqNum, error)
 
 	// MsgsBetweenSeqNums reads the provided chains, finds and returns ccip messages
