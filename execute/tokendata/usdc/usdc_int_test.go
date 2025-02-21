@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 
