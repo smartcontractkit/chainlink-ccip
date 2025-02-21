@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -77,6 +79,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		return results, nil
 	})
 
+	addrCodec := ccipocr3.NewMockAddressCodec(t)
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
@@ -85,7 +88,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
-		}, nil, chainC, offrampAddress,
+		}, nil, chainC, offrampAddress, addrCodec,
 	)
 
 	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
@@ -817,12 +820,14 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 
 	offrampAddress := []byte{0x3}
 	feeQuoterAddress := []byte{0x4}
+
+	addrCodec := ccipocr3.NewMockAddressCodec(t)
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
-		}, nil, chainC, offrampAddress,
+		}, nil, chainC, offrampAddress, addrCodec,
 	)
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -848,6 +853,8 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 	// Missing writer for chainB
 	contractWriters[chainA] = cw
 	contractWriters[chainC] = cw
+
+	addrCodec := ccipocr3.NewMockAddressCodec(t)
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
@@ -855,6 +862,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
+		addrCodec,
 	)
 
 	ctx := context.Background()
@@ -876,6 +884,7 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	// Missing writer for dest chain chainC
 	contractWriters[chainA] = cw
+	addrCodec := ccipocr3.NewMockAddressCodec(t)
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
@@ -883,6 +892,7 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
+		addrCodec,
 	)
 
 	ctx := context.Background()
