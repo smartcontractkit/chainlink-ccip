@@ -15,7 +15,7 @@ import (
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -73,7 +73,7 @@ Contracts: 274962
 */
 func TestObservationSize(t *testing.T) {
 	t.Skip("This test is for estimating message sizes, not for running in CI")
-	ocrTypeCodec := ocrtypecodec.NewExecCodecJSON()
+	ocrTypeCodec := ocrtypecodec.DefaultExecCodec
 
 	maxCommitReports := 100
 	maxMessages := 1100
