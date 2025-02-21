@@ -155,6 +155,9 @@ func TestTransactionSizing(t *testing.T) {
 			mustRandomPubkey(),                 // fee quoter dest chain
 			mustRandomPubkey(),                 // fee quoter billing token config
 			routerTable["fqLinkConfig"],        // fee quoter link token config
+			config.RMNRemoteProgram,
+			config.RMNRemoteCursesPDA,
+			config.RMNRemoteConfigPDA,
 			routerTable["routerTokenPoolSigner"],
 		)
 
