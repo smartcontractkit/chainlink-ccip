@@ -88,8 +88,8 @@ func (b *Bytes) UnmarshalJSON(data []byte) error {
 type Bytes32 [32]byte
 
 func NewBytes32FromString(s string) (Bytes32, error) {
-	if len(s) < 2 {
-		return Bytes32{}, fmt.Errorf("Bytes32 must be of at least length 2 (i.e, '0x' prefix): %s", s)
+	if len(s) > 66 { // "0x" + 64 hex chars
+		return Bytes32{}, fmt.Errorf("Bytes32 must be at most 32 bytes (64 hex chars) long: %s", s)
 	}
 
 	if !strings.HasPrefix(s, "0x") {
