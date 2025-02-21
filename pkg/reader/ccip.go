@@ -637,13 +637,13 @@ func (r *ccipChainReader) Nonces(
 
 			returnVal, err := readResult.GetResult()
 			if err != nil {
-				r.lggr.Errorw("failed to get nonce for address", "address", address, "err", err)
+				lggr.Errorw("failed to get nonce for address", "address", address, "err", err)
 				continue
 			}
 
 			val, ok := returnVal.(*uint64)
 			if !ok || val == nil {
-				r.lggr.Errorw("invalid nonce value returned", "address", address)
+				lggr.Errorw("invalid nonce value returned", "address", address)
 				continue
 			}
 
