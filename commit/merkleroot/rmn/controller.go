@@ -541,6 +541,8 @@ func (c *controller) listenForRmnObservationResponses(
 				if !finishedRequestIDs.Contains(requestID) {
 					c.metricsReporter.TrackRmnRequest(RmnMethodObservation, requestInfo.Latency(),
 						requestInfo.nodeID, "timeout")
+					lggr.Warnw("Timed out waiting for an observation response from RMN",
+						"requestID", requestID, "nodeID", requestInfo.nodeID, "latency", requestInfo.Latency())
 				}
 			}
 			return nil, ErrTimeout
@@ -1019,6 +1021,8 @@ func (c *controller) listenForRmnReportSignatures(
 				if !finishedRequests.Contains(requestID) {
 					c.metricsReporter.TrackRmnRequest(RmnMethodReportSignature, requestInfo.Latency(),
 						requestInfo.nodeID, "timeout")
+					lggr.Warnw("Timed out waiting for a report signature response from RMN",
+						"requestID", requestID, "nodeID", requestInfo.nodeID, "latency", requestInfo.Latency())
 				}
 			}
 			return nil, ErrTimeout
