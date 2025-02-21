@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -1456,10 +1457,13 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 			Observer:    0,
 		},
 	}
+
+	jsonCodec := ocrtypecodec.NewExecCodecJSON()
+
 	ctx := tests.Context(t)
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: ocrTypeCodec,
+		ocrTypeCodec: jsonCodec,
 		destChain:    3478487238524512106,
 		observer:     &metrics.Noop{},
 	}
@@ -1472,8 +1476,7 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 	}, nil, attObs)
 	require.NoError(t, err)
 
-	//ocrTypeCodec := ocrtypecodec.NewExecCodecJSON()
-	decodedOutcome, err := ocrTypeCodec.DecodeOutcome(outcomeBytes)
+	decodedOutcome, err := jsonCodec.DecodeOutcome(outcomeBytes)
 	require.NoError(t, err)
 	// assert uniqueness of merkle roots in commitreports
 	merkleRoots := make(map[string]struct{})
