@@ -48,6 +48,8 @@ deployments:
           toHost:
             configMaps:
               enabled: true
+            ingresses:
+              enabled: true
             pods:
               enabled: true
             secrets:
