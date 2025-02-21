@@ -630,6 +630,11 @@ func (r *ccipChainReader) Nonces(
 		for i, readResult := range results {
 			address := getAddressByIndex(addressToIndex, i)
 
+			if address == "" {
+				lggr.Errorw("critical error, address not found for index", "index", i)
+				continue
+			}
+
 			returnVal, err := readResult.GetResult()
 			if err != nil {
 				r.lggr.Errorw("failed to get nonce for address", "address", address, "err", err)
