@@ -1475,5 +1475,13 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 	}, nil, attObs)
 	require.NoError(t, err)
 
-	t.Log(string(outcomeBytes))
+	//ocrTypeCodec := ocrtypecodec.NewExecCodecJSON()
+	decodedOutcome, err := ocrTypeCodec.DecodeOutcome(outcomeBytes)
+	require.NoError(t, err)
+	// assert uniqueness of merkle roots in commitreports
+	merkleRoots := make(map[string]struct{})
+	for _, commitReport := range decodedOutcome.CommitReports {
+		merkleRoots[commitReport.MerkleRoot.String()] = struct{}{}
+	}
+	require.Equal(t, len(decodedOutcome.CommitReports), len(merkleRoots))
 }
