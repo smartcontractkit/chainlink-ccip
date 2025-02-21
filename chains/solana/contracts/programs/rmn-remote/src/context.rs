@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{program::RmnRemote, Config, CurseSubject, Cursed, RmnRemoteError};
+use crate::{program::RmnRemote, Config, CurseSubject, Curses, RmnRemoteError};
 
 /// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -40,9 +40,9 @@ pub struct Initialize<'info> {
         seeds = [seed::CURSES],
         bump,
         payer = authority,
-        space = ANCHOR_DISCRIMINATOR + Cursed::INIT_SPACE,
+        space = ANCHOR_DISCRIMINATOR + Curses::INIT_SPACE,
     )]
-    pub curses: Account<'info, Cursed>,
+    pub curses: Account<'info, Curses>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -66,6 +66,13 @@ pub struct UpdateConfig<'info> {
         constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
     pub config: Account<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [seed::CONFIG],
+        bump,
+    )]
+    pub cursed: Account<'info, Curses>,
 
     // validate signer is registered admin
     #[account(address = config.owner @ RmnRemoteError::Unauthorized)]
@@ -107,7 +114,7 @@ pub struct Curse<'info> {
         realloc::payer = authority,
         realloc::zero = false,
     )]
-    pub curses: Account<'info, Cursed>,
+    pub curses: Account<'info, Curses>,
 
     pub system_program: Program<'info, System>,
 }
@@ -132,7 +139,7 @@ pub struct Uncurse<'info> {
         realloc::payer = authority,
         realloc::zero = false,
     )]
-    pub curses: Account<'info, Cursed>,
+    pub curses: Account<'info, Curses>,
 
     pub system_program: Program<'info, System>,
 }
@@ -143,7 +150,7 @@ pub struct InspectCurses<'info> {
         seeds = [seed::CURSES],
         bump,
     )]
-    pub cursed: Account<'info, Cursed>,
+    pub curses: Account<'info, Curses>,
 
     #[account(
         seeds = [seed::CONFIG],

@@ -10,24 +10,19 @@ impl Public for Impl {
         ctx: Context<InspectCurses>,
         subject: CurseSubject,
     ) -> Result<()> {
-        let cursed_subjects = &ctx.accounts.cursed.subjects;
-        let local_chain_selector_subject =
-            CurseSubject::from_chain_selector(ctx.accounts.config.local_chain_selector);
-
+        let curses = &ctx.accounts.curses;
         require!(
-            !cursed_subjects.iter().any(|cs| *cs == subject),
+            !curses.is_subject_cursed(subject),
             RmnRemoteError::SubjectCursed
         );
         require!(
-            !cursed_subjects
-                .iter()
-                .any(|cs| *cs == local_chain_selector_subject),
+            !curses.is_chain_globally_cursed(),
             RmnRemoteError::GloballyCursed
         );
         Ok(())
     }
 
     fn get_cursed_subjects(&self, ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>> {
-        Ok(ctx.accounts.cursed.subjects.clone())
+        Ok(ctx.accounts.curses.cursed_subjects.clone())
     }
 }
