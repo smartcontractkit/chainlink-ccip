@@ -11,7 +11,7 @@ pub struct ConfigSigners {
 
 impl ConfigSigners {
     pub const fn space(total_signers: usize) -> usize {
-        // discriminator + vec prefix + 20 * total_signers + total_signers + is_finalized
+        // discriminator + vec prefix + (20 * total_signers) + total_signers + is_finalized
         8 + 4 + (20 * total_signers) + 1 + 1
     }
 }

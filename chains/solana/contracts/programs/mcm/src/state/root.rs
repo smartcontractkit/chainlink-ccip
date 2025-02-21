@@ -12,7 +12,7 @@ pub struct RootSignatures {
 impl RootSignatures {
     pub const fn space(total_signatures: usize) -> usize {
         // discriminator + vec prefix + (65 * max_sigs) + is_finalized
-        8 + 4 + (Signature::INIT_SPACE * total_signatures) + 1 + 1
+        8 + 4 + (Signature::INIT_SPACE * total_signatures) + 1
     }
 }
 
