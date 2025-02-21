@@ -114,6 +114,7 @@ type EventRouterConfigSet struct {
 	Discriminator    [8]byte
 	SvmChainSelector uint64
 	FeeQuoter        solana.PublicKey
+	RMNRemote        solana.PublicKey
 	LinkTokenMint    solana.PublicKey
 	FeeAggregator    solana.PublicKey
 }
@@ -123,6 +124,7 @@ type EventFeeQuoterConfigSet struct {
 	MaxFeeJuelsPerMsg  bin.Uint128
 	LinkTokenMint      solana.PublicKey
 	Onramp             solana.PublicKey
+	RMNRemote          solana.PublicKey
 	DefaultCodeVersion fee_quoter.CodeVersion
 }
 

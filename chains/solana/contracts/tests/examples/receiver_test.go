@@ -72,6 +72,7 @@ func TestCcipReceiver(t *testing.T) {
 				feeAggregator.PublicKey(),
 				config.FeeQuoterProgram,
 				linkTokenMint.PublicKey(),
+				config.RMNRemoteProgram,
 				config.RouterConfigPDA,
 				ccipAdmin.PublicKey(),
 				solana.SystemProgramID,
