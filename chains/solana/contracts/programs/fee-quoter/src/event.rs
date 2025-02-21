@@ -7,6 +7,7 @@ pub struct ConfigSet {
     pub max_fee_juels_per_msg: u128,
     pub link_token_mint: Pubkey,
     pub onramp: Pubkey,
+    pub rmn_remote: Pubkey,
     pub default_code_version: CodeVersion,
 }
 

@@ -17,6 +17,10 @@ pub struct OwnershipTransferred {
 #[event]
 pub struct ConfigSet {
     pub default_code_version: CodeVersion,
+}
+
+#[event]
+pub struct LocalChainSelectorUpdated {
     pub local_chain_selector: u64,
 }
 

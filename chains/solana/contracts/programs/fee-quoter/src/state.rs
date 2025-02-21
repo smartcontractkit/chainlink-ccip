@@ -34,6 +34,8 @@ pub struct Config {
     // pub token_price_staleness_threshold: u32,
     pub onramp: Pubkey,
 
+    pub rmn_remote: Pubkey,
+
     pub default_code_version: CodeVersion,
 }
 
