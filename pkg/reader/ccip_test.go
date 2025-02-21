@@ -121,13 +121,14 @@ func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 	ecr := reader_mocks.NewMockExtended(t)
 
 	mockAddrCodec := ccipocr3.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
-		addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
-		if err != nil {
-			return nil, err
-		}
-		return addrBytes, nil
-	})
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
+		Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
+			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+			if err != nil {
+				return nil, err
+			}
+			return addrBytes, nil
+		})
 	ccipReader := ccipChainReader{
 		lggr: logger.Test(t),
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{

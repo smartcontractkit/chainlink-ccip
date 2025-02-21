@@ -232,7 +232,9 @@ func filterRootsBasedOnRmnSigs(
 			cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector))
 		if err != nil {
 			lggr.Errorw("can't convert Onramp address to string",
-				"err", err, "sourceChainSelector", laneUpdate.LaneSource.SourceChainSelector, "onrampAddress", laneUpdate.LaneSource.OnrampAddress)
+				"err", err,
+				"sourceChainSelector", laneUpdate.LaneSource.SourceChainSelector,
+				"onrampAddress", laneUpdate.LaneSource.OnrampAddress)
 			continue
 		}
 		rk := rootKey{
