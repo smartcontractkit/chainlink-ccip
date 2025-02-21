@@ -9,7 +9,6 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -41,6 +40,7 @@ type priceReader struct {
 	tokenInfo    map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
 	ccipReader   CCIPReader
 	feedChain    ccipocr3.ChainSelector
+	addressCodec ccipocr3.AddressCodec
 }
 
 func NewPriceReader(
@@ -49,6 +49,7 @@ func NewPriceReader(
 	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
 	ccipReader CCIPReader,
 	feedChain ccipocr3.ChainSelector,
+	addressCodec ccipocr3.AddressCodec,
 ) PriceReader {
 	return &priceReader{
 		lggr:         lggr,
@@ -56,6 +57,7 @@ func NewPriceReader(
 		tokenInfo:    tokenInfo,
 		ccipReader:   ccipReader,
 		feedChain:    feedChain,
+		addressCodec: addressCodec,
 	}
 }
 
@@ -92,25 +94,30 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		return updateMap, nil
 	}
 
+	feeQuoterAddressStr, err := pr.addressCodec.AddressBytesToString(feeQuoterAddress[:], chain)
+	if err != nil {
+		lggr.Warnw("failed to convert fee quoter address to string", "chain", chain, "err", err)
+		return updateMap, nil
+	}
 	lggr.Infow("getting fee quoter token updates",
 		"tokens", tokens,
 		"chain", chain,
-		"feeQuoterAddress", typeconv.AddressBytesToString(feeQuoterAddress, uint64(chain)),
+		"feeQuoterAddress", feeQuoterAddressStr,
 	)
 
 	byteTokens := make([][]byte, 0, len(tokens))
 	for _, token := range tokens {
-		byteToken, err := typeconv.AddressStringToBytes(string(token), uint64(chain))
+		tokenAddressBytes, err := pr.addressCodec.AddressStringToBytes(string(token), chain)
 		if err != nil {
 			lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
 			continue
 		}
 
-		byteTokens = append(byteTokens, byteToken)
+		byteTokens = append(byteTokens, tokenAddressBytes)
 	}
 
 	boundContract := commontypes.BoundContract{
-		Address: typeconv.AddressBytesToString(feeQuoterAddress[:], uint64(chain)),
+		Address: feeQuoterAddressStr,
 		Name:    consts.ContractNameFeeQuoter,
 	}
 

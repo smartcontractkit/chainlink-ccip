@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -365,7 +364,13 @@ func (p *Plugin) getFilterObservation(
 		}
 
 		for _, msg := range commitReport.Messages {
-			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.destChain))
+			senderAddr, err := p.addrCodec.AddressBytesToString(msg.Sender[:], p.destChain)
+			if err != nil {
+				lggr.Errorw("unable to convert sender address to string", "err", err, "sender address", msg.Sender)
+				continue
+			}
+
+			sender := senderAddr
 			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
 		}
 	}

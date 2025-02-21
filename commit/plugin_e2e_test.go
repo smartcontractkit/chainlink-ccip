@@ -43,6 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	typepkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -897,6 +898,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
+	addrCodec := typepkg_mock.NewMockAddressCodec(params.t)
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
@@ -913,6 +915,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		nil,
 		params.reportingCfg,
 		&metrics.Noop{},
+		addrCodec,
 	)
 
 	if !params.enableDiscovery {

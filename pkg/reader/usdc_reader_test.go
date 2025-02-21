@@ -1,10 +1,13 @@
 package reader
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
+	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
@@ -94,6 +97,16 @@ func Test_USDCMessageReader_New(t *testing.T) {
 		},
 	}
 
+	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return "0x" + hex.EncodeToString(addr)
+	}, nil)
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).Return(func(addr string, _ cciptypes.ChainSelector) cciptypes.UnknownAddress {
+		addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+		require.NoError(t, err)
+		return addrBytes
+	}, nil)
+
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
@@ -102,7 +115,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				readers[k] = v
 			}
 
-			r, err := NewUSDCMessageReader(ctx, logger.Test(t), tc.tokensConfig, readers)
+			r, err := NewUSDCMessageReader(ctx, logger.Test(t), tc.tokensConfig, readers, mockAddrCodec)
 			if tc.errorMessage != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMessage)
@@ -183,7 +196,17 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 		},
 	}
 
-	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders)
+	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return "0x" + hex.EncodeToString(addr)
+	}, nil)
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).Return(func(addr string, _ cciptypes.ChainSelector) cciptypes.UnknownAddress {
+		addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+		require.NoError(t, err)
+		return addrBytes
+	}, nil)
+
+	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders, mockAddrCodec)
 	require.NoError(t, err)
 
 	tt := []struct {

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -204,6 +205,11 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	fujiReader := mockReader(t, fujiTransmitter, fuji)
 	sepoliaReader := mockReader(t, sepoliaTransmitter, sepolia)
 
+	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return "0x" + hex.EncodeToString(addr)
+	}, nil)
+
 	usdcReader, err := readerpkg.NewUSDCMessageReader(
 		tests.Context(t),
 		logger.Test(t),
@@ -211,7 +217,8 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			fujiChain:    fujiReader,
 			sepoliaChain: sepoliaReader,
-		})
+		},
+		mockAddrCodec)
 	require.NoError(t, err)
 
 	attestation, err := usdc.NewSequentialAttestationClient(logger.Test(t), pluginconfig.USDCCCTPObserverConfig{

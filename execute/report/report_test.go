@@ -3,6 +3,7 @@ package report
 import (
 	"context"
 	crand "crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -789,6 +791,12 @@ func Test_Builder_Build(t *testing.T) {
 			expectedExecThings:    []int{10},
 		},
 	}
+
+	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return "0x" + hex.EncodeToString(addr)
+	}, nil)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -810,7 +818,7 @@ func Test_Builder_Build(t *testing.T) {
 				WithMaxGas(tt.args.maxGasLimit),
 				WithMaxMessages(tt.args.maxMessages),
 				WithMaxSingleChainReports(tt.args.maxReports),
-				WithExtraMessageCheck(CheckNonces(tt.args.nonces)),
+				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
 			)
 
 			var updatedMessages []exectypes.CommitData
@@ -1231,6 +1239,12 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			expectedStatus: PseudoDeleted,
 		},
 	}
+
+	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return "0x" + hex.EncodeToString(addr)
+	}, nil)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1246,7 +1260,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				nil,
 				nil,
 				1,
-				WithExtraMessageCheck(CheckNonces(tt.args.nonces)),
+				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
 			)
 			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
 			if tt.expectedError != "" {

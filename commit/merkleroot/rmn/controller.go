@@ -29,8 +29,6 @@ import (
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -400,7 +398,7 @@ func (c *controller) sendObservationRequests(
 			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: request.LaneSource.SourceChainSelector,
-					OnrampAddress:       typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
+					OnrampAddress:       request.LaneSource.OnrampAddress,
 				},
 				ClosedInterval: request.ClosedInterval,
 			})
@@ -658,9 +656,7 @@ func (c *controller) validateSignedObservationResponse(
 		}
 
 		// todo: The original updateReq contains abi encoded onRamp address, the one in the RMN response
-		// is 20 bytes evm address. This is chain specific and should be handled in a chain specific way.
-		expOnRampAddress := typconv.KeepNRightBytes(updateReq.Data.LaneSource.OnrampAddress, 20)
-		if !bytes.Equal(expOnRampAddress, signedObsLu.LaneSource.OnrampAddress) {
+		if !bytes.Equal(updateReq.Data.LaneSource.OnrampAddress, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
 

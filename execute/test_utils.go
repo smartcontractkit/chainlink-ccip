@@ -37,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -327,7 +328,10 @@ func (it *IntTest) newNode(
 	}
 
 	it.ccipReader.ConfigDigest = configDigest
-
+	mockAddrCodec := typepkgmock.NewMockAddressCodec(it.t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return string(addr)
+	}, nil)
 	node1 := NewPlugin(
 		it.donID,
 		rCfg,
@@ -343,6 +347,7 @@ func (it *IntTest) newNode(
 		it.lggr,
 		costlyMessageObserver,
 		&metrics.Noop{},
+		mockAddrCodec,
 	)
 
 	// FIXME: Test should not rely on the specific type of the plugin but rather than that on

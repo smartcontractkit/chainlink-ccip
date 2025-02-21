@@ -15,8 +15,6 @@ import (
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -77,7 +75,7 @@ func (p *Processor) getOutcome(
 		}
 
 		merkleRootsOutcome, err := buildMerkleRootsOutcome(
-			q, p.offchainCfg.RMNEnabled, lggr, consObservation, previousOutcome)
+			q, p.offchainCfg.RMNEnabled, lggr, consObservation, previousOutcome, p.addressCodec)
 
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
@@ -170,6 +168,7 @@ func buildMerkleRootsOutcome(
 	lggr logger.Logger,
 	consensusObservation consensusObservation,
 	prevOutcome Outcome,
+	addressCodec cciptypes.AddressCodec,
 ) (Outcome, error) {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
@@ -200,7 +199,7 @@ func buildMerkleRootsOutcome(
 		}
 
 		roots = filterRootsBasedOnRmnSigs(
-			lggr, q.RMNSignatures.LaneUpdates, roots, consensusObservation.RMNEnabledChains)
+			lggr, q.RMNSignatures.LaneUpdates, roots, consensusObservation.RMNEnabledChains, addressCodec)
 	}
 
 	outcome := Outcome{
@@ -223,10 +222,16 @@ func filterRootsBasedOnRmnSigs(
 	signedLaneUpdates []*rmnpb.FixedDestLaneUpdate,
 	roots []cciptypes.MerkleRootChain,
 	rmnEnabledChains map[cciptypes.ChainSelector]bool,
+	addressCodec cciptypes.AddressCodec,
 ) []cciptypes.MerkleRootChain {
 	// Create a set of signed roots for quick lookup.
 	signedRoots := mapset.NewSet[rootKey]()
 	for _, laneUpdate := range signedLaneUpdates {
+		addrStr, err := addressCodec.AddressBytesToString(laneUpdate.LaneSource.OnrampAddress, cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector))
+		if err != nil {
+			lggr.Errorw("can't convert Onramp address to string", "err", err, "sourceChainSelector", laneUpdate.LaneSource.SourceChainSelector, "onrampAddress", laneUpdate.LaneSource.OnrampAddress)
+			continue
+		}
 		rk := rootKey{
 			ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
 			SeqNumsRange: cciptypes.NewSeqNumRange(
@@ -235,9 +240,7 @@ func filterRootsBasedOnRmnSigs(
 			),
 			MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
 			// NOTE: convert address into a comparable value for mapset.
-			OnRampAddress: typconv.AddressBytesToString(
-				laneUpdate.LaneSource.OnrampAddress,
-				laneUpdate.LaneSource.SourceChainSelector),
+			OnRampAddress: addrStr,
 		}
 		lggr.Infow("Found signed root", "root", rk)
 		signedRoots.Add(rk)
@@ -245,11 +248,16 @@ func filterRootsBasedOnRmnSigs(
 
 	validRoots := make([]cciptypes.MerkleRootChain, 0)
 	for _, root := range roots {
+		addrStr, err := addressCodec.AddressBytesToString(root.OnRampAddress, root.ChainSel)
+		if err != nil {
+			lggr.Errorw("can't convert Onramp address to string", "err", err, "sourceChainSelector", root.ChainSel, "onrampAddress", root.OnRampAddress)
+			continue
+		}
 		rk := rootKey{
 			ChainSel:      root.ChainSel,
 			SeqNumsRange:  root.SeqNumsRange,
 			MerkleRoot:    root.MerkleRoot,
-			OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
+			OnRampAddress: addrStr,
 		}
 
 		rootIsSignedAndRmnEnabled := signedRoots.Contains(rk) &&

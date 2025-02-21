@@ -3,9 +3,11 @@ package merkleroot
 import (
 	"testing"
 
+	typepkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -562,6 +564,11 @@ func Test_Processor_Outcome(t *testing.T) {
 		},
 	}
 
+	mockAddrCodec := typepkg_mock.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return string(addr)
+	}, nil)
+
 	for _, tc := range testCases {
 		require.Equal(t, len(tc.observations), len(tc.observers), "test case is wrong")
 		t.Run(tc.name, func(t *testing.T) {
@@ -580,6 +587,7 @@ func Test_Processor_Outcome(t *testing.T) {
 					MaxReportTransmissionCheckAttempts: uint(tc.maxReportTransmissionCheckAttempts),
 				},
 				metricsReporter: NoopMetrics{},
+				addressCodec:    mockAddrCodec,
 			}
 
 			aos := make([]plugincommon.AttributedObservation[Observation], 0, len(tc.observations))
@@ -602,6 +610,10 @@ func Test_Processor_Outcome(t *testing.T) {
 }
 
 func Test_buildMerkleRootsOutcome(t *testing.T) {
+	mockAddrCodec := typepkg_mock.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return string(addr)
+	}, nil)
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
 
@@ -624,11 +636,10 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 		}
 
 		lggr := logger.Test(t)
-
 		for i := 0; i < rounds; i++ {
-			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{})
+			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
-			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{})
+			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
 			require.Equal(t, report1, report2)
 		}
