@@ -1459,7 +1459,7 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 	ctx := tests.Context(t)
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 		destChain:    3478487238524512106,
 		observer:     &metrics.Noop{},
 	}
