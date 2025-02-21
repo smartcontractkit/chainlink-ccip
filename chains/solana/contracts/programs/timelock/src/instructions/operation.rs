@@ -80,7 +80,7 @@ pub struct InitializeOperation<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -119,7 +119,7 @@ pub struct InitializeInstruction<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -161,7 +161,7 @@ pub struct AppendInstructionData<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -186,7 +186,7 @@ pub struct FinalizeOperation<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -208,7 +208,7 @@ pub struct ClearOperation<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -235,7 +235,7 @@ pub struct InitializeBypasserOperation<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -273,7 +273,7 @@ pub struct InitializeBypasserInstruction<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -314,7 +314,7 @@ pub struct AppendBypasserInstructionData<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -338,7 +338,7 @@ pub struct FinalizeBypasserOperation<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
@@ -359,7 +359,7 @@ pub struct ClearBypasserOperation<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,

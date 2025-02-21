@@ -375,7 +375,7 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
         delay: u64,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
+        let mut config = ctx.accounts.config.load_mut()?;
         require!(delay > 0, TimelockError::InvalidInput);
         emit!(MinDelayChange {
             old_duration: config.min_delay,
@@ -400,7 +400,7 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
         selector: [u8; 8],
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
+        let mut config = ctx.accounts.config.load_mut()?;
         config.blocked_selectors.block_selector(selector)?;
         emit!(FunctionSelectorBlocked { selector });
         Ok(())
@@ -421,7 +421,7 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
         selector: [u8; 8],
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
+        let mut config = ctx.accounts.config.load_mut()?;
         config.blocked_selectors.unblock_selector(selector)?;
         emit!(FunctionSelectorUnblocked { selector });
         Ok(())
@@ -442,7 +442,7 @@ pub mod timelock {
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
+        let mut config = ctx.accounts.config.load_mut()?;
         require!(proposed_owner != config.owner, TimelockError::InvalidInput);
         config.proposed_owner = proposed_owner;
         Ok(())
@@ -460,8 +460,9 @@ pub mod timelock {
         ctx: Context<AcceptOwnership>,
         _timelock_id: [u8; TIMELOCK_ID_PADDED],
     ) -> Result<()> {
-        ctx.accounts.config.owner = std::mem::take(&mut ctx.accounts.config.proposed_owner);
-        ctx.accounts.config.proposed_owner = Pubkey::zeroed();
+        let mut config = ctx.accounts.config.load_mut()?;
+        config.owner = std::mem::take(&mut config.proposed_owner);
+        config.proposed_owner = Pubkey::zeroed();
         Ok(())
     }
 }
@@ -470,7 +471,7 @@ pub mod timelock {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct TransferOwnership<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
 }
@@ -479,8 +480,8 @@ pub struct TransferOwnership<'info> {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct AcceptOwnership<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
-    #[account(address = config.proposed_owner @ AuthError::Unauthorized)]
+    pub config: AccountLoader<'info, Config>,
+    #[account(address = config.load()?.proposed_owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -488,7 +489,7 @@ pub struct AcceptOwnership<'info> {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct UpdateDelay<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
 }
@@ -497,7 +498,7 @@ pub struct UpdateDelay<'info> {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct BlockFunctionSelector<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
 }
@@ -506,7 +507,7 @@ pub struct BlockFunctionSelector<'info> {
 #[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct UnblockFunctionSelector<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
 }
