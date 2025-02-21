@@ -30,6 +30,7 @@ pub struct Config {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub fee_quoter: Pubkey,
+    pub rmn_remote: Pubkey,
     pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }

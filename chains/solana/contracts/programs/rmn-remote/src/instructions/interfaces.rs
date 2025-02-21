@@ -1,17 +1,13 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    state::CodeVersion, AcceptOwnership, CurseSubject, Subject, UncurseSubject, UpdateConfig,
-    VerifyCurse,
+    state::CodeVersion, AcceptOwnership, Curse, CurseSubject, GetCursedSubjects, Uncurse,
+    UpdateConfig, VerifyUncursed,
 };
 
 pub trait Public {
-    fn verify_uncursed<'info>(&self, ctx: Context<VerifyCurse>) -> Result<()>;
-    fn verify_subject_uncursed<'info>(
-        &self,
-        ctx: Context<VerifyCurse>,
-        subject: Subject,
-    ) -> Result<()>;
+    fn verify_not_cursed(&self, ctx: Context<VerifyUncursed>, subject: CurseSubject) -> Result<()>;
+    fn get_cursed_subjects(&self, ctx: Context<GetCursedSubjects>) -> Result<Vec<CurseSubject>>;
 }
 
 pub trait Admin {
@@ -25,8 +21,12 @@ pub trait Admin {
         code_version: CodeVersion,
     ) -> Result<()>;
 
-    fn curse(&self, ctx: Context<CurseSubject>) -> Result<()>;
-    fn uncurse(&self, ctx: Context<CurseSubject>) -> Result<()>;
-    fn curse_subject(&self, ctx: Context<CurseSubject>, subject: Subject) -> Result<()>;
-    fn uncurse_subject(&self, ctx: Context<UncurseSubject>, subject: Subject) -> Result<()>;
+    fn set_local_chain_selector(
+        &self,
+        ctx: Context<UpdateConfig>,
+        local_chain_selector: u64,
+    ) -> Result<()>;
+
+    fn curse(&self, ctx: Context<Curse>, subject: CurseSubject) -> Result<()>;
+    fn uncurse(&self, ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()>;
 }

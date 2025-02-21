@@ -17,15 +17,19 @@ mod instructions;
 pub mod rmn_remote {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, local_chain_selector: u64) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             owner: ctx.accounts.authority.key(),
             version: 1,
             proposed_owner: Pubkey::default(),
             default_code_version: CodeVersion::V1,
+            local_chain_selector,
         });
 
-        // TODO emit event
+        emit!(ConfigSet {
+            default_code_version: ctx.accounts.config.default_code_version,
+            local_chain_selector
+        });
         Ok(())
     }
 }
@@ -44,6 +48,10 @@ pub enum RmnRemoteError {
     RedundantOwnerProposal,
     #[msg("Invalid version of the onchain state")]
     InvalidVersion,
+    #[msg("The subject is actively cursed")]
+    SubjectCursed,
+    #[msg("This chain is globally cursed")]
+    GloballyCursed,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
 }
