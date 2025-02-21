@@ -1,7 +1,6 @@
 rawGenesisConfig:
   genesis:
     config:
-      chainId: 1337
       algorithm:
         consensus: qbft
         blockperiodseconds: 5

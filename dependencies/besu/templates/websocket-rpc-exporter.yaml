@@ -92,7 +92,7 @@ in: |
           data:
             config.yaml: |
               blockchain: "Besu"
-              chain_id: {{ .Env.CHAIN_ID | conv.ToInt}}
+              chain_id: {{ .Env.CHAIN_ID | conv.ToInt }}
               network_name: {{ .Env.CHAIN_NAME | strings.Title }}
               network_type: "Testnet"
               connection_parameters:
