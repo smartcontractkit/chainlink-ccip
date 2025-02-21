@@ -2,6 +2,7 @@ package chainfee
 
 import (
 	"context"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -24,6 +25,7 @@ type processor struct {
 	chainSupport    plugincommon.ChainSupport
 	metricsReporter plugincommon.MetricsReporter
 	fRoleDON        int
+	obs             observer
 }
 
 func NewProcessor(
@@ -47,6 +49,15 @@ func NewProcessor(
 		chainSupport:    chainSupport,
 		cfg:             offChainConfig,
 		metricsReporter: metricsReporter,
+		obs: newAsyncObserver(
+			lggr,
+			ccipReader,
+			destChain,
+			oracleID,
+			chainSupport,
+			5*time.Second,
+			10*time.Second,
+		),
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, processorLabel, metricsReporter)
 }
@@ -58,5 +69,6 @@ func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &processor{}
 
 func (p *processor) Close() error {
+	p.obs.close()
 	return nil
 }
