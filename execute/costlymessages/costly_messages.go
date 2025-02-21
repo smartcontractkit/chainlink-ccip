@@ -44,6 +44,7 @@ func NewObserverWithDefaults(
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
 	estimateProvider cciptypes.EstimateProvider,
+	disableAvailableFeeUsdCheckByChain map[cciptypes.ChainSelector]bool,
 ) Observer {
 	return NewObserver(
 		lggr,
@@ -59,6 +60,7 @@ func NewObserverWithDefaults(
 			ccipReader:       ccipReader,
 			estimateProvider: estimateProvider,
 		},
+		disableAvailableFeeUsdCheckByChain,
 	)
 }
 
@@ -69,20 +71,23 @@ func NewObserver(
 	enabled bool,
 	feeCalculator MessageFeeE18USDCalculator,
 	execCostCalculator MessageExecCostUSD18Calculator,
+	disableAvailableFeeUsdCheckByChain map[cciptypes.ChainSelector]bool,
 ) Observer {
 	return &observer{
-		lggr:               lggr,
-		enabled:            enabled,
-		feeCalculator:      feeCalculator,
-		execCostCalculator: execCostCalculator,
+		lggr:                               lggr,
+		enabled:                            enabled,
+		feeCalculator:                      feeCalculator,
+		execCostCalculator:                 execCostCalculator,
+		disableAvailableFeeUsdCheckByChain: disableAvailableFeeUsdCheckByChain,
 	}
 }
 
 type observer struct {
-	lggr               logger.Logger
-	enabled            bool
-	feeCalculator      MessageFeeE18USDCalculator
-	execCostCalculator MessageExecCostUSD18Calculator
+	lggr                               logger.Logger
+	enabled                            bool
+	feeCalculator                      MessageFeeE18USDCalculator
+	execCostCalculator                 MessageExecCostUSD18Calculator
+	disableAvailableFeeUsdCheckByChain map[cciptypes.ChainSelector]bool
 }
 
 // Observe returns a slice of message IDs that are too costly to execute.
@@ -116,6 +121,13 @@ func (o *observer) Observe(
 
 	costlyMessages := make([]cciptypes.Bytes32, 0)
 	for _, msg := range messages {
+		checkFeeDisabled := o.disableAvailableFeeUsdCheckByChain[msg.Header.SourceChainSelector]
+		if checkFeeDisabled {
+			// If fee check is disabled, then we don't care if there is no fee, a positive fee, or negative fee, we
+			// should continue to the next message.
+			continue
+		}
+
 		fee, ok := messageFees[msg.Header.MessageID]
 		if !ok {
 			return nil, fmt.Errorf("missing fee for message %s", msg.Header.MessageID)
@@ -128,7 +140,7 @@ func (o *observer) Observe(
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
 		}
 		if err := validatePositive(execCost); err != nil {
-			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
+			return nil, fmt.Errorf("invalid exec cost for message %s: %w", msg.Header.MessageID, err)
 		}
 		lggr.Debugw("Comparing fee and exec cost", "fee", fee, "execCost", execCost)
 		if fee.Cmp(execCost) < 0 {
@@ -230,7 +242,7 @@ func NewConstMessageFeeUSD18Calculator(fee *big.Int) *ConstMessageFeeUSD18Calcul
 	return &ConstMessageFeeUSD18Calculator{fee: fee}
 }
 
-// MessageFeeUSD18 returns a fee of 0 for all messages.
+// MessageFeeUSD18 returns a fee of 'fee' for all messages.
 func (n *ConstMessageFeeUSD18Calculator) MessageFeeUSD18(
 	_ context.Context,
 	messages []cciptypes.Message,

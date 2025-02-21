@@ -168,6 +168,7 @@ func (p PluginFactory) NewReportingPlugin(
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
 		p.estimateProvider,
+		offchainConfig.DisableAvailableFeeUsdCheckByChain,
 	)
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)

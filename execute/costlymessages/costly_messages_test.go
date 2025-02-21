@@ -35,13 +35,15 @@ func mustMakeBytes(s string) ccipocr3.Bytes32 {
 
 func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 	tests := []struct {
-		name         string
-		notEnabled   bool
-		messageIDs   []ccipocr3.Bytes32
-		messageFees  map[ccipocr3.Bytes32]plugintypes.USD18
-		messageCosts map[ccipocr3.Bytes32]plugintypes.USD18
-		want         []ccipocr3.Bytes32
-		wantErr      assert.ErrorAssertionFunc
+		name                               string
+		notEnabled                         bool
+		messageIDs                         []ccipocr3.Bytes32
+		messageFees                        map[ccipocr3.Bytes32]plugintypes.USD18
+		messageCosts                       map[ccipocr3.Bytes32]plugintypes.USD18
+		disableAvailableFeeUsdCheckByChain map[ccipocr3.ChainSelector]bool
+		sourceSelectorsByMessageID         map[ccipocr3.Bytes32]ccipocr3.ChainSelector
+		want                               []ccipocr3.Bytes32
+		wantErr                            assert.ErrorAssertionFunc
 	}{
 		{
 			name:         "disabled observer returns empty slice",
@@ -49,24 +51,39 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 			messageIDs:   []ccipocr3.Bytes32{b1, b2, b3},
 			messageFees:  map[ccipocr3.Bytes32]plugintypes.USD18{},
 			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
-			want:         nil,
-			wantErr:      assert.NoError,
+			sourceSelectorsByMessageID: map[ccipocr3.Bytes32]ccipocr3.ChainSelector{
+				b1: 1,
+				b2: 2,
+				b3: 3,
+			},
+			want:    nil,
+			wantErr: assert.NoError,
 		},
 		{
 			name:         "empty",
 			messageIDs:   []ccipocr3.Bytes32{},
 			messageFees:  map[ccipocr3.Bytes32]plugintypes.USD18{},
 			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
-			want:         []ccipocr3.Bytes32{},
-			wantErr:      assert.NoError,
+			sourceSelectorsByMessageID: map[ccipocr3.Bytes32]ccipocr3.ChainSelector{
+				b1: 1,
+				b2: 2,
+				b3: 3,
+			},
+			want:    []ccipocr3.Bytes32{},
+			wantErr: assert.NoError,
 		},
 		{
 			name:         "missing fees",
 			messageIDs:   []ccipocr3.Bytes32{b1, b2, b2},
 			messageFees:  map[ccipocr3.Bytes32]plugintypes.USD18{},
 			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
-			want:         nil,
-			wantErr:      assert.Error,
+			sourceSelectorsByMessageID: map[ccipocr3.Bytes32]ccipocr3.ChainSelector{
+				b1: 1,
+				b2: 2,
+				b3: 3,
+			},
+			want:    nil,
+			wantErr: assert.Error,
 		},
 		{
 			name:       "missing costs",
@@ -77,8 +94,13 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 				b3: plugintypes.NewUSD18(30),
 			},
 			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
-			want:         nil,
-			wantErr:      assert.Error,
+			sourceSelectorsByMessageID: map[ccipocr3.Bytes32]ccipocr3.ChainSelector{
+				b1: 1,
+				b2: 2,
+				b3: 3,
+			},
+			want:    nil,
+			wantErr: assert.Error,
 		},
 		{
 			name:       "happy path",
@@ -93,7 +115,83 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 				b2: plugintypes.NewUSD18(25),
 				b3: plugintypes.NewUSD18(15),
 			},
+			sourceSelectorsByMessageID: map[ccipocr3.Bytes32]ccipocr3.ChainSelector{
+				b1: 1,
+				b2: 2,
+				b3: 3,
+			},
 			want:    []ccipocr3.Bytes32{b2},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "happy path disable fee check explicitly set to false",
+			messageIDs: []ccipocr3.Bytes32{b1, b2, b3},
+			messageFees: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(10),
+				b2: plugintypes.NewUSD18(20),
+				b3: plugintypes.NewUSD18(30),
+			},
+			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(5),
+				b2: plugintypes.NewUSD18(25),
+				b3: plugintypes.NewUSD18(15),
+			},
+			disableAvailableFeeUsdCheckByChain: map[ccipocr3.ChainSelector]bool{
+				1: false,
+				2: false,
+				3: false,
+			},
+			sourceSelectorsByMessageID: map[ccipocr3.Bytes32]ccipocr3.ChainSelector{
+				b1: 1,
+				b2: 2,
+				b3: 3,
+			},
+			want:    []ccipocr3.Bytes32{b2},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "disable available fee USD check for two source chains",
+			messageIDs: []ccipocr3.Bytes32{b1, b2, b3},
+			messageFees: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(10),
+				b2: plugintypes.NewUSD18(20),
+				b3: plugintypes.NewUSD18(30),
+			},
+			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{
+				// All costs exceed messageFees
+				b1: plugintypes.NewUSD18(35),
+				b2: plugintypes.NewUSD18(35),
+				b3: plugintypes.NewUSD18(35),
+			},
+			disableAvailableFeeUsdCheckByChain: map[ccipocr3.ChainSelector]bool{
+				1: true,
+				2: true,
+				3: false,
+			},
+			sourceSelectorsByMessageID: map[ccipocr3.Bytes32]ccipocr3.ChainSelector{
+				b1: 1,
+				b2: 2,
+				b3: 3,
+			},
+			want:    []ccipocr3.Bytes32{b3},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "disable available fee USD check - message fee is zero",
+			messageIDs: []ccipocr3.Bytes32{b1},
+			messageFees: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(0),
+			},
+			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(35),
+			},
+			disableAvailableFeeUsdCheckByChain: map[ccipocr3.ChainSelector]bool{
+				1: true,
+			},
+			sourceSelectorsByMessageID: map[ccipocr3.Bytes32]ccipocr3.ChainSelector{
+				b1: 1,
+			},
+			want:    []ccipocr3.Bytes32{},
 			wantErr: assert.NoError,
 		},
 	}
@@ -104,14 +202,19 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 			feeCalculator := NewStaticMessageFeeUSD18Calculator(tt.messageFees)
 			execCostCalculator := NewStaticMessageExecCostUSD18Calculator(tt.messageCosts)
 			observer := &observer{
-				lggr:               logger.Test(t),
-				enabled:            !tt.notEnabled,
-				feeCalculator:      feeCalculator,
-				execCostCalculator: execCostCalculator,
+				lggr:                               logger.Test(t),
+				enabled:                            !tt.notEnabled,
+				feeCalculator:                      feeCalculator,
+				execCostCalculator:                 execCostCalculator,
+				disableAvailableFeeUsdCheckByChain: tt.disableAvailableFeeUsdCheckByChain,
 			}
 			messages := make([]ccipocr3.Message, 0)
 			for _, id := range tt.messageIDs {
-				messages = append(messages, ccipocr3.Message{Header: ccipocr3.RampMessageHeader{MessageID: id}})
+				sourceSelector := tt.sourceSelectorsByMessageID[id]
+				messages = append(messages, ccipocr3.Message{Header: ccipocr3.RampMessageHeader{
+					MessageID:           id,
+					SourceChainSelector: sourceSelector,
+				}})
 			}
 
 			got, err := observer.Observe(ctx, messages, nil)
