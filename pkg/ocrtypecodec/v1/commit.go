@@ -46,15 +46,12 @@ func (c *CommitCodecProto) EncodeQuery(query committypes.Query) ([]byte, error) 
 		query.MerkleRootQuery.RMNSignatures = &rmn.ReportSignatures{}
 	}
 
-	sigs := c.tr.rmnSignaturesToProto(query.MerkleRootQuery.RMNSignatures)
-	laneUpdates := c.tr.laneUpdatesToProto(query.MerkleRootQuery.RMNSignatures.LaneUpdates)
-
 	pbQ := &ocrtypecodecpb.CommitQuery{
 		MerkleRootQuery: &ocrtypecodecpb.MerkleRootQuery{
 			RetryRmnSignatures: query.MerkleRootQuery.RetryRMNSignatures,
 			RmnSignatures: &ocrtypecodecpb.ReportSignatures{
-				Signatures:  sigs,
-				LaneUpdates: laneUpdates,
+				Signatures:  c.tr.rmnSignaturesToProto(query.MerkleRootQuery.RMNSignatures),
+				LaneUpdates: c.tr.laneUpdatesToProto(query.MerkleRootQuery.RMNSignatures.LaneUpdates),
 			},
 		},
 	}
@@ -72,15 +69,12 @@ func (c *CommitCodecProto) DecodeQuery(data []byte) (committypes.Query, error) {
 		return committypes.Query{}, fmt.Errorf("proto unmarshal query: %w", err)
 	}
 
-	sigs := c.tr.rmnSignaturesFromProto(pbQ.MerkleRootQuery.RmnSignatures.Signatures)
-	laneUpdates := c.tr.laneUpdatesFromProto(pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates)
-
 	q := committypes.Query{
 		MerkleRootQuery: merkleroot.Query{
 			RetryRMNSignatures: pbQ.MerkleRootQuery.RetryRmnSignatures,
 			RMNSignatures: &rmn.ReportSignatures{
-				Signatures:  sigs,
-				LaneUpdates: laneUpdates,
+				Signatures:  c.tr.rmnSignaturesFromProto(pbQ.MerkleRootQuery.RmnSignatures.Signatures),
+				LaneUpdates: c.tr.laneUpdatesFromProto(pbQ.MerkleRootQuery.RmnSignatures.LaneUpdates),
 			},
 		},
 		TokenPriceQuery: tokenprice.Query{},
@@ -230,6 +224,7 @@ func (c *CommitCodecProto) DecodeOutcome(data []byte) (committypes.Outcome, erro
 type CommitCodecJSON struct{}
 
 // NewCommitCodecJSON returns a new CommitCodecJSON.
+// DEPRECATED
 func NewCommitCodecJSON() *CommitCodecJSON {
 	return &CommitCodecJSON{}
 }

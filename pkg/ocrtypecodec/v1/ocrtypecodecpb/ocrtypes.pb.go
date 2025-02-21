@@ -77,7 +77,7 @@ type CommitObservation struct {
 	TokenPriceObs *TokenPriceObservation `protobuf:"bytes,2,opt,name=token_price_obs,json=tokenPriceObs,proto3" json:"token_price_obs,omitempty"`
 	ChainFeeObs   *ChainFeeObservation   `protobuf:"bytes,3,opt,name=chain_fee_obs,json=chainFeeObs,proto3" json:"chain_fee_obs,omitempty"`
 	DiscoveryObs  *DiscoveryObservation  `protobuf:"bytes,4,opt,name=discovery_obs,json=discoveryObs,proto3" json:"discovery_obs,omitempty"`
-	FChain        map[uint64]int32       `protobuf:"bytes,5,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	FChain        map[uint64]int32       `protobuf:"bytes,5,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"` // chainSelector to f
 }
 
 func (x *CommitObservation) Reset() {
@@ -223,14 +223,14 @@ type ExecObservation struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	CommitReports         map[uint64]*CommitObservations `protobuf:"bytes,1,rep,name=commit_reports,json=commitReports,proto3" json:"commit_reports,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	SeqNumsToMsgs         map[uint64]*SeqNumToMessage    `protobuf:"bytes,2,rep,name=seq_nums_to_msgs,json=seqNumsToMsgs,proto3" json:"seq_nums_to_msgs,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	MsgHashes             map[uint64]*SeqNumToBytes      `protobuf:"bytes,3,rep,name=msg_hashes,json=msgHashes,proto3" json:"msg_hashes,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	CommitReports         map[uint64]*CommitObservations `protobuf:"bytes,1,rep,name=commit_reports,json=commitReports,proto3" json:"commit_reports,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`     // chainSelector to commitObservations
+	SeqNumsToMsgs         map[uint64]*SeqNumToMessage    `protobuf:"bytes,2,rep,name=seq_nums_to_msgs,json=seqNumsToMsgs,proto3" json:"seq_nums_to_msgs,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"` // chainSelector to seqNum to msg
+	MsgHashes             map[uint64]*SeqNumToBytes      `protobuf:"bytes,3,rep,name=msg_hashes,json=msgHashes,proto3" json:"msg_hashes,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`                 // chainSelector to seqNum to bytes32
 	TokenDataObservations *TokenDataObservations         `protobuf:"bytes,4,opt,name=token_data_observations,json=tokenDataObservations,proto3" json:"token_data_observations,omitempty"`
-	CostlyMessages        [][]byte                       `protobuf:"bytes,5,rep,name=costly_messages,json=costlyMessages,proto3" json:"costly_messages,omitempty"`
+	CostlyMessages        [][]byte                       `protobuf:"bytes,5,rep,name=costly_messages,json=costlyMessages,proto3" json:"costly_messages,omitempty"` // Message IDs of costly messages
 	Nonces                map[uint64]*StringAddrToNonce  `protobuf:"bytes,6,rep,name=nonces,proto3" json:"nonces,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	Contracts             *DiscoveryObservation          `protobuf:"bytes,7,opt,name=contracts,proto3" json:"contracts,omitempty"`
-	FChain                map[uint64]int32               `protobuf:"bytes,8,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	FChain                map[uint64]int32               `protobuf:"bytes,8,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"` // chainSelector to f
 }
 
 func (x *ExecObservation) Reset() {
@@ -556,7 +556,7 @@ type DestChainUpdate struct {
 
 	LaneSource  *SourceChainMeta `protobuf:"bytes,1,opt,name=lane_source,json=laneSource,proto3" json:"lane_source,omitempty"`
 	SeqNumRange *SeqNumRange     `protobuf:"bytes,2,opt,name=seq_num_range,json=seqNumRange,proto3" json:"seq_num_range,omitempty"`
-	Root        []byte           `protobuf:"bytes,3,opt,name=root,proto3" json:"root,omitempty"`
+	Root        []byte           `protobuf:"bytes,3,opt,name=root,proto3" json:"root,omitempty"` // bytes32
 }
 
 func (x *DestChainUpdate) Reset() {
@@ -618,11 +618,11 @@ type MerkleRootObservation struct {
 	unknownFields protoimpl.UnknownFields
 
 	MerkleRoots        []*MerkleRootChain `protobuf:"bytes,1,rep,name=merkle_roots,json=merkleRoots,proto3" json:"merkle_roots,omitempty"`
-	RmnEnabledChains   map[uint64]bool    `protobuf:"bytes,2,rep,name=rmn_enabled_chains,json=rmnEnabledChains,proto3" json:"rmn_enabled_chains,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	RmnEnabledChains   map[uint64]bool    `protobuf:"bytes,2,rep,name=rmn_enabled_chains,json=rmnEnabledChains,proto3" json:"rmn_enabled_chains,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"` // chainSelector to bool
 	OnRampMaxSeqNums   []*SeqNumChain     `protobuf:"bytes,3,rep,name=on_ramp_max_seq_nums,json=onRampMaxSeqNums,proto3" json:"on_ramp_max_seq_nums,omitempty"`
 	OffRampNextSeqNums []*SeqNumChain     `protobuf:"bytes,4,rep,name=off_ramp_next_seq_nums,json=offRampNextSeqNums,proto3" json:"off_ramp_next_seq_nums,omitempty"`
 	RmnRemoteConfig    *RmnRemoteConfig   `protobuf:"bytes,5,opt,name=rmn_remote_config,json=rmnRemoteConfig,proto3" json:"rmn_remote_config,omitempty"`
-	FChain             map[uint64]int32   `protobuf:"bytes,6,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	FChain             map[uint64]int32   `protobuf:"bytes,6,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"` // chainSelector to f
 }
 
 func (x *MerkleRootObservation) Reset() {
@@ -848,7 +848,7 @@ type TokenPriceObservation struct {
 
 	FeedTokenPrices       map[string][]byte          `protobuf:"bytes,1,rep,name=feed_token_prices,json=feedTokenPrices,proto3" json:"feed_token_prices,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	FeeQuoterTokenUpdates map[string]*TimestampedBig `protobuf:"bytes,2,rep,name=fee_quoter_token_updates,json=feeQuoterTokenUpdates,proto3" json:"fee_quoter_token_updates,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	FChain                map[uint64]int32           `protobuf:"bytes,3,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	FChain                map[uint64]int32           `protobuf:"bytes,3,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"` // chainSelector to f
 	Timestamp             *timestamppb.Timestamp     `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 }
 
@@ -917,10 +917,10 @@ type ChainFeeObservation struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	FeeComponents     map[uint64]*ChainFeeComponents `protobuf:"bytes,1,rep,name=fee_components,json=feeComponents,proto3" json:"fee_components,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	NativeTokenPrices map[uint64][]byte              `protobuf:"bytes,2,rep,name=native_token_prices,json=nativeTokenPrices,proto3" json:"native_token_prices,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	ChainFeeUpdates   map[uint64]*ChainFeeUpdate     `protobuf:"bytes,3,rep,name=chain_fee_updates,json=chainFeeUpdates,proto3" json:"chain_fee_updates,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	FChain            map[uint64]int32               `protobuf:"bytes,4,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	FeeComponents     map[uint64]*ChainFeeComponents `protobuf:"bytes,1,rep,name=fee_components,json=feeComponents,proto3" json:"fee_components,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`               // chainSelector to ChainFeeComponents
+	NativeTokenPrices map[uint64][]byte              `protobuf:"bytes,2,rep,name=native_token_prices,json=nativeTokenPrices,proto3" json:"native_token_prices,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"` // chainSelector to bigInt bytes
+	ChainFeeUpdates   map[uint64]*ChainFeeUpdate     `protobuf:"bytes,3,rep,name=chain_fee_updates,json=chainFeeUpdates,proto3" json:"chain_fee_updates,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`       // chainSelector to ChainFeeUpdate
+	FChain            map[uint64]int32               `protobuf:"bytes,4,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`                                   // chainSelector to f
 	TimestampNow      *timestamppb.Timestamp         `protobuf:"bytes,5,opt,name=timestamp_now,json=timestampNow,proto3" json:"timestamp_now,omitempty"`
 }
 
@@ -996,8 +996,8 @@ type ChainFeeComponents struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ExecutionFee        []byte `protobuf:"bytes,1,opt,name=execution_fee,json=executionFee,proto3" json:"execution_fee,omitempty"`
-	DataAvailabilityFee []byte `protobuf:"bytes,2,opt,name=data_availability_fee,json=dataAvailabilityFee,proto3" json:"data_availability_fee,omitempty"`
+	ExecutionFee        []byte `protobuf:"bytes,1,opt,name=execution_fee,json=executionFee,proto3" json:"execution_fee,omitempty"`                        // bigInt bytes
+	DataAvailabilityFee []byte `protobuf:"bytes,2,opt,name=data_availability_fee,json=dataAvailabilityFee,proto3" json:"data_availability_fee,omitempty"` // bigInt bytes
 }
 
 func (x *ChainFeeComponents) Reset() {
@@ -1106,8 +1106,8 @@ type ComponentsUSDPrices struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ExecutionFeePriceUsd []byte `protobuf:"bytes,1,opt,name=execution_fee_price_usd,json=executionFeePriceUsd,proto3" json:"execution_fee_price_usd,omitempty"`
-	DataAvFeePriceUsd    []byte `protobuf:"bytes,2,opt,name=data_av_fee_price_usd,json=dataAvFeePriceUsd,proto3" json:"data_av_fee_price_usd,omitempty"`
+	ExecutionFeePriceUsd []byte `protobuf:"bytes,1,opt,name=execution_fee_price_usd,json=executionFeePriceUsd,proto3" json:"execution_fee_price_usd,omitempty"` // bigInt bytes
+	DataAvFeePriceUsd    []byte `protobuf:"bytes,2,opt,name=data_av_fee_price_usd,json=dataAvFeePriceUsd,proto3" json:"data_av_fee_price_usd,omitempty"`        // bigInt bytes
 }
 
 func (x *ComponentsUSDPrices) Reset() {
@@ -1161,7 +1161,7 @@ type DiscoveryObservation struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	FChain        map[uint64]int32            `protobuf:"bytes,1,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	FChain        map[uint64]int32            `protobuf:"bytes,1,rep,name=f_chain,json=fChain,proto3" json:"f_chain,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"` // chainSelector to f
 	ContractNames *ContractNameChainAddresses `protobuf:"bytes,2,opt,name=contract_names,json=contractNames,proto3" json:"contract_names,omitempty"`
 }
 
@@ -1216,7 +1216,7 @@ type ContractNameChainAddresses struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Addresses map[string]*ChainAddressMap `protobuf:"bytes,1,rep,name=addresses,proto3" json:"addresses,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Addresses map[string]*ChainAddressMap `protobuf:"bytes,1,rep,name=addresses,proto3" json:"addresses,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"` // contract name to chain to address
 }
 
 func (x *ContractNameChainAddresses) Reset() {
@@ -1263,7 +1263,7 @@ type ChainAddressMap struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainAddresses map[uint64][]byte `protobuf:"bytes,1,rep,name=chain_addresses,json=chainAddresses,proto3" json:"chain_addresses,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	ChainAddresses map[uint64][]byte `protobuf:"bytes,1,rep,name=chain_addresses,json=chainAddresses,proto3" json:"chain_addresses,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"` // chainSelector to address
 }
 
 func (x *ChainAddressMap) Reset() {
@@ -1313,7 +1313,7 @@ type MerkleRootOutcome struct {
 	OutcomeType                     int32              `protobuf:"varint,1,opt,name=outcome_type,json=outcomeType,proto3" json:"outcome_type,omitempty"`
 	RangesSelectedForReport         []*ChainRange      `protobuf:"bytes,2,rep,name=ranges_selected_for_report,json=rangesSelectedForReport,proto3" json:"ranges_selected_for_report,omitempty"`
 	RootsToReport                   []*MerkleRootChain `protobuf:"bytes,3,rep,name=roots_to_report,json=rootsToReport,proto3" json:"roots_to_report,omitempty"`
-	RmnEnabledChains                map[uint64]bool    `protobuf:"bytes,4,rep,name=rmn_enabled_chains,json=rmnEnabledChains,proto3" json:"rmn_enabled_chains,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	RmnEnabledChains                map[uint64]bool    `protobuf:"bytes,4,rep,name=rmn_enabled_chains,json=rmnEnabledChains,proto3" json:"rmn_enabled_chains,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"` // chainSelector to bool
 	OffRampNextSeqNums              []*SeqNumChain     `protobuf:"bytes,5,rep,name=off_ramp_next_seq_nums,json=offRampNextSeqNums,proto3" json:"off_ramp_next_seq_nums,omitempty"`
 	ReportTransmissionCheckAttempts uint32             `protobuf:"varint,6,opt,name=report_transmission_check_attempts,json=reportTransmissionCheckAttempts,proto3" json:"report_transmission_check_attempts,omitempty"`
 	RmnReportSignatures             []*SignatureEcdsa  `protobuf:"bytes,7,rep,name=rmn_report_signatures,json=rmnReportSignatures,proto3" json:"rmn_report_signatures,omitempty"`
@@ -1668,12 +1668,12 @@ type CommitData struct {
 	OnRampAddress       []byte                 `protobuf:"bytes,2,opt,name=on_ramp_address,json=onRampAddress,proto3" json:"on_ramp_address,omitempty"`
 	Timestamp           *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	BlockNum            uint64                 `protobuf:"varint,4,opt,name=block_num,json=blockNum,proto3" json:"block_num,omitempty"`
-	MerkleRoot          []byte                 `protobuf:"bytes,5,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root,omitempty"`
+	MerkleRoot          []byte                 `protobuf:"bytes,5,opt,name=merkle_root,json=merkleRoot,proto3" json:"merkle_root,omitempty"` // Should be 32bytes
 	SequenceNumberRange *SeqNumRange           `protobuf:"bytes,6,opt,name=sequence_number_range,json=sequenceNumberRange,proto3" json:"sequence_number_range,omitempty"`
 	ExecutedMessages    []uint64               `protobuf:"varint,7,rep,packed,name=executed_messages,json=executedMessages,proto3" json:"executed_messages,omitempty"`
 	Messages            []*Message             `protobuf:"bytes,8,rep,name=messages,proto3" json:"messages,omitempty"`
-	Hashes              [][]byte               `protobuf:"bytes,9,rep,name=hashes,proto3" json:"hashes,omitempty"`
-	CostlyMessages      [][]byte               `protobuf:"bytes,10,rep,name=costly_messages,json=costlyMessages,proto3" json:"costly_messages,omitempty"`
+	Hashes              [][]byte               `protobuf:"bytes,9,rep,name=hashes,proto3" json:"hashes,omitempty"`                                        // Each bytes should be 32bytes
+	CostlyMessages      [][]byte               `protobuf:"bytes,10,rep,name=costly_messages,json=costlyMessages,proto3" json:"costly_messages,omitempty"` // Message IDs of costly messages
 	MessageTokenData    []*MessageTokenData    `protobuf:"bytes,11,rep,name=message_token_data,json=messageTokenData,proto3" json:"message_token_data,omitempty"`
 }
 
@@ -2082,13 +2082,13 @@ type Message struct {
 	unknownFields protoimpl.UnknownFields
 
 	Header         *RampMessageHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
-	Sender         []byte             `protobuf:"bytes,2,opt,name=sender,proto3" json:"sender,omitempty"`
+	Sender         []byte             `protobuf:"bytes,2,opt,name=sender,proto3" json:"sender,omitempty"` // address
 	Data           []byte             `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	Receiver       []byte             `protobuf:"bytes,4,opt,name=receiver,proto3" json:"receiver,omitempty"`
+	Receiver       []byte             `protobuf:"bytes,4,opt,name=receiver,proto3" json:"receiver,omitempty"` // address
 	ExtraArgs      []byte             `protobuf:"bytes,5,opt,name=extra_args,json=extraArgs,proto3" json:"extra_args,omitempty"`
-	FeeToken       []byte             `protobuf:"bytes,7,opt,name=fee_token,json=feeToken,proto3" json:"fee_token,omitempty"`
-	FeeTokenAmount []byte             `protobuf:"bytes,8,opt,name=fee_token_amount,json=feeTokenAmount,proto3" json:"fee_token_amount,omitempty"`
-	FeeValueJuels  []byte             `protobuf:"bytes,9,opt,name=fee_value_juels,json=feeValueJuels,proto3" json:"fee_value_juels,omitempty"`
+	FeeToken       []byte             `protobuf:"bytes,7,opt,name=fee_token,json=feeToken,proto3" json:"fee_token,omitempty"`                     // address
+	FeeTokenAmount []byte             `protobuf:"bytes,8,opt,name=fee_token_amount,json=feeTokenAmount,proto3" json:"fee_token_amount,omitempty"` // bigInt bytes
+	FeeValueJuels  []byte             `protobuf:"bytes,9,opt,name=fee_value_juels,json=feeValueJuels,proto3" json:"fee_value_juels,omitempty"`    // bigInt bytes
 	TokenAmounts   []*RampTokenAmount `protobuf:"bytes,10,rep,name=token_amounts,json=tokenAmounts,proto3" json:"token_amounts,omitempty"`
 }
 
@@ -2198,7 +2198,7 @@ type RampMessageHeader struct {
 	SequenceNumber      uint64 `protobuf:"varint,4,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
 	Nonce               uint64 `protobuf:"varint,5,opt,name=nonce,proto3" json:"nonce,omitempty"`
 	MsgHash             []byte `protobuf:"bytes,6,opt,name=msg_hash,json=msgHash,proto3" json:"msg_hash,omitempty"`
-	OnRamp              []byte `protobuf:"bytes,7,opt,name=on_ramp,json=onRamp,proto3" json:"on_ramp,omitempty"`
+	OnRamp              []byte `protobuf:"bytes,7,opt,name=on_ramp,json=onRamp,proto3" json:"on_ramp,omitempty"` // address
 }
 
 func (x *RampMessageHeader) Reset() {
@@ -2287,10 +2287,10 @@ type RampTokenAmount struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	SourcePoolAddress []byte `protobuf:"bytes,1,opt,name=source_pool_address,json=sourcePoolAddress,proto3" json:"source_pool_address,omitempty"`
-	DestTokenAddress  []byte `protobuf:"bytes,2,opt,name=dest_token_address,json=destTokenAddress,proto3" json:"dest_token_address,omitempty"`
+	SourcePoolAddress []byte `protobuf:"bytes,1,opt,name=source_pool_address,json=sourcePoolAddress,proto3" json:"source_pool_address,omitempty"` // address
+	DestTokenAddress  []byte `protobuf:"bytes,2,opt,name=dest_token_address,json=destTokenAddress,proto3" json:"dest_token_address,omitempty"`    // address
 	ExtraData         []byte `protobuf:"bytes,3,opt,name=extra_data,json=extraData,proto3" json:"extra_data,omitempty"`
-	Amount            []byte `protobuf:"bytes,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	Amount            []byte `protobuf:"bytes,4,opt,name=amount,proto3" json:"amount,omitempty"` // bigInt bytes
 	DestExecData      []byte `protobuf:"bytes,5,opt,name=dest_exec_data,json=destExecData,proto3" json:"dest_exec_data,omitempty"`
 }
 
@@ -2366,7 +2366,7 @@ type StringAddrToNonce struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Nonces map[string]uint64 `protobuf:"bytes,1,rep,name=nonces,proto3" json:"nonces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	Nonces map[string]uint64 `protobuf:"bytes,1,rep,name=nonces,proto3" json:"nonces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"` // address string to nonce
 }
 
 func (x *StringAddrToNonce) Reset() {

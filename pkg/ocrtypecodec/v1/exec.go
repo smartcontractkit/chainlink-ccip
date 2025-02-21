@@ -119,6 +119,7 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 // DEPRECATED: Use ExecCodecProto instead.
 type ExecCodecJSON struct{}
 
+// DEPRECATED
 func NewExecCodecJSON() *ExecCodecJSON {
 	return &ExecCodecJSON{}
 }
