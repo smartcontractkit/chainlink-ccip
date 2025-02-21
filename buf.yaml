@@ -1,0 +1,11 @@
+version: v1
+
+lint:
+  use:
+    - STANDARD
+  ignore:
+    - rmn_offchain.proto
+
+breaking:
+  use:
+    - FILE

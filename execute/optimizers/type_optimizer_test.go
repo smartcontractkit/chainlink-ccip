@@ -9,7 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -82,7 +82,7 @@ func Test_truncateLastCommit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lggr := logger.Test(t)
-			op := NewObservationOptimizer(lggr, 10000, ocrtypecodec.NewExecCodecJSON())
+			op := NewObservationOptimizer(lggr, 10000, ocrtypecodec.DefaultExecCodec)
 			truncated, _ := op.truncateLastCommit(tt.observation, tt.chain)
 			require.Equal(t, tt.expected, truncated)
 		})
@@ -170,7 +170,7 @@ func Test_truncateChain(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lggr := logger.Test(t)
-			op := NewObservationOptimizer(lggr, 10000, ocrtypecodec.NewExecCodecJSON()) // size not important here
+			op := NewObservationOptimizer(lggr, 10000, ocrtypecodec.DefaultExecCodec) // size not important here
 			truncated := op.truncateChain(tt.observation, tt.chain)
 			require.Equal(t, tt.expected, truncated)
 		})
@@ -330,7 +330,7 @@ func Test_truncateObservation(t *testing.T) {
 			tt.observation.TokenData = makeNoopTokenDataObservations(tt.observation.Messages)
 			tt.expected.TokenData = tt.observation.TokenData
 			lggr := logger.Test(t)
-			op := NewObservationOptimizer(lggr, tt.maxSize, ocrtypecodec.NewExecCodecJSON())
+			op := NewObservationOptimizer(lggr, tt.maxSize, ocrtypecodec.NewExecCodecJSON()) // todo: use proto
 			obs, err := op.TruncateObservation(tt.observation)
 			if tt.wantErr {
 				require.Error(t, err)
