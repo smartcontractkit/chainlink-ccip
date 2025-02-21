@@ -19,7 +19,7 @@ pub fn schedule_batch<'info>(
     delay: u64,
 ) -> Result<()> {
     // delay should greater than min_delay
-    let config = &ctx.accounts.config;
+    let config = ctx.accounts.config.load()?;
     require!(delay >= config.min_delay, TimelockError::DelayInsufficient);
 
     let current_time = Clock::get()?.unix_timestamp as u64;
@@ -76,7 +76,7 @@ pub struct ScheduleBatch<'info> {
     pub operation: Box<Account<'info, Operation>>,
 
     #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     // NOTE: access controller check and access happens in require_role_or_admin macro
     pub role_access_controller: AccountLoader<'info, AccessController>,

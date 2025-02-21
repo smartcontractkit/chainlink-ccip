@@ -38,11 +38,12 @@ macro_rules! require_role_or_admin {
 /// - `Err(TimelockError::InvalidAccessController)` - If provided controller isn't configured for any roles
 /// - `Err(AuthError::Unauthorized)` - If authority lacks admin rights and required roles
 pub fn only_role_or_admin(
-    config: &Account<Config>,
+    config: &AccountLoader<Config>,
     role_controller: &AccountLoader<AccessController>,
     authority: &Signer,
     roles: &[Role],
 ) -> Result<()> {
+    let config = config.load()?;
     if authority.key() == config.owner {
         return Ok(());
     }
@@ -84,7 +85,11 @@ macro_rules! require_only_admin {
 ///
 /// # Returns
 /// - `Result<()>` - Ok if authorized, Err with AuthError::Unauthorized otherwise
-pub fn only_admin(config: &Account<Config>, authority: &Signer) -> Result<()> {
-    require_keys_eq!(authority.key(), config.owner, AuthError::Unauthorized);
+pub fn only_admin(config: &AccountLoader<Config>, authority: &Signer) -> Result<()> {
+    require_keys_eq!(
+        authority.key(),
+        config.load()?.owner,
+        AuthError::Unauthorized
+    );
     Ok(())
 }
