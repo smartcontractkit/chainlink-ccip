@@ -1,6 +1,7 @@
 package execute
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"testing"
@@ -158,9 +159,10 @@ func TestObservationSize(t *testing.T) {
 	// separate sender for each message
 	noncesObs := make(exectypes.NonceObservations, maxMessages)
 	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr ccipocr3.UnknownAddress, _ ccipocr3.ChainSelector) string {
-		return string(addr)
-	}, nil)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr ccipocr3.UnknownAddress, _ ccipocr3.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil)
 	for i := 0; i < maxMessages; i++ {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
 		if nil == noncesObs[idx] {

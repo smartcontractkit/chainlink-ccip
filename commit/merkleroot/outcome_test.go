@@ -1,6 +1,7 @@
 package merkleroot
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -566,9 +567,10 @@ func Test_Processor_Outcome(t *testing.T) {
 	}
 
 	mockAddrCodec := typepkg_mock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-		return string(addr)
-	}, nil)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil)
 
 	for _, tc := range testCases {
 		require.Equal(t, len(tc.observations), len(tc.observers), "test case is wrong")
@@ -612,9 +614,6 @@ func Test_Processor_Outcome(t *testing.T) {
 
 func Test_buildMerkleRootsOutcome(t *testing.T) {
 	mockAddrCodec := typepkg_mock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-		return string(addr)
-	}, nil)
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
 

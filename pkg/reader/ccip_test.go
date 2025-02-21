@@ -81,9 +81,10 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	})
 
 	mockAddrCodec := ccipocr3.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-		return "0x" + hex.EncodeToString(addr)
-	}, nil)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil)
 
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(

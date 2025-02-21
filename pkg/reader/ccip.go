@@ -244,7 +244,8 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 			sourceTokenAddrStr, err := r.addrCodec.AddressBytesToString(tokenPriceUpdate.SourceToken, r.destChain)
 			if err != nil {
-				r.lggr.Errorw("failed to convert source token address to string", "err", err, "sourceToken", tokenPriceUpdate.SourceToken)
+				r.lggr.Errorw("failed to convert source token address to string",
+					"err", err, "sourceToken", tokenPriceUpdate.SourceToken)
 				continue
 			}
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{

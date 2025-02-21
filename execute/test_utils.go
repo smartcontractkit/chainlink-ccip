@@ -243,16 +243,18 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
 	mockAddrCodec := typepkgmock.NewMockAddressCodec(it.t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-		return "0x" + hex.EncodeToString(addr)
-	}, nil)
-	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
-		addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
-		if err != nil {
-			return nil, err
-		}
-		return addrBytes, nil
-	})
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil)
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
+		Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
+			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+			if err != nil {
+				return nil, err
+			}
+			return addrBytes, nil
+		})
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
 		it.lggr,
@@ -341,9 +343,10 @@ func (it *IntTest) newNode(
 
 	it.ccipReader.ConfigDigest = configDigest
 	mockAddrCodec := typepkgmock.NewMockAddressCodec(it.t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-		return string(addr)
-	}, nil)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return string(addr)
+		}, nil)
 	node1 := NewPlugin(
 		it.donID,
 		rCfg,

@@ -207,9 +207,10 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	sepoliaReader := mockReader(t, sepoliaTransmitter, sepolia)
 
 	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-		return "0x" + hex.EncodeToString(addr)
-	}, nil)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil)
 
 	usdcReader, err := readerpkg.NewUSDCMessageReader(
 		tests.Context(t),
