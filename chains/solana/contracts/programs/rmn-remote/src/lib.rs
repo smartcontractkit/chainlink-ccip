@@ -34,12 +34,17 @@ pub mod rmn_remote {
             version: 1,
             proposed_owner: Pubkey::default(),
             default_code_version: CodeVersion::V1,
-            local_chain_selector,
         });
+
+        ctx.accounts
+            .curses
+            .set_local_chain_selector(local_chain_selector);
 
         emit!(ConfigSet {
             default_code_version: ctx.accounts.config.default_code_version,
-            local_chain_selector
+        });
+        emit!(LocalChainSelectorUpdated {
+            local_chain_selector,
         });
         Ok(())
     }

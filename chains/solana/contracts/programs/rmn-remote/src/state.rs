@@ -37,7 +37,6 @@ impl Display for CodeVersion {
 pub struct Config {
     pub version: u8,
     pub owner: Pubkey,
-    pub local_chain_selector: u64,
 
     pub proposed_owner: Pubkey,
     pub default_code_version: CodeVersion,
@@ -45,13 +44,31 @@ pub struct Config {
 
 #[account]
 #[derive(InitSpace, Debug)]
-pub struct Cursed {
+pub struct Curses {
     #[max_len(0)]
-    pub subjects: Vec<CurseSubject>,
+    pub cursed_subjects: Vec<CurseSubject>,
+
+    // Set during initialization of the PDA. Defines the subject that represents
+    // this entire chain being cursed, if present on the vector above.
+    global_subject: CurseSubject,
 }
 
-impl Cursed {
+impl Curses {
     pub fn dynamic_len(&self) -> usize {
-        Self::INIT_SPACE + self.subjects.len() * CurseSubject::INIT_SPACE
+        Self::INIT_SPACE + self.cursed_subjects.len() * CurseSubject::INIT_SPACE
+    }
+
+    /// sets the chain selector of the current chain, which will be saved as a curse
+    /// subject that represents the entire chain being cursed.
+    pub fn set_local_chain_selector(&mut self, local_chain_selector: u64) {
+        self.global_subject = CurseSubject::from_chain_selector(local_chain_selector);
+    }
+
+    pub fn is_subject_cursed(&self, subject: CurseSubject) -> bool {
+        self.cursed_subjects.contains(&subject)
+    }
+
+    pub fn is_chain_globally_cursed(&self) -> bool {
+        self.cursed_subjects.contains(&self.global_subject)
     }
 }

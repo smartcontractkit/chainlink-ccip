@@ -36,6 +36,9 @@ pub(super) fn get_fee_cpi<'info>(
             .fee_quoter_billing_token_config
             .to_account_info(),
         link_token_config: ctx.accounts.fee_quoter_link_token_config.to_account_info(),
+        rmn_remote: ctx.accounts.rmn_remote.to_account_info(),
+        rmn_remote_curses: ctx.accounts.rmn_remote_curses.to_account_info(),
+        rmn_remote_config: ctx.accounts.rmn_remote_config.to_account_info(),
     };
 
     let billing_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut accounts_per_token

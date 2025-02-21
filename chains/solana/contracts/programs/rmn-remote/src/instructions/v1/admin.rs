@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::{
     instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet, Curse, CurseSubject,
-    OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, SubjectCursed,
-    SubjectUncursed, Uncurse, UpdateConfig,
+    LocalChainSelectorUpdated, OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError,
+    SubjectCursed, SubjectUncursed, Uncurse, UpdateConfig,
 };
 
 pub struct Impl;
@@ -48,7 +48,6 @@ impl Admin for Impl {
 
         emit!(ConfigSet {
             default_code_version: config.default_code_version,
-            local_chain_selector: config.local_chain_selector
         });
         Ok(())
     }
@@ -57,11 +56,11 @@ impl Admin for Impl {
         let curses = &mut ctx.accounts.curses;
 
         require!(
-            !curses.subjects.contains(&subject),
+            !curses.cursed_subjects.contains(&subject),
             RmnRemoteError::SubjectIsAlreadyCursed
         );
 
-        curses.subjects.push(subject);
+        curses.cursed_subjects.push(subject);
         emit!(SubjectCursed { subject });
         Ok(())
     }
@@ -70,11 +69,11 @@ impl Admin for Impl {
         let curses = &mut ctx.accounts.curses;
 
         require!(
-            curses.subjects.contains(&subject),
+            curses.cursed_subjects.contains(&subject),
             RmnRemoteError::SubjectWasNotCursed
         );
 
-        curses.subjects.retain(|c| c != &subject);
+        curses.cursed_subjects.retain(|c| c != &subject);
         emit!(SubjectUncursed { subject });
         Ok(())
     }
@@ -84,11 +83,12 @@ impl Admin for Impl {
         ctx: Context<UpdateConfig>,
         local_chain_selector: u64,
     ) -> Result<()> {
-        ctx.accounts.config.local_chain_selector = local_chain_selector;
+        ctx.accounts
+            .cursed
+            .set_local_chain_selector(local_chain_selector);
 
-        emit!(ConfigSet {
-            default_code_version: ctx.accounts.config.default_code_version,
-            local_chain_selector
+        emit!(LocalChainSelectorUpdated {
+            local_chain_selector,
         });
 
         Ok(())

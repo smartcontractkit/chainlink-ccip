@@ -147,6 +147,20 @@ pub mod ccip_router {
             .update_fee_aggregator(ctx, fee_aggregator)
     }
 
+    /// Updates the RMN remote program in the router configuration.
+    /// The Admin is the only one able to update the RMN remote program.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `rmn_remote,` - The new RMN remote address.
+    pub fn update_rmn_remote(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        rmn_remote: Pubkey,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version).update_rmn_remote(ctx, rmn_remote)
+    }
+
     /// Adds a new chain selector to the router.
     ///
     /// The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).
@@ -453,6 +467,8 @@ pub enum CcipRouterError {
     // offset error code so that they don't clash with other programs
     // (Anchor's base custom error code 6000 + offset 1000 = start at 7000)
     Unauthorized = 1000,
+    #[msg("Invalid RMN Remote Address")]
+    InvalidRMNRemoteAddress,
     #[msg("Mint account input is invalid")]
     InvalidInputsMint,
     #[msg("Invalid version of the onchain state")]

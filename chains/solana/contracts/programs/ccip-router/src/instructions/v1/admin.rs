@@ -74,6 +74,23 @@ impl Admin for Impl {
         Ok(())
     }
 
+    fn update_rmn_remote(
+        &self,
+        ctx: Context<UpdateConfigCCIPRouter>,
+        rmn_remote: Pubkey,
+    ) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.rmn_remote = rmn_remote;
+        emit!(events::ConfigSet {
+            svm_chain_selector: config.svm_chain_selector,
+            fee_quoter: config.fee_quoter,
+            rmn_remote: config.rmn_remote,
+            link_token_mint: config.link_token_mint,
+            fee_aggregator: config.fee_aggregator,
+        });
+        Ok(())
+    }
+
     fn add_chain_selector(
         &self,
         ctx: Context<AddChainSelector>,
