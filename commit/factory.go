@@ -45,15 +45,15 @@ const (
 	// that assumes estimatedMaxNumberOfSourceChains source chains and
 	// estimatedMaxRmnNodesCount (theoretical max) RMN nodes.
 	// check factory_test for the calculation
-	maxQueryLength = 559_320
+	maxQueryLength = 242_869
 
 	// maxObservationLength is set to the maximum size of an observation
 	// check factory_test for the calculation
-	maxObservationLength = 1_047_206
+	maxObservationLength = 650_307
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 1_167_845
+	maxOutcomeLength = 700_620
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
