@@ -4,12 +4,16 @@ use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
-pub struct Subject {
-    value: u64,
+pub struct CurseSubject {
+    value: [u8; 16],
 }
 
-impl Subject {
-    pub const SOLANA: Self = Self { value: 900 };
+impl CurseSubject {
+    pub const fn from_chain_selector(selector: u64) -> Self {
+        Self {
+            value: (selector as u128).to_le_bytes(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
@@ -33,6 +37,7 @@ impl Display for CodeVersion {
 pub struct Config {
     pub version: u8,
     pub owner: Pubkey,
+    pub local_chain_selector: u64,
 
     pub proposed_owner: Pubkey,
     pub default_code_version: CodeVersion,
@@ -40,13 +45,13 @@ pub struct Config {
 
 #[account]
 #[derive(InitSpace, Debug)]
-pub struct Curses {
+pub struct Cursed {
     #[max_len(0)]
-    pub subjects: Vec<Subject>,
+    pub subjects: Vec<CurseSubject>,
 }
 
-impl Curses {
+impl Cursed {
     pub fn dynamic_len(&self) -> usize {
-        Self::INIT_SPACE + self.subjects.len() * Subject::INIT_SPACE
+        Self::INIT_SPACE + self.subjects.len() * CurseSubject::INIT_SPACE
     }
 }

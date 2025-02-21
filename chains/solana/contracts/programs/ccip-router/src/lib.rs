@@ -58,6 +58,7 @@ pub mod ccip_router {
         fee_aggregator: Pubkey,
         fee_quoter: Pubkey,
         link_token_mint: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             version: 1,
@@ -66,6 +67,7 @@ pub mod ccip_router {
             proposed_owner: Pubkey::default(),
             svm_chain_selector,
             fee_quoter,
+            rmn_remote,
             link_token_mint,
             fee_aggregator,
         });
@@ -73,6 +75,7 @@ pub mod ccip_router {
         emit!(events::admin::ConfigSet {
             svm_chain_selector: ctx.accounts.config.svm_chain_selector,
             fee_quoter: ctx.accounts.config.fee_quoter,
+            rmn_remote: ctx.accounts.config.rmn_remote,
             link_token_mint: ctx.accounts.config.link_token_mint,
             fee_aggregator: ctx.accounts.config.fee_aggregator,
         });

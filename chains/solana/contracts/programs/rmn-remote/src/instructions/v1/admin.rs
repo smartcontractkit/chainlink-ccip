@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet,
-    OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, Subject, Subject,
-    SubjectCursed, SubjectUncursed, UncurseSubject, UpdateConfig,
+    instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet, Curse, CurseSubject,
+    OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, SubjectCursed,
+    SubjectUncursed, Uncurse, UpdateConfig,
 };
 
 pub struct Impl;
@@ -47,12 +47,13 @@ impl Admin for Impl {
         config.default_code_version = code_version;
 
         emit!(ConfigSet {
-            default_code_version: config.default_code_version
+            default_code_version: config.default_code_version,
+            local_chain_selector: config.local_chain_selector
         });
         Ok(())
     }
 
-    fn curse_subject(&self, ctx: Context<Subject>, subject: Subject) -> Result<()> {
+    fn curse(&self, ctx: Context<Curse>, subject: CurseSubject) -> Result<()> {
         let curses = &mut ctx.accounts.curses;
 
         require!(
@@ -65,7 +66,7 @@ impl Admin for Impl {
         Ok(())
     }
 
-    fn uncurse_subject(&self, ctx: Context<UncurseSubject>, subject: Subject) -> Result<()> {
+    fn uncurse(&self, ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()> {
         let curses = &mut ctx.accounts.curses;
 
         require!(
@@ -78,11 +79,18 @@ impl Admin for Impl {
         Ok(())
     }
 
-    fn curse(&self, ctx: Context<crate::CurseSubject>) -> Result<()> {
-        todo!()
-    }
+    fn set_local_chain_selector(
+        &self,
+        ctx: Context<UpdateConfig>,
+        local_chain_selector: u64,
+    ) -> Result<()> {
+        ctx.accounts.config.local_chain_selector = local_chain_selector;
 
-    fn uncurse(&self, ctx: Context<crate::CurseSubject>) -> Result<()> {
-        todo!()
+        emit!(ConfigSet {
+            default_code_version: ctx.accounts.config.default_code_version,
+            local_chain_selector
+        });
+
+        Ok(())
     }
 }

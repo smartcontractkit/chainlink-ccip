@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{program::RmnRemote, Config, Curses, RmnRemoteError, Subject};
+use crate::{program::RmnRemote, Config, CurseSubject, Cursed, RmnRemoteError};
 
 /// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -10,6 +10,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 pub fn valid_version(v: u8, max_v: u8) -> bool {
     !uninitialized(v) && v <= max_v
 }
+
 pub fn uninitialized(v: u8) -> bool {
     v == 0
 }
@@ -17,7 +18,6 @@ pub fn uninitialized(v: u8) -> bool {
 /// Maximum acceptable config version accepted by this module: any accounts with higher
 /// version numbers than this will be rejected.
 pub const MAX_CONFIG_V: u8 = 1;
-const MAX_CHAINSTATE_V: u8 = 1;
 
 pub mod seed {
     pub const CONFIG: &[u8] = b"config";
@@ -40,9 +40,9 @@ pub struct Initialize<'info> {
         seeds = [seed::CURSES],
         bump,
         payer = authority,
-        space = ANCHOR_DISCRIMINATOR + Curses::INIT_SPACE,
+        space = ANCHOR_DISCRIMINATOR + Cursed::INIT_SPACE,
     )]
-    pub curses: Account<'info, Curses>,
+    pub curses: Account<'info, Cursed>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -88,7 +88,7 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-pub struct CurseSubject<'info> {
+pub struct Curse<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
@@ -103,17 +103,17 @@ pub struct CurseSubject<'info> {
         mut,
         seeds = [seed::CURSES],
         bump,
-        realloc = ANCHOR_DISCRIMINATOR + curses.dynamic_len() + Subject::INIT_SPACE,
+        realloc = ANCHOR_DISCRIMINATOR + curses.dynamic_len() + CurseSubject::INIT_SPACE,
         realloc::payer = authority,
         realloc::zero = false,
     )]
-    pub curses: Account<'info, Curses>,
+    pub curses: Account<'info, Cursed>,
 
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct UncurseSubject<'info> {
+pub struct Uncurse<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
@@ -128,20 +128,36 @@ pub struct UncurseSubject<'info> {
         mut,
         seeds = [seed::CURSES],
         bump,
-        realloc = (ANCHOR_DISCRIMINATOR + curses.dynamic_len()).saturating_sub(Subject::INIT_SPACE),
+        realloc = (ANCHOR_DISCRIMINATOR + curses.dynamic_len()).saturating_sub(CurseSubject::INIT_SPACE),
         realloc::payer = authority,
         realloc::zero = false,
     )]
-    pub curses: Account<'info, Curses>,
+    pub curses: Account<'info, Cursed>,
 
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct VerifyCurse<'info> {
+pub struct VerifyUncursed<'info> {
     #[account(
         seeds = [seed::CURSES],
         bump,
     )]
-    pub curses: Account<'info, Curses>,
+    pub cursed: Account<'info, Cursed>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+}
+
+#[derive(Accounts)]
+pub struct GetCursedSubjects<'info> {
+    #[account(
+        seeds = [seed::CURSES],
+        bump,
+    )]
+    pub cursed: Account<'info, Cursed>,
 }
