@@ -659,13 +659,6 @@ func TestIsValidCribNamespace(t *testing.T) {
 			skipPrefixCheck: false,
 			expectedErr:     nil,
 		},
-		{
-			name:            "InvalidNamespaceForKindProvider",
-			namespace:       "crib-somethingelse",
-			provider:        "kind",
-			skipPrefixCheck: false,
-			expectedErr:     fmt.Errorf("DEVSPACE_NAMESPACE must be set to 'crib-local' when using kind provider"),
-		},
 	}
 
 	for _, tc := range testCases {

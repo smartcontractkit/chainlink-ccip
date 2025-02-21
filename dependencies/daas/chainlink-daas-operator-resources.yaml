@@ -24,6 +24,12 @@ vars:
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  HOST_NAME:
+    source: env
+    default: main.stage.cldev.sh
+  AWS_ACM_CERT_ARN:
+    source: env
+    default: ""
 
 pullSecrets:
   regcred-prod:
@@ -33,27 +39,32 @@ pullSecrets:
 pipelines:
   deploy:
     run: |-
-      create_deployments chainlink-daas-operator-resources
+      create_deployments daas-operator-resources
   purge:
     run: |-
-      purge_deployments chainlink-daas-operator-resources
+      purge_deployments daas-operator-resources
 
 deployments:
-  chainlink-daas-operator-resources:
+  daas-operator-resources:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/daas-operator-resources
-        version: 0.0.1
+        version: 0.0.2
       values:
         dapi:
           enabled: true
           image: {}
-          # imagePullSecrets: [] # todo
+          imagePullSecrets: []
+        extraManifests: []
       upgradeArgs: ["--no-hooks"]
       templateArgs: ["--no-hooks"]
 
 profiles:
+  ###########################
+  ## image registry options
+  ###########################
+
   - name: use-aws-registry
     activation: # match all
       - vars:
@@ -61,28 +72,28 @@ profiles:
           REGISTRY: aws
     patches:
       - op: replace
-        path: deployments.chainlink-daas-operator-resources.helm.values.dapi.image
+        path: deployments.daas-operator-resources.helm.values.dapi.image
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.6
+          tag: 0.0.7
 
-  # - name: use-aws-registry-on-local # todo
-  #   activation: # match all
-  #     - vars:
-  #         ENV: local
-  #         REGISTRY: aws
-  #   patches:
-  #     - op: replace
-  #       path: deployments.chainlink-daas-operator-resources.helm.values.dapi.imagePullSecrets
-  #       value:
-  #         - name: regcred-prod
-  #     - op: replace
-  #       path: deployments.chainlink-daas-operator-resources.helm.values.dapi.image
-  #       value:
-  #         repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
-  #         pullPolicy: Always
-  #         tag: 0.0.6
+  - name: use-aws-registry-on-local
+    activation: # match all
+      - vars:
+          ENV: local
+          REGISTRY: aws
+    patches:
+      - op: replace
+        path: deployments.daas-operator-resources.helm.values.dapi.imagePullSecrets
+        value:
+          - name: regcred-prod
+      - op: replace
+        path: deployments.daas-operator-resources.helm.values.dapi.image
+        value:
+          repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
+          pullPolicy: Always
+          tag: 0.0.7
 
   - name: use-localhost-registry
     activation: # match all
@@ -91,8 +102,41 @@ profiles:
           REGISTRY: localhost
     patches:
       - op: replace
-        path: deployments.chainlink-daas-operator-resources.helm.values.dapi.image
+        path: deployments.daas-operator-resources.helm.values.dapi.image
         value:
           repository: localhost:5001/daas
           pullPolicy: Always
           tag: local
+
+  ###########################
+  ## ingress options
+  ###########################
+
+  - name: ingress-local
+    activation:
+      - vars:
+          ENV: local
+    patches:
+      - op: add
+        path: deployments.daas-operator-resources.helm.values.extraManifests
+        value:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: dapi
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: HTTP
+              nginx.ingress.kubernetes.io/use-regex: "true"
+          spec:
+            ingressClassName: nginx
+            rules:
+              - host: dapi.${HOST_NAME}
+                http:
+                  paths:
+                    - backend:
+                        service:
+                          name: daas-operator-resources-dapi
+                          port:
+                            number: 8888
+                      path: /
+                      pathType: Prefix

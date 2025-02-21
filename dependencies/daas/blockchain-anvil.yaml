@@ -10,6 +10,13 @@ vars:
   DEVSPACE_ENV_FILE:
     source: env
     default: .env
+  # switches / activation
+  ENV: # options=[local|stage|prod]
+    source: env
+    default: prod
+  PROVIDER: # options=[kind|aws]
+    source: all
+    default: aws
   # specific
   HOST_NAME:
     source: env
@@ -50,7 +57,7 @@ deployments:
               - /data/anvil/anvil_state.json
         service:
           name: anvil
-          type: NodePort
+          type: ClusterIP
           ports:
             - port: 8545
         podSecurityContext:
@@ -61,8 +68,36 @@ deployments:
           fsGroup: 1000
 
 profiles:
-  - name: anvil-ingress
+  ###########################
+  ## ingress options
+  ###########################
+
+  - name: ingress-local
+    activation:
+      - vars:
+          ENV: local
     patches:
+      - op: add
+        path: deployments.anvil.helm.values.ingress
+        value:
+          name: anvil
+          ingressClassName: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/backend-protocol: HTTP
+            nginx.ingress.kubernetes.io/use-regex: "true"
+          rules:
+            - host: anvil.${HOST_NAME}
+              path: /
+              pathType: Prefix
+
+  - name: ingress-aws
+    activation:
+      - vars:
+          PROVIDER: aws
+    patches:
+      - op: replace
+        path: deployments.anvil.helm.values.service.type
+        value: NodePort
       - op: add
         path: deployments.anvil.helm.values.ingress
         value:
@@ -77,6 +112,10 @@ profiles:
             - host: ${DEVSPACE_NAMESPACE}-anvil.${HOST_NAME}
               path: /*
               pathType: ImplementationSpecific
+
+  ###########################
+  ## misc options
+  ###########################
 
   - name: anvil-stateful
     patches:
@@ -112,3 +151,14 @@ profiles:
           - /data/anvil/anvil_state.json
           - --load-state
           - /data/anvil/anvil_state.json
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/component: anvil
+        app.kubernetes.io/name: devspace-app
+    events: ["after:deploy:anvil"]

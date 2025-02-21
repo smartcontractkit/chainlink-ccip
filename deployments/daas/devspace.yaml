@@ -91,7 +91,9 @@ pipelines:
     run: |-
       [[ "$ENV" == "local" && "$REGISTRY" == "aws" ]] && ensure_pull_secrets --all
       run_pipelines deps-kind
+      run_pipelines deps-blockchain
       run_pipelines deps-daas
+      run_pipelines deps-daas-api
 
   daas-aws:
     run: |-
@@ -199,7 +201,9 @@ profiles:
   - name: daas-kind
     parents:
       - profile: deps-kind
+      - profile: deps-blockchain
       - profile: deps-daas
+      - profile: deps-daas-api
 
   - name: daas-blockchain
     parents:

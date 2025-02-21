@@ -47,7 +47,11 @@ deployments:
           name: chainlink
 
 profiles:
-  - name: tenant-tiny
+  ###########################
+  ## size options
+  ###########################
+
+  - name: size-tiny-local
     activation:
       - vars:
           ENV: local
@@ -61,10 +65,14 @@ profiles:
               volumesPerServer: 4
               size: 2Gi
 
-  - name: tenant-ingress-local
+  ###########################
+  ## ingress options
+  ###########################
+
+  - name: ingress-local
     activation:
       - vars:
-          PROVIDER: aws
+          ENV: local
     patches:
       - op: add
         path: deployments.minio-tenant.helm.values.ingress
@@ -102,10 +110,10 @@ profiles:
                   - minio-console.${HOST_NAME}
                 secretName: minio-console-ingress-tls
 
-  - name: tenant-ingress-aws
+  - name: ingress-aws
     activation:
       - vars:
-          ENV: local
+          PROVIDER: aws
     patches:
       - op: add
         path: deployments.minio-tenant.helm.values.exposeServices

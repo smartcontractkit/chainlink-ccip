@@ -33,23 +33,27 @@ pullSecrets:
 pipelines:
   deploy:
     run: |-
-      create_deployments chainlink-daas-operator
+      create_deployments daas-operator
   purge:
     run: |-
-      purge_deployments chainlink-daas-operator
+      purge_deployments daas-operator
 
 deployments:
-  chainlink-daas-operator:
+  daas-operator:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/daas-operator
-        version: 0.1.0
+        version: 0.1.1
       values:
         image: {}
         imagePullSecrets: []
 
 profiles:
+  ###########################
+  ## image registry options
+  ###########################
+
   - name: use-aws-registry
     activation: # match all
       - vars:
@@ -57,11 +61,11 @@ profiles:
           REGISTRY: aws
     patches:
       - op: replace
-        path: deployments.chainlink-daas-operator.helm.values.image
+        path: deployments.daas-operator.helm.values.image
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.6
+          tag: 0.0.7
 
   - name: use-aws-registry-on-local
     activation: # match all
@@ -70,15 +74,15 @@ profiles:
           REGISTRY: aws
     patches:
       - op: replace
-        path: deployments.chainlink-daas-operator.helm.values.imagePullSecrets
+        path: deployments.daas-operator.helm.values.imagePullSecrets
         value:
           - name: regcred-prod
       - op: replace
-        path: deployments.chainlink-daas-operator.helm.values.image
+        path: deployments.daas-operator.helm.values.image
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.6
+          tag: 0.0.7
 
   - name: use-localhost-registry
     activation: # match all
@@ -87,8 +91,19 @@ profiles:
           REGISTRY: localhost
     patches:
       - op: replace
-        path: deployments.chainlink-daas-operator.helm.values.image
+        path: deployments.daas-operator.helm.values.image
         value:
           repository: localhost:5001/daas
           pullPolicy: Always
           tag: local
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/instance: daas-operator
+        app.kubernetes.io/name: daas-operator
+    events: ["after:deploy:daas-operator"]

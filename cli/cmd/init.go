@@ -174,7 +174,7 @@ var initCmd = &cobra.Command{
 			// TODO: allow setting clustername and config, for now using the defaults
 			start := time.Now()
 			kindCluster := wrappers.NewKindCluster("", nil, dockerCli, nil, viper.GetString("KUBECONFIG"), "", nil, nil)
-			if err := kindCluster.CreateOrReuse("", nil); err != nil {
+			if err := kindCluster.CreateOrReuse(viper.GetString("DEVSPACE_NAMESPACE"), nil); err != nil {
 				logger.Error("failed to spin up kind cluster", slog.Any("error", err))
 				os.Exit(1)
 			}

@@ -251,10 +251,6 @@ func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappe
 }
 
 func IsValidCribNamespace(namespace string, provider string, skipPrefixCheck bool) error {
-	if provider == "kind" && namespace != "crib-local" {
-		return fmt.Errorf("DEVSPACE_NAMESPACE must be set to 'crib-local' when using kind provider")
-	}
-
 	if !skipPrefixCheck && !strings.HasPrefix(namespace, "crib-") {
 		return fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix")
 	}
