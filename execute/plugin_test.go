@@ -4,12 +4,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"slices"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -1416,7 +1417,8 @@ func mustDecodeBase64(t *testing.T, base64Str string) []byte {
 // "costlyMessages": null,
 // "messageTokenData": null
 // }
-// And 2 observers observe the root 0xafbbb6789a9d008d0438210e0d9ab1cde75f811b09b8b6d658822c00cd18c9e6 (same as above) with no messages executed:
+// And 2 observers observe the root
+// 0xafbbb6789a9d008d0438210e0d9ab1cde75f811b09b8b6d658822c00cd18c9e6 (same as above) with no messages executed:
 //
 // {
 // "chainSelector": 14767482510784807000,
