@@ -121,10 +121,16 @@ func (b Bytes32) MarshalJSON() ([]byte, error) {
 func (b *Bytes32) UnmarshalJSON(data []byte) error {
 	v := string(data)
 	if len(v) < 4 {
-		return fmt.Errorf("invalid MerkleRoot: %s", v)
+		return fmt.Errorf("invalid Bytes32: %s", v)
 	}
+	v = v[1 : len(v)-1] // trim quotes
 
-	bCp, err := hex.DecodeString(v[1 : len(v)-1][2:])
+	if !strings.HasPrefix(v, "0x") {
+		return fmt.Errorf("bytes must start with '0x' prefix: %s", v)
+	}
+	v = v[2:] // trim 0x prefix
+
+	bCp, err := hex.DecodeString(v)
 	if err != nil {
 		return err
 	}
