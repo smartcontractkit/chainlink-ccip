@@ -266,16 +266,6 @@ func getPendingExecutedReports(
 	return groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, nil
 }
 
-// Helper function to check if a commit is in a slice of commits
-func containsCommit(commits []exectypes.CommitData, target exectypes.CommitData) bool {
-	for _, commit := range commits {
-		if commit.MerkleRoot == target.MerkleRoot {
-			return true
-		}
-	}
-	return false
-}
-
 func (p *Plugin) ValidateObservation(
 	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {

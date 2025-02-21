@@ -22,6 +22,7 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -134,6 +135,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 								mock.Anything,
 								sourceSel,
 								seqNrRangePair.snRange,
+								primitives.Unconfirmed,
 							).Return(
 							seqNrRangePair.snRange.ToSlice(),
 							nil,
@@ -145,6 +147,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 								mock.Anything,
 								sourceSel,
 								seqNrRangePair.snRange,
+								primitives.Unconfirmed,
 							).Return(nil, nil). // not executed
 							Maybe()
 					}
@@ -175,6 +178,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 								mock.Anything,
 								sourceSel,
 								seqNrRangePair.snRange,
+								primitives.Unconfirmed,
 							).Return(
 							fullRange[:len(fullRange)/2],
 							nil,
@@ -186,6 +190,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 								mock.Anything,
 								sourceSel,
 								seqNrRangePair.snRange,
+								primitives.Unconfirmed,
 							).Return(nil, nil).Maybe() // not executed
 					}
 					i++
@@ -207,6 +212,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 							mock.Anything,
 							sourceSel,
 							seqNrRangePair.snRange,
+							primitives.Unconfirmed,
 						).Return(nil, nil)
 				}
 				return ccipReaderMock
@@ -241,20 +247,25 @@ func Test_getPendingExecutedReports(t *testing.T) {
 	}
 
 	tcs := []struct {
-		name         string
-		reports      []plugintypes2.CommitPluginReportWithMeta
-		ranges       map[cciptypes.ChainSelector][]cciptypes.SeqNum
-		canExec      CanExecuteHandle
-		wantObs      exectypes.CommitObservations
-		wantExecuted []exectypes.CommitData
-		wantErr      assert.ErrorAssertionFunc
+		name                    string
+		reports                 []plugintypes2.CommitPluginReportWithMeta
+		ranges                  map[cciptypes.ChainSelector][]cciptypes.SeqNum // finalized
+		unfinalizedRanges       map[cciptypes.ChainSelector][]cciptypes.SeqNum // unfinalized
+		canExec                 CanExecuteHandle
+		wantObs                 exectypes.CommitObservations
+		wantExecutedFinalized   []exectypes.CommitData
+		wantExecutedUnfinalized []exectypes.CommitData
+		wantErr                 assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "empty",
-			reports: nil,
-			ranges:  nil,
-			wantObs: exectypes.CommitObservations{},
-			wantErr: assert.NoError,
+			name:                    "empty",
+			reports:                 nil,
+			ranges:                  nil,
+			unfinalizedRanges:       nil,
+			wantObs:                 exectypes.CommitObservations{},
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
 		},
 		{
 			name: "single non-executed report",
@@ -275,6 +286,9 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: nil,
 			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: nil,
+			},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
 					{
@@ -285,10 +299,12 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					},
 				},
 			},
-			wantErr: assert.NoError,
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
 		},
 		{
-			name: "single half-executed report",
+			name: "single partially-executed report with finalized and unfinalized",
 			reports: []plugintypes2.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
@@ -304,7 +320,10 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				},
 			},
 			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
-				1: {1, 2, 3, 7, 8},
+				1: {1, 2, 3},
+			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {7, 8},
 			},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
@@ -317,28 +336,12 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					},
 				},
 			},
-			wantErr: assert.NoError,
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
 		},
 		{
-			name: "last timestamp",
-			reports: []plugintypes2.CommitPluginReportWithMeta{
-				{
-					BlockNum:  999,
-					Timestamp: time.UnixMilli(10101010101),
-					Report:    cciptypes.CommitPluginReport{},
-				},
-				{
-					BlockNum:  999,
-					Timestamp: time.UnixMilli(9999999999999999),
-					Report:    cciptypes.CommitPluginReport{},
-				},
-			},
-			ranges:  map[cciptypes.ChainSelector][]cciptypes.SeqNum{},
-			wantObs: exectypes.CommitObservations{},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "single fully-executed report",
+			name: "single fully-executed finalized report",
 			reports: []plugintypes2.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
@@ -356,15 +359,110 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				1: cciptypes.NewSeqNumRange(1, 10).ToSlice(),
 			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: nil,
+			},
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
-			wantExecuted: []exectypes.CommitData{
+			wantExecutedFinalized: []exectypes.CommitData{
 				{
 					SourceChain:         1,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
 					Timestamp:           time.UnixMilli(10101010101),
 					BlockNum:            999,
+				},
+			},
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
+		},
+		{
+			name: "single fully-executed unfinalized report",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: nil,
+			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: cciptypes.NewSeqNumRange(1, 10).ToSlice(),
+			},
+			wantObs: exectypes.CommitObservations{
+				1: nil,
+			},
+			wantExecutedFinalized: nil,
+			wantExecutedUnfinalized: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+					Timestamp:           time.UnixMilli(10101010101),
+					BlockNum:            999,
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "multiple reports with both finalized and unfinalized fully executed",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  999,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+				{
+					BlockNum:  1000,
+					Timestamp: time.UnixMilli(10101010102),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(11, 20),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: cciptypes.NewSeqNumRange(1, 10).ToSlice(),
+			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: cciptypes.NewSeqNumRange(11, 20).ToSlice(),
+			},
+			wantObs: exectypes.CommitObservations{
+				1: nil,
+			},
+			wantExecutedFinalized: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+					Timestamp:           time.UnixMilli(10101010101),
+					BlockNum:            999,
+				},
+			},
+			wantExecutedUnfinalized: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20),
+					Timestamp:           time.UnixMilli(10101010102),
+					BlockNum:            1000,
 				},
 			},
 			wantErr: assert.NoError,
@@ -385,13 +483,15 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					},
 				},
 			},
-			canExec: canExecute(false),
-			ranges:  nil,
+			canExec:           canExecute(false),
+			ranges:            nil,
+			unfinalizedRanges: nil,
 			wantObs: exectypes.CommitObservations{
 				1: nil,
 			},
-			wantExecuted: nil, // the executed message is not returned.
-			wantErr:      assert.NoError,
+			wantExecutedFinalized:   nil,
+			wantExecutedUnfinalized: nil,
+			wantErr:                 assert.NoError,
 		},
 	}
 	for _, tt := range tcs {
@@ -403,18 +503,20 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			}
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			mockReader.On(
-				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything,
 			).Return(tt.reports, nil)
+
+			// Set up finalized messages mock
 			for k, v := range tt.ranges {
-				mockReader.On("ExecutedMessages", mock.Anything, k, mock.Anything, mock.Anything).Return(v, nil)
+				mockReader.On("ExecutedMessages", mock.Anything, k, mock.Anything, primitives.Finalized).Return(v, nil)
 			}
 
-			// CCIP Reader mocks:
-			// once:
-			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
-			// for each chain selector:
-			//      ExecutedMessages(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNum, error)
-			got, got2, err := getPendingExecutedReports(
+			// Set up unfinalized messages mock
+			for k, v := range tt.unfinalizedRanges {
+				mockReader.On("ExecutedMessages", mock.Anything, k, mock.Anything, primitives.Unconfirmed).Return(v, nil)
+			}
+
+			got, gotFinalized, gotUnfinalized, err := getPendingExecutedReports(
 				tests.Context(t),
 				mockReader,
 				tt.canExec,
@@ -425,7 +527,8 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.wantObs, got, "getPendingExecutedReports(...)")
-			assert.Equalf(t, tt.wantExecuted, got2, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantExecutedFinalized, gotFinalized, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantExecutedUnfinalized, gotUnfinalized, "getPendingExecutedReports(...)")
 		})
 	}
 }
@@ -912,6 +1015,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				mock.Anything,
 				cciptypes.ChainSelector(sourceChain),
 				cciptypes.NewSeqNumRange(seqNum, seqNum),
+				primitives.Unconfirmed,
 			).
 			Return(nil, nil)
 		return ccipReaderMock
@@ -1049,6 +1153,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 						mock.Anything,
 						cciptypes.ChainSelector(sourceChain),
 						cciptypes.NewSeqNumRange(seqNum, seqNum),
+						primitives.Unconfirmed,
 					).Return(
 					[]cciptypes.SeqNum{seqNum},
 					nil)
@@ -1287,6 +1392,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 				reports[0].Messages[0].Header.SequenceNumber,
 				reports[0].Messages[0].Header.SequenceNumber,
 			),
+			primitives.Unconfirmed,
 		).Return(nil, nil)
 
 	p := &Plugin{
@@ -1350,6 +1456,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Failure_AlreadyExecuted(t *testing.T)
 				reports[0].Messages[0].Header.SequenceNumber,
 				reports[0].Messages[0].Header.SequenceNumber,
 			),
+			primitives.Unconfirmed, // Changed from Finalized to Unconfirmed
 		).Return([]cciptypes.SeqNum{
 		reports[0].Messages[0].Header.SequenceNumber,
 	}, nil)

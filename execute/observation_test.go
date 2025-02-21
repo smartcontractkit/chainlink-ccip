@@ -22,7 +22,6 @@ import (
 )
 
 func Test_Observation_CacheUpdate(t *testing.T) {
-
 	getID := func(id string) cciptypes.Bytes32 {
 		var b cciptypes.Bytes32
 		copy(b[:], id)
@@ -100,7 +99,6 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("2")))
 		require.True(t, plugin.inflightMessageCache.IsInflight(2, getID("3")))
 	}
-
 }
 
 func Test_getMessagesObservation(t *testing.T) {
