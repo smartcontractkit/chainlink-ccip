@@ -56,7 +56,6 @@ func Test_truncateLastCommit(t *testing.T) {
 						11: exectypes.NewMessageTokenData(),
 					},
 				},
-				CostlyMessages: []cciptypes.Bytes32{{0x02}},
 			},
 			expected: exectypes.Observation{
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
@@ -74,7 +73,6 @@ func Test_truncateLastCommit(t *testing.T) {
 						1: exectypes.NewMessageTokenData(),
 					},
 				},
-				CostlyMessages: []cciptypes.Bytes32{},
 			},
 		},
 	}
@@ -116,13 +114,11 @@ func Test_truncateChain(t *testing.T) {
 						1: exectypes.NewMessageTokenData(),
 					},
 				},
-				CostlyMessages: []cciptypes.Bytes32{{0x01}},
 			},
 			expected: exectypes.Observation{
-				CommitReports:  map[cciptypes.ChainSelector][]exectypes.CommitData{},
-				Messages:       map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{},
-				TokenData:      map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{},
-				CostlyMessages: []cciptypes.Bytes32{},
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{},
+				Messages:      map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{},
+				TokenData:     map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{},
 			},
 		},
 		{
@@ -144,7 +140,6 @@ func Test_truncateChain(t *testing.T) {
 						1: exectypes.NewMessageTokenData(),
 					},
 				},
-				CostlyMessages: []cciptypes.Bytes32{{0x01}},
 			},
 			expected: exectypes.Observation{
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
@@ -162,7 +157,6 @@ func Test_truncateChain(t *testing.T) {
 						1: exectypes.NewMessageTokenData(),
 					},
 				},
-				CostlyMessages: []cciptypes.Bytes32{{0x01}},
 			},
 		},
 	}

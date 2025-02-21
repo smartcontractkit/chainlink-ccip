@@ -27,7 +27,6 @@ Total size of observation: 1056507
 200 CommitReports: 60635
 200 Messages: 583635
 TokenData: 112035
-Costly Messages: 13945
 Nonces: 12035
 Contracts: 274962
 
@@ -37,7 +36,6 @@ Total size of observation: 937407
 900 CommitReports: 302235
 100 Messages: 291835
 TokenData: 56035
-Costly Messages: 7045
 Nonces: 6035
 Contracts: 274962
 
@@ -47,7 +45,6 @@ Total size of observation: 665507
 100 CommitReports: 30335
 100 Messages: 291835
 TokenData: 56035
-Costly Messages: 7045
 Nonces: 6035
 Contracts: 274962
 
@@ -57,7 +54,6 @@ Total size of observation: 1025407
 100 CommitReports: 30335
 200 Messages: 582835
 TokenData: 112035
-Costly Messages: 13945
 Nonces: 12035
 Contracts: 274962
 
@@ -67,7 +63,6 @@ Total size of observation: 1565257
 100 CommitReports: 30335
 350 Messages: 1019335
 TokenData: 196035
-Costly Messages: 24295
 Nonces: 21035
 Contracts: 274962
 */
@@ -99,7 +94,6 @@ func TestObservationSize(t *testing.T) {
 
 			// These fields are all empty during this observation phase.
 			//Messages []cciptypes.Message `json:"messages"`
-			//CostlyMessages []cciptypes.Bytes32 `json:"costlyMessages"`
 			//MessageTokenData []MessageTokenData `json:"messageTokenData"`
 		})
 	}
@@ -189,15 +183,12 @@ func TestObservationSize(t *testing.T) {
 		set(contract)
 	}
 
-	costlyMessagesObs := make([]ccipocr3.Bytes32, maxMessages)
-
 	maxObs := exectypes.Observation{
-		CommitReports:  commitObs,
-		Messages:       msgObs,
-		TokenData:      tokenDataObs,
-		CostlyMessages: costlyMessagesObs,
-		Nonces:         noncesObs,
-		Contracts:      discoveryObs,
+		CommitReports: commitObs,
+		Messages:      msgObs,
+		TokenData:     tokenDataObs,
+		Nonces:        noncesObs,
+		Contracts:     discoveryObs,
 	}
 
 	encSize := func(obs exectypes.Observation) int {
@@ -215,7 +206,6 @@ func TestObservationSize(t *testing.T) {
 		encSize(exectypes.Observation{CommitReports: commitObs}))
 	fmt.Printf("%d Messages: %d\n", msgSum, encSize(exectypes.Observation{Messages: msgObs}))
 	fmt.Printf("TokenData: %d\n", encSize(exectypes.Observation{TokenData: tokenDataObs}))
-	fmt.Printf("Costly Messages: %d\n", encSize(exectypes.Observation{CostlyMessages: costlyMessagesObs}))
 	fmt.Printf("Nonces: %d\n", encSize(exectypes.Observation{Nonces: noncesObs}))
 	fmt.Printf("Contracts: %d\n", encSize(exectypes.Observation{Contracts: discoveryObs}))
 
