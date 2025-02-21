@@ -11,7 +11,10 @@ use crate::event::admin::{
     SourceChainAdded, SourceChainConfigUpdated,
 };
 use crate::instructions::interfaces::Admin;
-use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChain, SourceChainConfig, SourceChainState};
+use crate::state::{
+    CodeVersion, Ocr3ConfigInfo, ReferenceAddresses, SourceChain, SourceChainConfig,
+    SourceChainState,
+};
 use crate::CcipOfframpError;
 
 pub struct Impl;
@@ -62,11 +65,18 @@ impl Admin for Impl {
     fn update_reference_addresses(
         &self,
         ctx: Context<UpdateReferenceAddresses>,
-        reference_addresses: crate::state::ReferenceAddresses,
+        router: Pubkey,
+        fee_quoter: Pubkey,
+        offramp_lookup_table: Pubkey,
     ) -> Result<()> {
         ctx.accounts
             .reference_addresses
-            .set_inner(reference_addresses);
+            .set_inner(ReferenceAddresses {
+                version: 1,
+                router,
+                fee_quoter,
+                offramp_lookup_table,
+            });
 
         emit!(ReferenceAddressesSet {
             router: ctx.accounts.reference_addresses.router,

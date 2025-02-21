@@ -257,10 +257,16 @@
       ],
       "args": [
         {
-          "name": "referenceAddresses",
-          "type": {
-            "defined": "ReferenceAddresses"
-          }
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey"
+        },
+        {
+          "name": "offrampLookupTable",
+          "type": "publicKey"
         }
       ]
     },

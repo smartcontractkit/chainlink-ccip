@@ -168,7 +168,9 @@ pub mod ccip_offramp {
     /// * `reference_addresses` - The new reference addresses to be set.
     pub fn update_reference_addresses(
         ctx: Context<UpdateReferenceAddresses>,
-        reference_addresses: ReferenceAddresses,
+        router: Pubkey,
+        fee_quoter: Pubkey,
+        offramp_lookup_table: Pubkey,
     ) -> Result<()> {
         let default_code_version: CodeVersion = ctx
             .accounts
@@ -177,7 +179,12 @@ pub mod ccip_offramp {
             .default_code_version
             .try_into()?;
 
-        router::admin(default_code_version).update_reference_addresses(ctx, reference_addresses)
+        router::admin(default_code_version).update_reference_addresses(
+            ctx,
+            router,
+            fee_quoter,
+            offramp_lookup_table,
+        )
     }
 
     /// Adds a new source chain selector with its config to the offramp.

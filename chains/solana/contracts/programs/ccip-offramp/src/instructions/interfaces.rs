@@ -5,7 +5,7 @@ use crate::context::{
     PriceOnlyCommitReportContext, SetOcrConfig, TransferOwnership, UpdateConfig,
     UpdateReferenceAddresses, UpdateSourceChain,
 };
-use crate::state::{CodeVersion, Ocr3ConfigInfo, ReferenceAddresses, SourceChainConfig};
+use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChainConfig};
 
 pub trait Commit {
     fn commit<'info>(
@@ -64,7 +64,9 @@ pub trait Admin {
     fn update_reference_addresses(
         &self,
         ctx: Context<UpdateReferenceAddresses>,
-        reference_addresses: ReferenceAddresses,
+        router: Pubkey,
+        fee_quoter: Pubkey,
+        offramp_lookup_table: Pubkey,
     ) -> Result<()>;
 
     fn add_source_chain(

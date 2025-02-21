@@ -257,10 +257,16 @@ export type CcipOfframp = {
       ],
       "args": [
         {
-          "name": "referenceAddresses",
-          "type": {
-            "defined": "ReferenceAddresses"
-          }
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey"
+        },
+        {
+          "name": "offrampLookupTable",
+          "type": "publicKey"
         }
       ]
     },
@@ -2453,10 +2459,16 @@ export const IDL: CcipOfframp = {
       ],
       "args": [
         {
-          "name": "referenceAddresses",
-          "type": {
-            "defined": "ReferenceAddresses"
-          }
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey"
+        },
+        {
+          "name": "offrampLookupTable",
+          "type": "publicKey"
         }
       ]
     },

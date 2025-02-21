@@ -19,7 +19,9 @@ import (
 // * `ctx` - The context containing the accounts required for updating the reference addresses.
 // * `reference_addresses` - The new reference addresses to be set.
 type UpdateReferenceAddresses struct {
-	ReferenceAddresses *ReferenceAddresses
+	Router             *ag_solanago.PublicKey
+	FeeQuoter          *ag_solanago.PublicKey
+	OfframpLookupTable *ag_solanago.PublicKey
 
 	// [0] = [] config
 	//
@@ -37,9 +39,21 @@ func NewUpdateReferenceAddressesInstructionBuilder() *UpdateReferenceAddresses {
 	return nd
 }
 
-// SetReferenceAddresses sets the "referenceAddresses" parameter.
-func (inst *UpdateReferenceAddresses) SetReferenceAddresses(referenceAddresses ReferenceAddresses) *UpdateReferenceAddresses {
-	inst.ReferenceAddresses = &referenceAddresses
+// SetRouter sets the "router" parameter.
+func (inst *UpdateReferenceAddresses) SetRouter(router ag_solanago.PublicKey) *UpdateReferenceAddresses {
+	inst.Router = &router
+	return inst
+}
+
+// SetFeeQuoter sets the "feeQuoter" parameter.
+func (inst *UpdateReferenceAddresses) SetFeeQuoter(feeQuoter ag_solanago.PublicKey) *UpdateReferenceAddresses {
+	inst.FeeQuoter = &feeQuoter
+	return inst
+}
+
+// SetOfframpLookupTable sets the "offrampLookupTable" parameter.
+func (inst *UpdateReferenceAddresses) SetOfframpLookupTable(offrampLookupTable ag_solanago.PublicKey) *UpdateReferenceAddresses {
+	inst.OfframpLookupTable = &offrampLookupTable
 	return inst
 }
 
@@ -96,8 +110,14 @@ func (inst UpdateReferenceAddresses) ValidateAndBuild() (*Instruction, error) {
 func (inst *UpdateReferenceAddresses) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.ReferenceAddresses == nil {
-			return errors.New("ReferenceAddresses parameter is not set")
+		if inst.Router == nil {
+			return errors.New("Router parameter is not set")
+		}
+		if inst.FeeQuoter == nil {
+			return errors.New("FeeQuoter parameter is not set")
+		}
+		if inst.OfframpLookupTable == nil {
+			return errors.New("OfframpLookupTable parameter is not set")
 		}
 	}
 
@@ -125,8 +145,10 @@ func (inst *UpdateReferenceAddresses) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("ReferenceAddresses", *inst.ReferenceAddresses))
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("            Router", *inst.Router))
+						paramsBranch.Child(ag_format.Param("         FeeQuoter", *inst.FeeQuoter))
+						paramsBranch.Child(ag_format.Param("OfframpLookupTable", *inst.OfframpLookupTable))
 					})
 
 					// Accounts of the instruction:
@@ -140,16 +162,36 @@ func (inst *UpdateReferenceAddresses) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj UpdateReferenceAddresses) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ReferenceAddresses` param:
-	err = encoder.Encode(obj.ReferenceAddresses)
+	// Serialize `Router` param:
+	err = encoder.Encode(obj.Router)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeQuoter` param:
+	err = encoder.Encode(obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Serialize `OfframpLookupTable` param:
+	err = encoder.Encode(obj.OfframpLookupTable)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 func (obj *UpdateReferenceAddresses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ReferenceAddresses`:
-	err = decoder.Decode(&obj.ReferenceAddresses)
+	// Deserialize `Router`:
+	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeQuoter`:
+	err = decoder.Decode(&obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OfframpLookupTable`:
+	err = decoder.Decode(&obj.OfframpLookupTable)
 	if err != nil {
 		return err
 	}
@@ -159,14 +201,18 @@ func (obj *UpdateReferenceAddresses) UnmarshalWithDecoder(decoder *ag_binary.Dec
 // NewUpdateReferenceAddressesInstruction declares a new UpdateReferenceAddresses instruction with the provided parameters and accounts.
 func NewUpdateReferenceAddressesInstruction(
 	// Parameters:
-	referenceAddresses ReferenceAddresses,
+	router ag_solanago.PublicKey,
+	feeQuoter ag_solanago.PublicKey,
+	offrampLookupTable ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
-	referenceAddressesAccount ag_solanago.PublicKey,
+	referenceAddresses ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *UpdateReferenceAddresses {
 	return NewUpdateReferenceAddressesInstructionBuilder().
-		SetReferenceAddresses(referenceAddresses).
+		SetRouter(router).
+		SetFeeQuoter(feeQuoter).
+		SetOfframpLookupTable(offrampLookupTable).
 		SetConfigAccount(config).
-		SetReferenceAddressesAccount(referenceAddressesAccount).
+		SetReferenceAddressesAccount(referenceAddresses).
 		SetAuthorityAccount(authority)
 }
