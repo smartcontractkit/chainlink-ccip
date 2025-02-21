@@ -2,9 +2,13 @@ package tokendata_test
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"strings"
 	"testing"
 
+	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -18,6 +22,17 @@ import (
 )
 
 func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
+	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+		return "0x" + hex.EncodeToString(addr)
+	}, nil)
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
+		addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+		if err != nil {
+			return nil, err
+		}
+		return addrBytes, nil
+	})
 	obs, err := tokendata.NewConfigBasedCompositeObservers(
 		tests.Context(t),
 		logger.Test(t),
@@ -25,6 +40,7 @@ func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
 		[]pluginconfig.TokenDataObserverConfig{},
 		nil,
 		nil,
+		mockAddrCodec,
 	)
 	require.NoError(t, err)
 
