@@ -494,6 +494,81 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			wantExecutedUnfinalized: nil,
 			wantErr:                 assert.NoError,
 		},
+		{
+			name: "mixed execution states across three reports",
+			reports: []plugintypes2.CommitPluginReportWithMeta{
+				{
+					BlockNum:  1000,
+					Timestamp: time.UnixMilli(10101010101),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+							},
+						},
+					},
+				},
+				{
+					BlockNum:  1001,
+					Timestamp: time.UnixMilli(10101010102),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(11, 20),
+							},
+						},
+					},
+				},
+				{
+					BlockNum:  1002,
+					Timestamp: time.UnixMilli(10101010103),
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:     1,
+								SeqNumsRange: cciptypes.NewSeqNumRange(21, 30),
+							},
+						},
+					},
+				},
+			},
+			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: cciptypes.NewSeqNumRange(11, 20).ToSlice(), // Second report fully finalized
+			},
+			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				1: {1, 2, 3, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30}, // First report partially executed, third report fully executed unfinalized
+			},
+			wantObs: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
+					{
+						SourceChain:         1,
+						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+						Timestamp:           time.UnixMilli(10101010101),
+						BlockNum:            1000,
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+					},
+				},
+			},
+			wantExecutedFinalized: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20),
+					Timestamp:           time.UnixMilli(10101010102),
+					BlockNum:            1001,
+				},
+			},
+			wantExecutedUnfinalized: []exectypes.CommitData{
+				{
+					SourceChain:         1,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(21, 30),
+					Timestamp:           time.UnixMilli(10101010103),
+					BlockNum:            1002,
+				},
+			},
+			wantErr: assert.NoError,
+		},
 	}
 	for _, tt := range tcs {
 		t.Run(tt.name, func(t *testing.T) {
