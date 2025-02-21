@@ -15,6 +15,7 @@ type Config struct {
 	MaxFeeJuelsPerMsg  ag_binary.Uint128
 	LinkTokenMint      ag_solanago.PublicKey
 	Onramp             ag_solanago.PublicKey
+	RmnRemote          ag_solanago.PublicKey
 	DefaultCodeVersion CodeVersion
 }
 
@@ -53,6 +54,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Onramp` param:
 	err = encoder.Encode(obj.Onramp)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -105,6 +111,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Onramp`:
 	err = decoder.Decode(&obj.Onramp)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
 	if err != nil {
 		return err
 	}

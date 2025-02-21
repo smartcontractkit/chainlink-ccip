@@ -1,11 +1,17 @@
 use std::fmt::Display;
 
 use anchor_lang::prelude::*;
-use borsh::{BorshDeserialize, BorshSerialize};
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+/// Abstract curse subject.
+///
+/// In particular, a curse subject can be constructed from a chain
+/// selector to signify that any lane involving that chain as `destination` or `source` is
+/// cursed.
+///
+/// The above is not exhaustive: there may be other ways to define subjects.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, AnchorDeserialize, AnchorSerialize)]
 pub struct CurseSubject {
-    value: [u8; 16],
+    pub value: [u8; 16],
 }
 
 impl CurseSubject {
@@ -14,9 +20,13 @@ impl CurseSubject {
             value: (selector as u128).to_le_bytes(),
         }
     }
+
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self { value: bytes }
+    }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, AnchorDeserialize, AnchorSerialize)]
 #[repr(u8)]
 pub enum CodeVersion {
     Default = 0,

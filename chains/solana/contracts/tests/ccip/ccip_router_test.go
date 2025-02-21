@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_ccip_sender"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
@@ -46,6 +47,7 @@ func TestCCIPRouter(t *testing.T) {
 	fee_quoter.SetProgramID(config.FeeQuoterProgram)
 	ccip_offramp.SetProgramID(config.CcipOfframpProgram)
 	example_ccip_sender.SetProgramID(config.CcipBaseSender)
+	rmn_remote.SetProgramID(config.RMNRemoteProgram)
 
 	ctx := tests.Context(t)
 	user := solana.MustPrivateKeyFromBase58("ZZdVf32Npuhci4u4ir2NW9491Y3FTv2Gwk41HMpvgJoh81UM42LcNqAN8SXapHfPcr61QP7sJj7K2mKHt7qFCoV")
@@ -455,6 +457,35 @@ func TestCCIPRouter(t *testing.T) {
 				lookupTableAddr: lookupEntries,
 			}
 		})
+
+		t.Run("RMN Remote", func(t *testing.T) {
+			type ProgramData struct {
+				DataType uint32
+				Address  solana.PublicKey
+			}
+			// get program data account
+			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.RMNRemoteProgram, &rpc.GetAccountInfoOpts{
+				Commitment: config.DefaultCommitment,
+			})
+			require.NoError(t, err)
+
+			// Decode program data
+			var programData ProgramData
+			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+			ix, err := rmn_remote.NewInitializeInstruction(config.SvmChainSelector,
+				config.RMNRemoteConfigPDA,
+				config.RMNRemoteCursesPDA,
+				legacyAdmin.PublicKey(),
+				solana.SystemProgramID,
+				config.RMNRemoteProgram,
+				programData.Address,
+			).ValidateAndBuild()
+
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+		})
 	})
 
 	//////////////////////////
@@ -486,6 +517,7 @@ func TestCCIPRouter(t *testing.T) {
 				tempFeeAggregator,
 				config.FeeQuoterProgram,
 				link22.mint,
+				config.RMNRemoteProgram,
 				config.RouterConfigPDA,
 				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
@@ -502,6 +534,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
 			require.Equal(t, invalidSVMChainSelector, configSetEvent.SvmChainSelector)
 			require.Equal(t, config.FeeQuoterProgram, configSetEvent.FeeQuoter)
+			require.Equal(t, config.RMNRemoteProgram, configSetEvent.RMNRemote)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
 			require.Equal(t, tempFeeAggregator, configSetEvent.FeeAggregator)
 
@@ -532,6 +565,7 @@ func TestCCIPRouter(t *testing.T) {
 				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
+				config.RMNRemoteProgram,
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
 				legacyAdmin.PublicKey(),
@@ -549,6 +583,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
+			require.Equal(t, config.RMNRemoteProgram, configSetEvent.RMNRemote)
 			require.Equal(t, fee_quoter.V1_CodeVersion, configSetEvent.DefaultCodeVersion)
 
 			// Fetch account data
@@ -2725,6 +2760,15 @@ func TestCCIPRouter(t *testing.T) {
 		})
 	})
 
+	/////////////////////////////
+	//   Manual Cursing Tests  //
+	/////////////////////////////
+	t.Run("Manual Cursing", func(t *testing.T) {
+		t.Run("test", func(t *testing.T) {
+
+		})
+	})
+
 	//////////////////////////
 	//     getFee Tests     //
 	//////////////////////////
@@ -2736,7 +2780,7 @@ func TestCCIPRouter(t *testing.T) {
 				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
-			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -2777,7 +2821,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, token0.Mint.PublicKey(), tokenTransferFeeConfigUpdatedEvent.Token)
 			require.Equal(t, billing.MaxFeeUsdcents, tokenTransferFeeConfigUpdatedEvent.TokenTransferFeeConfig.MaxFeeUsdcents)
 
-			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token0BillingConfigPda))
 			raw.AccountMetaSlice.Append(solana.Meta(token0PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
@@ -2801,7 +2845,7 @@ func TestCCIPRouter(t *testing.T) {
 			token2BillingConfigPda := getFqTokenConfigPDA(token2.Mint.PublicKey())
 			token2PerChainPerConfigPda := getFqPerChainPerTokenConfigBillingPDA(token2.Mint.PublicKey())
 
-			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token2BillingConfigPda))
 			raw.AccountMetaSlice.Append(solana.Meta(token2PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
@@ -2829,7 +2873,7 @@ func TestCCIPRouter(t *testing.T) {
 					ExtraArgs: emptyEVMExtraArgsV2,
 				}
 
-				raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+				raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
 				instruction, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -2876,6 +2920,9 @@ func TestCCIPRouter(t *testing.T) {
 				fqDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -2933,6 +2980,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -2984,6 +3034,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3055,6 +3108,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3121,6 +3177,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3188,6 +3247,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3254,6 +3316,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3318,6 +3383,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3357,6 +3425,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3395,6 +3466,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 
@@ -3449,6 +3523,9 @@ func TestCCIPRouter(t *testing.T) {
 											config.FqEvmDestChainPDA,
 											billingConfigPDA,
 											link22.fqBillingConfigPDA,
+											config.RMNRemoteProgram,
+											config.RMNRemoteCursesPDA,
+											config.RMNRemoteConfigPDA,
 											config.ExternalTokenPoolsSignerPDA,
 										)
 										raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3497,6 +3574,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3536,6 +3616,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3615,6 +3698,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.FqEvmDestChainPDA,
 					wsol.fqBillingConfigPDA,
 					link22.fqBillingConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 					config.ExternalTokenPoolsSignerPDA,
 				)
 				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3720,6 +3806,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.FqEvmDestChainPDA,
 					wsol.fqBillingConfigPDA,
 					link22.fqBillingConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 					config.ExternalTokenPoolsSignerPDA,
 				)
 				base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3814,6 +3903,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -3961,6 +4053,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqEvmDestChainPDA,
 						wsol.fqBillingConfigPDA,
 						link22.fqBillingConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 						config.ExternalTokenPoolsSignerPDA,
 					)
 					tx.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -4026,7 +4121,7 @@ func TestCCIPRouter(t *testing.T) {
 						ExtraArgs: emptyEVMExtraArgsV2,
 					}
 					fqMsg := toFqMsg(message)
-					rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, token.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+					rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, token.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
 					ix, err := rawGetFeeIx.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -4058,6 +4153,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FqEvmDestChainPDA,
 						token.fqBillingConfigPDA,
 						link22.fqBillingConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 						config.ExternalTokenPoolsSignerPDA,
 					)
 					raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -4105,6 +4203,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				link22.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
@@ -4131,7 +4232,7 @@ func TestCCIPRouter(t *testing.T) {
 			fqMsg := toFqMsg(message)
 
 			// getFee
-			rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
+			rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
 			ix, err := rawGetFeeIx.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -4165,6 +4266,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.FqEvmDestChainPDA,
 				wsol.fqBillingConfigPDA,
 				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.ExternalTokenPoolsSignerPDA,
 			)
 
@@ -4310,10 +4414,13 @@ func TestCCIPRouter(t *testing.T) {
 							cc.fqConfig,
 							fc.feeTokenBillingConfigPDA,
 							link22.fqBillingConfigPDA,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 							config.ExternalTokenPoolsSignerPDA,
 						).ValidateAndBuild()
 						require.NoError(t, err)
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					})
 				}
 
@@ -4365,6 +4472,9 @@ func TestCCIPRouter(t *testing.T) {
 							cc.fqConfig,
 							fc.feeTokenBillingConfigPDA,
 							link22.fqBillingConfigPDA,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 							config.ExternalTokenPoolsSignerPDA,
 						)
 						// pass user token accounts
