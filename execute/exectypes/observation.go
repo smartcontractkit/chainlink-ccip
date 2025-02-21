@@ -17,7 +17,6 @@ const (
 	tokenDataLabel     = "tokenData"
 	commitReportsLabel = "commitReports"
 	noncesLabel        = "nonces"
-	costlyMessages     = "costlyMessages"
 	tokenStateReady    = "tokenReady"
 	tokenStateWaiting  = "tokenWaiting"
 )

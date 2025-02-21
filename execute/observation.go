@@ -284,9 +284,9 @@ func (p *Plugin) getMessagesObservation(
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// Phase 2: Get messages and determine which messages are too costly to execute.
+	// Phase 2: Get messages.
 	//          These messages will not be executed in the current round, but may be executed in future rounds
-	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
+	//          (e.g. if gas prices decrease).
 	if len(previousOutcome.CommitReports) == 0 {
 		lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
@@ -306,7 +306,7 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
 
-	// validating before continuing with heavy operations afterwards like truncation and costly messages
+	// validating before continuing with heavy operations afterwards like truncation
 	// all messages should have a token data observation even if it's empty
 	if validateTokenDataObservations(messageObs, tkData) != nil {
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")

@@ -509,7 +509,6 @@ func (d *dataGenerator) execObservation() exectypes.Observation {
 				ExecutedMessages: genSeqNums(d.numMessagesPerChain / 2),
 				Messages:         msgs,
 				Hashes:           genBytes32Slice(d.numMessagesPerChain),
-				// CostlyMessages:   genBytes32Slice(d.numMessagesPerChain / 4),
 				MessageTokenData: []exectypes.MessageTokenData{
 					{
 						TokenData: []exectypes.TokenData{
@@ -555,7 +554,6 @@ func (d *dataGenerator) execOutcome() exectypes.Outcome {
 			ExecutedMessages: genSeqNums(d.numMessagesPerChain / 2),
 			Messages:         msgs,
 			Hashes:           genBytes32Slice(d.numMessagesPerChain),
-			// CostlyMessages:   genBytes32Slice(d.numMessagesPerChain / 4),
 			MessageTokenData: []exectypes.MessageTokenData{
 				{
 					TokenData: []exectypes.TokenData{

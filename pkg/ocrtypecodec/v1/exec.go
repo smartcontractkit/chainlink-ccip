@@ -41,8 +41,6 @@ func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([
 		TokenDataObservations: &ocrtypecodecpb.TokenDataObservations{
 			TokenData: e.tr.tokenDataObservationsToProto(observation.TokenData),
 		},
-		// TODO: can we just delete this from the proto? breaking change :-)
-		// CostlyMessages: e.tr.bytes32SliceToProto(observation.CostlyMessages),
 		Nonces: e.tr.nonceObservationsToProto(observation.Nonces),
 		Contracts: &ocrtypecodecpb.DiscoveryObservation{
 			FChain: e.tr.fChainToProto(observation.Contracts.FChain),
@@ -71,8 +69,7 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 		Messages:      e.tr.messageObservationsFromProto(pbObs.SeqNumsToMsgs),
 		Hashes:        e.tr.messageHashesFromProto(pbObs.MsgHashes),
 		TokenData:     e.tr.tokenDataObservationsFromProto(pbObs.TokenDataObservations.TokenData),
-		// CostlyMessages: e.tr.bytes32SliceFromProto(pbObs.CostlyMessages),
-		Nonces: e.tr.nonceObservationsFromProto(pbObs.Nonces),
+		Nonces:        e.tr.nonceObservationsFromProto(pbObs.Nonces),
 		Contracts: discoverytypes.Observation{
 			FChain:    e.tr.fChainFromProto(pbObs.Contracts.FChain),
 			Addresses: e.tr.discoveryAddressesFromProto(pbObs.Contracts.ContractNames.Addresses),

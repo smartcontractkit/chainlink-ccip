@@ -133,7 +133,6 @@ const (
 	MissingNoncesForChain         messageStatus = "missing_nonces_for_chain"
 	MissingNonce                  messageStatus = "missing_nonce"
 	InvalidNonce                  messageStatus = "invalid_nonce"
-	TooCostly                     messageStatus = "tooCostly"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
 		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"

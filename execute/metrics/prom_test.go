@@ -88,13 +88,12 @@ func Test_TrackingObservations(t *testing.T) {
 	t.Cleanup(cleanupMetrics(reporter))
 
 	tcs := []struct {
-		name                   string
-		observation            exectypes.Observation
-		state                  exectypes.PluginState
-		expectedMessageCount   int
-		expectedCommitReports  int
-		expectedNonces         int
-		expectedCostlyMessages int
+		name                  string
+		observation           exectypes.Observation
+		state                 exectypes.PluginState
+		expectedMessageCount  int
+		expectedCommitReports int
+		expectedNonces        int
 	}{
 		{
 			name: "empty/missing structs should not report anything",
@@ -102,31 +101,9 @@ func Test_TrackingObservations(t *testing.T) {
 				CommitReports: make(exectypes.CommitObservations),
 				Messages:      make(exectypes.MessageObservations),
 			},
-			state:                  exectypes.GetCommitReports,
-			expectedCommitReports:  0,
-			expectedMessageCount:   0,
-			expectedNonces:         0,
-			expectedCostlyMessages: 0,
-		},
-		{
-			name: "observation with messages which some of them are costly",
-			observation: exectypes.Observation{
-				CommitReports: exectypes.CommitObservations{
-					cciptypes.ChainSelector(123): make([]exectypes.CommitData, 2),
-					cciptypes.ChainSelector(456): nil,
-					cciptypes.ChainSelector(780): make([]exectypes.CommitData, 1),
-				},
-				Messages: exectypes.MessageObservations{
-					cciptypes.ChainSelector(123): map[cciptypes.SeqNum]cciptypes.Message{
-						1: {},
-						2: {},
-					},
-				},
-			},
-			state:                 exectypes.Filter,
-			expectedCommitReports: 3,
-			expectedMessageCount:  2,
-			expectedNonces:        0,
+			state:                 exectypes.GetCommitReports,
+			expectedCommitReports: 0,
+			expectedMessageCount:  0,
 		},
 		{
 			name: "observation with nonces",
@@ -142,24 +119,16 @@ func Test_TrackingObservations(t *testing.T) {
 					cciptypes.ChainSelector(789): nil,
 				},
 			},
-			state:                  exectypes.GetMessages,
-			expectedCommitReports:  0,
-			expectedMessageCount:   0,
-			expectedNonces:         3,
-			expectedCostlyMessages: 0,
+			state:                 exectypes.GetMessages,
+			expectedCommitReports: 0,
+			expectedMessageCount:  0,
+			expectedNonces:        3,
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			reporter.TrackObservation(tc.observation, tc.state)
-
-			costlyMsgs := testutil.ToFloat64(
-				reporter.outputDetailsCounter.WithLabelValues(
-					chainID, plugincommon.ObservationMethod, string(tc.state), "costlyMessages",
-				),
-			)
-			require.Equal(t, tc.expectedCostlyMessages, int(costlyMsgs))
 
 			nonces := testutil.ToFloat64(
 				reporter.outputDetailsCounter.WithLabelValues(

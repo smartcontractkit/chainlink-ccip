@@ -198,13 +198,6 @@ func (op ObservationOptimizer) truncateChain(
 	if _, ok := observation.CommitReports[chain]; !ok {
 		return observation
 	}
-	messageIDs := make(map[cciptypes.Bytes32]struct{})
-	// To remove costly message IDs we need to iterate over all messages and find the ones that belong to the chain.
-	for _, seqNumMap := range observation.Messages {
-		for _, message := range seqNumMap {
-			messageIDs[message.Header.MessageID] = struct{}{}
-		}
-	}
 
 	delete(observation.CommitReports, chain)
 	delete(observation.Messages, chain)
