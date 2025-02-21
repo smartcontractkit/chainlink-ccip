@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
@@ -406,6 +407,14 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
+	}
+
+	onRampAddressAfterQuery, err := r.GetContractAddress(consts.ContractNameOnRamp, sourceChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("get onRamp address after query: %w", err)
+	}
+	if !bytes.Equal(onRampAddress, onRampAddressAfterQuery) {
+		return nil, fmt.Errorf("onRamp address has changed from %s to %s", onRampAddress, onRampAddressAfterQuery)
 	}
 
 	lggr.Infow("queried messages between sequence numbers",
