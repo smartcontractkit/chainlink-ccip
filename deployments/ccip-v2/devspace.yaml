@@ -198,11 +198,8 @@ profiles:
 
   - name: load-tests-aws
     parents:
-      - profile: load-tests
+      - profile: aws
     patches:
-      - op: add
-        path: dependencies.ccip-don.profiles
-        value: monitoring-service-monitor
       - op: add
         path: dependencies.ccip-don.profiles
         value: ccip-load-testing-aws-staging

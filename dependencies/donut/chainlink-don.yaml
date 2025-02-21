@@ -307,6 +307,17 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging.yaml
       )
+  - name: ccip-aws-staging
+    activation:
+      - vars:
+          PROVIDER: "aws"
+          DON_TYPE: "ccip"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip.yaml
+      )
   - name: ccip-load-testing-aws-staging
     merge: |-
       $(
