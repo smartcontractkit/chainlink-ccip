@@ -202,3 +202,64 @@ func TestExceedSizeObservation(t *testing.T) {
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.Len(t, sequenceNumbers, maxMsgsPerReport)
 }
+
+func TestPlugin_FinalizedUnfinalizedCaching(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcSelector := cciptypes.ChainSelector(1)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	// Create messages for finalized execution report
+	finalizedMessages := []inmem.MessagesWithMetadata{
+		{
+			Message:     makeMsgWithMetadata(100, srcSelector, dstSelector, true).Message, // Executed
+			Executed:    true,
+			Destination: dstSelector,
+		},
+		{
+			Message:     makeMsgWithMetadata(101, srcSelector, dstSelector, true).Message, // Executed
+			Executed:    true,
+			Destination: dstSelector,
+		},
+	}
+
+	// Create messages for non-executed report
+	unexecutedMessages := []inmem.MessagesWithMetadata{
+		{
+			Message:     makeMsgWithMetadata(200, srcSelector, dstSelector, false).Message, // Not executed
+			Executed:    false,
+			Destination: dstSelector,
+		},
+		{
+			Message:     makeMsgWithMetadata(201, srcSelector, dstSelector, false).Message, // Not executed
+			Executed:    false,
+			Destination: dstSelector,
+		},
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), srcSelector, dstSelector)
+
+	// Set up first report - should be executed and finalized
+	intTest.WithMessages(finalizedMessages, 1000, time.Now().Add(-4*time.Hour), 1)
+
+	// Set up second report - should remain available
+	intTest.WithMessages(unexecutedMessages, 1001, time.Now().Add(-3*time.Hour), 1)
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// First round - process both reports
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+
+	// First report should be marked as executed and removed from commits
+	// Second report should be available since it's not executed
+	require.Len(t, outcome.CommitReports, 1)
+
+	// Check that we see the second report
+	report := outcome.CommitReports[0]
+	require.Equal(t, cciptypes.NewSeqNumRange(200, 201), report.SequenceNumberRange)
+}
