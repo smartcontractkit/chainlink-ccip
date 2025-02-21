@@ -559,7 +559,7 @@ func (t *protoTranslator) commitDataSliceToProto(commits []exectypes.CommitData)
 			ExecutedMessages: t.seqNumsToProto(commit.ExecutedMessages),
 			Messages:         t.messagesToProto(commit.Messages),
 			Hashes:           t.bytes32SliceToProto(commit.Hashes),
-			CostlyMessages:   t.bytes32SliceToProto(commit.CostlyMessages),
+			// CostlyMessages:   t.bytes32SliceToProto(commit.CostlyMessages),
 			MessageTokenData: t.messageTokenDataSliceToProto(commit.MessageTokenData),
 		}
 	}
@@ -599,7 +599,7 @@ func (t *protoTranslator) commitDataSliceFromProto(pbCommits []*ocrtypecodecpb.C
 			ExecutedMessages: t.decodeSeqNums(commit.ExecutedMessages),
 			Messages:         t.decodeMessages(commit.Messages),
 			Hashes:           t.bytes32SliceFromProto(commit.Hashes),
-			CostlyMessages:   t.bytes32SliceFromProto(commit.CostlyMessages),
+			// CostlyMessages:   t.bytes32SliceFromProto(commit.CostlyMessages),
 			MessageTokenData: t.decodeMessageTokenData(commit.MessageTokenData),
 		}
 	}

@@ -41,8 +41,9 @@ func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([
 		TokenDataObservations: &ocrtypecodecpb.TokenDataObservations{
 			TokenData: e.tr.tokenDataObservationsToProto(observation.TokenData),
 		},
-		CostlyMessages: e.tr.bytes32SliceToProto(observation.CostlyMessages),
-		Nonces:         e.tr.nonceObservationsToProto(observation.Nonces),
+		// TODO: can we just delete this from the proto? breaking change :-)
+		// CostlyMessages: e.tr.bytes32SliceToProto(observation.CostlyMessages),
+		Nonces: e.tr.nonceObservationsToProto(observation.Nonces),
 		Contracts: &ocrtypecodecpb.DiscoveryObservation{
 			FChain: e.tr.fChainToProto(observation.Contracts.FChain),
 			ContractNames: &ocrtypecodecpb.ContractNameChainAddresses{
@@ -66,12 +67,12 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 	}
 
 	return exectypes.Observation{
-		CommitReports:  e.tr.commitReportsFromProto(pbObs.CommitReports),
-		Messages:       e.tr.messageObservationsFromProto(pbObs.SeqNumsToMsgs),
-		Hashes:         e.tr.messageHashesFromProto(pbObs.MsgHashes),
-		TokenData:      e.tr.tokenDataObservationsFromProto(pbObs.TokenDataObservations.TokenData),
-		CostlyMessages: e.tr.bytes32SliceFromProto(pbObs.CostlyMessages),
-		Nonces:         e.tr.nonceObservationsFromProto(pbObs.Nonces),
+		CommitReports: e.tr.commitReportsFromProto(pbObs.CommitReports),
+		Messages:      e.tr.messageObservationsFromProto(pbObs.SeqNumsToMsgs),
+		Hashes:        e.tr.messageHashesFromProto(pbObs.MsgHashes),
+		TokenData:     e.tr.tokenDataObservationsFromProto(pbObs.TokenDataObservations.TokenData),
+		// CostlyMessages: e.tr.bytes32SliceFromProto(pbObs.CostlyMessages),
+		Nonces: e.tr.nonceObservationsFromProto(pbObs.Nonces),
 		Contracts: discoverytypes.Observation{
 			FChain:    e.tr.fChainFromProto(pbObs.Contracts.FChain),
 			Addresses: e.tr.discoveryAddressesFromProto(pbObs.Contracts.ContractNames.Addresses),

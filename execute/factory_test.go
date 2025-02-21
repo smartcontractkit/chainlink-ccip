@@ -189,15 +189,12 @@ func TestObservationSize(t *testing.T) {
 		set(contract)
 	}
 
-	costlyMessagesObs := make([]ccipocr3.Bytes32, maxMessages)
-
 	maxObs := exectypes.Observation{
-		CommitReports:  commitObs,
-		Messages:       msgObs,
-		TokenData:      tokenDataObs,
-		CostlyMessages: costlyMessagesObs,
-		Nonces:         noncesObs,
-		Contracts:      discoveryObs,
+		CommitReports: commitObs,
+		Messages:      msgObs,
+		TokenData:     tokenDataObs,
+		Nonces:        noncesObs,
+		Contracts:     discoveryObs,
 	}
 
 	encSize := func(obs exectypes.Observation) int {
@@ -215,7 +212,6 @@ func TestObservationSize(t *testing.T) {
 		encSize(exectypes.Observation{CommitReports: commitObs}))
 	fmt.Printf("%d Messages: %d\n", msgSum, encSize(exectypes.Observation{Messages: msgObs}))
 	fmt.Printf("TokenData: %d\n", encSize(exectypes.Observation{TokenData: tokenDataObs}))
-	fmt.Printf("Costly Messages: %d\n", encSize(exectypes.Observation{CostlyMessages: costlyMessagesObs}))
 	fmt.Printf("Nonces: %d\n", encSize(exectypes.Observation{Nonces: noncesObs}))
 	fmt.Printf("Contracts: %d\n", encSize(exectypes.Observation{Contracts: discoveryObs}))
 

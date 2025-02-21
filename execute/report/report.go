@@ -222,24 +222,6 @@ func CheckTokenData() Check {
 	}
 }
 
-// CheckTooCostly compares the costly list for a given message.
-func CheckTooCostly() Check {
-	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
-		// 4. Check if the message is too costly to execute.
-		if slices.Contains(report.CostlyMessages, msg.Header.MessageID) {
-			lggr.Infow(
-				"message too costly to execute",
-				"messageID", msg.Header.MessageID,
-				"sourceChain", report.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"messageState", TooCostly)
-			return TooCostly, nil
-		}
-
-		return None, nil
-	}
-}
-
 // CheckNonces ensures that messages are executed in the correct order by
 // comparing the expected nonce to the message nonce. The check needs to be
 // initialized using a list of sender nonces from the destination chain. In

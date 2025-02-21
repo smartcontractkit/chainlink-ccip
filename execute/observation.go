@@ -294,7 +294,7 @@ func (p *Plugin) getMessagesObservation(
 		return observation, nil
 	}
 
-	messageObs, commitReportCache, messageTimestamps := readAllMessages(
+	messageObs, commitReportCache, _ := readAllMessages(
 		ctx,
 		lggr,
 		p.ccipReader,
@@ -312,11 +312,6 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
 	}
 
-	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages: %w", err)
-	}
-
 	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
@@ -325,7 +320,6 @@ func (p *Plugin) getMessagesObservation(
 	observation.CommitReports = commitReportCache
 	observation.Messages = messageObs
 	observation.Hashes = hashes
-	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
 
 	// Make sure encoded observation fits within the maximum observation size.
