@@ -46,7 +46,9 @@ func newBaseObserver(
 	}
 }
 
-func (o *baseObserver) getChainsFeeComponents(ctx context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents {
+func (o *baseObserver) getChainsFeeComponents(
+	ctx context.Context,
+) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	supportedChains, err := o.getSupportedChains(o.lggr, o.cs, o.oracleID, o.destChain)
 	if err != nil {
 		o.lggr.Errorw("failed to get supported chains unable to get chains fee components", "err", err)
@@ -100,7 +102,6 @@ func (o *baseObserver) getSupportedChains(
 }
 
 type asyncObserver struct {
-	cs           plugincommon.ChainSupport
 	baseObserver *baseObserver
 	lggr         logger.Logger
 	cancelFunc   func()
@@ -114,13 +115,11 @@ type asyncObserver struct {
 func newAsyncObserver(
 	lggr logger.Logger,
 	baseObserver *baseObserver,
-	cs plugincommon.ChainSupport,
 	tickDur, syncTimeout time.Duration,
 ) *asyncObserver {
 	ctx, cf := context.WithCancel(context.Background())
 
 	obs := &asyncObserver{
-		cs:           cs,
 		baseObserver: baseObserver,
 		lggr:         lggr,
 		cancelFunc:   nil,

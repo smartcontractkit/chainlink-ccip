@@ -28,8 +28,8 @@ const (
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
 	defaultInflightPriceCheckRetries          = 5
 	defaultRelativeBoostPerWaitHour           = 0.2 // 20 percent
-	defaultMerkleRootAsyncObserverSyncFreq    = 5 * time.Second
-	defaultMerkleRootAsyncObserverSyncTimeout = 10 * time.Second
+	defaultAsyncObserverSyncFreq              = 5 * time.Second
+	defaultAsyncObserverSyncTimeout           = 10 * time.Second
 )
 
 type FeeInfo struct {
@@ -134,13 +134,22 @@ type CommitOffchainConfig struct {
 	MerkleRootAsyncObserverDisabled bool `json:"merkleRootAsyncObserverDisabled"`
 
 	// MerkleRootAsyncObserverSyncFreq defines how frequently the async merkle roots observer should sync.
-	// Zero indicates that operations are done synchronously.
 	MerkleRootAsyncObserverSyncFreq time.Duration `json:"merkleRootAsyncObserverSyncFreq"`
 
 	// MerkleRootAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch seqNums).
 	MerkleRootAsyncObserverSyncTimeout time.Duration `json:"merkleRootAsyncObserverSyncTimeout"`
+
+	// ChainFeeAsyncObserverDisabled defines whether the async observer should be disabled. Default it is enabled.
+	ChainFeeAsyncObserverDisabled bool `json:"chainFeeAsyncObserverDisabled"`
+
+	// ChainFeeAsyncObserverSyncFreq defines how frequently the async chain fee observer should sync.
+	ChainFeeAsyncObserverSyncFreq time.Duration `json:"chainFeeAsyncObserverSyncFreq"`
+
+	// ChainFeeAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch token prices).
+	ChainFeeAsyncObserverSyncTimeout time.Duration `json:"chainFeeAsyncObserverSyncTimeout"`
 }
 
+//nolint:gocyclo // it is considered ok since we don't have complicated logic here
 func (c *CommitOffchainConfig) applyDefaults() {
 	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
 		c.RMNSignaturesTimeout = defaultRMNSignaturesTimeout
@@ -177,10 +186,19 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	// We want to apply defaults only if the async feature is enabled.
 	if !c.MerkleRootAsyncObserverDisabled {
 		if c.MerkleRootAsyncObserverSyncFreq == 0 {
-			c.MerkleRootAsyncObserverSyncFreq = defaultMerkleRootAsyncObserverSyncFreq
+			c.MerkleRootAsyncObserverSyncFreq = defaultAsyncObserverSyncFreq
 		}
 		if c.MerkleRootAsyncObserverSyncTimeout == 0 {
-			c.MerkleRootAsyncObserverSyncTimeout = defaultMerkleRootAsyncObserverSyncTimeout
+			c.MerkleRootAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
+		}
+	}
+
+	if !c.ChainFeeAsyncObserverDisabled {
+		if c.ChainFeeAsyncObserverSyncFreq == 0 {
+			c.ChainFeeAsyncObserverSyncFreq = defaultAsyncObserverSyncFreq
+		}
+		if c.ChainFeeAsyncObserverSyncTimeout == 0 {
+			c.ChainFeeAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
 		}
 	}
 }
@@ -231,6 +249,12 @@ func (c *CommitOffchainConfig) Validate() error {
 		(c.MerkleRootAsyncObserverSyncFreq == 0 || c.MerkleRootAsyncObserverSyncTimeout == 0) {
 		return fmt.Errorf("merkle root async observer sync freq (%s) or sync timeout (%s) not set",
 			c.MerkleRootAsyncObserverSyncFreq, c.MerkleRootAsyncObserverSyncTimeout)
+	}
+
+	if !c.ChainFeeAsyncObserverDisabled &&
+		(c.ChainFeeAsyncObserverSyncFreq == 0 || c.ChainFeeAsyncObserverSyncTimeout == 0) {
+		return fmt.Errorf("chain fee async observer sync freq (%s) or sync timeout (%s) not set",
+			c.ChainFeeAsyncObserverSyncFreq, c.ChainFeeAsyncObserverSyncTimeout)
 	}
 
 	return nil

@@ -38,6 +38,25 @@ func NewProcessor(
 	fRoleDON int,
 	metricsReporter plugincommon.MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
+	var obs observer
+	baseObs := newBaseObserver(
+		lggr,
+		ccipReader,
+		destChain,
+		oracleID,
+		chainSupport,
+	)
+	if !offChainConfig.ChainFeeAsyncObserverDisabled {
+		obs = newAsyncObserver(
+			lggr,
+			baseObs,
+			offChainConfig.ChainFeeAsyncObserverSyncFreq,
+			offChainConfig.ChainFeeAsyncObserverSyncTimeout,
+		)
+	} else {
+		obs = baseObs
+	}
+
 	p := &processor{
 		lggr:            lggr,
 		oracleID:        oracleID,
@@ -48,13 +67,7 @@ func NewProcessor(
 		chainSupport:    chainSupport,
 		cfg:             offChainConfig,
 		metricsReporter: metricsReporter,
-		obs: newBaseObserver(
-			lggr,
-			ccipReader,
-			destChain,
-			oracleID,
-			chainSupport,
-		),
+		obs:             obs,
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, processorLabel, metricsReporter)
 }
