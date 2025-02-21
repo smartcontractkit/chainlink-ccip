@@ -5,14 +5,14 @@ use crate::eth_utils::*;
 #[account]
 pub struct RootSignatures {
     pub total_signatures: u8,
-    pub signatures: Vec<Signature>,
     pub is_finalized: bool,
+    pub signatures: Vec<Signature>,
 }
 
 impl RootSignatures {
     pub const fn space(total_signatures: usize) -> usize {
-        // discriminator + vec prefix + (65 * max_sigs) + is_finalized
-        8 + 4 + (Signature::INIT_SPACE * total_signatures) + 1
+        // discriminator + total_signatures + is_finalized + vec prefix + (65 * max_sigs)
+        8 + 1 + 1 + 4 + (Signature::INIT_SPACE * total_signatures)
     }
 }
 
