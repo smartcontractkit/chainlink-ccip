@@ -538,7 +538,8 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				1: cciptypes.NewSeqNumRange(11, 20).ToSlice(), // Second report fully finalized
 			},
 			unfinalizedRanges: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
-				1: {1, 2, 3, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30}, // First report partially executed, third report fully executed unfinalized
+				1: {1, 2, 3, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30},
+				// First report partially executed, third report fully executed unfinalized
 			},
 			wantObs: exectypes.CommitObservations{
 				1: []exectypes.CommitData{
