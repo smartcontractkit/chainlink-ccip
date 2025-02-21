@@ -2,9 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::context::{
     AcceptOwnership, AddSourceChain, CommitReportContext, ExecuteReportContext,
-    PriceOnlyCommitReportContext, SetOcrConfig, TransferOwnership, UpdateConfig, UpdateSourceChain,
+    PriceOnlyCommitReportContext, SetOcrConfig, TransferOwnership, UpdateConfig,
+    UpdateReferenceAddresses, UpdateSourceChain,
 };
-use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChainConfig};
+use crate::state::{CodeVersion, Ocr3ConfigInfo, ReferenceAddresses, SourceChainConfig};
 
 pub trait Commit {
     fn commit<'info>(
@@ -58,6 +59,12 @@ pub trait Admin {
         &self,
         ctx: Context<UpdateConfig>,
         code_version: CodeVersion,
+    ) -> Result<()>;
+
+    fn update_reference_addresses(
+        &self,
+        ctx: Context<UpdateReferenceAddresses>,
+        reference_addresses: ReferenceAddresses,
     ) -> Result<()>;
 
     fn add_source_chain(
