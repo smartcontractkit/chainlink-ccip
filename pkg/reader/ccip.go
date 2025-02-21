@@ -747,7 +747,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		var update *plugintypes.TimestampedUnixBig
+		var update plugintypes.TimestampedUnixBig
 		err = reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameFeeQuoter,
@@ -763,7 +763,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		if update == nil || update.Timestamp == 0 {
+		if update.Timestamp == 0 {
 			lggr.Warnw("no native token price available", "chain", chain)
 			continue
 		}
