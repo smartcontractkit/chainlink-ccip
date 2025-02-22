@@ -75,6 +75,7 @@ type CommitReportInfo struct {
 	RemoteF     uint64            `json:"remoteF"`
 	MerkleRoots []MerkleRootChain `json:"merkleRoots"`
 	TokenPrices []TokenPrice      `json:"tokenPrices"`
+	GasPrices   []GasPriceChain   `json:"gasPrices"`
 }
 
 func (cri CommitReportInfo) Encode() ([]byte, error) {
