@@ -899,6 +899,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
 	addrCodec := typepkg_mock.NewMockAddressCodec(params.t)
+
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,

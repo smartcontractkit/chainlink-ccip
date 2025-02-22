@@ -227,7 +227,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
 		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
 			return "0x" + hex.EncodeToString(addr)
-		}, nil)
+		}, nil).Maybe()
 	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
 		Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
 			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
@@ -235,7 +235,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 				return nil, err
 			}
 			return addrBytes, nil
-		})
+		}).Maybe()
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
 		it.lggr,
@@ -253,9 +253,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -288,6 +288,7 @@ func (it *IntTest) newNode(
 	id int,
 	N int,
 	configDigest [32]byte,
+	mockCodec *typepkgmock.MockAddressCodec,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
 	rCfg := ocr3types.ReportingPluginConfig{
@@ -297,11 +298,6 @@ func (it *IntTest) newNode(
 	}
 
 	it.ccipReader.ConfigDigest = configDigest
-	mockAddrCodec := typepkgmock.NewMockAddressCodec(it.t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
-		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-			return string(addr)
-		}, nil)
 	node1 := NewPlugin(
 		it.donID,
 		rCfg,
@@ -316,7 +312,7 @@ func (it *IntTest) newNode(
 		ep,
 		it.lggr,
 		&metrics.Noop{},
-		mockAddrCodec,
+		mockCodec,
 	)
 
 	// FIXME: Test should not rely on the specific type of the plugin but rather than that on
