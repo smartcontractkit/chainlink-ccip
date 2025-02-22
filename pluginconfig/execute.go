@@ -27,7 +27,7 @@ type ExecuteOffchainConfig struct {
 	// The caching prevents us from issuing another report while one is already in flight.
 	InflightCacheExpiry commonconfig.Duration `json:"inflightCacheExpiry"`
 
-	// RootSnoozeTime is the interval at which we check roots for executable messages.
+	// RootSnoozeTime is the delay duration used when a commit root is snoozed.
 	RootSnoozeTime commonconfig.Duration `json:"rootSnoozeTime"`
 
 	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
