@@ -130,6 +130,26 @@ pub struct Initialize<'info> {
     pub program_data: Account<'info, ProgramData>,
 }
 
+#[derive(Accounts)]
+pub struct UpdateReferenceAddresses<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+    )]
+    pub reference_addresses: Account<'info, ReferenceAddresses>,
+
+    #[account(address = config.load()?.owner @ CcipOfframpError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
 /// Input from an offchain node, containing the Merkle root and interval for
 /// the source chain, and optionally some price updates alongside it.
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]

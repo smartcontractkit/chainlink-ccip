@@ -68,7 +68,6 @@ func newBuilderInternal(
 		CheckIfPseudoDeleted(),
 		CheckAlreadyExecuted(),
 		CheckTokenData(),
-		CheckTooCostly(),
 	}
 
 	builder := &execReportBuilder{
