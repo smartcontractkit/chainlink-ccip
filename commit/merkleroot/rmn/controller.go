@@ -16,6 +16,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"golang.org/x/exp/maps"
 	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
@@ -398,7 +399,8 @@ func (c *controller) sendObservationRequests(
 			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: request.LaneSource.SourceChainSelector,
-					OnrampAddress:       request.LaneSource.OnrampAddress,
+					// TODO check if we can remove the call for keepNRightBytes https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
+					OnrampAddress: typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
 				},
 				ClosedInterval: request.ClosedInterval,
 			})
