@@ -11,7 +11,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -226,7 +225,7 @@ func CheckTokenData() Check {
 // initialized using a list of sender nonces from the destination chain. In
 // order to check multiple messages from the same sender, a copy of the initial
 // list is maintained with incremented nonces after each message.
-func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64) Check {
+func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64, addressCodec ccipocr3.AddressCodec) Check {
 	// temporary map to store state between nonce checks for this round.
 	expectedNonce := make(map[ccipocr3.ChainSelector]map[string]uint64)
 
@@ -248,7 +247,11 @@ func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64) Chec
 		}
 
 		chainNonces := sendersNonce[report.SourceChain]
-		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(msg.Header.SourceChainSelector))
+		sender, err := addressCodec.AddressBytesToString(msg.Sender[:], msg.Header.SourceChainSelector)
+		if err != nil {
+			return Error, fmt.Errorf("unable to convert sender address to string: %w, sender address: %v", err, msg.Sender[:])
+		}
+
 		if _, ok := chainNonces[sender]; !ok {
 			lggr.Errorw("Skipping message - missing nonce",
 				"messageID", msg.Header.MessageID,

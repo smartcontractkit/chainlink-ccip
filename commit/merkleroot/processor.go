@@ -36,6 +36,7 @@ type Processor struct {
 	rmnCrypto              cciptypes.RMNCrypto
 	rmnHomeReader          readerpkg.RMNHome
 	metricsReporter        MetricsReporter
+	addressCodec           cciptypes.AddressCodec
 }
 
 // NewProcessor creates a new Processor
@@ -54,6 +55,7 @@ func NewProcessor(
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnHomeReader readerpkg.RMNHome,
 	metricsReporter MetricsReporter,
+	addressCodec cciptypes.AddressCodec,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	var observer Observer
 	baseObserver := newObserverImpl(
@@ -89,6 +91,7 @@ func NewProcessor(
 		rmnCrypto:       rmnCrypto,
 		rmnHomeReader:   rmnHomeReader,
 		metricsReporter: metricsReporter,
+		addressCodec:    addressCodec,
 	}
 	return plugincommon.NewTrackedProcessor(lggr, p, processorLabel, metricsReporter)
 }

@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -221,7 +223,19 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	ctx := tests.Context(it.t)
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
-
+	mockAddrCodec := typepkgmock.NewMockAddressCodec(it.t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil).Maybe()
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
+		Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
+			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+			if err != nil {
+				return nil, err
+			}
+			return addrBytes, nil
+		}).Maybe()
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
 		it.lggr,
@@ -229,6 +243,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		it.tokenObserverConfig,
 		testhelpers.TokenDataEncoderInstance,
 		it.tokenChainReader,
+		mockAddrCodec,
 	)
 	require.NoError(it.t, err)
 
@@ -238,9 +253,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -273,6 +288,7 @@ func (it *IntTest) newNode(
 	id int,
 	N int,
 	configDigest [32]byte,
+	mockCodec *typepkgmock.MockAddressCodec,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
 	rCfg := ocr3types.ReportingPluginConfig{
@@ -282,7 +298,6 @@ func (it *IntTest) newNode(
 	}
 
 	it.ccipReader.ConfigDigest = configDigest
-
 	node1 := NewPlugin(
 		it.donID,
 		rCfg,
@@ -297,6 +312,7 @@ func (it *IntTest) newNode(
 		ep,
 		it.lggr,
 		&metrics.Noop{},
+		mockCodec,
 	)
 
 	// FIXME: Test should not rely on the specific type of the plugin but rather than that on
