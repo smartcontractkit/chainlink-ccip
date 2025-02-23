@@ -16,10 +16,11 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"golang.org/x/exp/maps"
 	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
+
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
