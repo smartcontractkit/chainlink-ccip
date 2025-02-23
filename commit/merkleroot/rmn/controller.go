@@ -400,7 +400,8 @@ func (c *controller) sendObservationRequests(
 			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: request.LaneSource.SourceChainSelector,
-					// TODO check if we can remove the call for keepNRightBytes https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
+					// TODO check if we can remove the call for keepNRightBytes
+					// https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
 					OnrampAddress: typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
 				},
 				ClosedInterval: request.ClosedInterval,
