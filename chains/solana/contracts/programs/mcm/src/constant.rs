@@ -18,7 +18,3 @@ pub const SEEN_SIGNED_HASHES_SEED: &[u8] = b"seen_signed_hashes";
 
 // Fixed sizes in bytes
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
-pub const U8: usize = 1;
-pub const U64: usize = 8;
-pub const VEC_PREFIX: usize = 4;
-pub const STRING_PREFIX: usize = 4;

@@ -182,8 +182,8 @@ func (obj *MultisigConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 
 type RootSignatures struct {
 	TotalSignatures uint8
-	Signatures      []Signature
 	IsFinalized     bool
+	Signatures      []Signature
 }
 
 var RootSignaturesDiscriminator = [8]byte{21, 186, 10, 33, 117, 215, 246, 76}
@@ -199,13 +199,13 @@ func (obj RootSignatures) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	if err != nil {
 		return err
 	}
-	// Serialize `Signatures` param:
-	err = encoder.Encode(obj.Signatures)
+	// Serialize `IsFinalized` param:
+	err = encoder.Encode(obj.IsFinalized)
 	if err != nil {
 		return err
 	}
-	// Serialize `IsFinalized` param:
-	err = encoder.Encode(obj.IsFinalized)
+	// Serialize `Signatures` param:
+	err = encoder.Encode(obj.Signatures)
 	if err != nil {
 		return err
 	}
@@ -231,13 +231,13 @@ func (obj *RootSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	if err != nil {
 		return err
 	}
-	// Deserialize `Signatures`:
-	err = decoder.Decode(&obj.Signatures)
+	// Deserialize `IsFinalized`:
+	err = decoder.Decode(&obj.IsFinalized)
 	if err != nil {
 		return err
 	}
-	// Deserialize `IsFinalized`:
-	err = decoder.Decode(&obj.IsFinalized)
+	// Deserialize `Signatures`:
+	err = decoder.Decode(&obj.Signatures)
 	if err != nil {
 		return err
 	}
