@@ -20,12 +20,6 @@ pub trait Admin {
         code_version: CodeVersion,
     ) -> Result<()>;
 
-    fn set_local_chain_selector(
-        &self,
-        ctx: Context<UpdateConfig>,
-        local_chain_selector: u64,
-    ) -> Result<()>;
-
     fn curse(&self, ctx: Context<Curse>, subject: CurseSubject) -> Result<()>;
     fn uncurse(&self, ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()>;
 }

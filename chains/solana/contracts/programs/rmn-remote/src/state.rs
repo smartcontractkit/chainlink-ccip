@@ -15,6 +15,15 @@ pub struct CurseSubject {
 }
 
 impl CurseSubject {
+    pub const GLOBAL: Self = {
+        Self {
+            value: [
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x01,
+            ],
+        }
+    };
+
     pub const fn from_chain_selector(selector: u64) -> Self {
         Self {
             value: (selector as u128).to_le_bytes(),
@@ -57,10 +66,6 @@ pub struct Config {
 pub struct Curses {
     #[max_len(0)]
     pub cursed_subjects: Vec<CurseSubject>,
-
-    // Set during initialization of the PDA. Defines the subject that represents
-    // this entire chain being cursed, if present on the vector above.
-    global_subject: CurseSubject,
 }
 
 impl Curses {
@@ -68,17 +73,11 @@ impl Curses {
         Self::INIT_SPACE + self.cursed_subjects.len() * CurseSubject::INIT_SPACE
     }
 
-    /// sets the chain selector of the current chain, which will be saved as a curse
-    /// subject that represents the entire chain being cursed.
-    pub fn set_local_chain_selector(&mut self, local_chain_selector: u64) {
-        self.global_subject = CurseSubject::from_chain_selector(local_chain_selector);
-    }
-
     pub fn is_subject_cursed(&self, subject: CurseSubject) -> bool {
         self.cursed_subjects.contains(&subject)
     }
 
     pub fn is_chain_globally_cursed(&self) -> bool {
-        self.cursed_subjects.contains(&self.global_subject)
+        self.cursed_subjects.contains(&CurseSubject::GLOBAL)
     }
 }

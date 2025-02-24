@@ -35,8 +35,6 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for initialization.
-	// * `local_chain_selector` This chain selector will be used to verify if this chain is globally
-	// cursed, by transforming it into a curse subject (EVM equivalent: `bytes16(u128(selector))`)
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
 	// Transfers the ownership of the fee quoter to a new proposed owner.
@@ -69,17 +67,6 @@ var (
 	// * `ctx` - The context containing the accounts required for updating the configuration.
 	// * `code_version` - The new code version to be set as default.
 	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
-
-	// Sets the local chain selector. This chain selector will be used to verify if this chain is globally
-	// cursed, by transforming it into a curse subject (EVM equivalent: `bytes16(u128(selector))`)
-	//
-	// This should only be called in case of a previous misconfiguration during initialization.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `local_chain_selector` - The local chain selector.
-	Instruction_SetLocalChainSelector = ag_binary.TypeID([8]byte{246, 78, 137, 169, 22, 18, 215, 140})
 
 	// Curses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),
 	// the entire chain will be cursed.
@@ -133,8 +120,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AcceptOwnership"
 	case Instruction_SetDefaultCodeVersion:
 		return "SetDefaultCodeVersion"
-	case Instruction_SetLocalChainSelector:
-		return "SetLocalChainSelector"
 	case Instruction_Curse:
 		return "Curse"
 	case Instruction_Uncurse:
@@ -174,9 +159,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_default_code_version", (*SetDefaultCodeVersion)(nil),
-		},
-		{
-			"set_local_chain_selector", (*SetLocalChainSelector)(nil),
 		},
 		{
 			"curse", (*Curse)(nil),

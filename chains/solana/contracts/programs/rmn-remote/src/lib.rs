@@ -26,9 +26,7 @@ pub mod rmn_remote {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
-    /// * `local_chain_selector` This chain selector will be used to verify if this chain is globally
-    ///    cursed, by transforming it into a curse subject (EVM equivalent: `bytes16(u128(selector))`)
-    pub fn initialize(ctx: Context<Initialize>, local_chain_selector: u64) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             owner: ctx.accounts.authority.key(),
             version: 1,
@@ -36,15 +34,8 @@ pub mod rmn_remote {
             default_code_version: CodeVersion::V1,
         });
 
-        ctx.accounts
-            .curses
-            .set_local_chain_selector(local_chain_selector);
-
         emit!(ConfigSet {
             default_code_version: ctx.accounts.config.default_code_version,
-        });
-        emit!(LocalChainSelectorUpdated {
-            local_chain_selector,
         });
         Ok(())
     }
@@ -88,23 +79,6 @@ pub mod rmn_remote {
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
             .set_default_code_version(ctx, code_version)
-    }
-
-    /// Sets the local chain selector. This chain selector will be used to verify if this chain is globally
-    /// cursed, by transforming it into a curse subject (EVM equivalent: `bytes16(u128(selector))`)
-    ///
-    /// This should only be called in case of a previous misconfiguration during initialization.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for updating the configuration.
-    /// * `local_chain_selector` - The local chain selector.
-    pub fn set_local_chain_selector(
-        ctx: Context<UpdateConfig>,
-        local_chain_selector: u64,
-    ) -> Result<()> {
-        router::admin(ctx.accounts.config.default_code_version)
-            .set_local_chain_selector(ctx, local_chain_selector)
     }
 
     /// Curses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),

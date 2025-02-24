@@ -20,11 +20,6 @@ pub struct ConfigSet {
 }
 
 #[event]
-pub struct LocalChainSelectorUpdated {
-    pub local_chain_selector: u64,
-}
-
-#[event]
 pub struct SubjectCursed {
     pub subject: CurseSubject,
 }
