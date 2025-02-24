@@ -310,7 +310,7 @@ func (p *Plugin) checkReportCursed(
 	sourceChains := slicelib.Map(allRoots,
 		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector { return r.ChainSel })
 
-	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
+	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, sourceChains)
 	if err != nil {
 		lggr.Errorw("report not accepted due to curse checking error", "err", err)
 		return false, err
