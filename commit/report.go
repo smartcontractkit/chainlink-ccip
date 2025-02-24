@@ -396,7 +396,8 @@ func (p *Plugin) validateReport(
 
 	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeCommit)
 	if err != nil {
-		return cciptypes.CommitPluginReport{}, plugincommon.NewErrValidatingReport(fmt.Errorf("get offramp config digest: %w", err))
+		err = plugincommon.NewErrValidatingReport(fmt.Errorf("get offramp config digest: %w", err))
+		return cciptypes.CommitPluginReport{}, plugincommon.NewErrValidatingReport(err)
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
@@ -428,7 +429,8 @@ func (p *Plugin) validateReport(
 			"err", err,
 			"blessedMerkleRoots", decodedReport.BlessedMerkleRoots,
 			"unblessedMerkleRoots", decodedReport.UnblessedMerkleRoots)
-		return cciptypes.CommitPluginReport{}, plugincommon.NewErrInvalidReport(fmt.Sprintf("invalid merkle roots state %v", err))
+		err = plugincommon.NewErrInvalidReport(fmt.Sprintf("invalid merkle roots state %v", err))
+		return cciptypes.CommitPluginReport{}, err
 	}
 
 	return decodedReport, nil
