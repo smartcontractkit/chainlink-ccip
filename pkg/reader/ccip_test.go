@@ -1227,9 +1227,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			lggr := logger.Test(t)
-			curseInfo := getCurseInfoFromCursedSubjects(
-				lggr, tc.cursedSubjectsSet, tc.destChainSelector, tc.sourceChainSelectors)
+			curseInfo := getCurseInfoFromCursedSubjects(tc.cursedSubjectsSet, tc.destChainSelector)
 			assert.Equal(t, tc.expCurseInfo, *curseInfo)
 		})
 	}

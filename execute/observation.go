@@ -128,7 +128,7 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
 	}
 
-	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,

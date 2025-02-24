@@ -497,7 +497,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
+	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
