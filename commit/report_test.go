@@ -82,8 +82,17 @@ func TestPluginReports(t *testing.T) {
 					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
 				},
 			},
-			expReportInfo: ccipocr3.CommitReportInfo{},
-			expErr:        false,
+			expReportInfo: ccipocr3.CommitReportInfo{
+				PriceUpdates: ccipocr3.PriceUpdates{
+					TokenPriceUpdates: []ccipocr3.TokenPrice{
+						{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+					},
+					GasPriceUpdates: []ccipocr3.GasPriceChain{
+						{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+					},
+				},
+			},
+			expErr: false,
 		},
 		{
 			name: "only chain fee reported without merkle root is still transmitted",
@@ -106,8 +115,14 @@ func TestPluginReports(t *testing.T) {
 					RMNSignatures:        nil,
 				},
 			},
-			expReportInfo: ccipocr3.CommitReportInfo{},
-			expErr:        false,
+			expReportInfo: ccipocr3.CommitReportInfo{
+				PriceUpdates: ccipocr3.PriceUpdates{
+					GasPriceUpdates: []ccipocr3.GasPriceChain{
+						{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+					},
+				},
+			},
+			expErr: false,
 		},
 		{
 			name: "token prices reported but no merkle roots so report is not empty",
@@ -190,6 +205,9 @@ func TestPluginReports(t *testing.T) {
 				PriceUpdates: ccipocr3.PriceUpdates{
 					TokenPriceUpdates: []ccipocr3.TokenPrice{
 						{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+					},
+					GasPriceUpdates: []ccipocr3.GasPriceChain{
+						{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
 					},
 				},
 			},
