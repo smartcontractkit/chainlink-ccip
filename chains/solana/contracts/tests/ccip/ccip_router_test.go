@@ -441,6 +441,9 @@ func TestCCIPRouter(t *testing.T) {
 				config.OfframpBillingSignerPDA,
 				config.FeeQuoterProgram,
 				config.FqConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteCursesPDA,
 
 				// remaining accounts used on some price update
 				config.FqEvmDestChainPDA,
@@ -4956,9 +4959,10 @@ func TestCCIPRouter(t *testing.T) {
 							},
 							GasPriceUpdates: []ccip_offramp.GasPriceUpdate{
 								{DestChainSelector: config.EvmChainSelector, UsdPerUnitGas: common.To28BytesBE(5)},
+								{DestChainSelector: config.SvmChainSelector, UsdPerUnitGas: common.To28BytesBE(6)},
 							},
 						},
-						RemainingAccounts: []solana.PublicKey{config.OfframpStatePDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.FqEvmDestChainPDA},
+						RemainingAccounts: []solana.PublicKey{config.OfframpStatePDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.FqEvmDestChainPDA, config.FqSvmDestChainPDA},
 						RunEventValidations: func(t *testing.T, tx *rpc.GetTransactionResult) {
 							// yes multiple token updates
 							tokenUpdates, err := common.ParseMultipleEvents[ccip.UsdPerTokenUpdated](tx.Meta.LogMessages, "UsdPerTokenUpdated", config.PrintEvents)
@@ -4984,19 +4988,23 @@ func TestCCIPRouter(t *testing.T) {
 							// yes gas update
 							gasUpdates, err := common.ParseMultipleEvents[ccip.UsdPerUnitGasUpdated](tx.Meta.LogMessages, "UsdPerUnitGasUpdated", config.PrintEvents)
 							require.NoError(t, err)
-							require.Len(t, gasUpdates, 1)
-							var eventEvm bool
+							require.Len(t, gasUpdates, 2)
+							var eventEvm, eventSVM bool
 							for _, gasUpdate := range gasUpdates {
 								switch gasUpdate.DestChain {
 								case config.EvmChainSelector:
 									eventEvm = true
 									require.Equal(t, common.To28BytesBE(5), gasUpdate.Value)
+								case config.SvmChainSelector:
+									eventSVM = true
+									require.Equal(t, common.To28BytesBE(6), gasUpdate.Value)
 								default:
 									t.Fatalf("unexpected gas update: %v", gasUpdate)
 								}
 								require.Greater(t, gasUpdate.Timestamp, int64(0)) // timestamp is set
 							}
 							require.True(t, eventEvm, "missing evm gas update event")
+							require.True(t, eventSVM, "missing solana gas update event")
 						},
 						RunStateValidations: func(t *testing.T) {
 							var wsolTokenConfig fee_quoter.BillingTokenConfigWrapper
@@ -5013,6 +5021,11 @@ func TestCCIPRouter(t *testing.T) {
 							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &evmChainState))
 							require.Equal(t, common.To28BytesBE(5), evmChainState.State.UsdPerUnitGas.Value)
 							require.Greater(t, evmChainState.State.UsdPerUnitGas.Timestamp, int64(0))
+
+							var solanaChainState fee_quoter.DestChain
+							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &solanaChainState))
+							require.Equal(t, common.To28BytesBE(6), solanaChainState.State.UsdPerUnitGas.Value)
+							require.Greater(t, solanaChainState.State.UsdPerUnitGas.Timestamp, int64(0))
 						},
 						PriceSequenceComparator: Equal,
 					},
@@ -7174,7 +7187,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
+					tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, offrampLookupTable, common.AddComputeUnitLimit(300_000))
 					event := common.EventCommitReportAccepted{}
 					require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
@@ -7240,6 +7253,8 @@ func TestCCIPRouter(t *testing.T) {
 					)
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
+					maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
+
 					require.NoError(t, err)
 					tokenMetas[1] = solana.Meta(token0.Billing[config.SvmChainSelector])       // overwrite field that our TokenPool utils assume will be for EVM
 					tokenMetas[2] = solana.Meta(token0.Chain[config.SvmChainSelector]).WRITE() // overwrite field that our TokenPool utils assume will be for EVM
@@ -7668,6 +7683,7 @@ func TestCCIPRouter(t *testing.T) {
 				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
 				require.NoError(t, err)
 				raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
+				maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
@@ -7706,6 +7722,8 @@ func TestCCIPRouter(t *testing.T) {
 				rawManual.AccountMetaSlice = append(rawManual.AccountMetaSlice, tokenMetas...)
 				instruction, err = rawManual.ValidateAndBuild()
 				require.NoError(t, err)
+				maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
+
 				testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, addressTables)
 
 				_, finalBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[receiver.PublicKey()], config.DefaultCommitment)
