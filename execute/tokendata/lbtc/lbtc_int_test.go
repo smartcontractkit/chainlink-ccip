@@ -196,6 +196,7 @@ func Test_LBTC_Flow(t *testing.T) {
 			AttestationAPI:         server.URL,
 			AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Microsecond),
 			AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+			AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 		},
 		SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
 			bscChain: bscPool,

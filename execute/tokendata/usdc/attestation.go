@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -23,10 +22,6 @@ type attestationStatus string
 const (
 	apiVersion      = "v1"
 	attestationPath = "attestations"
-
-	// defaultCoolDownDurationSec defines the default time to wait after getting rate limited.
-	// this value is only used if the 429 response does not contain the Retry-After header
-	defaultCoolDownDuration = 5 * time.Minute
 
 	attestationStatusSuccess attestationStatus = "complete"
 	attestationStatusPending attestationStatus = "pending_confirmations"
@@ -93,7 +88,7 @@ func NewSequentialAttestationClient(
 		config.AttestationAPI,
 		config.AttestationAPIInterval.Duration(),
 		config.AttestationAPITimeout.Duration(),
-		defaultCoolDownDuration,
+		config.AttestationAPICooldown.Duration(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %w", err)

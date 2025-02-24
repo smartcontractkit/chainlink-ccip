@@ -163,6 +163,7 @@ func (it *IntTest) WithUSDC(
 				AttestationAPI:         it.usdcServer.server.URL,
 				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+				AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 			},
 			Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 				it.srcSelector: {
@@ -207,6 +208,7 @@ func (it *IntTest) WithLBTC(
 				AttestationAPI:         it.lbtcServer.server.URL,
 				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+				AttestationAPICooldown: commonconfig.MustNewDuration(1 * time.Second),
 			},
 			SourcePoolAddressByChain: map[cciptypes.ChainSelector]string{
 				it.srcSelector: sourcePoolAddress,

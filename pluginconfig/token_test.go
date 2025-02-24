@@ -82,6 +82,7 @@ func Test_TokenDataObserver_Unmarshal(t *testing.T) {
 							  "attestationAPI": "http://localhost:8080",
 							  "attestationAPITimeout": "1s",
 							  "attestationAPIInterval": "500ms",
+							  "attestationAPICooldown": "10m0s",
 							  "numWorkers": 10,
 							  "cacheExpirationInterval": "5s",
 							  "cacheCleanupInterval": "6s",	
@@ -97,6 +98,7 @@ func Test_TokenDataObserver_Unmarshal(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(10 * time.Minute),
 						},
 						WorkerConfig: WorkerConfig{
 							NumWorkers:              10,
@@ -132,7 +134,8 @@ func Test_TokenDataObserver_Unmarshal(t *testing.T) {
 							  },
 							  "attestationAPI": "http://localhost:8080",
 							  "attestationAPITimeout": "1s",
-							  "attestationAPIInterval": "500ms"
+							  "attestationAPIInterval": "500ms",
+							  "attestationAPICooldown": "10m0s"
 							}
 				  	],`,
 			want: []TokenDataObserverConfig{
@@ -144,6 +147,7 @@ func Test_TokenDataObserver_Unmarshal(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(10 * time.Minute),
 						},
 						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 							1: {
@@ -217,11 +221,39 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							  "attestationAPI": "",
 							  "attestationAPIInterval": null,
 							  "attestationAPITimeout": null,
+							  "attestationAPICooldown": null,
 							  "numWorkers": 0,
 							  "observeTimeout": null,
 							  "cacheCleanupInterval": null,
 							  "cacheExpirationInterval": null,
 							  "tokens": null
+							}
+				  	   ]`,
+			wantErr: false,
+		},
+		{
+			name: "empty lbtc is set",
+			config: []TokenDataObserverConfig{
+				{
+					Type:               "lbtc",
+					Version:            "1.0",
+					LBTCObserverConfig: &LBTCObserverConfig{},
+				},
+			},
+			wantJSON: `[
+							{
+							  "type": "lbtc",
+							  "version": "1.0",
+							  "attestationAPI": "",
+							  "attestationAPIInterval": null,
+							  "attestationAPITimeout": null,
+							  "attestationAPICooldown": null,
+							  "numWorkers": 0,
+							  "observeTimeout": null,
+							  "cacheCleanupInterval": null,
+							  "cacheExpirationInterval": null,
+							  "attestationAPIBatchSize": 0,
+							  "sourcePoolAddressByChain": null
 							}
 				  	   ]`,
 			wantErr: false,
@@ -237,6 +269,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(10 * time.Minute),
 						},
 						WorkerConfig: WorkerConfig{
 							NumWorkers:              10,
@@ -266,6 +299,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							  "attestationAPI": "http://localhost:8080",
 							  "attestationAPITimeout": "1s",
 							  "attestationAPIInterval": "500ms",
+							  "attestationAPICooldown": "10m0s",
 							  "numWorkers": 10,
 							  "cacheExpirationInterval": "5s",
 							  "cacheCleanupInterval": "6s",	
@@ -284,6 +318,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(10 * time.Minute),
 						},
 						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 							1: {
@@ -315,6 +350,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 					   	  "attestationAPI": "http://localhost:8080",
 					   	  "attestationAPITimeout": "1s",
 					   	  "attestationAPIInterval": "500ms",
+						  "attestationAPICooldown": "10m0s",
 						  "numWorkers": 0,
 						  "observeTimeout": null,
 						  "cacheCleanupInterval": null,
@@ -333,6 +369,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(10 * time.Second),
 						},
 						WorkerConfig: WorkerConfig{
 							NumWorkers:              10,
@@ -356,6 +393,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							  "attestationAPI": "http://localhost:8080",
 							  "attestationAPITimeout": "1s",
 							  "attestationAPIInterval": "500ms",
+						      "attestationAPICooldown": "10s",
 							  "attestationAPIBatchSize": 0,
 							  "numWorkers": 10,
 							  "cacheExpirationInterval": "5s",
@@ -375,6 +413,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(10 * time.Minute),
 						},
 						WorkerConfig: WorkerConfig{
 							NumWorkers:              10,
@@ -402,6 +441,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(10 * time.Second),
 						},
 						WorkerConfig: WorkerConfig{
 							NumWorkers:              10,
@@ -432,6 +472,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							  "attestationAPI": "http://localhost:8080",
 							  "attestationAPITimeout": "1s",
 							  "attestationAPIInterval": "500ms",
+						      "attestationAPICooldown": "10m0s",
 							  "numWorkers": 10,
 							  "cacheExpirationInterval": "5s",
 							  "cacheCleanupInterval": "6s",	
@@ -446,6 +487,7 @@ func Test_TokenDataObserver_Marshal(t *testing.T) {
 							  "attestationAPI": "http://localhost:8080",
 							  "attestationAPITimeout": "1s",
 							  "attestationAPIInterval": "500ms",
+						      "attestationAPICooldown": "10s",
 							  "attestationAPIBatchSize": 0,
 							  "numWorkers": 10,
 							  "cacheExpirationInterval": "5s",
@@ -496,6 +538,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 				AttestationAPI:         "http://localhost:8080",
 				AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 				AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+				AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 			},
 			WorkerConfig: WorkerConfig{
 				NumWorkers:              10,
@@ -518,6 +561,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 				AttestationAPI:         "http://localhost:8080",
 				AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 				AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+				AttestationAPICooldown: commonconfig.MustNewDuration(1 * time.Second),
 			},
 			WorkerConfig: WorkerConfig{
 				NumWorkers:              10,
@@ -579,6 +623,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 						},
 					},
 				}),
@@ -598,6 +643,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 							AttestationAPI:         "http://localhost:8080",
 							AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 							AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+							AttestationAPICooldown: commonconfig.MustNewDuration(1 * time.Second),
 						},
 					},
 				}),
@@ -623,6 +669,34 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			lbtcEnabled: false,
 			wantErr:     true,
 			errMsg:      "duplicate token data observer type",
+		},
+		{
+			name: "usdc type but two simultaneous configs",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: withUSDCConfig(),
+					LBTCObserverConfig:     withLBTCConfig(),
+				}),
+			usdcEnabled: true,
+			lbtcEnabled: false,
+			wantErr:     true,
+			errMsg:      "LBTCObserverConfig must be null with USDC plugin type",
+		},
+		{
+			name: "lbtc type but two simultaneous configs",
+			config: withBaseConfig(
+				TokenDataObserverConfig{
+					Type:                   "lbtc",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: withUSDCConfig(),
+					LBTCObserverConfig:     withLBTCConfig(),
+				}),
+			usdcEnabled: false,
+			lbtcEnabled: true,
+			wantErr:     true,
+			errMsg:      "USDCCCTPObserverConfig must be null with LBTC plugin type",
 		},
 		{
 			name: "valid config with multiple the same observers types but different versions",

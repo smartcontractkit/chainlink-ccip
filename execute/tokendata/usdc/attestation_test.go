@@ -183,6 +183,7 @@ func Test_AttestationClient(t *testing.T) {
 							AttestationAPI:         server.URL,
 							AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 							AttestationAPITimeout:  commonconfig.MustNewDuration(5 * time.Second),
+							AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 						},
 					},
 				)

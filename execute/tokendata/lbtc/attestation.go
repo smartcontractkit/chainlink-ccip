@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -19,9 +18,8 @@ import (
 type AttestationStatus string
 
 const (
-	apiVersion              = "v1"
-	attestationPath         = "deposits/getByHash"
-	defaultCoolDownDuration = 30 * time.Second
+	apiVersion      = "v1"
+	attestationPath = "deposits/getByHash"
 
 	attestationStatusUnspecified AttestationStatus = "NOTARIZATION_STATUS_UNSPECIFIED"
 	attestationStatusFailed      AttestationStatus = "NOTARIZATION_STATUS_FAILED"
@@ -62,7 +60,7 @@ func NewLBTCAttestationClient(
 		config.AttestationAPI,
 		config.AttestationAPIInterval.Duration(),
 		config.AttestationAPITimeout.Duration(),
-		defaultCoolDownDuration,
+		config.AttestationAPICooldown.Duration(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get http client: %w", err)

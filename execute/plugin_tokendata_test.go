@@ -18,7 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -33,7 +33,7 @@ func runRoundAndGetOutcome(ctx context.Context, ocrTypeCodec ocrtypecodec.ExecCo
 }
 
 func Test_LBTC_USDC_Transfer(t *testing.T) {
-	ocrTypeCodec := ocrtypecodec.NewExecCodecJSON()
+	ocrTypeCodec := ocrtypecodec.DefaultExecCodec
 	ctx := tests.Context(t)
 
 	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)

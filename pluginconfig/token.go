@@ -77,10 +77,19 @@ func (t *TokenDataObserverConfig) WellFormed() error {
 // Validate checks that the observer's config is semantically correct - fields are set correctly
 // depending on the config's type
 func (t *TokenDataObserverConfig) Validate() error {
+	if err := t.WellFormed(); err != nil {
+		return err
+	}
 	if t.IsUSDC() {
+		if t.LBTCObserverConfig != nil {
+			return errors.New("LBTCObserverConfig must be null with USDC plugin type")
+		}
 		return t.USDCCCTPObserverConfig.Validate()
 	}
 	if t.IsLBTC() {
+		if t.USDCCCTPObserverConfig != nil {
+			return errors.New("USDCCCTPObserverConfig must be null with LBTC plugin type")
+		}
 		return t.LBTCObserverConfig.Validate()
 	}
 	return errors.New("unknown token data observer type " + t.Type)
@@ -98,31 +107,30 @@ func (t *TokenDataObserverConfig) IsLBTC() bool {
 // It constructs raw map based on provided type. Custom marshaller is needed because default golang marshaller
 // doesn't marshal clashing fields of pointer embeddings even if only one pointer is present and rest are set to nil
 func (t *TokenDataObserverConfig) MarshalJSON() ([]byte, error) {
-	raw := map[string]interface{}{
-		"type":    t.Type,
-		"version": t.Version,
-	}
-	var err error
-	var configJSONRaw []byte
 	switch t.Type {
 	case USDCCCTPHandlerType:
-		configJSONRaw, err = json.Marshal(t.USDCCCTPObserverConfig)
-		if err != nil {
-			return nil, err
-		}
+		return json.Marshal(&struct {
+			Type    string `json:"type"`
+			Version string `json:"version"`
+			*USDCCCTPObserverConfig
+		}{
+			Type:                   t.Type,
+			Version:                t.Version,
+			USDCCCTPObserverConfig: t.USDCCCTPObserverConfig,
+		})
 	case LBTCHandlerType:
-		configJSONRaw, err = json.Marshal(t.LBTCObserverConfig)
-		if err != nil {
-			return nil, err
-		}
+		return json.Marshal(&struct {
+			Type    string `json:"type"`
+			Version string `json:"version"`
+			*LBTCObserverConfig
+		}{
+			Type:               t.Type,
+			Version:            t.Version,
+			LBTCObserverConfig: t.LBTCObserverConfig,
+		})
 	default:
 		return nil, fmt.Errorf("unknown token data observer type: %q", t.Type)
 	}
-	err = json.Unmarshal(configJSONRaw, &raw)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(raw)
 }
 
 // UnmarshalJSON is a custom JSON unmarshaller for TokenDataObserverConfig.
@@ -167,12 +175,15 @@ type AttestationConfig struct {
 	// AttestationAPIInterval defines the rate in requests per second that the attestation API can be called.
 	// Default set according to the APIs documentated 10 requests per second rate limit.
 	AttestationAPIInterval *commonconfig.Duration `json:"attestationAPIInterval"`
+	// AttestationAPICooldown defines in what time it is allowed to make next call to API.
+	// Activates when plugin hits API's rate limits
+	AttestationAPICooldown *commonconfig.Duration `json:"attestationAPICooldown"`
 }
 
 func (p *AttestationConfig) setDefaults() {
 	// Default to 1 second if AttestationAPITimeout is not set
 	if p.AttestationAPITimeout == nil {
-		p.AttestationAPITimeout = commonconfig.MustNewDuration(5 * time.Second)
+		p.AttestationAPITimeout = commonconfig.MustNewDuration(1 * time.Second)
 	}
 
 	// Default to 100 millis if AttestationAPIInterval is not set this is set according to the APIs documented
@@ -251,7 +262,14 @@ type USDCCCTPObserverConfig struct {
 	Tokens map[cciptypes.ChainSelector]USDCCCTPTokenConfig `json:"tokens"`
 }
 
+func (p *USDCCCTPObserverConfig) setDefaults() {
+	if p.AttestationAPICooldown == nil || p.AttestationAPICooldown.Duration() == 0 {
+		p.AttestationAPICooldown = commonconfig.MustNewDuration(5 * time.Minute)
+	}
+}
+
 func (p *USDCCCTPObserverConfig) Validate() error {
+	p.setDefaults()
 	err := p.AttestationConfig.Validate()
 	if err != nil {
 		return err
@@ -260,7 +278,6 @@ func (p *USDCCCTPObserverConfig) Validate() error {
 	if err != nil {
 		return err
 	}
-
 	if len(p.Tokens) == 0 {
 		return errors.New("Tokens not set")
 	}
@@ -299,20 +316,15 @@ type LBTCObserverConfig struct {
 }
 
 func (c *LBTCObserverConfig) setDefaults() {
+	if c.AttestationAPICooldown == nil || c.AttestationAPICooldown.Duration() == 0 {
+		c.AttestationAPICooldown = commonconfig.MustNewDuration(1 * time.Second)
+	}
 	if c.AttestationAPIBatchSize == 0 {
 		c.AttestationAPIBatchSize = 50
 	}
 }
 
 func (c *LBTCObserverConfig) Validate() error {
-	err := c.AttestationConfig.Validate()
-	if err != nil {
-		return err
-	}
-	err = c.WorkerConfig.Validate()
-	if err != nil {
-		return err
-	}
 	c.setDefaults()
 	if c.AttestationAPIBatchSize == 0 {
 		return errors.New("AttestationAPIBatchSize is not set")
@@ -324,6 +336,14 @@ func (c *LBTCObserverConfig) Validate() error {
 		if sourcePoolAddress == "" {
 			return errors.New("SourcePoolAddressByChain is empty")
 		}
+	}
+	err := c.AttestationConfig.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.WorkerConfig.Validate()
+	if err != nil {
+		return err
 	}
 	return nil
 }
