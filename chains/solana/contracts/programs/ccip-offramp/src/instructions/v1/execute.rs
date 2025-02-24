@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use rmn_remote::state::CurseSubject;
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 
@@ -33,6 +34,13 @@ impl Execute for Impl {
             ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
                 .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
         let report_context = ReportContext::from_byte_words(report_context_byte_words);
+        verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            execution_report.source_chain_selector,
+        )?;
+
         // limit borrowing of ctx
         {
             let config = ctx.accounts.config.load()?;
@@ -76,6 +84,12 @@ impl Execute for Impl {
         let execution_report =
             ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
                 .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+        verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            execution_report.source_chain_selector,
+        )?;
         internal_execute(ctx, execution_report, token_indexes)
     }
 }
@@ -140,8 +154,8 @@ fn internal_execute<'info>(
     // token_indexes = [2, 4] where remaining_accounts is [custom_account, custom_account, token1_account1, token1_account2, token2_account1, token2_account2] for example
     for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
         let accs = get_token_accounts_for(
-            ctx.accounts.reference_addresses.router,
-            ctx.accounts.reference_addresses.fee_quoter,
+            ctx.accounts.reference_addresses.load()?.router,
+            ctx.accounts.reference_addresses.load()?.fee_quoter,
             ctx.remaining_accounts,
             execution_report.message.token_receiver,
             execution_report.message.header.source_chain_selector,
@@ -585,6 +599,24 @@ mod execution_state {
             get(&commit_report, 65);
         }
     }
+}
+
+pub fn verify_uncursed_cpi<'info>(
+    rmn_remote: AccountInfo<'info>,
+    rmn_remote_config: AccountInfo<'info>,
+    rmn_remote_curses: AccountInfo<'info>,
+    chain_selector: u64,
+) -> Result<()> {
+    let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
+        config: rmn_remote_config,
+        curses: rmn_remote_curses,
+    };
+    let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
+    rmn_remote::cpi::verify_not_cursed(
+        cpi_context,
+        CurseSubject::from_chain_selector(chain_selector),
+    )?;
+    Ok(())
 }
 
 #[cfg(test)]

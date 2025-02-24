@@ -636,6 +636,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.OfframpReferenceAddressesPDA,
 				config.CcipRouterProgram,
 				config.FeeQuoterProgram,
+				config.RMNRemoteProgram,
 				lookupTableAddr,
 				config.OfframpStatePDA,
 				config.OfframpExternalExecutionConfigPDA,
@@ -666,6 +667,7 @@ func TestCCIPRouter(t *testing.T) {
 				Router:             [32]byte{1},
 				FeeQuoter:          [32]byte{2},
 				OfframpLookupTable: [32]byte{3},
+				RMNRemote:          [32]byte{4},
 			}
 
 			// Now, actually initialize the offramp
@@ -673,6 +675,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.OfframpReferenceAddressesPDA,
 				testReferenceAddresses.Router,             // will be updated in later test
 				testReferenceAddresses.FeeQuoter,          // will be updated in later test
+				testReferenceAddresses.RmnRemote,          // will be updated in later test
 				testReferenceAddresses.OfframpLookupTable, // will be updated in later test
 				config.OfframpStatePDA,
 				config.OfframpExternalExecutionConfigPDA,
@@ -703,6 +706,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, testReferenceAddresses.Router, refAddrEvent.Router)
 			require.Equal(t, testReferenceAddresses.FeeQuoter, refAddrEvent.FeeQuoter)
 			require.Equal(t, testReferenceAddresses.OfframpLookupTable, refAddrEvent.OfframpLookupTable)
+			require.Equal(t, testReferenceAddresses.RMNRemote, refAddrEvent.RMNRemote)
 
 			var configSetEvent ccip.EventOfframpConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
@@ -4952,10 +4956,9 @@ func TestCCIPRouter(t *testing.T) {
 							},
 							GasPriceUpdates: []ccip_offramp.GasPriceUpdate{
 								{DestChainSelector: config.EvmChainSelector, UsdPerUnitGas: common.To28BytesBE(5)},
-								{DestChainSelector: config.SvmChainSelector, UsdPerUnitGas: common.To28BytesBE(6)},
 							},
 						},
-						RemainingAccounts: []solana.PublicKey{config.OfframpStatePDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.FqEvmDestChainPDA, config.FqSvmDestChainPDA},
+						RemainingAccounts: []solana.PublicKey{config.OfframpStatePDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.FqEvmDestChainPDA},
 						RunEventValidations: func(t *testing.T, tx *rpc.GetTransactionResult) {
 							// yes multiple token updates
 							tokenUpdates, err := common.ParseMultipleEvents[ccip.UsdPerTokenUpdated](tx.Meta.LogMessages, "UsdPerTokenUpdated", config.PrintEvents)
@@ -4981,23 +4984,19 @@ func TestCCIPRouter(t *testing.T) {
 							// yes gas update
 							gasUpdates, err := common.ParseMultipleEvents[ccip.UsdPerUnitGasUpdated](tx.Meta.LogMessages, "UsdPerUnitGasUpdated", config.PrintEvents)
 							require.NoError(t, err)
-							require.Len(t, gasUpdates, 2)
-							var eventEvm, eventSVM bool
+							require.Len(t, gasUpdates, 1)
+							var eventEvm bool
 							for _, gasUpdate := range gasUpdates {
 								switch gasUpdate.DestChain {
 								case config.EvmChainSelector:
 									eventEvm = true
 									require.Equal(t, common.To28BytesBE(5), gasUpdate.Value)
-								case config.SvmChainSelector:
-									eventSVM = true
-									require.Equal(t, common.To28BytesBE(6), gasUpdate.Value)
 								default:
 									t.Fatalf("unexpected gas update: %v", gasUpdate)
 								}
 								require.Greater(t, gasUpdate.Timestamp, int64(0)) // timestamp is set
 							}
 							require.True(t, eventEvm, "missing evm gas update event")
-							require.True(t, eventSVM, "missing solana gas update event")
 						},
 						RunStateValidations: func(t *testing.T) {
 							var wsolTokenConfig fee_quoter.BillingTokenConfigWrapper
@@ -5014,11 +5013,6 @@ func TestCCIPRouter(t *testing.T) {
 							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqEvmDestChainPDA, config.DefaultCommitment, &evmChainState))
 							require.Equal(t, common.To28BytesBE(5), evmChainState.State.UsdPerUnitGas.Value)
 							require.Greater(t, evmChainState.State.UsdPerUnitGas.Timestamp, int64(0))
-
-							var solanaChainState fee_quoter.DestChain
-							require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.FqSvmDestChainPDA, config.DefaultCommitment, &solanaChainState))
-							require.Equal(t, common.To28BytesBE(6), solanaChainState.State.UsdPerUnitGas.Value)
-							require.Greater(t, solanaChainState.State.UsdPerUnitGas.Timestamp, int64(0))
 						},
 						PriceSequenceComparator: Equal,
 					},
@@ -5113,6 +5107,9 @@ func TestCCIPRouter(t *testing.T) {
 							config.FeeQuoterProgram,
 							config.FqAllowedPriceUpdaterOfframpPDA,
 							config.FqConfigPDA,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 						)
 
 						for _, pubkey := range testcase.RemainingAccounts {
@@ -5202,6 +5199,9 @@ func TestCCIPRouter(t *testing.T) {
 							config.FeeQuoterProgram,
 							config.FqAllowedPriceUpdaterOfframpPDA,
 							config.FqConfigPDA,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 						)
 
 						for _, pubkey := range testcase.RemainingAccounts {
@@ -5267,6 +5267,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: AccountNotInitialized"})
@@ -5312,6 +5315,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidSequenceInterval_CcipOfframpError.String()})
@@ -5356,6 +5362,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidSequenceInterval_CcipOfframpError.String()})
@@ -5400,6 +5409,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidProof_CcipOfframpError.String()})
@@ -5445,6 +5457,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment,
@@ -5491,6 +5506,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidSequenceInterval_CcipOfframpError.String()})
@@ -5618,6 +5636,9 @@ func TestCCIPRouter(t *testing.T) {
 								config.FeeQuoterProgram,
 								config.FqAllowedPriceUpdaterOfframpPDA,
 								config.FqConfigPDA,
+								config.RMNRemoteProgram,
+								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigPDA,
 							)
 
 							raw.AccountMetaSlice.Append(solana.Meta(config.OfframpStatePDA).WRITE())
@@ -5674,6 +5695,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -5747,6 +5771,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3ConfigDigestMismatch_CcipOfframpError.String()})
@@ -5791,6 +5818,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3UnauthorizedTransmitter_CcipOfframpError.String()})
@@ -5839,6 +5869,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3WrongNumberOfSignatures_CcipOfframpError.String()})
@@ -5882,6 +5915,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3WrongNumberOfSignatures_CcipOfframpError.String()})
@@ -5937,6 +5973,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3UnauthorizedSigner_CcipOfframpError.String()})
@@ -5985,9 +6024,12 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3NonUniqueSignatures_CcipOfframpError.String()}, common.AddComputeUnitLimit(210_000))
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + ccip.Ocr3NonUniqueSignatures_CcipOfframpError.String()}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 				})
 			})
 		})
@@ -6039,9 +6081,12 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
 				event := common.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
@@ -6065,6 +6110,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 
 				raw.AccountMetaSlice = append(
@@ -6135,9 +6183,12 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
 				event := common.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
@@ -6163,6 +6214,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -6215,9 +6269,12 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
 				event := common.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
@@ -6259,6 +6316,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -6317,6 +6377,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -6343,6 +6406,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -6384,6 +6450,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -6432,6 +6501,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -6495,6 +6567,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -6521,6 +6596,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -6556,6 +6634,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -6633,6 +6714,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -6659,6 +6743,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -6720,9 +6807,12 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
 				event := common.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
@@ -6746,6 +6836,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 
 				raw.AccountMetaSlice = append(
@@ -6817,6 +6910,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -6844,6 +6940,9 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
 						config.OfframpTokenPoolsSignerPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					)
 					raw.AccountMetaSlice = append(
 						raw.AccountMetaSlice,
@@ -6938,6 +7037,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -6965,6 +7067,9 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
 						config.OfframpTokenPoolsSignerPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					)
 
 					tokenMetas0, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
@@ -7064,6 +7169,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -7119,6 +7227,9 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
 						config.OfframpTokenPoolsSignerPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					)
 					raw.AccountMetaSlice = append(
 						raw.AccountMetaSlice,
@@ -7181,6 +7292,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
@@ -7241,6 +7355,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -7269,6 +7386,9 @@ func TestCCIPRouter(t *testing.T) {
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
 							config.OfframpTokenPoolsSignerPDA,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 						)
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
@@ -7307,6 +7427,9 @@ func TestCCIPRouter(t *testing.T) {
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
 							config.OfframpTokenPoolsSignerPDA,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 						)
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
@@ -7359,6 +7482,9 @@ func TestCCIPRouter(t *testing.T) {
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
 							config.OfframpTokenPoolsSignerPDA,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 						)
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
@@ -7412,6 +7538,9 @@ func TestCCIPRouter(t *testing.T) {
 							solana.SystemProgramID,
 							solana.SysVarInstructionsPubkey,
 							config.OfframpTokenPoolsSignerPDA,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 						)
 						raw.AccountMetaSlice = append(
 							raw.AccountMetaSlice,
@@ -7499,6 +7628,9 @@ func TestCCIPRouter(t *testing.T) {
 					config.FeeQuoterProgram,
 					config.FqAllowedPriceUpdaterOfframpPDA,
 					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -7528,6 +7660,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 
 				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
@@ -7561,6 +7696,9 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 					solana.SysVarInstructionsPubkey,
 					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
 				)
 
 				tokenMetas, addressTables, err = tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])

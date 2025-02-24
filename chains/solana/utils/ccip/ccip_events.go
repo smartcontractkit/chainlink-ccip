@@ -108,6 +108,7 @@ type EventOfframpReferenceAddressesSet struct {
 	Router             solana.PublicKey
 	FeeQuoter          solana.PublicKey
 	OfframpLookupTable solana.PublicKey
+	RMNRemote          solana.PublicKey
 }
 
 type EventRouterConfigSet struct {

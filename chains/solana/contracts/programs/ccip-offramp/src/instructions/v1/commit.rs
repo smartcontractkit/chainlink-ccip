@@ -37,6 +37,13 @@ impl Commit for Impl {
         // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
         let source_chain = &mut ctx.accounts.source_chain;
 
+        helpers::verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            source_chain.chain_selector,
+        )?;
+
         require!(
             source_chain.config.is_enabled,
             CcipOfframpError::UnsupportedSourceChainSelector
@@ -218,6 +225,7 @@ impl Commit for Impl {
 
 mod helpers {
     use fee_quoter::cpi::accounts::UpdatePrices;
+    use rmn_remote::state::CurseSubject;
 
     use super::*;
     pub(super) fn update_prices<'info>(
@@ -296,6 +304,24 @@ mod helpers {
             fee_quoter::cpi::update_prices(cpi_ctx, token_price_updates, gas_price_update)?;
         }
 
+        Ok(())
+    }
+
+    pub(super) fn verify_uncursed_cpi<'info>(
+        rmn_remote: AccountInfo<'info>,
+        rmn_remote_config: AccountInfo<'info>,
+        rmn_remote_curses: AccountInfo<'info>,
+        chain_selector: u64,
+    ) -> Result<()> {
+        let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
+            config: rmn_remote_config,
+            curses: rmn_remote_curses,
+        };
+        let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
+        rmn_remote::cpi::verify_not_cursed(
+            cpi_context,
+            CurseSubject::from_chain_selector(chain_selector),
+        )?;
         Ok(())
     }
 }
