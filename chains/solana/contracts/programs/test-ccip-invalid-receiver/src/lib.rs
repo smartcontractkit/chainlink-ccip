@@ -55,6 +55,9 @@ pub mod test_ccip_invalid_receiver {
             ctx.accounts.pool_signer.to_account_info(),
             ctx.accounts.pool_token_account.to_account_info(),
             ctx.accounts.chain_config.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             ctx.accounts.receiver_token_account.to_account_info(),
         ];
 
@@ -97,6 +100,9 @@ pub mod test_ccip_invalid_receiver {
             ctx.accounts.mint.to_account_info(),
             ctx.accounts.pool_signer.to_account_info(),
             ctx.accounts.pool_token_account.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             ctx.accounts.chain_config.to_account_info(),
         ];
 
@@ -305,6 +311,15 @@ pub struct PoolProxyReleaseOrMint<'info> {
     pub chain_config: UncheckedAccount<'info>,
 
     /// CHECK
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_config: UncheckedAccount<'info>,
+
+    /// CHECK
     #[account(mut)]
     pub receiver_token_account: UncheckedAccount<'info>,
 }
@@ -340,6 +355,15 @@ pub struct PoolProxyLockOrBurn<'info> {
 
     #[account(mut)]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_config: UncheckedAccount<'info>,
 
     /// CHECK
     #[account(mut)]

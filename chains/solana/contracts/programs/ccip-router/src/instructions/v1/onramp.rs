@@ -186,6 +186,9 @@ impl OnRamp for Impl {
                     current_token_accounts.mint.to_account_info(),
                     current_token_accounts.pool_signer.to_account_info(),
                     current_token_accounts.pool_token_account.to_account_info(),
+                    ctx.accounts.rmn_remote.to_account_info(),
+                    ctx.accounts.rmn_remote_curses.to_account_info(),
+                    ctx.accounts.rmn_remote_config.to_account_info(),
                     current_token_accounts.pool_chain_config.to_account_info(),
                 ]);
                 acc_infos.extend_from_slice(current_token_accounts.remaining_accounts);

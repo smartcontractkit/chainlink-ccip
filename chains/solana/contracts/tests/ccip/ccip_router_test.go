@@ -245,6 +245,7 @@ func TestCCIPRouter(t *testing.T) {
 			ixInit0, err := test_token_pool.NewInitializeInstruction(
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
+				config.RMNRemoteProgram,
 				token0.PoolConfig,
 				token0.Mint.PublicKey(),
 				token0PoolAdmin.PublicKey(),
@@ -255,6 +256,7 @@ func TestCCIPRouter(t *testing.T) {
 			ixInit1, err := test_token_pool.NewInitializeInstruction(
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
+				config.RMNRemoteProgram,
 				token1.PoolConfig,
 				token1.Mint.PublicKey(),
 				token1PoolAdmin.PublicKey(),
@@ -265,6 +267,7 @@ func TestCCIPRouter(t *testing.T) {
 			ixInit2, err := test_token_pool.NewInitializeInstruction(
 				test_token_pool.BurnAndMint_PoolType,
 				config.CcipRouterProgram,
+				config.RMNRemoteProgram,
 				token2.PoolConfig,
 				token2.Mint.PublicKey(),
 				token2PoolAdmin.PublicKey(),

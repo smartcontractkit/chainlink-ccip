@@ -13,12 +13,17 @@ pub mod example_lockrelease_token_pool {
 
     use super::*;
 
-    pub fn initialize(ctx: Context<InitializeTokenPool>, router: Pubkey) -> Result<()> {
+    pub fn initialize(
+        ctx: Context<InitializeTokenPool>,
+        router: Pubkey,
+        rmn_remote: Pubkey,
+    ) -> Result<()> {
         ctx.accounts.state.config.init(
             &ctx.accounts.mint,
             ctx.program_id.key(),
             ctx.accounts.authority.key(),
             router,
+            rmn_remote,
         )
     }
 
@@ -143,6 +148,9 @@ pub mod example_lockrelease_token_pool {
             ctx.accounts.state.config.mint,
             &remote.pool_addresses,
             inbound_rate_limit,
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
         release_tokens(
@@ -172,6 +180,9 @@ pub mod example_lockrelease_token_pool {
             &mut ctx.accounts.chain_config.base.outbound_rate_limit,
             ctx.accounts.state.config.list_enabled,
             &ctx.accounts.state.config.allow_list,
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
         lock_tokens(ctx.accounts.authority.key(), lock_or_burn)?;

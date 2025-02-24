@@ -22,6 +22,7 @@ type BaseConfig struct {
 	CanAcceptLiquidity    bool
 	ListEnabled           bool
 	AllowList             []ag_solanago.PublicKey
+	RmnRemote             ag_solanago.PublicKey
 }
 
 func (obj BaseConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -92,6 +93,11 @@ func (obj BaseConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	}
 	// Serialize `AllowList` param:
 	err = encoder.Encode(obj.AllowList)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -166,6 +172,11 @@ func (obj *BaseConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	}
 	// Deserialize `AllowList`:
 	err = decoder.Decode(&obj.AllowList)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
 	if err != nil {
 		return err
 	}
