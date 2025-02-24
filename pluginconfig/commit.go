@@ -280,6 +280,22 @@ func (c *CommitOffchainConfig) Validate() error {
 			c.ChainFeeAsyncObserverSyncFreq, c.ChainFeeAsyncObserverSyncTimeout)
 	}
 
+	// Options for multiple reports. These settings were added so that Solana can be configured
+	// to split merkle roots across multiple reports. The functions do not support RMN, so it is
+	// an error to use them unless RMNEnabled == false.
+	var errs []error
+	if c.RMNEnabled {
+		if c.MultipleReports {
+			errs = append(errs, fmt.Errorf("multipleReports is set with RMN enabled"))
+		}
+		if c.MaxMerkleRootsPerReport != 0 {
+			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport is set with RMN enabled"))
+		}
+		if len(errs) > 0 {
+			return errors.Join(errs...)
+		}
+	}
+
 	return nil
 }
 

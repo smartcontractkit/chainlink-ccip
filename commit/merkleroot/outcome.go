@@ -298,6 +298,7 @@ func checkForReportTransmission(
 	consensusObservation consensusObservation,
 ) Outcome {
 	offRampUpdated := false
+	// TODO: does this need to be updated to ensure all seqNum's are updated instead of just one?
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
