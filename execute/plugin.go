@@ -682,13 +682,13 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
 	decodedReport, err := p.validateReport(ctx, lggr, r)
-	if errors.Is(err, plugincommon.ErrValidationError) {
-		lggr.Infow("validation error", "err", err)
-		return false, fmt.Errorf("validating report: %w", err)
-	}
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
 		lggr.Infow("report not valid, not accepting: %w", err)
 		return false, nil
+	}
+	if err != nil {
+		lggr.Infow("validation error", "err", err)
+		return false, fmt.Errorf("validating report: %w", err)
 	}
 
 	// TODO: consider doing this in validateReport,
@@ -723,13 +723,13 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
 
 	decodedReport, err := p.validateReport(ctx, lggr, r)
-	if errors.Is(err, plugincommon.ErrValidationError) {
-		lggr.Infow("validation error", "err", err)
-		return false, fmt.Errorf("validating report: %w", err)
-	}
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
 		lggr.Infow("report not valid, not transmitting: %w", err)
 		return false, nil
+	}
+	if err != nil {
+		lggr.Infow("validation error", "err", err)
+		return false, fmt.Errorf("validating report: %w", err)
 	}
 
 	lggr.Infow("ShouldTransmitAttestedReport returns true, report accepted",
