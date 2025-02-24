@@ -29,7 +29,7 @@ message ExecObservation {
   map<uint64, SeqNumToMessage> seq_nums_to_msgs = 2; // chainSelector to seqNum to msg
   map<uint64, SeqNumToBytes> msg_hashes = 3; // chainSelector to seqNum to bytes32
   TokenDataObservations token_data_observations = 4;
-  repeated bytes costly_messages = 5; // Message IDs of costly messages
+  repeated bytes costly_messages = 5 [deprecated=true]; // DEPRECATED: Message IDs of costly messages
   map<uint64, StringAddrToNonce> nonces = 6;
   DiscoveryObservation contracts = 7;
   map<uint64, int32> f_chain = 8; // chainSelector to f
@@ -171,7 +171,7 @@ message CommitData {
   repeated uint64 executed_messages = 7;
   repeated Message messages = 8;
   repeated bytes hashes = 9; // Each bytes should be 32bytes
-  repeated bytes costly_messages = 10; // Message IDs of costly messages
+  repeated bytes costly_messages = 10 [deprecated=true]; // DEPRECATED: Message IDs of costly messages
   repeated MessageTokenData message_token_data = 11;
 }
 
