@@ -754,16 +754,16 @@ export type Mcm = {
             "type": "u8"
           },
           {
+            "name": "isFinalized",
+            "type": "bool"
+          },
+          {
             "name": "signatures",
             "type": {
               "vec": {
                 "defined": "Signature"
               }
             }
-          },
-          {
-            "name": "isFinalized",
-            "type": "bool"
           }
         ]
       }
@@ -1888,16 +1888,16 @@ export const IDL: Mcm = {
             "type": "u8"
           },
           {
+            "name": "isFinalized",
+            "type": "bool"
+          },
+          {
             "name": "signatures",
             "type": {
               "vec": {
                 "defined": "Signature"
               }
             }
-          },
-          {
-            "name": "isFinalized",
-            "type": "bool"
           }
         ]
       }
