@@ -154,6 +154,7 @@ type ReferenceAddresses struct {
 	Router             ag_solanago.PublicKey
 	FeeQuoter          ag_solanago.PublicKey
 	OfframpLookupTable ag_solanago.PublicKey
+	RmnRemote          ag_solanago.PublicKey
 }
 
 var ReferenceAddressesDiscriminator = [8]byte{99, 5, 216, 212, 250, 75, 74, 12}
@@ -181,6 +182,11 @@ func (obj ReferenceAddresses) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `OfframpLookupTable` param:
 	err = encoder.Encode(obj.OfframpLookupTable)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -218,6 +224,11 @@ func (obj *ReferenceAddresses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `OfframpLookupTable`:
 	err = decoder.Decode(&obj.OfframpLookupTable)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
 	if err != nil {
 		return err
 	}

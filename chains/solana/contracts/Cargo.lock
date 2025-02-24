@@ -671,6 +671,7 @@ dependencies = [
  "ethnum",
  "fee_quoter",
  "hex",
+ "rmn_remote",
  "solana-program",
 ]
 

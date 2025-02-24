@@ -81,12 +81,14 @@ pub struct Initialize<'info> {
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ReferenceAddresses::INIT_SPACE,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     /// CHECK: Router address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub router: UncheckedAccount<'info>,
     /// CHECK: FeeQuoter address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub fee_quoter: UncheckedAccount<'info>,
+    /// CHECK: RMNRemote address, to be persisted in reference_addresses. Just they key is used, no data is read.
+    pub rmn_remote: UncheckedAccount<'info>,
     /// CHECK: ALT address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub offramp_lookup_table: UncheckedAccount<'info>,
 
@@ -334,9 +336,9 @@ pub struct CommitReportContext<'info> {
     #[account(
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
-        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(
         mut,
@@ -372,7 +374,7 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: fee quoter program account, used to invoke fee quoter with price updates
     #[account(
-        address = reference_addresses.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
+        address = reference_addresses.load()?.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
@@ -389,9 +391,34 @@ pub struct CommitReportContext<'info> {
     #[account(
         seeds = [fee_quoter::context::seed::CONFIG],
         bump,
-        seeds::program = reference_addresses.fee_quoter,
+        seeds::program = reference_addresses.load()?.fee_quoter,
     )]
     pub fee_quoter_config: UncheckedAccount<'info>,
+
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = reference_addresses.load()?.rmn_remote @ CcipOfframpError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
     // remaining accounts
     // global state account (to update the last seen price sequence number)
     // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
@@ -410,9 +437,9 @@ pub struct PriceOnlyCommitReportContext<'info> {
     #[account(
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
-        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -431,7 +458,7 @@ pub struct PriceOnlyCommitReportContext<'info> {
 
     /// CHECK: fee quoter program account, used to invoke fee quoter with price updates
     #[account(
-        address = reference_addresses.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
+        address = reference_addresses.load()?.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
@@ -448,9 +475,34 @@ pub struct PriceOnlyCommitReportContext<'info> {
     #[account(
         seeds = [fee_quoter::context::seed::CONFIG],
         bump,
-        seeds::program = reference_addresses.fee_quoter,
+        seeds::program = reference_addresses.load()?.fee_quoter,
     )]
     pub fee_quoter_config: UncheckedAccount<'info>,
+
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = reference_addresses.load()?.rmn_remote @ CcipOfframpError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
     // remaining accounts
     // global state account (to update the last seen price sequence number)
     // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
@@ -472,9 +524,9 @@ pub struct ExecuteReportContext<'info> {
     #[account(
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
-        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(
         seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
@@ -498,10 +550,10 @@ pub struct ExecuteReportContext<'info> {
     /// so that token pools and receivers can then check that the caller is an actual offramp that
     /// has been registered in the router as such for that source chain.
     #[account(
-        owner = reference_addresses.router @ CcipOfframpError::InvalidInputsAllowedOfframpAccount, // this guarantees that it was initialized
+        owner = reference_addresses.load()?.router @ CcipOfframpError::InvalidInputsAllowedOfframpAccount, // this guarantees that it was initialized
         seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), offramp.key().as_ref()],
         bump,
-        seeds::program = reference_addresses.router,
+        seeds::program = reference_addresses.load()?.router,
     )]
     pub allowed_offramp: UncheckedAccount<'info>,
 
@@ -519,6 +571,31 @@ pub struct ExecuteReportContext<'info> {
 
     #[account(seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]
     pub token_pools_signer: Account<'info, ExternalExecutionConfig>,
+
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = reference_addresses.load()?.rmn_remote @ CcipOfframpError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
     // remaining accounts
     // [receiver_program, receiver_account, ...user specified accounts from message data for arbitrary messaging]
     // +

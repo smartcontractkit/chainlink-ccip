@@ -210,6 +210,9 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable["feeQuoterProgram"],
 			offrampTable["fqAllowedPriceUpdater"],
 			offrampTable["fqConfigPDA"],
+			config.RMNRemoteProgram,
+			config.RMNRemoteCursesPDA,
+			config.RMNRemoteConfigPDA,
 		)
 
 		for _, v := range addAccounts {
@@ -290,6 +293,9 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable["systemProgram"],
 			offrampTable["sysVarInstruction"],
 			offrampTable["tokenPoolSigner"],
+			config.RMNRemoteProgram,
+			config.RMNRemoteCursesPDA,
+			config.RMNRemoteConfigPDA,
 		)
 
 		for _, v := range addAccounts {
