@@ -881,12 +881,12 @@ func getCurseInfoFromCursedSubjects(
 		GlobalCurse: cursedSubjectsSet.Contains(GlobalCurseSubject),
 	}
 
-	for _, cursedSource := range cursedSubjectsSet.ToSlice() {
-		if cursedSource == GlobalCurseSubject {
+	for _, cursedSubject := range cursedSubjectsSet.ToSlice() {
+		if cursedSubject == GlobalCurseSubject {
 			continue
 		}
 
-		chainSelector := cciptypes.ChainSelector(binary.BigEndian.Uint64(cursedSource[8:]))
+		chainSelector := cciptypes.ChainSelector(binary.BigEndian.Uint64(cursedSubject[8:]))
 		if chainSelector == destChainSelector {
 			continue
 		}
