@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -170,7 +170,7 @@ func (op ObservationOptimizer) truncateLastCommit(
 	observation.CommitReports[chain] = commits
 	// Remove from the encoded size.
 	bytesTruncated = bytesTruncated + op.emptyEncodedSizes.CommitData + 4 // brackets, and commas
-	for seqNum, msg := range observation.Messages[chain] {
+	for seqNum := range observation.Messages[chain] {
 		if lastCommit.SequenceNumberRange.Contains(seqNum) {
 			// Remove the message from the observation.
 			delete(observation.Messages[chain], seqNum)
@@ -181,13 +181,6 @@ func (op ObservationOptimizer) truncateLastCommit(
 			bytesTruncated += op.emptyEncodedSizes.MessageAndTokenData
 			bytesTruncated = bytesTruncated + 2*op.emptyEncodedSizes.SeqNumMap
 			bytesTruncated += 4 // for brackets and commas
-			// Remove costly messages
-			for i, costlyMessage := range observation.CostlyMessages {
-				if costlyMessage == msg.Header.MessageID {
-					observation.CostlyMessages = internal.RemoveIthElement(observation.CostlyMessages, i)
-					break
-				}
-			}
 			// Leaving Nonces untouched
 		}
 	}
@@ -205,27 +198,11 @@ func (op ObservationOptimizer) truncateChain(
 	if _, ok := observation.CommitReports[chain]; !ok {
 		return observation
 	}
-	messageIDs := make(map[cciptypes.Bytes32]struct{})
-	// To remove costly message IDs we need to iterate over all messages and find the ones that belong to the chain.
-	for _, seqNumMap := range observation.Messages {
-		for _, message := range seqNumMap {
-			messageIDs[message.Header.MessageID] = struct{}{}
-		}
-	}
-
-	deleteCostlyMessages := func() {
-		for i, costlyMessage := range observation.CostlyMessages {
-			if _, ok := messageIDs[costlyMessage]; ok {
-				observation.CostlyMessages = append(observation.CostlyMessages[:i], observation.CostlyMessages[i+1:]...)
-			}
-		}
-	}
 
 	delete(observation.CommitReports, chain)
 	delete(observation.Messages, chain)
 	delete(observation.TokenData, chain)
 	delete(observation.Nonces, chain)
-	deleteCostlyMessages()
 
 	return observation
 }

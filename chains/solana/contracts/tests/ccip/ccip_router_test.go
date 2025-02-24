@@ -624,12 +624,18 @@ func TestCCIPRouter(t *testing.T) {
 
 			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{badInitConfigIx}, ccipAdmin, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
 
+			testReferenceAddresses := ccip_offramp.ReferenceAddresses{
+				Router:             [32]byte{1},
+				FeeQuoter:          [32]byte{2},
+				OfframpLookupTable: [32]byte{3},
+			}
+
 			// Now, actually initialize the offramp
 			initIx, err := ccip_offramp.NewInitializeInstruction(
 				config.OfframpReferenceAddressesPDA,
-				config.CcipRouterProgram,
-				config.FeeQuoterProgram,
-				lookupTableAddr,
+				testReferenceAddresses.Router,             // will be updated in later test
+				testReferenceAddresses.FeeQuoter,          // will be updated in later test
+				testReferenceAddresses.OfframpLookupTable, // will be updated in later test
 				config.OfframpStatePDA,
 				config.OfframpExternalExecutionConfigPDA,
 				config.OfframpTokenPoolsSignerPDA,
@@ -656,9 +662,9 @@ func TestCCIPRouter(t *testing.T) {
 
 			var refAddrEvent ccip.EventOfframpReferenceAddressesSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ReferenceAddressesSet", &refAddrEvent, config.PrintEvents))
-			require.Equal(t, config.CcipRouterProgram, refAddrEvent.Router)
-			require.Equal(t, config.FeeQuoterProgram, refAddrEvent.FeeQuoter)
-			require.Equal(t, lookupTableAddr, refAddrEvent.OfframpLookupTable)
+			require.Equal(t, testReferenceAddresses.Router, refAddrEvent.Router)
+			require.Equal(t, testReferenceAddresses.FeeQuoter, refAddrEvent.FeeQuoter)
+			require.Equal(t, testReferenceAddresses.OfframpLookupTable, refAddrEvent.OfframpLookupTable)
 
 			var configSetEvent ccip.EventOfframpConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
@@ -681,9 +687,59 @@ func TestCCIPRouter(t *testing.T) {
 			// check reference addresses
 			var referenceAddresses ccip_offramp.ReferenceAddresses
 			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &referenceAddresses))
-			require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
-			require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
-			require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router)
+			require.Equal(t, testReferenceAddresses.FeeQuoter, referenceAddresses.FeeQuoter)
+			require.Equal(t, testReferenceAddresses.OfframpLookupTable, referenceAddresses.OfframpLookupTable)
+			require.Equal(t, testReferenceAddresses.Router, referenceAddresses.Router)
+		})
+
+		t.Run("Offramp: Update reference addresses", func(t *testing.T) {
+			var lookupTableAddr solana.PublicKey
+			for k := range offrampLookupTable { // there is only one entry
+				lookupTableAddr = k
+			}
+
+			t.Run("When an unauthorized user tries to make the update, it fails", func(t *testing.T) {
+				ix, err := ccip_offramp.NewUpdateReferenceAddressesInstruction(
+					config.CcipRouterProgram,
+					config.FeeQuoterProgram,
+					lookupTableAddr,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					user.PublicKey(), // unauthorized user here
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip.Unauthorized_CcipRouterError.String()})
+			})
+
+			t.Run("When the admin makes the update, it succeeds", func(t *testing.T) {
+				ix, err := ccip_offramp.NewUpdateReferenceAddressesInstruction(
+					config.CcipRouterProgram,
+					config.FeeQuoterProgram,
+					lookupTableAddr,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				// check event
+				var refAddrEvent ccip.EventOfframpReferenceAddressesSet
+				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ReferenceAddressesSet", &refAddrEvent, config.PrintEvents))
+				require.Equal(t, config.CcipRouterProgram, refAddrEvent.Router)
+				require.Equal(t, config.FeeQuoterProgram, refAddrEvent.FeeQuoter)
+				require.Equal(t, lookupTableAddr, refAddrEvent.OfframpLookupTable)
+
+				// check state
+				var referenceAddresses ccip_offramp.ReferenceAddresses
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpReferenceAddressesPDA, config.DefaultCommitment, &referenceAddresses))
+				require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
+				require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
+				require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router)
+			})
 		})
 
 		t.Run("Offramp permissions", func(t *testing.T) {

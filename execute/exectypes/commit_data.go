@@ -35,11 +35,6 @@ type CommitData struct {
 	// Length of this slice should equal to the length of Messages slice.
 	Hashes []cciptypes.Bytes32 `json:"messageHashes"`
 
-	// CostlyMessages are the message IDs of messages that cost more to execute than was paid to execute them (i.e.
-	// source fee < execution cost). These messages will not be executed in the current round, but may be executed in
-	// future rounds (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
-	CostlyMessages []cciptypes.Bytes32 `json:"costlyMessages"`
-
 	// TokenData for each message.
 	// Length of this slice should equal to the length of Messages slice.
 	MessageTokenData []MessageTokenData `json:"messageTokenData"`

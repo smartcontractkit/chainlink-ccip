@@ -125,3 +125,10 @@ type EventFeeQuoterConfigSet struct {
 	Onramp             solana.PublicKey
 	DefaultCodeVersion fee_quoter.CodeVersion
 }
+
+type EventReferenceAddressesSet struct {
+	Discriminator      [8]byte
+	Router             solana.PublicKey
+	FeeQuoter          solana.PublicKey
+	OfframpLookupTable solana.PublicKey
+}
