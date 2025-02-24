@@ -190,8 +190,8 @@ func buildMerkleRootsOutcome(
 	var err error
 
 	if len(roots) > 0 && rmnEnabled {
-		if q.RMNSignatures == nil {
-			return Outcome{}, fmt.Errorf("RMN signatures are nil while RMN is enabled")
+		if !q.ContainsRmnSignatures() {
+			return Outcome{}, fmt.Errorf("RMN signatures are empty while RMN is enabled")
 		}
 
 		sigs, err = rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
