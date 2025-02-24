@@ -2767,7 +2767,7 @@ func TestCCIPRouter(t *testing.T) {
 				ExtraArgs: emptyEVMExtraArgsV2,
 			}
 
-			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
+			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -2808,7 +2808,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, token0.Mint.PublicKey(), tokenTransferFeeConfigUpdatedEvent.Token)
 			require.Equal(t, billing.MaxFeeUsdcents, tokenTransferFeeConfigUpdatedEvent.TokenTransferFeeConfig.MaxFeeUsdcents)
 
-			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
+			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token0BillingConfigPda))
 			raw.AccountMetaSlice.Append(solana.Meta(token0PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
@@ -2832,7 +2832,7 @@ func TestCCIPRouter(t *testing.T) {
 			token2BillingConfigPda := getFqTokenConfigPDA(token2.Mint.PublicKey())
 			token2PerChainPerConfigPda := getFqPerChainPerTokenConfigBillingPDA(token2.Mint.PublicKey())
 
-			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
+			raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token2BillingConfigPda))
 			raw.AccountMetaSlice.Append(solana.Meta(token2PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
@@ -2860,7 +2860,7 @@ func TestCCIPRouter(t *testing.T) {
 					ExtraArgs: emptyEVMExtraArgsV2,
 				}
 
-				raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
+				raw := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, message, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 				instruction, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -4108,7 +4108,7 @@ func TestCCIPRouter(t *testing.T) {
 						ExtraArgs: emptyEVMExtraArgsV2,
 					}
 					fqMsg := toFqMsg(message)
-					rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, token.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
+					rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, token.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 					ix, err := rawGetFeeIx.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -4219,7 +4219,7 @@ func TestCCIPRouter(t *testing.T) {
 			fqMsg := toFqMsg(message)
 
 			// getFee
-			rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA, config.RMNRemoteProgram, config.RMNRemoteCursesPDA, config.RMNRemoteConfigPDA)
+			rawGetFeeIx := fee_quoter.NewGetFeeInstruction(config.EvmChainSelector, fqMsg, config.FqConfigPDA, config.FqEvmDestChainPDA, wsol.fqBillingConfigPDA, link22.fqBillingConfigPDA)
 			ix, err := rawGetFeeIx.ValidateAndBuild()
 			require.NoError(t, err)
 

@@ -48,19 +48,13 @@ type GetFee struct {
 	// [2] = [] billingTokenConfig
 	//
 	// [3] = [] linkTokenConfig
-	//
-	// [4] = [] rmnRemote
-	//
-	// [5] = [] rmnRemoteCurses
-	//
-	// [6] = [] rmnRemoteConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewGetFeeInstructionBuilder creates a new `GetFee` instruction builder.
 func NewGetFeeInstructionBuilder() *GetFee {
 	nd := &GetFee{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 7),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -121,39 +115,6 @@ func (inst *GetFee) GetLinkTokenConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
-// SetRmnRemoteAccount sets the "rmnRemote" account.
-func (inst *GetFee) SetRmnRemoteAccount(rmnRemote ag_solanago.PublicKey) *GetFee {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(rmnRemote)
-	return inst
-}
-
-// GetRmnRemoteAccount gets the "rmnRemote" account.
-func (inst *GetFee) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
-}
-
-// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
-func (inst *GetFee) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *GetFee {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(rmnRemoteCurses)
-	return inst
-}
-
-// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
-func (inst *GetFee) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
-}
-
-// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
-func (inst *GetFee) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *GetFee {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(rmnRemoteConfig)
-	return inst
-}
-
-// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
-func (inst *GetFee) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
-}
-
 func (inst GetFee) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -196,15 +157,6 @@ func (inst *GetFee) Validate() error {
 		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.LinkTokenConfig is not set")
 		}
-		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.RmnRemote is not set")
-		}
-		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.RmnRemoteCurses is not set")
-		}
-		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.RmnRemoteConfig is not set")
-		}
 	}
 	return nil
 }
@@ -224,14 +176,11 @@ func (inst *GetFee) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("            config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("         destChain", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("billingTokenConfig", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("   linkTokenConfig", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("         rmnRemote", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("   rmnRemoteCurses", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("   rmnRemoteConfig", inst.AccountMetaSlice[6]))
 					})
 				})
 		})
@@ -273,18 +222,12 @@ func NewGetFeeInstruction(
 	config ag_solanago.PublicKey,
 	destChain ag_solanago.PublicKey,
 	billingTokenConfig ag_solanago.PublicKey,
-	linkTokenConfig ag_solanago.PublicKey,
-	rmnRemote ag_solanago.PublicKey,
-	rmnRemoteCurses ag_solanago.PublicKey,
-	rmnRemoteConfig ag_solanago.PublicKey) *GetFee {
+	linkTokenConfig ag_solanago.PublicKey) *GetFee {
 	return NewGetFeeInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
 		SetMessage(message).
 		SetConfigAccount(config).
 		SetDestChainAccount(destChain).
 		SetBillingTokenConfigAccount(billingTokenConfig).
-		SetLinkTokenConfigAccount(linkTokenConfig).
-		SetRmnRemoteAccount(rmnRemote).
-		SetRmnRemoteCursesAccount(rmnRemoteCurses).
-		SetRmnRemoteConfigAccount(rmnRemoteConfig)
+		SetLinkTokenConfigAccount(linkTokenConfig)
 }
