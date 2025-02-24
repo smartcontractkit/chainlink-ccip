@@ -187,6 +187,9 @@ fn internal_execute<'info>(
             accs.pool_signer.to_account_info(),
             accs.pool_token_account.to_account_info(),
             accs.pool_chain_config.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             accs.user_token_account.to_account_info(),
         ];
         acc_infos.extend_from_slice(accs.remaining_accounts);

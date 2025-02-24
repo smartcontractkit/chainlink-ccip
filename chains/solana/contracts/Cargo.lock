@@ -410,6 +410,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "rmn_remote",
  "solana-program",
  "spl-math",
 ]
@@ -967,6 +968,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
+ "rmn_remote",
  "solana-program",
  "spl-math",
 ]
@@ -978,6 +980,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
+ "rmn_remote",
  "solana-program",
  "spl-math",
 ]
@@ -2464,6 +2467,7 @@ dependencies = [
  "base-token-pool",
  "example-burnmint-token-pool",
  "example-lockrelease-token-pool",
+ "rmn_remote",
  "solana-program",
  "spl-math",
 ]

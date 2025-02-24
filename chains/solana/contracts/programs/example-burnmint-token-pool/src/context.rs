@@ -122,6 +122,31 @@ pub struct TokenOfframp<'info> {
     )]
     pub chain_config: Account<'info, ChainConfig>,
 
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = state.config.rmn_remote @ CcipTokenPoolError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = state.config.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = state.config.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
+
     // User specific accounts ---------------
     #[account(mut, address = get_associated_token_address_with_program_id(&release_or_mint.receiver, &mint.key(), &token_program.key()))]
     pub receiver_token_account: InterfaceAccount<'info, TokenAccount>,
@@ -161,6 +186,30 @@ pub struct TokenOnramp<'info> {
         seeds = [POOL_CHAINCONFIG_SEED, lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
         bump,
     )]
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = state.config.rmn_remote @ CcipTokenPoolError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = state.config.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = state.config.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
     pub chain_config: Account<'info, ChainConfig>,
 }
 

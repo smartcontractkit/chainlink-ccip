@@ -30,6 +30,10 @@
         {
           "name": "router",
           "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
         }
       ]
     },
@@ -410,6 +414,21 @@
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "receiverTokenAccount",
           "isMut": true,
           "isSigner": false
@@ -461,8 +480,23 @@
           "isSigner": false
         },
         {
-          "name": "chainConfig",
+          "name": "rmnRemote",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "chainConfig",
+          "isMut": false,
           "isSigner": false
         }
       ],

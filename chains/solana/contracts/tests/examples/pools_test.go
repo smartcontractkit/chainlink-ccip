@@ -115,7 +115,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("setup", func(t *testing.T) {
-						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)
@@ -170,6 +170,9 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							mint,
 							poolSigner,
 							poolTokenAccount,
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 							p.Chain[config.EvmChainSelector],
 						).ValidateAndBuild()
 						require.NoError(t, err)
@@ -207,6 +210,9 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							poolSigner,
 							poolTokenAccount,
 							p.Chain[config.EvmChainSelector],
+							config.RMNRemoteProgram,
+							config.RMNRemoteCursesPDA,
+							config.RMNRemoteConfigPDA,
 							p.User[admin.PublicKey()],
 						).ValidateAndBuild()
 						require.NoError(t, err)
