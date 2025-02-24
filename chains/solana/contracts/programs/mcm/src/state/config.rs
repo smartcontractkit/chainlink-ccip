@@ -10,8 +10,8 @@ pub struct ConfigSigners {
 }
 
 impl ConfigSigners {
-    // 8 (discriminator) + 4 (vec len) + (20 * total_signers) +1(total_signers) + 1 (is_finalized)
     pub const fn space(total_signers: usize) -> usize {
+        // discriminator + vec prefix + (20 * total_signers) + total_signers + is_finalized
         8 + 4 + (20 * total_signers) + 1 + 1
     }
 }
@@ -40,18 +40,11 @@ pub struct MultisigConfig {
 }
 
 impl MultisigConfig {
-    pub const INIT_SPACE: usize = 8 + // chain_id (u64)
-        NUM_GROUPS + // group_quorums [u8; NUM_GROUPS]
-        NUM_GROUPS + // group_parents [u8; NUM_GROUPS]
-        32 + // owner (Pubkey)
-        32 + // proposed_owner (Pubkey)
-        4 + // string prefix for multisig_id
-        MULTISIG_ID_PADDED + // fixed max multisig_id length from initialization
-        4; // empty vec prefix for signers
+    // chain_id (u64) + group_quorums + group_parents + owner + proposed_owner + multisig_id + vec prefix for signers
+    pub const INIT_SPACE: usize = 8 + NUM_GROUPS + NUM_GROUPS + 32 + 32 + MULTISIG_ID_PADDED + 4;
 
     // for realloc - only need to account for signers
     pub fn space_with_signers(num_signers: usize) -> usize {
-        Self::INIT_SPACE +      // Base space including fixed multisig_id
-        num_signers * McmSigner::INIT_SPACE // Just add signers space
+        Self::INIT_SPACE + num_signers * McmSigner::INIT_SPACE
     }
 }
