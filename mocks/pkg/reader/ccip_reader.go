@@ -773,9 +773,9 @@ func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// GetRmnCurseInfo provides a mock function with given fields: ctx, sourceChainSelectors
-func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []ccipocr3.ChainSelector) (*reader.CurseInfo, error) {
-	ret := _m.Called(ctx, sourceChainSelectors)
+// GetRmnCurseInfo provides a mock function with given fields: ctx
+func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context) (*reader.CurseInfo, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRmnCurseInfo")
@@ -783,19 +783,19 @@ func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context, sourceChainSelect
 
 	var r0 *reader.CurseInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (*reader.CurseInfo, error)); ok {
-		return rf(ctx, sourceChainSelectors)
+	if rf, ok := ret.Get(0).(func(context.Context) (*reader.CurseInfo, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) *reader.CurseInfo); ok {
-		r0 = rf(ctx, sourceChainSelectors)
+	if rf, ok := ret.Get(0).(func(context.Context) *reader.CurseInfo); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*reader.CurseInfo)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.ChainSelector) error); ok {
-		r1 = rf(ctx, sourceChainSelectors)
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -810,14 +810,13 @@ type MockCCIPReader_GetRmnCurseInfo_Call struct {
 
 // GetRmnCurseInfo is a helper method to define mock.On call
 //   - ctx context.Context
-//   - sourceChainSelectors []ccipocr3.ChainSelector
-func (_e *MockCCIPReader_Expecter) GetRmnCurseInfo(ctx interface{}, sourceChainSelectors interface{}) *MockCCIPReader_GetRmnCurseInfo_Call {
-	return &MockCCIPReader_GetRmnCurseInfo_Call{Call: _e.mock.On("GetRmnCurseInfo", ctx, sourceChainSelectors)}
+func (_e *MockCCIPReader_Expecter) GetRmnCurseInfo(ctx interface{}) *MockCCIPReader_GetRmnCurseInfo_Call {
+	return &MockCCIPReader_GetRmnCurseInfo_Call{Call: _e.mock.On("GetRmnCurseInfo", ctx)}
 }
 
-func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Run(run func(ctx context.Context, sourceChainSelectors []ccipocr3.ChainSelector)) *MockCCIPReader_GetRmnCurseInfo_Call {
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Run(run func(ctx context.Context)) *MockCCIPReader_GetRmnCurseInfo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -827,7 +826,7 @@ func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Return(_a0 *reader.CurseInfo, _a1
 	return _c
 }
 
-func (_c *MockCCIPReader_GetRmnCurseInfo_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (*reader.CurseInfo, error)) *MockCCIPReader_GetRmnCurseInfo_Call {
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) RunAndReturn(run func(context.Context) (*reader.CurseInfo, error)) *MockCCIPReader_GetRmnCurseInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

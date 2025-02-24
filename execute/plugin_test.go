@@ -1111,7 +1111,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
 					Return(&reader2.CurseInfo{
 						CursedSourceChains: map[cciptypes.ChainSelector]bool{
 							cciptypes.ChainSelector(sourceChain): false,
@@ -1133,7 +1133,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
 					Return(&reader2.CurseInfo{}, fmt.Errorf("test error"))
 
 				homeChain := basicHomeChain()
@@ -1153,7 +1153,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
 					Return(&reader2.CurseInfo{GlobalCurse: true}, nil)
 
 				homeChain := basicHomeChain()
@@ -1173,7 +1173,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
 					Return(&reader2.CurseInfo{CursedDestination: true}, nil)
 
 				homeChain := basicHomeChain()
@@ -1193,7 +1193,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				*readerpkg_mock.MockCCIPReader,
 			) {
 				mockReader := basicCCIPReader()
-				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
+				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
 					Return(&reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{
 						cciptypes.ChainSelector(sourceChain): true,
 					},

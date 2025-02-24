@@ -682,7 +682,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		func(r cciptypes.ExecutePluginReportSingleChain) cciptypes.ChainSelector {
 			return r.SourceChainSelector
 		})
-	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
+	isCursed, err := plugincommon.IsReportCursed(ctx, lggr, p.ccipReader, sourceChains)
 	if err != nil {
 		lggr.Errorw(
 			"report not accepted due to curse checking error",

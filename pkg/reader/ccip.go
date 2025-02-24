@@ -842,10 +842,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Remo
 
 // GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 // from the destination chain RMN remote contract.
-func (r *ccipChainReader) GetRmnCurseInfo(
-	ctx context.Context,
-	sourceChainSelectors []cciptypes.ChainSelector,
-) (*CurseInfo, error) {
+func (r *ccipChainReader) GetRmnCurseInfo(ctx context.Context) (*CurseInfo, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
@@ -871,32 +868,34 @@ func (r *ccipChainReader) GetRmnCurseInfo(
 	lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
 
 	return getCurseInfoFromCursedSubjects(
-		lggr,
 		mapset.NewSet(cursedSubjects.CursedSubjects...),
 		r.destChain,
-		sourceChainSelectors,
 	), nil
 }
 
 func getCurseInfoFromCursedSubjects(
-	lggr logger.Logger,
 	cursedSubjectsSet mapset.Set[[16]byte],
 	destChainSelector cciptypes.ChainSelector,
-	sourceChainSelectors []cciptypes.ChainSelector,
 ) *CurseInfo {
 	curseInfo := &CurseInfo{
-		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, len(sourceChainSelectors)),
+		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, cursedSubjectsSet.Cardinality()),
 		CursedDestination: cursedSubjectsSet.Contains(GlobalCurseSubject) ||
 			cursedSubjectsSet.Contains(chainSelectorToBytes16(destChainSelector)),
 		GlobalCurse: cursedSubjectsSet.Contains(GlobalCurseSubject),
 	}
 
-	for _, ch := range sourceChainSelectors {
-		chainSelB16 := chainSelectorToBytes16(ch)
-		lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
-		curseInfo.CursedSourceChains[ch] = cursedSubjectsSet.Contains(chainSelB16)
-	}
+	for _, cursedSubject := range cursedSubjectsSet.ToSlice() {
+		if cursedSubject == GlobalCurseSubject {
+			continue
+		}
 
+		chainSelector := cciptypes.ChainSelector(binary.BigEndian.Uint64(cursedSubject[8:]))
+		if chainSelector == destChainSelector {
+			continue
+		}
+
+		curseInfo.CursedSourceChains[chainSelector] = true
+	}
 	return curseInfo
 }
 
