@@ -11,7 +11,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
@@ -68,7 +67,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 
 	// No state, report only generated in Filter state so cache is not updated.
 	{
-		enc, err := jsonOcrTypeCodec.EncodeOutcome(outcome)
+		enc, err := ocrTypeCodec.EncodeOutcome(outcome)
 		require.NoError(t, err)
 
 		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
@@ -86,7 +85,7 @@ func Test_Observation_CacheUpdate(t *testing.T) {
 	// Filter state, cache is updated.
 	{
 		outcome.State = exectypes.Filter
-		enc, err := jsonOcrTypeCodec.EncodeOutcome(outcome)
+		enc, err := ocrTypeCodec.EncodeOutcome(outcome)
 		require.NoError(t, err)
 
 		outCtx := ocr3types.OutcomeContext{PreviousOutcome: enc}
@@ -110,18 +109,16 @@ func Test_getMessagesObservation(t *testing.T) {
 	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
 	msgHasher := mocks.NewMessageHasher()
 	tokenDataObserver := tokendata.NoopTokenDataObserver{}
-	costlyMessageObserver := costlymessages.NoopObserver{}
 
 	//emptyMsgHash, err := msgHasher.Hash(ctx, cciptypes.Message{})
 	//require.NoError(t, err)
 	// Set up the plugin with mock objects
 	plugin := &Plugin{
-		lggr:                  mocks.NullLogger,
-		ccipReader:            ccipReader,
-		msgHasher:             msgHasher,
-		tokenDataObserver:     &tokenDataObserver,
-		costlyMessageObserver: &costlyMessageObserver,
-		ocrTypeCodec:          jsonOcrTypeCodec,
+		lggr:              mocks.NullLogger,
+		ccipReader:        ccipReader,
+		msgHasher:         msgHasher,
+		tokenDataObserver: &tokenDataObserver,
+		ocrTypeCodec:      ocrTypeCodec,
 	}
 
 	tests := []struct {
@@ -164,7 +161,6 @@ func Test_getMessagesObservation(t *testing.T) {
 						3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
 					},
 				},
-				CostlyMessages: []cciptypes.Bytes32{},
 				TokenData: exectypes.TokenDataObservations{
 					1: {
 						1: exectypes.NewMessageTokenData(),
@@ -217,7 +213,6 @@ func Test_getMessagesObservation(t *testing.T) {
 						12: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 12}},
 					},
 				},
-				CostlyMessages: []cciptypes.Bytes32{},
 				TokenData: exectypes.TokenDataObservations{
 					1: {
 						1:  exectypes.NewMessageTokenData(),

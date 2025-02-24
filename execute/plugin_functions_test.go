@@ -628,7 +628,7 @@ func Test_combineReportsAndMessages(t *testing.T) {
 
 func Test_decodeAttributedObservations(t *testing.T) {
 	mustEncode := func(obs exectypes.Observation) []byte {
-		enc, err := jsonOcrTypeCodec.EncodeObservation(obs)
+		enc, err := ocrTypeCodec.EncodeObservation(obs)
 		if err != nil {
 			t.Fatal("Unable to encode")
 		}
@@ -663,7 +663,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							1: {{MerkleRoot: cciptypes.Bytes32{1}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
 						},
 					},
 				},
@@ -695,7 +695,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							1: {{MerkleRoot: cciptypes.Bytes32{1}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
 						},
 					},
 				},
@@ -703,7 +703,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(2),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							2: {{MerkleRoot: cciptypes.Bytes32{2}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
 						},
 					},
 				},
@@ -724,7 +724,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := decodeAttributedObservations(tt.args, jsonOcrTypeCodec)
+			got, err := decodeAttributedObservations(tt.args, ocrTypeCodec)
 			if !tt.wantErr(t, err, fmt.Sprintf("decodeAttributedObservations(%v)", tt.args)) {
 				return
 			}
@@ -1372,80 +1372,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 	}
 }
 
-func Test_mergeCostlyMessages(t *testing.T) {
-	tests := []struct {
-		name       string
-		aos        []plugincommon.AttributedObservation[exectypes.Observation]
-		fChainDest int
-		want       []cciptypes.Bytes32
-	}{
-		{
-			name:       "no observations",
-			aos:        []plugincommon.AttributedObservation[exectypes.Observation]{},
-			fChainDest: 1,
-			want:       nil,
-		},
-		{
-			name: "observations below threshold",
-			aos: []plugincommon.AttributedObservation[exectypes.Observation]{
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-			},
-			fChainDest: 3,
-			want:       nil,
-		},
-		{
-			name: "observations above threshold",
-			aos: []plugincommon.AttributedObservation[exectypes.Observation]{
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-			},
-			fChainDest: 2,
-			want: []cciptypes.Bytes32{
-				{0x01},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := mergeCostlyMessages(tt.aos, tt.fChainDest)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func Test_allSeqNrsObserved(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -1489,64 +1415,6 @@ func Test_allSeqNrsObserved(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := msgsConformToSeqRange(tt.msgs, tt.numberRange); got != tt.want {
 				t.Errorf("msgsConformToSeqRange() = %v, wantPending %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_validateCostlyMessagesObservations(t *testing.T) {
-	tests := []struct {
-		name           string
-		observedMsgs   exectypes.MessageObservations
-		costlyMessages []cciptypes.Bytes32
-		expErr         bool
-	}{
-		{
-			name: "ValidCostlyMessages",
-			observedMsgs: exectypes.MessageObservations{
-				1: {
-					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
-					2: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x02}}},
-				},
-			},
-			costlyMessages: []cciptypes.Bytes32{{0x01}, {0x02}},
-			expErr:         false,
-		},
-		{
-			name: "CostlyMessageNotFound",
-			observedMsgs: exectypes.MessageObservations{
-				1: {
-					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
-				},
-			},
-			costlyMessages: []cciptypes.Bytes32{{0x02}},
-			expErr:         true,
-		},
-		{
-			name: "EmptyCostlyMessages",
-			observedMsgs: exectypes.MessageObservations{
-				1: {
-					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
-				},
-			},
-			costlyMessages: []cciptypes.Bytes32{},
-			expErr:         false,
-		},
-		{
-			name:           "EmptyObservedMessages",
-			observedMsgs:   exectypes.MessageObservations{},
-			costlyMessages: []cciptypes.Bytes32{{0x01}},
-			expErr:         true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			err := validateCostlyMessagesObservations(tc.observedMsgs, tc.costlyMessages)
-			if tc.expErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
 			}
 		})
 	}

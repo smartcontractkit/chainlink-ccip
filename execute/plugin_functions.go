@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -87,24 +87,6 @@ func validateTokenDataObservations(
 		}
 	}
 
-	return nil
-}
-
-// validateCostlyMessagesObservations validates that all costly messages belong to already observed messages
-func validateCostlyMessagesObservations(
-	observedMsgs exectypes.MessageObservations,
-	costlyMessages []cciptypes.Bytes32,
-) error {
-	msgs := observedMsgs.Flatten()
-	msgsIDMap := make(map[cciptypes.Bytes32]struct{})
-	for _, msg := range msgs {
-		msgsIDMap[msg.Header.MessageID] = struct{}{}
-	}
-	for _, id := range costlyMessages {
-		if _, ok := msgsIDMap[id]; !ok {
-			return fmt.Errorf("costly message %s not found in observed messages", id)
-		}
-	}
 	return nil
 }
 
@@ -596,30 +578,6 @@ func mergeNonceObservations(
 	return results
 }
 
-// mergeCostlyMessages merges all costly message observations. A message is considered costly if it is observed by more
-// than `fChainDest` observers.
-func mergeCostlyMessages(
-	aos []plugincommon.AttributedObservation[exectypes.Observation],
-	fChainDest int,
-) []cciptypes.Bytes32 {
-	costlyMessages := mapset.NewSet[cciptypes.Bytes32]()
-	counts := make(map[cciptypes.Bytes32]int)
-	for _, ao := range aos {
-		for _, costlyMessage := range ao.Observation.CostlyMessages {
-			counts[costlyMessage]++
-			if consensus.GteFPlusOne(fChainDest, counts[costlyMessage]) {
-				costlyMessages.Add(costlyMessage)
-			}
-		}
-	}
-
-	if costlyMessages.Cardinality() == 0 {
-		return nil
-	}
-
-	return costlyMessages.ToSlice()
-}
-
 // getConsensusObservation merges all attributed observations into a single observation based on which values have
 // consensus among the observers.
 func getConsensusObservation(
@@ -661,9 +619,6 @@ func getConsensusObservation(
 	mergedHashes := mergeMessageHashes(lggr, aos, fChain)
 	lggr.Debugw("merged message hashes", "mergedHashes", mergedHashes)
 
-	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])
-	lggr.Debugw("merged costly messages", "mergedCostlyMessages", mergedCostlyMessages)
-
 	mergedNonceObservations :=
 		mergeNonceObservations(aos, fChain[destChainSelector])
 	lggr.Debugw("merged nonce observations", "mergedNonceObservations", mergedNonceObservations)
@@ -671,7 +626,6 @@ func getConsensusObservation(
 	observation := exectypes.NewObservation(
 		mergedCommitObservations,
 		mergedMessageObservations,
-		mergedCostlyMessages,
 		mergedTokenObservations,
 		mergedNonceObservations,
 		dt.Observation{},

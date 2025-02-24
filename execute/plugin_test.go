@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -38,13 +39,10 @@ import (
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
-
-var jsonOcrTypeCodec = ocrtypecodec.NewExecCodecJSON()
 
 func genRandomChainReports(numReports, numMsgsPerReport int) []cciptypes.ExecutePluginReportSingleChain {
 	// generate random chain reports with unique (random) source
@@ -460,7 +458,7 @@ func TestPlugin_ObservationQuorum(t *testing.T) {
 
 func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 	ctx := tests.Context(t)
-	p := &Plugin{ocrTypeCodec: jsonOcrTypeCodec}
+	p := &Plugin{ocrTypeCodec: ocrTypeCodec}
 	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: []byte("not a valid observation"),
 	})
@@ -471,10 +469,10 @@ func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
 	ctx := tests.Context(t)
 	p := &Plugin{
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
-		Observation: []byte(`{"oracleID": "0xdeadbeef"}`),
+		Observation: []byte{},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "error finding supported chains by node: oracle ID 0 not found in oracleIDToP2pID")
@@ -493,7 +491,7 @@ func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
 			0: {},
 		},
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 		lggr:         lggr,
 	}
 
@@ -505,14 +503,14 @@ func TestPlugin_ValidateObservation_IneligibleMessageObserver(t *testing.T) {
 				},
 			},
 		},
-	}, nil, nil, nil, dt.Observation{}, nil)
-	encoded, err := jsonOcrTypeCodec.EncodeObservation(observation)
+	}, nil, nil, dt.Observation{}, nil)
+	encoded, err := ocrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
 
 	prevOutcome := exectypes.Outcome{
 		State: exectypes.GetCommitReports,
 	}
-	encodedPrevOutcome, err := jsonOcrTypeCodec.EncodeOutcome(prevOutcome)
+	encodedPrevOutcome, err := ocrTypeCodec.EncodeOutcome(prevOutcome)
 	require.NoError(t, err)
 	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{PreviousOutcome: encodedPrevOutcome}, types.Query{},
 		types.AttributedObservation{
@@ -536,7 +534,7 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 			0: {},
 		},
 		lggr:         lggr,
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
@@ -549,9 +547,9 @@ func TestPlugin_ValidateObservation_IneligibleCommitReportsObserver(t *testing.T
 		},
 	}
 	observation := exectypes.NewObservation(
-		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+		commitReports, nil, nil, nil, dt.Observation{}, nil,
 	)
-	encoded, err := jsonOcrTypeCodec.EncodeObservation(observation)
+	encoded, err := ocrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
 	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: encoded,
@@ -575,7 +573,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
 			0: {},
 		},
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 
 	// Reports with duplicate roots.
@@ -587,9 +585,9 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 		},
 	}
 	observation := exectypes.NewObservation(
-		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+		commitReports, nil, nil, nil, dt.Observation{}, nil,
 	)
-	encoded, err := jsonOcrTypeCodec.EncodeObservation(observation)
+	encoded, err := ocrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
 	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: encoded,
@@ -614,7 +612,7 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 			0: {},
 		},
 		discovery:    mockDiscoveryProcessor,
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 
 	// Reports with duplicate roots.
@@ -625,9 +623,9 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 		},
 	}
 	observation := exectypes.NewObservation(
-		commitReports, nil, nil, nil, nil, dt.Observation{}, nil,
+		commitReports, nil, nil, nil, dt.Observation{}, nil,
 	)
-	encoded, err := jsonOcrTypeCodec.EncodeObservation(observation)
+	encoded, err := ocrTypeCodec.EncodeObservation(observation)
 	require.NoError(t, err)
 	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: encoded,
@@ -638,13 +636,13 @@ func TestPlugin_ValidateObservation_CallsDiscoveryValidateObservation(t *testing
 func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{
 		PreviousOutcome: []byte("not a valid observation"),
 	}, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to decode previous outcome: invalid character")
+	assert.Contains(t, err.Error(), "unable to decode previous outcome: proto unmarshal ExecOutcome")
 }
 
 func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
@@ -657,7 +655,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 		homeChain:       mockHomeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{},
 		lggr:            lggr,
-		ocrTypeCodec:    jsonOcrTypeCodec,
+		ocrTypeCodec:    ocrTypeCodec,
 	}
 
 	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{}, nil)
@@ -675,9 +673,9 @@ func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
-	observation, err := jsonOcrTypeCodec.EncodeObservation(exectypes.Observation{
+	observation, err := ocrTypeCodec.EncodeObservation(exectypes.Observation{
 		Contracts: dt.Observation{}, FChain: fChainMap,
 	})
 	require.NoError(t, err)
@@ -694,7 +692,7 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 	ctx := tests.Context(t)
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil,
 		[]types.AttributedObservation{
@@ -704,7 +702,7 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 			},
 		})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to decode observations: invalid character")
+	assert.Contains(t, err.Error(), "unable to decode observations: proto unmarshal ExecObservation")
 }
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {
@@ -718,9 +716,9 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 			F: 1,
 		},
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
-	observation, err := jsonOcrTypeCodec.EncodeObservation(exectypes.Observation{
+	observation, err := ocrTypeCodec.EncodeObservation(exectypes.Observation{
 		Contracts: dt.Observation{}, FChain: fChainMap,
 	})
 	require.NoError(t, err)
@@ -743,13 +741,13 @@ func TestPlugin_Outcome_CommitReportsMergeMissingValidator_Skips(t *testing.T) {
 
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {},
 	}
-	observation, err := jsonOcrTypeCodec.EncodeObservation(exectypes.Observation{
+	observation, err := ocrTypeCodec.EncodeObservation(exectypes.Observation{
 		CommitReports: commitReports,
 		Contracts:     dt.Observation{},
 		FChain:        fChainMap,
@@ -773,7 +771,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 
 	// map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
@@ -786,7 +784,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 			},
 		},
 	}
-	observation, err := jsonOcrTypeCodec.EncodeObservation(exectypes.Observation{
+	observation, err := ocrTypeCodec.EncodeObservation(exectypes.Observation{
 		Messages: messages, Contracts: dt.Observation{}, FChain: fChainMap,
 	})
 	require.NoError(t, err)
@@ -803,7 +801,7 @@ func TestPlugin_Reports_UnableToParse(t *testing.T) {
 	ctx := tests.Context(t)
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: ocrTypeCodec,
 	}
 	_, err := p.Reports(ctx, 0, ocr3types.Outcome("not a valid observation"))
 	require.Error(t, err)
@@ -815,8 +813,8 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
-	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: jsonOcrTypeCodec}
-	report, err := jsonOcrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
+	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: ocrTypeCodec}
+	report, err := ocrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
 		exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}))
 	require.NoError(t, err)
 
@@ -1459,10 +1457,13 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 			Observer:    0,
 		},
 	}
+
+	jsonCodec := ocrtypecodec.NewExecCodecJSON()
+
 	ctx := tests.Context(t)
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		ocrTypeCodec: jsonOcrTypeCodec,
+		ocrTypeCodec: jsonCodec,
 		destChain:    3478487238524512106,
 		observer:     &metrics.Noop{},
 	}
@@ -1475,8 +1476,7 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 	}, nil, attObs)
 	require.NoError(t, err)
 
-	//ocrTypeCodec := ocrtypecodec.NewExecCodecJSON()
-	decodedOutcome, err := ocrTypeCodec.DecodeOutcome(outcomeBytes)
+	decodedOutcome, err := jsonCodec.DecodeOutcome(outcomeBytes)
 	require.NoError(t, err)
 	// assert uniqueness of merkle roots in commitreports
 	merkleRoots := make(map[string]struct{})

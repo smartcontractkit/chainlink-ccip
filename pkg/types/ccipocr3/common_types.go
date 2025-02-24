@@ -165,6 +165,13 @@ func NewBigIntFromInt64(i int64) BigInt {
 	return BigInt{Int: big.NewInt(i)}
 }
 
+func (b BigInt) Bytes() []byte {
+	if b.Int == nil {
+		return []byte{}
+	}
+	return b.Int.Bytes()
+}
+
 func (b BigInt) MarshalJSON() ([]byte, error) {
 	if b.Int == nil {
 		return []byte("null"), nil
