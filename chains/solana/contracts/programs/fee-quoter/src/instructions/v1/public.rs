@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::native_mint;
 use ethnum::U256;
-use rmn_remote::state::CurseSubject;
 use std::ops::AddAssign;
 
 use crate::context::GetFee;
@@ -44,8 +43,6 @@ impl Public for Impl {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<GetFeeResult> {
-        verify_uncursed_cpi(&ctx, dest_chain_selector)?;
-
         let remaining_accounts = &ctx.remaining_accounts;
         let message = &message;
         require_eq!(
@@ -123,23 +120,6 @@ impl Public for Impl {
             processed_extra_args,
         })
     }
-}
-
-fn verify_uncursed_cpi<'info>(
-    ctx: &Context<'_, '_, 'info, 'info, GetFee<'_>>,
-    dest_chain_selector: u64,
-) -> Result<()> {
-    let cpi_program = ctx.accounts.rmn_remote.to_account_info();
-    let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
-        config: ctx.accounts.rmn_remote_config.to_account_info(),
-        curses: ctx.accounts.rmn_remote_curses.to_account_info(),
-    };
-    let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
-    rmn_remote::cpi::verify_not_cursed(
-        cpi_context,
-        CurseSubject::from_chain_selector(dest_chain_selector),
-    )?;
-    Ok(())
 }
 
 // Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)

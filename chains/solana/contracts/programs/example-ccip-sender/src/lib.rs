@@ -84,9 +84,6 @@ pub mod example_ccip_sender {
                 ctx.accounts
                     .ccip_fee_quoter_link_token_config
                     .to_account_info(),
-                ctx.accounts.ccip_rmn_remote.to_account_info(),
-                ctx.accounts.ccip_rmn_remote_curses.to_account_info(),
-                ctx.accounts.ccip_rmn_remote_config.to_account_info(),
             ]
             .to_vec();
 

@@ -125,31 +125,6 @@ pub struct GetFee<'info> {
         bump,
     )]
     pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
-
-    ////////////////////
-    // RMN Remote CPI //
-    ////////////////////
-    /// CHECK: This is the account for the RMN Remote program
-    #[account(
-        address = config.rmn_remote @ FeeQuoterError::InvalidRMNRemoteAddress,
-    )]
-    pub rmn_remote: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
-        bump,
-        seeds::program = config.rmn_remote,
-    )]
-    pub rmn_remote_curses: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
-        bump,
-        seeds::program = config.rmn_remote,
-    )]
-    pub rmn_remote_config: UncheckedAccount<'info>,
     //
     // remaining_accounts:
     // - First all BillingTokenConfigWrapper accounts (one per token transferred)

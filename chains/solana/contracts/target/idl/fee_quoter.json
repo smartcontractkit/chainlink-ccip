@@ -602,21 +602,6 @@
           "name": "linkTokenConfig",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "rmnRemote",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
