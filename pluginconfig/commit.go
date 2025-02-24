@@ -146,6 +146,12 @@ type CommitOffchainConfig struct {
 
 	// ChainFeeAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch token prices).
 	ChainFeeAsyncObserverSyncTimeout time.Duration `json:"chainFeeAsyncObserverSyncTimeout"`
+
+	// MaxRootsPerReport is the maximum number of roots to include in a single report.
+	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
+
+	// MultipleReports is a flag to enable/disable multiple reports per round.
+	MultipleReports bool `json:"multipleReports"`
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
