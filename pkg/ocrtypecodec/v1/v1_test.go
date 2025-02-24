@@ -493,11 +493,6 @@ func (d *dataGenerator) execObservation() exectypes.Observation {
 
 	}
 
-	costlyMsgs := make([]cciptypes.Bytes32, d.numMessagesPerChain)
-	for i := 0; i < d.numMessagesPerChain; i++ {
-		costlyMsgs[i] = randomBytes32()
-	}
-
 	commitReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for i := 0; i < d.numSourceChains; i++ {
 		commitReports[cciptypes.ChainSelector(rand.Uint64())] = []exectypes.CommitData{
@@ -514,7 +509,6 @@ func (d *dataGenerator) execObservation() exectypes.Observation {
 				ExecutedMessages: genSeqNums(d.numMessagesPerChain / 2),
 				Messages:         msgs,
 				Hashes:           genBytes32Slice(d.numMessagesPerChain),
-				CostlyMessages:   genBytes32Slice(d.numMessagesPerChain / 4),
 				MessageTokenData: []exectypes.MessageTokenData{
 					{
 						TokenData: []exectypes.TokenData{
@@ -532,14 +526,13 @@ func (d *dataGenerator) execObservation() exectypes.Observation {
 	}
 
 	return exectypes.Observation{
-		CommitReports:  commitReports,
-		Messages:       msgObservations,
-		Hashes:         msgHashObservations,
-		TokenData:      tokenDataObservations,
-		CostlyMessages: costlyMsgs,
-		Nonces:         nonces,
-		Contracts:      discoveryObs,
-		FChain:         discoveryObs.FChain,
+		CommitReports: commitReports,
+		Messages:      msgObservations,
+		Hashes:        msgHashObservations,
+		TokenData:     tokenDataObservations,
+		Nonces:        nonces,
+		Contracts:     discoveryObs,
+		FChain:        discoveryObs.FChain,
 	}
 }
 
@@ -561,7 +554,6 @@ func (d *dataGenerator) execOutcome() exectypes.Outcome {
 			ExecutedMessages: genSeqNums(d.numMessagesPerChain / 2),
 			Messages:         msgs,
 			Hashes:           genBytes32Slice(d.numMessagesPerChain),
-			CostlyMessages:   genBytes32Slice(d.numMessagesPerChain / 4),
 			MessageTokenData: []exectypes.MessageTokenData{
 				{
 					TokenData: []exectypes.TokenData{

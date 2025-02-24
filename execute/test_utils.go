@@ -3,7 +3,6 @@ package execute
 import (
 	"context"
 	"encoding/binary"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
@@ -33,7 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
@@ -59,8 +56,6 @@ type IntTest struct {
 	server              *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
 	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
-	feeCalculator       *costlymessages.CCIPMessageFeeUSD18Calculator
-	execCostCalculator  *costlymessages.StaticMessageExecCostUSD18Calculator
 }
 
 func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
@@ -150,20 +145,6 @@ func (it *IntTest) WithMessages(
 	)
 }
 
-func (it *IntTest) WithCustomFeeBoosting(
-	relativeBoostPerWaitHour float64,
-	now func() time.Time,
-	messageCost map[cciptypes.Bytes32]plugintypes.USD18,
-) {
-	it.feeCalculator = costlymessages.NewCCIPMessageFeeUSD18Calculator(
-		it.lggr,
-		it.ccipReader,
-		relativeBoostPerWaitHour,
-		now,
-	)
-	it.execCostCalculator = costlymessages.NewStaticMessageExecCostUSD18Calculator(messageCost)
-}
-
 func (it *IntTest) WithUSDC(
 	sourcePoolAddress string,
 	attestations map[string]string,
@@ -251,36 +232,15 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	)
 	require.NoError(it.t, err)
 
-	var feeCalculator costlymessages.MessageFeeE18USDCalculator
-	if it.feeCalculator != nil {
-		feeCalculator = it.feeCalculator
-	} else {
-		feeCalculator = costlymessages.NewConstMessageFeeUSD18Calculator(big.NewInt(5))
-	}
-
-	var execCostCalculator costlymessages.MessageExecCostUSD18Calculator
-	if it.execCostCalculator != nil {
-		execCostCalculator = it.execCostCalculator
-	} else {
-		execCostCalculator = costlymessages.NewConstMessageExecCostUSD18Calculator(big.NewInt(3))
-	}
-
-	costlyMessageObserver := costlymessages.NewObserver(
-		it.lggr,
-		true,
-		feeCalculator,
-		execCostCalculator,
-	)
-
 	ep := gasmock.NewMockEstimateProvider(it.t)
 	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -304,16 +264,11 @@ func (it *IntTest) Close() {
 	}
 }
 
-func (it *IntTest) UpdateExecutionCost(id cciptypes.Bytes32, val int64) {
-	it.execCostCalculator.UpdateCosts(id, plugintypes.NewUSD18(val))
-}
-
 func (it *IntTest) newNode(
 	cfg pluginconfig.ExecuteOffchainConfig,
 	homeChain reader.HomeChain,
 	ep cciptypes.EstimateProvider,
 	tokenDataObserver tokendata.TokenDataObserver,
-	costlyMessageObserver costlymessages.Observer,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
@@ -341,7 +296,6 @@ func (it *IntTest) newNode(
 		tokenDataObserver,
 		ep,
 		it.lggr,
-		costlyMessageObserver,
 		&metrics.Noop{},
 	)
 
@@ -419,13 +373,6 @@ func newMessageSentEvent(
 }
 
 type msgOption func(*cciptypes.Message)
-
-func withFeeValueJuels(fee int64) msgOption {
-	return func(m *cciptypes.Message) {
-		juels := new(big.Int).Mul(big.NewInt(fee), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
-		m.FeeValueJuels = cciptypes.NewBigInt(juels)
-	}
-}
 
 func withData(data []byte) msgOption {
 	return func(m *cciptypes.Message) {
@@ -522,18 +469,6 @@ func extractSequenceNumbers(messages []cciptypes.Message) []cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})
 	return sequenceNumbers
-}
-
-type timeMachine struct {
-	now time.Time
-}
-
-func (t *timeMachine) Now() time.Time {
-	return t.now
-}
-
-func (t *timeMachine) SetNow(now time.Time) {
-	t.now = now
 }
 
 func emptyMessagesForRange(start, end uint64) []cciptypes.Message {
