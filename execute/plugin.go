@@ -239,11 +239,9 @@ func getPendingExecutedReports(
 		// Get unfinalized messages by taking the difference
 		unfinalizedMsgSet := allExecutedMsgSet.Difference(finalizedMsgSet)
 
-		finalizedMessages := finalizedMsgSet.ToSlice()
-		sort.Slice(finalizedMessages, func(i, j int) bool { return finalizedMessages[i] < finalizedMessages[j] })
+		finalizedMessages := slicelib.ToSortedSlice(finalizedMsgSet)
 
-		unfinalizedMessages := unfinalizedMsgSet.ToSlice()
-		sort.Slice(unfinalizedMessages, func(i, j int) bool { return unfinalizedMessages[i] < unfinalizedMessages[j] })
+		unfinalizedMessages := slicelib.ToSortedSlice(unfinalizedMsgSet)
 
 		// Fully finalized roots are removed from the reports and set in groupedCommits
 		var executedCommitsFinalized []exectypes.CommitData
