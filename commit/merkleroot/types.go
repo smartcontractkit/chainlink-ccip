@@ -23,6 +23,11 @@ type Query struct {
 	RMNSignatures      *rmn.ReportSignatures
 }
 
+// ContainsRmnSignatures returns true if the query contains RMN signatures.
+func (q Query) ContainsRmnSignatures() bool {
+	return q.RMNSignatures != nil && len(q.RMNSignatures.Signatures) > 0
+}
+
 type Observation struct {
 	MerkleRoots        []cciptypes.MerkleRootChain      `json:"merkleRoots"`
 	RMNEnabledChains   map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`

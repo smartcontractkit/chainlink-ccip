@@ -197,36 +197,33 @@ func (p *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 
 // shouldSkipRMNVerification checks whether RMN verification should be skipped based on the current state and query.
 func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Outcome) (bool, error) {
-	// Skip verification if RMN signatures are not expected in the current state.
-	if nextState != buildingReport && q.RMNSignatures == nil {
-		return true, nil
-	}
+	emptySigs := !q.ContainsRmnSignatures()
 
-	// Skip verification if we are retrying RMN signatures in the next round.
-	if nextState == buildingReport && q.RetryRMNSignatures {
-		if q.RMNSignatures != nil {
+	switch nextState {
+	case buildingReport:
+		if q.RetryRMNSignatures {
+			if emptySigs {
+				return true, nil
+			}
 			return false, fmt.Errorf("RMN signatures are provided but not expected if retrying is set to true")
 		}
-		return true, nil
-	}
 
-	// If in the BuildingReport state and RMN signatures are required but not provided, return an error.
-	if nextState == buildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
-		return false, ErrSignaturesNotProvidedByLeader
-	}
+		if emptySigs {
+			return false, ErrSignaturesNotProvidedByLeader
+		}
 
-	// If in the BuildingReport state but RMN remote config is not available, return an error.
-	if nextState == buildingReport && prevOutcome.RMNRemoteCfg.IsEmpty() {
-		return false, fmt.Errorf("RMN report config is not provided from the previous outcome")
-	}
+		if prevOutcome.RMNRemoteCfg.IsEmpty() {
+			return false, fmt.Errorf("RMN report config is not provided from the previous outcome")
+		}
 
-	// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
-	if nextState != buildingReport && q.RMNSignatures != nil {
+		return false, nil
+	default:
+		if emptySigs {
+			return true, nil // Sigs not expected
+		}
+		// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
 		return false, fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
 	}
-
-	// Proceed with RMN verification.
-	return false, nil
 }
 
 func (p *Processor) getObservation(
