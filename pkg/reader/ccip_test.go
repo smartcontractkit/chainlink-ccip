@@ -1208,27 +1208,19 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 
 func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 	testCases := []struct {
-		name                 string
-		cursedSubjectsSet    mapset.Set[[16]byte]
-		destChainSelector    cciptypes.ChainSelector
-		sourceChainSelectors []cciptypes.ChainSelector
-		expCurseInfo         CurseInfo
+		name              string
+		cursedSubjectsSet mapset.Set[[16]byte]
+		destChainSelector cciptypes.ChainSelector
+		expCurseInfo      CurseInfo
 	}{
 		{
 			name:              "no cursed subjects",
 			cursedSubjectsSet: mapset.NewSet[[16]byte](),
 			destChainSelector: chainA,
-			sourceChainSelectors: []cciptypes.ChainSelector{
-				chainB,
-				chainC,
-			},
 			expCurseInfo: CurseInfo{
-				CursedSourceChains: map[cciptypes.ChainSelector]bool{
-					chainB: false,
-					chainC: false,
-				},
-				CursedDestination: false,
-				GlobalCurse:       false,
+				CursedSourceChains: map[cciptypes.ChainSelector]bool{},
+				CursedDestination:  false,
+				GlobalCurse:        false,
 			},
 		},
 		{
@@ -1240,10 +1232,6 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			sourceChainSelectors: []cciptypes.ChainSelector{
-				chainB,
-				chainC,
-			},
 			expCurseInfo: CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
@@ -1261,10 +1249,6 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				chainSelectorToBytes16(chainA), // dest
 			),
 			destChainSelector: chainA,
-			sourceChainSelectors: []cciptypes.ChainSelector{
-				chainB,
-				chainC,
-			},
 			expCurseInfo: CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
@@ -1282,10 +1266,6 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			sourceChainSelectors: []cciptypes.ChainSelector{
-				chainB,
-				chainC,
-			},
 			expCurseInfo: CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
@@ -1302,10 +1282,6 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				chainSelectorToBytes16(chainC),
 			),
 			destChainSelector: chainA,
-			sourceChainSelectors: []cciptypes.ChainSelector{
-				chainB,
-				chainC,
-			},
 			expCurseInfo: CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
 					chainB: true,
@@ -1323,13 +1299,8 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 				GlobalCurseSubject,
 			),
 			destChainSelector: chainA,
-			sourceChainSelectors: []cciptypes.ChainSelector{
-				chainB,
-				chainC,
-			},
 			expCurseInfo: CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
-					chainB: false,
 					chainC: true,
 				},
 				CursedDestination: true,
@@ -1340,9 +1311,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			lggr := logger.Test(t)
-			curseInfo := getCurseInfoFromCursedSubjects(
-				lggr, tc.cursedSubjectsSet, tc.destChainSelector, tc.sourceChainSelectors)
+			curseInfo := getCurseInfoFromCursedSubjects(tc.cursedSubjectsSet, tc.destChainSelector)
 			assert.Equal(t, tc.expCurseInfo, *curseInfo)
 		})
 	}
