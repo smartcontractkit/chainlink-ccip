@@ -883,6 +883,10 @@ func getCurseInfoFromCursedSubjects(
 
 	for _, cursedSource := range cursedSubjectsSet.ToSlice() {
 		chainSelector := binary.BigEndian.Uint64(cursedSource[8:])
+		castedChainSelector := cciptypes.ChainSelector(chainSelector)
+		if castedChainSelector == destChainSelector {
+			continue
+		}
 		curseInfo.CursedSourceChains[cciptypes.ChainSelector(chainSelector)] = true
 	}
 	return curseInfo
