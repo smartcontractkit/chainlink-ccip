@@ -187,8 +187,10 @@ func TestPluginReports(t *testing.T) {
 						MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
 					},
 				},
-				TokenPrices: []ccipocr3.TokenPrice{
-					{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+				PriceUpdates: ccipocr3.PriceUpdates{
+					TokenPriceUpdates: []ccipocr3.TokenPrice{
+						{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+					},
 				},
 			},
 		},
