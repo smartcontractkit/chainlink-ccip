@@ -997,6 +997,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "fee_quoter",
+ "smalloc",
  "solana-program",
 ]
 
@@ -1909,6 +1910,12 @@ dependencies = [
  "bitmaps",
  "typenum",
 ]
+
+[[package]]
+name = "smalloc"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe4dc8671765eaefc12e36c40a397e963149dfc4aac7c727ba42db1827408298"
 
 [[package]]
 name = "smallvec"
