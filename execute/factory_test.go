@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -156,7 +157,14 @@ func TestObservationSize(t *testing.T) {
 	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
 		Return(func(addr ccipocr3.UnknownAddress, _ ccipocr3.ChainSelector) string {
 			return "0x" + hex.EncodeToString(addr)
-		}, nil)
+		}, nil).Maybe()
+
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
+		Return(func(addr string, _ ccipocr3.ChainSelector) ccipocr3.UnknownAddress {
+			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+			require.NoError(t, err)
+			return addrBytes
+		}, nil).Maybe()
 	for i := 0; i < maxMessages; i++ {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
 		if nil == noncesObs[idx] {

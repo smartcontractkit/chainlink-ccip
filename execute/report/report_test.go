@@ -1247,6 +1247,12 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
 			return "0x" + hex.EncodeToString(addr)
 		}, nil)
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
+		Return(func(addr string, _ cciptypes.ChainSelector) cciptypes.UnknownAddress {
+			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+			require.NoError(t, err)
+			return addrBytes
+		}, nil).Maybe()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

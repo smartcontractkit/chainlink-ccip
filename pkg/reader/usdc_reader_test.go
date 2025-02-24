@@ -1,17 +1,13 @@
 package reader
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
-
-	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -98,18 +94,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
-		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-			return "0x" + hex.EncodeToString(addr)
-		}, nil)
-	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
-		Return(func(addr string, _ cciptypes.ChainSelector) cciptypes.UnknownAddress {
-			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
-			require.NoError(t, err)
-			return addrBytes
-		}, nil)
-
+	mockAddrCodec := newMockAddressCodec(t)
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
@@ -199,18 +184,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
-		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-			return "0x" + hex.EncodeToString(addr)
-		}, nil)
-	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
-		Return(func(addr string, _ cciptypes.ChainSelector) cciptypes.UnknownAddress {
-			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
-			require.NoError(t, err)
-			return addrBytes
-		}, nil)
-
+	mockAddrCodec := newMockAddressCodec(t)
 	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders, mockAddrCodec)
 	require.NoError(t, err)
 
