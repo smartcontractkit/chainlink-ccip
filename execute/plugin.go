@@ -534,7 +534,7 @@ func (p *Plugin) validateReport(
 	// Just a safety check, should never happen.
 	if r.Report == nil {
 		lggr.Warn("skipping nil report")
-		return cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{}, plugincommon.NewErrInvalidReport("nil report")
 	}
 
 	decodedReport, err = p.reportCodec.Decode(ctx, r.Report)
@@ -586,7 +586,7 @@ func (p *Plugin) validateReport(
 		// been executed, so we don't want to re-execute them.
 		// This gives the exec plugin a chance to remedy the situation
 		// by selecting a different set of messages.
-		return decodedReport, nil
+		return decodedReport, plugincommon.NewErrInvalidReport(err.Error())
 	}
 	if err != nil {
 		// TODO: should we return true here if we couldn't check for already executed messages?
