@@ -1188,7 +1188,6 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 			destChainSelector: chainA,
 			expCurseInfo: CurseInfo{
 				CursedSourceChains: map[cciptypes.ChainSelector]bool{
-					chainB: false,
 					chainC: true,
 				},
 				CursedDestination: true,
