@@ -4,14 +4,17 @@ use super::ocr3base::ocr3_set;
 
 use crate::context::{
     AcceptOwnership, AddSourceChain, OcrPluginType, SetOcrConfig, TransferOwnership, UpdateConfig,
-    UpdateSourceChain,
+    UpdateReferenceAddresses, UpdateSourceChain,
 };
 use crate::event::admin::{
-    ConfigSet, OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded,
-    SourceChainConfigUpdated,
+    ConfigSet, OwnershipTransferRequested, OwnershipTransferred, ReferenceAddressesSet,
+    SourceChainAdded, SourceChainConfigUpdated,
 };
 use crate::instructions::interfaces::Admin;
-use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChain, SourceChainConfig, SourceChainState};
+use crate::state::{
+    CodeVersion, Ocr3ConfigInfo, ReferenceAddresses, SourceChain, SourceChainConfig,
+    SourceChainState,
+};
 use crate::CcipOfframpError;
 
 pub struct Impl;
@@ -56,6 +59,31 @@ impl Admin for Impl {
             CcipOfframpError::InvalidCodeVersion
         );
         ctx.accounts.config.load_mut()?.default_code_version = code_version.into();
+        Ok(())
+    }
+
+    fn update_reference_addresses(
+        &self,
+        ctx: Context<UpdateReferenceAddresses>,
+        router: Pubkey,
+        fee_quoter: Pubkey,
+        offramp_lookup_table: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts
+            .reference_addresses
+            .set_inner(ReferenceAddresses {
+                version: 1,
+                router,
+                fee_quoter,
+                offramp_lookup_table,
+            });
+
+        emit!(ReferenceAddressesSet {
+            router: ctx.accounts.reference_addresses.router,
+            fee_quoter: ctx.accounts.reference_addresses.fee_quoter,
+            offramp_lookup_table: ctx.accounts.reference_addresses.offramp_lookup_table,
+        });
+
         Ok(())
     }
 

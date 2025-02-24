@@ -227,9 +227,52 @@
       ]
     },
     {
+      "name": "updateReferenceAddresses",
+      "docs": [
+        "Updates reference addresses in the offramp contract, such as",
+        "the CCIP router, Fee Quoter, and the Offramp Lookup Table.",
+        "Only the Admin may update these addresses.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the reference addresses.",
+        "* `reference_addresses` - The new reference addresses to be set."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "referenceAddresses",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey"
+        },
+        {
+          "name": "offrampLookupTable",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "addSourceChain",
       "docs": [
-        "Config //",
         "Adds a new source chain selector with its config to the offramp.",
         "",
         "The Admin needs to add any new chain supported.",

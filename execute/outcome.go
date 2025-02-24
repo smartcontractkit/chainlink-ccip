@@ -9,8 +9,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 
-	mapset "github.com/deckarep/golang-set/v2"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -125,10 +123,6 @@ func (p *Plugin) getMessagesOutcome(
 	observation exectypes.Observation,
 ) exectypes.Outcome {
 	commitReports := make([]exectypes.CommitData, 0)
-	costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
-	for _, msgID := range observation.CostlyMessages {
-		costlyMessagesSet.Add(msgID)
-	}
 
 	// First ensure that all observed messages has hashes and token data.
 	if err := validateHashesExist(observation.Messages, observation.Hashes); err != nil {
@@ -144,7 +138,6 @@ func (p *Plugin) getMessagesOutcome(
 	// add messages to their commitReports.
 	for i, report := range reports {
 		report.Messages = nil
-		report.CostlyMessages = nil
 		for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
 			if msg, ok := observation.Messages[report.SourceChain][j]; ok {
 				// Always add the message and hash, even if it wont be executed.
@@ -152,10 +145,6 @@ func (p *Plugin) getMessagesOutcome(
 				report.Messages = append(report.Messages, msg)
 
 				report.Hashes = append(report.Hashes, observation.Hashes[report.SourceChain][j])
-
-				if costlyMessagesSet.Contains(msg.Header.MessageID) {
-					report.CostlyMessages = append(report.CostlyMessages, msg.Header.MessageID)
-				}
 				report.MessageTokenData = append(report.MessageTokenData, observation.TokenData[report.SourceChain][j])
 			}
 		}

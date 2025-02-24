@@ -38,7 +38,6 @@ Chain discovery observations.
 CommitData for reports from the destination chain. The following fields
 are empty:
 * Messages
-* CostlyMessages
 * TokenData
 
 ### Outcome
@@ -52,14 +51,13 @@ Chain discovery observations.
 
 CommitData from the previous outcome.
 Messages from the source chains.
-CostlyMessages as computed from source chain observations.
 TokenData from external attestation services (i.e. CCTP).
 
 ### Outcome
 
 Chain discovery observations.
 
-CommitData populated with all Messages, CostlyMessages, and TokenData.
+CommitData populated with all Messages and TokenData.
 
 ## Filter
 ### Observation
