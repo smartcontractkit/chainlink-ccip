@@ -4272,10 +4272,14 @@ func TestCCIPRouter(t *testing.T) {
 									Token:  token1.Mint.PublicKey(),
 									Amount: 2,
 								},
+								{
+									Token:  token1.Mint.PublicKey(),
+									Amount: 2,
+								},
 							},
 							[]byte{1, 2, 3}, // message data
 							fc.feeToken,     // empty fee token to indicate native SOL
-							[]uint8{2, 15},
+							[]uint8{3, 16, 29},
 							senderState,
 							cc.senderChainConfig,
 							senderPDA,
@@ -4303,6 +4307,7 @@ func TestCCIPRouter(t *testing.T) {
 							base.AccountMetaSlice,
 							solana.Meta(token0.User[user.PublicKey()]).WRITE(),
 							solana.Meta(token1.User[user.PublicKey()]).WRITE(),
+							solana.Meta(token1.User[user.PublicKey()]).WRITE(),
 						)
 
 						// pass token pool accounts with the sender program ATA
@@ -4311,6 +4316,7 @@ func TestCCIPRouter(t *testing.T) {
 						base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas0...)
 						tokenMetas1, addressTables1, err := tokens.ParseTokenLookupTableWithChain(ctx, solanaGoClient, token1, token1SenderATA, cc.chainSelector)
 						require.NoError(t, err)
+						base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
 						base.AccountMetaSlice = append(base.AccountMetaSlice, tokenMetas1...)
 						addressTables[token1.PoolLookupTable] = addressTables1[token1.PoolLookupTable]
 						for k, v := range ccipSendLookupTable {
@@ -4324,8 +4330,10 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 						ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, token1.User[user.PublicKey()], token1.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
 						require.NoError(t, err)
+						ixApprove2, err := tokens.TokenApproveChecked(2, 0, token1.Program, token1.User[user.PublicKey()], token1.Mint.PublicKey(), senderPDA, user.PublicKey(), nil)
+						require.NoError(t, err)
 
-						testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+						testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ixApprove2, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					})
 				}
 			})
