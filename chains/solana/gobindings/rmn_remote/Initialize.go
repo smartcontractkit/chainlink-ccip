@@ -17,10 +17,7 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for initialization.
-// * `local_chain_selector` This chain selector will be used to verify if this chain is globally
-// cursed, by transforming it into a curse subject (EVM equivalent: `bytes16(u128(selector))`)
 type Initialize struct {
-	LocalChainSelector *uint64
 
 	// [0] = [WRITE] config
 	//
@@ -42,12 +39,6 @@ func NewInitializeInstructionBuilder() *Initialize {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
-}
-
-// SetLocalChainSelector sets the "localChainSelector" parameter.
-func (inst *Initialize) SetLocalChainSelector(localChainSelector uint64) *Initialize {
-	inst.LocalChainSelector = &localChainSelector
-	return inst
 }
 
 // SetConfigAccount sets the "config" account.
@@ -134,13 +125,6 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *Initialize) Validate() error {
-	// Check whether all (required) parameters are set:
-	{
-		if inst.LocalChainSelector == nil {
-			return errors.New("LocalChainSelector parameter is not set")
-		}
-	}
-
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -174,9 +158,7 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("LocalChainSelector", *inst.LocalChainSelector))
-					})
+					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -192,26 +174,14 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `LocalChainSelector` param:
-	err = encoder.Encode(obj.LocalChainSelector)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `LocalChainSelector`:
-	err = decoder.Decode(&obj.LocalChainSelector)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
-	// Parameters:
-	localChainSelector uint64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	curses ag_solanago.PublicKey,
@@ -220,7 +190,6 @@ func NewInitializeInstruction(
 	program ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetLocalChainSelector(localChainSelector).
 		SetConfigAccount(config).
 		SetCursesAccount(curses).
 		SetAuthorityAccount(authority).

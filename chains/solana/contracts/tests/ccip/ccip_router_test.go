@@ -476,7 +476,7 @@ func TestCCIPRouter(t *testing.T) {
 			var programData ProgramData
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-			ix, err := rmn_remote.NewInitializeInstruction(config.SvmChainSelector,
+			ix, err := rmn_remote.NewInitializeInstruction(
 				config.RMNRemoteConfigPDA,
 				config.RMNRemoteCursesPDA,
 				legacyAdmin.PublicKey(),

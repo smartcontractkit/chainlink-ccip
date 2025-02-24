@@ -11,9 +11,7 @@
         "",
         "# Arguments",
         "",
-        "* `ctx` - The context containing the accounts required for initialization.",
-        "* `local_chain_selector` This chain selector will be used to verify if this chain is globally",
-        "cursed, by transforming it into a curse subject (EVM equivalent: `bytes16(u128(selector))`)"
+        "* `ctx` - The context containing the accounts required for initialization."
       ],
       "accounts": [
         {
@@ -47,12 +45,7 @@
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "localChainSelector",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "transferOwnership",
@@ -152,43 +145,6 @@
           "type": {
             "defined": "CodeVersion"
           }
-        }
-      ]
-    },
-    {
-      "name": "setLocalChainSelector",
-      "docs": [
-        "Sets the local chain selector. This chain selector will be used to verify if this chain is globally",
-        "cursed, by transforming it into a curse subject (EVM equivalent: `bytes16(u128(selector))`)",
-        "",
-        "This should only be called in case of a previous misconfiguration during initialization.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `local_chain_selector` - The local chain selector."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "cursed",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "localChainSelector",
-          "type": "u64"
         }
       ]
     },
@@ -382,12 +338,6 @@
                 "defined": "CurseSubject"
               }
             }
-          },
-          {
-            "name": "globalSubject",
-            "type": {
-              "defined": "CurseSubject"
-            }
           }
         ]
       }
@@ -474,16 +424,6 @@
           "type": {
             "defined": "CodeVersion"
           },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "LocalChainSelectorUpdated",
-      "fields": [
-        {
-          "name": "localChainSelector",
-          "type": "u64",
           "index": false
         }
       ]

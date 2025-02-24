@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::{
     instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet, Curse, CurseSubject,
-    LocalChainSelectorUpdated, OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError,
-    SubjectCursed, SubjectUncursed, Uncurse, UpdateConfig,
+    OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, SubjectCursed,
+    SubjectUncursed, Uncurse, UpdateConfig,
 };
 
 pub struct Impl;
@@ -75,22 +75,6 @@ impl Admin for Impl {
 
         curses.cursed_subjects.retain(|c| c != &subject);
         emit!(SubjectUncursed { subject });
-        Ok(())
-    }
-
-    fn set_local_chain_selector(
-        &self,
-        ctx: Context<UpdateConfig>,
-        local_chain_selector: u64,
-    ) -> Result<()> {
-        ctx.accounts
-            .cursed
-            .set_local_chain_selector(local_chain_selector);
-
-        emit!(LocalChainSelectorUpdated {
-            local_chain_selector,
-        });
-
         Ok(())
     }
 }
