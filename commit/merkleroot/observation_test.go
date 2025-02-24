@@ -900,9 +900,9 @@ func Test_shouldSkipRMNVerification(t *testing.T) {
 			queryContainsRmnSigs: true,
 		},
 		{
-			name:               "rmn sigs missing error is expected",
+			name:               "rmn sigs missing but error is not expected since chains might be rmn-disabled",
 			nextProcessorState: buildingReport,
-			expErr:             true,
+			expErr:             false,
 		},
 		{
 			name:                       "rmn sigs are present while we retry sigs in the next round this is invalid",

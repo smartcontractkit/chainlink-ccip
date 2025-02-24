@@ -208,13 +208,12 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 			return false, fmt.Errorf("RMN signatures are provided but not expected if retrying is set to true")
 		}
 
-		if emptySigs {
-			return false, ErrSignaturesNotProvidedByLeader
-		}
-
 		if prevOutcome.RMNRemoteCfg.IsEmpty() {
 			return false, fmt.Errorf("RMN report config is not provided from the previous outcome")
 		}
+
+		// we don't want to check for empty sigs since at this point we don't know which chains are RMN-disabled.
+		// if signatures are missing for specific chains they will be caught in the outcome phase.
 
 		return false, nil
 	default:

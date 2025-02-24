@@ -190,10 +190,6 @@ func buildMerkleRootsOutcome(
 	var err error
 
 	if len(roots) > 0 && rmnEnabled {
-		if q.RMNSignatures == nil {
-			return Outcome{}, fmt.Errorf("RMN signatures are nil while RMN is enabled")
-		}
-
 		sigs, err = rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 		if err != nil {
 			return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
