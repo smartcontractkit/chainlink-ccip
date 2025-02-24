@@ -126,6 +126,7 @@ profiles:
                   service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /healthz
               ingress:
                 className: nginx-internal
+                enabled: true
                 annotations:
                   nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
                   external-dns.alpha.kubernetes.io/ttl: "120"

@@ -31,7 +31,7 @@ func main() {
 	solanaChainsCountPtr := flag.Int("solana-chains-count", 0, "Number of network configs to generate")
 	flag.Parse()
 
-	if *gethChainsCountPtr == 0 && *solanaChainsCountPtr == 0 {
+	if *besuChainsCountPtr == 0 && *gethChainsCountPtr == 0 && *solanaChainsCountPtr == 0 {
 		fmt.Println("Error: at least one chain is required, to generate config")
 		flag.Usage()
 		return
@@ -44,7 +44,8 @@ func main() {
 
 	tmpl, err := template.New("values.yaml.tmpl").ParseFiles(tmplFile)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Error parsing template: %v\n", err)
+		os.Exit(1)
 	}
 
 	err = tmpl.Execute(os.Stdout, c)
@@ -69,7 +70,7 @@ func BuildNetworkConfigs(besuChainsCount int, gethChainsCount int, solanaChainsC
 }
 
 func BuildSolanaNetworkConfigs(count int) []SolanaChain {
-	chains := make([]SolanaChain, 0)
+	chains := make([]SolanaChain, 0, count)
 	for i := 1; i <= count; i++ {
 		chains = append(chains, SolanaChain{ChainId: int64(1000 + i)})
 	}
@@ -77,11 +78,24 @@ func BuildSolanaNetworkConfigs(count int) []SolanaChain {
 }
 
 func BuildEVMNetworkConfigs(chainsCount int) []EVMChain {
-	chains := make([]EVMChain{}, 0)
+	// If chainsCount is 0, return an empty slice
+	if chainsCount == 0 {
+		return []EVMChain{}
+	}
 
-	// Generate chains starting from NetworkId 1337
-	for i := 0; i < chainsCount; i++ {
-		networkId := int64(1337 + i) // The first chain will have NetworkId 1337
+	// Initialize the chains slice
+	chains := []EVMChain{
+		{NetworkId: 1337, FinalityDepth: defaultFinalityDepth},
+	}
+
+	// Add the second chain if chainsCount > 1
+	if chainsCount > 1 {
+		chains = append(chains, EVMChain{NetworkId: 2337, FinalityDepth: defaultFinalityDepth})
+	}
+
+	// Add subsequent chains starting from 90000000 if chainsCount > 2
+	for i := 2; i < chainsCount; i++ {
+		networkId := int64(90000000 + i - 1)
 		chains = append(chains, EVMChain{NetworkId: networkId, FinalityDepth: defaultFinalityDepth})
 	}
 

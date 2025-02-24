@@ -78,7 +78,11 @@ pipelines:
 
   ccip:
     run: |-
-      # Deploy CCIP enabled fully configured DON
+      run_dependency_pipelines ccip-don
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
+
+  ccip-infra-only:
+    run: |-
       run_dependency_pipelines ccip-don --set-flag infraOnly="true"
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
@@ -155,30 +159,33 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             pipeline: deploy-ccip-v2
             profiles:
-              - crib-aws-main-fwog
               - network-besu-chain-alpha
               - network-besu-chain-beta
               - version-from-env
-
+      - op: add
+        path: vars
+        value:
+          ENV: sandbox
 commands:
   besu:
     command: |-
       devspace run-pipeline chain-alpha -p chain-alpha
       devspace run-pipeline chain-beta -p chain-beta
-    description: Run the Besu pipeline to deploy both alpha and beta chains.
+    description: Deploy both alpha and beta Besu chains
     appendArgs: true
   chain-alpha:
-    command: |-
-      devspace run-pipeline chain-alpha -p chain-alpha
-    description: Run the pipeline to deploy the alpha chain.
+    command: devspace run-pipeline chain-alpha -p chain-alpha
+    description: Deploy alpha Besu chain
     appendArgs: true
   chain-beta:
-    command: |-
-      devspace run-pipeline chain-beta -p chain-beta
-    description: Run the pipeline to deploy the beta chain.
+    command: devspace run-pipeline chain-beta -p chain-beta
+    description: Deploy beta Besu chain
     appendArgs: true
   ccip:
-    command: |-
-      devspace run-pipeline ccip -p ccip
-    description: Deploy CCIP v1.6 DON
+    command: devspace run-pipeline ccip -p ccip
+    description: Deploy CCIP v1.6 DON with full onchain configuration
+    appendArgs: true
+  ccip-infra:
+    command: devspace run-pipeline ccip-infra-only -p ccip
+    description: Deploy CCIP v1.6 DON infrastructure only (no onchain deployment)
     appendArgs: true

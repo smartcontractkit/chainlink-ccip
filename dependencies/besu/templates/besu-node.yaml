@@ -28,12 +28,18 @@ in: |
           repo: https://charts.devspace.sh
         values:
           ingress:
-            name: {{ $type }}-{{ $i }}
+            name: chain-${CHAIN_NAME}-{{ $type }}
             rules:
-              - host: {{ $type }}-{{ $i }}.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              - host: chain-${CHAIN_NAME}-{{ $type }}.${DEVSPACE_INGRESS_BASE_DOMAIN}
                 path: /
                 servicePort: 8545
                 serviceName: besu-node-{{ $type }}-{{ $i }}
+                pathType: ImplementationSpecific
+              - host: chain-${CHAIN_NAME}-{{ $type }}.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                path: /ws/
+                servicePort: 8546
+                serviceName: besu-node-{{ $type }}-{{ $i }}
+                pathType: ImplementationSpecific
             ingressClassName: "${INGRESS_CLASS_NAME}"
             annotations:
               alb.ingress.kubernetes.io/certificate-arn: ${AWS_ACM_CERT_ARN}

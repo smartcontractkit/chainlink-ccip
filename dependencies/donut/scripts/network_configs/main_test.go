@@ -17,7 +17,7 @@ func TestBuildNetworkConfigs(t *testing.T) {
 		want Config
 	}{
 		{
-			"1 chain",
+			"1 geth chain",
 			args{
 				besuChainsCount:   0,
 				gethChainsCount:   1,
@@ -31,6 +31,24 @@ func TestBuildNetworkConfigs(t *testing.T) {
 						FinalityDepth: defaultFinalityDepth,
 					},
 				},
+				SolanaChains: []SolanaChain{},
+			},
+		},
+		{
+			"1 besu chain",
+			args{
+				besuChainsCount:   1,
+				gethChainsCount:   0,
+				solanaChainsCount: 0,
+		  },
+			Config{
+				BesuChains: []EVMChain{
+					{
+						NetworkId:     1337,
+						FinalityDepth: defaultFinalityDepth,
+					},
+				},
+				GethChains: []EVMChain{},
 				SolanaChains: []SolanaChain{},
 			},
 		},
@@ -156,8 +174,9 @@ func TestBuildNetworkConfigs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := BuildNetworkConfigs(tt.args.besuChainsCount, tt.args.gethChainsCount, tt.args.solanaChainsCount); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("BuildNetworkConfigs() = got %+v, want %+v", got, tt.want)
+			got := BuildNetworkConfigs(tt.args.besuChainsCount, tt.args.gethChainsCount, tt.args.solanaChainsCount)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("%s: BuildNetworkConfigs() = got %+v, want %+v", tt.name, got, tt.want)
 			}
 		})
 	}
