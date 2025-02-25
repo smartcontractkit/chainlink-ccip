@@ -61,7 +61,6 @@ impl Admin for Impl {
             max_fee_juels_per_msg: config.max_fee_juels_per_msg,
             link_token_mint: config.link_token_mint,
             onramp: config.onramp,
-            rmn_remote: config.rmn_remote,
             default_code_version: config.default_code_version
         });
         Ok(())
@@ -209,19 +208,6 @@ impl Admin for Impl {
             dest_chain_selector: chain_selector,
             token: mint,
             token_transfer_fee_config: cfg,
-        });
-        Ok(())
-    }
-
-    fn update_rmn_remote(&self, ctx: Context<UpdateConfig>, rmn_remote: Pubkey) -> Result<()> {
-        let config = &mut ctx.accounts.config;
-        config.rmn_remote = rmn_remote;
-        emit!(ConfigSet {
-            max_fee_juels_per_msg: config.max_fee_juels_per_msg,
-            link_token_mint: config.link_token_mint,
-            onramp: config.onramp,
-            rmn_remote: config.rmn_remote,
-            default_code_version: config.default_code_version
         });
         Ok(())
     }

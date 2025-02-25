@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Curses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),
+// Curses an abstract subject. If the subject is CurseSubject::GLOBAL,
 // the entire chain will be cursed.
 //
 // # Only the CCIP Admin may perform this operation

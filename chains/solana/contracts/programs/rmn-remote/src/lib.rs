@@ -81,7 +81,7 @@ pub mod rmn_remote {
             .set_default_code_version(ctx, code_version)
     }
 
-    /// Curses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),
+    /// Curses an abstract subject. If the subject is CurseSubject::GLOBAL,
     /// the entire chain will be cursed.
     ///
     /// Only the CCIP Admin may perform this operation
@@ -94,8 +94,9 @@ pub mod rmn_remote {
         router::admin(ctx.accounts.config.default_code_version).curse(ctx, subject)
     }
 
-    /// Uncurses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),
-    /// the entire chain curse will be lifted.
+    /// Uncurses an abstract subject. If the subject is CurseSubject::GLOBAL,
+    /// the entire chain curse will be lifted. (note that any other specific
+    /// subject curses will remain active.)
     ///
     /// Only the CCIP Admin may perform this operation
     ///

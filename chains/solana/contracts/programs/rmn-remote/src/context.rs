@@ -68,7 +68,6 @@ pub struct UpdateConfig<'info> {
     pub config: Account<'info, Config>,
 
     #[account(
-        mut,
         seeds = [seed::CONFIG],
         bump,
     )]

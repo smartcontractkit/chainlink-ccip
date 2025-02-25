@@ -571,7 +571,6 @@ func TestCCIPRouter(t *testing.T) {
 				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
-				config.RMNRemoteProgram,
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
 				legacyAdmin.PublicKey(),

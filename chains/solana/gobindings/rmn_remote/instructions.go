@@ -68,7 +68,7 @@ var (
 	// * `code_version` - The new code version to be set as default.
 	Instruction_SetDefaultCodeVersion = ag_binary.TypeID([8]byte{47, 151, 233, 254, 121, 82, 206, 152})
 
-	// Curses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),
+	// Curses an abstract subject. If the subject is CurseSubject::GLOBAL,
 	// the entire chain will be cursed.
 	//
 	// Only the CCIP Admin may perform this operation
@@ -79,8 +79,9 @@ var (
 	// * `subject` - The subject to curse.
 	Instruction_Curse = ag_binary.TypeID([8]byte{10, 127, 226, 227, 138, 3, 192, 73})
 
-	// Uncurses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),
-	// the entire chain curse will be lifted.
+	// Uncurses an abstract subject. If the subject is CurseSubject::GLOBAL,
+	// the entire chain curse will be lifted. (note that any other specific
+	// subject curses will remain active.)
 	//
 	// Only the CCIP Admin may perform this operation
 	//
