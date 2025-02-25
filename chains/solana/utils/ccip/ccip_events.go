@@ -125,7 +125,6 @@ type EventFeeQuoterConfigSet struct {
 	MaxFeeJuelsPerMsg  bin.Uint128
 	LinkTokenMint      solana.PublicKey
 	Onramp             solana.PublicKey
-	RMNRemote          solana.PublicKey
 	DefaultCodeVersion fee_quoter.CodeVersion
 }
 
