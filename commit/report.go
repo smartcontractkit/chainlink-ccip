@@ -283,7 +283,7 @@ func (p *Plugin) Reports(
 	// The Solana report has some special limitations. Those limitations can be used if the offchain
 	maxRoots := p.offchainCfg.MaxMerkleRootsPerReport
 	if !p.offchainCfg.RMNEnabled && maxRoots != 0 {
-		if p.offchainCfg.MultipleReports {
+		if p.offchainCfg.MultipleReportsEnabled {
 			lggr.Infow("building multiple reports")
 			reports, err = buildMultipleReports(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, maxRoots)
 		} else {

@@ -162,11 +162,11 @@ type CommitOffchainConfig struct {
 	// NOTE: this can only be used if RMNEnabled == false.
 	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
 
-	// MultipleReports is a flag to enable/disable multiple reports per round.
+	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
 	// This is typically set to true on chains that use 'MaxMerkleRootsPerReport'
 	// in order to avoid delays when there are reports from multiple sources.
 	// NOTE: this can only be used if RMNEnabled == false.
-	MultipleReports bool `json:"multipleReports"`
+	MultipleReportsEnabled bool `json:"multipleReports"`
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -291,7 +291,7 @@ func (c *CommitOffchainConfig) Validate() error {
 	// an error to use them unless RMNEnabled == false.
 	var errs []error
 	if c.RMNEnabled {
-		if c.MultipleReports {
+		if c.MultipleReportsEnabled {
 			errs = append(errs, fmt.Errorf("multipleReports is set with RMN enabled"))
 		}
 		if c.MaxMerkleRootsPerReport != 0 {
