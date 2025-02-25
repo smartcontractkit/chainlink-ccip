@@ -18,7 +18,6 @@ func Test_TokenDataObserver_Unmarshal(t *testing.T) {
 	baseJSON := `{
 					  %s
 					  "batchGasLimit": 1,
-					  "relativeBoostPerWaitHour": 1,
 					  "inflightCacheExpiry": "1s",
 					  "rootSnoozeTime": "1s",
 					  "messageVisibilityInterval": "1s",
@@ -523,7 +522,6 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 	withBaseConfig := func(configs ...TokenDataObserverConfig) ExecuteOffchainConfig {
 		return ExecuteOffchainConfig{
 			BatchGasLimit:             1,
-			RelativeBoostPerWaitHour:  1,
 			InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
 			RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 			MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
