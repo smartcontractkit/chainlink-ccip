@@ -8,7 +8,7 @@ use crate::context::{seed, CommitInput, CommitReportContext, OcrPluginType};
 use crate::event::CommitReportAccepted;
 use crate::instructions::interfaces::Commit;
 use crate::state::GlobalState;
-use crate::{CcipOfframpError, MerkleRoot, PriceOnlyCommitReportContext};
+use crate::{CcipOfframpError, PriceOnlyCommitReportContext};
 
 pub struct Impl;
 impl Commit for Impl {
@@ -132,7 +132,7 @@ impl Commit for Impl {
         commit_report.max_msg_nr = root.max_seq_nr;
 
         emit!(CommitReportAccepted {
-            merkle_root: (*root).clone(),
+            merkle_root: Some((*root).clone()),
             price_updates: report.price_updates.clone(),
         });
 
@@ -198,7 +198,7 @@ impl Commit for Impl {
         )?;
 
         emit!(CommitReportAccepted {
-            merkle_root: MerkleRoot::default(),
+            merkle_root: None,
             price_updates: report.price_updates.clone(),
         });
 
