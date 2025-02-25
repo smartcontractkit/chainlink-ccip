@@ -249,16 +249,11 @@ func (c *CommitOffchainConfig) applyDefaults() {
 		}
 	}
 
-	// Only apply defaults if the curve based deviation is disabled. Otherwise, these values should already be set in
-	// the config.
-	if !c.CurveBasedGasDeviationEnabled {
-		if c.ExecNoDeviationThresholdUSDWei.Int == nil {
-			c.ExecNoDeviationThresholdUSDWei = cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)}
-		}
-
-		if c.DataAvNoDeviationThresholdUSDWei.Int == nil {
-			c.DataAvNoDeviationThresholdUSDWei = cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)}
-		}
+	if c.ExecNoDeviationThresholdUSDWei.Int == nil {
+		c.ExecNoDeviationThresholdUSDWei = cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)}
+	}
+	if c.DataAvNoDeviationThresholdUSDWei.Int == nil {
+		c.DataAvNoDeviationThresholdUSDWei = cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)}
 	}
 }
 
