@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	mapset "github.com/deckarep/golang-set/v2"
 )
 
 func TestCountUnique(t *testing.T) {
@@ -158,6 +160,45 @@ func TestMap(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.expResults, Map(tc.items, tc.valid))
+		})
+	}
+}
+
+func TestToSortedSlice(t *testing.T) {
+	testCases := []struct {
+		name        string
+		input       []int64
+		expElements []int64
+	}{
+		{
+			name:        "empty set",
+			input:       []int64{},
+			expElements: []int64{},
+		},
+		{
+			name:        "single element",
+			input:       []int64{1},
+			expElements: []int64{1},
+		},
+		{
+			name:        "multiple elements unsorted",
+			input:       []int64{3, 1, 4, 2},
+			expElements: []int64{1, 2, 3, 4},
+		},
+		{
+			name:        "duplicate elements",
+			input:       []int64{3, 1, 3, 2, 1},
+			expElements: []int64{1, 2, 3},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			set := mapset.NewSet[int64]()
+			for _, v := range tc.input {
+				set.Add(v)
+			}
+			assert.Equal(t, tc.expElements, ToSortedSlice(set))
 		})
 	}
 }

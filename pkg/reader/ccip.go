@@ -331,7 +331,10 @@ type ExecutionStateChangedEvent struct {
 }
 
 func (r *ccipChainReader) ExecutedMessages(
-	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
+	ctx context.Context,
+	source cciptypes.ChainSelector,
+	seqNumRange cciptypes.SeqNumRange,
+	confidence primitives.ConfidenceLevel,
 ) ([]cciptypes.SeqNum, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
@@ -362,7 +365,7 @@ func (r *ccipChainReader) ExecutedMessages(
 				}),
 				// We don't need to wait for an execute state changed event to be finalized
 				// before we optimistically mark a message as executed.
-				query.Confidence(primitives.Unconfirmed),
+				query.Confidence(confidence),
 			},
 		},
 		query.LimitAndSort{
