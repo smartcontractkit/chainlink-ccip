@@ -1791,7 +1791,9 @@ export type CcipOfframp = {
         {
           "name": "merkleRoot",
           "type": {
-            "defined": "MerkleRoot"
+            "option": {
+              "defined": "MerkleRoot"
+            }
           },
           "index": false
         },
@@ -3993,7 +3995,9 @@ export const IDL: CcipOfframp = {
         {
           "name": "merkleRoot",
           "type": {
-            "defined": "MerkleRoot"
+            "option": {
+              "defined": "MerkleRoot"
+            }
           },
           "index": false
         },
