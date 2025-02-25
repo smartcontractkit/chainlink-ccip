@@ -219,7 +219,6 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 			}
 			return addrBytes, nil
 		}).Maybe()
-
 	usdcReader, err := readerpkg.NewUSDCMessageReader(
 		tests.Context(t),
 		logger.Test(t),
