@@ -172,6 +172,7 @@ pub mod ccip_offramp {
         router: Pubkey,
         fee_quoter: Pubkey,
         offramp_lookup_table: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         let default_code_version: CodeVersion = ctx
             .accounts
@@ -185,6 +186,7 @@ pub mod ccip_offramp {
             router,
             fee_quoter,
             offramp_lookup_table,
+            rmn_remote,
         )
     }
 

@@ -673,7 +673,7 @@ func TestCCIPRouter(t *testing.T) {
 				Router:             [32]byte{1},
 				FeeQuoter:          [32]byte{2},
 				OfframpLookupTable: [32]byte{3},
-				RMNRemote:          [32]byte{4},
+				RmnRemote:          [32]byte{4},
 			}
 
 			// Now, actually initialize the offramp
@@ -712,7 +712,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, testReferenceAddresses.Router, refAddrEvent.Router)
 			require.Equal(t, testReferenceAddresses.FeeQuoter, refAddrEvent.FeeQuoter)
 			require.Equal(t, testReferenceAddresses.OfframpLookupTable, refAddrEvent.OfframpLookupTable)
-			require.Equal(t, testReferenceAddresses.RMNRemote, refAddrEvent.RMNRemote)
+			require.Equal(t, testReferenceAddresses.RmnRemote, refAddrEvent.RMNRemote)
 
 			var configSetEvent ccip.EventOfframpConfigSet
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
@@ -751,6 +751,7 @@ func TestCCIPRouter(t *testing.T) {
 					config.CcipRouterProgram,
 					config.FeeQuoterProgram,
 					lookupTableAddr,
+					config.RMNRemoteProgram,
 					config.OfframpConfigPDA,
 					config.OfframpReferenceAddressesPDA,
 					user.PublicKey(), // unauthorized user here
@@ -765,6 +766,7 @@ func TestCCIPRouter(t *testing.T) {
 					config.CcipRouterProgram,
 					config.FeeQuoterProgram,
 					lookupTableAddr,
+					config.RMNRemoteProgram,
 					config.OfframpConfigPDA,
 					config.OfframpReferenceAddressesPDA,
 					legacyAdmin.PublicKey(),
@@ -6621,8 +6623,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				globalCurse := rmn_remote.CurseSubject{
 					Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},

@@ -272,6 +272,10 @@
         {
           "name": "offrampLookupTable",
           "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
         }
       ]
     },
