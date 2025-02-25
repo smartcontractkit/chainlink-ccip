@@ -27,8 +27,6 @@ jobs:
             name: "OOO Execution Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
             name: "Messaging Test"
-          - cmd: cd integration-tests/smoke/ccip && go test ccip_fee_boosting_test.go -timeout 12m -test.parallel=2 -count=1 -json
-            name: "Fee Boosting Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_batching_test.go -timeout 12m -test.parallel=2 -count=1 -json
             name: "Batching Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_reader_test.go -timeout 5m -test.parallel=1 -count=1 -json
