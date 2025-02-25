@@ -123,7 +123,7 @@ type CommitOffchainConfig struct {
 	// SignObservationPrefix is the prefix used by the RMN node to sign observations.
 	SignObservationPrefix string `json:"signObservationPrefix"`
 
-	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
+	// TransmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
 
 	// InflightPriceCheckRetries is the number of rounds we wait for a price report to get recorded on the blockchain.
@@ -157,9 +157,15 @@ type CommitOffchainConfig struct {
 	TokenPriceAsyncObserverSyncTimeout commonconfig.Duration `json:"tokenPriceAsyncObserverSyncTimeout"`
 
 	// MaxRootsPerReport is the maximum number of roots to include in a single report.
+	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
+	// Disable by setting to 0.
+	// NOTE: this can only be used if RMNEnabled == false.
 	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
 
 	// MultipleReports is a flag to enable/disable multiple reports per round.
+	// This is typically set to true on chains that use 'MaxMerkleRootsPerReport'
+	// in order to avoid delays when there are reports from multiple sources.
+	// NOTE: this can only be used if RMNEnabled == false.
 	MultipleReports bool `json:"multipleReports"`
 }
 
