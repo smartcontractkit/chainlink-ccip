@@ -2787,12 +2787,12 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("applying a global curse", func(t *testing.T) {
-			global_curse := rmn_remote.CurseSubject{
+			globalCurse := rmn_remote.CurseSubject{
 				Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 			}
 
 			ix, err := rmn_remote.NewCurseInstruction(
-				global_curse,
+				globalCurse,
 				config.RMNRemoteConfigPDA,
 				legacyAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
@@ -2806,7 +2806,7 @@ func TestCCIPRouter(t *testing.T) {
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 1)
-			require.Equal(t, curses.CursedSubjects[0], global_curse)
+			require.Equal(t, curses.CursedSubjects[0], globalCurse)
 
 			// All subjects are cursed now
 			svmCurse := rmn_remote.CurseSubject{}
@@ -2833,7 +2833,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 
 			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
-				global_curse,
+				globalCurse,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
 			).ValidateAndBuild()
@@ -2924,12 +2924,12 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("removing a global curse", func(t *testing.T) {
-			global_curse := rmn_remote.CurseSubject{
+			globalCurse := rmn_remote.CurseSubject{
 				Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 			}
 
 			ix, err := rmn_remote.NewUncurseInstruction(
-				global_curse,
+				globalCurse,
 				config.RMNRemoteConfigPDA,
 				legacyAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
@@ -3019,12 +3019,12 @@ func TestCCIPRouter(t *testing.T) {
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
-			global_curse := rmn_remote.CurseSubject{
+			globalCurse := rmn_remote.CurseSubject{
 				Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 			}
 
 			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
-				global_curse,
+				globalCurse,
 				config.RMNRemoteCursesPDA,
 				config.RMNRemoteConfigPDA,
 			).ValidateAndBuild()
@@ -6613,13 +6613,13 @@ func TestCCIPRouter(t *testing.T) {
 				event := ccip.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
 
-				global_curse := rmn_remote.CurseSubject{
+				globalCurse := rmn_remote.CurseSubject{
 					Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 				}
 
 				// Curse is applied
 				ix, err := rmn_remote.NewCurseInstruction(
-					global_curse,
+					globalCurse,
 					config.RMNRemoteConfigPDA,
 					legacyAdmin.PublicKey(),
 					config.RMNRemoteCursesPDA,
@@ -6702,7 +6702,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				// Curse is removed
 				ix, err = rmn_remote.NewUncurseInstruction(
-					global_curse,
+					globalCurse,
 					config.RMNRemoteConfigPDA,
 					legacyAdmin.PublicKey(),
 					config.RMNRemoteCursesPDA,

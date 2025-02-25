@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"testing"
@@ -478,9 +479,84 @@ func TestTokenPool(t *testing.T) {
 							require.NoError(t, err)
 							result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 							require.NotNil(t, result)
-
 						})
 
+						t.Run("subject cursed", func(t *testing.T) {
+							evmCurse := rmn_remote.CurseSubject{}
+							binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+
+							ix, err := rmn_remote.NewCurseInstruction(
+								evmCurse,
+								config.RMNRemoteConfigPDA,
+								admin.PublicKey(),
+								config.RMNRemoteCursesPDA,
+								solana.SystemProgramID,
+							).ValidateAndBuild()
+							require.NoError(t, err)
+							result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+							require.NotNil(t, result)
+
+							lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+								test_ccip_invalid_receiver.LockOrBurnInV1{
+									LocalToken:          mint,
+									Amount:              amount,
+									RemoteChainSelector: config.EvmChainSelector,
+								},
+								p.PoolProgram,
+								dumbRampPoolSigner,
+								poolConfig,
+								v.tokenProgram,
+								mint,
+								poolSigner,
+								poolTokenAccount,
+								config.RMNRemoteProgram,
+								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigPDA,
+								p.Chain[config.EvmChainSelector],
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{lbI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
+
+							rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+								test_ccip_invalid_receiver.ReleaseOrMintInV1{
+									LocalToken:          mint,
+									SourcePoolAddress:   remotePool.Address,
+									Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
+									Receiver:            admin.PublicKey(),
+									RemoteChainSelector: config.EvmChainSelector,
+								},
+								config.CcipTokenPoolProgram,
+								dumbRampPoolSigner,
+								dumbRamp,
+								allowedOfframpPDA,
+								poolConfig,
+								v.tokenProgram,
+								mint,
+								poolSigner,
+								poolTokenAccount,
+								p.Chain[config.EvmChainSelector],
+								config.RMNRemoteProgram,
+								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigPDA,
+								p.User[admin.PublicKey()],
+							).ValidateAndBuild()
+
+							require.NoError(t, err)
+
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
+
+							ix, err = rmn_remote.NewUncurseInstruction(
+								evmCurse,
+								config.RMNRemoteConfigPDA,
+								admin.PublicKey(),
+								config.RMNRemoteCursesPDA,
+								solana.SystemProgramID,
+							).ValidateAndBuild()
+							require.NoError(t, err)
+							result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+							require.NotNil(t, result)
+						})
 						t.Run("exceed-rate-limit", func(t *testing.T) {
 							t.Parallel()
 
