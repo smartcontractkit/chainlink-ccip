@@ -15,8 +15,7 @@ export type FeeQuoter = {
         "* `svm_chain_selector` - The chain selector for SVM.",
         "* `default_gas_limit` - The default gas limit for other destination chains.",
         "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.",
-        "* `rmn_remote` - RMN Remote program, to verify ccip is not cursed when retrieving fees."
+        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
       ],
       "accounts": [
         {
@@ -56,10 +55,6 @@ export type FeeQuoter = {
         },
         {
           "name": "onramp",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
           "type": "publicKey"
         }
       ]
@@ -388,36 +383,6 @@ export type FeeQuoter = {
       ]
     },
     {
-      "name": "updateRmnRemote",
-      "docs": [
-        "Updates the RMN remote program in the configuration.",
-        "The Admin is the only one able to update the RMN remote program.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `rmn_remote,` - The new RMN remote address."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
       "name": "setTokenTransferFeeConfig",
       "docs": [
         "Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.",
@@ -710,10 +675,6 @@ export type FeeQuoter = {
           },
           {
             "name": "onramp",
-            "type": "publicKey"
-          },
-          {
-            "name": "rmnRemote",
             "type": "publicKey"
           },
           {
@@ -1248,11 +1209,6 @@ export type FeeQuoter = {
           "index": false
         },
         {
-          "name": "rmnRemote",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "defaultCodeVersion",
           "type": {
             "defined": "CodeVersion"
@@ -1491,181 +1447,176 @@ export type FeeQuoter = {
     },
     {
       "code": 8002,
-      "name": "InvalidRMNRemoteAddress",
-      "msg": "Invalid RMN Remote Address"
-    },
-    {
-      "code": 8003,
       "name": "ZeroGasLimit",
       "msg": "Gas limit is zero"
     },
     {
-      "code": 8004,
+      "code": 8003,
       "name": "DefaultGasLimitExceedsMaximum",
       "msg": "Default gas limit exceeds the maximum"
     },
     {
-      "code": 8005,
+      "code": 8004,
       "name": "InvalidVersion",
       "msg": "Invalid version of the onchain state"
     },
     {
-      "code": 8006,
+      "code": 8005,
       "name": "RedundantOwnerProposal",
       "msg": "Proposed owner is the current owner"
     },
     {
-      "code": 8007,
+      "code": 8006,
       "name": "InvalidInputsMissingWritable",
       "msg": "Account should be writable"
     },
     {
-      "code": 8008,
+      "code": 8007,
       "name": "InvalidInputsChainSelector",
       "msg": "Chain selector is invalid"
     },
     {
-      "code": 8009,
+      "code": 8008,
       "name": "InvalidInputsMint",
       "msg": "Mint account input is invalid"
     },
     {
-      "code": 8010,
+      "code": 8009,
       "name": "InvalidInputsMintOwner",
       "msg": "Mint account input has an invalid owner"
     },
     {
-      "code": 8011,
+      "code": 8010,
       "name": "InvalidInputsTokenConfigAccount",
       "msg": "Token config account is invalid"
     },
     {
-      "code": 8012,
+      "code": 8011,
       "name": "InvalidInputsMissingExtraArgs",
       "msg": "Missing extra args in message to SVM receiver"
     },
     {
-      "code": 8013,
+      "code": 8012,
       "name": "InvalidInputsMissingDataAfterExtraArgs",
       "msg": "Missing data after extra args tag"
     },
     {
-      "code": 8014,
+      "code": 8013,
       "name": "InvalidInputsDestChainStateAccount",
       "msg": "Destination chain state account is invalid"
     },
     {
-      "code": 8015,
+      "code": 8014,
       "name": "InvalidInputsPerChainPerTokenConfig",
       "msg": "Per chain per token config account is invalid"
     },
     {
-      "code": 8016,
+      "code": 8015,
       "name": "InvalidInputsBillingTokenConfig",
       "msg": "Billing token config account is invalid"
     },
     {
-      "code": 8017,
+      "code": 8016,
       "name": "InvalidInputsAccountCount",
       "msg": "Number of accounts provided is incorrect"
     },
     {
-      "code": 8018,
+      "code": 8017,
       "name": "InvalidInputsNoUpdates",
       "msg": "No price or gas update provided"
     },
     {
-      "code": 8019,
+      "code": 8018,
       "name": "InvalidInputsTokenAccounts",
       "msg": "Invalid token accounts"
     },
     {
-      "code": 8020,
+      "code": 8019,
       "name": "DestinationChainDisabled",
       "msg": "Destination chain disabled"
     },
     {
-      "code": 8021,
+      "code": 8020,
       "name": "FeeTokenDisabled",
       "msg": "Fee token disabled"
     },
     {
-      "code": 8022,
+      "code": 8021,
       "name": "MessageTooLarge",
       "msg": "Message exceeds maximum data size"
     },
     {
-      "code": 8023,
+      "code": 8022,
       "name": "UnsupportedNumberOfTokens",
       "msg": "Message contains an unsupported number of tokens"
     },
     {
-      "code": 8024,
+      "code": 8023,
       "name": "InvalidEVMAddress",
       "msg": "Invalid EVM address"
     },
     {
-      "code": 8025,
+      "code": 8024,
       "name": "InvalidEncoding",
       "msg": "Invalid encoding"
     },
     {
-      "code": 8026,
+      "code": 8025,
       "name": "InvalidTokenPrice",
       "msg": "Invalid token price"
     },
     {
-      "code": 8027,
+      "code": 8026,
       "name": "StaleGasPrice",
       "msg": "Stale gas price"
     },
     {
-      "code": 8028,
+      "code": 8027,
       "name": "InvalidInputsMissingTokenConfig",
       "msg": "Inputs are missing token configuration"
     },
     {
-      "code": 8029,
+      "code": 8028,
       "name": "MessageFeeTooHigh",
       "msg": "Message fee is too high"
     },
     {
-      "code": 8030,
+      "code": 8029,
       "name": "MessageGasLimitTooHigh",
       "msg": "Message gas limit too high"
     },
     {
-      "code": 8031,
+      "code": 8030,
       "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
       "msg": "Extra arg out of order execution must be true"
     },
     {
-      "code": 8032,
+      "code": 8031,
       "name": "InvalidExtraArgsTag",
       "msg": "Invalid extra args tag"
     },
     {
-      "code": 8033,
+      "code": 8032,
       "name": "InvalidChainFamilySelector",
       "msg": "Invalid chain family selector"
     },
     {
-      "code": 8034,
+      "code": 8033,
       "name": "InvalidTokenReceiver",
       "msg": "Invalid token receiver"
     },
     {
-      "code": 8035,
+      "code": 8034,
       "name": "InvalidSVMAddress",
       "msg": "Invalid SVM address"
     },
     {
-      "code": 8036,
+      "code": 8035,
       "name": "UnauthorizedPriceUpdater",
       "msg": "The caller is not an authorized price updater"
     },
     {
-      "code": 8037,
+      "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
@@ -1689,8 +1640,7 @@ export const IDL: FeeQuoter = {
         "* `svm_chain_selector` - The chain selector for SVM.",
         "* `default_gas_limit` - The default gas limit for other destination chains.",
         "* `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.",
-        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.",
-        "* `rmn_remote` - RMN Remote program, to verify ccip is not cursed when retrieving fees."
+        "* `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed."
       ],
       "accounts": [
         {
@@ -1730,10 +1680,6 @@ export const IDL: FeeQuoter = {
         },
         {
           "name": "onramp",
-          "type": "publicKey"
-        },
-        {
-          "name": "rmnRemote",
           "type": "publicKey"
         }
       ]
@@ -2062,36 +2008,6 @@ export const IDL: FeeQuoter = {
       ]
     },
     {
-      "name": "updateRmnRemote",
-      "docs": [
-        "Updates the RMN remote program in the configuration.",
-        "The Admin is the only one able to update the RMN remote program.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required for updating the configuration.",
-        "* `rmn_remote,` - The new RMN remote address."
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "rmnRemote",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
       "name": "setTokenTransferFeeConfig",
       "docs": [
         "Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.",
@@ -2384,10 +2300,6 @@ export const IDL: FeeQuoter = {
           },
           {
             "name": "onramp",
-            "type": "publicKey"
-          },
-          {
-            "name": "rmnRemote",
             "type": "publicKey"
           },
           {
@@ -2922,11 +2834,6 @@ export const IDL: FeeQuoter = {
           "index": false
         },
         {
-          "name": "rmnRemote",
-          "type": "publicKey",
-          "index": false
-        },
-        {
           "name": "defaultCodeVersion",
           "type": {
             "defined": "CodeVersion"
@@ -3165,181 +3072,176 @@ export const IDL: FeeQuoter = {
     },
     {
       "code": 8002,
-      "name": "InvalidRMNRemoteAddress",
-      "msg": "Invalid RMN Remote Address"
-    },
-    {
-      "code": 8003,
       "name": "ZeroGasLimit",
       "msg": "Gas limit is zero"
     },
     {
-      "code": 8004,
+      "code": 8003,
       "name": "DefaultGasLimitExceedsMaximum",
       "msg": "Default gas limit exceeds the maximum"
     },
     {
-      "code": 8005,
+      "code": 8004,
       "name": "InvalidVersion",
       "msg": "Invalid version of the onchain state"
     },
     {
-      "code": 8006,
+      "code": 8005,
       "name": "RedundantOwnerProposal",
       "msg": "Proposed owner is the current owner"
     },
     {
-      "code": 8007,
+      "code": 8006,
       "name": "InvalidInputsMissingWritable",
       "msg": "Account should be writable"
     },
     {
-      "code": 8008,
+      "code": 8007,
       "name": "InvalidInputsChainSelector",
       "msg": "Chain selector is invalid"
     },
     {
-      "code": 8009,
+      "code": 8008,
       "name": "InvalidInputsMint",
       "msg": "Mint account input is invalid"
     },
     {
-      "code": 8010,
+      "code": 8009,
       "name": "InvalidInputsMintOwner",
       "msg": "Mint account input has an invalid owner"
     },
     {
-      "code": 8011,
+      "code": 8010,
       "name": "InvalidInputsTokenConfigAccount",
       "msg": "Token config account is invalid"
     },
     {
-      "code": 8012,
+      "code": 8011,
       "name": "InvalidInputsMissingExtraArgs",
       "msg": "Missing extra args in message to SVM receiver"
     },
     {
-      "code": 8013,
+      "code": 8012,
       "name": "InvalidInputsMissingDataAfterExtraArgs",
       "msg": "Missing data after extra args tag"
     },
     {
-      "code": 8014,
+      "code": 8013,
       "name": "InvalidInputsDestChainStateAccount",
       "msg": "Destination chain state account is invalid"
     },
     {
-      "code": 8015,
+      "code": 8014,
       "name": "InvalidInputsPerChainPerTokenConfig",
       "msg": "Per chain per token config account is invalid"
     },
     {
-      "code": 8016,
+      "code": 8015,
       "name": "InvalidInputsBillingTokenConfig",
       "msg": "Billing token config account is invalid"
     },
     {
-      "code": 8017,
+      "code": 8016,
       "name": "InvalidInputsAccountCount",
       "msg": "Number of accounts provided is incorrect"
     },
     {
-      "code": 8018,
+      "code": 8017,
       "name": "InvalidInputsNoUpdates",
       "msg": "No price or gas update provided"
     },
     {
-      "code": 8019,
+      "code": 8018,
       "name": "InvalidInputsTokenAccounts",
       "msg": "Invalid token accounts"
     },
     {
-      "code": 8020,
+      "code": 8019,
       "name": "DestinationChainDisabled",
       "msg": "Destination chain disabled"
     },
     {
-      "code": 8021,
+      "code": 8020,
       "name": "FeeTokenDisabled",
       "msg": "Fee token disabled"
     },
     {
-      "code": 8022,
+      "code": 8021,
       "name": "MessageTooLarge",
       "msg": "Message exceeds maximum data size"
     },
     {
-      "code": 8023,
+      "code": 8022,
       "name": "UnsupportedNumberOfTokens",
       "msg": "Message contains an unsupported number of tokens"
     },
     {
-      "code": 8024,
+      "code": 8023,
       "name": "InvalidEVMAddress",
       "msg": "Invalid EVM address"
     },
     {
-      "code": 8025,
+      "code": 8024,
       "name": "InvalidEncoding",
       "msg": "Invalid encoding"
     },
     {
-      "code": 8026,
+      "code": 8025,
       "name": "InvalidTokenPrice",
       "msg": "Invalid token price"
     },
     {
-      "code": 8027,
+      "code": 8026,
       "name": "StaleGasPrice",
       "msg": "Stale gas price"
     },
     {
-      "code": 8028,
+      "code": 8027,
       "name": "InvalidInputsMissingTokenConfig",
       "msg": "Inputs are missing token configuration"
     },
     {
-      "code": 8029,
+      "code": 8028,
       "name": "MessageFeeTooHigh",
       "msg": "Message fee is too high"
     },
     {
-      "code": 8030,
+      "code": 8029,
       "name": "MessageGasLimitTooHigh",
       "msg": "Message gas limit too high"
     },
     {
-      "code": 8031,
+      "code": 8030,
       "name": "ExtraArgOutOfOrderExecutionMustBeTrue",
       "msg": "Extra arg out of order execution must be true"
     },
     {
-      "code": 8032,
+      "code": 8031,
       "name": "InvalidExtraArgsTag",
       "msg": "Invalid extra args tag"
     },
     {
-      "code": 8033,
+      "code": 8032,
       "name": "InvalidChainFamilySelector",
       "msg": "Invalid chain family selector"
     },
     {
-      "code": 8034,
+      "code": 8033,
       "name": "InvalidTokenReceiver",
       "msg": "Invalid token receiver"
     },
     {
-      "code": 8035,
+      "code": 8034,
       "name": "InvalidSVMAddress",
       "msg": "Invalid SVM address"
     },
     {
-      "code": 8036,
+      "code": 8035,
       "name": "UnauthorizedPriceUpdater",
       "msg": "The caller is not an authorized price updater"
     },
     {
-      "code": 8037,
+      "code": 8036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }

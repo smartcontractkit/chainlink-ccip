@@ -67,7 +67,7 @@ export type RmnRemote = {
         },
         {
           "name": "cursed",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -130,7 +130,7 @@ export type RmnRemote = {
         },
         {
           "name": "cursed",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -151,7 +151,7 @@ export type RmnRemote = {
     {
       "name": "curse",
       "docs": [
-        "Curses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),",
+        "Curses an abstract subject. If the subject is CurseSubject::GLOBAL,",
         "the entire chain will be cursed.",
         "",
         "Only the CCIP Admin may perform this operation",
@@ -195,8 +195,9 @@ export type RmnRemote = {
     {
       "name": "uncurse",
       "docs": [
-        "Uncurses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),",
-        "the entire chain curse will be lifted.",
+        "Uncurses an abstract subject. If the subject is CurseSubject::GLOBAL,",
+        "the entire chain curse will be lifted. (note that any other specific",
+        "subject curses will remain active.)",
         "",
         "Only the CCIP Admin may perform this operation",
         "",
@@ -566,7 +567,7 @@ export const IDL: RmnRemote = {
         },
         {
           "name": "cursed",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -629,7 +630,7 @@ export const IDL: RmnRemote = {
         },
         {
           "name": "cursed",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -650,7 +651,7 @@ export const IDL: RmnRemote = {
     {
       "name": "curse",
       "docs": [
-        "Curses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),",
+        "Curses an abstract subject. If the subject is CurseSubject::GLOBAL,",
         "the entire chain will be cursed.",
         "",
         "Only the CCIP Admin may perform this operation",
@@ -694,8 +695,9 @@ export const IDL: RmnRemote = {
     {
       "name": "uncurse",
       "docs": [
-        "Uncurses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),",
-        "the entire chain curse will be lifted.",
+        "Uncurses an abstract subject. If the subject is CurseSubject::GLOBAL,",
+        "the entire chain curse will be lifted. (note that any other specific",
+        "subject curses will remain active.)",
         "",
         "Only the CCIP Admin may perform this operation",
         "",

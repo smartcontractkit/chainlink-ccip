@@ -35,14 +35,12 @@ pub mod fee_quoter {
     /// * `default_gas_limit` - The default gas limit for other destination chains.
     /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
-    /// * `rmn_remote` - RMN Remote program, to verify ccip is not cursed when retrieving fees.
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
         link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
-        rmn_remote: Pubkey,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             version: 1,
@@ -52,14 +50,12 @@ pub mod fee_quoter {
             link_token_mint,
             onramp,
             default_code_version: CodeVersion::V1,
-            rmn_remote,
         });
 
         emit!(ConfigSet {
             max_fee_juels_per_msg,
             link_token_mint,
             onramp,
-            rmn_remote,
             default_code_version: CodeVersion::V1,
         });
 
@@ -196,17 +192,6 @@ pub mod fee_quoter {
         )
     }
 
-    /// Updates the RMN remote program in the configuration.
-    /// The Admin is the only one able to update the RMN remote program.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required for updating the configuration.
-    /// * `rmn_remote,` - The new RMN remote address.
-    pub fn update_rmn_remote(ctx: Context<UpdateConfig>, rmn_remote: Pubkey) -> Result<()> {
-        router::admin(ctx.accounts.config.default_code_version).update_rmn_remote(ctx, rmn_remote)
-    }
-
     /// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
     /// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
     /// and overwriting it if it does.
@@ -338,8 +323,6 @@ pub enum FeeQuoterError {
     Unauthorized = 2000,
     #[msg("Invalid inputs")]
     InvalidInputs,
-    #[msg("Invalid RMN Remote Address")]
-    InvalidRMNRemoteAddress,
     #[msg("Gas limit is zero")]
     ZeroGasLimit,
     #[msg("Default gas limit exceeds the maximum")]

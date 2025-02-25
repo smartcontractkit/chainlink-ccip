@@ -10,8 +10,9 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Uncurses an abstract subject. If the subject is CurseSubject::from_chain_selector(local_chain_selector),
-// the entire chain curse will be lifted.
+// Uncurses an abstract subject. If the subject is CurseSubject::GLOBAL,
+// the entire chain curse will be lifted. (note that any other specific
+// subject curses will remain active.)
 //
 // # Only the CCIP Admin may perform this operation
 //

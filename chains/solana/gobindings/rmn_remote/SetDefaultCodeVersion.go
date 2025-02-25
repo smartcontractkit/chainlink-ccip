@@ -24,7 +24,7 @@ type SetDefaultCodeVersion struct {
 
 	// [0] = [WRITE] config
 	//
-	// [1] = [WRITE] cursed
+	// [1] = [] cursed
 	//
 	// [2] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -57,7 +57,7 @@ func (inst *SetDefaultCodeVersion) GetConfigAccount() *ag_solanago.AccountMeta {
 
 // SetCursedAccount sets the "cursed" account.
 func (inst *SetDefaultCodeVersion) SetCursedAccount(cursed ag_solanago.PublicKey) *SetDefaultCodeVersion {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(cursed).WRITE()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(cursed)
 	return inst
 }
 

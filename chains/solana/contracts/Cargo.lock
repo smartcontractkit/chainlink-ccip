@@ -1027,7 +1027,6 @@ dependencies = [
  "bytemuck",
  "ethnum",
  "hex",
- "rmn_remote",
  "solana-program",
 ]
 

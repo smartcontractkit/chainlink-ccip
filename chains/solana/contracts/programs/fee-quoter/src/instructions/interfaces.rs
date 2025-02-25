@@ -88,6 +88,4 @@ pub trait Admin {
         mint: Pubkey,
         cfg: TokenTransferFeeConfig,
     ) -> Result<()>;
-
-    fn update_rmn_remote(&self, ctx: Context<UpdateConfig>, rmn_remote: Pubkey) -> Result<()>;
 }

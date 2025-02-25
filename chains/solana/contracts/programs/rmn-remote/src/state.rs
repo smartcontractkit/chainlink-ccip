@@ -15,6 +15,8 @@ pub struct CurseSubject {
 }
 
 impl CurseSubject {
+    // Global curse subject, standardized across chains and chain families. If this subject is
+    // cursed, all lanes starting to or ending in this chain are disabled.
     pub const GLOBAL: Self = {
         Self {
             value: [

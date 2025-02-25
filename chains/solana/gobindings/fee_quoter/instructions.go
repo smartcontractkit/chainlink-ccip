@@ -39,7 +39,6 @@ var (
 	// * `default_gas_limit` - The default gas limit for other destination chains.
 	// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
 	// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
-	// * `rmn_remote` - RMN Remote program, to verify ccip is not cursed when retrieving fees.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
 	// Transfers the ownership of the fee quoter to a new proposed owner.
@@ -123,15 +122,6 @@ var (
 	// * `chain_selector` - The destination chain selector to be updated.
 	// * `dest_chain_config` - The new configuration for the destination chain.
 	Instruction_UpdateDestChainConfig = ag_binary.TypeID([8]byte{215, 122, 81, 22, 190, 58, 219, 13})
-
-	// Updates the RMN remote program in the configuration.
-	// The Admin is the only one able to update the RMN remote program.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required for updating the configuration.
-	// * `rmn_remote,` - The new RMN remote address.
-	Instruction_UpdateRmnRemote = ag_binary.TypeID([8]byte{66, 12, 215, 147, 14, 176, 55, 214})
 
 	// Sets the token transfer fee configuration for a particular token when it's transferred to a particular dest chain.
 	// It is an upsert, initializing the per-chain-per-token config account if it doesn't exist
@@ -234,8 +224,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "DisableDestChain"
 	case Instruction_UpdateDestChainConfig:
 		return "UpdateDestChainConfig"
-	case Instruction_UpdateRmnRemote:
-		return "UpdateRmnRemote"
 	case Instruction_SetTokenTransferFeeConfig:
 		return "SetTokenTransferFeeConfig"
 	case Instruction_AddPriceUpdater:
@@ -292,9 +280,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"update_dest_chain_config", (*UpdateDestChainConfig)(nil),
-		},
-		{
-			"update_rmn_remote", (*UpdateRmnRemote)(nil),
 		},
 		{
 			"set_token_transfer_fee_config", (*SetTokenTransferFeeConfig)(nil),
