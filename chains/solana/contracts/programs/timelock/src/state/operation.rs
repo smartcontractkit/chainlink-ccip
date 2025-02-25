@@ -1,9 +1,22 @@
+//! # Timelock Operation Management
+//!
+//! This module implements the core data structures and functions for managing timelock operations.
+//! Operations represent batches of instructions that can be scheduled for delayed execution,
+//! providing governance safeguards for critical administrative actions.
+//!
+//! The timelock system uses a state machine approach where operations progress through
+//! several defined states, with cryptographic verification to ensure integrity.
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::solana_program::keccak::{hashv, HASH_BYTES};
 
 use crate::constants::ANCHOR_DISCRIMINATOR;
 
+/// Represents the current state of a timelock operation in its lifecycle.
+///
+/// Operations move through these states sequentially as they are prepared,
+/// scheduled, and eventually executed.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, PartialOrd)]
 pub enum OperationState {
     /// Operation is created but not yet finalized.
@@ -16,6 +29,12 @@ pub enum OperationState {
     Done,
 }
 
+/// Represents a batch of instructions that can be scheduled for delayed execution.
+///
+/// Operations are the core data structure of the timelock system. Each operation contains
+/// a set of instructions that will be executed atomically once the operation is ready.
+/// Operations include cryptographic safeguards (ID verification) and dependency tracking
+/// to ensure proper sequencing.
 #[account]
 pub struct Operation {
     pub state: OperationState,
@@ -127,13 +146,15 @@ impl Operation {
     }
 }
 
-// The native SVM's Instruction type from solana_program doesn't implement the AnchorSerialize trait.
-// This is a wrapper that provides serialization capabilities while maintaining the same functionality
+/// A serializable representation of a Solana instruction.
+///
+/// The native SVM's Instruction type from solana_program doesn't implement the AnchorSerialize trait.
+/// This wrapper provides serialization capabilities while maintaining the same functionality.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default, Debug)]
 pub struct InstructionData {
-    pub program_id: Pubkey,
-    pub data: Vec<u8>,
-    pub accounts: Vec<InstructionAccount>,
+    pub program_id: Pubkey, // Target program that will process this instruction
+    pub data: Vec<u8>,      // Instruction data passed to the program
+    pub accounts: Vec<InstructionAccount>, // Accounts required for this instruction
 }
 
 impl InstructionData {
@@ -153,12 +174,16 @@ impl From<&InstructionData> for Instruction {
     }
 }
 
+/// Represents an account used in an instruction, including its metadata.
+///
+/// This structure mirrors the AccountMeta used in Solana instructions
+/// but implements Anchor's serialization traits.
 // NOTE: space for InstructionAccount is calculated with InitSpace trait since it's static
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone, Default, Debug)]
 pub struct InstructionAccount {
-    pub pubkey: Pubkey,
-    pub is_signer: bool,
-    pub is_writable: bool,
+    pub pubkey: Pubkey,    // The account's public key
+    pub is_signer: bool,   // Whether the account is a signer for the instruction
+    pub is_writable: bool, // Whether the account is writable in the instruction
 }
 
 impl From<&InstructionAccount> for AccountMeta {
