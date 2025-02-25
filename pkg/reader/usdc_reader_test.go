@@ -94,6 +94,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 		},
 	}
 
+	mockAddrCodec := newMockAddressCodec(t)
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
@@ -102,7 +103,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				readers[k] = v
 			}
 
-			r, err := NewUSDCMessageReader(ctx, logger.Test(t), tc.tokensConfig, readers)
+			r, err := NewUSDCMessageReader(ctx, logger.Test(t), tc.tokensConfig, readers, mockAddrCodec)
 			if tc.errorMessage != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMessage)
@@ -183,7 +184,8 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 		},
 	}
 
-	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders)
+	mockAddrCodec := newMockAddressCodec(t)
+	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders, mockAddrCodec)
 	require.NoError(t, err)
 
 	tt := []struct {

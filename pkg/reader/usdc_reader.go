@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -80,10 +79,12 @@ func NewUSDCMessageReader(
 	lggr logger.Logger,
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+	addrCodec cciptypes.AddressCodec,
 ) (USDCMessageReader, error) {
 	boundContracts := make(map[cciptypes.ChainSelector]types.BoundContract)
 	for chainSelector, token := range tokensConfig {
-		bytesAddress, err := typconv.AddressStringToBytes(token.SourceMessageTransmitterAddr, uint64(chainSelector))
+
+		bytesAddress, err := addrCodec.AddressStringToBytes(token.SourceMessageTransmitterAddr, chainSelector)
 		if err != nil {
 			return nil, err
 		}
@@ -95,6 +96,7 @@ func NewUSDCMessageReader(
 			chainSelector,
 			consts.ContractNameCCTPMessageTransmitter,
 			bytesAddress,
+			addrCodec,
 		)
 		if err != nil {
 			return nil, err

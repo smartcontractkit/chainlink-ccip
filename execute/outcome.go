@@ -178,7 +178,7 @@ func (p *Plugin) getFilterOutcome(
 		p.destChain,
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
-		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces)),
+		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),
 		report.WithExtraMessageCheck(report.CheckIfInflight(p.inflightMessageCache.IsInflight)),
 		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),

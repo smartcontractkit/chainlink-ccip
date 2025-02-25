@@ -24,7 +24,6 @@ import (
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -62,12 +61,17 @@ func newCCIPChainReaderInternal(
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
 	}
 
+	offrampAddrStr, err := addrCodec.AddressBytesToString(offrampAddress, destChain)
+	if err != nil {
+		panic(fmt.Sprintf("failed to convert offramp address to string: %v", err))
+	}
+
 	reader := &ccipChainReader{
 		lggr:            lggr,
 		contractReaders: crs,
 		contractWriters: contractWriters,
 		destChain:       destChain,
-		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
+		offrampAddress:  offrampAddrStr,
 		addrCodec:       addrCodec,
 	}
 
@@ -159,8 +163,33 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	}
 
 	ev := CommitReportAcceptedEvent{}
+	iter, err := r.queryCommitReports(ctx, ts, limit, &ev)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+	}
 
-	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
+	lggr.Debugw("queried commit reports", "numReports", len(iter),
+		"destChain", r.destChain,
+		"ts", ts,
+		"limit", limit*2)
+
+	reports, err := r.processCommitReports(iter, ts, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	lggr.Debugw("decoded commit reports", "reports", reports)
+
+	if len(reports) < limit {
+		return reports, nil
+	}
+	return reports[:limit], nil
+}
+
+func (r *ccipChainReader) queryCommitReports(
+	ctx context.Context, ts time.Time, limit int, ev *CommitReportAcceptedEvent,
+) ([]types.Sequence, error) {
+	return r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
 		query.KeyFilter{
@@ -178,16 +207,14 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				Count: uint64(limit * 2),
 			},
 		},
-		&ev,
+		ev,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query offRamp: %w", err)
-	}
-	lggr.Debugw("queried commit reports", "numReports", len(iter),
-		"destChain", r.destChain,
-		"ts", ts,
-		"limit", limit*2)
+}
 
+func (r *ccipChainReader) processCommitReports(
+	iter []types.Sequence, ts time.Time, limit int,
+) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+	lggr := r.lggr
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
 		ev, err := validateCommitReportAcceptedEvent(item, ts)
@@ -203,52 +230,11 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			isBlessed[mr.MerkleRoot] = true
 		}
 		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
-		blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.BlessedMerkleRoots))
-		unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.UnblessedMerkleRoots))
-		for _, mr := range allMerkleRoots {
-			onRampAddress, err := r.GetContractAddress(
-				consts.ContractNameOnRamp,
-				cciptypes.ChainSelector(mr.SourceChainSelector),
-			)
-			if err != nil {
-				r.lggr.Errorw("get onRamp address for selector", "sourceChain", mr.SourceChainSelector, "err", err)
-				continue
-			}
+		blessedMerkleRoots, unblessedMerkleRoots := r.processMerkleRoots(allMerkleRoots, isBlessed)
 
-			mrc := cciptypes.MerkleRootChain{
-				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
-				OnRampAddress: onRampAddress,
-				SeqNumsRange: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(mr.MinSeqNr),
-					cciptypes.SeqNum(mr.MaxSeqNr),
-				),
-				MerkleRoot: mr.MerkleRoot,
-			}
-			if isBlessed[mr.MerkleRoot] {
-				blessedMerkleRoots = append(blessedMerkleRoots, mrc)
-			} else {
-				unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
-			}
-		}
-
-		priceUpdates := cciptypes.PriceUpdates{
-			TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
-			GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
-		}
-
-		for _, tokenPriceUpdate := range ev.PriceUpdates.TokenPriceUpdates {
-			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: cciptypes.UnknownEncodedAddress(
-					typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
-				Price: cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
-			})
-		}
-
-		for _, gasPriceUpdate := range ev.PriceUpdates.GasPriceUpdates {
-			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates, cciptypes.GasPriceChain{
-				ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
-				GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
-			})
+		priceUpdates, err := r.processPriceUpdates(ev.PriceUpdates)
+		if err != nil {
+			return nil, err
 		}
 
 		blockNum, err := strconv.ParseUint(item.Head.Height, 10, 64)
@@ -273,6 +259,65 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		return reports, nil
 	}
 	return reports[:limit], nil
+}
+
+func (r *ccipChainReader) processMerkleRoots(
+	allMerkleRoots []MerkleRoot, isBlessed map[cciptypes.Bytes32]bool,
+) ([]cciptypes.MerkleRootChain, []cciptypes.MerkleRootChain) {
+	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
+	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
+	for _, mr := range allMerkleRoots {
+		onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, cciptypes.ChainSelector(mr.SourceChainSelector))
+		if err != nil {
+			continue
+		}
+		mrc := cciptypes.MerkleRootChain{
+			ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
+			OnRampAddress: onRampAddress,
+			SeqNumsRange: cciptypes.NewSeqNumRange(
+				cciptypes.SeqNum(mr.MinSeqNr),
+				cciptypes.SeqNum(mr.MaxSeqNr),
+			),
+			MerkleRoot: mr.MerkleRoot,
+		}
+		if isBlessed[mr.MerkleRoot] {
+			blessedMerkleRoots = append(blessedMerkleRoots, mrc)
+		} else {
+			unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
+		}
+	}
+	return blessedMerkleRoots, unblessedMerkleRoots
+}
+
+func (r *ccipChainReader) processPriceUpdates(
+	priceUpdates PriceUpdates,
+) (cciptypes.PriceUpdates, error) {
+	lggr := r.lggr
+	updates := cciptypes.PriceUpdates{
+		TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
+		GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
+	}
+
+	for _, tokenPriceUpdate := range priceUpdates.TokenPriceUpdates {
+		sourceTokenAddrStr, err := r.addrCodec.AddressBytesToString(tokenPriceUpdate.SourceToken, r.destChain)
+		if err != nil {
+			lggr.Errorw("failed to convert source token address to string", "err", err)
+			return updates, err
+		}
+		updates.TokenPriceUpdates = append(updates.TokenPriceUpdates, cciptypes.TokenPrice{
+			TokenID: cciptypes.UnknownEncodedAddress(sourceTokenAddrStr),
+			Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
+		})
+	}
+
+	for _, gasPriceUpdate := range priceUpdates.GasPriceUpdates {
+		updates.GasPriceUpdates = append(updates.GasPriceUpdates, cciptypes.GasPriceChain{
+			ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
+			GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
+		})
+	}
+
+	return updates, nil
 }
 
 type ExecutionStateChangedEvent struct {
@@ -582,7 +627,7 @@ func (r *ccipChainReader) Nonces(
 	responses := make([]uint64, len(addresses))
 
 	for i, address := range addresses {
-		sender, err := typeconv.AddressStringToBytes(address, uint64(sourceChainSelector))
+		sender, err := r.addrCodec.AddressStringToBytes(address, sourceChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 		}
@@ -1083,7 +1128,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 			}
 
 			// try to bind
-			_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chainSel, contractName, address)
+			_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chainSel, contractName, address, r.addrCodec)
 			if err != nil {
 				if errors.Is(err, ErrContractReaderNotFound) {
 					// don't support this chain
@@ -1110,7 +1155,7 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
 	}
 
-	addressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(chain))
+	addressBytes, err := r.addrCodec.AddressStringToBytes(bindings[0].Binding.Address, chain)
 	if err != nil {
 		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
 	}
@@ -1404,7 +1449,7 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	lggr logger.Logger,
 	chain cciptypes.ChainSelector,
 	rmnRemoteProxyAddress []byte) ([]byte, error) {
-	_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
+	_, err := bindExtendedReaderContract(ctx, lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress, r.addrCodec)
 	if err != nil {
 		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
 	}
