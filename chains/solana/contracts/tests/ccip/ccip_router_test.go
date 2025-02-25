@@ -134,7 +134,10 @@ func TestCCIPRouter(t *testing.T) {
 	emptyAddress := [64]byte{}
 
 	validSourceChainConfig := ccip_offramp.SourceChainConfig{
-		OnRamp:    [2][64]byte{onRampAddress, emptyAddress},
+		OnRamp: [2]ccip_offramp.OnRampAddress{{
+			Bytes: onRampAddress,
+			Len:   3,
+		}},
 		IsEnabled: true,
 	}
 	validFqDestChainConfig := fee_quoter.DestChainConfig{
@@ -951,7 +954,9 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-				require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				onRampAddress := [64]byte{1, 2, 3}
+
+				require.Equal(t, [2]ccip_offramp.OnRampAddress{{Bytes: onRampAddress, Len: 3}, {Bytes: emptyAddress, Len: 0}}, sourceChainStateAccount.Config.OnRamp)
 			})
 		})
 
@@ -960,7 +965,15 @@ func TestCCIPRouter(t *testing.T) {
 
 			// the router is the SVM onramp
 			paddedCcipRouterProgram := common.ToPadded64Bytes(config.CcipRouterProgram.Bytes())
-			onRampConfig := [2][64]byte{paddedCcipRouterProgram, emptyAddress}
+			onRampConfig := [2]ccip_offramp.OnRampAddress{
+				{
+					Bytes: paddedCcipRouterProgram,
+					Len:   32,
+				}, {
+					Bytes: emptyAddress,
+					Len:   0,
+				},
+			}
 
 			t.Run("CCIP Router", func(t *testing.T) {
 				instruction, err := ccip_router.NewAddChainSelectorInstruction(
@@ -1013,7 +1026,7 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewAddSourceChainInstruction(
 					config.SvmChainSelector,
 					ccip_offramp.SourceChainConfig{
-						OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
+						OnRamp:    onRampConfig,
 						IsEnabled: true,
 					},
 					config.OfframpSvmSourceChainPDA,
@@ -1030,7 +1043,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-				require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				require.Equal(t, [2]ccip_offramp.OnRampAddress{{Bytes: paddedCcipRouterProgram, Len: 32}, {Bytes: emptyAddress, Len: 0}}, sourceChainStateAccount.Config.OnRamp)
 			})
 		})
 
@@ -6972,10 +6985,11 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("Router authorization of offramp for lanes", func(t *testing.T) {
 					// Check SVM is an accepted source chain
-					svmOnramp := common.ToPadded64Bytes(config.CcipRouterProgram[:])
 					var sourceChain ccip_offramp.SourceChain
 					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChain))
-					require.Contains(t, sourceChain.Config.OnRamp, svmOnramp)
+					t.Log(sourceChain.Config)
+					require.Equal(t, sourceChain.Config.OnRamp[0].Bytes[0:32], config.CcipRouterProgram[:])
+					require.Equal(t, sourceChain.Config.OnRamp[0].Len, uint32(32))
 
 					// Check offramp program is not registered in router as valid offramp for SVM<>SVM lane
 					testutils.AssertClosedAccount(ctx, t, solanaGoClient, config.AllowedOfframpSvmPDA, config.DefaultCommitment)
