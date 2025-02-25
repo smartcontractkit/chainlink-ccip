@@ -402,6 +402,85 @@ func TestTokenPool(t *testing.T) {
 							}
 						})
 
+						t.Run("globally cursed", func(t *testing.T) {
+							global_curse := rmn_remote.CurseSubject{
+								Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+							}
+
+							ix, err := rmn_remote.NewCurseInstruction(
+								global_curse,
+								config.RMNRemoteConfigPDA,
+								admin.PublicKey(),
+								config.RMNRemoteCursesPDA,
+								solana.SystemProgramID,
+							).ValidateAndBuild()
+							require.NoError(t, err)
+							result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+							require.NotNil(t, result)
+
+							lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
+								test_ccip_invalid_receiver.LockOrBurnInV1{
+									LocalToken:          mint,
+									Amount:              amount,
+									RemoteChainSelector: config.EvmChainSelector,
+								},
+								p.PoolProgram,
+								dumbRampPoolSigner,
+								poolConfig,
+								v.tokenProgram,
+								mint,
+								poolSigner,
+								poolTokenAccount,
+								config.RMNRemoteProgram,
+								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigPDA,
+								p.Chain[config.EvmChainSelector],
+							).ValidateAndBuild()
+							require.NoError(t, err)
+
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{lbI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+
+							rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
+								test_ccip_invalid_receiver.ReleaseOrMintInV1{
+									LocalToken:          mint,
+									SourcePoolAddress:   remotePool.Address,
+									Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
+									Receiver:            admin.PublicKey(),
+									RemoteChainSelector: config.EvmChainSelector,
+								},
+								config.CcipTokenPoolProgram,
+								dumbRampPoolSigner,
+								dumbRamp,
+								allowedOfframpPDA,
+								poolConfig,
+								v.tokenProgram,
+								mint,
+								poolSigner,
+								poolTokenAccount,
+								p.Chain[config.EvmChainSelector],
+								config.RMNRemoteProgram,
+								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigPDA,
+								p.User[admin.PublicKey()],
+							).ValidateAndBuild()
+
+							require.NoError(t, err)
+
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+
+							ix, err = rmn_remote.NewUncurseInstruction(
+								global_curse,
+								config.RMNRemoteConfigPDA,
+								admin.PublicKey(),
+								config.RMNRemoteCursesPDA,
+								solana.SystemProgramID,
+							).ValidateAndBuild()
+							require.NoError(t, err)
+							result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+							require.NotNil(t, result)
+
+						})
+
 						t.Run("exceed-rate-limit", func(t *testing.T) {
 							t.Parallel()
 
