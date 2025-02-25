@@ -229,6 +229,7 @@ func TestPluginReports(t *testing.T) {
 				ocrTypeCodec:    ocrTypeCodec,
 				oracleIDToP2PID: map[commontypes.OracleID]libocrtypes.PeerID{1: {1}},
 				chainSupport:    cs,
+				reportBuilder:   buildStandardReport,
 			}
 			cs.EXPECT().SupportsDestChain(commontypes.OracleID(1)).Return(true, nil).Maybe()
 
