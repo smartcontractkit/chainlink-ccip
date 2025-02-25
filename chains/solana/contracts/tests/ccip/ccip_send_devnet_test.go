@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
-//go:embed _gitignore.config.yaml
+//go:embed devnet.config.yaml
 var devnetInfoBuffer []byte
 
 func TestDevnet(t *testing.T) {
