@@ -40,6 +40,9 @@ func TestDevnet(t *testing.T) {
 	routerAddress, err := solana.PublicKeyFromBase58(devnetInfo.Router)
 	require.NoError(t, err)
 
+	// this makes it so that instructions for the router target the right program id in devnet
+	ccip_router.SetProgramID(routerAddress)
+
 	user := solana.PrivateKey(devnetInfo.UserPrivK)
 	require.True(t, user.IsValid())
 
@@ -49,48 +52,58 @@ func TestDevnet(t *testing.T) {
 	var routerConfig ccip_router.Config
 
 	t.Run("Read Config PDA", func(t *testing.T) {
-		common.GetAccountDataBorshInto(ctx, client, configPDA, rpc.CommitmentConfirmed, &routerConfig)
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, configPDA, rpc.CommitmentConfirmed, &routerConfig))
 		fmt.Printf("Router Config: %+v\n", routerConfig)
 	})
 
+	destinationChainSelector := uint64(16015286601757825753) // sepolia
+
+	destinationChainStatePDA, err := state.FindDestChainStatePDA(destinationChainSelector, routerAddress)
+	require.NoError(t, err)
+
+	nonceEvmPDA, err := state.FindNoncePDA(destinationChainSelector, user.PublicKey(), routerAddress)
+	require.NoError(t, err)
+
+	billingSignerPDA, _, err := state.FindFeeBillingSignerPDA(routerAddress)
+	require.NoError(t, err)
+
+	// TODO: create in FeeQuoter the wsol receiver --> Register WSOL as a valid fee token
+	wsolReceiver, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, billingSignerPDA)
+	require.NoError(t, err)
+
+	fqConfigPDA, _, err := state.FindFqConfigPDA(routerConfig.FeeQuoter)
+	require.NoError(t, err)
+
+	fqDestChainPDA, _, err := state.FindFqDestChainPDA(destinationChainSelector, routerConfig.FeeQuoter)
+	require.NoError(t, err)
+
+	fqBillingTokenConfigPDA, _, err := state.FindFqBillingTokenConfigPDA(solana.SolMint, routerConfig.FeeQuoter)
+	require.NoError(t, err)
+
+	fqLinkBillingConfigPDA, _, err := state.FindFqBillingTokenConfigPDA(routerConfig.LinkTokenMint, routerConfig.FeeQuoter)
+	require.NoError(t, err)
+
+	externalTpSignerPDA, _, err := state.FindExternalTokenPoolsSignerPDA(routerAddress)
+	require.NoError(t, err)
+
+	t.Run("Read other PDAs", func(t *testing.T) {
+		var calcDestChainState ccip_router.DestChain
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, destinationChainStatePDA, rpc.CommitmentConfirmed, &calcDestChainState))
+		fmt.Printf("(Calculated) DestChainState: %+v\n", calcDestChainState)
+
+		var loggedDestChainState ccip_router.DestChain
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, solana.MustPublicKeyFromBase58("6WwuJ4Z2RCkzZs2XY5TRhhGVGeBwSzC74sSBzoddfBPd"), rpc.CommitmentConfirmed, &loggedDestChainState))
+		fmt.Printf("(Logged) DestChainState: %+v\n", loggedDestChainState)
+	})
+
+	message := ccip_router.SVM2AnyMessage{
+		FeeToken:  solana.SolMint,
+		Receiver:  []byte{1, 2, 3}, // TODO
+		Data:      []byte{4, 5, 6},
+		ExtraArgs: []byte{},
+	}
+
 	t.Run("OnRamp: CCIP Send", func(t *testing.T) {
-		destinationChainSelector := uint64(16423721717087811551) // "svm"
-
-		destinationChainStatePDA, err := state.FindDestChainStatePDA(destinationChainSelector, routerAddress)
-		require.NoError(t, err)
-
-		nonceEvmPDA, err := state.FindNoncePDA(destinationChainSelector, user.PublicKey(), routerAddress)
-		require.NoError(t, err)
-
-		billingSignerPDA, _, err := state.FindFeeBillingSignerPDA(routerAddress)
-		require.NoError(t, err)
-
-		// TODO: create in FeeQuoter the wsol receiver --> Register WSOL as a valid fee token
-		wsolReceiver, _, err := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, billingSignerPDA)
-		require.NoError(t, err)
-
-		fqConfigPDA, _, err := state.FindFqConfigPDA(routerConfig.FeeQuoter)
-		require.NoError(t, err)
-
-		fqDestChainPDA, _, err := state.FindFqDestChainPDA(destinationChainSelector, routerConfig.FeeQuoter)
-		require.NoError(t, err)
-
-		fqBillingTokenConfigPDA, _, err := state.FindFqBillingTokenConfigPDA(solana.SolMint, routerConfig.FeeQuoter)
-		require.NoError(t, err)
-
-		fqLinkBillingConfigPDA, _, err := state.FindFqBillingTokenConfigPDA(routerConfig.LinkTokenMint, routerConfig.FeeQuoter)
-		require.NoError(t, err)
-
-		externalTpSignerPDA, _, err := state.FindExternalTokenPoolsSignerPDA(routerAddress)
-		require.NoError(t, err)
-
-		message := ccip_router.SVM2AnyMessage{
-			FeeToken:  solana.SolMint,
-			Receiver:  []byte{1, 2, 3}, // TODO
-			Data:      []byte{4, 5, 6},
-			ExtraArgs: []byte{},
-		}
-
 		raw := ccip_router.NewCcipSendInstruction(
 			destinationChainSelector,
 			message,
@@ -112,48 +125,10 @@ func TestDevnet(t *testing.T) {
 			fqLinkBillingConfigPDA,
 			externalTpSignerPDA,
 		)
-		raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+		// raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
 		instruction, err := raw.ValidateAndBuild()
 		require.NoError(t, err)
 		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{instruction}, user, rpc.CommitmentConfirmed)
 		require.NotNil(t, result)
 	})
 }
-
-/*
-	destinationChainSelector := config.EvmChainSelector
-	destinationChainStatePDA := config.EvmDestChainStatePDA
-	message := ccip_router.SVM2AnyMessage{
-		FeeToken:  wsol.mint,
-		Receiver:  validReceiverAddress[:],
-		Data:      []byte{4, 5, 6},
-		ExtraArgs: emptyEVMExtraArgsV2,
-	}
-
-	raw := ccip_router.NewCcipSendInstruction(
-		destinationChainSelector,
-		message,
-		[]byte{},
-		config.RouterConfigPDA,
-		destinationChainStatePDA,
-		nonceEvmPDA,
-		user.PublicKey(),
-		solana.SystemProgramID,
-		wsol.program,
-		wsol.mint,
-		wsol.userATA,
-		wsol.billingATA,
-		config.BillingSignerPDA,
-		config.FeeQuoterProgram,
-		config.FqConfigPDA,
-		config.FqEvmDestChainPDA,
-		wsol.fqBillingConfigPDA,
-		link22.fqBillingConfigPDA,
-		config.ExternalTokenPoolsSignerPDA,
-	)
-	raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-	instruction, err := raw.ValidateAndBuild()
-	require.NoError(t, err)
-	result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
-	require.NotNil(t, result)
-*/
