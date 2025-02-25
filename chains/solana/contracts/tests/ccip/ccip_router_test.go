@@ -2794,6 +2794,7 @@ func TestCCIPRouter(t *testing.T) {
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 1)
+			require.Equal(t, curses.CursedSubjects[0], global_curse)
 		})
 
 		t.Run("ccip_send fails with a global curse active", func(t *testing.T) {
@@ -2837,6 +2838,46 @@ func TestCCIPRouter(t *testing.T) {
 			require.NotNil(t, result)
 		})
 
+		t.Run("commit fails with a global curse active", func(t *testing.T) {
+			report := ccip_offramp.CommitInput{
+				MerkleRoot:   nil,
+				PriceUpdates: ccip_offramp.PriceUpdates{},
+			}
+
+			reportContext := ccip.NextCommitReportContext()
+
+			sigs, err := ccip.SignCommitReport(reportContext, report, signers)
+			require.NoError(t, err)
+
+			transmitter := getTransmitter()
+
+			raw := ccip_offramp.NewCommitPriceOnlyInstruction(
+				reportContext,
+				testutils.MustMarshalBorsh(t, report),
+				sigs.Rs,
+				sigs.Ss,
+				sigs.RawVs,
+				config.OfframpConfigPDA,
+				config.OfframpReferenceAddressesPDA,
+				transmitter.PublicKey(),
+				solana.SystemProgramID,
+				solana.SysVarInstructionsPubkey,
+				config.OfframpBillingSignerPDA,
+				config.FeeQuoterProgram,
+				config.FqAllowedPriceUpdaterOfframpPDA,
+				config.FqConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			)
+
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+			require.NotNil(t, result)
+		})
+
 		t.Run("removing a global curse", func(t *testing.T) {
 			global_curse := rmn_remote.CurseSubject{
 				Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
@@ -2844,6 +2885,125 @@ func TestCCIPRouter(t *testing.T) {
 
 			ix, err := rmn_remote.NewUncurseInstruction(
 				global_curse,
+				config.RMNRemoteConfigPDA,
+				legacyAdmin.PublicKey(),
+				config.RMNRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			var curses rmn_remote.Curses
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			require.NoError(t, err, "failed to get account info")
+			require.Equal(t, len(curses.CursedSubjects), 0)
+		})
+
+		t.Run("adding chain selector curses", func(t *testing.T) {
+			svmCurse := rmn_remote.CurseSubject{}
+			binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
+			evmCurse := rmn_remote.CurseSubject{}
+			binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+
+			ix, err := rmn_remote.NewCurseInstruction(
+				svmCurse,
+				config.RMNRemoteConfigPDA,
+				legacyAdmin.PublicKey(),
+				config.RMNRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			var curses rmn_remote.Curses
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			require.NoError(t, err, "failed to get account info")
+			require.Equal(t, len(curses.CursedSubjects), 1)
+			require.Equal(t, curses.CursedSubjects[0], svmCurse)
+
+			ix, err = rmn_remote.NewCurseInstruction(
+				evmCurse,
+				config.RMNRemoteConfigPDA,
+				legacyAdmin.PublicKey(),
+				config.RMNRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			require.NoError(t, err, "failed to get account info")
+			require.Equal(t, len(curses.CursedSubjects), 2)
+			require.Equal(t, curses.CursedSubjects[0], svmCurse)
+			require.Equal(t, curses.CursedSubjects[1], evmCurse)
+
+			ix, err = rmn_remote.NewUncurseInstruction(
+				svmCurse,
+				config.RMNRemoteConfigPDA,
+				legacyAdmin.PublicKey(),
+				config.RMNRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
+			require.NoError(t, err, "failed to get account info")
+			require.Equal(t, len(curses.CursedSubjects), 1)
+			require.Equal(t, curses.CursedSubjects[0], evmCurse)
+
+		})
+
+		t.Run("ccip_send fails with a cursed destination", func(t *testing.T) {
+			destinationChainSelector := config.EvmChainSelector
+			destinationChainStatePDA := config.EvmDestChainStatePDA
+			message := ccip_router.SVM2AnyMessage{
+				FeeToken:  wsol.mint,
+				Receiver:  validReceiverAddress[:],
+				Data:      []byte{4, 5, 6},
+				ExtraArgs: emptyEVMExtraArgsV2,
+			}
+
+			raw := ccip_router.NewCcipSendInstruction(
+				destinationChainSelector,
+				message,
+				[]byte{},
+				config.RouterConfigPDA,
+				destinationChainStatePDA,
+				nonceEvmPDA,
+				user.PublicKey(),
+				solana.SystemProgramID,
+				wsol.program,
+				wsol.mint,
+				wsol.userATA,
+				wsol.billingATA,
+				config.BillingSignerPDA,
+				config.FeeQuoterProgram,
+				config.FqConfigPDA,
+				config.FqEvmDestChainPDA,
+				wsol.fqBillingConfigPDA,
+				link22.fqBillingConfigPDA,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+				config.ExternalTokenPoolsSignerPDA,
+			)
+			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
+			require.NotNil(t, result)
+		})
+
+		t.Run("cleanup", func(t *testing.T) {
+			evmCurse := rmn_remote.CurseSubject{}
+			binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+			ix, err := rmn_remote.NewUncurseInstruction(
+				evmCurse,
 				config.RMNRemoteConfigPDA,
 				legacyAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
@@ -6326,6 +6486,154 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Message: Source chain selector not supported."})
+			})
+
+			t.Run("execute fails with a global curse active", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				sourceChainSelector := config.EvmChainSelector
+				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID})
+				sequenceNumber := message.Header.SequenceNumber
+				reportContext := ccip.NextCommitReportContext()
+
+				commitReport := ccip_offramp.CommitInput{
+					MerkleRoot: &ccip_offramp.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := state.FindOfframpCommitReportPDA(config.EvmChainSelector, root, config.CcipOfframpProgram)
+				require.NoError(t, err)
+
+				instruction, err := ccip_offramp.NewCommitInstruction(
+					reportContext,
+					testutils.MustMarshalBorsh(t, commitReport),
+					sigs.Rs,
+					sigs.Ss,
+					sigs.RawVs,
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpBillingSignerPDA,
+					config.FeeQuoterProgram,
+					config.FqAllowedPriceUpdaterOfframpPDA,
+					config.FqConfigPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT)) // signature verification compute unit amounts can vary depending on sorting
+				event := ccip.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+
+				global_curse := rmn_remote.CurseSubject{
+					Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+				}
+
+				// Curse is applied
+				ix, err := rmn_remote.NewCurseInstruction(
+					global_curse,
+					config.RMNRemoteConfigPDA,
+					legacyAdmin.PublicKey(),
+					config.RMNRemoteCursesPDA,
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				executionReport := ccip_offramp.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Root:                root,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+				raw := ccip_offramp.NewExecuteInstruction(
+					testutils.MustMarshalBorsh(t, executionReport),
+					reportContext,
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					config.OfframpExternalExecutionConfigPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+
+				raw.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+				require.NotNil(t, result)
+
+				// Manually execution fails in the same way
+				manual := ccip_offramp.NewManuallyExecuteInstruction(
+					testutils.MustMarshalBorsh(t, executionReport),
+					[]byte{},
+					config.OfframpConfigPDA,
+					config.OfframpReferenceAddressesPDA,
+					config.OfframpEvmSourceChainPDA,
+					rootPDA,
+					config.CcipOfframpProgram,
+					config.AllowedOfframpEvmPDA,
+					config.OfframpExternalExecutionConfigPDA,
+					user.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.OfframpTokenPoolsSignerPDA,
+					config.RMNRemoteProgram,
+					config.RMNRemoteCursesPDA,
+					config.RMNRemoteConfigPDA,
+				)
+				manual.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipLogicReceiver, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+				require.NotNil(t, result)
+
+				// Curse is removed
+				ix, err = rmn_remote.NewUncurseInstruction(
+					global_curse,
+					config.RMNRemoteConfigPDA,
+					legacyAdmin.PublicKey(),
+					config.RMNRemoteCursesPDA,
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
 			})
 
 			t.Run("When executing a report with unsupported source chain selector account, it fails", func(t *testing.T) {
