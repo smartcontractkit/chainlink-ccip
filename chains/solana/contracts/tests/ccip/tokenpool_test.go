@@ -404,12 +404,12 @@ func TestTokenPool(t *testing.T) {
 						})
 
 						t.Run("globally cursed", func(t *testing.T) {
-							global_curse := rmn_remote.CurseSubject{
+							globalCurse := rmn_remote.CurseSubject{
 								Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 							}
 
 							ix, err := rmn_remote.NewCurseInstruction(
-								global_curse,
+								globalCurse,
 								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
 								config.RMNRemoteCursesPDA,
@@ -470,7 +470,7 @@ func TestTokenPool(t *testing.T) {
 							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
 
 							ix, err = rmn_remote.NewUncurseInstruction(
-								global_curse,
+								globalCurse,
 								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
 								config.RMNRemoteCursesPDA,
