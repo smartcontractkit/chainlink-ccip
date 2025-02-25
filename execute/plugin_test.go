@@ -994,7 +994,11 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 		Return(nil, fmt.Errorf("test error"))
 	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: ocrTypeCodec}
 	report, err := ocrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
-		exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}))
+		exectypes.Unknown, nil,
+		cciptypes.ExecutePluginReport{ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+			{},
+			{},
+		}}))
 	require.NoError(t, err)
 
 	_, err = p.Reports(ctx, 0, report)
