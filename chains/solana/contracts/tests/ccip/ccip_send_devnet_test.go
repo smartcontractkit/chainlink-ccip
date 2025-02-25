@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	_ "embed"
 	"fmt"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -16,17 +18,29 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
+//go:embed _gitignore.config.yaml
+var devnetInfoBuffer []byte
+
 func TestDevnet(t *testing.T) {
 	ctx := tests.Context(t)
 
+	type DevnetInfo struct {
+		Router    string `yaml:"router"`
+		UserPrivK []byte `yaml:"user_privk"`
+	}
+	var devnetInfo DevnetInfo
+	err := yaml.Unmarshal(devnetInfoBuffer, &devnetInfo)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Config: %+v\n", devnetInfo)
+
 	client := rpc.New("https://api.devnet.solana.com")
 
-	routerAddress, err := solana.PublicKeyFromBase58("HXoMKDD4hb6VvrgrTZ6kpvJELQrVs4ABgZKTwa1yJNgb")
+	routerAddress, err := solana.PublicKeyFromBase58(devnetInfo.Router)
 	require.NoError(t, err)
 
-	// user, err := solana.NewRandomPrivateKey()
-	// require.NoError(t, err)
-	user := solana.PrivateKey{} // TODO fill with actual private key
+	user := solana.PrivateKey(devnetInfo.UserPrivK)
 	require.True(t, user.IsValid())
 
 	configPDA, _, err := state.FindConfigPDA(routerAddress)
