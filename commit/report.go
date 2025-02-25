@@ -280,7 +280,8 @@ func (p *Plugin) Reports(
 
 	var reports []ocr3types.ReportPlus[[]byte]
 
-	// The Solana report has some special limitations. Those limitations can be used if the offchain
+	// These options were added to allow for more flexibility around report building. For example Solana
+	// only supports a single merkle root per report.
 	maxRoots := p.offchainCfg.MaxMerkleRootsPerReport
 	if !p.offchainCfg.RMNEnabled && maxRoots != 0 {
 		if p.offchainCfg.MultipleReportsEnabled {
