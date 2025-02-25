@@ -2774,6 +2774,31 @@ func TestCCIPRouter(t *testing.T) {
 	//   Manual Cursing Tests  //
 	/////////////////////////////
 	t.Run("Manual Cursing", func(t *testing.T) {
+		t.Run("no curses by default", func(t *testing.T) {
+			svmCurse := rmn_remote.CurseSubject{}
+			binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
+			evmCurse := rmn_remote.CurseSubject{}
+			binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+
+			ix, err := rmn_remote.NewVerifyNotCursedInstruction(
+				evmCurse,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
+				svmCurse,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
+			require.NotNil(t, result)
+		})
+
 		t.Run("applying a global curse", func(t *testing.T) {
 			global_curse := rmn_remote.CurseSubject{
 				Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
@@ -2795,6 +2820,39 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, len(curses.CursedSubjects), 1)
 			require.Equal(t, curses.CursedSubjects[0], global_curse)
+
+			// All subjects are cursed now
+			svmCurse := rmn_remote.CurseSubject{}
+			binary.LittleEndian.PutUint64(svmCurse.Value[:], config.SvmChainSelector)
+			evmCurse := rmn_remote.CurseSubject{}
+			binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
+
+			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
+				evmCurse,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+			require.NotNil(t, result)
+
+			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
+				svmCurse,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+			require.NotNil(t, result)
+
+			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
+				global_curse,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+			require.NotNil(t, result)
 		})
 
 		t.Run("ccip_send fails with a global curse active", func(t *testing.T) {
@@ -2956,6 +3014,36 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, len(curses.CursedSubjects), 1)
 			require.Equal(t, curses.CursedSubjects[0], evmCurse)
 
+			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
+				evmCurse,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
+			require.NotNil(t, result)
+
+			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
+				svmCurse,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			global_curse := rmn_remote.CurseSubject{
+				Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+			}
+
+			ix, err = rmn_remote.NewVerifyNotCursedInstruction(
+				global_curse,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
 		})
 
 		t.Run("ccip_send fails with a cursed destination", func(t *testing.T) {

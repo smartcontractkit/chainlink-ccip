@@ -12,12 +12,12 @@ impl Public for Impl {
     ) -> Result<()> {
         let curses = &ctx.accounts.curses;
         require!(
-            !curses.is_subject_cursed(subject),
-            RmnRemoteError::SubjectCursed
-        );
-        require!(
             !curses.is_chain_globally_cursed(),
             RmnRemoteError::GloballyCursed
+        );
+        require!(
+            !curses.is_subject_cursed(subject),
+            RmnRemoteError::SubjectCursed
         );
         Ok(())
     }
