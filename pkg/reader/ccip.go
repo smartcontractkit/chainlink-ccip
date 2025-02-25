@@ -269,7 +269,7 @@ func (r *ccipChainReader) processMerkleRoots(
 	for _, mr := range allMerkleRoots {
 		onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, cciptypes.ChainSelector(mr.SourceChainSelector))
 		if err != nil {
-			continue
+			panic(err)
 		}
 		mrc := cciptypes.MerkleRootChain{
 			ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
