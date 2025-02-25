@@ -5000,8 +5000,8 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
-						commitEvent := ccip.EventCommitReportAccepted{}
-						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
+						commitEvent := common.EventCommitReportAccepted{}
+						require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent))
 						require.Equal(t, config.EvmChainSelector, commitEvent.Report.SourceChainSelector)
 						require.Equal(t, root, commitEvent.Report.MerkleRoot)
 						require.Equal(t, minV, commitEvent.Report.MinSeqNr)
@@ -5089,11 +5089,11 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 
 						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
-						commitEvent := ccip.EventCommitReportAccepted{}
-						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
+						commitEvent := common.EventCommitReportAccepted{}
+						require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent))
 
 						require.Equal(t, testcase.PriceUpdates, commitEvent.PriceUpdates)
-						require.Equal(t, ccip_offramp.MerkleRoot{SourceChainSelector: 0x0, OnRampAddress: nil, MinSeqNr: 0x0, MaxSeqNr: 0x0, MerkleRoot: [32]uint8{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}}, commitEvent.Report)
+						require.Nil(t, commitEvent.Report)
 						testcase.RunEventValidations(t, tx)
 						testcase.RunStateValidations(t)
 					})
@@ -5554,11 +5554,11 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
-				commitEvent := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
+				commitEvent := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent))
 				require.Equal(t, config.EvmChainSelector, commitEvent.Report.SourceChainSelector)
 				require.Equal(t, root, commitEvent.Report.MerkleRoot)
 				require.Equal(t, minV, commitEvent.Report.MinSeqNr)
@@ -5919,8 +5919,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: sourceChainSelector,
@@ -6016,8 +6016,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				message.Header.SourceChainSelector = 89
 
@@ -6097,8 +6097,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				unsupportedSourceChainPDA, _, err := state.FindOfframpSourceChainPDA(unsupportedChainSelector, config.CcipOfframpProgram)
 				require.NoError(t, err)
@@ -6200,8 +6200,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
@@ -6381,8 +6381,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport1 := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
@@ -6521,8 +6521,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
@@ -6609,8 +6609,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: sourceChainSelector,
@@ -6707,8 +6707,8 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-					event := ccip.EventCommitReportAccepted{}
-					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+					event := common.EventCommitReportAccepted{}
+					require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 					executionReport := ccip_offramp.ExecutionReportSingleChain{
 						SourceChainSelector: sourceChainSelector,
@@ -6829,8 +6829,8 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-					event := ccip.EventCommitReportAccepted{}
-					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+					event := common.EventCommitReportAccepted{}
+					require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 					executionReport := ccip_offramp.ExecutionReportSingleChain{
 						SourceChainSelector: sourceChainSelector,
@@ -6957,8 +6957,8 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-					event := ccip.EventCommitReportAccepted{}
-					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+					event := common.EventCommitReportAccepted{}
+					require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 					return setupResult{
 						initSupply,
@@ -7135,8 +7135,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				t.Run("Before elapsed time", func(t *testing.T) {
 					t.Run("When user manually executing before the period of time has passed, it fails", func(t *testing.T) {
@@ -7397,8 +7397,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				// try to execute report ----------------------
 				// should fail because token account does not exist
