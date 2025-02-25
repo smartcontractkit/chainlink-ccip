@@ -1035,7 +1035,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 			defer mu.Unlock()
 
 			// Add FeeQuoter from dynamic config
-			if len(config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter) > 0 {
+			if !cciptypes.UnknownAddress(config.OnRamp.DynamicConfig.DynamicConfig.FeeQuoter).IsZeroOrEmpty() {
 				resp = resp.Append(
 					consts.ContractNameFeeQuoter,
 					chainSel,
@@ -1043,7 +1043,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context,
 			}
 
 			// Add Router from dest chain config
-			if len(config.OnRamp.DestChainConfig.Router) > 0 {
+			if !cciptypes.UnknownAddress(config.OnRamp.DestChainConfig.Router).IsZeroOrEmpty() {
 				resp = resp.Append(
 					consts.ContractNameRouter,
 					chainSel,
