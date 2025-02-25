@@ -10,8 +10,31 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// initialize a new multisig configuration, store the chain_id and multisig_id
-// multisig_id is a unique identifier for the multisig configuration(32 bytes, left-padded)
+// Initialize a new multisig configuration.
+//
+// Creates the foundation for a new multisig instance by initializing the core configuration
+// PDAs and registering the multisig_id and chain_id. This is the first step in setting up
+// a new multisig configuration.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the accounts required for initialization:
+// - `multisig_config`: PDA that will store the core configuration
+// - `root_metadata`: PDA that will store the current root's metadata
+// - `expiring_root_and_op_count`: PDA that tracks the current root and operation count
+// - `authority`: The deployer who becomes the initial owner
+// - `program_data`: Used to validate that the caller is the program's upgrade authority
+// - `chain_id`: Network identifier for the chain this configuration is targeting
+// - `multisig_id`: A unique, 32-byte identifier (left-padded) for this multisig instance
+//
+// # Access Control
+//
+// This instruction can only be called by the program's upgrade authority (typically the deployer).
+//
+// # Note
+//
+// After initialization, the owner can transfer ownership through the two-step
+// transfer_ownership/accept_ownership process.
 type Initialize struct {
 	ChainId    *uint64
 	MultisigId *[32]uint8

@@ -10,7 +10,16 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ClearSignatures is the `clearSignatures` instruction.
+// Clear the temporary signature storage.
+//
+// Closes the account storing signatures, allowing it to be reinitialized if needed.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
+// - `root`: The Merkle root associated with the signatures.
+// - `valid_until`: Timestamp until which the root would remain valid.
 type ClearSignatures struct {
 	MultisigId *[32]uint8
 	Root       *[32]uint8
