@@ -195,7 +195,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyFinalizedExecutedCommits, fullyUnfinalizedExecutedCommits, err := getPendingExecutedReports(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingExecutedReports(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
@@ -210,13 +210,13 @@ func (p *Plugin) getCommitReportsObservation(
 
 	// If fully executed reports are detected, mark them in the cache.
 	// This cache will be re-initialized on each plugin restart.
-	for _, fullyExecutedCommit := range fullyFinalizedExecutedCommits {
+	for _, fullyExecutedCommit := range fullyExecutedFinalized {
 		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
 	}
 
 	// If fully executed reports are detected, snooze them in the cache.
 	// This cache will be re-initialized on each plugin restart.
-	for _, fullyExecutedCommit := range fullyUnfinalizedExecutedCommits {
+	for _, fullyExecutedCommit := range fullyExecutedUnfinalized {
 		p.commitRootsCache.Snooze(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
 	}
 

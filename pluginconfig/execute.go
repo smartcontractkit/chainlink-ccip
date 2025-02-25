@@ -25,6 +25,7 @@ type ExecuteOffchainConfig struct {
 
 	// InflightCacheExpiry indicates how long we keep a report in the plugin cache before we expire it.
 	// The caching prevents us from issuing another report while one is already in flight.
+	// If a reorg occurs and invalidates the execution, the messages become available again after expiry.
 	InflightCacheExpiry commonconfig.Duration `json:"inflightCacheExpiry"`
 
 	// RootSnoozeTime is the interval at which we check roots for executable messages.
