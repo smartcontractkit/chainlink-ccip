@@ -10,7 +10,17 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitSignatures is the `initSignatures` instruction.
+// Initialize storage for ECDSA signatures.
+//
+// Creates a temporary account to hold signatures that will validate a new Merkle root.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
+// - `root`: The new Merkle root these signatures will approve.
+// - `valid_until`: Timestamp until which the root will remain valid.
+// - `total_signatures`: The total number of signatures to be added.
 type InitSignatures struct {
 	MultisigId      *[32]uint8
 	Root            *[32]uint8

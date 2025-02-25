@@ -608,13 +608,26 @@
     {
       "name": "executeBatch",
       "docs": [
-        "Execute a scheduled batch of instructions.",
+        "Executes a scheduled batch of operations after validating readiness and predecessor dependencies.",
+        "",
+        "This function:",
+        "1. Verifies the operation is ready for execution (delay period has passed)",
+        "2. Validates that any predecessor operation has been completed",
+        "3. Executes each instruction in the operation using the timelock signer PDA",
+        "4. Emits events for each executed instruction",
         "",
         "# Parameters",
         "",
-        "- `ctx`: The context containing the accounts required for execution.",
-        "- `timelock_id`: The timelock identifier.",
-        "- `id`: The operation identifier."
+        "- `ctx`: Context containing operation accounts and signer information",
+        "- `timelock_id`: Identifier for the timelock instance",
+        "- `_id`: Operation ID (used for PDA derivation)",
+        "",
+        "# Security Considerations",
+        "",
+        "This instruction uses PDA signing to create a trusted execution environment.",
+        "The timelock's signer PDA will replace any account marked as a signer in the",
+        "original instructions, providing the necessary privileges while maintaining",
+        "security through program derivation."
       ],
       "accounts": [
         {
@@ -1002,13 +1015,25 @@
     {
       "name": "bypasserExecuteBatch",
       "docs": [
-        "Execute a bypasser operation immediately.",
+        "Execute operations immediately using the bypasser flow, bypassing time delays",
+        "and predecessor checks.",
+        "",
+        "This function provides an emergency execution mechanism that:",
+        "1. Skips the timelock waiting period required for standard operations",
+        "2. Does not enforce predecessor dependencies",
+        "3. Closes the operation account after execution",
+        "",
+        "# Emergency Use Only",
+        "",
+        "The bypasser flow is intended strictly for emergency situations where",
+        "waiting for the standard timelock delay would cause harm. Access to this",
+        "function is tightly controlled through the Bypasser role.",
         "",
         "# Parameters",
         "",
-        "- `ctx`: The context containing the bypasser execution account.",
-        "- `timelock_id`: The timelock identifier.",
-        "- `id`: The operation identifier."
+        "- `ctx`: Context containing operation accounts and signer information",
+        "- `timelock_id`: Identifier for the timelock instance",
+        "- `_id`: Operation ID (used for PDA derivation)"
       ],
       "accounts": [
         {
@@ -1194,7 +1219,7 @@
     {
       "name": "transferOwnership",
       "docs": [
-        "Propose a new owner for the timelock.",
+        "Propose a new owner for the timelock instance config.",
         "",
         "Only the current owner (admin) can propose a new owner.",
         "",
@@ -1235,7 +1260,7 @@
     {
       "name": "acceptOwnership",
       "docs": [
-        "Accept ownership of the timelock.",
+        "Accept ownership of the timelock config.",
         "",
         "The proposed new owner must call this function to assume ownership.",
         "",
@@ -1323,6 +1348,14 @@
     },
     {
       "name": "Operation",
+      "docs": [
+        "Represents a batch of instructions that can be scheduled for delayed execution.",
+        "",
+        "Operations are the core data structure of the timelock system. Each operation contains",
+        "a set of instructions that will be executed atomically once the operation is ready.",
+        "Operations include cryptographic safeguards (ID verification) and dependency tracking",
+        "to ensure proper sequencing."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1408,6 +1441,12 @@
     },
     {
       "name": "InstructionData",
+      "docs": [
+        "A serializable representation of a Solana instruction.",
+        "",
+        "The native SVM's Instruction type from solana_program doesn't implement the AnchorSerialize trait.",
+        "This wrapper provides serialization capabilities while maintaining the same functionality."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1432,6 +1471,12 @@
     },
     {
       "name": "InstructionAccount",
+      "docs": [
+        "Represents an account used in an instruction, including its metadata.",
+        "",
+        "This structure mirrors the AccountMeta used in Solana instructions",
+        "but implements Anchor's serialization traits."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1534,6 +1579,12 @@
     },
     {
       "name": "OperationState",
+      "docs": [
+        "Represents the current state of a timelock operation in its lifecycle.",
+        "",
+        "Operations move through these states sequentially as they are prepared,",
+        "scheduled, and eventually executed."
+      ],
       "type": {
         "kind": "enum",
         "variants": [
