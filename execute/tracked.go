@@ -85,7 +85,7 @@ func withTrackedMethod[T any](
 
 	p.reporter.TrackLatency(state, method, latency, err)
 	p.lggr.Debugw("tracking exec latency",
-		"state",
+		"state", state,
 		"method", method,
 		"latency", latency,
 	)

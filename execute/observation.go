@@ -143,6 +143,23 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 // getCommitReportsObservations implements phase1 of the execute plugin state machine. It fetches commit reports from
 // the destination chain and determines which messages are ready to be executed. These are added to the provided
 // observation object.
+//
+// Execution and Snoozing Logic:
+// 1. For finalized executions:
+//   - When messages are executed with finality (on destChain), they are permanently marked as executed
+//   - MarkAsExecuted removes the commit root from the cache entirely to prevent reprocessing
+//   - These messages will never be considered for execution again
+//
+// 2. For unfinalized executions:
+//   - When messages are executed but not yet finalized, they are temporarily snoozed
+//   - Snoozing adds the commit root to a snooze cache with a TTL
+//   - If a reorg occurs and invalidates the execution, the messages become available again after the snooze period
+//   - This prevents duplicate executions while allowing recovery from reorgs
+//
+// 3. For cursed chains:
+//   - All commit reports from cursed source chains are snoozed
+//   - This temporarily prevents execution until the curse is lifted
+//   - Messages become available again after the snooze period if the chain is no longer cursed
 func (p *Plugin) getCommitReportsObservation(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -178,7 +195,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingExecutedReports(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
@@ -193,8 +210,14 @@ func (p *Plugin) getCommitReportsObservation(
 
 	// If fully executed reports are detected, mark them in the cache.
 	// This cache will be re-initialized on each plugin restart.
-	for _, fullyExecutedCommit := range fullyExecutedCommits {
+	for _, fullyExecutedCommit := range fullyExecutedFinalized {
 		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
+	}
+
+	// If fully executed reports are detected, snooze them in the cache.
+	// This cache will be re-initialized on each plugin restart.
+	for _, fullyExecutedCommit := range fullyExecutedUnfinalized {
+		p.commitRootsCache.Snooze(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
 	}
 
 	// Remove and snooze commit reports from cursed chains.
