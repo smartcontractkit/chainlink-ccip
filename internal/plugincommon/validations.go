@@ -17,7 +17,11 @@ func ValidateFChain(fChain map[cciptypes.ChainSelector]int) error {
 	return nil
 }
 
-var ErrValidationError = errors.New("report validation errors")
+// ErrReportValidation is used when the validation being performed in order to validate a report has errored.
+// This does not necessarily mean that the report is valid or invalid.
+var ErrReportValidation = errors.New("report validation errors")
+
+// ErrInvalidReport is used when a report is found to be invalid.
 var ErrInvalidReport = errors.New("invalid report")
 
 // NewErrValidatingReport is returned when the report could not be validated due to an error.
@@ -34,7 +38,7 @@ func (e *errWrappedValidatingReport) Error() string {
 }
 
 func (e *errWrappedValidatingReport) Unwrap() error {
-	return ErrValidationError
+	return ErrReportValidation
 }
 
 // NewErrInvalidReport is returned when the report is specifically invalid due to a validation rule.
