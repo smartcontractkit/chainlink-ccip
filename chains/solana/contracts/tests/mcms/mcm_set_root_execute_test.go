@@ -370,7 +370,13 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, isErr)
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSigsIx}, admin, config.DefaultCommitment)
 
-				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				// append signature hijacking scenario
+				invalidAppendSigsIxs, iaserr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, user.PublicKey(), config.MaxAppendSignatureBatchSize)
+				require.NoError(t, iaserr)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidAppendSigsIxs[0]}, user, config.DefaultCommitment, []string{"AnchorError caused by account: signatures. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized"})
+
+				// now try with valid authority
+				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, asErr)
 
 				// partially register signatures
@@ -1108,7 +1114,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, err)
 				txs = append(txs, TxWithStage{Instructions: []solana.Instruction{initSigsIx}, Stage: InitSignatures})
 
-				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, asErr)
 
 				// one tx is enough since we only have 5 signers

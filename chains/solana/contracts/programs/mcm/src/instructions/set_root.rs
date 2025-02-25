@@ -300,7 +300,7 @@ pub struct AppendSignatures<'info> {
         mut,
         seeds = [ROOT_SIGNATURES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref(), authority.key().as_ref()],
         bump,
-        constraint = !signatures.is_finalized @ McmError::SignaturesAlreadyFinalized
+        constraint = !signatures.is_finalized @ McmError::SignaturesAlreadyFinalized,
     )]
     pub signatures: Account<'info, RootSignatures>,
 
@@ -315,7 +315,7 @@ pub struct ClearSignatures<'info> {
         mut,
         seeds = [ROOT_SIGNATURES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref(), authority.key().as_ref()],
         bump,
-        close = authority // close so that it can be re-initialized
+        close = authority, // close so that it can be re-initialized
     )]
     pub signatures: Account<'info, RootSignatures>,
 
@@ -330,7 +330,7 @@ pub struct FinalizeSignatures<'info> {
         mut,
         seeds = [ROOT_SIGNATURES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref(), authority.key().as_ref()],
         bump,
-        constraint = !signatures.is_finalized @ McmError::SignaturesAlreadyFinalized
+        constraint = !signatures.is_finalized @ McmError::SignaturesAlreadyFinalized,
     )]
     pub signatures: Account<'info, RootSignatures>,
 

@@ -263,7 +263,7 @@ func GetMcmPreloadSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, roo
 	}
 	ixs = append(ixs, initSigsIx)
 
-	appendSigsIxs, asErr := GetAppendSignaturesIxs(signatures, msigID, root, validUntil, signaturesPDA, authority, appendChunkSize)
+	appendSigsIxs, asErr := GetAppendSignaturesIxs(signatures, msigID, root, validUntil, authority, appendChunkSize)
 	if asErr != nil {
 		return nil, asErr
 	}
@@ -286,7 +286,9 @@ func GetMcmPreloadSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, roo
 }
 
 // get chunked append instructions to preload signatures to pda, required before set_root
-func GetAppendSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, root [32]uint8, validUntil uint32, signaturesPDA solana.PublicKey, authority solana.PublicKey, chunkSize int) ([]solana.Instruction, error) {
+func GetAppendSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, root [32]uint8, validUntil uint32, authority solana.PublicKey, chunkSize int) ([]solana.Instruction, error) {
+	signaturesPDA := GetRootSignaturesPDA(msigID, root, validUntil, authority)
+
 	if chunkSize > config.MaxAppendSignatureBatchSize {
 		return nil, errors.New("chunkSize exceeds max signatures chunk size")
 	}
