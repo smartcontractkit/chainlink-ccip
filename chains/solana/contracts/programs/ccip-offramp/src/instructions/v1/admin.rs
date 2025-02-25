@@ -68,20 +68,21 @@ impl Admin for Impl {
         router: Pubkey,
         fee_quoter: Pubkey,
         offramp_lookup_table: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
-        ctx.accounts
-            .reference_addresses
-            .set_inner(ReferenceAddresses {
-                version: 1,
-                router,
-                fee_quoter,
-                offramp_lookup_table,
-            });
+        *ctx.accounts.reference_addresses.load_mut()? = ReferenceAddresses {
+            version: 1,
+            router,
+            fee_quoter,
+            offramp_lookup_table,
+            rmn_remote,
+        };
 
         emit!(ReferenceAddressesSet {
-            router: ctx.accounts.reference_addresses.router,
-            fee_quoter: ctx.accounts.reference_addresses.fee_quoter,
-            offramp_lookup_table: ctx.accounts.reference_addresses.offramp_lookup_table,
+            router,
+            fee_quoter,
+            offramp_lookup_table,
+            rmn_remote
         });
 
         Ok(())

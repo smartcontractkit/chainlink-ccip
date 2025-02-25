@@ -146,7 +146,7 @@ pub struct UpdateReferenceAddresses<'info> {
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(address = config.load()?.owner @ CcipOfframpError::Unauthorized)]
     pub authority: Signer<'info>,
