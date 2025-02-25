@@ -24,6 +24,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+// reportBuilderFunc is used to inject different algorithms for building commit reports.
 type reportBuilderFunc func(
 	ctx context.Context,
 	lggr logger.Logger,
