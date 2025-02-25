@@ -724,7 +724,7 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 type SourceChainConfig struct {
 	IsEnabled       bool
 	LaneCodeVersion CodeVersion
-	OnRamp          [2][64]uint8
+	OnRamp          [2]OnRampAddress
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -759,6 +759,39 @@ func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	}
 	// Deserialize `OnRamp`:
 	err = decoder.Decode(&obj.OnRamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OnRampAddress struct {
+	Bytes [64]uint8
+	Len   uint32
+}
+
+func (obj OnRampAddress) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Bytes` param:
+	err = encoder.Encode(obj.Bytes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Len` param:
+	err = encoder.Encode(obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OnRampAddress) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Bytes`:
+	err = decoder.Decode(&obj.Bytes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Len`:
+	err = decoder.Decode(&obj.Len)
 	if err != nil {
 		return err
 	}
