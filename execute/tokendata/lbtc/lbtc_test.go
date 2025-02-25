@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -256,5 +256,7 @@ func MessageWithTokensAndExtraData16(t *testing.T, tokenPoolAddr ...string) ccip
 }
 
 func bytes32From(address string, idx int) []byte {
-	return crypto.Keccak256([]byte(fmt.Sprintf("%s%d", address, idx)))
+	hasher := hashutil.NewKeccak()
+	hash := hasher.Hash([]byte(fmt.Sprintf("%s%d", address, idx)))
+	return hash[:]
 }
