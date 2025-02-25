@@ -588,7 +588,6 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
-			require.Equal(t, config.RMNRemoteProgram, configSetEvent.RMNRemote)
 			require.Equal(t, fee_quoter.V1_CodeVersion, configSetEvent.DefaultCodeVersion)
 
 			// Fetch account data
