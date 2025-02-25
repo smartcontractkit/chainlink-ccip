@@ -6585,7 +6585,6 @@ func TestCCIPRouter(t *testing.T) {
 				sourceChainSelector := config.EvmChainSelector
 				message, root := testutils.CreateNextMessage(ctx, solanaGoClient, t, []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID})
 				sequenceNumber := message.Header.SequenceNumber
-				reportContext := ccip.NextCommitReportContext()
 
 				commitReport := ccip_offramp.CommitInput{
 					MerkleRoot: &ccip_offramp.MerkleRoot{
