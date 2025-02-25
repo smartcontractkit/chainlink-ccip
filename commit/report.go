@@ -24,6 +24,15 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+type reportBuilderFunc func(
+	ctx context.Context,
+	lggr logger.Logger,
+	reportCodec cciptypes.CommitPluginCodec,
+	transmissionSchedule *ocr3types.TransmissionSchedule,
+	outcome committypes.Outcome,
+	maxMerkleRootsPerReport uint64,
+) ([]ocr3types.ReportPlus[[]byte], error)
+
 // buildOneReport is the common logic for building a report. Different report building
 // algorithms can reassemble reports by selecting which blessed and unblessed merkle
 // roots to include in the report, and which price updates and rmn signatures to use.
@@ -101,8 +110,8 @@ func buildStandardReport(
 	reportCodec cciptypes.CommitPluginCodec,
 	transmission *ocr3types.TransmissionSchedule,
 	outcome committypes.Outcome,
+	_ uint64,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-
 	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
 	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0)
 
@@ -278,22 +287,8 @@ func (p *Plugin) Reports(
 	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2PID)
 
-	var reports []ocr3types.ReportPlus[[]byte]
-
-	// These options were added to allow for more flexibility around report building. For example Solana
-	// only supports a single merkle root per report.
 	maxRoots := p.offchainCfg.MaxMerkleRootsPerReport
-	if !p.offchainCfg.RMNEnabled && maxRoots != 0 {
-		if p.offchainCfg.MultipleReportsEnabled {
-			lggr.Infow("building multiple reports")
-			reports, err = buildMultipleReports(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, maxRoots)
-		} else {
-			lggr.Infow("building truncated reports")
-			reports, err = buildTruncatedReport(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, maxRoots)
-		}
-	} else {
-		reports, err = buildStandardReport(ctx, lggr, p.reportCodec, transmissionSchedule, outcome)
-	}
+	reports, err := p.reportBuilder(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, maxRoots)
 
 	if err != nil {
 		return nil, fmt.Errorf("error while building reports: %w", err)
