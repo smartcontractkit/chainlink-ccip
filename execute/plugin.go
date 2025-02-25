@@ -482,15 +482,16 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
+	if len(decodedOutcome.Report.ChainReports) == 0 {
+		lggr.Warn("empty report", "report", decodedOutcome.Report)
+		return nil, nil
+	}
+
 	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
-	if len(decodedOutcome.Report.ChainReports) == 0 {
-		lggr.Warn("empty report", "report", decodedOutcome.Report)
-		return nil, nil
-	}
 	reportInfo := extractReportInfo(decodedOutcome)
 	p.lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
 	encodedInfo, err := reportInfo.Encode()
