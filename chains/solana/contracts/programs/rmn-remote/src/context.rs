@@ -103,7 +103,8 @@ pub struct Curse<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    #[account(mut, address = config.proposed_owner @ RmnRemoteError::Unauthorized)]
+    // validate signer is registered admin
+    #[account(mut, address = config.owner @ RmnRemoteError::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(
@@ -128,7 +129,8 @@ pub struct Uncurse<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    #[account(mut, address = config.proposed_owner @ RmnRemoteError::Unauthorized)]
+    // validate signer is registered admin
+    #[account(mut, address = config.owner @ RmnRemoteError::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(
