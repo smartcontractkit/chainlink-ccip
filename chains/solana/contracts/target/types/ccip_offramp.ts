@@ -2288,7 +2288,7 @@ export type CcipOfframp = {
       "msg": "Signatures out of registration"
     },
     {
-      "code": 9053,
+      "code": 9054,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
     }
@@ -4585,7 +4585,7 @@ export const IDL: CcipOfframp = {
       "msg": "Signatures out of registration"
     },
     {
-      "code": 9053,
+      "code": 9054,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
     }
