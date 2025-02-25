@@ -29,6 +29,8 @@ const (
 	defaultInflightPriceCheckRetries          = 5
 	defaultAsyncObserverSyncFreq              = 5 * time.Second
 	defaultAsyncObserverSyncTimeout           = 10 * time.Second
+	defaultExecNoDeviationThresholdUSDWei     = 10e9
+	defaultDataAvNoDeviationThresholdUSDWei   = 20e9
 )
 
 type FeeInfo struct {
@@ -213,6 +215,18 @@ func (c *CommitOffchainConfig) applyDefaults() {
 			c.ChainFeeAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
 		}
 	}
+
+	// Only apply defaults if the curve based deviation is disabled. Otherwise, these values should already be set in
+	// the config.
+	if !c.CurveBasedGasDeviationEnabled {
+		if c.ExecNoDeviationThresholdUSDWei.Int == nil {
+			c.ExecNoDeviationThresholdUSDWei = cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)}
+		}
+
+		if c.DataAvNoDeviationThresholdUSDWei.Int == nil {
+			c.DataAvNoDeviationThresholdUSDWei = cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)}
+		}
+	}
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -267,6 +281,23 @@ func (c *CommitOffchainConfig) Validate() error {
 		(c.ChainFeeAsyncObserverSyncFreq == 0 || c.ChainFeeAsyncObserverSyncTimeout == 0) {
 		return fmt.Errorf("chain fee async observer sync freq (%s) or sync timeout (%s) not set",
 			c.ChainFeeAsyncObserverSyncFreq, c.ChainFeeAsyncObserverSyncTimeout)
+	}
+
+	if c.ExecNoDeviationThresholdUSDWei.Int == nil {
+		return fmt.Errorf("execNoDeviationThresholdUSDWei not set")
+	}
+
+	if c.DataAvNoDeviationThresholdUSDWei.Int == nil {
+		return fmt.Errorf("dataAvNoDeviationThresholdUSDWei not set")
+	}
+
+	if c.CurveBasedGasDeviationEnabled {
+		if c.ExecNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) <= 0 {
+			return fmt.Errorf("execNoDeviationThresholdUSDWei must be greater than 0")
+		}
+		if c.DataAvNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) <= 0 {
+			return fmt.Errorf("dataAvNoDeviationThresholdUSDWei must be greater than 0")
+		}
 	}
 
 	return nil
