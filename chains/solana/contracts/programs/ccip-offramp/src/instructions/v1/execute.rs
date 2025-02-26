@@ -270,9 +270,17 @@ fn internal_execute<'info>(
         let recv_and_msg_account_keys = Some(*msg_program.key)
             .into_iter()
             .chain(msg_accounts.iter().map(|a| *a.key));
-        verify_merkle_root(&execution_report, commit_report.merkle_root, recv_and_msg_account_keys)?
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            recv_and_msg_account_keys,
+        )?
     } else {
-        verify_merkle_root(&execution_report, commit_report.merkle_root, None.into_iter())?
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            None.into_iter(),
+        )?
     };
 
     let new_state = MessageExecutionState::Success;
