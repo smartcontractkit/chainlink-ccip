@@ -26,7 +26,7 @@ build: ensure_go_version
 generate: ensure_go_version clean-generate proto-generate generate-mocks
 
 generate-mocks: ensure_go_version
-	go install github.com/vektra/mockery/v2@v2.43.2
+	go install github.com/vektra/mockery/v2@v2.52.3
 	mockery
 
 # If you have a different version of protoc installed, you can use the following command to generate the protobuf files
