@@ -150,6 +150,11 @@ func reportRangesOutcome(
 		rmnRemoteConfig = observedRMNRemoteConfig[dstChain]
 	}
 
+	if len(rangesToReport) == 0 {
+		lggr.Info("No ranges to report, outcomeType is ReportEmpty")
+		return Outcome{OutcomeType: ReportEmpty}
+	}
+
 	outcome := Outcome{
 		OutcomeType:             ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,

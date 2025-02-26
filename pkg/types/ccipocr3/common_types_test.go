@@ -1,6 +1,7 @@
 package ccipocr3
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,8 +34,31 @@ func TestNewBytes32FromString(t *testing.T) {
 			expErr:   true,
 		},
 		{
-			name:     "invalid input, not enough hex chars",
+			name:     "invalid input, odd len",
 			input:    "0x2",
+			expected: Bytes32{},
+			expErr:   true,
+		},
+		{
+			name:     "valid input, not enough hex chars",
+			input:    "0x22",
+			expected: Bytes32{0x22},
+			expErr:   false,
+		},
+		{
+			name:  "valid input exact length",
+			input: "0x" + strings.Repeat("12", 32),
+			expected: Bytes32{
+				0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12,
+				0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12,
+				0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12,
+				0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12,
+			},
+			expErr: false,
+		},
+		{
+			name:     "invalid input, tou much hex chars",
+			input:    "0x" + strings.Repeat("12", 33),
 			expected: Bytes32{},
 			expErr:   true,
 		},
