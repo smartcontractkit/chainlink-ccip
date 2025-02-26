@@ -29,7 +29,7 @@ pub(super) fn calculate_merkle_root(
     let mut hash = hashed_leaf;
 
     for p in proofs {
-        hash = hash_pair(&hash, &p);
+        hash = hash_pair(&hash, p);
     }
 
     Ok(hash)
