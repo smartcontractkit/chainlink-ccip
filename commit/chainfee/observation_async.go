@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -120,13 +121,13 @@ func newAsyncObserver(
 
 	obs := &asyncObserver{
 		baseObserver: baseObserver,
-		lggr:         lggr,
+		lggr:         logutil.WithComponent(lggr, "chainfeeAsyncObserver"),
 		cancelFunc:   nil,
 		mu:           &sync.RWMutex{},
 	}
 
 	ticker := time.NewTicker(tickDur)
-	lggr.Debugw("async observer started", "tickDur", tickDur, "syncTimeout", syncTimeout)
+	lggr.Debugw("async chainfee observer started", "tickDur", tickDur, "syncTimeout", syncTimeout)
 	obs.start(ctx, ticker.C, syncTimeout)
 
 	obs.cancelFunc = func() {
@@ -151,7 +152,7 @@ func (o *asyncObserver) start(ctx context.Context, ticker <-chan time.Time, sync
 }
 
 func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
-	o.lggr.Debugw("async observer is syncing", "syncTimeout", syncTimeout)
+	o.lggr.Debugw("async chainfee observer is syncing", "syncTimeout", syncTimeout)
 	ctxSync, cf := context.WithTimeout(ctx, syncTimeout)
 	defer cf()
 
@@ -191,19 +192,19 @@ func (o *asyncObserver) sync(ctx context.Context, syncTimeout time.Duration) {
 	wg := &sync.WaitGroup{}
 	wg.Add(len(syncOps))
 	for _, op := range syncOps {
-		go o.applySyncOp(ctxSync, o.lggr, op.id, wg, op.op)
+		go o.applySyncOp(ctxSync, op.id, wg, op.op)
 	}
 	wg.Wait()
 }
 
 // applySyncOp applies the given operation synchronously.
 func (o *asyncObserver) applySyncOp(
-	ctx context.Context, lggr logger.Logger, id string, wg *sync.WaitGroup, op func(ctx context.Context)) {
+	ctx context.Context, id string, wg *sync.WaitGroup, op func(ctx context.Context)) {
 	defer wg.Done()
 	tStart := time.Now()
 	o.lggr.Debugw("async observer applying sync operation", "id", id)
 	op(ctx)
-	lggr.Debugw("async observer has applied the sync operation",
+	o.lggr.Debugw("async observer has applied the sync operation",
 		"id", id, "duration", time.Since(tStart))
 }
 
