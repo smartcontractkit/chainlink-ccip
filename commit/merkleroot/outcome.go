@@ -82,7 +82,9 @@ func (p *Processor) getOutcome(
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
 		return checkForReportTransmission(
-			lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
+			attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
+			multipleReports := p.offchainCfg.
+			lggr, attempts, p.offchainCfg previousOutcome, consObservation), nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
@@ -298,12 +300,15 @@ func checkForReportTransmission(
 	consensusObservation consensusObservation,
 ) Outcome {
 	offRampUpdated := false
+	offRampPending := true
 	// TODO: does this need to be updated to ensure all seqNum's are updated instead of just one?
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
 				offRampUpdated = true
 				break
+			} else {
+				offRampPending = false
 			}
 
 			if previousSeqNumChain.SeqNum > currentSeqNum {
