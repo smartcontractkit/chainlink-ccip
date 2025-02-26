@@ -1,10 +1,6 @@
 name: CRIB Keystone Smoke Test
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
