@@ -662,6 +662,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ccip-router-dummy-emitter"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
 name = "ccip_offramp"
 version = "0.1.0-dev"
 dependencies = [
