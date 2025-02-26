@@ -387,7 +387,7 @@ func (p *Plugin) getFilterObservation(
 			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], commitReport.SourceChain)
 			if err != nil {
 				lggr.Errorw("unable to convert sender address to string", "err", err, "sender address", msg.Sender)
-				continue
+				panic(err)
 			}
 
 			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
