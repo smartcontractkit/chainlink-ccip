@@ -2000,10 +2000,6 @@ func validateSendRequestedEvent(
 		return fmt.Errorf("invalid fee token: %s", ev.Message.FeeToken.String())
 	}
 
-	if ev.Message.Header.OnRamp.IsZeroOrEmpty() {
-		return fmt.Errorf("invalid onramp address: %s", ev.Message.Header.OnRamp.String())
-	}
-
 	return nil
 }
 
