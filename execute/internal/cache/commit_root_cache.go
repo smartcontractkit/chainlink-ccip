@@ -28,6 +28,15 @@ type CommitsRootsCache interface {
 	CanExecute(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) bool
 	MarkAsExecuted(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32)
 	Snooze(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32)
+
+	// GetTimestampToQueryFrom returns the timestamp that should be used when querying for commit reports.
+	// If the latest finalized timestamp is before the message visibility window, the defaultTimestamp is used.
+	// Otherwise, the visibility window based on the latest finalized timestamp is used.
+	GetTimestampToQueryFrom() time.Time
+
+	// UpdateLatestFinalizedTimestamp updates the cached latest finalized timestamp.
+	// This is used to optimize commit report queries by tracking the newest finalized report.
+	UpdateLatestFinalizedTimestamp(timestamp time.Time)
 }
 
 func NewCommitRootsCache(
@@ -60,6 +69,7 @@ func internalNewCommitRootsCache(
 		executedRoots:             executedRoots,
 		snoozedRoots:              snoozedRoots,
 		messageVisibilityInterval: messageVisibilityInterval,
+		latestFinalizedTimestamp:  time.Time{}, // Zero value (not set)
 		cacheMu:                   sync.RWMutex{},
 	}
 }
@@ -78,6 +88,9 @@ type commitRootsCache struct {
 	// messageVisibilityInterval). We keep executed roots there to make sure we don't accidentally try to reprocess
 	// already executed CommitReport
 	executedRoots *cache.Cache
+	// latestFinalizedTimestamp tracks the timestamp of the latest finalized commit root
+	// to optimize database queries by starting from this timestamp
+	latestFinalizedTimestamp time.Time
 }
 
 func getKey(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) string {
@@ -119,4 +132,42 @@ func (r *commitRootsCache) isSnoozed(key string) bool {
 func (r *commitRootsCache) isExecuted(key string) bool {
 	_, executed := r.executedRoots.Get(key)
 	return executed
+}
+
+func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+
+	messageVisibilityWindow := time.Now().Add(-r.messageVisibilityInterval)
+	if r.latestFinalizedTimestamp.Before(messageVisibilityWindow) {
+		r.latestFinalizedTimestamp = messageVisibilityWindow
+	}
+	commitRootsFilterTimestamp := r.latestFinalizedTimestamp
+
+	r.lggr.Debugw("Getting timestamp to query from",
+		"latestFinalizedTimestamp", r.latestFinalizedTimestamp,
+		"messageVisibilityWindow", messageVisibilityWindow,
+		"commitRootsFilterTimestamp", commitRootsFilterTimestamp)
+
+	// Otherwise use the visibility window based on latest finalized timestamp
+	return commitRootsFilterTimestamp
+}
+
+// UpdateLatestFinalizedTimestamp updates the cached latest finalized timestamp.
+// This is used to optimize commit report queries by tracking the newest finalized report.
+func (r *commitRootsCache) UpdateLatestFinalizedTimestamp(timestamp time.Time) {
+	if timestamp.IsZero() {
+		return
+	}
+
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+
+	// Update if not set or if the new timestamp is newer
+	if r.latestFinalizedTimestamp.IsZero() || timestamp.After(r.latestFinalizedTimestamp) {
+		r.lggr.Debugw("Updating latest finalized timestamp",
+			"oldTimestamp", r.latestFinalizedTimestamp,
+			"newTimestamp", timestamp)
+		r.latestFinalizedTimestamp = timestamp
+	}
 }
