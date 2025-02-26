@@ -125,3 +125,8 @@ type EventFeeQuoterConfigSet struct {
 	Onramp             solana.PublicKey
 	DefaultCodeVersion fee_quoter.CodeVersion
 }
+
+type PriceUpdaterAdded struct {
+	Discriminator [8]byte
+	PriceUpdater  solana.PublicKey
+}
