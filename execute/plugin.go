@@ -165,17 +165,19 @@ func getPendingReportsForExecution(
 	canExecute CanExecuteHandle,
 	ts time.Time,
 	lggr logger.Logger,
-) (exectypes.CommitObservations, []exectypes.CommitData, []exectypes.CommitData, error) {
-	var fullyExecutedFinalized []exectypes.CommitData
-	var fullyExecutedUnfinalized []exectypes.CommitData
-
+) (
+	groupedCommits exectypes.CommitObservations,
+	fullyExecutedFinalized []exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
+	err error,
+) {
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
-	groupedCommits := groupByChainSelector(commitReports)
+	groupedCommits = groupByChainSelector(commitReports)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 

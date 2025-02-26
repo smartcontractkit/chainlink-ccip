@@ -290,16 +290,13 @@ func groupByChainSelector(
 // The provided reports must be sorted by sequence number range starting sequence number.
 func combineReportsAndMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum,
-) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData) {
+) (pending []exectypes.CommitData, fullyExecuted []exectypes.CommitData) {
 	if len(executedMessages) == 0 {
 		return reports, nil
 	}
 
 	// filtered contains the reports with fully executed messages removed
 	// and the executed messages appended to the report sorted by sequence number.
-	var pending []exectypes.CommitData
-	var fullyExecuted []exectypes.CommitData
-
 	for i, report := range reports {
 		reportRange := report.SequenceNumberRange
 
