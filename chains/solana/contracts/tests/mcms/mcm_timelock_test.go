@@ -552,10 +552,10 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					signatures, bulkSignErr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, bulkSignErr)
-					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 					t.Run("mcm:preload signatures", func(t *testing.T) {
-						preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+						preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 						require.NoError(t, plerr)
 
 						for _, ix := range preloadIxs {
@@ -972,7 +972,7 @@ func TestMcmWithTimelock(t *testing.T) {
 			////////////////////////////////////////////////
 			// mcm::set_root - with preloading signatures //
 			////////////////////////////////////////////////
-			preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+			preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 			require.NoError(t, plerr)
 
 			for _, ix := range preloadIxs {
@@ -980,7 +980,7 @@ func TestMcmWithTimelock(t *testing.T) {
 			}
 
 			var sigAccount mcm.RootSignatures
-			queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), config.DefaultCommitment, &sigAccount)
+			queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey()), config.DefaultCommitment, &sigAccount)
 			require.NoError(t, queryErr, "failed to get account info")
 
 			require.Equal(t, true, sigAccount.IsFinalized)
@@ -999,7 +999,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				validUntil,
 				rootValidationData.Metadata,
 				rootValidationData.MetadataProof,
-				proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil),
+				proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey()),
 				proposerMsig.RootMetadataPDA,
 				mcms.GetSeenSignedHashesPDA(proposerMsig.PaddedID, rootValidationData.Root, validUntil),
 				proposerMsig.ExpiringRootAndOpCountPDA,
@@ -1149,9 +1149,9 @@ func TestMcmWithTimelock(t *testing.T) {
 				signatures, serr := mcms.BulkSignOnMsgHash(canceller.Signers, rootValidationData.EthMsgHash)
 				require.NoError(t, serr)
 
-				signaturesPDA := canceller.RootSignaturesPDA(rootValidationData.Root, validUntil)
+				signaturesPDA := canceller.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
-				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, canceller.PaddedID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, canceller.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 
 				for _, ix := range preloadIxs {
@@ -1306,10 +1306,10 @@ func TestMcmWithTimelock(t *testing.T) {
 				signatures, serr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 				require.NoError(t, serr)
 
-				signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+				signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 				// preload signatures
-				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -1768,7 +1768,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					signatures, sigerr := mcms.BulkSignOnMsgHash(executorMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, sigerr)
 
-					signaturesPDA := executorMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+					signaturesPDA := executorMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 					// preload signatures
 					preloadIxs, prerr := mcms.GetMcmPreloadSignaturesIxs(
@@ -1776,7 +1776,6 @@ func TestMcmWithTimelock(t *testing.T) {
 						executorMsig.PaddedID,
 						rootValidationData.Root,
 						validUntil,
-						signaturesPDA,
 						admin.PublicKey(),
 						config.MaxAppendSignatureBatchSize,
 					)
@@ -2112,7 +2111,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					signatures, serr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, serr)
 
-					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 					// preload signatures
 					preloadIxs, prerr := mcms.GetMcmPreloadSignaturesIxs(
@@ -2120,7 +2119,6 @@ func TestMcmWithTimelock(t *testing.T) {
 						proposerMsig.PaddedID,
 						rootValidationData.Root,
 						validUntil,
-						signaturesPDA,
 						admin.PublicKey(),
 						config.MaxAppendSignatureBatchSize,
 					)
@@ -2322,10 +2320,10 @@ func TestMcmWithTimelock(t *testing.T) {
 					signatures, serr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, serr)
 
-					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 					// preload signatures
-					preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+					preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 					require.NoError(t, plerr)
 					for _, ix := range preloadIxs {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)

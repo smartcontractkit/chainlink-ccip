@@ -11,7 +11,6 @@ use crate::messages::{
 use crate::state::{CommitReport, MessageExecutionState, SourceChain};
 use crate::CcipOfframpError;
 
-use super::config::is_on_ramp_configured;
 use super::merkle::{calculate_merkle_root, MerkleError, LEAF_DOMAIN_SEPARATOR};
 use super::messages::{is_writable, Any2SVMMessage, ReleaseOrMintInV1, ReleaseOrMintOutV1};
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
@@ -99,13 +98,6 @@ fn internal_execute<'info>(
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain = &ctx.accounts.source_chain;
-    require!(
-        is_on_ramp_configured(
-            &source_chain.config,
-            &execution_report.message.on_ramp_address
-        ),
-        CcipOfframpError::OnrampNotConfigured
-    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
@@ -270,9 +262,17 @@ fn internal_execute<'info>(
         let recv_and_msg_account_keys = Some(*msg_program.key)
             .into_iter()
             .chain(msg_accounts.iter().map(|a| *a.key));
-        verify_merkle_root(&execution_report, recv_and_msg_account_keys)?
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            recv_and_msg_account_keys,
+        )?
     } else {
-        verify_merkle_root(&execution_report, None.into_iter())?
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            None.into_iter(),
+        )?
     };
 
     let new_state = MessageExecutionState::Success;
@@ -368,15 +368,16 @@ fn parse_messaging_accounts<'info>(
 
 pub fn verify_merkle_root(
     execution_report: &ExecutionReportSingleChain,
+    expected_root: [u8; 32],
     // logic receiver followed by all other message account keys, when they were
     // provided (i.e. when the message isn't a token transfer exclusively)
     recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
 ) -> Result<[u8; 32]> {
     let hashed_leaf = hash(&execution_report.message, recv_and_msg_account_keys);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
-        calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
+        calculate_merkle_root(hashed_leaf, &execution_report.proofs);
     require!(
-        verified_root.is_ok() && verified_root.unwrap() == execution_report.root,
+        verified_root.is_ok() && verified_root.unwrap() == expected_root,
         CcipOfframpError::InvalidProof
     );
     Ok(hashed_leaf)
@@ -429,7 +430,6 @@ fn hash(
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = [msg.sender.len() as u8];
-    let on_ramp_address_size = [msg.on_ramp_address.len() as u8];
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -449,8 +449,6 @@ fn hash(
         "Any2SVMMessageHashV1".as_bytes(),
         &header_source_chain_selector,
         &header_dest_chain_selector,
-        &on_ramp_address_size,
-        &msg.on_ramp_address,
         // message header
         &msg.header.message_id,
         &msg.token_receiver.to_bytes(),
@@ -599,8 +597,6 @@ mod tests {
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
-        let on_ramp_address = &[1, 2, 3].to_vec();
-
         let message = Any2SVMRampMessage {
             sender: [
                 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -635,7 +631,6 @@ mod tests {
                 compute_units: 1000,
                 is_writable_bitmap: 1,
             },
-            on_ramp_address: on_ramp_address.clone(),
         };
         let remaining_account_keys = [
             Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8").unwrap(),
@@ -646,7 +641,7 @@ mod tests {
         let hash_result = hash(&message, remaining_account_keys);
 
         assert_eq!(
-            "8ceebcae8acd670231be9eb13203797bf6cb09e7a4851dd57600af3ed3945eb0",
+            "7c1572c33e52696603008269d3dfb2936811891af29c263bfb83e38ae6b36321",
             hex::encode(hash_result)
         );
     }

@@ -116,7 +116,10 @@ func (p *Plugin) Observation(
 
 	p.observer.TrackObservation(observation, state)
 	lggr.Infow("execute plugin got observation", "observation", observation,
-		"duration", time.Since(tStart), "state", state)
+		"duration", time.Since(tStart),
+		"state", state,
+		"numCommitReports", len(observation.CommitReports),
+		"numMessages", len(observation.Messages))
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
@@ -195,7 +198,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingExecutedReports(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingReportsForExecution(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
