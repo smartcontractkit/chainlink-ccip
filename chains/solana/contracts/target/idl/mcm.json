@@ -2,15 +2,54 @@
   "version": "0.1.0-dev",
   "name": "mcm",
   "docs": [
-    "This is mcm program supporting multiple instances of multisig configuration",
-    "A single deployed program manages multiple multisig states(configurations) identified by multisig_id"
+    "A multi-signature contract system that supports signing many transactions targeting",
+    "multiple chains with a single set of signatures. This program manages multiple multisig",
+    "configurations through Program Derived Accounts (PDAs), each identified by a unique",
+    "multisig_id.",
+    "",
+    "Key Features:",
+    "- Multiple Configurations: A single deployed program instance can manage",
+    "multiple independent multisig configurations",
+    "- Hierarchical Signature Groups: Supports complex approval structures with",
+    "nested groups and customizable quorum requirements",
+    "- Merkle Tree Operations: Batches signed operations in Merkle trees for",
+    "efficient verification and execution",
+    "",
+    "Usage Flow:",
+    "1. Initialize multisig configuration with a unique ID",
+    "2. Set up signer hierarchy and group structure",
+    "3. Set a Merkle root with authenticated metadata and signatures",
+    "4. Execute operations by providing Merkle proofs"
   ],
   "instructions": [
     {
       "name": "initialize",
       "docs": [
-        "initialize a new multisig configuration, store the chain_id and multisig_id",
-        "multisig_id is a unique identifier for the multisig configuration(32 bytes, left-padded)"
+        "Initialize a new multisig configuration.",
+        "",
+        "Creates the foundation for a new multisig instance by initializing the core configuration",
+        "PDAs and registering the multisig_id and chain_id. This is the first step in setting up",
+        "a new multisig configuration.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the accounts required for initialization:",
+        "- `multisig_config`: PDA that will store the core configuration",
+        "- `root_metadata`: PDA that will store the current root's metadata",
+        "- `expiring_root_and_op_count`: PDA that tracks the current root and operation count",
+        "- `authority`: The deployer who becomes the initial owner",
+        "- `program_data`: Used to validate that the caller is the program's upgrade authority",
+        "- `chain_id`: Network identifier for the chain this configuration is targeting",
+        "- `multisig_id`: A unique, 32-byte identifier (left-padded) for this multisig instance",
+        "",
+        "# Access Control",
+        "",
+        "This instruction can only be called by the program's upgrade authority (typically the deployer).",
+        "",
+        "# Note",
+        "",
+        "After initialization, the owner can transfer ownership through the two-step",
+        "transfer_ownership/accept_ownership process."
       ],
       "accounts": [
         {
@@ -67,6 +106,17 @@
     },
     {
       "name": "transferOwnership",
+      "docs": [
+        "Propose a new owner for the multisig instance config.",
+        "",
+        "Only the current owner (admin) can propose a new owner.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the configuration account.",
+        "- `_multisig_id`: The multisig identifier.",
+        "- `proposed_owner`: The public key of the proposed new owner."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -97,6 +147,16 @@
     },
     {
       "name": "acceptOwnership",
+      "docs": [
+        "Accept ownership of the multisig config.",
+        "",
+        "The proposed new owner must call this function to assume ownership.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the configuration account.",
+        "- `_multisig_id`: The multisig identifier."
+      ],
       "accounts": [
         {
           "name": "config",
@@ -123,6 +183,45 @@
     },
     {
       "name": "setConfig",
+      "docs": [
+        "Set up the configuration for the multisig instance.",
+        "",
+        "Validates and establishes the signer hierarchy, group structure, and quorum requirements.",
+        "If `clear_root` is true, it also invalidates the current Merkle root.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing the multisig configuration account.",
+        "- `multisig_id`: The unique identifier for this multisig instance.",
+        "- `signer_groups`: Vector assigning each signer to a specific group (must match signers length).",
+        "- `group_quorums`: Array defining the required signatures for each group. A group with quorum=0 is disabled.",
+        "- `group_parents`: Array defining the hierarchical relationship between groups, forming a tree structure.",
+        "- `clear_root`: If true, invalidates the current root to prevent further operations from being executed.",
+        "",
+        "# Example",
+        "",
+        "A group structure like this:",
+        "",
+        "```text",
+        "┌──────┐",
+        "┌─►│2-of-3│◄───────┐",
+        "│  └──────┘        │",
+        "│        ▲         │",
+        "│        │         │",
+        "┌──┴───┐ ┌──┴───┐ ┌───┴────┐",
+        "┌──►│1-of-2│ │2-of-2│ │signer A│",
+        "│   └──────┘ └──────┘ └────────┘",
+        "│       ▲      ▲  ▲",
+        "│       │      │  │",
+        "┌───────┴┐ ┌────┴───┐ ┌┴───────┐",
+        "│signer B│ │signer C│ │signer D│",
+        "└────────┘ └────────┘ └────────┘",
+        "```",
+        "",
+        "Would be configured with:",
+        "- group_quorums = [2, 1, 2, ...] (root: 2-of-3, group1: 1-of-2, group2: 2-of-2)",
+        "- group_parents = [0, 0, 0, ...] (all groups under root)"
+      ],
       "accounts": [
         {
           "name": "multisigConfig",
@@ -195,6 +294,21 @@
     },
     {
       "name": "setRoot",
+      "docs": [
+        "Set a new Merkle root that defines approved operations.",
+        "",
+        "This function updates the active Merkle root after verifying ECDSA signatures and validating",
+        "the provided metadata against a Merkle proof.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier.",
+        "- `root`: The new Merkle root to set.",
+        "- `valid_until`: timestamp until which the root remains valid.",
+        "- `metadata`: Structured input containing chain_id, multisig, and operation counters.",
+        "- `metadata_proof`: Merkle proof validating the metadata."
+      ],
       "accounts": [
         {
           "name": "rootSignatures",
@@ -276,6 +390,34 @@
     },
     {
       "name": "execute",
+      "docs": [
+        "Executes an operation after verifying it's authorized in the current Merkle root.",
+        "",
+        "This function:",
+        "1. Performs extensive validation checks on the operation",
+        "- Ensures the operation is within the allowed count range",
+        "- Verifies chain ID matches the configured chain",
+        "- Checks the root has not expired",
+        "- Validates the operation's nonce against current state",
+        "2. Verifies the operation's inclusion in the Merkle tree",
+        "3. Executes the cross-program invocation with the multisig signer PDA",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: Context containing operation accounts and signer information",
+        "- `multisig_id`: Identifier for the multisig instance",
+        "- `chain_id`: Network identifier that must match configuration",
+        "- `nonce`: Operation counter that must match current state",
+        "- `data`: Instruction data to be executed",
+        "- `proof`: Merkle proof for operation verification",
+        "",
+        "# Security Considerations",
+        "",
+        "This instruction implements secure privilege delegation through PDA signing.",
+        "The multisig's signer PDA becomes the authoritative signer for the operation,",
+        "allowing controlled execution of privileged actions while maintaining the",
+        "security guarantees of the Merkle root validation."
+      ],
       "accounts": [
         {
           "name": "multisigConfig",
@@ -345,6 +487,17 @@
     },
     {
       "name": "initSigners",
+      "docs": [
+        "Initialize the storage for signer addresses.",
+        "",
+        "Creates a temporary account to hold signer addresses during the multisig configuration process.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier.",
+        "- `total_signers`: The total number of signers to be added."
+      ],
       "accounts": [
         {
           "name": "multisigConfig",
@@ -385,6 +538,17 @@
     },
     {
       "name": "appendSigners",
+      "docs": [
+        "Append a batch of signer addresses to the temporary storage.",
+        "",
+        "Allows adding multiple signer addresses in batches to overcome transaction size limits.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier.",
+        "- `signers_batch`: A batch of Ethereum addresses (20 bytes each) to be added as signers."
+      ],
       "accounts": [
         {
           "name": "multisigConfig",
@@ -427,6 +591,16 @@
     },
     {
       "name": "clearSigners",
+      "docs": [
+        "Clear the temporary signer storage.",
+        "",
+        "Closes the account storing signer addresses, allowing it to be reinitialized if needed.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier."
+      ],
       "accounts": [
         {
           "name": "multisigConfig",
@@ -458,6 +632,16 @@
     },
     {
       "name": "finalizeSigners",
+      "docs": [
+        "Finalize the signer configuration.",
+        "",
+        "Marks the signer list as complete and ready for incorporation into the multisig configuration.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier."
+      ],
       "accounts": [
         {
           "name": "multisigConfig",
@@ -489,6 +673,19 @@
     },
     {
       "name": "initSignatures",
+      "docs": [
+        "Initialize storage for ECDSA signatures.",
+        "",
+        "Creates a temporary account to hold signatures that will validate a new Merkle root.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier.",
+        "- `root`: The new Merkle root these signatures will approve.",
+        "- `valid_until`: Timestamp until which the root will remain valid.",
+        "- `total_signatures`: The total number of signatures to be added."
+      ],
       "accounts": [
         {
           "name": "signatures",
@@ -537,6 +734,19 @@
     },
     {
       "name": "appendSignatures",
+      "docs": [
+        "Append a batch of ECDSA signatures to the temporary storage.",
+        "",
+        "Allows adding multiple signatures in batches to overcome transaction size limits.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier.",
+        "- `root`: The Merkle root being approved.",
+        "- `valid_until`: Timestamp until which the root will remain valid.",
+        "- `signatures_batch`: A batch of ECDSA signatures to be verified."
+      ],
       "accounts": [
         {
           "name": "signatures",
@@ -584,6 +794,18 @@
     },
     {
       "name": "clearSignatures",
+      "docs": [
+        "Clear the temporary signature storage.",
+        "",
+        "Closes the account storing signatures, allowing it to be reinitialized if needed.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier.",
+        "- `root`: The Merkle root associated with the signatures.",
+        "- `valid_until`: Timestamp until which the root would remain valid."
+      ],
       "accounts": [
         {
           "name": "signatures",
@@ -623,6 +845,18 @@
     },
     {
       "name": "finalizeSignatures",
+      "docs": [
+        "Finalize the signature configuration.",
+        "",
+        "Marks the signature list as finalized and ready for verification when setting a new root.",
+        "",
+        "# Parameters",
+        "",
+        "- `ctx`: The context containing required accounts.",
+        "- `multisig_id`: The multisig instance identifier.",
+        "- `root`: The Merkle root associated with the signatures.",
+        "- `valid_until`: Timestamp until which the root will remain valid."
+      ],
       "accounts": [
         {
           "name": "signatures",
@@ -754,16 +988,16 @@
             "type": "u8"
           },
           {
+            "name": "isFinalized",
+            "type": "bool"
+          },
+          {
             "name": "signatures",
             "type": {
               "vec": {
                 "defined": "Signature"
               }
             }
-          },
-          {
-            "name": "isFinalized",
-            "type": "bool"
           }
         ]
       }
@@ -837,6 +1071,9 @@
   "types": [
     {
       "name": "Signature",
+      "docs": [
+        "ECDSA signature with components used in Ethereum signature verification."
+      ],
       "type": {
         "kind": "struct",
         "fields": [

@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -132,6 +133,7 @@ type CCIPReader interface {
 		ctx context.Context,
 		source cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
+		confidence primitives.ConfidenceLevel,
 	) ([]cciptypes.SeqNum, error)
 
 	// MsgsBetweenSeqNums reads the provided chains, finds and returns ccip messages
@@ -194,7 +196,7 @@ type CCIPReader interface {
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context) (*CurseInfo, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

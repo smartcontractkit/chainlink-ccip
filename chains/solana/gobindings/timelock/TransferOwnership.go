@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Propose a new owner for the timelock.
+// Propose a new owner for the timelock instance config.
 //
 // Only the current owner (admin) can propose a new owner.
 //

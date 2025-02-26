@@ -8,6 +8,8 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	internaltypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -61,7 +63,7 @@ func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 }
 
 func (r InMemoryCCIPReader) ExecutedMessages(
-	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
+	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange, _ primitives.ConfidenceLevel,
 ) ([]cciptypes.SeqNum, error) {
 	msgs, ok := r.Messages[source]
 	// no messages for chain
@@ -177,9 +179,7 @@ func (r InMemoryCCIPReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Re
 	return rmntypes.RemoteConfig{}, nil
 }
 
-func (r InMemoryCCIPReader) GetRmnCurseInfo(
-	ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector,
-) (*reader.CurseInfo, error) {
+func (r InMemoryCCIPReader) GetRmnCurseInfo(ctx context.Context) (*reader.CurseInfo, error) {
 	return &reader.CurseInfo{
 		CursedSourceChains: map[cciptypes.ChainSelector]bool{},
 		CursedDestination:  false,
