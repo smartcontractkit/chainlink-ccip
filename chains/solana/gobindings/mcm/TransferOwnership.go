@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// TransferOwnership is the `transferOwnership` instruction.
+// Propose a new owner for the multisig instance config.
+//
+// Only the current owner (admin) can propose a new owner.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the configuration account.
+// - `_multisig_id`: The multisig identifier.
+// - `proposed_owner`: The public key of the proposed new owner.
 type TransferOwnership struct {
 	MultisigId    *[32]uint8
 	ProposedOwner *ag_solanago.PublicKey

@@ -13,6 +13,8 @@ import (
 
 	plugintypes "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
+	primitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
 	reader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
@@ -154,9 +156,9 @@ func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// ExecutedMessages provides a mock function with given fields: ctx, source, seqNumRange
-func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange) ([]ccipocr3.SeqNum, error) {
-	ret := _m.Called(ctx, source, seqNumRange)
+// ExecutedMessages provides a mock function with given fields: ctx, source, seqNumRange, confidence
+func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error) {
+	ret := _m.Called(ctx, source, seqNumRange, confidence)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecutedMessages")
@@ -164,19 +166,19 @@ func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.
 
 	var r0 []ccipocr3.SeqNum
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) ([]ccipocr3.SeqNum, error)); ok {
-		return rf(ctx, source, seqNumRange)
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange, primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error)); ok {
+		return rf(ctx, source, seqNumRange, confidence)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) []ccipocr3.SeqNum); ok {
-		r0 = rf(ctx, source, seqNumRange)
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange, primitives.ConfidenceLevel) []ccipocr3.SeqNum); ok {
+		r0 = rf(ctx, source, seqNumRange, confidence)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]ccipocr3.SeqNum)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) error); ok {
-		r1 = rf(ctx, source, seqNumRange)
+	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange, primitives.ConfidenceLevel) error); ok {
+		r1 = rf(ctx, source, seqNumRange, confidence)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -193,13 +195,14 @@ type MockCCIPReader_ExecutedMessages_Call struct {
 //   - ctx context.Context
 //   - source ccipocr3.ChainSelector
 //   - seqNumRange ccipocr3.SeqNumRange
-func (_e *MockCCIPReader_Expecter) ExecutedMessages(ctx interface{}, source interface{}, seqNumRange interface{}) *MockCCIPReader_ExecutedMessages_Call {
-	return &MockCCIPReader_ExecutedMessages_Call{Call: _e.mock.On("ExecutedMessages", ctx, source, seqNumRange)}
+//   - confidence primitives.ConfidenceLevel
+func (_e *MockCCIPReader_Expecter) ExecutedMessages(ctx interface{}, source interface{}, seqNumRange interface{}, confidence interface{}) *MockCCIPReader_ExecutedMessages_Call {
+	return &MockCCIPReader_ExecutedMessages_Call{Call: _e.mock.On("ExecutedMessages", ctx, source, seqNumRange, confidence)}
 }
 
-func (_c *MockCCIPReader_ExecutedMessages_Call) Run(run func(ctx context.Context, source ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange)) *MockCCIPReader_ExecutedMessages_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) Run(run func(ctx context.Context, source ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel)) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].(ccipocr3.SeqNumRange))
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].(ccipocr3.SeqNumRange), args[3].(primitives.ConfidenceLevel))
 	})
 	return _c
 }
@@ -209,7 +212,7 @@ func (_c *MockCCIPReader_ExecutedMessages_Call) Return(_a0 []ccipocr3.SeqNum, _a
 	return _c
 }
 
-func (_c *MockCCIPReader_ExecutedMessages_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange) ([]ccipocr3.SeqNum, error)) *MockCCIPReader_ExecutedMessages_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, ccipocr3.SeqNumRange, primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error)) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -770,9 +773,9 @@ func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// GetRmnCurseInfo provides a mock function with given fields: ctx, sourceChainSelectors
-func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []ccipocr3.ChainSelector) (*reader.CurseInfo, error) {
-	ret := _m.Called(ctx, sourceChainSelectors)
+// GetRmnCurseInfo provides a mock function with given fields: ctx
+func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context) (*reader.CurseInfo, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRmnCurseInfo")
@@ -780,19 +783,19 @@ func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context, sourceChainSelect
 
 	var r0 *reader.CurseInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (*reader.CurseInfo, error)); ok {
-		return rf(ctx, sourceChainSelectors)
+	if rf, ok := ret.Get(0).(func(context.Context) (*reader.CurseInfo, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) *reader.CurseInfo); ok {
-		r0 = rf(ctx, sourceChainSelectors)
+	if rf, ok := ret.Get(0).(func(context.Context) *reader.CurseInfo); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*reader.CurseInfo)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.ChainSelector) error); ok {
-		r1 = rf(ctx, sourceChainSelectors)
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -807,14 +810,13 @@ type MockCCIPReader_GetRmnCurseInfo_Call struct {
 
 // GetRmnCurseInfo is a helper method to define mock.On call
 //   - ctx context.Context
-//   - sourceChainSelectors []ccipocr3.ChainSelector
-func (_e *MockCCIPReader_Expecter) GetRmnCurseInfo(ctx interface{}, sourceChainSelectors interface{}) *MockCCIPReader_GetRmnCurseInfo_Call {
-	return &MockCCIPReader_GetRmnCurseInfo_Call{Call: _e.mock.On("GetRmnCurseInfo", ctx, sourceChainSelectors)}
+func (_e *MockCCIPReader_Expecter) GetRmnCurseInfo(ctx interface{}) *MockCCIPReader_GetRmnCurseInfo_Call {
+	return &MockCCIPReader_GetRmnCurseInfo_Call{Call: _e.mock.On("GetRmnCurseInfo", ctx)}
 }
 
-func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Run(run func(ctx context.Context, sourceChainSelectors []ccipocr3.ChainSelector)) *MockCCIPReader_GetRmnCurseInfo_Call {
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Run(run func(ctx context.Context)) *MockCCIPReader_GetRmnCurseInfo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -824,7 +826,7 @@ func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Return(_a0 *reader.CurseInfo, _a1
 	return _c
 }
 
-func (_c *MockCCIPReader_GetRmnCurseInfo_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (*reader.CurseInfo, error)) *MockCCIPReader_GetRmnCurseInfo_Call {
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) RunAndReturn(run func(context.Context) (*reader.CurseInfo, error)) *MockCCIPReader_GetRmnCurseInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

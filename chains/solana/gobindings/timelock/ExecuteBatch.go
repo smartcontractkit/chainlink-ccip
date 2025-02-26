@@ -10,13 +10,26 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Execute a scheduled batch of instructions.
+// Executes a scheduled batch of operations after validating readiness and predecessor dependencies.
+//
+// This function:
+// 1. Verifies the operation is ready for execution (delay period has passed)
+// 2. Validates that any predecessor operation has been completed
+// 3. Executes each instruction in the operation using the timelock signer PDA
+// 4. Emits events for each executed instruction
 //
 // # Parameters
 //
-// - `ctx`: The context containing the accounts required for execution.
-// - `timelock_id`: The timelock identifier.
-// - `id`: The operation identifier.
+// - `ctx`: Context containing operation accounts and signer information
+// - `timelock_id`: Identifier for the timelock instance
+// - `_id`: Operation ID (used for PDA derivation)
+//
+// # Security Considerations
+//
+// This instruction uses PDA signing to create a trusted execution environment.
+// The timelock's signer PDA will replace any account marked as a signer in the
+// original instructions, providing the necessary privileges while maintaining
+// security through program derivation.
 type ExecuteBatch struct {
 	TimelockId *[32]uint8
 	Id         *[32]uint8

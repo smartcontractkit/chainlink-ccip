@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -209,7 +211,7 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 				Messages: tt.fields.MessagesWithExecuted,
 				Dest:     tt.fields.Dest,
 			}
-			got, err := r.ExecutedMessages(context.Background(), tt.args.source, tt.args.seqNumRange)
+			got, err := r.ExecutedMessages(context.Background(), tt.args.source, tt.args.seqNumRange, primitives.Finalized)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ExecutedMessages() error = %v, wantErr %v", err, tt.wantErr)
 				return
