@@ -6,6 +6,7 @@ use crate::event::{UsdPerTokenUpdated, UsdPerUnitGasUpdated};
 use crate::instructions::interfaces::Prices;
 use crate::state::{BillingTokenConfigWrapper, DestChain, TimestampedPackedU224};
 use crate::FeeQuoterError;
+use solana_program::system_program;
 
 pub struct Impl;
 impl Prices for Impl {
@@ -60,10 +61,16 @@ fn apply_token_price_update<'info>(
     token_update: &TokenPriceUpdate,
     token_config_account_info: &'info AccountInfo<'info>,
 ) -> Result<()> {
+    // Token is uninitialized, so we silently ignore it.
+    if token_config_account_info.owner == &system_program::ID {
+        return Ok(());
+    }
+
     let (expected, _) = Pubkey::find_program_address(
         &[FEE_BILLING_TOKEN_CONFIG, token_update.source_token.as_ref()],
         &crate::ID,
     );
+
     require_keys_eq!(
         token_config_account_info.key(),
         expected,
