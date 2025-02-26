@@ -301,7 +301,7 @@ func (p *Plugin) ValidateObservation(
 	}
 
 	// check message related validations when states can contain messages
-	if state == exectypes.GetMessages || state == exectypes.Filter {
+	if nextState == exectypes.GetMessages || nextState == exectypes.Filter {
 		if err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
 			return fmt.Errorf("validate observer reading eligibility: %w", err)
 		}
