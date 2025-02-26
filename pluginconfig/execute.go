@@ -22,7 +22,7 @@ type ExecuteOffchainConfig struct {
 	// If a reorg occurs and invalidates the execution, the messages become available again after expiry.
 	InflightCacheExpiry commonconfig.Duration `json:"inflightCacheExpiry"`
 
-	// RootSnoozeTime is the interval at which we check roots for executable messages.
+	// RootSnoozeTime is the delay duration used when a commit root is snoozed.
 	RootSnoozeTime commonconfig.Duration `json:"rootSnoozeTime"`
 
 	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
