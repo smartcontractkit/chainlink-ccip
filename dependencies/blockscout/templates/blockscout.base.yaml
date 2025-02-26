@@ -40,8 +40,8 @@ in: |
             env:
               DATABASE_URL: 'postgresql://blockscout:blockscout123@blockscout-postgres-{{ .Env.ETHEREUM_VARIANT }}-chain-{{ .Env.CHAIN_NAME }}-{{ .Env.CHAIN_ID }}.${NAMESPACE}.svc.cluster.local:5432/blockscout?ssl=false'
               ETHEREUM_JSONRPC_VARIANT: {{ .Env.ETHEREUM_VARIANT }}
-              ETHEREUM_JSONRPC_HTTP_URL: 'http://besu-node-rpc-1.${NAMESPACE}.svc.cluster.local:8545'
-              ETHEREUM_JSONRPC_TRACE_URL: 'http://besu-node-rpc-1.${NAMESPACE}.svc.cluster.local:8545'
+              ETHEREUM_JSONRPC_HTTP_URL: 'http://{{ .Env.ETHEREUM_VARIANT }}-node-rpc-1.${NAMESPACE}.svc.cluster.local:8545'
+              ETHEREUM_JSONRPC_TRACE_URL: 'http://{{ .Env.ETHEREUM_VARIANT }}-node-rpc-1.${NAMESPACE}.svc.cluster.local:8545'
               ECTO_USE_SSL: 'false'
               CHECK_ORIGIN: 'false'
             service:
