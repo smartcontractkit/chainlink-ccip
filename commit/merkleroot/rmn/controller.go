@@ -662,6 +662,8 @@ func (c *controller) validateSignedObservationResponse(
 		}
 
 		// todo: The original updateReq contains abi encoded onRamp address, the one in the RMN response
+		// is 20 bytes evm address. This is chain specific and should be handled in a chain specific way.
+
 		// TODO check if we can remove the call for keepNRightBytes
 		// https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
 		expOnRampAddress := typconv.KeepNRightBytes(updateReq.Data.LaneSource.OnrampAddress, 20)
