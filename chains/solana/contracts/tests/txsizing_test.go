@@ -238,7 +238,6 @@ func TestTransactionSizing(t *testing.T) {
 			},
 		},
 		OffchainTokenData: [][]byte{},
-		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
 	}
 	executeSingleToken := ccip_offramp.ExecutionReportSingleChain{
@@ -267,7 +266,6 @@ func TestTransactionSizing(t *testing.T) {
 			},
 		},
 		OffchainTokenData: [][]byte{},
-		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
 	}
 
