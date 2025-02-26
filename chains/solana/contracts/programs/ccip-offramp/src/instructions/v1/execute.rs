@@ -262,9 +262,17 @@ fn internal_execute<'info>(
         let recv_and_msg_account_keys = Some(*msg_program.key)
             .into_iter()
             .chain(msg_accounts.iter().map(|a| *a.key));
-        verify_merkle_root(&execution_report, recv_and_msg_account_keys)?
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            recv_and_msg_account_keys,
+        )?
     } else {
-        verify_merkle_root(&execution_report, None.into_iter())?
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            None.into_iter(),
+        )?
     };
 
     let new_state = MessageExecutionState::Success;
@@ -360,15 +368,16 @@ fn parse_messaging_accounts<'info>(
 
 pub fn verify_merkle_root(
     execution_report: &ExecutionReportSingleChain,
+    expected_root: [u8; 32],
     // logic receiver followed by all other message account keys, when they were
     // provided (i.e. when the message isn't a token transfer exclusively)
     recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
 ) -> Result<[u8; 32]> {
     let hashed_leaf = hash(&execution_report.message, recv_and_msg_account_keys);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
-        calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
+        calculate_merkle_root(hashed_leaf, &execution_report.proofs);
     require!(
-        verified_root.is_ok() && verified_root.unwrap() == execution_report.root,
+        verified_root.is_ok() && verified_root.unwrap() == expected_root,
         CcipOfframpError::InvalidProof
     );
     Ok(hashed_leaf)

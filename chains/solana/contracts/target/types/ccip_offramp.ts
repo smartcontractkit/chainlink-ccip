@@ -1339,15 +1339,6 @@ export type CcipOfframp = {
             }
           },
           {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
             "name": "proofs",
             "type": {
               "vec": {
@@ -3559,15 +3550,6 @@ export const IDL: CcipOfframp = {
             "name": "offchainTokenData",
             "type": {
               "vec": "bytes"
-            }
-          },
-          {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
             }
           },
           {
