@@ -80,3 +80,12 @@ docker-update-contracts:
 
 .PHONY: solana-checks
 solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
+
+.PHONY: docker-build-test-router
+docker-build-test-router:
+	docker run --rm \
+		-v $(shell pwd)/contracts:/workdir \
+		-v ${TARGET_DIR}:/workdir/target \
+		-e CARGO_TARGET_DIR=/workdir/target \
+		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
+		${ANCHOR_IMAGE} anchor build -p ccip_router
