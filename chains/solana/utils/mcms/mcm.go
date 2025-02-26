@@ -54,7 +54,7 @@ func GetExpiringRootAndOpCountPDA(msigID [32]byte) solana.PublicKey {
 }
 
 // get address of the root_signatures pda
-func GetRootSignaturesPDA(msigID [32]byte, root [32]byte, validUntil uint32) solana.PublicKey {
+func GetRootSignaturesPDA(msigID [32]byte, root [32]byte, validUntil uint32, authority solana.PublicKey) solana.PublicKey {
 	validUntilBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(validUntilBytes, validUntil)
 
@@ -63,6 +63,7 @@ func GetRootSignaturesPDA(msigID [32]byte, root [32]byte, validUntil uint32) sol
 		msigID[:],
 		root[:],
 		validUntilBytes,
+		authority[:],
 	}, config.McmProgram)
 	return pda
 }
@@ -160,19 +161,19 @@ func NewValidMcmConfig(msigID [32]byte, signerPrivateKeys []string, signerGroups
 	return config, nil
 }
 
-func GetNewMcmMultisig(name [32]byte) Multisig {
+func GetNewMcmMultisig(id [32]byte) Multisig {
 	return Multisig{
-		PaddedID:                  name,
-		SignerPDA:                 GetSignerPDA(name),
-		ConfigPDA:                 GetConfigPDA(name),
-		RootMetadataPDA:           GetRootMetadataPDA(name),
-		ExpiringRootAndOpCountPDA: GetExpiringRootAndOpCountPDA(name),
-		ConfigSignersPDA:          GetConfigSignersPDA(name),
-		RootSignaturesPDA: func(root [32]byte, validUntil uint32) solana.PublicKey {
-			return GetRootSignaturesPDA(name, root, validUntil)
+		PaddedID:                  id,
+		SignerPDA:                 GetSignerPDA(id),
+		ConfigPDA:                 GetConfigPDA(id),
+		RootMetadataPDA:           GetRootMetadataPDA(id),
+		ExpiringRootAndOpCountPDA: GetExpiringRootAndOpCountPDA(id),
+		ConfigSignersPDA:          GetConfigSignersPDA(id),
+		RootSignaturesPDA: func(root [32]byte, validUntil uint32, authority solana.PublicKey) solana.PublicKey {
+			return GetRootSignaturesPDA(id, root, validUntil, authority)
 		},
 		SeenSignedHashesPDA: func(root [32]byte, validUntil uint32) solana.PublicKey {
-			return GetSeenSignedHashesPDA(name, root, validUntil)
+			return GetSeenSignedHashesPDA(id, root, validUntil)
 		},
 	}
 }
@@ -242,8 +243,10 @@ func GetAppendSignersIxs(signerAddresses [][20]uint8, msigID [32]byte, multisigC
 }
 
 // instructions builder for preloading signatures
-func GetMcmPreloadSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, root [32]uint8, validUntil uint32, signaturesPDA solana.PublicKey, authority solana.PublicKey, appendChunkSize int) ([]solana.Instruction, error) {
+func GetMcmPreloadSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, root [32]uint8, validUntil uint32, authority solana.PublicKey, appendChunkSize int) ([]solana.Instruction, error) {
 	ixs := make([]solana.Instruction, 0)
+
+	signaturesPDA := GetRootSignaturesPDA(msigID, root, validUntil, authority)
 
 	initSigsIx, isErr := mcm.NewInitSignaturesInstruction(
 		msigID,
@@ -260,7 +263,7 @@ func GetMcmPreloadSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, roo
 	}
 	ixs = append(ixs, initSigsIx)
 
-	appendSigsIxs, asErr := GetAppendSignaturesIxs(signatures, msigID, root, validUntil, signaturesPDA, authority, appendChunkSize)
+	appendSigsIxs, asErr := GetAppendSignaturesIxs(signatures, msigID, root, validUntil, authority, appendChunkSize)
 	if asErr != nil {
 		return nil, asErr
 	}
@@ -283,7 +286,9 @@ func GetMcmPreloadSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, roo
 }
 
 // get chunked append instructions to preload signatures to pda, required before set_root
-func GetAppendSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, root [32]uint8, validUntil uint32, signaturesPDA solana.PublicKey, authority solana.PublicKey, chunkSize int) ([]solana.Instruction, error) {
+func GetAppendSignaturesIxs(signatures []mcm.Signature, msigID [32]byte, root [32]uint8, validUntil uint32, authority solana.PublicKey, chunkSize int) ([]solana.Instruction, error) {
+	signaturesPDA := GetRootSignaturesPDA(msigID, root, validUntil, authority)
+
 	if chunkSize > config.MaxAppendSignatureBatchSize {
 		return nil, errors.New("chunkSize exceeds max signatures chunk size")
 	}
