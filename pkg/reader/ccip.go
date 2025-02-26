@@ -298,65 +298,6 @@ func (r *ccipChainReader) processCommitReports(
 	return reports[:limit], nil
 }
 
-func (r *ccipChainReader) processMerkleRoots(
-	allMerkleRoots []MerkleRoot, isBlessed map[cciptypes.Bytes32]bool,
-) ([]cciptypes.MerkleRootChain, []cciptypes.MerkleRootChain) {
-	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
-	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
-	for _, mr := range allMerkleRoots {
-		onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, cciptypes.ChainSelector(mr.SourceChainSelector))
-		if err != nil {
-			continue
-		}
-		mrc := cciptypes.MerkleRootChain{
-			ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
-			OnRampAddress: onRampAddress,
-			SeqNumsRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(mr.MinSeqNr),
-				cciptypes.SeqNum(mr.MaxSeqNr),
-			),
-			MerkleRoot: mr.MerkleRoot,
-		}
-		if isBlessed[mr.MerkleRoot] {
-			blessedMerkleRoots = append(blessedMerkleRoots, mrc)
-		} else {
-			unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
-		}
-	}
-	return blessedMerkleRoots, unblessedMerkleRoots
-}
-
-func (r *ccipChainReader) processPriceUpdates(
-	priceUpdates PriceUpdates,
-) (cciptypes.PriceUpdates, error) {
-	lggr := r.lggr
-	updates := cciptypes.PriceUpdates{
-		TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
-		GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
-	}
-
-	for _, tokenPriceUpdate := range priceUpdates.TokenPriceUpdates {
-		sourceTokenAddrStr, err := r.addrCodec.AddressBytesToString(tokenPriceUpdate.SourceToken, r.destChain)
-		if err != nil {
-			lggr.Errorw("failed to convert source token address to string", "err", err)
-			return updates, err
-		}
-		updates.TokenPriceUpdates = append(updates.TokenPriceUpdates, cciptypes.TokenPrice{
-			TokenID: cciptypes.UnknownEncodedAddress(sourceTokenAddrStr),
-			Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
-		})
-	}
-
-	for _, gasPriceUpdate := range priceUpdates.GasPriceUpdates {
-		updates.GasPriceUpdates = append(updates.GasPriceUpdates, cciptypes.GasPriceChain{
-			ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
-			GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
-		})
-	}
-
-	return updates, nil
-}
-
 type ExecutionStateChangedEvent struct {
 	SourceChainSelector cciptypes.ChainSelector
 	SequenceNumber      cciptypes.SeqNum
