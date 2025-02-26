@@ -81,10 +81,10 @@ func (p *Processor) getOutcome(
 
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
+		attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
+		multipleReports := p.offchainCfg.MultipleReportsEnabled
 		return checkForReportTransmission(
-			attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
-			multipleReports := p.offchainCfg.
-			lggr, attempts, p.offchainCfg previousOutcome, consObservation), nextState, nil
+			lggr, attempts, multipleReports, previousOutcome, consObservation), nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
@@ -296,19 +296,21 @@ type rootKey struct {
 func checkForReportTransmission(
 	lggr logger.Logger,
 	maxReportTransmissionCheckAttempts uint,
+	multipleReportsEnabled bool,
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {
-	offRampUpdated := false
-	offRampPending := true
-	// TODO: does this need to be updated to ensure all seqNum's are updated instead of just one?
+	// Check that all sources have been updates. We check that all have been updated
+	// in case there were multiple reports generated in the previous round.
+	sourceUpdates := make(map[cciptypes.ChainSelector]bool)
+	for _, root := range previousOutcome.RootsToReport {
+		sourceUpdates[root.ChainSel] = false
+	}
+
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
-				offRampUpdated = true
-				break
-			} else {
-				offRampPending = false
+				sourceUpdates[previousSeqNumChain.ChainSel] = true
 			}
 
 			if previousSeqNumChain.SeqNum > currentSeqNum {
@@ -322,7 +324,12 @@ func checkForReportTransmission(
 		}
 	}
 
-	if offRampUpdated {
+	allUpdated := true
+	for _, updated := range sourceUpdates {
+		allUpdated = allUpdated && updated
+	}
+
+	if allUpdated {
 		return Outcome{
 			OutcomeType: ReportTransmitted,
 		}
