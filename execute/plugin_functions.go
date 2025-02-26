@@ -132,6 +132,11 @@ func validateMessagesConformToCommitReports(
 	observedData exectypes.CommitObservations,
 	observedMsgs exectypes.MessageObservations,
 ) error {
+	if len(observedData) != len(observedMsgs) {
+		return fmt.Errorf("count of observed data=%d and observed msgs=%d do not match",
+			len(observedData), len(observedMsgs))
+	}
+
 	msgsCount := 0
 	for chain, report := range observedData {
 		for _, data := range report {

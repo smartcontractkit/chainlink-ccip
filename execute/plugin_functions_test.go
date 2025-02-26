@@ -187,6 +187,7 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
 				1: {},
 			},
+			expErr: true,
 		},
 		{
 			name:         "EmptyObservedData",
