@@ -23,6 +23,7 @@ var (
 	Token2022Program           = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 	FeeQuoterProgram           = solana.MustPublicKeyFromBase58("FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw")
 	CcipOfframpProgram         = solana.MustPublicKeyFromBase58("offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5")
+	RMNRemoteProgram           = solana.MustPublicKeyFromBase58("CPkyVFQmyzmb6HfDE5TQr3NmZAsydcYspBoc3bf6Zo5x")
 
 	// test values
 	OnRampAddress                   = []byte{1, 2, 3}
@@ -74,4 +75,8 @@ var (
 	FqEvmDestChainPDA, _, _               = state.FindFqDestChainPDA(EvmChainSelector, FeeQuoterProgram)
 	FqSvmDestChainPDA, _, _               = state.FindFqDestChainPDA(SvmChainSelector, FeeQuoterProgram)
 	FqAllowedPriceUpdaterOfframpPDA, _, _ = state.FindFqAllowedPriceUpdaterPDA(OfframpBillingSignerPDA, FeeQuoterProgram)
+
+	// RMN Remote PDAs
+	RMNRemoteConfigPDA, _, _ = state.FindRMNRemoteConfigPDA(RMNRemoteProgram)
+	RMNRemoteCursesPDA, _, _ = state.FindRMNRemoteCursesPDA(RMNRemoteProgram)
 )

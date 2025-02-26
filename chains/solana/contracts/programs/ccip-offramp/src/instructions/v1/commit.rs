@@ -24,6 +24,16 @@ impl Commit for Impl {
         let report = CommitInput::deserialize(&mut raw_report.as_ref())
             .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
 
+        // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
+        let source_chain = &mut ctx.accounts.source_chain;
+
+        helpers::verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            source_chain.chain_selector,
+        )?;
+
         require!(
             report.merkle_root.is_some(),
             CcipOfframpError::MissingExpectedMerkleRoot
@@ -33,9 +43,6 @@ impl Commit for Impl {
 
         // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
         let config = ctx.accounts.config.load()?;
-
-        // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-        let source_chain = &mut ctx.accounts.source_chain;
 
         require!(
             source_chain.config.is_enabled,
@@ -160,6 +167,16 @@ impl Commit for Impl {
     ) -> Result<()> {
         let report = CommitInput::deserialize(&mut raw_report.as_ref())
             .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+
+        helpers::verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            // No merkle root, so there's no remote chain selector to check.
+            // We pass zero to verify there's no global curse.
+            0,
+        )?;
+
         require!(
             report.merkle_root.is_none(),
             CcipOfframpError::UnexpectedMerkleRoot,
@@ -218,6 +235,7 @@ impl Commit for Impl {
 
 mod helpers {
     use fee_quoter::cpi::accounts::UpdatePrices;
+    use rmn_remote::state::CurseSubject;
 
     use super::*;
     pub(super) fn update_prices<'info>(
@@ -296,6 +314,24 @@ mod helpers {
             fee_quoter::cpi::update_prices(cpi_ctx, token_price_updates, gas_price_update)?;
         }
 
+        Ok(())
+    }
+
+    pub(super) fn verify_uncursed_cpi<'info>(
+        rmn_remote: AccountInfo<'info>,
+        rmn_remote_config: AccountInfo<'info>,
+        rmn_remote_curses: AccountInfo<'info>,
+        chain_selector: u64,
+    ) -> Result<()> {
+        let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
+            config: rmn_remote_config,
+            curses: rmn_remote_curses,
+        };
+        let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
+        rmn_remote::cpi::verify_not_cursed(
+            cpi_context,
+            CurseSubject::from_chain_selector(chain_selector),
+        )?;
         Ok(())
     }
 }

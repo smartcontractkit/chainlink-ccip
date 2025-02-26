@@ -18,12 +18,14 @@ pub mod test_token_pool {
         ctx: Context<InitializeTokenPool>,
         pool_type: PoolType,
         router: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         ctx.accounts.state.config.init(
             &ctx.accounts.mint,
             ctx.program_id.key(),
             ctx.accounts.authority.key(),
             router,
+            rmn_remote,
         )?;
         ctx.accounts.state.pool_type = pool_type;
         Ok(())
@@ -132,6 +134,9 @@ pub mod test_token_pool {
             ctx.accounts.state.config.mint,
             &remote.pool_addresses,
             inbound_rate_limit,
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
         match ctx.accounts.state.pool_type {
@@ -220,6 +225,9 @@ pub mod test_token_pool {
             &mut ctx.accounts.chain_config.base.outbound_rate_limit,
             ctx.accounts.state.config.list_enabled,
             &ctx.accounts.state.config.allow_list,
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
         match ctx.accounts.state.pool_type {

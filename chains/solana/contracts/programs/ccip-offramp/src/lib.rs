@@ -35,14 +35,14 @@ pub mod ccip_offramp {
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts
-            .reference_addresses
-            .set_inner(ReferenceAddresses {
-                version: 1,
-                router: ctx.accounts.router.key(),
-                fee_quoter: ctx.accounts.fee_quoter.key(),
-                offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
-            });
+        let mut reference_addresses = ctx.accounts.reference_addresses.load_init()?;
+        *reference_addresses = ReferenceAddresses {
+            version: 1,
+            router: ctx.accounts.router.key(),
+            fee_quoter: ctx.accounts.fee_quoter.key(),
+            rmn_remote: ctx.accounts.rmn_remote.key(),
+            offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
+        };
 
         ctx.accounts.state.latest_price_sequence_number = 0;
 
@@ -50,6 +50,7 @@ pub mod ccip_offramp {
             router: ctx.accounts.router.key(),
             fee_quoter: ctx.accounts.fee_quoter.key(),
             offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
+            rmn_remote: ctx.accounts.rmn_remote.key(),
         });
 
         Ok(())
@@ -171,6 +172,7 @@ pub mod ccip_offramp {
         router: Pubkey,
         fee_quoter: Pubkey,
         offramp_lookup_table: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         let default_code_version: CodeVersion = ctx
             .accounts
@@ -184,6 +186,7 @@ pub mod ccip_offramp {
             router,
             fee_quoter,
             offramp_lookup_table,
+            rmn_remote,
         )
     }
 
@@ -525,6 +528,8 @@ pub enum CcipOfframpError {
     InvalidSequenceInterval = 3000,
     #[msg("The given Merkle Root is missing")]
     RootNotCommitted,
+    #[msg("Invalid RMN Remote Address")]
+    InvalidRMNRemoteAddress,
     #[msg("The given Merkle Root is already committed")]
     ExistingMerkleRoot,
     #[msg("The signer is unauthorized")]

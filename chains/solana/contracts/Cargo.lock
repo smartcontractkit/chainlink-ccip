@@ -410,6 +410,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "rmn_remote",
  "solana-program",
  "spl-math",
 ]
@@ -671,6 +672,7 @@ dependencies = [
  "ethnum",
  "fee_quoter",
  "hex",
+ "rmn_remote",
  "solana-program",
 ]
 
@@ -684,6 +686,7 @@ dependencies = [
  "ethnum",
  "fee_quoter",
  "hex",
+ "rmn_remote",
  "solana-program",
 ]
 
@@ -965,6 +968,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
+ "rmn_remote",
  "solana-program",
  "spl-math",
 ]
@@ -976,6 +980,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
+ "rmn_remote",
  "solana-program",
  "spl-math",
 ]
@@ -996,6 +1001,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "fee_quoter",
+ "smalloc",
  "solana-program",
 ]
 
@@ -1738,6 +1744,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
+name = "rmn_remote"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "bytemuck",
+]
+
+[[package]]
 name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1899,6 +1913,12 @@ dependencies = [
  "bitmaps",
  "typenum",
 ]
+
+[[package]]
+name = "smalloc"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe4dc8671765eaefc12e36c40a397e963149dfc4aac7c727ba42db1827408298"
 
 [[package]]
 name = "smallvec"
@@ -2446,6 +2466,7 @@ dependencies = [
  "base-token-pool",
  "example-burnmint-token-pool",
  "example-lockrelease-token-pool",
+ "rmn_remote",
  "solana-program",
  "spl-math",
 ]

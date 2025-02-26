@@ -36,6 +36,10 @@ export type TestTokenPool = {
         {
           "name": "router",
           "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
         }
       ]
     },
@@ -361,6 +365,21 @@ export type TestTokenPool = {
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "receiverTokenAccount",
           "isMut": true,
           "isSigner": false
@@ -409,6 +428,21 @@ export type TestTokenPool = {
         {
           "name": "poolTokenAccount",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -525,6 +559,10 @@ export const IDL: TestTokenPool = {
         {
           "name": "router",
           "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
         }
       ]
     },
@@ -850,6 +888,21 @@ export const IDL: TestTokenPool = {
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "receiverTokenAccount",
           "isMut": true,
           "isSigner": false
@@ -898,6 +951,21 @@ export const IDL: TestTokenPool = {
         {
           "name": "poolTokenAccount",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
           "isSigner": false
         },
         {
