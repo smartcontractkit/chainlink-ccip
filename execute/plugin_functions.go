@@ -169,9 +169,14 @@ func validateMessagesConformToCommitReports(
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain
 // and that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedData map[cciptypes.ChainSelector][]exectypes.CommitData,
 ) error {
-	for _, commitData := range observedData {
+	for chainSel, commitData := range observedData {
+		if !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observed a non-supported chain %d", chainSel)
+		}
+
 		// observed commitData must not contain duplicates
 
 		observedMerkleRoots := mapset.NewSet[string]()
