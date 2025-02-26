@@ -1019,16 +1019,16 @@ func noReportMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
 	}
 }
 
-func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt) {
+func newRandomFees() (components types.ChainFeeComponents, nativePrice ccipocr3.BigInt, usdPrices ccipocr3.BigInt) {
 	execFee := big.NewInt(rand.RandomInt64())
 	dataAvFee := big.NewInt(rand.RandomInt64())
-	nativePrice := big.NewInt(rand.RandomInt64())
-	usdPrices := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
-		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePrice),
-		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePrice),
+	nativePriceI := big.NewInt(rand.RandomInt64())
+	usdPricesF := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
+		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePriceI),
+		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePriceI),
 	})
 
 	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee},
-		ccipocr3.NewBigInt(nativePrice),
-		ccipocr3.NewBigInt(usdPrices)
+		ccipocr3.NewBigInt(nativePriceI),
+		ccipocr3.NewBigInt(usdPricesF)
 }
