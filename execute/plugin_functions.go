@@ -101,14 +101,23 @@ func validateHashesExist(
 	}
 
 	for chain, msgs := range observedMsgs {
-		_, ok := hashes[chain]
+		hashesForChain, ok := hashes[chain]
 		if !ok {
 			return fmt.Errorf("hash not found for chain %d", chain)
 		}
 
+		if len(msgs) != len(hashesForChain) {
+			return fmt.Errorf("unexpected number of message hashes for chain %d: expected %d, got %d",
+				chain, len(msgs), len(hashesForChain))
+		}
+
 		for seq, msg := range msgs {
-			if _, ok := hashes[chain][seq]; !ok {
+			h, exists := hashes[chain][seq]
+			if !exists {
 				return fmt.Errorf("hash not found for message %s", msg)
+			}
+			if h.IsEmpty() {
+				return fmt.Errorf("hash is empty for message %s", msg)
 			}
 		}
 	}
