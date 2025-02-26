@@ -45,7 +45,7 @@ type ccipChainReader struct {
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
 	configPoller    ConfigPoller
-	addrCodec       cciptypes.AddressCodec // TODO replace the internal/libs/typeconv calls with addrCodec calls
+	addrCodec       cciptypes.AddressCodec
 }
 
 func newCCIPChainReaderInternal(
