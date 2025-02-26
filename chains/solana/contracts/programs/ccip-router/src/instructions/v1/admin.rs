@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
+use crate::context::UpdateDestChainSelectorConfigStatic;
 use crate::events::admin as events;
 use crate::state::{CodeVersion, RestoreOnAction};
 use crate::{
@@ -118,7 +119,7 @@ impl Admin for Impl {
 
     fn bump_ccip_version_for_dest_chain(
         &self,
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigStatic>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;
@@ -138,7 +139,7 @@ impl Admin for Impl {
 
     fn rollback_ccip_version_for_dest_chain(
         &self,
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigStatic>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         let dest_chain_state = &mut ctx.accounts.dest_chain_state.state;

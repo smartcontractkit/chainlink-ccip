@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::context::{
     AcceptOwnership, AddChainSelector, AddOfframp, CcipSend, RemoveOfframp, TransferOwnership,
-    UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, WithdrawBilledFunds,
+    UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateDestChainSelectorConfigStatic,
+    WithdrawBilledFunds,
 };
 use crate::messages::SVM2AnyMessage;
 use crate::state::{CodeVersion, DestChainConfig};
@@ -50,13 +51,13 @@ pub trait Admin {
 
     fn bump_ccip_version_for_dest_chain(
         &self,
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigStatic>,
         dest_chain_selector: u64,
     ) -> Result<()>;
 
     fn rollback_ccip_version_for_dest_chain(
         &self,
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigStatic>,
         dest_chain_selector: u64,
     ) -> Result<()>;
 
