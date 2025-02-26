@@ -1953,7 +1953,6 @@ func validateExecutionStateChangedEvent(
 	return nil
 }
 
-//nolint:gocyclo // This function is not complex enough to warrant a refactor.
 func validateSendRequestedEvent(
 	ev *SendRequestedEvent, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange) error {
 	if ev == nil {
