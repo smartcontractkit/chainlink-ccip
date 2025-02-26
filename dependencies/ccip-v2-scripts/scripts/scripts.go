@@ -14,10 +14,12 @@ import (
 )
 
 func DeployCCIPAndAddLanes(logger *zap.SugaredLogger, env config.DevspaceEnv) {
+	logger.Infow("Deploying CCIP Contracts and Adding lanes", "environment", env)
 	CallDeployerFn(logger, env, env.TmpDir, crib.DeployCCIPAndAddLanes)
 }
 
 func ConfigureOCR(logger *zap.SugaredLogger, env config.DevspaceEnv) {
+	logger.Infow("Configuring OCR", "environment", env)
 	CallDeployerFn(logger, env, env.TmpDir, crib.ConfigureCCIPOCR)
 }
 

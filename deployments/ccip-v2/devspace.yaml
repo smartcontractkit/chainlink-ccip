@@ -290,7 +290,9 @@ commands:
     description: Deploy job-distributor
     appendArgs: true
   ccip-v2-scripts:
-    command: ccip-v2-scripts
+    command: |
+      # ensure that ccip-v2-scripts binary is always up to date with local changes
+      task ccip-v2-scripts:build && ccip-v2-scripts
     description: |
       run ccip-v2-scripts cli command within devspace context, you can use it to deploy home chain
       or any other command available within ccip-v2-scripts binary.
