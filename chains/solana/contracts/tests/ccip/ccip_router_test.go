@@ -5938,7 +5938,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: sourceChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6037,7 +6036,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6134,7 +6132,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: unsupportedChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6219,7 +6216,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6261,7 +6257,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6310,7 +6305,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6400,7 +6394,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport1 := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message2, // execute out of order
-					Root:                root,
 					Proofs:              [][32]uint8{hash1},
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6436,7 +6429,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport2 := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message1,
-					Root:                root,
 					Proofs:              [][32]uint8{[32]byte(hash2)},
 				}
 				raw = ccip_offramp.NewExecuteInstruction(
@@ -6540,7 +6532,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6628,7 +6619,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: sourceChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6727,7 +6717,6 @@ func TestCCIPRouter(t *testing.T) {
 						SourceChainSelector: sourceChainSelector,
 						Message:             message,
 						OffchainTokenData:   [][]byte{{}},
-						Root:                root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -6849,7 +6838,6 @@ func TestCCIPRouter(t *testing.T) {
 						SourceChainSelector: sourceChainSelector,
 						Message:             message,
 						OffchainTokenData:   [][]byte{{}, {}},
-						Root:                root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -7005,7 +6993,6 @@ func TestCCIPRouter(t *testing.T) {
 						SourceChainSelector: config.SvmChainSelector,
 						Message:             setup.message,
 						OffchainTokenData:   [][]byte{{}},
-						Root:                setup.root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -7068,7 +7055,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 
@@ -7157,7 +7143,6 @@ func TestCCIPRouter(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
 							Message:             message1,
-							Root:                root,
 							Proofs:              [][32]uint8{[32]byte(hash2)},
 						}
 
@@ -7196,7 +7181,6 @@ func TestCCIPRouter(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
 							Message:             message1,
-							Root:                root,
 							Proofs:              [][32]uint8{[32]byte(hash2)},
 						}
 
@@ -7249,7 +7233,6 @@ func TestCCIPRouter(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
 							Message:             message1,
-							Root:                root,
 							Proofs:              [][32]uint8{[32]byte(hash2)},
 						}
 
@@ -7303,7 +7286,6 @@ func TestCCIPRouter(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
 							Message:             message2,
-							Root:                root,
 							Proofs:              [][32]uint8{[32]byte(hash1)},
 						}
 
@@ -7420,7 +7402,6 @@ func TestCCIPRouter(t *testing.T) {
 					SourceChainSelector: sourceChainSelector,
 					Message:             message,
 					OffchainTokenData:   [][]byte{{}},
-					Root:                root,
 					Proofs:              [][32]uint8{},
 				}
 				raw := ccip_offramp.NewExecuteInstruction(

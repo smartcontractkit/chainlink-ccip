@@ -18,7 +18,7 @@ fn hash_pair(hash1: &[u8; 32], hash2: &[u8; 32]) -> [u8; 32] {
 
 pub(super) fn calculate_merkle_root(
     hashed_leaf: [u8; 32],
-    proofs: Vec<[u8; 32]>,
+    proofs: &[[u8; 32]],
 ) -> Result<[u8; 32], MerkleError> {
     let proofs_len = proofs.len();
 
@@ -29,7 +29,7 @@ pub(super) fn calculate_merkle_root(
     let mut hash = hashed_leaf;
 
     for p in proofs {
-        hash = hash_pair(&hash, &p);
+        hash = hash_pair(&hash, p);
     }
 
     Ok(hash)
@@ -64,7 +64,7 @@ mod tests {
                 .try_into()
                 .unwrap();
 
-        let result = calculate_merkle_root(hashed_leaf, proofs);
+        let result = calculate_merkle_root(hashed_leaf, &proofs);
         assert!(result.is_ok());
         assert_eq!(hex::encode(expected_root), hex::encode(result.unwrap()));
     }
@@ -86,7 +86,7 @@ mod tests {
                 .try_into()
                 .unwrap();
 
-        let result = calculate_merkle_root(hashed_leaf, proofs);
+        let result = calculate_merkle_root(hashed_leaf, &proofs);
         assert!(result.is_ok());
         assert_eq!(hex::encode(expected_root), hex::encode(result.unwrap()));
     }
@@ -101,7 +101,7 @@ mod tests {
             .unwrap();
         let proofs = vec![[0x44; 32]; 129]; // Array size greater than 128
 
-        let result = calculate_merkle_root(hashed_leaf, proofs);
+        let result = calculate_merkle_root(hashed_leaf, &proofs);
         assert!(result.is_err());
     }
 
@@ -132,7 +132,7 @@ mod tests {
                 .try_into()
                 .unwrap();
 
-        let result = calculate_merkle_root(a, proofs);
+        let result = calculate_merkle_root(a, &proofs);
         assert!(result.is_ok());
         assert_eq!(hex::encode(expected_root), hex::encode(result.unwrap()));
     }
