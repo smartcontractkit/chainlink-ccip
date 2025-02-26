@@ -375,7 +375,7 @@ pub fn verify_merkle_root(
 ) -> Result<[u8; 32]> {
     let hashed_leaf = hash(&execution_report.message, recv_and_msg_account_keys);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
-        calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
+        calculate_merkle_root(hashed_leaf, &execution_report.proofs);
     require!(
         verified_root.is_ok() && verified_root.unwrap() == expected_root,
         CcipOfframpError::InvalidProof
