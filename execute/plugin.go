@@ -149,7 +149,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
 
-// getPendingExecutedReports is used to find commit reports which need to be executed.
+// getPendingReportsForExecution is used to find commit reports which need to be executed.
 //
 // The function checks execution status at two levels:
 // 1. Gets all executed messages (both finalized and unfinalized) via primitives.Unconfirmed
@@ -159,7 +159,7 @@ type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.B
 // - fullyExecutedFinalized: All messages executed with finality (mark as executed)
 // - fullyExecutedUnfinalized: All messages executed but not finalized (snooze)
 // - groupedCommits: Reports with unexecuted messages (available for execution)
-func getPendingExecutedReports(
+func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
 	canExecute CanExecuteHandle,
