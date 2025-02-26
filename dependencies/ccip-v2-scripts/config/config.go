@@ -14,11 +14,30 @@ import (
 
 type ChainType int
 
-// Define constants using iota
+// Define constants
 const (
 	EVM ChainType = iota
 	SOLANA
+	defaultFinalityDepth = 200
 )
+
+type ChainConfigurer struct {
+	chainID      uint64
+	deployerKey  string
+	env          DevspaceEnv
+	chainVariant string
+	chainName    string
+	chainType    ChainType
+}
+
+type EVMChain struct {
+	NetworkId     int64
+	FinalityDepth int
+}
+
+type ChainlinkNodeConfigurer struct {
+	env DevspaceEnv
+}
 
 // String method to convert enum values to readable strings
 func (s ChainType) String() string {
@@ -64,30 +83,56 @@ func GetEnvConfig(env DevspaceEnv) (*devenv.EnvironmentConfig, error) {
 }
 
 func getChainConfigurers(env DevspaceEnv) []ChainConfigurer {
-	chainConfigurers := []ChainConfigurer{
-		NewChainConfigurer(env, uint64(1337), EVM, "alpha"),
-		NewChainConfigurer(env, uint64(2337), EVM, "beta"),
-	}
+	chainConfigurers := make([]ChainConfigurer, 0, env.BesuChainsCount+env.GethChainsCount+env.SolanaChainsCount)
 
-	if env.GethChainsCount > 2 {
-		//nolint:gosec
-		for i := 1; i <= env.GethChainsCount-2; i++ {
-			const baseChainID uint64 = 90000000
-			chainID := baseChainID + uint64(i)
-			c := NewChainConfigurer(env, chainID, EVM, fmt.Sprintf("nchain-%d", chainID))
-
-			chainConfigurers = append(chainConfigurers, c)
+	// Add Besu chains
+	besuChainsCount := env.BesuChainsCount
+	besuChains := BuildEVMNetworkConfigs(besuChainsCount)
+	for i, chain := range besuChains {
+		// Check if the NetworkId is negative before converting to uint64
+		if chain.NetworkId < 0 {
+			panic(fmt.Sprintf("Error: NetworkId %d for besu chain is negative, cannot convert to uint64", chain.NetworkId))
 		}
-	}
-	if env.SolanaChainsCount > 0 {
-		//nolint:gosec
-		for i := 1; i <= env.SolanaChainsCount; i++ {
-			chainID := 1000 + uint64(i)
-			c := NewChainConfigurer(env, chainID, SOLANA, fmt.Sprintf("solana-local-%d", chainID))
+		networkId := uint64(chain.NetworkId)
 
-			chainConfigurers = append(chainConfigurers, c)
+		var c ChainConfigurer
+		switch i {
+		case 0:
+			c = NewChainConfigurer(env, networkId, EVM, "besu", "alpha")
+		case 1:
+			c = NewChainConfigurer(env, networkId, EVM, "besu", "beta")
+		default:
+			c = NewChainConfigurer(env, networkId, EVM, "besu", fmt.Sprintf("besu-%d", networkId))
 		}
+
+		chainConfigurers = append(chainConfigurers, c)
 	}
+
+	// Add Geth chains
+	gethChainsCount := env.GethChainsCount
+	gethChains := BuildEVMNetworkConfigs(gethChainsCount)
+	for _, chain := range gethChains {
+		// Check if the NetworkId is negative before converting to uint64
+		if chain.NetworkId < 0 {
+			panic(fmt.Sprintf("Error: NetworkId %d for geth chain is negative, cannot convert to uint64", chain.NetworkId))
+		}
+		networkId := uint64(chain.NetworkId)
+
+		c := NewChainConfigurer(env, networkId, EVM, "geth", fmt.Sprintf("geth-%d", networkId))
+		chainConfigurers = append(chainConfigurers, c)
+	}
+
+	// Add Solana chains
+	for i := 1; i <= env.SolanaChainsCount; i++ {
+		chainID := 1000 + i
+		if chainID < 0 {
+			fmt.Printf("Error: chainID for Solana chain %d is negative, cannot convert to uint64\n", chainID)
+			continue
+		}
+		c := NewChainConfigurer(env, uint64(chainID), SOLANA, "", fmt.Sprintf("solana-local-%d", chainID))
+		chainConfigurers = append(chainConfigurers, c)
+	}
+
 	return chainConfigurers
 }
 
@@ -110,10 +155,6 @@ func GetTransmittedChainConfigs(env DevspaceEnv) []crib.ChainConfig {
 	}
 
 	return chainConfigs
-}
-
-type ChainlinkNodeConfigurer struct {
-	env DevspaceEnv
 }
 
 func NewCLNodeConfigurer(env DevspaceEnv) ChainlinkNodeConfigurer {
@@ -164,24 +205,17 @@ func (c ChainlinkNodeConfigurer) getNodeInfo(nodeName string, isBootstrap bool) 
 	}
 }
 
-type ChainConfigurer struct {
-	chainID     uint64
-	deployerKey string
-	env         DevspaceEnv
-	chainName   string
-	chainType   ChainType
-}
-
-func NewChainConfigurer(env DevspaceEnv, chainID uint64, chainType ChainType, name string) ChainConfigurer {
+func NewChainConfigurer(env DevspaceEnv, chainID uint64, chainType ChainType, chainVariant, name string) ChainConfigurer {
 	// These are generally known private keys used for testing
 	testKey := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 	return ChainConfigurer{
-		env:         env,
-		chainID:     chainID,
-		chainName:   name,
-		deployerKey: testKey,
-		chainType:   chainType,
+		env:          env,
+		chainID:      chainID,
+		chainName:    name,
+		chainVariant: chainVariant,
+		deployerKey:  testKey,
+		chainType:    chainType,
 	}
 }
 
@@ -259,28 +293,36 @@ func ChainSelector(chainID uint64) uint64 {
 }
 
 func (c ChainConfigurer) externalWSRPC() *string {
+	var u string
 	if c.env.CIEnv {
-		hostName := gapV2HostName(c.env, fmt.Sprintf("geth-%d-ws", c.chainID))
-		u := fmt.Sprintf("wss://%s", hostName)
-		return &u
+		hostName := gapV2HostName(c.env, fmt.Sprintf("%s-%d-ws", strings.ToLower(c.chainName), c.chainID))
+		u = fmt.Sprintf("wss://%s", hostName)
+	} else if c.chainType == EVM && c.chainVariant == "besu" {
+		u = fmt.Sprintf("wss://chain-%s-rpc.%s/ws/", c.chainName, c.env.IngressBaseDomain)
+	} else {
+		u = fmt.Sprintf("wss://%s-%s-%d-ws.%s", c.env.Namespace, c.chainTypeHostNamePart(), c.chainID, c.env.IngressBaseDomain)
 	}
-	u := fmt.Sprintf("wss://%s-%s-%d-ws.%s", c.env.Namespace, c.chainTypeHosNamePart(), c.chainID, c.env.IngressBaseDomain)
 	return &u
 }
 
 func (c ChainConfigurer) externalHTTPRPC() *string {
+	var u string
 	if c.env.CIEnv {
-		hostName := gapV2HostName(c.env, fmt.Sprintf("geth-%d", c.chainID))
-		u := fmt.Sprintf("https://%s", hostName)
-		return &u
+		hostName := gapV2HostName(c.env, fmt.Sprintf("%s-%d", strings.ToLower(c.chainVariant), c.chainID))
+		u = fmt.Sprintf("https://%s", hostName)
+	} else if c.chainType == EVM && c.chainVariant == "besu" {
+		u = fmt.Sprintf("https://chain-%s-rpc.%s", c.chainName, c.env.IngressBaseDomain)
+	} else {
+		u = fmt.Sprintf("https://%s-%s-%d-http.%s:443", c.env.Namespace, c.chainTypeHostNamePart(), c.chainID, c.env.IngressBaseDomain)
 	}
-	u := fmt.Sprintf("https://%s-%s-%d-http.%s:443", c.env.Namespace, c.chainTypeHosNamePart(), c.chainID, c.env.IngressBaseDomain)
 	return &u
 }
 
-func (c ChainConfigurer) chainTypeHosNamePart() string {
+func (c ChainConfigurer) chainTypeHostNamePart() string {
 	var chainType string
-	if c.chainType == EVM {
+	if c.chainType == EVM && c.chainVariant == "besu" {
+		chainType = "besu"
+	} else if c.chainType == EVM && c.chainVariant == "geth" {
 		chainType = "geth"
 	} else if c.chainType == SOLANA {
 		chainType = "solana"
@@ -289,27 +331,61 @@ func (c ChainConfigurer) chainTypeHosNamePart() string {
 }
 
 func (c ChainConfigurer) internalWSRPC() *string {
-	if c.chainType == EVM {
-		u := fmt.Sprintf("ws://geth-%d-ws:8546", c.chainID)
-		return &u
-	} else if c.chainType == SOLANA {
-		u := fmt.Sprintf("ws://solana-%d:8545", c.chainID)
-		return &u
+	var u string
+
+	switch {
+	case c.chainType == EVM && c.chainVariant == "besu":
+		u = fmt.Sprintf("ws://%s-node-rpc-1.chain-%s.svc.cluster.local:8546", strings.ToLower(c.chainVariant), c.chainName)
+	case c.chainType == EVM && c.chainVariant == "geth":
+		u = fmt.Sprintf("ws://%s-%d-ws:8546", strings.ToLower(c.chainVariant), c.chainID)
+	case c.chainType == SOLANA:
+		u = fmt.Sprintf("ws://%s-%d:8545", strings.ToLower(c.chainType.String()), c.chainID)
+	default:
+		return nil
 	}
-	return nil
+	return &u
 }
 
 func (c ChainConfigurer) internalHTTPRPC() *string {
-	if c.chainType == EVM {
-		u := fmt.Sprintf("http://geth-%d:8544", c.chainID)
-		return &u
-	} else if c.chainType == SOLANA {
-		u := fmt.Sprintf("http://solana-%d:8544", c.chainID)
-		return &u
+	var u string
+	switch {
+	case c.chainType == EVM && c.chainVariant == "besu":
+		u = fmt.Sprintf("http://%s-node-rpc-1.chain-%s.svc.cluster.local:8545", c.chainVariant, c.chainName)
+	case c.chainType == EVM && c.chainVariant == "geth":
+		u = fmt.Sprintf("http://%s-%d:8544", strings.ToLower(c.chainVariant), c.chainID)
+	case c.chainType == SOLANA:
+		u = fmt.Sprintf("http://%s-%d:8544", strings.ToLower(c.chainType.String()), c.chainID)
+	default:
+		return nil
 	}
-	return nil
+	return &u
 }
 
 func (c ChainConfigurer) getChainName() string {
 	return fmt.Sprintf("%s-simulated-%d", strings.ToLower(c.chainType.String()), c.chainID)
+}
+
+func BuildEVMNetworkConfigs(chainsCount int) []EVMChain {
+	// If chainsCount is 0, return an empty slice
+	if chainsCount == 0 {
+		return []EVMChain{}
+	}
+
+	// Initialize the chains slice
+	chains := []EVMChain{
+		{NetworkId: 1337, FinalityDepth: defaultFinalityDepth},
+	}
+
+	// Add the second chain if chainsCount > 1
+	if chainsCount > 1 {
+		chains = append(chains, EVMChain{NetworkId: 2337, FinalityDepth: defaultFinalityDepth})
+	}
+
+	// Add subsequent chains starting from 90000000 if chainsCount > 2
+	for i := 2; i < chainsCount; i++ {
+		networkId := int64(90000000 + i - 1)
+		chains = append(chains, EVMChain{NetworkId: networkId, FinalityDepth: defaultFinalityDepth})
+	}
+
+	return chains
 }

@@ -45,8 +45,10 @@ in: |
           {{- if ne $.Env.PROVIDER "kind" }}
           - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
           {{- end }}
-          {{- if eq $.Env.PROVIDER "aws" }}
+          {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.CRIB_EKS_CLUSTER_NAME "main-stage-cluster") }}
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
+          {{- else if and (eq $.Env.PROVIDER "aws") (eq $.Env.ENV "sandbox") }}
+          - ${LOCAL_VALUES_DIR}/postgresql/env.crib-sandbox.yaml
           {{- end }}
         values:
           fullnameOverride: ${DON_TYPE}-db-bt-{{ $i }}
@@ -66,8 +68,10 @@ in: |
           {{- if ne $.Env.PROVIDER "kind" }}
           - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
           {{- end }}
-          {{- if eq $.Env.PROVIDER "aws" }}
+          {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.CRIB_EKS_CLUSTER_NAME "main-stage-cluster") }}
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
+          {{- else if and (eq $.Env.PROVIDER "aws") (eq $.Env.ENV "sandbox") }}
+          - ${LOCAL_VALUES_DIR}/postgresql/env.crib-sandbox.yaml
           {{- end }}
         values:
           fullnameOverride: ${DON_TYPE}-db-{{ $i }}
