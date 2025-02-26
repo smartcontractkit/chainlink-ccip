@@ -284,8 +284,8 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	state := previousOutcome.State.Next()
-	if state == exectypes.Initialized || state == exectypes.GetCommitReports {
+	nextState := previousOutcome.State.Next()
+	if nextState == exectypes.GetCommitReports {
 		err = validateNoMessageRelatedObservations(
 			decodedObservation.Messages,
 			decodedObservation.TokenData,
