@@ -82,9 +82,7 @@ func (p *Processor) getOutcome(
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
 		attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
-		multipleReports := p.offchainCfg.MultipleReportsEnabled
-		return checkForReportTransmission(
-			lggr, attempts, multipleReports, previousOutcome, consObservation), nextState, nil
+		return checkForReportTransmission(lggr, attempts, previousOutcome, consObservation), nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
@@ -296,7 +294,6 @@ type rootKey struct {
 func checkForReportTransmission(
 	lggr logger.Logger,
 	maxReportTransmissionCheckAttempts uint,
-	multipleReportsEnabled bool,
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {

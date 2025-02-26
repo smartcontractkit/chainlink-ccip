@@ -3,6 +3,7 @@
 
 package rmn
 
+//nolint:staticcheck // ignoring deprecated golang.org/x/exp/rand rule for now.
 import (
 	"bytes"
 	"context"
