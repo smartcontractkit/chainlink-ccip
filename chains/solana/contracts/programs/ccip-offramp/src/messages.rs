@@ -59,7 +59,6 @@ pub struct Any2SVMRampMessage {
     pub token_receiver: Pubkey,
     pub token_amounts: Vec<Any2SVMTokenTransfer>,
     pub extra_args: Any2SVMRampExtraArgs,
-    pub on_ramp_address: Vec<u8>,
 }
 
 impl Any2SVMRampMessage {
@@ -72,7 +71,6 @@ impl Any2SVMRampMessage {
         + 32 // token receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
-        + 4 + self.on_ramp_address.len() // on_ramp_address
     }
 }
 
