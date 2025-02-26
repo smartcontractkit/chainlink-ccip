@@ -153,8 +153,6 @@ func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
 	return commitRootsFilterTimestamp
 }
 
-// UpdateLatestFinalizedTimestamp updates the cached latest finalized timestamp.
-// This is used to optimize commit report queries by tracking the newest finalized report.
 func (r *commitRootsCache) UpdateLatestFinalizedTimestamp(timestamp time.Time) {
 	if timestamp.IsZero() {
 		return
