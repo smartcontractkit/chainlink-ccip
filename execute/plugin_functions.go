@@ -34,7 +34,8 @@ func validateCommitReportsReadingEligibility(
 		}
 		for _, data := range observedData[chainSel] {
 			if data.SourceChain != chainSel {
-				return fmt.Errorf("observer not allowed to read from chain %d", data.SourceChain)
+				return fmt.Errorf("invalid observed data, key=%d but data chain=%d",
+					data.SourceChain, chainSel)
 			}
 		}
 	}
