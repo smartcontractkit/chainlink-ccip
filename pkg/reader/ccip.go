@@ -1983,8 +1983,8 @@ func validateSendRequestedEvent(
 		return fmt.Errorf("message ID is zero")
 	}
 
-	if ev.Message.Receiver.IsZeroOrEmpty() {
-		return fmt.Errorf("invalid receiver address: %s", ev.Message.Receiver.String())
+	if len(ev.Message.Receiver) == 0 {
+		return fmt.Errorf("empty receiver address: %s", ev.Message.Receiver.String())
 	}
 
 	if ev.Message.Sender.IsZeroOrEmpty() {
