@@ -409,7 +409,6 @@ type Any2SVMRampMessage struct {
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
 	ExtraArgs     Any2SVMRampExtraArgs
-	OnRampAddress []byte
 }
 
 func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -440,11 +439,6 @@ func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `ExtraArgs` param:
 	err = encoder.Encode(obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Serialize `OnRampAddress` param:
-	err = encoder.Encode(obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -479,11 +473,6 @@ func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `ExtraArgs`:
 	err = decoder.Decode(&obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OnRampAddress`:
-	err = decoder.Decode(&obj.OnRampAddress)
 	if err != nil {
 		return err
 	}

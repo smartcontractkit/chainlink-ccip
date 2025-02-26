@@ -1446,10 +1446,6 @@
             "type": {
               "defined": "Any2SVMRampExtraArgs"
             }
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
           }
         ]
       }
