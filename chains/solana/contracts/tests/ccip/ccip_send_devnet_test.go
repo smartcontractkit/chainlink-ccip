@@ -97,8 +97,8 @@ func TestDevnet(t *testing.T) {
 	})
 
 	message := ccip_router.SVM2AnyMessage{
-		FeeToken:  solana.SolMint,
-		Receiver:  []byte{1, 2, 3}, // TODO
+		FeeToken:  solana.PublicKey{},
+		Receiver:  []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 12, 248, 134, 206, 65, 149, 35, 22, 68, 26, 228, 202, 195, 95, 0, 240, 232, 130, 166}, // just an example EVM address
 		Data:      []byte{4, 5, 6},
 		ExtraArgs: []byte{},
 	}
