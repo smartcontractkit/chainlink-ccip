@@ -271,6 +271,7 @@ func (a *asyncObserver) observeFeeQuoterTokenUpdates(
 ) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
+	lggr.Debugw("observeFeeQuoterTokenUpdates returning cached value", "numUpdates", len(a.tokenUpdates))
 	return a.tokenUpdates
 }
 
@@ -281,6 +282,7 @@ func (a *asyncObserver) observeFeedTokenPrices(
 ) cciptypes.TokenPriceMap {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
+	lggr.Debugw("observeFeedTokenPrices returning cached value", "numPrices", len(a.tokenPriceMap))
 	return a.tokenPriceMap
 }
 

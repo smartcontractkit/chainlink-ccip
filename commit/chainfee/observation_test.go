@@ -124,7 +124,7 @@ func Test_processor_Observation(t *testing.T) {
 				oracleID:        oracleID,
 				homeChain:       homeChain,
 				metricsReporter: plugincommon2.NoopReporter{},
-				obs:             newBaseObserver(lggr, ccipReader, tc.dstChain, oracleID, cs),
+				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)
@@ -323,7 +323,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				oracleID:        oracleID,
 				homeChain:       homeChain,
 				metricsReporter: plugincommon2.NoopReporter{},
-				obs:             newBaseObserver(lggr, ccipReader, tc.dstChain, oracleID, cs),
+				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)
