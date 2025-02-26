@@ -241,7 +241,6 @@ type ExecutionReportSingleChain struct {
 	SourceChainSelector uint64
 	Message             Any2SVMRampMessage
 	OffchainTokenData   [][]byte
-	Root                [32]uint8
 	Proofs              [][32]uint8
 }
 
@@ -258,11 +257,6 @@ func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *ag_binary.Enco
 	}
 	// Serialize `OffchainTokenData` param:
 	err = encoder.Encode(obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	// Serialize `Root` param:
-	err = encoder.Encode(obj.Root)
 	if err != nil {
 		return err
 	}
@@ -287,11 +281,6 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 	}
 	// Deserialize `OffchainTokenData`:
 	err = decoder.Decode(&obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Root`:
-	err = decoder.Decode(&obj.Root)
 	if err != nil {
 		return err
 	}

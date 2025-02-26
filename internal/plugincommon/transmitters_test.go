@@ -35,11 +35,11 @@ func TestGetTransmissionSchedule(t *testing.T) {
 		},
 		{
 			name:                        "some transmitters supporting dest",
-			allTheOracles:               []commontypes.OracleID{1, 2, 3},
-			oraclesSupportingDest:       []commontypes.OracleID{1, 3},
+			allTheOracles:               []commontypes.OracleID{1, 2, 3, 4, 5},
+			oraclesSupportingDest:       []commontypes.OracleID{1, 3, 4},
 			transmissionDelayMultiplier: 5 * time.Second,
-			expectedTransmitters:        []commontypes.OracleID{1, 3},
-			expectedTransmissionDelays:  []time.Duration{5 * time.Second, 10 * time.Second},
+			expectedTransmitters:        []commontypes.OracleID{1, 3, 4},
+			expectedTransmissionDelays:  []time.Duration{0 * time.Second, 5 * time.Second, 10 * time.Second},
 			expectedError:               false,
 		},
 		{
@@ -56,7 +56,7 @@ func TestGetTransmissionSchedule(t *testing.T) {
 			oraclesSupportingDest:       []commontypes.OracleID{1, 3},
 			transmissionDelayMultiplier: 5 * time.Second,
 			expectedTransmitters:        []commontypes.OracleID{1, 3},
-			expectedTransmissionDelays:  []time.Duration{5 * time.Second, 10 * time.Second},
+			expectedTransmissionDelays:  []time.Duration{0 * time.Second, 5 * time.Second},
 			expectedError:               false,
 		},
 	}

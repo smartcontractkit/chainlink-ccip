@@ -10,7 +10,16 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// FinalizeSignatures is the `finalizeSignatures` instruction.
+// Finalize the signature configuration.
+//
+// Marks the signature list as finalized and ready for verification when setting a new root.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
+// - `root`: The Merkle root associated with the signatures.
+// - `valid_until`: Timestamp until which the root will remain valid.
 type FinalizeSignatures struct {
 	MultisigId *[32]uint8
 	Root       *[32]uint8
