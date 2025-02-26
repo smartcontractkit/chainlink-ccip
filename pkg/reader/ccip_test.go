@@ -3,9 +3,11 @@ package reader
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
@@ -79,7 +80,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		return results, nil
 	})
 
-	addrCodec := ccipocr3.NewMockAddressCodec(t)
+	mockAddrCodec := newMockAddressCodec(t)
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
@@ -88,8 +89,11 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
-		}, nil, chainC, offrampAddress, addrCodec,
+		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
+
+	addrStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, 111_111)
+	require.NoError(t, err)
 
 	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
 		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
@@ -97,7 +101,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x2"}}))
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
 		context.Background(), []types.BoundContract{{Name: "OffRamp",
-			Address: typeconv.AddressBytesToString(offrampAddress, 111_111)}}))
+			Address: addrStr}}))
 
 	ctx := context.Background()
 	cfgs, err := ccipReader.getOffRampSourceChainsConfig(
@@ -111,15 +115,17 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 	ecr := reader_mocks.NewMockExtended(t)
 
+	mockAddrCodec := newMockAddressCodec(t)
 	ccipReader := ccipChainReader{
 		lggr: logger.Test(t),
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 			chainA: ecr,
 		},
+		addrCodec: mockAddrCodec,
 	}
 
 	someAddr := "0x1234567890123456789012345678901234567890"
-	someAddrBytes, err := typeconv.AddressStringToBytes(someAddr, uint64(chainA))
+	someAddrBytes, err := mockAddrCodec.AddressStringToBytes(someAddr, chainA)
 	require.NoError(t, err)
 
 	t.Run("happy path", func(t *testing.T) {
@@ -131,7 +137,7 @@ func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 		}).Once()
 		addr, err := ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainA)
 		assert.NoError(t, err)
-		assert.Equal(t, someAddrBytes, addr)
+		assert.Equal(t, someAddrBytes, cciptypes.UnknownAddress(addr))
 	})
 
 	t.Run("multiple bindings leads to error", func(t *testing.T) {
@@ -175,27 +181,35 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
+
+	mockAddrCodec := newMockAddressCodec(t)
+	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
+	require.NoError(t, err)
 	destExtended := reader_mocks.NewMockExtended(t)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
-			Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
+			Address: destNonceMgrAddrStr,
 		},
 	}).Return(nil)
 
+	s1OnrampAddrStr, err := mockAddrCodec.AddressBytesToString(s1Onramp, sourceChain1)
+	require.NoError(t, err)
 	source1Extended := reader_mocks.NewMockExtended(t)
 	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
-			Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
+			Address: s1OnrampAddrStr,
 		},
 	}).Return(nil)
 
+	sourceChain2AddrStr, err := mockAddrCodec.AddressBytesToString(s2Onramp, sourceChain2)
+	require.NoError(t, err)
 	source2Extended := reader_mocks.NewMockExtended(t)
 	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
-			Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
+			Address: sourceChain2AddrStr,
 		},
 	}).Return(nil)
 
@@ -211,6 +225,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 		},
 		destChain: destChain,
 		lggr:      logger.Test(t),
+		addrCodec: mockAddrCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -223,7 +238,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 		},
 	}
 
-	err := ccipReader.Sync(ctx, contracts)
+	err = ccipReader.Sync(ctx, contracts)
 	require.NoError(t, err)
 }
 
@@ -239,18 +254,23 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 
 	destNonceMgr := []byte{0x3}
 	destExtended := reader_mocks.NewMockExtended(t)
+	mockAddrCodec := newMockAddressCodec(t)
+	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
+	require.NoError(t, err)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
-			Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
+			Address: destNonceMgrAddrStr,
 		},
 	}).Return(nil)
 
+	sourceChain1AddrStr, err := mockAddrCodec.AddressBytesToString(s1Onramp, sourceChain1)
+	require.NoError(t, err)
 	source1Extended := reader_mocks.NewMockExtended(t)
 	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
-			Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
+			Address: sourceChain1AddrStr,
 		},
 	}).Return(nil)
 
@@ -269,6 +289,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 		},
 		destChain: destChain,
 		lggr:      logger.Test(t),
+		addrCodec: mockAddrCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -281,7 +302,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 		},
 	}
 
-	err := ccipReader.Sync(ctx, contracts)
+	err = ccipReader.Sync(ctx, contracts)
 	require.NoError(t, err)
 }
 
@@ -294,19 +315,25 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
 	destExtended := reader_mocks.NewMockExtended(t)
+	mockAddrCodec := newMockAddressCodec(t)
+
+	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
+	require.NoError(t, err)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
-			Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
+			Address: destNonceMgrAddrStr,
 		},
 	}).Return(nil)
 
 	// only support source2, source1 unsupported.
+	sourceChain2AddrStr, err := mockAddrCodec.AddressBytesToString(s2Onramp, sourceChain2)
+	require.NoError(t, err)
 	source2Extended := reader_mocks.NewMockExtended(t)
 	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
-			Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
+			Address: sourceChain2AddrStr,
 		},
 	}).Return(nil)
 
@@ -320,6 +347,7 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 		},
 		destChain: destChain,
 		lggr:      logger.Test(t),
+		addrCodec: mockAddrCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -332,7 +360,7 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 		},
 	}
 
-	err := ccipReader.Sync(ctx, contracts)
+	err = ccipReader.Sync(ctx, contracts)
 	require.NoError(t, err)
 }
 
@@ -344,28 +372,36 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
+
+	mockAddrCodec := newMockAddressCodec(t)
+	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
+	require.NoError(t, err)
 	destExtended := reader_mocks.NewMockExtended(t)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
-			Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
+			Address: destNonceMgrAddrStr,
 		},
 	}).Return(nil)
 
+	s1OnrampAddrStr, err := mockAddrCodec.AddressBytesToString(s1Onramp, sourceChain1)
+	require.NoError(t, err)
 	expectedErr := errors.New("some error")
 	source1Extended := reader_mocks.NewMockExtended(t)
 	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
-			Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
+			Address: s1OnrampAddrStr,
 		},
 	}).Return(expectedErr)
 
+	s2OnrampAddrStr, err := mockAddrCodec.AddressBytesToString(s2Onramp, sourceChain2)
+	require.NoError(t, err)
 	source2Extended := reader_mocks.NewMockExtended(t)
 	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
-			Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
+			Address: s2OnrampAddrStr,
 		},
 	}).Return(nil)
 
@@ -381,6 +417,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 		},
 		destChain: destChain,
 		lggr:      logger.Test(t),
+		addrCodec: mockAddrCodec,
 	}
 
 	contracts := ContractAddresses{
@@ -393,7 +430,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 		},
 	}
 
-	err := ccipReader.Sync(ctx, contracts)
+	err = ccipReader.Sync(ctx, contracts)
 	require.Error(t, err)
 	require.ErrorIs(t, err, expectedErr)
 }
@@ -776,11 +813,15 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	}
 	mockCache.On("GetChainConfig", mock.Anything, chainC).Return(chainConfig, nil)
 
+	mockAddrCodec := newMockAddressCodec(t)
+
+	offrampAddressStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, chainC)
+	require.NoError(t, err)
 	ccipReader := &ccipChainReader{
 		lggr:           logger.Test(t),
 		destChain:      chainC,
 		configPoller:   mockCache,
-		offrampAddress: typeconv.AddressBytesToString(offrampAddress, uint64(chainC)),
+		offrampAddress: offrampAddressStr,
 	}
 
 	cfg, err := ccipReader.getDestFeeQuoterStaticConfig(ctx)
@@ -821,18 +862,21 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	offrampAddress := []byte{0x3}
 	feeQuoterAddress := []byte{0x4}
 
-	addrCodec := ccipocr3.NewMockAddressCodec(t)
+	mockAddrCodec := newMockAddressCodec(t)
+
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
-		}, nil, chainC, offrampAddress, addrCodec,
+		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
 
+	feeQuoterAddressStr, err := mockAddrCodec.AddressBytesToString(feeQuoterAddress, 111_111)
+	require.NoError(t, err)
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
 		context.Background(), []types.BoundContract{{Name: "FeeQuoter",
-			Address: typeconv.AddressBytesToString(feeQuoterAddress, 111_111)}}))
+			Address: feeQuoterAddressStr}}))
 
 	ctx := context.Background()
 	price, err := ccipReader.getFeeQuoterTokenPriceUSD(ctx, []byte{0x3, 0x4})
@@ -854,7 +898,6 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 	contractWriters[chainA] = cw
 	contractWriters[chainC] = cw
 
-	addrCodec := ccipocr3.NewMockAddressCodec(t)
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
@@ -862,7 +905,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
-		addrCodec,
+		newMockAddressCodec(t),
 	)
 
 	ctx := context.Background()
@@ -884,7 +927,6 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	// Missing writer for dest chain chainC
 	contractWriters[chainA] = cw
-	addrCodec := ccipocr3.NewMockAddressCodec(t)
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
@@ -892,7 +934,7 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
-		addrCodec,
+		newMockAddressCodec(t),
 	)
 
 	ctx := context.Background()
@@ -935,11 +977,14 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	}))
 
 	// Setup ccipReader with both cache and contract readers
+	mockAddrCodec := newMockAddressCodec(t)
+	offrampAddressStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, chainC)
+	require.NoError(t, err)
 	ccipReader := &ccipChainReader{
 		lggr:           logger.Test(t),
 		destChain:      chainC,
 		configPoller:   mockCache,
-		offrampAddress: typeconv.AddressBytesToString(offrampAddress, uint64(chainC)),
+		offrampAddress: offrampAddressStr,
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 			chainC: destCR,
 		},
@@ -1245,13 +1290,13 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 		}),
 		false,
 	).Return(responses, []string{}, nil)
-
 	ccipReader := &ccipChainReader{
 		lggr: logger.Test(t),
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 			chainB: destReader,
 		},
 		destChain: chainB,
+		addrCodec: newMockAddressCodec(t),
 	}
 
 	// Bind the contract first
@@ -1706,4 +1751,21 @@ func (m *mockConfigCache) RefreshChainConfig(
 	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
 	args := m.Called(ctx, chainSel)
 	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
+}
+
+func newMockAddressCodec(t *testing.T) *ccipocr3.MockAddressCodec {
+	mockAddrCodec := ccipocr3.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil).Maybe()
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
+		Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
+			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+			if err != nil {
+				return nil, err
+			}
+			return addrBytes, nil
+		}).Maybe()
+	return mockAddrCodec
 }

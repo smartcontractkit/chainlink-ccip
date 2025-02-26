@@ -3,9 +3,11 @@ package commit
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,9 +45,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	typepkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -899,6 +903,19 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
+	mockAddrCodec := typepkg_mock.NewMockAddressCodec(params.t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil).Maybe()
+
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
+		Return(func(addr string, _ cciptypes.ChainSelector) cciptypes.UnknownAddress {
+			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+			require.NoError(params.t, err)
+			return addrBytes
+		}, nil).Maybe()
+
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
@@ -915,6 +932,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		nil,
 		params.reportingCfg,
 		&metrics.Noop{},
+		mockAddrCodec,
 	)
 
 	if !params.enableDiscovery {
