@@ -15,9 +15,8 @@ import (
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -82,7 +81,9 @@ func (p *Processor) getOutcome(
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
 		attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
-		return checkForReportTransmission(lggr, attempts, previousOutcome, consObservation), nextState, nil
+		multipleReports := p.offchainCfg.MultipleReportsEnabled
+		outcome := checkForReportTransmission(lggr, attempts, multipleReports, previousOutcome, consObservation)
+		return outcome, nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
@@ -294,20 +295,26 @@ type rootKey struct {
 func checkForReportTransmission(
 	lggr logger.Logger,
 	maxReportTransmissionCheckAttempts uint,
+	multipleReports bool,
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {
-	// Check that all sources have been updates. We check that all have been updated
+	// Check that all sources have been updates using a set initialized from . We check that all have been updated
 	// in case there were multiple reports generated in the previous round.
-	sourceUpdates := make(map[cciptypes.ChainSelector]bool)
+	pendingSources := make(map[cciptypes.ChainSelector]struct{})
 	for _, root := range previousOutcome.RootsToReport {
-		sourceUpdates[root.ChainSel] = false
+		pendingSources[root.ChainSel] = struct{}{}
 	}
 
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
-				sourceUpdates[previousSeqNumChain.ChainSel] = true
+				delete(pendingSources, previousSeqNumChain.ChainSel)
+				// if there is only one report, stop checking after the first match by resetting
+				// the pendingSources set.
+				if !multipleReports {
+					pendingSources = make(map[cciptypes.ChainSelector]struct{})
+				}
 			}
 
 			if previousSeqNumChain.SeqNum > currentSeqNum {
@@ -321,12 +328,8 @@ func checkForReportTransmission(
 		}
 	}
 
-	allUpdated := true
-	for _, updated := range sourceUpdates {
-		allUpdated = allUpdated && updated
-	}
-
-	if allUpdated {
+	// All pending sources have been updated, we can move to the next state.
+	if len(pendingSources) == 0 {
 		return Outcome{
 			OutcomeType: ReportTransmitted,
 		}
