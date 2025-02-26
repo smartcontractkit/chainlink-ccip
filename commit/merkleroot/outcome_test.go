@@ -647,13 +647,8 @@ func Test_reportRangesOutcome(t *testing.T) {
 		expectedOutcome      Outcome
 	}{
 		{
-			name: "base empty outcome",
-			expectedOutcome: Outcome{
-				OutcomeType:             ReportIntervalsSelected,
-				RangesSelectedForReport: []plugintypes.ChainRange{},
-				OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
-				RMNRemoteCfg:            rmntypes.RemoteConfig{},
-			},
+			name:            "base empty outcome",
+			expectedOutcome: Outcome{OutcomeType: ReportEmpty},
 		},
 		{
 			name: "simple scenario with one chain",

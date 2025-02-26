@@ -149,7 +149,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
 
-// getPendingExecutedReports is used to find commit reports which need to be executed.
+// getPendingReportsForExecution is used to find commit reports which need to be executed.
 //
 // The function checks execution status at two levels:
 // 1. Gets all executed messages (both finalized and unfinalized) via primitives.Unconfirmed
@@ -159,7 +159,7 @@ type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.B
 // - fullyExecutedFinalized: All messages executed with finality (mark as executed)
 // - fullyExecutedUnfinalized: All messages executed but not finalized (snooze)
 // - groupedCommits: Reports with unexecuted messages (available for execution)
-func getPendingExecutedReports(
+func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
 	canExecute CanExecuteHandle,
@@ -286,8 +286,8 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	state := previousOutcome.State.Next()
-	if state == exectypes.Initialized || state == exectypes.GetCommitReports {
+	nextState := previousOutcome.State.Next()
+	if nextState == exectypes.GetCommitReports {
 		err = validateNoMessageRelatedObservations(
 			decodedObservation.Messages,
 			decodedObservation.TokenData,
@@ -303,7 +303,7 @@ func (p *Plugin) ValidateObservation(
 	}
 
 	// check message related validations when states can contain messages
-	if state == exectypes.GetMessages || state == exectypes.Filter {
+	if nextState == exectypes.GetMessages || nextState == exectypes.Filter {
 		if err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
 			return fmt.Errorf("validate observer reading eligibility: %w", err)
 		}
@@ -337,7 +337,7 @@ func validateCommonStateObservations(
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
+	if err := validateObservedSequenceNumbers(supportedChains, decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
