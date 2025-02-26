@@ -29,9 +29,9 @@ func (p *processor) Observation(
 ) (Observation, error) {
 	lggr := logutil.WithContextValues(ctx, p.lggr)
 
-	feeComponents := p.obs.getChainsFeeComponents(ctx)
-	nativeTokenPrices := p.obs.getNativeTokenPrices(ctx)
-	chainFeeUpdates := p.obs.getChainFeePriceUpdates(ctx)
+	feeComponents := p.obs.getChainsFeeComponents(ctx, lggr)
+	nativeTokenPrices := p.obs.getNativeTokenPrices(ctx, lggr)
+	chainFeeUpdates := p.obs.getChainFeePriceUpdates(ctx, lggr)
 	fChain := p.observeFChain(lggr)
 	now := time.Now().UTC()
 
