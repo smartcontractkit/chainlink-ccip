@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -12,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_lockrelease_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -25,6 +27,8 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 
 	// acting as "dumb" onramp & offramp, proxying calls to the pool that are signed by PDA
 	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
+	rmn_remote.SetProgramID(config.RMNRemoteProgram)
+
 	dumbRamp := config.CcipInvalidReceiverProgram
 	allowedOfframpPDA, _ := state.FindAllowedOfframpPDA(config.EvmChainSelector, dumbRamp, dumbRamp)
 	rampPoolSignerPDA, _, _ := state.FindExternalTokenPoolsSignerPDA(dumbRamp)
@@ -58,6 +62,35 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+		})
+
+		t.Run("RMN Remote", func(t *testing.T) {
+			type ProgramData struct {
+				DataType uint32
+				Address  solana.PublicKey
+			}
+			// get program data account
+			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.RMNRemoteProgram, &rpc.GetAccountInfoOpts{
+				Commitment: config.DefaultCommitment,
+			})
+			require.NoError(t, err)
+
+			// Decode program data
+			var programData ProgramData
+			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+			ix, err := rmn_remote.NewInitializeInstruction(
+				config.RMNRemoteConfigPDA,
+				config.RMNRemoteCursesPDA,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+				config.RMNRemoteProgram,
+				programData.Address,
+			).ValidateAndBuild()
+
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			require.NotNil(t, result)
 		})
 	})
 
