@@ -113,7 +113,8 @@ func (p *processor) Outcome(
 }
 
 func (p *processor) Close() error {
-	return p.obs.Close()
+	p.obs.close()
+	return nil
 }
 
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &processor{}

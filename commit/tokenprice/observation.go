@@ -2,7 +2,6 @@ package tokenprice
 
 import (
 	"context"
-	"io"
 	"sort"
 	"sync"
 	"time"
@@ -65,7 +64,7 @@ type observer interface {
 	observeFeeQuoterTokenUpdates(
 		ctx context.Context,
 		lggr logger.Logger) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig
-	io.Closer
+	close()
 }
 
 type baseObserver struct {
@@ -161,9 +160,7 @@ func (b *baseObserver) observeFeeQuoterTokenUpdates(
 	return tokenUpdates
 }
 
-func (b *baseObserver) Close() error {
-	return nil
-}
+func (b *baseObserver) close() {}
 
 // asyncObserver wraps baseObserver and periodically syncs the tokenPriceMap and tokenUpdates.
 // It is used to avoid blocking the processor when querying the tokenPriceReader.
@@ -286,9 +283,8 @@ func (a *asyncObserver) observeFeedTokenPrices(
 	return a.tokenPriceMap
 }
 
-func (a *asyncObserver) Close() error {
+func (a *asyncObserver) close() {
 	a.cancelFunc()
-	return nil
 }
 
 var _ observer = &asyncObserver{}
