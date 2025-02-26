@@ -81,8 +81,8 @@ func (p *Processor) getOutcome(
 
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
-		return checkForReportTransmission(
-			lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
+		attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
+		return checkForReportTransmission(lggr, attempts, previousOutcome, consObservation), nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
@@ -297,12 +297,17 @@ func checkForReportTransmission(
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {
-	offRampUpdated := false
+	// Check that all sources have been updates. We check that all have been updated
+	// in case there were multiple reports generated in the previous round.
+	sourceUpdates := make(map[cciptypes.ChainSelector]bool)
+	for _, root := range previousOutcome.RootsToReport {
+		sourceUpdates[root.ChainSel] = false
+	}
+
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
-				offRampUpdated = true
-				break
+				sourceUpdates[previousSeqNumChain.ChainSel] = true
 			}
 
 			if previousSeqNumChain.SeqNum > currentSeqNum {
@@ -316,7 +321,12 @@ func checkForReportTransmission(
 		}
 	}
 
-	if offRampUpdated {
+	allUpdated := true
+	for _, updated := range sourceUpdates {
+		allUpdated = allUpdated && updated
+	}
+
+	if allUpdated {
 		return Outcome{
 			OutcomeType: ReportTransmitted,
 		}
