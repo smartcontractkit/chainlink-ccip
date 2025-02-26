@@ -3,7 +3,6 @@
 
 package rmn
 
-//nolint:staticcheck // ignoring deprecated golang.org/x/exp/rand rule for now.
 import (
 	"bytes"
 	"context"
@@ -18,7 +17,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
-	rand2 "golang.org/x/exp/rand"
+	rand2 "golang.org/x/exp/rand" //nolint:staticcheck // ignoring deprecated golang.org/x/exp/rand rule for now.
 	"google.golang.org/protobuf/proto"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
