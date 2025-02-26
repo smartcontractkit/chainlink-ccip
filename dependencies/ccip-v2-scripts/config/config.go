@@ -91,8 +91,7 @@ func getChainConfigurers(env DevspaceEnv) []ChainConfigurer {
 	for i, chain := range besuChains {
 		// Check if the NetworkId is negative before converting to uint64
 		if chain.NetworkId < 0 {
-			fmt.Printf("Error: NetworkId for chain %d is negative, cannot convert to uint64\n", chain.NetworkId)
-			continue
+			panic(fmt.Sprintf("Error: NetworkId %d for besu chain is negative, cannot convert to uint64", chain.NetworkId))
 		}
 		networkId := uint64(chain.NetworkId)
 
@@ -115,8 +114,7 @@ func getChainConfigurers(env DevspaceEnv) []ChainConfigurer {
 	for _, chain := range gethChains {
 		// Check if the NetworkId is negative before converting to uint64
 		if chain.NetworkId < 0 {
-			fmt.Printf("Error: NetworkId for chain %d is negative, cannot convert to uint64\n", chain.NetworkId)
-			continue
+			panic(fmt.Sprintf("Error: NetworkId %d for geth chain is negative, cannot convert to uint64", chain.NetworkId))
 		}
 		networkId := uint64(chain.NetworkId)
 
