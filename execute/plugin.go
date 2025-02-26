@@ -439,6 +439,7 @@ func selectReport(
 
 	execReports, selectedReports, err := builder.Build()
 
+	lggr.Debugw("selected report to be executed", "reports", selectedReports)
 	lggr.Infow(
 		"reports have been selected",
 		"numReports", len(execReports),
@@ -485,6 +486,7 @@ func (p *Plugin) Reports(
 	}
 
 	reportInfo := extractReportInfo(decodedOutcome)
+	p.lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
 	encodedInfo, err := reportInfo.Encode()
 	if err != nil {
 		return nil, err

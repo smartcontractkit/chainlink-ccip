@@ -1339,15 +1339,6 @@
             }
           },
           {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
             "name": "proofs",
             "type": {
               "vec": {

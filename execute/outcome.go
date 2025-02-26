@@ -98,7 +98,9 @@ func (p *Plugin) Outcome(
 	}
 
 	p.observer.TrackOutcome(outcome, state)
-	lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
+	lggr.Infow("generated outcome", "execPluginState", state, "outcome",
+		outcome, "numCommitReports", len(outcome.CommitReports), "numChainReports",
+		len(outcome.Report.ChainReports), "numMessages", len(observation.Messages))
 
 	return p.ocrTypeCodec.EncodeOutcome(outcome)
 }
