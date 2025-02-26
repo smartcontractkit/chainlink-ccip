@@ -1437,10 +1437,6 @@ export type CcipOfframp = {
             "type": {
               "defined": "Any2SVMRampExtraArgs"
             }
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
           }
         ]
       }
@@ -3655,10 +3651,6 @@ export const IDL: CcipOfframp = {
             "type": {
               "defined": "Any2SVMRampExtraArgs"
             }
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
           }
         ]
       }
