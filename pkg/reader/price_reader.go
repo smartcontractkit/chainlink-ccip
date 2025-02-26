@@ -110,7 +110,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		tokenAddressBytes, err := pr.addressCodec.AddressStringToBytes(string(token), chain)
 		if err != nil {
 			lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
-			panic(err)
+			continue
 		}
 
 		byteTokens = append(byteTokens, tokenAddressBytes)
