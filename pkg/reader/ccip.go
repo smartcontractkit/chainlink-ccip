@@ -263,9 +263,9 @@ func (r *ccipChainReader) processCommitReports(
 
 func (r *ccipChainReader) processMerkleRoots(
 	allMerkleRoots []MerkleRoot, isBlessed map[cciptypes.Bytes32]bool,
-) ([]cciptypes.MerkleRootChain, []cciptypes.MerkleRootChain) {
-	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
-	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
+) (blessedMerkleRoots []cciptypes.MerkleRootChain, unblessedMerkleRoots []cciptypes.MerkleRootChain) {
+	blessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
+	unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
 	for _, mr := range allMerkleRoots {
 		onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, cciptypes.ChainSelector(mr.SourceChainSelector))
 		if err != nil {
