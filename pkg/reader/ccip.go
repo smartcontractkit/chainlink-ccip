@@ -231,47 +231,10 @@ func (r *ccipChainReader) processCommitReports(
 			isBlessed[mr.MerkleRoot] = true
 		}
 		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
-		blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.BlessedMerkleRoots))
-		unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.UnblessedMerkleRoots))
-		for _, mr := range allMerkleRoots {
-			mrc := cciptypes.MerkleRootChain{
-				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
-				OnRampAddress: mr.OnRampAddress,
-				SeqNumsRange: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(mr.MinSeqNr),
-					cciptypes.SeqNum(mr.MaxSeqNr),
-				),
-				MerkleRoot: mr.MerkleRoot,
-			}
-			if isBlessed[mr.MerkleRoot] {
-				blessedMerkleRoots = append(blessedMerkleRoots, mrc)
-			} else {
-				unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
-			}
-		}
-
-		priceUpdates := cciptypes.PriceUpdates{
-			TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
-			GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
-		}
-
-		for _, tokenPriceUpdate := range ev.PriceUpdates.TokenPriceUpdates {
-			sourceTokenAddress, err := r.addrCodec.AddressBytesToString(tokenPriceUpdate.SourceToken, r.destChain)
-			if err != nil {
-				lggr.Errorw("failed to convert source token address to string", "err", err)
-				return nil, err
-			}
-			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: cciptypes.UnknownEncodedAddress(sourceTokenAddress),
-				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
-			})
-		}
-
-		for _, gasPriceUpdate := range ev.PriceUpdates.GasPriceUpdates {
-			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates, cciptypes.GasPriceChain{
-				ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
-				GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
-			})
+		blessedMerkleRoots, unblessedMerkleRoots := r.processMerkleRoots(allMerkleRoots, isBlessed)
+		priceUpdates, err := r.processPriceUpdates(ev.PriceUpdates)
+		if err != nil {
+			return nil, err
 		}
 
 		blockNum, err := strconv.ParseUint(item.Head.Height, 10, 64)
@@ -296,6 +259,65 @@ func (r *ccipChainReader) processCommitReports(
 		return reports, nil
 	}
 	return reports[:limit], nil
+}
+
+func (r *ccipChainReader) processMerkleRoots(
+	allMerkleRoots []MerkleRoot, isBlessed map[cciptypes.Bytes32]bool,
+) ([]cciptypes.MerkleRootChain, []cciptypes.MerkleRootChain) {
+	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
+	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
+	for _, mr := range allMerkleRoots {
+		onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, cciptypes.ChainSelector(mr.SourceChainSelector))
+		if err != nil {
+			continue
+		}
+		mrc := cciptypes.MerkleRootChain{
+			ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
+			OnRampAddress: onRampAddress,
+			SeqNumsRange: cciptypes.NewSeqNumRange(
+				cciptypes.SeqNum(mr.MinSeqNr),
+				cciptypes.SeqNum(mr.MaxSeqNr),
+			),
+			MerkleRoot: mr.MerkleRoot,
+		}
+		if isBlessed[mr.MerkleRoot] {
+			blessedMerkleRoots = append(blessedMerkleRoots, mrc)
+		} else {
+			unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
+		}
+	}
+	return blessedMerkleRoots, unblessedMerkleRoots
+}
+
+func (r *ccipChainReader) processPriceUpdates(
+	priceUpdates PriceUpdates,
+) (cciptypes.PriceUpdates, error) {
+	lggr := r.lggr
+	updates := cciptypes.PriceUpdates{
+		TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
+		GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
+	}
+
+	for _, tokenPriceUpdate := range priceUpdates.TokenPriceUpdates {
+		sourceTokenAddrStr, err := r.addrCodec.AddressBytesToString(tokenPriceUpdate.SourceToken, r.destChain)
+		if err != nil {
+			lggr.Errorw("failed to convert source token address to string", "err", err)
+			return updates, err
+		}
+		updates.TokenPriceUpdates = append(updates.TokenPriceUpdates, cciptypes.TokenPrice{
+			TokenID: cciptypes.UnknownEncodedAddress(sourceTokenAddrStr),
+			Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
+		})
+	}
+
+	for _, gasPriceUpdate := range priceUpdates.GasPriceUpdates {
+		updates.GasPriceUpdates = append(updates.GasPriceUpdates, cciptypes.GasPriceChain{
+			ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
+			GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
+		})
+	}
+
+	return updates, nil
 }
 
 type ExecutionStateChangedEvent struct {

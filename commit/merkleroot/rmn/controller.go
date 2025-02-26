@@ -662,7 +662,8 @@ func (c *controller) validateSignedObservationResponse(
 		}
 
 		// todo: The original updateReq contains abi encoded onRamp address, the one in the RMN response
-		if !bytes.Equal(updateReq.Data.LaneSource.OnrampAddress, signedObsLu.LaneSource.OnrampAddress) {
+		expOnRampAddress := typconv.KeepNRightBytes(updateReq.Data.LaneSource.OnrampAddress, 20)
+		if !bytes.Equal(expOnRampAddress, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
 
