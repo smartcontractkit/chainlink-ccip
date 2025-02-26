@@ -1458,7 +1458,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 					{SourceChain: 2},
 				},
 			},
-			expErr: "observer not allowed to read from chain 2",
+			expErr: "invalid observed data, key=2 but data chain=1",
 		},
 	}
 
