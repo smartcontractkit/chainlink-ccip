@@ -146,6 +146,15 @@ type CommitOffchainConfig struct {
 
 	// ChainFeeAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch token prices).
 	ChainFeeAsyncObserverSyncTimeout time.Duration `json:"chainFeeAsyncObserverSyncTimeout"`
+
+	// TokenPriceAsyncObserverDisabled defines whether the async observer should be disabled. Default it is enabled.
+	TokenPriceAsyncObserverDisabled bool `json:"tokenPriceAsyncObserverDisabled"`
+
+	// TokenPriceAsyncObserverSyncFreq defines how frequently the async token price observer should sync.
+	TokenPriceAsyncObserverSyncFreq commonconfig.Duration `json:"tokenPriceAsyncObserverSyncFreq"`
+
+	// TokenPriceAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch token prices).
+	TokenPriceAsyncObserverSyncTimeout commonconfig.Duration `json:"tokenPriceAsyncObserverSyncTimeout"`
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -198,6 +207,15 @@ func (c *CommitOffchainConfig) applyDefaults() {
 		}
 		if c.ChainFeeAsyncObserverSyncTimeout == 0 {
 			c.ChainFeeAsyncObserverSyncTimeout = defaultAsyncObserverSyncTimeout
+		}
+	}
+
+	if !c.TokenPriceAsyncObserverDisabled {
+		if c.TokenPriceAsyncObserverSyncFreq.Duration() == 0 {
+			c.TokenPriceAsyncObserverSyncFreq = *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq)
+		}
+		if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
+			c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 		}
 	}
 }

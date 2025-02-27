@@ -243,7 +243,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 	}
 }
 
-func Test_getPendingExecutedReports(t *testing.T) {
+func Test_getPendingReportsForExecution(t *testing.T) {
 	canExecute := func(ret bool) CanExecuteHandle {
 		return func(cciptypes.ChainSelector, cciptypes.Bytes32) bool { return ret }
 	}
@@ -594,19 +594,19 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				mockReader.On("ExecutedMessages", mock.Anything, k, mock.Anything, primitives.Unconfirmed).Return(v, nil)
 			}
 
-			got, gotFinalized, gotUnfinalized, err := getPendingExecutedReports(
+			got, gotFinalized, gotUnfinalized, err := getPendingReportsForExecution(
 				tests.Context(t),
 				mockReader,
 				tt.canExec,
 				time.Now(),
 				logger.Test(t),
 			)
-			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
+			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
 				return
 			}
-			assert.Equalf(t, tt.wantObs, got, "getPendingExecutedReports(...)")
-			assert.Equalf(t, tt.wantExecutedFinalized, gotFinalized, "getPendingExecutedReports(...)")
-			assert.Equalf(t, tt.wantExecutedUnfinalized, gotUnfinalized, "getPendingExecutedReports(...)")
+			assert.Equalf(t, tt.wantObs, got, "getPendingReportsForExecution(...)")
+			assert.Equalf(t, tt.wantExecutedFinalized, gotFinalized, "getPendingReportsForExecution(...)")
+			assert.Equalf(t, tt.wantExecutedUnfinalized, gotUnfinalized, "getPendingReportsForExecution(...)")
 		})
 	}
 }

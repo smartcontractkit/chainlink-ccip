@@ -199,7 +199,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingExecutedReports(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingReportsForExecution(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
