@@ -76,6 +76,7 @@ type Plugin struct {
 	estimateProvider  cciptypes.EstimateProvider
 	lggr              logger.Logger
 	ocrTypeCodec      ocrtypecodec.ExecCodec
+	addrCodec         cciptypes.AddressCodec
 
 	// state
 
@@ -100,6 +101,7 @@ func NewPlugin(
 	estimateProvider cciptypes.EstimateProvider,
 	lggr logger.Logger,
 	metricsReporter metrics.Reporter,
+	addrCodec cciptypes.AddressCodec,
 ) ocr3types.ReportingPlugin[[]byte] {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
@@ -141,6 +143,7 @@ func NewPlugin(
 		),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
 		ocrTypeCodec:         ocrTypCodec,
+		addrCodec:            addrCodec,
 	}
 	return NewTrackedPlugin(p, lggr, metricsReporter, ocrTypCodec)
 }

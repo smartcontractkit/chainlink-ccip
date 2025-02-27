@@ -11,6 +11,8 @@ import (
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
@@ -899,6 +901,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
+	mockAddrCodec := internal.NewMockAddressCodec(params.t)
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
@@ -915,6 +918,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		nil,
 		params.reportingCfg,
 		&metrics.Noop{},
+		mockAddrCodec,
 	)
 
 	if !params.enableDiscovery {

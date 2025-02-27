@@ -20,6 +20,8 @@ import (
 	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
 
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
@@ -28,8 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -400,7 +400,9 @@ func (c *controller) sendObservationRequests(
 			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: request.LaneSource.SourceChainSelector,
-					OnrampAddress:       typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
+					// TODO check if we can remove the call for keepNRightBytes
+					// https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
+					OnrampAddress: typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
 				},
 				ClosedInterval: request.ClosedInterval,
 			})
@@ -661,6 +663,9 @@ func (c *controller) validateSignedObservationResponse(
 
 		// todo: The original updateReq contains abi encoded onRamp address, the one in the RMN response
 		// is 20 bytes evm address. This is chain specific and should be handled in a chain specific way.
+
+		// TODO check if we can remove the call for keepNRightBytes
+		// https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
 		expOnRampAddress := typconv.KeepNRightBytes(updateReq.Data.LaneSource.OnrampAddress, 20)
 		if !bytes.Equal(expOnRampAddress, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
