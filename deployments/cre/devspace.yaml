@@ -1,0 +1,138 @@
+version: v2beta1
+name: chainlink
+
+vars:
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
+  SCRIPTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/scripts"
+  DEVSPACE_ENV_FILE: .env
+  DEPENDENCIES_DIR:
+    source: env
+    default: "${CRIB_DIR}/dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/imports"
+  TMP_DIR:
+    source: env
+    default: "${CRIB_DIR}/deployments/ccip-v2/.tmp"
+  # "The provider being used to deploy CRIB"
+  PROVIDER:
+    source: all
+    default: "aws"
+  CHAINLINK_CODE_DIR:
+    source: env
+    default: "../../.."
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  DON_TYPE:
+    source: env
+    default: base
+  DON_VERSION:
+    source: env
+    default: latest
+  DON_NODE_COUNT:
+    source: env
+    default: 4
+  DON_BOOT_NODE_COUNT:
+    source: env
+    default: 1
+  GETH_CHAINS_COUNT:
+    source: env
+    default: 2
+  CHAINLINK_PRODUCT:
+    source: env
+    default: chainlink
+
+imports:
+  - path: ${IMPORTS_DIR}/lib-common
+  - path: ${IMPORTS_DIR}/lib-aws
+  - path: ${IMPORTS_DIR}/lib-kind
+
+pipelines:
+  maybe-kind:
+    run: |-
+      if [ "$PROVIDER" == "kind" ]; then
+        run_dependency_pipelines kind-core
+        if [ "$ENABLE_MONITORING" == "true" ]; then
+          run_dependency_pipelines kind-monitoring
+        fi
+      fi
+  chains:
+    run: |-
+      run_pipelines maybe-kind
+
+      run_dependency_pipelines geth-chains
+  dons:
+    run: |-
+      run_pipelines maybe-kind
+
+      run_dependency_pipelines capability-don
+      run_dependency_pipelines job-distributor
+profiles:
+  - name: base
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          geth-chains:
+            path: ${DEPENDENCIES_DIR}/geth-v2
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              CHAINS_COUNT: ${GETH_CHAINS_COUNT}
+          capability-don:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles:
+              - version-from-env
+              - network-generated
+              - cre-config-overrides
+          workflow-don:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles:
+              - version-from-env
+              - network-generated
+              - cre-config-overrides
+          job-distributor:
+            path: ${DEPENDENCIES_DIR}/job-distributor
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+  - name: kind
+    parents:
+      - profile: base
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          kind-core:
+            path: ${DEPENDENCIES_DIR}/kind-core
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          kind-monitoring:
+            path: ${DEPENDENCIES_DIR}/kind-monitoring
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+  - name: aws
+    parents:
+      - profile: base
+    patches:
+      - op: add
+        path: dependencies.ccip-don.profiles
+        value: monitoring-service-monitor
+
+commands:
+  deploy-chains:
+    command: devspace run-pipeline chains -p ${PROVIDER}
+    description: Deploy all chains
+    appendArgs: true
+  deploy-dons:
+    command: devspace run-pipeline dons -p ${PROVIDER}
+    description: Deploy all DONs
+    appendArgs: true
