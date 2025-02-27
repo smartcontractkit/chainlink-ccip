@@ -1,6 +1,6 @@
 ---
 version: v2beta1
-name: cre
+name: cre-enterprise-sandbox
 
 vars:
   CHAINLINK_CODE_DIR:
