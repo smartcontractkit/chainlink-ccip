@@ -1,0 +1,9 @@
+{
+  "apiVersion": "daas.chain.link/v1alpha1",
+  "kind": "Don",
+  "name": "don-0",
+  "namespace": "daas",
+  "spec": {
+    "foo": "bar"
+  }
+}

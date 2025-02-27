@@ -20,6 +20,14 @@ vars:
   REGISTRY: # options=[localhost|aws]
     source: env
     default: prod
+  CHARTS: # options=[local|aws]
+    source: env
+    default: aws
+  ## local directories
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
+  CHARTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/../infra-charts"
   # specific
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
@@ -35,6 +43,9 @@ pullSecrets:
   regcred-prod:
     registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
     secret: regcred-prod
+  regcred-sdlc:
+    registry: 795953128386.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-sdlc
 
 pipelines:
   deploy:
@@ -50,17 +61,38 @@ deployments:
     helm:
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/daas-operator-resources
-        version: 0.0.2
+        version: 0.0.3
       values:
         dapi:
           enabled: true
           image: {}
           imagePullSecrets: []
+          service:
+            type: ClusterIP
+          ingress:
+            enabled: false
         extraManifests: []
       upgradeArgs: ["--no-hooks"]
       templateArgs: ["--no-hooks"]
 
 profiles:
+  ###########################
+  ## chart options
+  ###########################
+
+  - name: use-local-charts
+    activation:
+      - vars:
+          CHARTS: local
+    merge:
+      deployments:
+        daas-operator-resources:
+          helm:
+            chart:
+              name: daas-operator-resources
+              path: ${CHARTS_DIR}/daas-operator-resources
+              version: null
+
   ###########################
   ## image registry options
   ###########################
@@ -76,7 +108,7 @@ profiles:
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.7
+          tag: 0.0.8
 
   - name: use-aws-registry-on-local
     activation: # match all
@@ -93,7 +125,7 @@ profiles:
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.7
+          tag: 0.0.8
 
   - name: use-localhost-registry
     activation: # match all
@@ -117,26 +149,14 @@ profiles:
       - vars:
           ENV: local
     patches:
-      - op: add
-        path: deployments.daas-operator-resources.helm.values.extraManifests
+      - op: replace
+        path: deployments.daas-operator-resources.helm.values.dapi.ingress
         value:
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
-          metadata:
-            name: dapi
-            annotations:
-              nginx.ingress.kubernetes.io/backend-protocol: HTTP
-              nginx.ingress.kubernetes.io/use-regex: "true"
-          spec:
-            ingressClassName: nginx
-            rules:
-              - host: dapi.${HOST_NAME}
-                http:
-                  paths:
-                    - backend:
-                        service:
-                          name: daas-operator-resources-dapi
-                          port:
-                            number: 8888
-                      path: /
-                      pathType: Prefix
+          enabled: true
+          annotations:
+            nginx.ingress.kubernetes.io/backend-protocol: HTTP
+            nginx.ingress.kubernetes.io/use-regex: "true"
+          ingressClassName: nginx
+          host: dapi.${HOST_NAME}
+          path: /
+          pathType: Prefix

@@ -1,0 +1,24 @@
+---
+apiVersion: daas.chain.link/v1alpha1
+kind: Oracle
+metadata:
+  name: node-0
+  namespace: daas
+spec:
+  image:
+    repository: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
+    tag: develop
+    pullPolicy: Always
+  imagePullSecrets:
+    - name: regcred-prod
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: HTTP
+      nginx.ingress.kubernetes.io/use-regex: "true"
+    ingressClassName: nginx
+    host: node-0.local.chain.link
+    path: /
+    pathType: Prefix

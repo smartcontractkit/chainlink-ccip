@@ -20,6 +20,14 @@ vars:
   REGISTRY: # options=[localhost|aws]
     source: env
     default: prod
+  CHARTS: # options=[local|aws]
+    source: env
+    default: aws
+  ## local directories
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
+  CHARTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/../infra-charts"
   # specific
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
@@ -29,6 +37,9 @@ pullSecrets:
   regcred-prod:
     registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
     secret: regcred-prod
+  regcred-sdlc:
+    registry: 795953128386.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-sdlc
 
 pipelines:
   deploy:
@@ -44,12 +55,29 @@ deployments:
     helm:
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/daas-operator
-        version: 0.1.1
+        version: 0.1.2
       values:
         image: {}
         imagePullSecrets: []
 
 profiles:
+  ###########################
+  ## chart options
+  ###########################
+
+  - name: use-local-charts
+    activation:
+      - vars:
+          CHARTS: local
+    merge:
+      deployments:
+        daas-operator:
+          helm:
+            chart:
+              name: daas-operator
+              path: ${CHARTS_DIR}/daas-operator
+              version: null
+
   ###########################
   ## image registry options
   ###########################
@@ -65,7 +93,7 @@ profiles:
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.7
+          tag: 0.0.8
 
   - name: use-aws-registry-on-local
     activation: # match all
@@ -82,7 +110,7 @@ profiles:
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.7
+          tag: 0.0.8
 
   - name: use-localhost-registry
     activation: # match all

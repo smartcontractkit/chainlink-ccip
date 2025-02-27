@@ -16,6 +16,9 @@ vars:
   REGISTRY: # options=[localhost|aws]
     source: env
     default: prod
+  CHARTS: # options=[local|aws]
+    source: env
+    default: aws
   CLUSTER_SERVICES: # options=[ingress-controller-nginx|cert-manager|minio-operator]
     source: env
     default: ("ingress-controller-nginx" "cert-manager")
@@ -33,6 +36,9 @@ vars:
   IMPORTS_DIR:
     source: env
     default: "${CRIB_DIR}/imports"
+  CHARTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/../infra-charts"
   # specific (consolidate from used dependencies)
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
@@ -53,6 +59,9 @@ pullSecrets:
   regcred-prod:
     registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
     secret: regcred-prod
+  regcred-sdlc:
+    registry: 795953128386.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-sdlc
 
 pipelines:
   ## dependency pipelines
@@ -71,6 +80,10 @@ pipelines:
   deps-vcluster-daas:
     run: |-
       run_dependency_pipelines vcluster-daas
+
+  deps-vcluster-daas-alt:
+    run: |-
+      run_dependency_pipelines vcluster-daas-alt
 
   deps-blockchain:
     run: |-
@@ -98,6 +111,10 @@ pipelines:
   daas-aws:
     run: |-
       run_pipelines deps-vcluster-daas
+
+  daas-aws-alt:
+    run: |-
+      run_pipelines deps-vcluster-daas-alt
 
   daas-blockchain:
     run: |-
@@ -156,8 +173,25 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             overwriteVars: true
             profiles:
-              - deploy-crib-aws
-              - deploy-anvil
+              - vcluster-crib-aws
+              - deploy-cluster-services-console
+              - deploy-blockchain-anvil
+              - deploy-chainlink-daas-operator
+              - deploy-chainlink-daas-api
+
+  - name: deps-vcluster-daas-alt
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          vcluster-daas-alt:
+            path: ${DEPENDENCIES_DIR}/daas/vcluster-daas.yaml
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles:
+              - vcluster-crib-aws
+              - deploy-cluster-services-console
+              - deploy-blockchain-anvil
 
   - name: deps-blockchain
     patches:
@@ -198,6 +232,10 @@ profiles:
     parents:
       - profile: deps-vcluster-daas
 
+  - name: daas-aws-alt
+    parents:
+      - profile: deps-vcluster-daas-alt
+
   - name: daas-kind
     parents:
       - profile: deps-kind
@@ -222,6 +260,10 @@ commands:
   daas-aws:
     command: devspace run-pipeline daas-aws -p daas-aws
     description: Run the daas aws pipeline.
+    appendArgs: true
+  daas-aws-alt:
+    command: devspace run-pipeline daas-aws-alt -p daas-aws-alt
+    description: Run the daas aws alt pipeline.
     appendArgs: true
   daas-kind:
     command: devspace run-pipeline daas-kind -p daas-kind

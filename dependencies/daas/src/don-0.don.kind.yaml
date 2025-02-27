@@ -1,0 +1,8 @@
+---
+apiVersion: daas.chain.link/v1alpha1
+kind: Don
+metadata:
+  name: don-0
+  namespace: daas
+spec:
+  foo: bar
