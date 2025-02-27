@@ -17,7 +17,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
-	rand2 "golang.org/x/exp/rand" //nolint:staticcheck // ignoring deprecated golang.org/x/exp/rand rule for now.
+	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
