@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k8s-tester
+  labels:
+    app.kubernetes.io/name: k8s-remote-tester
+    app.kubernetes.io/version: 0.1.1
+  annotations:
+    "prometheus.io/scrape": 'true'
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k8s-remote-tester
+        app.kubernetes.io/version: 0.1.1
+      annotations:
+        "prometheus.io/scrape": 'true'
+    spec:
+      containers:
+        - name: tester
+          image: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink-tests:develop
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            # Same as the value in the ccip.toml CribEnvDirectory = "/data/crib-env-state"
+            - name: k8s-remote-tester-crib-env-state-cm
+              mountPath: /data/crib-env-state
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            runAsUser: 999
+            runAsGroup: 999
+            runAsNonRoot: true
+      restartPolicy: Never
+      volumes:
+        - name: k8s-remote-tester-crib-env-state-cm
+          configMap:
+            name: k8s-remote-tester-crib-env-state-cm
+            defaultMode: 0755
+  backoffLimit: 0

@@ -128,6 +128,9 @@ pipelines:
       run_dependency_pipelines geth-chains
       run_dependency_pipelines solana-chains
       run_dependency_pipelines ccip-don --set-flag infraOnly="true"
+  k8s-remote-tester:
+    run: |-
+      run_dependency_pipelines k8s-remote-tester
   geth:
     run: |-
       if [ "$PROVIDER" == "kind" ]; then
@@ -205,6 +208,14 @@ profiles:
         value: ccip-load-testing-aws-staging
 
   ### Misc profiles for testing individual dependencies in isolation
+  - name: k8s-remote-tester
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          k8s-remote-tester:
+            path: ${DEPENDENCIES_DIR}/k8s-remote-tester
+            namespace: ${DEVSPACE_NAMESPACE}
   - name: ccip-v2-scripts
     patches:
       - op: add
@@ -273,6 +284,15 @@ commands:
     command: devspace run-pipeline ccip-v2-infra-only-render --render
     description: Render infra components, pass desired profile via -p flag
     appendArgs: true
+  start-remote-tests:
+    command: devspace -p k8s-remote-tester run-pipeline k8s-remote-tester
+    description: Run CCIP tests in k8s cluster
+  stop-remote-tests:
+    command: kubectl delete job k8s-tester
+    description: stop remote tester job
+  remote-tester-logs:
+    command: kubectl logs -f -l app.kubernetes.io/name=k8s-remote-tester
+    description: tail remote-tester logs
   deploy-dashboard:
     command: crib dashboard deploy --product=ccip
     description: Deploy Grafana Dashboards (outdated)

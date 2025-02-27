@@ -33,6 +33,17 @@ Example Scenario:
   * After re-deploying, it is necessary to reconfigure OCR. Use `devspace run ccip-v2-scripts configure-ocr` to do that. 
   * Now you can continue running the tests using the same data, without the need to re-provision entire environment from scratch.
 
+### Running load tests using k8s-remote-tester
+* Before starting update the `dependencies/k8s-remote-tester/testconfig/overrides.toml`
+* To start Load tests, run `devspace run start-remote-tests`
+* To stop Load tests: `devspace run stop-remote-tests`
+
+The commands above are wrappers to k8s-remote-tester dependency, check the [k8s-remote-tester README](../../dependencies/k8s-remote-tester/README.md) for more details.
+
+#### Updating test code and building an image
+
+
+
 ## Rendering Manifests locally
 There is special devspace run command to render manifests without deploying anything.
 `devspace run ccip-v2-infra-render`

@@ -1,0 +1,65 @@
+---
+version: v2beta1
+name: k8s-tester
+
+vars:
+  ENV_STATE_DIR:
+    source: env
+    default: "../../deployments/ccip-v2/.tmp"
+  IMAGE_TAG:
+    source: env
+    default: develop
+  BASE64_CONFIG_OVERRIDE:
+    source: command
+    value: $(cat ./testconfig/overrides.toml | base64)
+  TEST_NAME:
+    source: env
+    default: TestCCIPLoad_RPS
+  SUITE:
+    source: env
+    default: ccip
+
+pipelines:
+  deploy:
+    run: |-
+      # Generates config map from files in the ENV_STATE_DIR
+      ./scripts/generate-config-map.sh
+      # Deploy one shot batch job with a test run
+      create_deployments k8s-tester
+
+deployments:
+  k8s-tester:
+    namespace: ${DEVSPACE_NAMESPACE}
+    kubectl:
+      manifests:
+        - generated-manifests
+        - manifests
+      patches:
+        - target:
+            apiVersion: batch/v1
+            kind: Job
+            name: k8s-tester
+          op: replace
+          path: spec.template.spec.containers[0].image
+          value: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink-tests:${IMAGE_TAG}
+        - target:
+            apiVersion: batch/v1
+            kind: Job
+            name: k8s-tester
+          op: add
+          path: spec.template.spec.containers[*]
+          value:
+            env:
+              - name: SUITE
+                value: ccip
+              - name: TEST_NAME
+                value: TestCCIPLoad_RPS
+                # this is required by the Image but not needed for testing against CRIB
+              - name: E2E_TEST_CHAINLINK_IMAGE
+                value: na
+              - name: LOKI_URL
+                value: https://logs-gateway.ops.prod.cldev.sh/loki/api/v1/push
+              - name: LOKI_TENANT_ID
+                value: promtail-staging-us-west-2-main
+              - name: "BASE64_CONFIG_OVERRIDE"
+                value: "${BASE64_CONFIG_OVERRIDE}"

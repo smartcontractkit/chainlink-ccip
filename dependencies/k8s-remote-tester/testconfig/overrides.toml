@@ -1,0 +1,4 @@
+[Load.CCIP.Load]
+CribEnvDirectory = "/data/crib-env-state"
+NumDestinationChains = 2
+TestLabel = "CribTest"
