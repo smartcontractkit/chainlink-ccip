@@ -4717,7 +4717,13 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, testPriceUpdater, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, testPriceUpdater, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			updateIgnoredEvent := ccip.TokenPriceUpdateIgnored{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "TokenPriceUpdateIgnored", &updateIgnoredEvent, config.PrintEvents))
+			require.Equal(t, updateIgnoredEvent.Token, token2.Mint.PublicKey())
+			require.Equal(t, updateIgnoredEvent.Value, anotherTokenPrice)
 
 			// Check that final onchain price matches the new one
 			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))

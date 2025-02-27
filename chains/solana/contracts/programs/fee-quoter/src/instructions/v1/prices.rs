@@ -5,7 +5,7 @@ use crate::context::{GasPriceUpdate, TokenPriceUpdate, UpdatePrices};
 use crate::event::{UsdPerTokenUpdated, UsdPerUnitGasUpdated};
 use crate::instructions::interfaces::Prices;
 use crate::state::{BillingTokenConfigWrapper, DestChain, TimestampedPackedU224};
-use crate::FeeQuoterError;
+use crate::{FeeQuoterError, TokenPriceUpdateIgnored};
 use solana_program::system_program;
 
 pub struct Impl;
@@ -61,8 +61,12 @@ fn apply_token_price_update<'info>(
     token_update: &TokenPriceUpdate,
     token_config_account_info: &'info AccountInfo<'info>,
 ) -> Result<()> {
-    // Token is uninitialized, so we silently ignore it.
+    // Token is uninitialized, so we ignore it.
     if token_config_account_info.owner == &system_program::ID {
+        emit!(TokenPriceUpdateIgnored {
+            token: token_update.source_token,
+            value: token_update.usd_per_token
+        });
         return Ok(());
     }
 
