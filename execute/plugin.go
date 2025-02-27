@@ -124,8 +124,7 @@ func NewPlugin(
 			destChain,
 			reportingCfg.F,
 			oracleIDToP2pID,
-			&plugincommon.NoopReporter{},
-			"execDiscovery",
+			metricsReporter,
 		),
 		chainSupport: plugincommon.NewChainSupport(
 			logutil.WithComponent(lggr, "ChainSupport"),

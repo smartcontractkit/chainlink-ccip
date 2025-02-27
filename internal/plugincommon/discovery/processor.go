@@ -32,26 +32,6 @@ type ContractDiscoveryProcessor struct {
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID
 }
 
-func internalNewContractDiscoveryProcessor(
-	lggr logger.Logger,
-	reader *reader.CCIPReader,
-	homechain reader.HomeChain,
-	dest cciptypes.ChainSelector,
-	fRoleDON int,
-	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
-) plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] {
-	return NewContractDiscoveryProcessor(
-		lggr,
-		reader,
-		homechain,
-		dest,
-		fRoleDON,
-		oracleIDToP2PID,
-		plugincommon.NoopReporter{},
-		"discovery",
-	)
-}
-
 func NewContractDiscoveryProcessor(
 	lggr logger.Logger,
 	reader *reader.CCIPReader,
@@ -60,7 +40,6 @@ func NewContractDiscoveryProcessor(
 	fRoleDON int,
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
 	reporter plugincommon.MetricsReporter,
-	processorPrefixName string,
 ) plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] {
 	p := &ContractDiscoveryProcessor{
 		lggr:            lggr,
@@ -70,7 +49,7 @@ func NewContractDiscoveryProcessor(
 		fRoleDON:        fRoleDON,
 		oracleIDToP2PID: oracleIDToP2PID,
 	}
-	return plugincommon.NewTrackedProcessor(lggr, p, processorPrefixName, reporter)
+	return plugincommon.NewTrackedProcessor(lggr, p, "discovery", reporter)
 }
 
 // Query is not needed for this processor.

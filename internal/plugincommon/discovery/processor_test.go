@@ -778,3 +778,22 @@ var dummyObservation = discoverytypes.Observation{
 		},
 	},
 }
+
+func internalNewContractDiscoveryProcessor(
+	lggr logger.Logger,
+	reader *reader.CCIPReader,
+	homechain reader.HomeChain,
+	dest cciptypes.ChainSelector,
+	fRoleDON int,
+	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
+) plugincommon.PluginProcessor[discoverytypes.Query, discoverytypes.Observation, discoverytypes.Outcome] {
+	return NewContractDiscoveryProcessor(
+		lggr,
+		reader,
+		homechain,
+		dest,
+		fRoleDON,
+		oracleIDToP2PID,
+		plugincommon.NoopReporter{},
+	)
+}
