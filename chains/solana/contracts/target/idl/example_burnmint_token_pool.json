@@ -481,7 +481,7 @@
         },
         {
           "name": "rmnRemote",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -496,7 +496,7 @@
         },
         {
           "name": "chainConfig",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         }
       ],

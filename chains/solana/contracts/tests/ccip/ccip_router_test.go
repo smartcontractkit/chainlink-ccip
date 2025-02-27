@@ -6642,7 +6642,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: sourceChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(

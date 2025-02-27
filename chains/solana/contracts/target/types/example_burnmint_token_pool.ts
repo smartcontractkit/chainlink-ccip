@@ -481,7 +481,7 @@ export type ExampleBurnmintTokenPool = {
         },
         {
           "name": "rmnRemote",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -496,7 +496,7 @@ export type ExampleBurnmintTokenPool = {
         },
         {
           "name": "chainConfig",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         }
       ],
@@ -1032,7 +1032,7 @@ export const IDL: ExampleBurnmintTokenPool = {
         },
         {
           "name": "rmnRemote",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1047,7 +1047,7 @@ export const IDL: ExampleBurnmintTokenPool = {
         },
         {
           "name": "chainConfig",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         }
       ],

@@ -26,13 +26,13 @@ type LockOrBurnTokens struct {
 	//
 	// [5] = [WRITE] poolTokenAccount
 	//
-	// [6] = [WRITE] rmnRemote
+	// [6] = [] rmnRemote
 	//
 	// [7] = [] rmnRemoteCurses
 	//
 	// [8] = [] rmnRemoteConfig
 	//
-	// [9] = [] chainConfig
+	// [9] = [WRITE] chainConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
@@ -118,7 +118,7 @@ func (inst *LockOrBurnTokens) GetPoolTokenAccountAccount() *ag_solanago.AccountM
 
 // SetRmnRemoteAccount sets the "rmnRemote" account.
 func (inst *LockOrBurnTokens) SetRmnRemoteAccount(rmnRemote ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(rmnRemote).WRITE()
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(rmnRemote)
 	return inst
 }
 
@@ -151,7 +151,7 @@ func (inst *LockOrBurnTokens) GetRmnRemoteConfigAccount() *ag_solanago.AccountMe
 
 // SetChainConfigAccount sets the "chainConfig" account.
 func (inst *LockOrBurnTokens) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(chainConfig)
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 

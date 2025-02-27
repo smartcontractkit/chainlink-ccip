@@ -181,11 +181,6 @@ pub struct TokenOnramp<'info> {
     pub pool_signer: UncheckedAccount<'info>,
     #[account(mut, address = get_associated_token_address_with_program_id(&pool_signer.key(), &mint.key(), &token_program.key()))]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(
-        mut,
-        seeds = [POOL_CHAINCONFIG_SEED, lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
-        bump,
-    )]
     ////////////////////
     // RMN Remote CPI //
     ////////////////////
@@ -210,6 +205,12 @@ pub struct TokenOnramp<'info> {
         seeds::program = state.config.rmn_remote,
     )]
     pub rmn_remote_config: UncheckedAccount<'info>,
+
+    #[account(
+        mut,
+        seeds = [POOL_CHAINCONFIG_SEED, lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
+        bump,
+    )]
     pub chain_config: Account<'info, ChainConfig>,
 }
 
