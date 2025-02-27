@@ -1218,14 +1218,18 @@ func (scc SourceChainConfig) check() (bool /* enabled */, error) {
 	}
 	// This may happen due to some sort of regression in the codec that unmarshals
 	// chain data -> go struct.
-	if len(scc.OnRamp) == 0 {
+	if scc.OnRamp.IsZeroOrEmpty() {
 		return false, fmt.Errorf(
 			"onRamp misconfigured/didn't unmarshal: %x",
 			scc.OnRamp,
 		)
 	}
 
-	if len(scc.Router) == 0 {
+	if scc.MinSeqNr == 0 {
+		return false, fmt.Errorf("minSeqNr is 0: %v", scc.MinSeqNr)
+	}
+
+	if cciptypes.UnknownAddress(scc.Router).IsZeroOrEmpty() {
 		return false, fmt.Errorf("router is empty: %v", scc.Router)
 	}
 

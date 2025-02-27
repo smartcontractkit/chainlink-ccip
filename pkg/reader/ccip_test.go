@@ -72,6 +72,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 				v.OnRamp = cciptypes.UnknownAddress(fromString)
 				v.IsEnabled = true
 				v.Router = fromString
+				v.MinSeqNr = 1
 				res.SetResult(v, nil)
 				results[contractName] = append(results[contractName], res)
 			}
@@ -459,10 +460,12 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 			OnRamp:    onramps[0],
 			Router:    destRouter,
 			IsEnabled: true,
+			MinSeqNr:  1,
 		}, &SourceChainConfig{
 			OnRamp:    onramps[1],
 			Router:    destRouter,
 			IsEnabled: true,
+			MinSeqNr:  1,
 		}},
 	))
 
@@ -595,11 +598,13 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 			OnRamp:    onramps[0],
 			Router:    destRouter[0],
 			IsEnabled: true,
+			MinSeqNr:  1,
 		},
 			&SourceChainConfig{
 				OnRamp:    onramps[1],
 				Router:    destRouter[1],
 				IsEnabled: true,
+				MinSeqNr:  1,
 			},
 		}))
 
@@ -1353,16 +1358,19 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 				OnRamp:    []byte{0x1},
 				Router:    []byte{0x6},
 				IsEnabled: true,
+				MinSeqNr:  1,
 			},
 			&SourceChainConfig{
 				OnRamp:    []byte{0x2},
 				Router:    []byte{0x6},
 				IsEnabled: true,
+				MinSeqNr:  1,
 			},
 			&SourceChainConfig{
 				OnRamp:    []byte{0x3},
 				Router:    []byte{0x6},
 				IsEnabled: true,
+				MinSeqNr:  1,
 			},
 		},
 	))
