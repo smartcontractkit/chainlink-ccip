@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
@@ -78,7 +79,8 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		nil, // oracleIDToP2PID, not needed for this test,
+		&metrics.Noop{},
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -116,6 +118,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
+		&metrics.Noop{},
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -156,6 +159,7 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
+		&metrics.Noop{},
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -195,6 +199,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
+		&metrics.Noop{},
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -253,6 +258,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
+		&metrics.Noop{},
 	)
 
 	obsSrc := discoverytypes.Observation{
@@ -336,6 +342,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
+		&metrics.Noop{},
 	)
 
 	fChainObs := discoverytypes.Observation{
@@ -426,6 +433,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
+		&metrics.Noop{},
 	)
 
 	fChainObs := discoverytypes.Observation{
@@ -512,6 +520,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
+		&metrics.Noop{},
 	)
 
 	obs := discoverytypes.Observation{
@@ -565,6 +574,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) 
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		&metrics.Noop{},
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -592,6 +602,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		&metrics.Noop{},
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -627,6 +638,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedCha
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
+		&metrics.Noop{},
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -745,6 +757,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 				dest,
 				fRoleDON,
 				oracleIDToP2PID,
+				&metrics.Noop{},
 			)
 
 			ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
