@@ -131,6 +131,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		ChainFeeAsyncObserverDisabled      bool
 		ChainFeeAsyncObserverSyncFreq      time.Duration
 		ChainFeeAsyncObserverSyncTimeout   time.Duration
+		TokenPriceAsyncObservedDisabled    bool
+		TokenPriceAsyncObserverSyncFreq    commonconfig.Duration
+		TokenPriceAsyncObserverSyncTimeout commonconfig.Duration
 	}
 	remoteTokenAddress := rand.RandomAddress()
 	aggregatorAddress := rand.RandomAddress()
@@ -160,6 +163,8 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 			false,
 		},
@@ -177,6 +182,8 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 			false,
 		},
@@ -389,6 +396,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
 				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 		},
 		{
@@ -397,6 +406,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				RMNEnabled:                      true,
 				MerkleRootAsyncObserverDisabled: true,
 				ChainFeeAsyncObserverDisabled:   true,
+				TokenPriceAsyncObserverDisabled: true,
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -410,6 +420,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 				MerkleRootAsyncObserverDisabled:    true,
 				ChainFeeAsyncObserverDisabled:      true,
+				TokenPriceAsyncObserverDisabled:    true,
 			},
 		},
 		{
@@ -423,6 +434,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				TransmissionDelayMultiplier:        20,
 				InflightPriceCheckRetries:          5,
 				ChainFeeAsyncObserverSyncFreq:      12 * time.Minute,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(10 * time.Minute),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -438,6 +451,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncFreq:      12 * time.Minute,
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(10 * time.Minute),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
 			},
 		},
 		{
@@ -463,6 +478,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MerkleRootAsyncObserverSyncTimeout: 10 * time.Minute,
 				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 		},
 	}

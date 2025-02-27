@@ -738,7 +738,7 @@ func prepareCcipReaderMock(
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
 	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-		Return(&reader2.CurseInfo{}, nil).Maybe()
+		Return(reader2.CurseInfo{}, nil).Maybe()
 	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
 		Return(sourceChainConfigs, nil).Maybe()
 
@@ -979,6 +979,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		InflightPriceCheckRetries:       10,
 		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
 		ChainFeeAsyncObserverDisabled:   true,
+		TokenPriceAsyncObserverDisabled: true,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

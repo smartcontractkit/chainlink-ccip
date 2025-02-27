@@ -424,11 +424,58 @@ func Test_ExecLatency(t *testing.T) {
 	})
 }
 
+func Test_LatencyAndErrors(t *testing.T) {
+	reporter, err := NewPromReporter(logger.Test(t), selector)
+	require.NoError(t, err)
+
+	t.Run("single latency metric", func(t *testing.T) {
+		processor := "discovery1"
+		method := "query"
+
+		reporter.TrackProcessorLatency(processor, method, time.Second, nil)
+		l1 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
+		require.Equal(t, 1, l1)
+
+		errs := testutil.ToFloat64(
+			reporter.processorErrors.WithLabelValues(chainID, processor, method),
+		)
+		require.Equal(t, float64(0), errs)
+	})
+
+	t.Run("multiple latency metrics", func(t *testing.T) {
+		processor := "discovery2"
+		method := "observation"
+
+		passCounter := 10
+		for i := 0; i < passCounter; i++ {
+			reporter.TrackProcessorLatency(processor, method, time.Second, nil)
+		}
+		l2 := internal.CounterFromHistogramByLabels(t, reporter.processorLatencyHistogram, chainID, processor, method)
+		require.Equal(t, passCounter, l2)
+	})
+
+	t.Run("multiple error metrics", func(t *testing.T) {
+		processor := "discovery3"
+		method := "outcome"
+
+		errCounter := 5
+		for i := 0; i < errCounter; i++ {
+			reporter.TrackProcessorLatency(processor, method, time.Second, fmt.Errorf("error"))
+		}
+		errs := testutil.ToFloat64(
+			reporter.processorErrors.WithLabelValues(chainID, processor, method),
+		)
+		require.Equal(t, float64(errCounter), errs)
+	})
+}
+
 func cleanupMetrics(p *PromReporter) func() {
 	return func() {
 		p.sequenceNumbers.Reset()
 		p.outputDetailsCounter.Reset()
 		p.latencyHistogram.Reset()
 		p.execErrors.Reset()
+		p.processorLatencyHistogram.Reset()
+		p.processorErrors.Reset()
 	}
 }
