@@ -83,12 +83,12 @@ func TestCommitRootsCache_GetTimestampToQueryFrom(t *testing.T) {
 			messageVisibilityWindow := now.Add(-messageVisibilityInterval)
 			if tc.latestFinalized.Before(messageVisibilityWindow) {
 				// If original timestamp was before visibility window, internal state should be updated
-				timeDiff = cache.latestFinalizedTimestamp.Sub(messageVisibilityWindow)
+				timeDiff = cache.latestFinalizedFullyExecutedRoot.Sub(messageVisibilityWindow)
 				assert.True(t, timeDiff > -time.Second && timeDiff < time.Second,
 					"Internal state should be updated to visibility window")
 			} else if !tc.latestFinalized.IsZero() {
 				// Otherwise should remain unchanged if not zero (using approximate comparison)
-				timeDiff = cache.latestFinalizedTimestamp.Sub(tc.latestFinalized)
+				timeDiff = cache.latestFinalizedFullyExecutedRoot.Sub(tc.latestFinalized)
 				assert.True(t, timeDiff > -time.Second && timeDiff < time.Second,
 					"Internal timestamp should equal finalized timestamp")
 			}
@@ -181,11 +181,11 @@ func TestCommitRootsCache_TimestampQueryWithMessageVisibilityVariations(t *testi
 			messageVisibilityWindow := now.Add(-tc.messageVisibilityInterval)
 			if tc.latestFinalized.Before(messageVisibilityWindow) {
 				// If finalized is before visibility window, internal state should be updated
-				assert.True(t, !cache.latestFinalizedTimestamp.Before(messageVisibilityWindow),
+				assert.True(t, !cache.latestFinalizedFullyExecutedRoot.Before(messageVisibilityWindow),
 					"Internal timestamp should have been updated to at least visibility window")
 			} else {
 				// Otherwise it should match the original finalized timestamp (approximate comparison)
-				timeDiff = cache.latestFinalizedTimestamp.Sub(tc.latestFinalized)
+				timeDiff = cache.latestFinalizedFullyExecutedRoot.Sub(tc.latestFinalized)
 				assert.True(t, timeDiff > -time.Second && timeDiff < time.Second,
 					"Internal timestamp should remain approximately equal to finalized timestamp")
 			}
@@ -227,7 +227,7 @@ func TestCommitRootsCache_TimestampQueryWithMessageVisibilityVariations(t *testi
 			"After shortening visibility window, should use visibility window")
 
 		// Verify internal state was updated
-		assert.True(t, !cache.latestFinalizedTimestamp.Before(expectedWindow),
+		assert.True(t, !cache.latestFinalizedFullyExecutedRoot.Before(expectedWindow),
 			"Internal timestamp should have been updated to new visibility window")
 	})
 }
@@ -317,7 +317,7 @@ func TestCommitRootsCache_UpdateLatestFinalizedTimestamp(t *testing.T) {
 			// Set initial timestamp if not zero
 			if !tc.initialTimestamp.IsZero() {
 				cache.UpdateLatestFinalizedTimestamp(tc.initialTimestamp)
-				assert.Equal(t, tc.initialTimestamp, cache.latestFinalizedTimestamp,
+				assert.Equal(t, tc.initialTimestamp, cache.latestFinalizedFullyExecutedRoot,
 					"Initial timestamp should be set correctly")
 			}
 
@@ -326,14 +326,14 @@ func TestCommitRootsCache_UpdateLatestFinalizedTimestamp(t *testing.T) {
 
 			// Verify update occurred or not
 			if tc.expectUpdate {
-				assert.Equal(t, tc.updateTimestamp, cache.latestFinalizedTimestamp,
+				assert.Equal(t, tc.updateTimestamp, cache.latestFinalizedFullyExecutedRoot,
 					"Timestamp should be updated to new value")
 			} else {
 				if tc.initialTimestamp.IsZero() {
-					assert.True(t, cache.latestFinalizedTimestamp.IsZero(),
+					assert.True(t, cache.latestFinalizedFullyExecutedRoot.IsZero(),
 						"Timestamp should still be zero")
 				} else {
-					assert.Equal(t, tc.initialTimestamp, cache.latestFinalizedTimestamp,
+					assert.Equal(t, tc.initialTimestamp, cache.latestFinalizedFullyExecutedRoot,
 						"Timestamp should not be updated")
 				}
 			}
@@ -349,10 +349,10 @@ func TestCommitRootsCache_UpdateLatestFinalizedTimestamp(t *testing.T) {
 
 				// Verify second update occurred or not
 				if tc.expectSecondUpdate {
-					assert.Equal(t, tc.secondUpdate, cache.latestFinalizedTimestamp,
+					assert.Equal(t, tc.secondUpdate, cache.latestFinalizedFullyExecutedRoot,
 						"Timestamp should be updated to second value")
 				} else {
-					assert.Equal(t, expectedBeforeSecondUpdate, cache.latestFinalizedTimestamp,
+					assert.Equal(t, expectedBeforeSecondUpdate, cache.latestFinalizedFullyExecutedRoot,
 						"Timestamp should not be updated by second update")
 				}
 			}
@@ -612,5 +612,5 @@ func TestNewCommitRootsCache(t *testing.T) {
 	assert.Equal(t, rootSnoozeTime, concreteCache.rootSnoozeTime)
 	assert.NotNil(t, concreteCache.executedRoots, "executedRoots should not be nil")
 	assert.NotNil(t, concreteCache.snoozedRoots, "snoozedRoots should not be nil")
-	assert.True(t, concreteCache.latestFinalizedTimestamp.IsZero(), "latestFinalizedTimestamp should be zero value")
+	assert.True(t, concreteCache.latestFinalizedFullyExecutedRoot.IsZero(), "latestFinalizedTimestamp should be zero value")
 }
