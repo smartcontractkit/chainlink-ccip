@@ -1799,7 +1799,7 @@ func (r *ccipChainReader) processRMNRemoteResults(results []types.BatchReadResul
 	config := RMNRemoteConfig{}
 
 	if len(results) != 3 {
-		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("expected 2 RMN remote results, got %d", len(results))
+		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("expected 3 RMN remote results, got %d", len(results))
 	}
 
 	// Process DigestHeader
