@@ -74,7 +74,7 @@ pipelines:
       fi
   deploy:
     run: |-
-      run_pipeline maybe-kind
+      run_pipelines maybe-kind
       create_deployments --all
   deploy-ccip-v2:
     flags:
