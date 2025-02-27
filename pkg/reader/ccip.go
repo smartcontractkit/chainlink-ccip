@@ -1617,11 +1617,7 @@ func (r *ccipChainReader) processConfigResults(
 		case consts.ContractNameRMNProxy:
 			config.RMNProxy, err = r.processRMNProxyResults(results)
 		case consts.ContractNameRMNRemote:
-			var rmnRemote RMNRemoteConfig
-			var curseInfo CurseInfo
-			rmnRemote, curseInfo, err = r.processRMNRemoteResults(results)
-			config.RMNRemote = rmnRemote
-			config.CurseInfo = curseInfo
+			config.RMNRemote, config.CurseInfo, err = r.processRMNRemoteResults(results)
 		case consts.ContractNameFeeQuoter:
 			config.FeeQuoter, err = r.processFeeQuoterResults(results)
 		case consts.ContractNameOnRamp:
