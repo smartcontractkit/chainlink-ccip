@@ -126,6 +126,7 @@ func NewPlugin(
 			destChain,
 			reportingCfg.F,
 			oracleIDToP2pID,
+			metricsReporter,
 		),
 		chainSupport: plugincommon.NewChainSupport(
 			logutil.WithComponent(lggr, "ChainSupport"),
@@ -138,7 +139,8 @@ func NewPlugin(
 		commitRootsCache: cache.NewCommitRootsCache(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
-			time.Minute*5),
+			time.Minute*5,
+		),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
 		ocrTypeCodec:         ocrTypCodec,
 		addrCodec:            addrCodec,
