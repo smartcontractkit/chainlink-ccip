@@ -425,7 +425,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		}
 
 		if err := validateSendRequestedEvent(msg, sourceChainSelector, r.destChain, seqNumRange); err != nil {
-			lggr.Errorw("validate send requested event", "err", err, "msg", msg)
+			lggr.Errorw("validate send requested event", "err", err, "message", msg)
 			continue
 		}
 
