@@ -20,6 +20,13 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-bt-{{ $i }}
+            - chainlink:
+                v2Config:
+                  99-config-override.toml: |
+  {{ file.Read (printf "%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) }}
+                v2Secret:
+                99-secrets-override.toml: |
+  {{ file.Read (printf "%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) }}
           {{- end }}
           {{- end }}
           {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
@@ -29,6 +36,13 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-{{ $i }}
+            - chainlink:
+                v2Config:
+                  99-config-override.toml: |
+  {{ file.Read (printf "%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) }}
+                v2Secret:
+                99-secrets-override.toml: |
+  {{ file.Read (printf "%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) }}
           {{- end }}
           {{- end }}
     {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
@@ -45,10 +59,8 @@ in: |
           {{- if ne $.Env.PROVIDER "kind" }}
           - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
           {{- end }}
-          {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.CRIB_EKS_CLUSTER_NAME "main-stage-cluster") }}
+          {{- if eq $.Env.PROVIDER "aws" }}
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
-          {{- else if and (eq $.Env.PROVIDER "aws") (eq $.Env.ENV "sandbox") }}
-          - ${LOCAL_VALUES_DIR}/postgresql/env.crib-sandbox.yaml
           {{- end }}
         values:
           fullnameOverride: ${DON_TYPE}-db-bt-{{ $i }}
@@ -68,10 +80,8 @@ in: |
           {{- if ne $.Env.PROVIDER "kind" }}
           - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
           {{- end }}
-          {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.CRIB_EKS_CLUSTER_NAME "main-stage-cluster") }}
+          {{- if eq $.Env.PROVIDER "aws" }}
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
-          {{- else if and (eq $.Env.PROVIDER "aws") (eq $.Env.ENV "sandbox") }}
-          - ${LOCAL_VALUES_DIR}/postgresql/env.crib-sandbox.yaml
           {{- end }}
         values:
           fullnameOverride: ${DON_TYPE}-db-{{ $i }}

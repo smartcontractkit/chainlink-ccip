@@ -44,6 +44,9 @@ vars:
   CHAINLINK_PRODUCT:
     source: env
     default: chainlink
+  CRE_CONFIG_DIR:
+    source: env
+    default: "${CRIB_DIR}/deployments/cre/config"
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -90,7 +93,6 @@ profiles:
             profiles:
               - version-from-env
               - network-generated
-              - cre-config-overrides
           workflow-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
@@ -99,7 +101,6 @@ profiles:
             profiles:
               - version-from-env
               - network-generated
-              - cre-config-overrides
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true

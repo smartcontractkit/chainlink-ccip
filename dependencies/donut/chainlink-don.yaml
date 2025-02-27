@@ -52,9 +52,6 @@ vars:
   # chains
   # Option to generate variable number of networks to be configured in Node config
   # It is required when network-generated profile is activated
-  BESU_CHAINS_COUNT:
-    source: env
-    default: 0
   GETH_CHAINS_COUNT:
     source: env
     default: 2
@@ -65,6 +62,8 @@ vars:
   ENABLE_DON_BASE:
     source: env
     default: "true"
+  CRE_CONFIG_DIR:
+    source: env
 
 pipelines:
   maybe-kind:
@@ -175,13 +174,11 @@ profiles:
           ENABLE_DON_BASE: "true"
     merge: |-
       $(
-        CRIB_EKS_CLUSTER_NAME="${CRIB_EKS_CLUSTER_NAME}" \
-        DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
         DON_NODE_COUNT=${DON_NODE_COUNT} \
-        ENV=${ENV} \
-        LOCAL_VALUES_DIR="${LOCAL_VALUES_DIR}" \
-        POSTGRES_CHART_VERSION="15.5.9" \
+        DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
         PROVIDER=${PROVIDER} \
+        POSTGRES_CHART_VERSION="15.5.9" \
+        CRE_CONFIG_DIR="${CRE_CONFIG_DIR}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.base.yaml
       )
@@ -240,7 +237,6 @@ profiles:
       $(
         pushd ./scripts/network_configs/ > /dev/null
         go run main.go \
-          -besu-chains-count="${BESU_CHAINS_COUNT}" \
           -geth-chains-count="${GETH_CHAINS_COUNT}" \
           -solana-chains-count="${SOLANA_CHAINS_COUNT}"
       )
@@ -284,11 +280,6 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/overrides.ccip-v2.yaml
-  - name: cre-config-overrides
-    patches:
-      - op: add
-        path: deployments.chainlink-don.helm.valuesFiles
-        value: ${CRE_CONFIG_DIR}/cre-overrides.yaml
   - name: ccip-v2-scripts
     activation:
       - vars:
@@ -313,7 +304,6 @@ profiles:
     activation:
       - vars:
           PROVIDER: "aws"
-          CRIB_EKS_CLUSTER_NAME: "main-stage-cluster"
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
@@ -326,28 +316,6 @@ profiles:
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip.yaml
-      )
-  - name: crib-aws-main-fwog
-    activation:
-      - vars:
-          PROVIDER: "aws"
-          CRIB_EKS_CLUSTER_NAME: "main-fwog"
-    merge: |-
-      $(
-        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
-        gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-main-fwog.yaml
-      )
-  - name: crib-aws-sandbox
-    activation:
-      - vars:
-          PROVIDER: "aws"
-          ENV: "sand"
-    merge: |-
-      $(
-        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
-        gomplate \
-          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-sandbox.yaml
       )
   - name: ccip-load-testing-aws-staging
     merge: |-
