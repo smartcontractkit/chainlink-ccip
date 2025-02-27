@@ -69,6 +69,14 @@ pub struct UsdPerTokenUpdated {
     pub timestamp: i64,  // EVM uses u256 here
 }
 
+/// Emitted when the price update corresponds to a token that isn't registered
+/// for price tracking.
+#[event]
+pub struct TokenPriceUpdateIgnored {
+    pub token: Pubkey,
+    pub value: [u8; 28], // EVM uses u256 here
+}
+
 #[event]
 pub struct TokenTransferFeeConfigUpdated {
     pub dest_chain_selector: u64,
