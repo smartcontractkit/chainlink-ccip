@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"

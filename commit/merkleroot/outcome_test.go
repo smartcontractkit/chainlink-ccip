@@ -3,11 +3,12 @@ package merkleroot
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 

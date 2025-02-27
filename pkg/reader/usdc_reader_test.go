@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
