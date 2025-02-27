@@ -1121,7 +1121,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(&reader2.CurseInfo{
+					Return(reader2.CurseInfo{
 						CursedSourceChains: map[cciptypes.ChainSelector]bool{
 							cciptypes.ChainSelector(sourceChain): false,
 						}}, nil)
@@ -1143,7 +1143,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(&reader2.CurseInfo{}, fmt.Errorf("test error"))
+					Return(reader2.CurseInfo{}, fmt.Errorf("test error"))
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1163,7 +1163,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(&reader2.CurseInfo{GlobalCurse: true}, nil)
+					Return(reader2.CurseInfo{GlobalCurse: true}, nil)
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1183,7 +1183,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(&reader2.CurseInfo{CursedDestination: true}, nil)
+					Return(reader2.CurseInfo{CursedDestination: true}, nil)
 
 				homeChain := basicHomeChain()
 				codec := basicMockCodec()
@@ -1203,7 +1203,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			) {
 				mockReader := basicCCIPReader()
 				mockReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-					Return(&reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					Return(reader2.CurseInfo{CursedSourceChains: map[cciptypes.ChainSelector]bool{
 						cciptypes.ChainSelector(sourceChain): true,
 					},
 					}, nil)
