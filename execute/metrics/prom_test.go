@@ -429,7 +429,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("single latency metric", func(t *testing.T) {
-		processor := "discovery"
+		processor := "discovery1"
 		method := "query"
 
 		reporter.TrackProcessorLatency(processor, method, time.Second, nil)
@@ -443,7 +443,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 	})
 
 	t.Run("multiple latency metrics", func(t *testing.T) {
-		processor := "discovery"
+		processor := "discovery2"
 		method := "observation"
 
 		passCounter := 10
@@ -455,7 +455,7 @@ func Test_LatencyAndErrors(t *testing.T) {
 	})
 
 	t.Run("multiple error metrics", func(t *testing.T) {
-		processor := "discovery"
+		processor := "discovery3"
 		method := "outcome"
 
 		errCounter := 5
