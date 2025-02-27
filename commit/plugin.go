@@ -146,6 +146,7 @@ func NewPlugin(
 		reportingCfg.F,
 		oracleIDToP2pID,
 		reporter,
+		"commitDiscovery",
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(

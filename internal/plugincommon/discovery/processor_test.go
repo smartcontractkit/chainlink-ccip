@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
@@ -73,14 +72,13 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test,
-		&metrics.Noop{},
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -111,14 +109,13 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
-		&metrics.Noop{},
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -152,14 +149,13 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
-		&metrics.Noop{},
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -192,14 +188,13 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
-		&metrics.Noop{},
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -251,14 +246,13 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		Return(nil)
 	defer mockReader.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
-		&metrics.Noop{},
 	)
 
 	obsSrc := discoverytypes.Observation{
@@ -335,14 +329,13 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		Return(nil)
 	defer mockReader.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
-		&metrics.Noop{},
 	)
 
 	fChainObs := discoverytypes.Observation{
@@ -426,14 +419,13 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		Return(nil)
 	defer mockReader.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
-		&metrics.Noop{},
 	)
 
 	fChainObs := discoverytypes.Observation{
@@ -513,14 +505,13 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		Return(syncErr)
 	defer mockReader.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		nil, // oracleIDToP2PID, not needed for this test
-		&metrics.Noop{},
 	)
 
 	obs := discoverytypes.Observation{
@@ -567,14 +558,13 @@ func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) 
 	mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(supportedChains, nil)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		nil, // reader, not needed for this test
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
-		&metrics.Noop{},
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -595,14 +585,13 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 
 	oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{}
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		nil, // reader, not needed for this test
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
-		&metrics.Noop{},
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -631,14 +620,13 @@ func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedCha
 	mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(nil, expectedErr)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		nil, // reader, not needed for this test
 		mockHomeChain,
 		dest,
 		fRoleDON,
 		oracleIDToP2PID,
-		&metrics.Noop{},
 	)
 
 	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
@@ -750,14 +738,13 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 				nil).Maybe()
 			defer mockHomeChain.AssertExpectations(t)
 
-			cdp := NewContractDiscoveryProcessor(
+			cdp := internalNewContractDiscoveryProcessor(
 				lggr,
 				nil, // reader, not needed for this test
 				mockHomeChain,
 				dest,
 				fRoleDON,
 				oracleIDToP2PID,
-				&metrics.Noop{},
 			)
 
 			ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
