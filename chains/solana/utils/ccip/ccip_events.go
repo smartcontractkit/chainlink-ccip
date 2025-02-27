@@ -65,6 +65,13 @@ type UsdPerTokenUpdated struct {
 }
 
 // FeeQuoter-specific event
+type TokenPriceUpdateIgnored struct {
+	Discriminator [8]byte
+	Token         solana.PublicKey
+	Value         [28]byte
+}
+
+// FeeQuoter-specific event
 type UsdPerUnitGasUpdated struct {
 	Discriminator [8]byte
 	DestChain     uint64

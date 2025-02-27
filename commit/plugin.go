@@ -82,6 +82,7 @@ func NewPlugin(
 	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	reporter metrics.Reporter,
+	addressCodec cciptypes.AddressCodec,
 ) *Plugin {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
@@ -125,6 +126,7 @@ func NewPlugin(
 		rmnCrypto,
 		rmnHomeReader,
 		reporter,
+		addressCodec,
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
@@ -146,6 +148,7 @@ func NewPlugin(
 		destChain,
 		reportingCfg.F,
 		oracleIDToP2pID,
+		reporter,
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(
