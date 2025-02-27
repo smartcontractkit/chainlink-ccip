@@ -662,13 +662,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ccip-router-dummy-emitter"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
-]
-
-[[package]]
 name = "ccip_offramp"
 version = "0.1.0-dev"
 dependencies = [
@@ -897,6 +890,18 @@ dependencies = [
  "block-buffer 0.10.4",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "dummy"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "ethnum",
+ "hex",
+ "solana-program",
 ]
 
 [[package]]
