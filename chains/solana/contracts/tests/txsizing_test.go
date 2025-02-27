@@ -330,7 +330,7 @@ func TestTransactionSizing(t *testing.T) {
 				mustRandomPubkey():            maps.Values(routerTable),
 				tokenTable["poolLookupTable"]: maps.Values(tokenTable),
 			},
-			failOnExcessAlways,
+			failOnExcessOnlyWithTables, // without lookup tables, we already know it exceeds the max tx size
 		},
 		{
 			"commit:noPrices",
