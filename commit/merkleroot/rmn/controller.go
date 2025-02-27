@@ -824,7 +824,7 @@ func transformAndSortObservations(
 	return attrSigObservations
 }
 
-// selectsRoots selects the roots from the signed observations.
+// selectRoots selects the roots from the signed observations.
 // If there are more than one valid roots based on the provided F it returns an error.
 func selectRoots(
 	observations []rmnSignedObservationWithMeta,

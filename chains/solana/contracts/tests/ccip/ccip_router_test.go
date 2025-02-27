@@ -134,7 +134,10 @@ func TestCCIPRouter(t *testing.T) {
 	emptyAddress := [64]byte{}
 
 	validSourceChainConfig := ccip_offramp.SourceChainConfig{
-		OnRamp:    [2][64]byte{onRampAddress, emptyAddress},
+		OnRamp: [2]ccip_offramp.OnRampAddress{{
+			Bytes: onRampAddress,
+			Len:   3,
+		}},
 		IsEnabled: true,
 	}
 	validFqDestChainConfig := fee_quoter.DestChainConfig{
@@ -951,7 +954,9 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-				require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				onRampAddress := [64]byte{1, 2, 3}
+
+				require.Equal(t, [2]ccip_offramp.OnRampAddress{{Bytes: onRampAddress, Len: 3}, {Bytes: emptyAddress, Len: 0}}, sourceChainStateAccount.Config.OnRamp)
 			})
 		})
 
@@ -960,7 +965,15 @@ func TestCCIPRouter(t *testing.T) {
 
 			// the router is the SVM onramp
 			paddedCcipRouterProgram := common.ToPadded64Bytes(config.CcipRouterProgram.Bytes())
-			onRampConfig := [2][64]byte{paddedCcipRouterProgram, emptyAddress}
+			onRampConfig := [2]ccip_offramp.OnRampAddress{
+				{
+					Bytes: paddedCcipRouterProgram,
+					Len:   32,
+				}, {
+					Bytes: emptyAddress,
+					Len:   0,
+				},
+			}
 
 			t.Run("CCIP Router", func(t *testing.T) {
 				instruction, err := ccip_router.NewAddChainSelectorInstruction(
@@ -1013,7 +1026,7 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err := ccip_offramp.NewAddSourceChainInstruction(
 					config.SvmChainSelector,
 					ccip_offramp.SourceChainConfig{
-						OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
+						OnRamp:    onRampConfig,
 						IsEnabled: true,
 					},
 					config.OfframpSvmSourceChainPDA,
@@ -1030,7 +1043,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-				require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
+				require.Equal(t, [2]ccip_offramp.OnRampAddress{{Bytes: paddedCcipRouterProgram, Len: 32}, {Bytes: emptyAddress, Len: 0}}, sourceChainStateAccount.Config.OnRamp)
 			})
 		})
 
@@ -5000,8 +5013,8 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
-						commitEvent := ccip.EventCommitReportAccepted{}
-						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
+						commitEvent := common.EventCommitReportAccepted{}
+						require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent))
 						require.Equal(t, config.EvmChainSelector, commitEvent.Report.SourceChainSelector)
 						require.Equal(t, root, commitEvent.Report.MerkleRoot)
 						require.Equal(t, minV, commitEvent.Report.MinSeqNr)
@@ -5089,11 +5102,11 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 
 						tx := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, rpc.CommitmentConfirmed, offrampLookupTable, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
-						commitEvent := ccip.EventCommitReportAccepted{}
-						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
+						commitEvent := common.EventCommitReportAccepted{}
+						require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent))
 
 						require.Equal(t, testcase.PriceUpdates, commitEvent.PriceUpdates)
-						require.Equal(t, ccip_offramp.MerkleRoot{SourceChainSelector: 0x0, OnRampAddress: nil, MinSeqNr: 0x0, MaxSeqNr: 0x0, MerkleRoot: [32]uint8{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}}, commitEvent.Report)
+						require.Nil(t, commitEvent.Report)
 						testcase.RunEventValidations(t, tx)
 						testcase.RunStateValidations(t)
 					})
@@ -5554,11 +5567,11 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
-				commitEvent := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, config.PrintEvents))
+				commitEvent := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent))
 				require.Equal(t, config.EvmChainSelector, commitEvent.Report.SourceChainSelector)
 				require.Equal(t, root, commitEvent.Report.MerkleRoot)
 				require.Equal(t, minV, commitEvent.Report.MinSeqNr)
@@ -5919,13 +5932,12 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: sourceChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6016,15 +6028,14 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				message.Header.SourceChainSelector = 89
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6097,8 +6108,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				unsupportedSourceChainPDA, _, err := state.FindOfframpSourceChainPDA(unsupportedChainSelector, config.CcipOfframpProgram)
 				require.NoError(t, err)
@@ -6121,7 +6132,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: unsupportedChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6161,7 +6171,7 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message.Header.DestChainSelector = 89 // invalid dest chain selector
 				sequenceNumber := message.Header.SequenceNumber
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				hash, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 
 				require.NoError(t, err)
 				root := [32]byte(hash)
@@ -6200,13 +6210,12 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6248,7 +6257,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6287,7 +6295,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				message := ccip.CreateDefaultMessageWith(sourceChainSelector, executedSequenceNumber) // already executed seq number
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				hash, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -6297,7 +6305,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6342,7 +6349,7 @@ func TestCCIPRouter(t *testing.T) {
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 				message1, hash1 := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message2 := ccip.CreateDefaultMessageWith(config.EvmChainSelector, message1.Header.SequenceNumber+1)
-				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress, msgAccounts)
+				hash2, err := ccip.HashAnyToSVMMessage(message2, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1[:], hash2[:]}))
@@ -6381,13 +6388,12 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport1 := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message2, // execute out of order
-					Root:                root,
 					Proofs:              [][32]uint8{hash1},
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6423,7 +6429,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport2 := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message1,
-					Root:                root,
 					Proofs:              [][32]uint8{[32]byte(hash2)},
 				}
 				raw = ccip_offramp.NewExecuteInstruction(
@@ -6483,7 +6488,7 @@ func TestCCIPRouter(t *testing.T) {
 				message.TokenReceiver = stubAccountPDA
 				sequenceNumber := message.Header.SequenceNumber
 				message.ExtraArgs.IsWritableBitmap = 0
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				hash, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -6521,13 +6526,12 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6568,7 +6572,7 @@ func TestCCIPRouter(t *testing.T) {
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message.Data = []byte{} // empty message data
-				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				hash, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -6609,13 +6613,12 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: sourceChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 				raw := ccip_offramp.NewExecuteInstruction(
@@ -6667,7 +6670,7 @@ func TestCCIPRouter(t *testing.T) {
 						DestTokenAddress:  token0.Mint.PublicKey(),
 						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 					}}
-					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 					require.NoError(t, err)
 
 					root := [32]byte(rootBytes)
@@ -6707,14 +6710,13 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-					event := ccip.EventCommitReportAccepted{}
-					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+					event := common.EventCommitReportAccepted{}
+					require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 					executionReport := ccip_offramp.ExecutionReportSingleChain{
 						SourceChainSelector: sourceChainSelector,
 						Message:             message,
 						OffchainTokenData:   [][]byte{{}},
-						Root:                root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -6789,7 +6791,7 @@ func TestCCIPRouter(t *testing.T) {
 						DestTokenAddress:  token1.Mint.PublicKey(),
 						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(2)},
 					}}
-					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 					require.NoError(t, err)
 
 					root := [32]byte(rootBytes)
@@ -6829,14 +6831,13 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-					event := ccip.EventCommitReportAccepted{}
-					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+					event := common.EventCommitReportAccepted{}
+					require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 					executionReport := ccip_offramp.ExecutionReportSingleChain{
 						SourceChainSelector: sourceChainSelector,
 						Message:             message,
 						OffchainTokenData:   [][]byte{{}, {}},
-						Root:                root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -6906,7 +6907,6 @@ func TestCCIPRouter(t *testing.T) {
 					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 					message.Header.SourceChainSelector = args.sourceChainSelector
-					message.OnRampAddress = args.onramp
 					if args.sequenceNumber != 0 {
 						message.Header.SequenceNumber = args.sequenceNumber
 					}
@@ -6917,7 +6917,7 @@ func TestCCIPRouter(t *testing.T) {
 						DestTokenAddress:  token0.Mint.PublicKey(),
 						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 					}}
-					rootBytes, err := ccip.HashAnyToSVMMessage(message, args.onramp, msgAccounts)
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 					require.NoError(t, err)
 
 					root := [32]byte(rootBytes)
@@ -6957,8 +6957,8 @@ func TestCCIPRouter(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-					event := ccip.EventCommitReportAccepted{}
-					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+					event := common.EventCommitReportAccepted{}
+					require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 					return setupResult{
 						initSupply,
@@ -6972,10 +6972,11 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("Router authorization of offramp for lanes", func(t *testing.T) {
 					// Check SVM is an accepted source chain
-					svmOnramp := common.ToPadded64Bytes(config.CcipRouterProgram[:])
 					var sourceChain ccip_offramp.SourceChain
 					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChain))
-					require.Contains(t, sourceChain.Config.OnRamp, svmOnramp)
+					t.Log(sourceChain.Config)
+					require.Equal(t, sourceChain.Config.OnRamp[0].Bytes[0:32], config.CcipRouterProgram[:])
+					require.Equal(t, sourceChain.Config.OnRamp[0].Len, uint32(32))
 
 					// Check offramp program is not registered in router as valid offramp for SVM<>SVM lane
 					testutils.AssertClosedAccount(ctx, t, solanaGoClient, config.AllowedOfframpSvmPDA, config.DefaultCommitment)
@@ -6991,7 +6992,6 @@ func TestCCIPRouter(t *testing.T) {
 						SourceChainSelector: config.SvmChainSelector,
 						Message:             setup.message,
 						OffchainTokenData:   [][]byte{{}},
-						Root:                setup.root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -7054,7 +7054,6 @@ func TestCCIPRouter(t *testing.T) {
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
 					SourceChainSelector: config.EvmChainSelector,
 					Message:             message,
-					Root:                root,
 					Proofs:              [][32]uint8{}, // single leaf merkle tree
 				}
 
@@ -7092,11 +7091,11 @@ func TestCCIPRouter(t *testing.T) {
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 				message1, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 
-				hash1, err := ccip.HashAnyToSVMMessage(message1, config.OnRampAddress, msgAccounts)
+				hash1, err := ccip.HashAnyToSVMMessage(message1, msgAccounts)
 				require.NoError(t, err)
 
 				message2 := ccip.CreateDefaultMessageWith(config.EvmChainSelector, message1.Header.SequenceNumber+1)
-				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress, msgAccounts)
+				hash2, err := ccip.HashAnyToSVMMessage(message2, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1, hash2}))
@@ -7135,15 +7134,14 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				t.Run("Before elapsed time", func(t *testing.T) {
 					t.Run("When user manually executing before the period of time has passed, it fails", func(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
 							Message:             message1,
-							Root:                root,
 							Proofs:              [][32]uint8{[32]byte(hash2)},
 						}
 
@@ -7182,7 +7180,6 @@ func TestCCIPRouter(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
 							Message:             message1,
-							Root:                root,
 							Proofs:              [][32]uint8{[32]byte(hash2)},
 						}
 
@@ -7235,7 +7232,6 @@ func TestCCIPRouter(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
 							Message:             message1,
-							Root:                root,
 							Proofs:              [][32]uint8{[32]byte(hash2)},
 						}
 
@@ -7289,7 +7285,6 @@ func TestCCIPRouter(t *testing.T) {
 						executionReport := ccip_offramp.ExecutionReportSingleChain{
 							SourceChainSelector: config.EvmChainSelector,
 							Message:             message2,
-							Root:                root,
 							Proofs:              [][32]uint8{[32]byte(hash1)},
 						}
 
@@ -7359,7 +7354,7 @@ func TestCCIPRouter(t *testing.T) {
 					Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 				}}
 				message.TokenReceiver = receiver.PublicKey()
-				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
+				rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(rootBytes)
@@ -7397,8 +7392,8 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
-				event := ccip.EventCommitReportAccepted{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+				event := common.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEventCommitReportAccepted(tx.Meta.LogMessages, "CommitReportAccepted", &event))
 
 				// try to execute report ----------------------
 				// should fail because token account does not exist
@@ -7406,7 +7401,6 @@ func TestCCIPRouter(t *testing.T) {
 					SourceChainSelector: sourceChainSelector,
 					Message:             message,
 					OffchainTokenData:   [][]byte{{}},
-					Root:                root,
 					Proofs:              [][32]uint8{},
 				}
 				raw := ccip_offramp.NewExecuteInstruction(

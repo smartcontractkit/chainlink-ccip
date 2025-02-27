@@ -22,6 +22,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
@@ -147,27 +149,35 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
 
-// getPendingExecutedReports is used to find commit reports which need to be executed.
-// It considers all commit reports as of the given timestamp. Of the reports found, the
-// provided canExecute function is used to filter out reports which the caller knows to
-// be ineligible (i.e. already executed, or snoozed for some reason). The final step
-// is to check their execution state to see if the messages for each report are already
-// executed. Any fully executed reports are returned separately for the caller to remember.
-func getPendingExecutedReports(
+// getPendingReportsForExecution is used to find commit reports which need to be executed.
+//
+// The function checks execution status at two levels:
+// 1. Gets all executed messages (both finalized and unfinalized) via primitives.Unconfirmed
+// 2. Gets only finalized executed messages via primitives.Finalized
+//
+// Reports are then classified as:
+// - fullyExecutedFinalized: All messages executed with finality (mark as executed)
+// - fullyExecutedUnfinalized: All messages executed but not finalized (snooze)
+// - groupedCommits: Reports with unexecuted messages (available for execution)
+func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
 	canExecute CanExecuteHandle,
 	ts time.Time,
 	lggr logger.Logger,
-) (exectypes.CommitObservations, []exectypes.CommitData /* fully executed roots */, error) {
-	var fullyExecuted []exectypes.CommitData
+) (
+	groupedCommits exectypes.CommitObservations,
+	fullyExecutedFinalized []exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
+	err error,
+) {
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
-	groupedCommits := groupByChainSelector(commitReports)
+	groupedCommits = groupByChainSelector(commitReports)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
@@ -205,32 +215,55 @@ func getPendingExecutedReports(
 
 		ranges, err := computeRanges(reports)
 		if err != nil {
-			return nil, nil, fmt.Errorf("compute report ranges: %w", err)
+			return nil, nil, nil, fmt.Errorf("compute report ranges: %w", err)
 		}
 
-		executedMessageSet := mapset.NewSet[cciptypes.SeqNum]()
+		// Get both finalized and unfinalized executed messages
+		finalizedMsgSet := mapset.NewSet[cciptypes.SeqNum]()
+		allExecutedMsgSet := mapset.NewSet[cciptypes.SeqNum]()
+
 		for _, seqRange := range ranges {
-			executedMessagesForRange, err2 := ccipReader.ExecutedMessages(ctx, selector, seqRange)
-			if err2 != nil {
-				return nil, nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err2)
+			// Get all executed messages
+			allMessages, err := ccipReader.ExecutedMessages(ctx, selector, seqRange, primitives.Unconfirmed)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err)
 			}
-			executedMessageSet = executedMessageSet.Union(mapset.NewSet(executedMessagesForRange...))
+			allExecutedMsgSet = allExecutedMsgSet.Union(mapset.NewSet(allMessages...))
+
+			// Get finalized messages
+			finalizedMessages, err := ccipReader.ExecutedMessages(ctx, selector, seqRange, primitives.Finalized)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("get finalized %d executed messages in range %v: %w", selector, seqRange, err)
+			}
+			finalizedMsgSet = finalizedMsgSet.Union(mapset.NewSet(finalizedMessages...))
 		}
 
-		executedMessages := executedMessageSet.ToSlice()
-		sort.Slice(executedMessages, func(i, j int) bool { return executedMessages[i] < executedMessages[j] })
+		// Get unfinalized messages by taking the difference
+		unfinalizedMsgSet := allExecutedMsgSet.Difference(finalizedMsgSet)
 
-		// Remove fully executed reports.
-		// Populate executed messages on the reports.
-		var executedCommits []exectypes.CommitData
-		groupedCommits[selector], executedCommits = combineReportsAndMessages(reports, executedMessages)
-		fullyExecuted = append(fullyExecuted, executedCommits...)
+		finalizedMessages := slicelib.ToSortedSlice(finalizedMsgSet)
+
+		unfinalizedMessages := slicelib.ToSortedSlice(unfinalizedMsgSet)
+
+		// Fully finalized roots are removed from the reports and set in groupedCommits
+		var executedCommitsFinalized []exectypes.CommitData
+		remainingReports, executedCommitsFinalized := combineReportsAndMessages(reports, finalizedMessages)
+		fullyExecutedFinalized = append(fullyExecutedFinalized, executedCommitsFinalized...)
+
+		// Process unfinalized messages
+		finalRemainingReports, executedCommitsUnfinalized := combineReportsAndMessages(remainingReports, unfinalizedMessages)
+		fullyExecutedUnfinalized = append(fullyExecutedUnfinalized, executedCommitsUnfinalized...)
+
+		// Update groupedCommits with the remaining reports
+		groupedCommits[selector] = finalRemainingReports
 	}
 
 	lggr.Debugw("grouped commits after removing fully executed reports",
-		"groupedCommits", groupedCommits, "count", len(groupedCommits))
+		"groupedCommits", groupedCommits,
+		"countFinalized", len(fullyExecutedFinalized),
+		"countUnfinalized", len(fullyExecutedUnfinalized))
 
-	return groupedCommits, fullyExecuted, nil
+	return groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, nil
 }
 
 func (p *Plugin) ValidateObservation(
@@ -253,8 +286,8 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	state := previousOutcome.State.Next()
-	if state == exectypes.Initialized || state == exectypes.GetCommitReports {
+	nextState := previousOutcome.State.Next()
+	if nextState == exectypes.GetCommitReports {
 		err = validateNoMessageRelatedObservations(
 			decodedObservation.Messages,
 			decodedObservation.TokenData,
@@ -270,7 +303,7 @@ func (p *Plugin) ValidateObservation(
 	}
 
 	// check message related validations when states can contain messages
-	if state == exectypes.GetMessages || state == exectypes.Filter {
+	if nextState == exectypes.GetMessages || nextState == exectypes.Filter {
 		if err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
 			return fmt.Errorf("validate observer reading eligibility: %w", err)
 		}
@@ -304,7 +337,7 @@ func validateCommonStateObservations(
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
+	if err := validateObservedSequenceNumbers(supportedChains, decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
@@ -408,6 +441,7 @@ func selectReport(
 
 	execReports, selectedReports, err := builder.Build()
 
+	lggr.Debugw("selected report to be executed", "reports", selectedReports)
 	lggr.Infow(
 		"reports have been selected",
 		"numReports", len(execReports),
@@ -454,6 +488,7 @@ func (p *Plugin) Reports(
 	}
 
 	reportInfo := extractReportInfo(decodedOutcome)
+	p.lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
 	encodedInfo, err := reportInfo.Encode()
 	if err != nil {
 		return nil, err
@@ -562,7 +597,7 @@ func (p *Plugin) checkAlreadyExecuted(
 	// TODO: batch these queries? these are all DB reads.
 	// maybe some alternative queries exist.
 	for sourceChainSelector, seqNrRange := range seqNrRangesBySource {
-		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange.snRange)
+		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange.snRange, primitives.Unconfirmed)
 		if err != nil {
 			return fmt.Errorf("couldn't check if messages already executed: %w", err)
 		}

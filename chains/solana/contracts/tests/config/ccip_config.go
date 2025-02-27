@@ -26,7 +26,6 @@ var (
 
 	// test values
 	OnRampAddress                   = []byte{1, 2, 3}
-	OnRampAddressPadded             = [64]byte{1, 2, 3}
 	EnableExecutionAfter            = int64(1800) // 30min
 	MaxOracles                      = 16
 	OcrF                      uint8 = 5

@@ -170,6 +170,25 @@ impl Op {
             .collect()
     }
 
+    /// Prepares account metas for CPI execution with the multisig signer.
+    ///
+    /// This critical security function:
+    /// 1. Creates a modified copy of the original account metas
+    /// 2. Sets `is_signer = true` only for the designated multisig signer PDA
+    /// 3. Ensures other accounts cannot act as signers
+    ///
+    /// This selective signer assignment guarantees that only operations
+    /// validated through the MCM's Merkle verification process can
+    /// exercise signing authority, protecting privileged operations from
+    /// unauthorized execution.
+    ///
+    /// # Parameters
+    ///
+    /// - `multisig_signer`: The public key of the multisig signer PDA
+    ///
+    /// # Returns
+    ///
+    /// A modified vector of AccountMeta with the signer flag properly set
     fn cpi_remaining_accounts(&self, multisig_signer: Pubkey) -> Vec<AccountMeta> {
         self.remaining_accounts
             .iter()

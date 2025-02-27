@@ -1339,15 +1339,6 @@ export type CcipOfframp = {
             }
           },
           {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
             "name": "proofs",
             "type": {
               "vec": {
@@ -1446,10 +1437,6 @@ export type CcipOfframp = {
             "type": {
               "defined": "Any2SVMRampExtraArgs"
             }
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
           }
         ]
       }
@@ -1612,14 +1599,32 @@ export type CcipOfframp = {
             "type": {
               "array": [
                 {
-                  "array": [
-                    "u8",
-                    64
-                  ]
+                  "defined": "OnRampAddress"
                 },
                 2
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnRampAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u32"
           }
         ]
       }
@@ -1791,7 +1796,9 @@ export type CcipOfframp = {
         {
           "name": "merkleRoot",
           "type": {
-            "defined": "MerkleRoot"
+            "option": {
+              "defined": "MerkleRoot"
+            }
           },
           "index": false
         },
@@ -2196,6 +2203,11 @@ export type CcipOfframp = {
       "code": 9052,
       "name": "Ocr3SignaturesOutOfRegistration",
       "msg": "Signatures out of registration"
+    },
+    {
+      "code": 9053,
+      "name": "InvalidOnrampAddress",
+      "msg": "Invalid onramp address"
     }
   ]
 };
@@ -3541,15 +3553,6 @@ export const IDL: CcipOfframp = {
             }
           },
           {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
             "name": "proofs",
             "type": {
               "vec": {
@@ -3648,10 +3651,6 @@ export const IDL: CcipOfframp = {
             "type": {
               "defined": "Any2SVMRampExtraArgs"
             }
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
           }
         ]
       }
@@ -3814,14 +3813,32 @@ export const IDL: CcipOfframp = {
             "type": {
               "array": [
                 {
-                  "array": [
-                    "u8",
-                    64
-                  ]
+                  "defined": "OnRampAddress"
                 },
                 2
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnRampAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u32"
           }
         ]
       }
@@ -3993,7 +4010,9 @@ export const IDL: CcipOfframp = {
         {
           "name": "merkleRoot",
           "type": {
-            "defined": "MerkleRoot"
+            "option": {
+              "defined": "MerkleRoot"
+            }
           },
           "index": false
         },
@@ -4398,6 +4417,11 @@ export const IDL: CcipOfframp = {
       "code": 9052,
       "name": "Ocr3SignaturesOutOfRegistration",
       "msg": "Signatures out of registration"
+    },
+    {
+      "code": 9053,
+      "name": "InvalidOnrampAddress",
+      "msg": "Invalid onramp address"
     }
   ]
 };

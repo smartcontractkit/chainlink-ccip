@@ -1339,15 +1339,6 @@
             }
           },
           {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
             "name": "proofs",
             "type": {
               "vec": {
@@ -1446,10 +1437,6 @@
             "type": {
               "defined": "Any2SVMRampExtraArgs"
             }
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
           }
         ]
       }
@@ -1612,14 +1599,32 @@
             "type": {
               "array": [
                 {
-                  "array": [
-                    "u8",
-                    64
-                  ]
+                  "defined": "OnRampAddress"
                 },
                 2
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnRampAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u32"
           }
         ]
       }
@@ -1791,7 +1796,9 @@
         {
           "name": "merkleRoot",
           "type": {
-            "defined": "MerkleRoot"
+            "option": {
+              "defined": "MerkleRoot"
+            }
           },
           "index": false
         },
@@ -2196,6 +2203,11 @@
       "code": 9052,
       "name": "Ocr3SignaturesOutOfRegistration",
       "msg": "Signatures out of registration"
+    },
+    {
+      "code": 9053,
+      "name": "InvalidOnrampAddress",
+      "msg": "Invalid onramp address"
     }
   ]
 }
