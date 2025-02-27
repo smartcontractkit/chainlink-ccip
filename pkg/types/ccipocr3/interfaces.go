@@ -25,6 +25,13 @@ type AddressCodec interface {
 	AddressStringToBytes(string, ChainSelector) (UnknownAddress, error)
 }
 
+type ExtraDataCodec interface {
+	// DecodeExtraArgs reformat bytes into a chain agnostic map[string]any representation for extra args
+	DecodeExtraArgs(extraArgs Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
+	// DecodeTokenAmountDestExecData reformat bytes to chain-agnostic map[string]any for tokenAmount DestExecData field
+	DecodeTokenAmountDestExecData(destExecData Bytes, sourceChainSelector ChainSelector) (map[string]any, error)
+}
+
 // RMNCrypto provides a chain-agnostic interface for verifying RMN signatures.
 // For example, on EVM, RMN reports are abi-encoded prior to being signed.
 // On Solana, they would be borsh encoded instead, etc.
