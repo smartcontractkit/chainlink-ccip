@@ -324,7 +324,7 @@ func checkForReportTransmission(
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
-				// if there are not multiple reports, a single update means the report has been transmitted.
+				// if there is only one report, any single update means the report has been transmitted.
 				if !multipleReports {
 					return Outcome{
 						OutcomeType: ReportTransmitted,
