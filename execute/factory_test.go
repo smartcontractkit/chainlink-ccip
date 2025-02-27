@@ -1,18 +1,14 @@
 package execute
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
@@ -153,18 +149,7 @@ func TestObservationSize(t *testing.T) {
 
 	// separate sender for each message
 	noncesObs := make(exectypes.NonceObservations, maxMessages)
-	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
-		Return(func(addr ccipocr3.UnknownAddress, _ ccipocr3.ChainSelector) string {
-			return "0x" + hex.EncodeToString(addr)
-		}, nil).Maybe()
-
-	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
-		Return(func(addr string, _ ccipocr3.ChainSelector) ccipocr3.UnknownAddress {
-			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
-			require.NoError(t, err)
-			return addrBytes
-		}, nil).Maybe()
+	mockAddrCodec := internal.NewMockAddressCodec(t)
 	for i := 0; i < maxMessages; i++ {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
 		if nil == noncesObs[idx] {

@@ -3,7 +3,6 @@ package report
 import (
 	"context"
 	crand "crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -11,12 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-
-	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -793,12 +791,7 @@ func Test_Builder_Build(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
-		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-			return "0x" + hex.EncodeToString(addr)
-		}, nil)
-
+	mockAddrCodec := internal.NewMockAddressCodec(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1242,18 +1235,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
-	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
-		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
-			return "0x" + hex.EncodeToString(addr)
-		}, nil)
-	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
-		Return(func(addr string, _ cciptypes.ChainSelector) cciptypes.UnknownAddress {
-			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
-			require.NoError(t, err)
-			return addrBytes
-		}, nil).Maybe()
-
+	mockAddrCodec := internal.NewMockAddressCodec(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

@@ -1,7 +1,6 @@
 package commit
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -9,12 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -307,18 +304,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
-		mockAddrCodec := typepkgmock.NewMockAddressCodec(t)
-		mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
-			Return(func(addr ccipocr3.UnknownAddress, _ ccipocr3.ChainSelector) string {
-				return "0x" + hex.EncodeToString(addr)
-			}, nil).Maybe()
-		mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
-			Return(func(addr string, _ ccipocr3.ChainSelector) ccipocr3.UnknownAddress {
-				addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
-				require.NoError(t, err)
-				return addrBytes
-			}, nil).Maybe()
-
+		mockAddrCodec := internal.NewMockAddressCodec(t)
 		p := &PluginFactory{
 			baseLggr: lggr,
 			ocrConfig: reader.OCR3ConfigWithMeta{

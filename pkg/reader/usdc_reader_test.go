@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
@@ -94,7 +95,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := newMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodec(t)
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
@@ -184,7 +185,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := newMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodec(t)
 	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders, mockAddrCodec)
 	require.NoError(t, err)
 
