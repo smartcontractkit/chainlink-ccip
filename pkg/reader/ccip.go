@@ -148,6 +148,10 @@ type ConfigInfo struct {
 	IsSignatureVerificationEnabled bool
 }
 
+type RMNCurseResponse struct {
+	CursedSubjects [][16]byte
+}
+
 // ---------------------------------------------------
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
@@ -847,35 +851,19 @@ func (r *ccipChainReader) GetRMNRemoteConfig(ctx context.Context) (rmntypes.Remo
 
 // GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 // from the destination chain RMN remote contract.
-func (r *ccipChainReader) GetRmnCurseInfo(ctx context.Context) (*CurseInfo, error) {
-	lggr := logutil.WithContextValues(ctx, r.lggr)
+func (r *ccipChainReader) GetRmnCurseInfo(ctx context.Context) (CurseInfo, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
-		return nil, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+		return CurseInfo{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
-	type retTyp struct {
-		CursedSubjects [][16]byte
-	}
-	var cursedSubjects retTyp
-
-	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameRMNRemote,
-		consts.MethodNameGetCursedSubjects,
-		primitives.Unconfirmed,
-		map[string]any{},
-		&cursedSubjects,
-	)
+	// TODO: Curse requires a dedicated cache, but for now fetching it in background,
+	// together with the other configurations
+	config, err := r.configPoller.GetChainConfig(ctx, r.destChain)
 	if err != nil {
-		return nil, fmt.Errorf("get latest value of %s: %w", consts.MethodNameGetCursedSubjects, err)
+		return CurseInfo{}, fmt.Errorf("get chain config: %w", err)
 	}
 
-	lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
-
-	return getCurseInfoFromCursedSubjects(
-		mapset.NewSet(cursedSubjects.CursedSubjects...),
-		r.destChain,
-	), nil
+	return config.CurseInfo, nil
 }
 
 func getCurseInfoFromCursedSubjects(
@@ -1511,6 +1499,7 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 
 func (r *ccipChainReader) prepareBatchConfigRequests(
 	chainSel cciptypes.ChainSelector) contractreader.ExtendedBatchGetLatestValuesRequest {
+
 	var (
 		commitLatestOCRConfig OCRConfigResponse
 		execLatestOCRConfig   OCRConfigResponse
@@ -1523,6 +1512,7 @@ func (r *ccipChainReader) prepareBatchConfigRequests(
 		onRampDynamicConfig   getOnRampDynamicConfigResponse
 		onRampDestConfig      onRampDestChainConfig
 		wrappedNativeAddress  []byte
+		cursedSubjects        RMNCurseResponse
 	)
 
 	var requests contractreader.ExtendedBatchGetLatestValuesRequest
@@ -1597,6 +1587,11 @@ func (r *ccipChainReader) prepareBatchConfigRequests(
 					Params:    map[string]any{},
 					ReturnVal: &rmnVersionConfig,
 				},
+				{
+					ReadName:  consts.MethodNameGetCursedSubjects,
+					Params:    map[string]any{},
+					ReturnVal: &cursedSubjects,
+				},
 			},
 			consts.ContractNameFeeQuoter: {{
 				ReadName:  consts.MethodNameFeeQuoterGetStaticConfig,
@@ -1622,7 +1617,7 @@ func (r *ccipChainReader) processConfigResults(
 		case consts.ContractNameRMNProxy:
 			config.RMNProxy, err = r.processRMNProxyResults(results)
 		case consts.ContractNameRMNRemote:
-			config.RMNRemote, err = r.processRMNRemoteResults(results)
+			config.RMNRemote, config.CurseInfo, err = r.processRMNRemoteResults(results)
 		case consts.ContractNameFeeQuoter:
 			config.FeeQuoter, err = r.processFeeQuoterResults(results)
 		case consts.ContractNameOnRamp:
@@ -1796,38 +1791,57 @@ func (r *ccipChainReader) processRMNProxyResults(results []types.BatchReadResult
 	return RMNProxyConfig{}, fmt.Errorf("invalid type for RMN proxy remote address: %T", val)
 }
 
-func (r *ccipChainReader) processRMNRemoteResults(results []types.BatchReadResult) (RMNRemoteConfig, error) {
+func (r *ccipChainReader) processRMNRemoteResults(results []types.BatchReadResult) (
+	RMNRemoteConfig,
+	CurseInfo,
+	error,
+) {
 	config := RMNRemoteConfig{}
 
-	if len(results) != 2 {
-		return RMNRemoteConfig{}, fmt.Errorf("expected 2 RMN remote results, got %d", len(results))
+	if len(results) != 3 {
+		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("expected 3 RMN remote results, got %d", len(results))
 	}
 
 	// Process DigestHeader
 	val, err := results[0].GetResult()
 	if err != nil {
-		return RMNRemoteConfig{}, fmt.Errorf("get RMN remote digest header result: %w", err)
+		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("get RMN remote digest header result: %w", err)
 	}
 
 	typed, ok := val.(*rmnDigestHeader)
 	if !ok {
-		return RMNRemoteConfig{}, fmt.Errorf("invalid type for RMN remote digest header: %T", val)
+		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("invalid type for RMN remote digest header: %T", val)
 	}
 	config.DigestHeader = *typed
 
 	// Process VersionedConfig
 	val, err = results[1].GetResult()
 	if err != nil {
-		return RMNRemoteConfig{}, fmt.Errorf("get RMN remote versioned config result: %w", err)
+		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("get RMN remote versioned config result: %w", err)
 	}
 
 	vconf, ok := val.(*versionedConfig)
 	if !ok {
-		return RMNRemoteConfig{}, fmt.Errorf("invalid type for RMN remote versioned config: %T", val)
+		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("invalid type for RMN remote versioned config: %T", val)
 	}
 	config.VersionedConfig = *vconf
 
-	return config, nil
+	// Process CursedSubjects
+	val, err = results[2].GetResult()
+	if err != nil {
+		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("get RMN remote cursed subjects result: %w", err)
+	}
+
+	c, ok := val.(*RMNCurseResponse)
+	if !ok {
+		return RMNRemoteConfig{}, CurseInfo{}, fmt.Errorf("invalid type for RMN remote cursed subjects: %T", val)
+	}
+	curseInfo := *getCurseInfoFromCursedSubjects(
+		mapset.NewSet(c.CursedSubjects...),
+		r.destChain,
+	)
+
+	return config, curseInfo, nil
 }
 
 func (r *ccipChainReader) processFeeQuoterResults(results []types.BatchReadResult) (FeeQuoterConfig, error) {
