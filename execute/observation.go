@@ -123,11 +123,11 @@ func (p *Plugin) Observation(
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
-func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.CurseInfo, error) {
+func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (reader.CurseInfo, error) {
 	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
 		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
-		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
 	}
 
 	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx)
@@ -136,7 +136,7 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 			"err", err,
 			"sourceChains", allSourceChains,
 		)
-		return nil, fmt.Errorf("nothing to observe: rmn read error: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("nothing to observe: rmn read error: %w", err)
 	}
 
 	return curseInfo, nil
@@ -167,9 +167,10 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// TODO: set fetchFrom to the oldest pending commit report.
-	// TODO: or, cache commit reports so that we don't need to fetch them again.
-	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
+	// Get the optimized timestamp using the cache
+	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
+
+	lggr.Infow("Querying commit reports", "queryTimestamp", fetchFrom)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 	//          a valid execution report.
@@ -214,6 +215,9 @@ func (p *Plugin) getCommitReportsObservation(
 	// This cache will be re-initialized on each plugin restart.
 	for _, fullyExecutedCommit := range fullyExecutedFinalized {
 		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
+
+		// Update the latest finalized timestamp if this report is newer
+		p.commitRootsCache.UpdateLatestFinalizedTimestamp(fullyExecutedCommit.Timestamp)
 	}
 
 	// If fully executed reports are detected, snooze them in the cache.
