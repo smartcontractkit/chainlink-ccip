@@ -612,5 +612,8 @@ func TestNewCommitRootsCache(t *testing.T) {
 	assert.Equal(t, rootSnoozeTime, concreteCache.rootSnoozeTime)
 	assert.NotNil(t, concreteCache.executedRoots, "executedRoots should not be nil")
 	assert.NotNil(t, concreteCache.snoozedRoots, "snoozedRoots should not be nil")
-	assert.True(t, concreteCache.latestFinalizedFullyExecutedRoot.IsZero(), "latestFinalizedTimestamp should be zero value")
+	assert.True(
+		t,
+		concreteCache.latestFinalizedFullyExecutedRoot.IsZero(),
+		"latestFinalizedTimestamp should be zero value")
 }
