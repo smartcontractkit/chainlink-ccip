@@ -56,6 +56,7 @@ impl OnRamp for Impl {
                 ctx.accounts.authority.key(),
                 dest_chain_selector,
                 ctx.program_id.key(),
+                ctx.accounts.config.fee_quoter,
                 &ctx.remaining_accounts[start..end],
             )?;
 
