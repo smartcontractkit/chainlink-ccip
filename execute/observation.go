@@ -124,11 +124,11 @@ func (p *Plugin) Observation(
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
-func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.CurseInfo, error) {
+func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (reader.CurseInfo, error) {
 	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
 		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
-		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
 	}
 
 	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx)
@@ -137,7 +137,7 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 			"err", err,
 			"sourceChains", allSourceChains,
 		)
-		return nil, fmt.Errorf("nothing to observe: rmn read error: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("nothing to observe: rmn read error: %w", err)
 	}
 
 	return curseInfo, nil
