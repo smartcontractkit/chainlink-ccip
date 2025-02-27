@@ -27,15 +27,16 @@ pub mod rmn_remote {
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts.config.set_inner(Config {
+        ctx.accounts.config_and_curses.set_inner(ConfigAndCurses {
             owner: ctx.accounts.authority.key(),
             version: 1,
             proposed_owner: Pubkey::default(),
             default_code_version: CodeVersion::V1,
+            cursed_subjects: vec![],
         });
 
         emit!(ConfigSet {
-            default_code_version: ctx.accounts.config.default_code_version,
+            default_code_version: ctx.accounts.config_and_curses.default_code_version,
         });
         Ok(())
     }
@@ -61,7 +62,7 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required for accepting ownership.
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        router::admin(ctx.accounts.config.default_code_version).accept_ownership(ctx)
+        router::admin(ctx.accounts.config_and_curses.default_code_version).accept_ownership(ctx)
     }
 
     /// Sets the default code version to be used. This is then used by the slim routing layer to determine
@@ -91,7 +92,7 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required for adding a new curse.
     /// * `subject` - The subject to curse.
     pub fn curse(ctx: Context<Curse>, subject: CurseSubject) -> Result<()> {
-        router::admin(ctx.accounts.config.default_code_version).curse(ctx, subject)
+        router::admin(ctx.accounts.config_and_curses.default_code_version).curse(ctx, subject)
     }
 
     /// Uncurses an abstract subject. If the subject is CurseSubject::GLOBAL,
@@ -105,7 +106,7 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required for removing a curse.
     /// * `subject` - The subject to uncurse.
     pub fn uncurse(ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()> {
-        router::admin(ctx.accounts.config.default_code_version).uncurse(ctx, subject)
+        router::admin(ctx.accounts.config_and_curses.default_code_version).uncurse(ctx, subject)
     }
 
     /// Verifies that the subject is not cursed AND that this chain is not globally cursed.
@@ -117,7 +118,8 @@ pub mod rmn_remote {
     /// * `subject` - The subject to verify. Note that this instruction will revert if the chain
     ///   is globally cursed too, even if the provided subject is not explicitly cursed.
     pub fn verify_not_cursed(ctx: Context<InspectCurses>, subject: CurseSubject) -> Result<()> {
-        router::public(ctx.accounts.config.default_code_version).verify_not_cursed(ctx, subject)
+        router::public(ctx.accounts.config_and_curses.default_code_version)
+            .verify_not_cursed(ctx, subject)
     }
 
     /// Retrieves a list of cursed subjects. Note this function will not revert if there's an active
@@ -127,7 +129,7 @@ pub mod rmn_remote {
     ///
     /// * `ctx` - The context containing the accounts required to inspect curses.
     pub fn get_cursed_subjects(ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>> {
-        router::public(ctx.accounts.config.default_code_version).get_cursed_subjects(ctx)
+        router::public(ctx.accounts.config_and_curses.default_code_version).get_cursed_subjects(ctx)
     }
 }
 

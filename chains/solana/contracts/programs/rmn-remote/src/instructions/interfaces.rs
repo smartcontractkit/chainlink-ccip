@@ -11,7 +11,6 @@ pub trait Public {
 
 pub trait Admin {
     fn transfer_ownership(&self, ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()>;
-
     fn accept_ownership(&self, ctx: Context<AcceptOwnership>) -> Result<()>;
 
     fn set_default_code_version(

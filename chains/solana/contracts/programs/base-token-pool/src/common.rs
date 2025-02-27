@@ -435,8 +435,7 @@ pub fn validate_lock_or_burn<'info>(
     allow_list_enabled: bool,
     allow_list: &[Pubkey],
     rmn_remote: AccountInfo<'info>,
-    rmn_remote_curses: AccountInfo<'info>,
-    rmn_remote_config: AccountInfo<'info>,
+    rmn_remote_config_and_curses: AccountInfo<'info>,
 ) -> Result<()> {
     // validate token matches configured pool token
     require!(
@@ -451,8 +450,7 @@ pub fn validate_lock_or_burn<'info>(
 
     verify_uncursed_cpi(
         rmn_remote,
-        rmn_remote_config,
-        rmn_remote_curses,
+        rmn_remote_config_and_curses,
         lock_or_burn_in.remote_chain_selector,
     )?;
 
@@ -472,8 +470,7 @@ pub fn validate_release_or_mint<'info>(
     pool_addresses: &[RemoteAddress],
     inbound_rate_limit: &mut RateLimitTokenBucket,
     rmn_remote: AccountInfo<'info>,
-    rmn_remote_curses: AccountInfo<'info>,
-    rmn_remote_config: AccountInfo<'info>,
+    rmn_remote_config_and_curses: AccountInfo<'info>,
 ) -> Result<()> {
     require_eq!(
         config_mint,
@@ -489,8 +486,7 @@ pub fn validate_release_or_mint<'info>(
 
     verify_uncursed_cpi(
         rmn_remote,
-        rmn_remote_config,
-        rmn_remote_curses,
+        rmn_remote_config_and_curses,
         release_or_mint_in.remote_chain_selector,
     )?;
 
@@ -499,13 +495,11 @@ pub fn validate_release_or_mint<'info>(
 
 pub fn verify_uncursed_cpi<'info>(
     rmn_remote: AccountInfo<'info>,
-    rmn_remote_config: AccountInfo<'info>,
-    rmn_remote_curses: AccountInfo<'info>,
+    rmn_remote_config_and_curses: AccountInfo<'info>,
     chain_selector: u64,
 ) -> Result<()> {
     let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
-        config: rmn_remote_config,
-        curses: rmn_remote_curses,
+        config_and_curses: rmn_remote_config_and_curses,
     };
     let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
     rmn_remote::cpi::verify_not_cursed(

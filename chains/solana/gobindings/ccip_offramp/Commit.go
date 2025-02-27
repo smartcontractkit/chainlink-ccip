@@ -66,16 +66,14 @@ type Commit struct {
 	//
 	// [11] = [] rmnRemote
 	//
-	// [12] = [] rmnRemoteCurses
-	//
-	// [13] = [] rmnRemoteConfig
+	// [12] = [] rmnRemoteConfigAndCurses
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCommitInstructionBuilder creates a new `Commit` instruction builder.
 func NewCommitInstructionBuilder() *Commit {
 	nd := &Commit{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 14),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 13),
 	}
 	return nd
 }
@@ -244,26 +242,15 @@ func (inst *Commit) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[11]
 }
 
-// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
-func (inst *Commit) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *Commit {
-	inst.AccountMetaSlice[12] = ag_solanago.Meta(rmnRemoteCurses)
+// SetRmnRemoteConfigAndCursesAccount sets the "rmnRemoteConfigAndCurses" account.
+func (inst *Commit) SetRmnRemoteConfigAndCursesAccount(rmnRemoteConfigAndCurses ag_solanago.PublicKey) *Commit {
+	inst.AccountMetaSlice[12] = ag_solanago.Meta(rmnRemoteConfigAndCurses)
 	return inst
 }
 
-// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
-func (inst *Commit) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
+// GetRmnRemoteConfigAndCursesAccount gets the "rmnRemoteConfigAndCurses" account.
+func (inst *Commit) GetRmnRemoteConfigAndCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[12]
-}
-
-// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
-func (inst *Commit) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *Commit {
-	inst.AccountMetaSlice[13] = ag_solanago.Meta(rmnRemoteConfig)
-	return inst
-}
-
-// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
-func (inst *Commit) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[13]
 }
 
 func (inst Commit) Build() *Instruction {
@@ -342,10 +329,7 @@ func (inst *Commit) Validate() error {
 			return errors.New("accounts.RmnRemote is not set")
 		}
 		if inst.AccountMetaSlice[12] == nil {
-			return errors.New("accounts.RmnRemoteCurses is not set")
-		}
-		if inst.AccountMetaSlice[13] == nil {
-			return errors.New("accounts.RmnRemoteConfig is not set")
+			return errors.New("accounts.RmnRemoteConfigAndCurses is not set")
 		}
 	}
 	return nil
@@ -369,7 +353,7 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=14]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=13]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                      config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("          referenceAddresses", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("                 sourceChain", inst.AccountMetaSlice[2]))
@@ -382,8 +366,7 @@ func (inst *Commit) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("feeQuoterAllowedPriceUpdater", inst.AccountMetaSlice[9]))
 						accountsBranch.Child(ag_format.Meta("             feeQuoterConfig", inst.AccountMetaSlice[10]))
 						accountsBranch.Child(ag_format.Meta("                   rmnRemote", inst.AccountMetaSlice[11]))
-						accountsBranch.Child(ag_format.Meta("             rmnRemoteCurses", inst.AccountMetaSlice[12]))
-						accountsBranch.Child(ag_format.Meta("             rmnRemoteConfig", inst.AccountMetaSlice[13]))
+						accountsBranch.Child(ag_format.Meta("    rmnRemoteConfigAndCurses", inst.AccountMetaSlice[12]))
 					})
 				})
 		})
@@ -467,8 +450,7 @@ func NewCommitInstruction(
 	feeQuoterAllowedPriceUpdater ag_solanago.PublicKey,
 	feeQuoterConfig ag_solanago.PublicKey,
 	rmnRemote ag_solanago.PublicKey,
-	rmnRemoteCurses ag_solanago.PublicKey,
-	rmnRemoteConfig ag_solanago.PublicKey) *Commit {
+	rmnRemoteConfigAndCurses ag_solanago.PublicKey) *Commit {
 	return NewCommitInstructionBuilder().
 		SetReportContextByteWords(reportContextByteWords).
 		SetRawReport(rawReport).
@@ -487,6 +469,5 @@ func NewCommitInstruction(
 		SetFeeQuoterAllowedPriceUpdaterAccount(feeQuoterAllowedPriceUpdater).
 		SetFeeQuoterConfigAccount(feeQuoterConfig).
 		SetRmnRemoteAccount(rmnRemote).
-		SetRmnRemoteCursesAccount(rmnRemoteCurses).
-		SetRmnRemoteConfigAccount(rmnRemoteConfig)
+		SetRmnRemoteConfigAndCursesAccount(rmnRemoteConfigAndCurses)
 }

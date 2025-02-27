@@ -55,22 +55,18 @@ impl Display for CodeVersion {
 
 #[account]
 #[derive(InitSpace, Debug)]
-pub struct Config {
+pub struct ConfigAndCurses {
     pub version: u8,
     pub owner: Pubkey,
 
     pub proposed_owner: Pubkey,
     pub default_code_version: CodeVersion,
-}
 
-#[account]
-#[derive(InitSpace, Debug)]
-pub struct Curses {
     #[max_len(0)]
     pub cursed_subjects: Vec<CurseSubject>,
 }
 
-impl Curses {
+impl ConfigAndCurses {
     pub fn dynamic_len(&self) -> usize {
         Self::INIT_SPACE + self.cursed_subjects.len() * CurseSubject::INIT_SPACE
     }

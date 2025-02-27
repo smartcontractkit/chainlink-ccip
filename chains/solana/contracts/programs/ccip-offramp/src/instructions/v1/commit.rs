@@ -29,8 +29,7 @@ impl Commit for Impl {
 
         helpers::verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
-            ctx.accounts.rmn_remote_config.to_account_info(),
-            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
             source_chain.chain_selector,
         )?;
 
@@ -170,8 +169,7 @@ impl Commit for Impl {
 
         helpers::verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
-            ctx.accounts.rmn_remote_config.to_account_info(),
-            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
             // No merkle root, so there's no remote chain selector to check.
             // We pass zero to verify there's no global curse.
             0,
@@ -319,13 +317,11 @@ mod helpers {
 
     pub(super) fn verify_uncursed_cpi<'info>(
         rmn_remote: AccountInfo<'info>,
-        rmn_remote_config: AccountInfo<'info>,
-        rmn_remote_curses: AccountInfo<'info>,
+        rmn_remote_config_and_curses: AccountInfo<'info>,
         chain_selector: u64,
     ) -> Result<()> {
         let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
-            config: rmn_remote_config,
-            curses: rmn_remote_curses,
+            config_and_curses: rmn_remote_config_and_curses,
         };
         let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
         rmn_remote::cpi::verify_not_cursed(

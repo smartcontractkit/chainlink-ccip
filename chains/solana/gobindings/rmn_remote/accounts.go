@@ -8,18 +8,19 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Config struct {
+type ConfigAndCurses struct {
 	Version            uint8
 	Owner              ag_solanago.PublicKey
 	ProposedOwner      ag_solanago.PublicKey
 	DefaultCodeVersion CodeVersion
+	CursedSubjects     []CurseSubject
 }
 
-var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
+var ConfigAndCursesDiscriminator = [8]byte{30, 63, 90, 30, 82, 84, 129, 129}
 
-func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ConfigAndCurses) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ConfigDiscriminator[:], false)
+	err = encoder.WriteBytes(ConfigAndCursesDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -43,20 +44,25 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Serialize `CursedSubjects` param:
+	err = encoder.Encode(obj.CursedSubjects)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ConfigAndCurses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ConfigDiscriminator[:]) {
+		if !discriminator.Equal(ConfigAndCursesDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[155 12 170 224 30 250 204 130]",
+				"[30 63 90 30 82 84 129 129]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}
@@ -79,43 +85,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	err = decoder.Decode(&obj.DefaultCodeVersion)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-type Curses struct {
-	CursedSubjects []CurseSubject
-}
-
-var CursesDiscriminator = [8]byte{129, 28, 49, 58, 74, 237, 146, 202}
-
-func (obj Curses) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(CursesDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `CursedSubjects` param:
-	err = encoder.Encode(obj.CursedSubjects)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Curses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(CursesDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[129 28 49 58 74 237 146 202]",
-				fmt.Sprint(discriminator[:]))
-		}
 	}
 	// Deserialize `CursedSubjects`:
 	err = decoder.Decode(&obj.CursedSubjects)

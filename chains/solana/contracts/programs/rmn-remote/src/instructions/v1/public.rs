@@ -10,7 +10,7 @@ impl Public for Impl {
         ctx: Context<InspectCurses>,
         subject: CurseSubject,
     ) -> Result<()> {
-        let curses = &ctx.accounts.curses;
+        let curses = &ctx.accounts.config_and_curses;
         require!(
             !curses.is_chain_globally_cursed(),
             RmnRemoteError::GloballyCursed
@@ -23,6 +23,6 @@ impl Public for Impl {
     }
 
     fn get_cursed_subjects(&self, ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>> {
-        Ok(ctx.accounts.curses.cursed_subjects.clone())
+        Ok(ctx.accounts.config_and_curses.cursed_subjects.clone())
     }
 }

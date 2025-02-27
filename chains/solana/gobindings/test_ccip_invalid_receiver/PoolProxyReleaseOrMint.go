@@ -44,13 +44,10 @@ type PoolProxyReleaseOrMint struct {
 	// [10] = [] rmnRemote
 	// ··········· CHECK
 	//
-	// [11] = [] rmnRemoteCurses
+	// [11] = [] rmnRemoteConfigAndCurses
 	// ··········· CHECK
 	//
-	// [12] = [] rmnRemoteConfig
-	// ··········· CHECK
-	//
-	// [13] = [WRITE] receiverTokenAccount
+	// [12] = [WRITE] receiverTokenAccount
 	// ··········· CHECK
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
@@ -58,7 +55,7 @@ type PoolProxyReleaseOrMint struct {
 // NewPoolProxyReleaseOrMintInstructionBuilder creates a new `PoolProxyReleaseOrMint` instruction builder.
 func NewPoolProxyReleaseOrMintInstructionBuilder() *PoolProxyReleaseOrMint {
 	nd := &PoolProxyReleaseOrMint{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 14),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 13),
 	}
 	return nd
 }
@@ -206,43 +203,30 @@ func (inst *PoolProxyReleaseOrMint) GetRmnRemoteAccount() *ag_solanago.AccountMe
 	return inst.AccountMetaSlice[10]
 }
 
-// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
+// SetRmnRemoteConfigAndCursesAccount sets the "rmnRemoteConfigAndCurses" account.
 // CHECK
-func (inst *PoolProxyReleaseOrMint) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(rmnRemoteCurses)
+func (inst *PoolProxyReleaseOrMint) SetRmnRemoteConfigAndCursesAccount(rmnRemoteConfigAndCurses ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
+	inst.AccountMetaSlice[11] = ag_solanago.Meta(rmnRemoteConfigAndCurses)
 	return inst
 }
 
-// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
+// GetRmnRemoteConfigAndCursesAccount gets the "rmnRemoteConfigAndCurses" account.
 // CHECK
-func (inst *PoolProxyReleaseOrMint) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
+func (inst *PoolProxyReleaseOrMint) GetRmnRemoteConfigAndCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[11]
-}
-
-// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
-// CHECK
-func (inst *PoolProxyReleaseOrMint) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
-	inst.AccountMetaSlice[12] = ag_solanago.Meta(rmnRemoteConfig)
-	return inst
-}
-
-// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
-// CHECK
-func (inst *PoolProxyReleaseOrMint) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[12]
 }
 
 // SetReceiverTokenAccountAccount sets the "receiverTokenAccount" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) SetReceiverTokenAccountAccount(receiverTokenAccount ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
-	inst.AccountMetaSlice[13] = ag_solanago.Meta(receiverTokenAccount).WRITE()
+	inst.AccountMetaSlice[12] = ag_solanago.Meta(receiverTokenAccount).WRITE()
 	return inst
 }
 
 // GetReceiverTokenAccountAccount gets the "receiverTokenAccount" account.
 // CHECK
 func (inst *PoolProxyReleaseOrMint) GetReceiverTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[13]
+	return inst.AccountMetaSlice[12]
 }
 
 func (inst PoolProxyReleaseOrMint) Build() *Instruction {
@@ -306,12 +290,9 @@ func (inst *PoolProxyReleaseOrMint) Validate() error {
 			return errors.New("accounts.RmnRemote is not set")
 		}
 		if inst.AccountMetaSlice[11] == nil {
-			return errors.New("accounts.RmnRemoteCurses is not set")
+			return errors.New("accounts.RmnRemoteConfigAndCurses is not set")
 		}
 		if inst.AccountMetaSlice[12] == nil {
-			return errors.New("accounts.RmnRemoteConfig is not set")
-		}
-		if inst.AccountMetaSlice[13] == nil {
 			return errors.New("accounts.ReceiverTokenAccount is not set")
 		}
 	}
@@ -332,21 +313,20 @@ func (inst *PoolProxyReleaseOrMint) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=14]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       testPool", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("      cpiSigner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta(" offrampProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta(" allowedOfframp", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("          state", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("   tokenProgram", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("           mint", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("     poolSigner", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("      poolToken", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("    chainConfig", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("      rmnRemote", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("rmnRemoteCurses", inst.AccountMetaSlice[11]))
-						accountsBranch.Child(ag_format.Meta("rmnRemoteConfig", inst.AccountMetaSlice[12]))
-						accountsBranch.Child(ag_format.Meta("  receiverToken", inst.AccountMetaSlice[13]))
+					instructionBranch.Child("Accounts[len=13]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("                testPool", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("               cpiSigner", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("          offrampProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("          allowedOfframp", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("                   state", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("            tokenProgram", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("                    mint", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("              poolSigner", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("               poolToken", inst.AccountMetaSlice[8]))
+						accountsBranch.Child(ag_format.Meta("             chainConfig", inst.AccountMetaSlice[9]))
+						accountsBranch.Child(ag_format.Meta("               rmnRemote", inst.AccountMetaSlice[10]))
+						accountsBranch.Child(ag_format.Meta("rmnRemoteConfigAndCurses", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("           receiverToken", inst.AccountMetaSlice[12]))
 					})
 				})
 		})
@@ -385,8 +365,7 @@ func NewPoolProxyReleaseOrMintInstruction(
 	poolTokenAccount ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
 	rmnRemote ag_solanago.PublicKey,
-	rmnRemoteCurses ag_solanago.PublicKey,
-	rmnRemoteConfig ag_solanago.PublicKey,
+	rmnRemoteConfigAndCurses ag_solanago.PublicKey,
 	receiverTokenAccount ag_solanago.PublicKey) *PoolProxyReleaseOrMint {
 	return NewPoolProxyReleaseOrMintInstructionBuilder().
 		SetReleaseOrMint(releaseOrMint).
@@ -401,7 +380,6 @@ func NewPoolProxyReleaseOrMintInstruction(
 		SetPoolTokenAccountAccount(poolTokenAccount).
 		SetChainConfigAccount(chainConfig).
 		SetRmnRemoteAccount(rmnRemote).
-		SetRmnRemoteCursesAccount(rmnRemoteCurses).
-		SetRmnRemoteConfigAccount(rmnRemoteConfig).
+		SetRmnRemoteConfigAndCursesAccount(rmnRemoteConfigAndCurses).
 		SetReceiverTokenAccountAccount(receiverTokenAccount)
 }

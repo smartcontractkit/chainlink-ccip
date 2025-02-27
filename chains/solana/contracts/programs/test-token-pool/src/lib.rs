@@ -135,8 +135,7 @@ pub mod test_token_pool {
             &remote.pool_addresses,
             inbound_rate_limit,
             ctx.accounts.rmn_remote.to_account_info(),
-            ctx.accounts.rmn_remote_curses.to_account_info(),
-            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
         )?;
 
         match ctx.accounts.state.pool_type {
@@ -226,8 +225,7 @@ pub mod test_token_pool {
             ctx.accounts.state.config.list_enabled,
             &ctx.accounts.state.config.allow_list,
             ctx.accounts.rmn_remote.to_account_info(),
-            ctx.accounts.rmn_remote_curses.to_account_info(),
-            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
         )?;
 
         match ctx.accounts.state.pool_type {

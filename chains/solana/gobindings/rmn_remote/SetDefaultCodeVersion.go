@@ -24,16 +24,14 @@ type SetDefaultCodeVersion struct {
 
 	// [0] = [WRITE] config
 	//
-	// [1] = [] cursed
-	//
-	// [2] = [SIGNER] authority
+	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetDefaultCodeVersionInstructionBuilder creates a new `SetDefaultCodeVersion` instruction builder.
 func NewSetDefaultCodeVersionInstructionBuilder() *SetDefaultCodeVersion {
 	nd := &SetDefaultCodeVersion{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
@@ -55,26 +53,15 @@ func (inst *SetDefaultCodeVersion) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-// SetCursedAccount sets the "cursed" account.
-func (inst *SetDefaultCodeVersion) SetCursedAccount(cursed ag_solanago.PublicKey) *SetDefaultCodeVersion {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(cursed)
-	return inst
-}
-
-// GetCursedAccount gets the "cursed" account.
-func (inst *SetDefaultCodeVersion) GetCursedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
-}
-
 // SetAuthorityAccount sets the "authority" account.
 func (inst *SetDefaultCodeVersion) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetDefaultCodeVersion {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetDefaultCodeVersion) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[1]
 }
 
 func (inst SetDefaultCodeVersion) Build() *Instruction {
@@ -108,9 +95,6 @@ func (inst *SetDefaultCodeVersion) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Cursed is not set")
-		}
-		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -131,10 +115,9 @@ func (inst *SetDefaultCodeVersion) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   cursed", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
@@ -163,11 +146,9 @@ func NewSetDefaultCodeVersionInstruction(
 	codeVersion CodeVersion,
 	// Accounts:
 	config ag_solanago.PublicKey,
-	cursed ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetDefaultCodeVersion {
 	return NewSetDefaultCodeVersionInstructionBuilder().
 		SetCodeVersion(codeVersion).
 		SetConfigAccount(config).
-		SetCursedAccount(cursed).
 		SetAuthorityAccount(authority)
 }

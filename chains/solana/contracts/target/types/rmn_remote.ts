@@ -15,12 +15,7 @@ export type RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "curses",
+          "name": "configAndCurses",
           "isMut": true,
           "isSigner": false
         },
@@ -66,11 +61,6 @@ export type RmnRemote = {
           "isSigner": false
         },
         {
-          "name": "cursed",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -97,7 +87,7 @@ export type RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "config",
+          "name": "configAndCurses",
           "isMut": true,
           "isSigner": false
         },
@@ -126,11 +116,6 @@ export type RmnRemote = {
         {
           "name": "config",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "cursed",
-          "isMut": false,
           "isSigner": false
         },
         {
@@ -163,17 +148,12 @@ export type RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
         },
         {
-          "name": "curses",
+          "name": "configAndCurses",
           "isMut": true,
           "isSigner": false
         },
@@ -208,17 +188,12 @@ export type RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
         },
         {
-          "name": "curses",
+          "name": "configAndCurses",
           "isMut": true,
           "isSigner": false
         },
@@ -251,12 +226,7 @@ export type RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
+          "name": "configAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -282,12 +252,7 @@ export type RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
+          "name": "configAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -302,7 +267,7 @@ export type RmnRemote = {
   ],
   "accounts": [
     {
-      "name": "config",
+      "name": "configAndCurses",
       "type": {
         "kind": "struct",
         "fields": [
@@ -323,15 +288,7 @@ export type RmnRemote = {
             "type": {
               "defined": "CodeVersion"
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "curses",
-      "type": {
-        "kind": "struct",
-        "fields": [
+          },
           {
             "name": "cursedSubjects",
             "type": {
@@ -515,12 +472,7 @@ export const IDL: RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "curses",
+          "name": "configAndCurses",
           "isMut": true,
           "isSigner": false
         },
@@ -566,11 +518,6 @@ export const IDL: RmnRemote = {
           "isSigner": false
         },
         {
-          "name": "cursed",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -597,7 +544,7 @@ export const IDL: RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "config",
+          "name": "configAndCurses",
           "isMut": true,
           "isSigner": false
         },
@@ -626,11 +573,6 @@ export const IDL: RmnRemote = {
         {
           "name": "config",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "cursed",
-          "isMut": false,
           "isSigner": false
         },
         {
@@ -663,17 +605,12 @@ export const IDL: RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
         },
         {
-          "name": "curses",
+          "name": "configAndCurses",
           "isMut": true,
           "isSigner": false
         },
@@ -708,17 +645,12 @@ export const IDL: RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
         },
         {
-          "name": "curses",
+          "name": "configAndCurses",
           "isMut": true,
           "isSigner": false
         },
@@ -751,12 +683,7 @@ export const IDL: RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
+          "name": "configAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -782,12 +709,7 @@ export const IDL: RmnRemote = {
       ],
       "accounts": [
         {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
+          "name": "configAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -802,7 +724,7 @@ export const IDL: RmnRemote = {
   ],
   "accounts": [
     {
-      "name": "config",
+      "name": "configAndCurses",
       "type": {
         "kind": "struct",
         "fields": [
@@ -823,15 +745,7 @@ export const IDL: RmnRemote = {
             "type": {
               "defined": "CodeVersion"
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "curses",
-      "type": {
-        "kind": "struct",
-        "fields": [
+          },
           {
             "name": "cursedSubjects",
             "type": {

@@ -141,12 +141,7 @@ export type ExampleCcipSender = {
           "isSigner": false
         },
         {
-          "name": "ccipRmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ccipRmnRemoteConfig",
+          "name": "ccipRmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },
@@ -618,12 +613,7 @@ export const IDL: ExampleCcipSender = {
           "isSigner": false
         },
         {
-          "name": "ccipRmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ccipRmnRemoteConfig",
+          "name": "ccipRmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },

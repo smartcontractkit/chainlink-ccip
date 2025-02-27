@@ -56,16 +56,14 @@ type CommitPriceOnly struct {
 	//
 	// [9] = [] rmnRemote
 	//
-	// [10] = [] rmnRemoteCurses
-	//
-	// [11] = [] rmnRemoteConfig
+	// [10] = [] rmnRemoteConfigAndCurses
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCommitPriceOnlyInstructionBuilder creates a new `CommitPriceOnly` instruction builder.
 func NewCommitPriceOnlyInstructionBuilder() *CommitPriceOnly {
 	nd := &CommitPriceOnly{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 12),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 11),
 	}
 	return nd
 }
@@ -212,26 +210,15 @@ func (inst *CommitPriceOnly) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[9]
 }
 
-// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
-func (inst *CommitPriceOnly) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *CommitPriceOnly {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(rmnRemoteCurses)
+// SetRmnRemoteConfigAndCursesAccount sets the "rmnRemoteConfigAndCurses" account.
+func (inst *CommitPriceOnly) SetRmnRemoteConfigAndCursesAccount(rmnRemoteConfigAndCurses ag_solanago.PublicKey) *CommitPriceOnly {
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(rmnRemoteConfigAndCurses)
 	return inst
 }
 
-// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
-func (inst *CommitPriceOnly) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
+// GetRmnRemoteConfigAndCursesAccount gets the "rmnRemoteConfigAndCurses" account.
+func (inst *CommitPriceOnly) GetRmnRemoteConfigAndCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[10]
-}
-
-// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
-func (inst *CommitPriceOnly) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *CommitPriceOnly {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(rmnRemoteConfig)
-	return inst
-}
-
-// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
-func (inst *CommitPriceOnly) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
 }
 
 func (inst CommitPriceOnly) Build() *Instruction {
@@ -304,10 +291,7 @@ func (inst *CommitPriceOnly) Validate() error {
 			return errors.New("accounts.RmnRemote is not set")
 		}
 		if inst.AccountMetaSlice[10] == nil {
-			return errors.New("accounts.RmnRemoteCurses is not set")
-		}
-		if inst.AccountMetaSlice[11] == nil {
-			return errors.New("accounts.RmnRemoteConfig is not set")
+			return errors.New("accounts.RmnRemoteConfigAndCurses is not set")
 		}
 	}
 	return nil
@@ -331,7 +315,7 @@ func (inst *CommitPriceOnly) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=12]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=11]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                      config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("          referenceAddresses", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("                   authority", inst.AccountMetaSlice[2]))
@@ -342,8 +326,7 @@ func (inst *CommitPriceOnly) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("feeQuoterAllowedPriceUpdater", inst.AccountMetaSlice[7]))
 						accountsBranch.Child(ag_format.Meta("             feeQuoterConfig", inst.AccountMetaSlice[8]))
 						accountsBranch.Child(ag_format.Meta("                   rmnRemote", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("             rmnRemoteCurses", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("             rmnRemoteConfig", inst.AccountMetaSlice[11]))
+						accountsBranch.Child(ag_format.Meta("    rmnRemoteConfigAndCurses", inst.AccountMetaSlice[10]))
 					})
 				})
 		})
@@ -425,8 +408,7 @@ func NewCommitPriceOnlyInstruction(
 	feeQuoterAllowedPriceUpdater ag_solanago.PublicKey,
 	feeQuoterConfig ag_solanago.PublicKey,
 	rmnRemote ag_solanago.PublicKey,
-	rmnRemoteCurses ag_solanago.PublicKey,
-	rmnRemoteConfig ag_solanago.PublicKey) *CommitPriceOnly {
+	rmnRemoteConfigAndCurses ag_solanago.PublicKey) *CommitPriceOnly {
 	return NewCommitPriceOnlyInstructionBuilder().
 		SetReportContextByteWords(reportContextByteWords).
 		SetRawReport(rawReport).
@@ -443,6 +425,5 @@ func NewCommitPriceOnlyInstruction(
 		SetFeeQuoterAllowedPriceUpdaterAccount(feeQuoterAllowedPriceUpdater).
 		SetFeeQuoterConfigAccount(feeQuoterConfig).
 		SetRmnRemoteAccount(rmnRemote).
-		SetRmnRemoteCursesAccount(rmnRemoteCurses).
-		SetRmnRemoteConfigAccount(rmnRemoteConfig)
+		SetRmnRemoteConfigAndCursesAccount(rmnRemoteConfigAndCurses)
 }

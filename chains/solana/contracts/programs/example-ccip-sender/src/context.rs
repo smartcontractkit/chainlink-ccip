@@ -100,9 +100,7 @@ pub struct CcipSend<'info> {
     /// CHECK: validated during CPI
     pub ccip_rmn_remote: UncheckedAccount<'info>,
     /// CHECK: validated during CPI
-    pub ccip_rmn_remote_curses: UncheckedAccount<'info>,
-    /// CHECK: validated during CPI
-    pub ccip_rmn_remote_config: UncheckedAccount<'info>,
+    pub ccip_rmn_remote_config_and_curses: UncheckedAccount<'info>,
     #[account(mut)]
     /// CHECK: validated during CPI
     pub ccip_token_pools_signer: UncheckedAccount<'info>,

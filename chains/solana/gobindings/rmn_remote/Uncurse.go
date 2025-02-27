@@ -23,20 +23,18 @@ import (
 type Uncurse struct {
 	Subject *CurseSubject
 
-	// [0] = [] config
+	// [0] = [WRITE, SIGNER] authority
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [WRITE] configAndCurses
 	//
-	// [2] = [WRITE] curses
-	//
-	// [3] = [] systemProgram
+	// [2] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewUncurseInstructionBuilder creates a new `Uncurse` instruction builder.
 func NewUncurseInstructionBuilder() *Uncurse {
 	nd := &Uncurse{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -47,48 +45,37 @@ func (inst *Uncurse) SetSubject(subject CurseSubject) *Uncurse {
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *Uncurse) SetConfigAccount(config ag_solanago.PublicKey) *Uncurse {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
-	return inst
-}
-
-// GetConfigAccount gets the "config" account.
-func (inst *Uncurse) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
 // SetAuthorityAccount sets the "authority" account.
 func (inst *Uncurse) SetAuthorityAccount(authority ag_solanago.PublicKey) *Uncurse {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Uncurse) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[0]
 }
 
-// SetCursesAccount sets the "curses" account.
-func (inst *Uncurse) SetCursesAccount(curses ag_solanago.PublicKey) *Uncurse {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(curses).WRITE()
+// SetConfigAndCursesAccount sets the "configAndCurses" account.
+func (inst *Uncurse) SetConfigAndCursesAccount(configAndCurses ag_solanago.PublicKey) *Uncurse {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(configAndCurses).WRITE()
 	return inst
 }
 
-// GetCursesAccount gets the "curses" account.
-func (inst *Uncurse) GetCursesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+// GetConfigAndCursesAccount gets the "configAndCurses" account.
+func (inst *Uncurse) GetConfigAndCursesAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Uncurse) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Uncurse {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Uncurse) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst Uncurse) Build() *Instruction {
@@ -119,15 +106,12 @@ func (inst *Uncurse) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
-		}
-		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
-		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Curses is not set")
+		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.ConfigAndCurses is not set")
 		}
-		if inst.AccountMetaSlice[3] == nil {
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -148,11 +132,10 @@ func (inst *Uncurse) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("       curses", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("configAndCurses", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("  systemProgram", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -180,14 +163,12 @@ func NewUncurseInstruction(
 	// Parameters:
 	subject CurseSubject,
 	// Accounts:
-	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	curses ag_solanago.PublicKey,
+	configAndCurses ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Uncurse {
 	return NewUncurseInstructionBuilder().
 		SetSubject(subject).
-		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
-		SetCursesAccount(curses).
+		SetConfigAndCursesAccount(configAndCurses).
 		SetSystemProgramAccount(systemProgram)
 }

@@ -187,8 +187,7 @@ impl OnRamp for Impl {
                     current_token_accounts.pool_signer.to_account_info(),
                     current_token_accounts.pool_token_account.to_account_info(),
                     ctx.accounts.rmn_remote.to_account_info(),
-                    ctx.accounts.rmn_remote_curses.to_account_info(),
-                    ctx.accounts.rmn_remote_config.to_account_info(),
+                    ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
                     current_token_accounts.pool_chain_config.to_account_info(),
                 ]);
                 acc_infos.extend_from_slice(current_token_accounts.remaining_accounts);
@@ -237,8 +236,7 @@ mod helpers {
     ) -> Result<()> {
         let cpi_program = ctx.accounts.rmn_remote.to_account_info();
         let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
-            config: ctx.accounts.rmn_remote_config.to_account_info(),
-            curses: ctx.accounts.rmn_remote_curses.to_account_info(),
+            config_and_curses: ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
         };
         let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
         rmn_remote::cpi::verify_not_cursed(

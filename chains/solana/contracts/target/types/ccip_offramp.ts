@@ -624,12 +624,7 @@ export type CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -763,12 +758,7 @@ export type CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -917,12 +907,7 @@ export type CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -1034,12 +1019,7 @@ export type CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -2921,12 +2901,7 @@ export const IDL: CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -3060,12 +3035,7 @@ export const IDL: CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -3214,12 +3184,7 @@ export const IDL: CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         }
@@ -3331,12 +3296,7 @@ export const IDL: CcipOfframp = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         }

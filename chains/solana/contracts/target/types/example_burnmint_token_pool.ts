@@ -419,12 +419,7 @@ export type ExampleBurnmintTokenPool = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },
@@ -485,12 +480,7 @@ export type ExampleBurnmintTokenPool = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },
@@ -970,12 +960,7 @@ export const IDL: ExampleBurnmintTokenPool = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },
@@ -1036,12 +1021,7 @@ export const IDL: ExampleBurnmintTokenPool = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },

@@ -141,12 +141,7 @@
           "isSigner": false
         },
         {
-          "name": "ccipRmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ccipRmnRemoteConfig",
+          "name": "ccipRmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },

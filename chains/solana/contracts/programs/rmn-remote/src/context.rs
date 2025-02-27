@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{program::RmnRemote, Config, CurseSubject, Curses, RmnRemoteError};
+use crate::{program::RmnRemote, ConfigAndCurses, CurseSubject, RmnRemoteError};
 
 /// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -20,29 +20,19 @@ pub fn uninitialized(v: u8) -> bool {
 pub const MAX_CONFIG_V: u8 = 1;
 
 pub mod seed {
-    pub const CONFIG: &[u8] = b"config";
-    pub const CURSES: &[u8] = b"curses";
+    pub const CONFIG_AND_CURSES: &[u8] = b"config_and_curses";
 }
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(
         init,
-        seeds = [seed::CONFIG],
+        seeds = [seed::CONFIG_AND_CURSES],
         bump,
         payer = authority,
-        space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
+        space = ANCHOR_DISCRIMINATOR + ConfigAndCurses::INIT_SPACE,
     )]
-    pub config: Account<'info, Config>,
-
-    #[account(
-        init,
-        seeds = [seed::CURSES],
-        bump,
-        payer = authority,
-        space = ANCHOR_DISCRIMINATOR + Curses::INIT_SPACE,
-    )]
-    pub curses: Account<'info, Curses>,
+    pub config_and_curses: Account<'info, ConfigAndCurses>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -57,21 +47,16 @@ pub struct Initialize<'info> {
     pub program_data: Account<'info, ProgramData>,
 }
 
+// No realloc, so curses may not be modified.
 #[derive(Accounts)]
 pub struct UpdateConfig<'info> {
     #[account(
         mut,
-        seeds = [seed::CONFIG],
+        seeds = [seed::CONFIG_AND_CURSES],
         bump,
         constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
-    pub config: Account<'info, Config>,
-
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-    )]
-    pub cursed: Account<'info, Curses>,
+    pub config: Account<'info, ConfigAndCurses>,
 
     // validate signer is registered admin
     #[account(address = config.owner @ RmnRemoteError::Unauthorized)]
@@ -82,65 +67,53 @@ pub struct UpdateConfig<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
-        seeds = [seed::CONFIG],
+        seeds = [seed::CONFIG_AND_CURSES],
         bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
+        constraint = valid_version(config_and_curses.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
-    pub config: Account<'info, Config>,
+    pub config_and_curses: Account<'info, ConfigAndCurses>,
 
     // validate signer is the new admin, accepting ownership of the contract
-    #[account(address = config.proposed_owner @ RmnRemoteError::Unauthorized)]
+    #[account(address = config_and_curses.proposed_owner @ RmnRemoteError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct Curse<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
-    )]
-    pub config: Account<'info, Config>,
-
     // validate signer is registered admin
-    #[account(mut, address = config.owner @ RmnRemoteError::Unauthorized)]
+    #[account(mut, address = config_and_curses.owner @ RmnRemoteError::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(
         mut,
-        seeds = [seed::CURSES],
+        seeds = [seed::CONFIG_AND_CURSES],
         bump,
-        realloc = ANCHOR_DISCRIMINATOR + curses.dynamic_len() + CurseSubject::INIT_SPACE,
+        realloc = ANCHOR_DISCRIMINATOR + config_and_curses.dynamic_len() + CurseSubject::INIT_SPACE,
         realloc::payer = authority,
         realloc::zero = false,
+        constraint = valid_version(config_and_curses.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
-    pub curses: Account<'info, Curses>,
+    pub config_and_curses: Account<'info, ConfigAndCurses>,
 
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct Uncurse<'info> {
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
-    )]
-    pub config: Account<'info, Config>,
-
     // validate signer is registered admin
-    #[account(mut, address = config.owner @ RmnRemoteError::Unauthorized)]
+    #[account(mut, address = config_and_curses.owner @ RmnRemoteError::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(
         mut,
-        seeds = [seed::CURSES],
+        seeds = [seed::CONFIG_AND_CURSES],
         bump,
-        realloc = (ANCHOR_DISCRIMINATOR + curses.dynamic_len()).saturating_sub(CurseSubject::INIT_SPACE),
+        realloc = (ANCHOR_DISCRIMINATOR + config_and_curses.dynamic_len()).saturating_sub(CurseSubject::INIT_SPACE),
         realloc::payer = authority,
         realloc::zero = false,
+        constraint = valid_version(config_and_curses.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
     )]
-    pub curses: Account<'info, Curses>,
+    pub config_and_curses: Account<'info, ConfigAndCurses>,
 
     pub system_program: Program<'info, System>,
 }
@@ -148,15 +121,8 @@ pub struct Uncurse<'info> {
 #[derive(Accounts)]
 pub struct InspectCurses<'info> {
     #[account(
-        seeds = [seed::CURSES],
+        seeds = [seed::CONFIG_AND_CURSES],
         bump,
     )]
-    pub curses: Account<'info, Curses>,
-
-    #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.version, MAX_CONFIG_V) @ RmnRemoteError::InvalidVersion,
-    )]
-    pub config: Account<'info, Config>,
+    pub config_and_curses: Account<'info, ConfigAndCurses>,
 }

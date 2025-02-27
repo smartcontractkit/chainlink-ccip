@@ -18,40 +18,27 @@ import (
 // * `ctx` - The context containing the accounts required to inspect curses.
 type GetCursedSubjects struct {
 
-	// [0] = [] curses
-	//
-	// [1] = [] config
+	// [0] = [] configAndCurses
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewGetCursedSubjectsInstructionBuilder creates a new `GetCursedSubjects` instruction builder.
 func NewGetCursedSubjectsInstructionBuilder() *GetCursedSubjects {
 	nd := &GetCursedSubjects{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 1),
 	}
 	return nd
 }
 
-// SetCursesAccount sets the "curses" account.
-func (inst *GetCursedSubjects) SetCursesAccount(curses ag_solanago.PublicKey) *GetCursedSubjects {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(curses)
+// SetConfigAndCursesAccount sets the "configAndCurses" account.
+func (inst *GetCursedSubjects) SetConfigAndCursesAccount(configAndCurses ag_solanago.PublicKey) *GetCursedSubjects {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(configAndCurses)
 	return inst
 }
 
-// GetCursesAccount gets the "curses" account.
-func (inst *GetCursedSubjects) GetCursesAccount() *ag_solanago.AccountMeta {
+// GetConfigAndCursesAccount gets the "configAndCurses" account.
+func (inst *GetCursedSubjects) GetConfigAndCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
-}
-
-// SetConfigAccount sets the "config" account.
-func (inst *GetCursedSubjects) SetConfigAccount(config ag_solanago.PublicKey) *GetCursedSubjects {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
-	return inst
-}
-
-// GetConfigAccount gets the "config" account.
-func (inst *GetCursedSubjects) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
 }
 
 func (inst GetCursedSubjects) Build() *Instruction {
@@ -75,10 +62,7 @@ func (inst *GetCursedSubjects) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Curses is not set")
-		}
-		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.ConfigAndCurses is not set")
 		}
 	}
 	return nil
@@ -96,9 +80,8 @@ func (inst *GetCursedSubjects) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("curses", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("config", inst.AccountMetaSlice[1]))
+					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("configAndCurses", inst.AccountMetaSlice[0]))
 					})
 				})
 		})
@@ -114,9 +97,7 @@ func (obj *GetCursedSubjects) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 // NewGetCursedSubjectsInstruction declares a new GetCursedSubjects instruction with the provided parameters and accounts.
 func NewGetCursedSubjectsInstruction(
 	// Accounts:
-	curses ag_solanago.PublicKey,
-	config ag_solanago.PublicKey) *GetCursedSubjects {
+	configAndCurses ag_solanago.PublicKey) *GetCursedSubjects {
 	return NewGetCursedSubjectsInstructionBuilder().
-		SetCursesAccount(curses).
-		SetConfigAccount(config)
+		SetConfigAndCursesAccount(configAndCurses)
 }

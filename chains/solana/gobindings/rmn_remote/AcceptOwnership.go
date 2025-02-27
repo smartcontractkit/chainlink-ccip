@@ -20,7 +20,7 @@ import (
 // The new owner must be a signer of the transaction.
 type AcceptOwnership struct {
 
-	// [0] = [WRITE] config
+	// [0] = [WRITE] configAndCurses
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -34,14 +34,14 @@ func NewAcceptOwnershipInstructionBuilder() *AcceptOwnership {
 	return nd
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *AcceptOwnership) SetConfigAccount(config ag_solanago.PublicKey) *AcceptOwnership {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
+// SetConfigAndCursesAccount sets the "configAndCurses" account.
+func (inst *AcceptOwnership) SetConfigAndCursesAccount(configAndCurses ag_solanago.PublicKey) *AcceptOwnership {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(configAndCurses).WRITE()
 	return inst
 }
 
-// GetConfigAccount gets the "config" account.
-func (inst *AcceptOwnership) GetConfigAccount() *ag_solanago.AccountMeta {
+// GetConfigAndCursesAccount gets the "configAndCurses" account.
+func (inst *AcceptOwnership) GetConfigAndCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -77,7 +77,7 @@ func (inst *AcceptOwnership) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.ConfigAndCurses is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -99,8 +99,8 @@ func (inst *AcceptOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("configAndCurses", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
@@ -116,9 +116,9 @@ func (obj *AcceptOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewAcceptOwnershipInstruction declares a new AcceptOwnership instruction with the provided parameters and accounts.
 func NewAcceptOwnershipInstruction(
 	// Accounts:
-	config ag_solanago.PublicKey,
+	configAndCurses ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AcceptOwnership {
 	return NewAcceptOwnershipInstructionBuilder().
-		SetConfigAccount(config).
+		SetConfigAndCursesAccount(configAndCurses).
 		SetAuthorityAccount(authority)
 }

@@ -419,12 +419,7 @@
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },
@@ -485,12 +480,7 @@
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },

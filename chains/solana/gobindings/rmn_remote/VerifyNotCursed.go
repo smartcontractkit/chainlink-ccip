@@ -21,16 +21,14 @@ import (
 type VerifyNotCursed struct {
 	Subject *CurseSubject
 
-	// [0] = [] curses
-	//
-	// [1] = [] config
+	// [0] = [] configAndCurses
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewVerifyNotCursedInstructionBuilder creates a new `VerifyNotCursed` instruction builder.
 func NewVerifyNotCursedInstructionBuilder() *VerifyNotCursed {
 	nd := &VerifyNotCursed{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 1),
 	}
 	return nd
 }
@@ -41,26 +39,15 @@ func (inst *VerifyNotCursed) SetSubject(subject CurseSubject) *VerifyNotCursed {
 	return inst
 }
 
-// SetCursesAccount sets the "curses" account.
-func (inst *VerifyNotCursed) SetCursesAccount(curses ag_solanago.PublicKey) *VerifyNotCursed {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(curses)
+// SetConfigAndCursesAccount sets the "configAndCurses" account.
+func (inst *VerifyNotCursed) SetConfigAndCursesAccount(configAndCurses ag_solanago.PublicKey) *VerifyNotCursed {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(configAndCurses)
 	return inst
 }
 
-// GetCursesAccount gets the "curses" account.
-func (inst *VerifyNotCursed) GetCursesAccount() *ag_solanago.AccountMeta {
+// GetConfigAndCursesAccount gets the "configAndCurses" account.
+func (inst *VerifyNotCursed) GetConfigAndCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
-}
-
-// SetConfigAccount sets the "config" account.
-func (inst *VerifyNotCursed) SetConfigAccount(config ag_solanago.PublicKey) *VerifyNotCursed {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
-	return inst
-}
-
-// GetConfigAccount gets the "config" account.
-func (inst *VerifyNotCursed) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
 }
 
 func (inst VerifyNotCursed) Build() *Instruction {
@@ -91,10 +78,7 @@ func (inst *VerifyNotCursed) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Curses is not set")
-		}
-		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.ConfigAndCurses is not set")
 		}
 	}
 	return nil
@@ -114,9 +98,8 @@ func (inst *VerifyNotCursed) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("curses", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("config", inst.AccountMetaSlice[1]))
+					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("configAndCurses", inst.AccountMetaSlice[0]))
 					})
 				})
 		})
@@ -144,10 +127,8 @@ func NewVerifyNotCursedInstruction(
 	// Parameters:
 	subject CurseSubject,
 	// Accounts:
-	curses ag_solanago.PublicKey,
-	config ag_solanago.PublicKey) *VerifyNotCursed {
+	configAndCurses ag_solanago.PublicKey) *VerifyNotCursed {
 	return NewVerifyNotCursedInstructionBuilder().
 		SetSubject(subject).
-		SetCursesAccount(curses).
-		SetConfigAccount(config)
+		SetConfigAndCursesAccount(configAndCurses)
 }

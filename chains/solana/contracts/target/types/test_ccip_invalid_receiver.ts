@@ -161,15 +161,7 @@ export type TestCcipInvalidReceiver = {
           ]
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -257,15 +249,7 @@ export type TestCcipInvalidReceiver = {
           ]
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -621,15 +605,7 @@ export const IDL: TestCcipInvalidReceiver = {
           ]
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -717,15 +693,7 @@ export const IDL: TestCcipInvalidReceiver = {
           ]
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false,
           "docs": [

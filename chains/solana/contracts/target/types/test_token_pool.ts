@@ -370,12 +370,7 @@ export type TestTokenPool = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },
@@ -436,12 +431,7 @@ export type TestTokenPool = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },
@@ -893,12 +883,7 @@ export const IDL: TestTokenPool = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },
@@ -959,12 +944,7 @@ export const IDL: TestTokenPool = {
           "isSigner": false
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false
         },

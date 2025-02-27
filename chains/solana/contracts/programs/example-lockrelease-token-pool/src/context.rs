@@ -137,19 +137,11 @@ pub struct TokenOfframp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [rmn_remote::context::seed::CONFIG_AND_CURSES],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
-    pub rmn_remote_curses: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
-        bump,
-        seeds::program = state.config.rmn_remote,
-    )]
-    pub rmn_remote_config: UncheckedAccount<'info>,
+    pub rmn_remote_config_and_curses: UncheckedAccount<'info>,
 
     // User specific accounts ---------------
     #[account(mut, address = get_associated_token_address_with_program_id(&release_or_mint.receiver, &mint.key(), &token_program.key()))]
@@ -198,19 +190,11 @@ pub struct TokenOnramp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [rmn_remote::context::seed::CONFIG_AND_CURSES],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
-    pub rmn_remote_curses: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
-        bump,
-        seeds::program = state.config.rmn_remote,
-    )]
-    pub rmn_remote_config: UncheckedAccount<'info>,
+    pub rmn_remote_config_and_curses: UncheckedAccount<'info>,
 
     #[account(
         mut,

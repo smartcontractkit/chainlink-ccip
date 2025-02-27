@@ -156,8 +156,7 @@ func TestTransactionSizing(t *testing.T) {
 			mustRandomPubkey(),                 // fee quoter billing token config
 			routerTable["fqLinkConfig"],        // fee quoter link token config
 			config.RMNRemoteProgram,
-			config.RMNRemoteCursesPDA,
-			config.RMNRemoteConfigPDA,
+			config.RMNRemoteConfigAndCursesPDA,
 			routerTable["routerTokenPoolSigner"],
 		)
 
@@ -211,8 +210,7 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable["fqAllowedPriceUpdater"],
 			offrampTable["fqConfigPDA"],
 			config.RMNRemoteProgram,
-			config.RMNRemoteCursesPDA,
-			config.RMNRemoteConfigPDA,
+			config.RMNRemoteConfigAndCursesPDA,
 		)
 
 		for _, v := range addAccounts {
@@ -292,8 +290,7 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable["sysVarInstruction"],
 			offrampTable["tokenPoolSigner"],
 			config.RMNRemoteProgram,
-			config.RMNRemoteCursesPDA,
-			config.RMNRemoteConfigPDA,
+			config.RMNRemoteConfigAndCursesPDA,
 		)
 
 		for _, v := range addAccounts {

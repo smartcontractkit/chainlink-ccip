@@ -77,6 +77,5 @@ var (
 	FqAllowedPriceUpdaterOfframpPDA, _, _ = state.FindFqAllowedPriceUpdaterPDA(OfframpBillingSignerPDA, FeeQuoterProgram)
 
 	// RMN Remote PDAs
-	RMNRemoteConfigPDA, _, _ = state.FindRMNRemoteConfigPDA(RMNRemoteProgram)
-	RMNRemoteCursesPDA, _, _ = state.FindRMNRemoteCursesPDA(RMNRemoteProgram)
+	RMNRemoteConfigAndCursesPDA, _, _ = state.FindRMNRemoteConfigAndCursesPDA(RMNRemoteProgram)
 )

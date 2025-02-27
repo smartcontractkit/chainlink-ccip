@@ -406,19 +406,11 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [rmn_remote::context::seed::CONFIG_AND_CURSES],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
-    pub rmn_remote_curses: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
-        bump,
-        seeds::program = reference_addresses.load()?.rmn_remote,
-    )]
-    pub rmn_remote_config: UncheckedAccount<'info>,
+    pub rmn_remote_config_and_curses: UncheckedAccount<'info>,
     // remaining accounts
     // global state account (to update the last seen price sequence number)
     // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
@@ -490,19 +482,11 @@ pub struct PriceOnlyCommitReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [rmn_remote::context::seed::CONFIG_AND_CURSES],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
-    pub rmn_remote_curses: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
-        bump,
-        seeds::program = reference_addresses.load()?.rmn_remote,
-    )]
-    pub rmn_remote_config: UncheckedAccount<'info>,
+    pub rmn_remote_config_and_curses: UncheckedAccount<'info>,
     // remaining accounts
     // global state account (to update the last seen price sequence number)
     // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
@@ -583,19 +567,11 @@ pub struct ExecuteReportContext<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [rmn_remote::context::seed::CONFIG_AND_CURSES],
         bump,
         seeds::program = reference_addresses.load()?.rmn_remote,
     )]
-    pub rmn_remote_curses: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
-        bump,
-        seeds::program = reference_addresses.load()?.rmn_remote,
-    )]
-    pub rmn_remote_config: UncheckedAccount<'info>,
+    pub rmn_remote_config_and_curses: UncheckedAccount<'info>,
     // remaining accounts
     // [receiver_program, receiver_account, ...user specified accounts from message data for arbitrary messaging]
     // +

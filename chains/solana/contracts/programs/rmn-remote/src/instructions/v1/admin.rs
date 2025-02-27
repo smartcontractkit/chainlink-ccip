@@ -23,13 +23,13 @@ impl Admin for Impl {
     }
 
     fn accept_ownership(&self, ctx: Context<AcceptOwnership>) -> Result<()> {
-        let config = &mut ctx.accounts.config;
+        let config = &mut ctx.accounts.config_and_curses;
         emit!(OwnershipTransferred {
             from: config.owner,
             to: config.proposed_owner,
         });
-        ctx.accounts.config.owner = ctx.accounts.config.proposed_owner;
-        ctx.accounts.config.proposed_owner = Pubkey::default();
+        ctx.accounts.config_and_curses.owner = ctx.accounts.config_and_curses.proposed_owner;
+        ctx.accounts.config_and_curses.proposed_owner = Pubkey::default();
         Ok(())
     }
 
@@ -53,7 +53,7 @@ impl Admin for Impl {
     }
 
     fn curse(&self, ctx: Context<Curse>, subject: CurseSubject) -> Result<()> {
-        let curses = &mut ctx.accounts.curses;
+        let curses = &mut ctx.accounts.config_and_curses;
 
         require!(
             !curses.cursed_subjects.contains(&subject),
@@ -66,7 +66,7 @@ impl Admin for Impl {
     }
 
     fn uncurse(&self, ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()> {
-        let curses = &mut ctx.accounts.curses;
+        let curses = &mut ctx.accounts.config_and_curses;
 
         require!(
             curses.cursed_subjects.contains(&subject),

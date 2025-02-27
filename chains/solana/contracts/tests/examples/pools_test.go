@@ -80,8 +80,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 			ix, err := rmn_remote.NewInitializeInstruction(
-				config.RMNRemoteConfigPDA,
-				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigAndCursesPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
 				config.RMNRemoteProgram,
@@ -204,8 +203,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							poolSigner,
 							poolTokenAccount,
 							config.RMNRemoteProgram,
-							config.RMNRemoteCursesPDA,
-							config.RMNRemoteConfigPDA,
+							config.RMNRemoteConfigAndCursesPDA,
 							p.Chain[config.EvmChainSelector],
 						).ValidateAndBuild()
 						require.NoError(t, err)
@@ -244,8 +242,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 							poolTokenAccount,
 							p.Chain[config.EvmChainSelector],
 							config.RMNRemoteProgram,
-							config.RMNRemoteCursesPDA,
-							config.RMNRemoteConfigPDA,
+							config.RMNRemoteConfigAndCursesPDA,
 							p.User[admin.PublicKey()],
 						).ValidateAndBuild()
 						require.NoError(t, err)

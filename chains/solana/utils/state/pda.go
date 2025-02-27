@@ -119,10 +119,6 @@ func FindOfframpCommitReportPDA(chainSelector uint64, root [32]byte, offrampProg
 // RMN Remote PDAs //
 /////////////////////
 
-func FindRMNRemoteConfigPDA(rmnRemoteProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("config")}, rmnRemoteProgram)
-}
-
-func FindRMNRemoteCursesPDA(rmnRemoteProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte("curses")}, rmnRemoteProgram)
+func FindRMNRemoteConfigAndCursesPDA(rmnRemoteProgram solana.PublicKey) (solana.PublicKey, uint8, error) {
+	return solana.FindProgramAddress([][]byte{[]byte("config_and_curses")}, rmnRemoteProgram)
 }

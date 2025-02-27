@@ -404,19 +404,11 @@ pub struct CcipSend<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [rmn_remote::context::seed::CONFIG_AND_CURSES],
         bump,
         seeds::program = config.rmn_remote,
     )]
-    pub rmn_remote_curses: UncheckedAccount<'info>,
-
-    /// CHECK: This account is just used in the CPI to the RMN Remote program
-    #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
-        bump,
-        seeds::program = config.rmn_remote,
-    )]
-    pub rmn_remote_config: UncheckedAccount<'info>,
+    pub rmn_remote_config_and_curses: UncheckedAccount<'info>,
 
     /// CPI signers, optional if no tokens are being transferred.
     /// CHECK: Using this to sign.

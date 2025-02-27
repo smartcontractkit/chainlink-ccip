@@ -36,8 +36,7 @@ impl Execute for Impl {
         let report_context = ReportContext::from_byte_words(report_context_byte_words);
         verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
-            ctx.accounts.rmn_remote_config.to_account_info(),
-            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
             execution_report.source_chain_selector,
         )?;
 
@@ -86,8 +85,7 @@ impl Execute for Impl {
                 .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
         verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
-            ctx.accounts.rmn_remote_config.to_account_info(),
-            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
             execution_report.source_chain_selector,
         )?;
         internal_execute(ctx, execution_report, token_indexes)
@@ -188,8 +186,7 @@ fn internal_execute<'info>(
             accs.pool_token_account.to_account_info(),
             accs.pool_chain_config.to_account_info(),
             ctx.accounts.rmn_remote.to_account_info(),
-            ctx.accounts.rmn_remote_curses.to_account_info(),
-            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_config_and_curses.to_account_info(),
             accs.user_token_account.to_account_info(),
         ];
         acc_infos.extend_from_slice(accs.remaining_accounts);
@@ -606,13 +603,11 @@ mod execution_state {
 
 pub fn verify_uncursed_cpi<'info>(
     rmn_remote: AccountInfo<'info>,
-    rmn_remote_config: AccountInfo<'info>,
-    rmn_remote_curses: AccountInfo<'info>,
+    rmn_remote_config_and_curses: AccountInfo<'info>,
     chain_selector: u64,
 ) -> Result<()> {
     let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
-        config: rmn_remote_config,
-        curses: rmn_remote_curses,
+        config_and_curses: rmn_remote_config_and_curses,
     };
     let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
     rmn_remote::cpi::verify_not_cursed(

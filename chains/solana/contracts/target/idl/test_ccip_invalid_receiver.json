@@ -161,15 +161,7 @@
           ]
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -257,15 +249,7 @@
           ]
         },
         {
-          "name": "rmnRemoteCurses",
-          "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "CHECK"
-          ]
-        },
-        {
-          "name": "rmnRemoteConfig",
+          "name": "rmnRemoteConfigAndCurses",
           "isMut": false,
           "isSigner": false,
           "docs": [

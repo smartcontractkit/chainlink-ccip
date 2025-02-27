@@ -93,8 +93,7 @@ func TestTokenPool(t *testing.T) {
 		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 		ix, err := rmn_remote.NewInitializeInstruction(
-			config.RMNRemoteConfigPDA,
-			config.RMNRemoteCursesPDA,
+			config.RMNRemoteConfigAndCursesPDA,
 			admin.PublicKey(),
 			solana.SystemProgramID,
 			config.RMNRemoteProgram,
@@ -278,8 +277,8 @@ func TestTokenPool(t *testing.T) {
 							poolSigner,
 							poolTokenAccount,
 							config.RMNRemoteProgram,
-							config.RMNRemoteCursesPDA,
-							config.RMNRemoteConfigPDA,
+
+							config.RMNRemoteConfigAndCursesPDA,
 							p.Chain[config.EvmChainSelector],
 						).ValidateAndBuild()
 						require.NoError(t, err)
@@ -323,8 +322,8 @@ func TestTokenPool(t *testing.T) {
 							poolTokenAccount,
 							p.Chain[config.EvmChainSelector],
 							config.RMNRemoteProgram,
-							config.RMNRemoteCursesPDA,
-							config.RMNRemoteConfigPDA,
+
+							config.RMNRemoteConfigAndCursesPDA,
 							p.User[admin.PublicKey()],
 						).ValidateAndBuild()
 
@@ -410,9 +409,8 @@ func TestTokenPool(t *testing.T) {
 
 							ix, err := rmn_remote.NewCurseInstruction(
 								globalCurse,
-								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
-								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								solana.SystemProgramID,
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -433,8 +431,7 @@ func TestTokenPool(t *testing.T) {
 								poolSigner,
 								poolTokenAccount,
 								config.RMNRemoteProgram,
-								config.RMNRemoteCursesPDA,
-								config.RMNRemoteConfigPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								p.Chain[config.EvmChainSelector],
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -460,8 +457,7 @@ func TestTokenPool(t *testing.T) {
 								poolTokenAccount,
 								p.Chain[config.EvmChainSelector],
 								config.RMNRemoteProgram,
-								config.RMNRemoteCursesPDA,
-								config.RMNRemoteConfigPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								p.User[admin.PublicKey()],
 							).ValidateAndBuild()
 
@@ -471,9 +467,8 @@ func TestTokenPool(t *testing.T) {
 
 							ix, err = rmn_remote.NewUncurseInstruction(
 								globalCurse,
-								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
-								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								solana.SystemProgramID,
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -487,9 +482,8 @@ func TestTokenPool(t *testing.T) {
 
 							ix, err := rmn_remote.NewCurseInstruction(
 								evmCurse,
-								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
-								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								solana.SystemProgramID,
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -510,8 +504,7 @@ func TestTokenPool(t *testing.T) {
 								poolSigner,
 								poolTokenAccount,
 								config.RMNRemoteProgram,
-								config.RMNRemoteCursesPDA,
-								config.RMNRemoteConfigPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								p.Chain[config.EvmChainSelector],
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -537,8 +530,7 @@ func TestTokenPool(t *testing.T) {
 								poolTokenAccount,
 								p.Chain[config.EvmChainSelector],
 								config.RMNRemoteProgram,
-								config.RMNRemoteCursesPDA,
-								config.RMNRemoteConfigPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								p.User[admin.PublicKey()],
 							).ValidateAndBuild()
 
@@ -548,9 +540,8 @@ func TestTokenPool(t *testing.T) {
 
 							ix, err = rmn_remote.NewUncurseInstruction(
 								evmCurse,
-								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
-								config.RMNRemoteCursesPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								solana.SystemProgramID,
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -580,8 +571,7 @@ func TestTokenPool(t *testing.T) {
 								poolTokenAccount,
 								p.Chain[config.EvmChainSelector],
 								config.RMNRemoteProgram,
-								config.RMNRemoteCursesPDA,
-								config.RMNRemoteConfigPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								p.User[admin.PublicKey()],
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -620,8 +610,7 @@ func TestTokenPool(t *testing.T) {
 								poolTokenAccount,
 								p.Chain[config.EvmChainSelector],
 								config.RMNRemoteProgram,
-								config.RMNRemoteCursesPDA,
-								config.RMNRemoteConfigPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								p.User[admin.PublicKey()],
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -649,8 +638,7 @@ func TestTokenPool(t *testing.T) {
 								poolTokenAccount,
 								p.Chain[config.EvmChainSelector],
 								config.RMNRemoteProgram,
-								config.RMNRemoteCursesPDA,
-								config.RMNRemoteConfigPDA,
+								config.RMNRemoteConfigAndCursesPDA,
 								p.User[admin.PublicKey()],
 							).ValidateAndBuild()
 							require.NoError(t, err)
@@ -750,8 +738,7 @@ func TestTokenPool(t *testing.T) {
 				p.PoolSigner,
 				p.PoolTokenAccount,
 				config.RMNRemoteProgram,
-				config.RMNRemoteCursesPDA,
-				config.RMNRemoteConfigPDA,
+				config.RMNRemoteConfigAndCursesPDA,
 				p.Chain[config.EvmChainSelector],
 			)
 			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipLogicReceiver, false, false))
@@ -783,8 +770,7 @@ func TestTokenPool(t *testing.T) {
 				p.PoolTokenAccount,
 				p.Chain[config.EvmChainSelector],
 				config.RMNRemoteProgram,
-				config.RMNRemoteCursesPDA,
-				config.RMNRemoteConfigPDA,
+				config.RMNRemoteConfigAndCursesPDA,
 				p.User[admin.PublicKey()],
 			)
 

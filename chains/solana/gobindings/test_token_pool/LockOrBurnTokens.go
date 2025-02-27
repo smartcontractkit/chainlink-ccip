@@ -28,18 +28,16 @@ type LockOrBurnTokens struct {
 	//
 	// [6] = [] rmnRemote
 	//
-	// [7] = [] rmnRemoteCurses
+	// [7] = [] rmnRemoteConfigAndCurses
 	//
-	// [8] = [] rmnRemoteConfig
-	//
-	// [9] = [WRITE] chainConfig
+	// [8] = [WRITE] chainConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewLockOrBurnTokensInstructionBuilder creates a new `LockOrBurnTokens` instruction builder.
 func NewLockOrBurnTokensInstructionBuilder() *LockOrBurnTokens {
 	nd := &LockOrBurnTokens{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 9),
 	}
 	return nd
 }
@@ -127,37 +125,26 @@ func (inst *LockOrBurnTokens) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[6]
 }
 
-// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
-func (inst *LockOrBurnTokens) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(rmnRemoteCurses)
+// SetRmnRemoteConfigAndCursesAccount sets the "rmnRemoteConfigAndCurses" account.
+func (inst *LockOrBurnTokens) SetRmnRemoteConfigAndCursesAccount(rmnRemoteConfigAndCurses ag_solanago.PublicKey) *LockOrBurnTokens {
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(rmnRemoteConfigAndCurses)
 	return inst
 }
 
-// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
-func (inst *LockOrBurnTokens) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
+// GetRmnRemoteConfigAndCursesAccount gets the "rmnRemoteConfigAndCurses" account.
+func (inst *LockOrBurnTokens) GetRmnRemoteConfigAndCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[7]
-}
-
-// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
-func (inst *LockOrBurnTokens) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(rmnRemoteConfig)
-	return inst
-}
-
-// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
-func (inst *LockOrBurnTokens) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
 }
 
 // SetChainConfigAccount sets the "chainConfig" account.
 func (inst *LockOrBurnTokens) SetChainConfigAccount(chainConfig ag_solanago.PublicKey) *LockOrBurnTokens {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(chainConfig).WRITE()
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(chainConfig).WRITE()
 	return inst
 }
 
 // GetChainConfigAccount gets the "chainConfig" account.
 func (inst *LockOrBurnTokens) GetChainConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
+	return inst.AccountMetaSlice[8]
 }
 
 func (inst LockOrBurnTokens) Build() *Instruction {
@@ -209,12 +196,9 @@ func (inst *LockOrBurnTokens) Validate() error {
 			return errors.New("accounts.RmnRemote is not set")
 		}
 		if inst.AccountMetaSlice[7] == nil {
-			return errors.New("accounts.RmnRemoteCurses is not set")
+			return errors.New("accounts.RmnRemoteConfigAndCurses is not set")
 		}
 		if inst.AccountMetaSlice[8] == nil {
-			return errors.New("accounts.RmnRemoteConfig is not set")
-		}
-		if inst.AccountMetaSlice[9] == nil {
 			return errors.New("accounts.ChainConfig is not set")
 		}
 	}
@@ -235,17 +219,16 @@ func (inst *LockOrBurnTokens) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("      authority", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("          state", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("   tokenProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           mint", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("     poolSigner", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("      poolToken", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("      rmnRemote", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("rmnRemoteCurses", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("rmnRemoteConfig", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("    chainConfig", inst.AccountMetaSlice[9]))
+					instructionBranch.Child("Accounts[len=9]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("               authority", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("                   state", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("            tokenProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("                    mint", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("              poolSigner", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("               poolToken", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("               rmnRemote", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("rmnRemoteConfigAndCurses", inst.AccountMetaSlice[7]))
+						accountsBranch.Child(ag_format.Meta("             chainConfig", inst.AccountMetaSlice[8]))
 					})
 				})
 		})
@@ -280,8 +263,7 @@ func NewLockOrBurnTokensInstruction(
 	poolSigner ag_solanago.PublicKey,
 	poolTokenAccount ag_solanago.PublicKey,
 	rmnRemote ag_solanago.PublicKey,
-	rmnRemoteCurses ag_solanago.PublicKey,
-	rmnRemoteConfig ag_solanago.PublicKey,
+	rmnRemoteConfigAndCurses ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey) *LockOrBurnTokens {
 	return NewLockOrBurnTokensInstructionBuilder().
 		SetLockOrBurn(lockOrBurn).
@@ -292,7 +274,6 @@ func NewLockOrBurnTokensInstruction(
 		SetPoolSignerAccount(poolSigner).
 		SetPoolTokenAccountAccount(poolTokenAccount).
 		SetRmnRemoteAccount(rmnRemote).
-		SetRmnRemoteCursesAccount(rmnRemoteCurses).
-		SetRmnRemoteConfigAccount(rmnRemoteConfig).
+		SetRmnRemoteConfigAndCursesAccount(rmnRemoteConfigAndCurses).
 		SetChainConfigAccount(chainConfig)
 }
