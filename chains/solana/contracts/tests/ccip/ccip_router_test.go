@@ -5131,6 +5131,57 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, gasPrice, gasPriceAccount.State.UsdPerUnitGas.Value)
 		})
 
+		t.Run("When the caller updates prices containing unregistered tokens, the call succeeds and the unregistered tokens are ignored", func(t *testing.T) {
+			tokenPrice := common.To28BytesBE(123)
+			anotherTokenPrice := common.To28BytesBE(234)
+
+			var tokenPriceAccount fee_quoter.BillingTokenConfigWrapper
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
+			require.Equal(t, tokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
+
+			// This token isn't registered as a billing token.
+			require.True(t, common.IsClosedAccount(ctx, solanaGoClient, token2.Billing[config.EvmChainSelector], config.DefaultCommitment))
+
+			// Update prices
+			raw := fee_quoter.NewUpdatePricesInstruction(
+				[]fee_quoter.TokenPriceUpdate{
+					{
+						SourceToken: wsol.mint,
+						UsdPerToken: anotherTokenPrice,
+					},
+					{
+						// This token will just be ignored.
+						SourceToken: token2.Mint.PublicKey(),
+						UsdPerToken: anotherTokenPrice,
+					},
+				},
+				[]fee_quoter.GasPriceUpdate{},
+				testPriceUpdater.PublicKey(),
+				testAllowedPriceUpdaterPDA,
+				config.FqConfigPDA,
+			)
+			raw.AccountMetaSlice.Append(solana.Meta(wsol.fqBillingConfigPDA).WRITE())
+			raw.AccountMetaSlice.Append(solana.Meta(token2.Billing[config.EvmChainSelector]).WRITE())
+
+			ix, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, testPriceUpdater, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			updateIgnoredEvent := ccip.TokenPriceUpdateIgnored{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "TokenPriceUpdateIgnored", &updateIgnoredEvent, config.PrintEvents))
+			require.Equal(t, updateIgnoredEvent.Token, token2.Mint.PublicKey())
+			require.Equal(t, updateIgnoredEvent.Value, anotherTokenPrice)
+
+			// Check that final onchain price matches the new one
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.fqBillingConfigPDA, config.DefaultCommitment, &tokenPriceAccount))
+			require.Equal(t, anotherTokenPrice, tokenPriceAccount.Config.UsdPerToken.Value)
+
+			// This token continues to be unregistered for billing.
+			require.True(t, common.IsClosedAccount(ctx, solanaGoClient, token2.Billing[config.EvmChainSelector], config.DefaultCommitment))
+		})
+
 		t.Run("When a non-admin tries to remove a price updater, it fails", func(t *testing.T) {
 			ix, err := fee_quoter.NewRemovePriceUpdaterInstruction(
 				testPriceUpdater.PublicKey(),
@@ -5860,8 +5911,6 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("Invalid price updates", func(t *testing.T) {
-					randomToken := solana.MustPublicKeyFromBase58("AGDpGy7auzgKT8zt6qhfHFm1rDwvqQGGTYxuYn7MtydQ") // just some non-existing token
-
 					randomChain := uint64(123456) // just some non-existing chain
 					randomChainPDA, _, err := state.FindFqDestChainPDA(randomChain, config.FeeQuoterProgram)
 					require.NoError(t, err)
@@ -5873,12 +5922,6 @@ func TestCCIPRouter(t *testing.T) {
 						AccountMetaSlice  solana.AccountMetaSlice
 						ExpectedError     string
 					}{
-						{
-							Name:             "with a price update for a token that doesn't exist",
-							Tokens:           []solana.PublicKey{randomToken},
-							AccountMetaSlice: solana.AccountMetaSlice{solana.Meta(getFqTokenConfigPDA(randomToken)).WRITE()},
-							ExpectedError:    "AccountNotInitialized",
-						},
 						{
 							Name:              "with a gas price update for a chain that doesn't exist",
 							GasChainSelectors: []uint64{randomChain},

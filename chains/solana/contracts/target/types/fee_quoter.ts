@@ -1377,6 +1377,26 @@ export type FeeQuoter = {
       ]
     },
     {
+      "name": "TokenPriceUpdateIgnored",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenTransferFeeConfigUpdated",
       "fields": [
         {
@@ -2997,6 +3017,26 @@ export const IDL: FeeQuoter = {
         {
           "name": "timestamp",
           "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenPriceUpdateIgnored",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
           "index": false
         }
       ]

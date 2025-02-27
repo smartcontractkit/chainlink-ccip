@@ -695,7 +695,7 @@ func (o observerImpl) computeMerkleRoot(
 
 			msgHash, err := o.msgHasher.Hash(ctx, msg)
 			if err != nil {
-				lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+				lggr.Warnw("failed to hash message", "message", msg, "err", err)
 				return fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
 			}
 
