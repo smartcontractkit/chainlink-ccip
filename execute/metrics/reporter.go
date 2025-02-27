@@ -31,8 +31,7 @@ func (n *Noop) TrackLatency(exectypes.PluginState, plugincommon.MethodType, time
 
 func (n *Noop) TrackProcessorOutput(string, plugincommon.MethodType, plugintypes.Trackable) {}
 
-func (n *Noop) TrackProcessorLatency(processor string, method plugincommon.MethodType, latency time.Duration, err error) {
-}
+func (n *Noop) TrackProcessorLatency(string, plugincommon.MethodType, time.Duration, error) {}
 
 var _ Reporter = &Noop{}
 var _ Reporter = &PromReporter{}
