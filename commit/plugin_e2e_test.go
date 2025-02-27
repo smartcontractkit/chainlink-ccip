@@ -739,7 +739,7 @@ func prepareCcipReaderMock(
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
 	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-		Return(&reader2.CurseInfo{}, nil).Maybe()
+		Return(reader2.CurseInfo{}, nil).Maybe()
 	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
 		Return(sourceChainConfigs, nil).Maybe()
 

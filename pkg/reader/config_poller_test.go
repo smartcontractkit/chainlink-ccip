@@ -444,6 +444,8 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 				rmnDigestResult.SetResult(&rmnDigestHeader{}, nil)
 				rmnConfigResult := &types.BatchReadResult{ReadName: consts.MethodNameGetVersionedConfig}
 				rmnConfigResult.SetResult(&versionedConfig{}, nil)
+				rmnCurseResult := &types.BatchReadResult{ReadName: consts.MethodNameGetCursedSubjects}
+				rmnCurseResult.SetResult(&RMNCurseResponse{}, nil)
 
 				feeQuoterResult := &types.BatchReadResult{ReadName: consts.MethodNameFeeQuoterGetStaticConfig}
 				feeQuoterResult.SetResult(&feeQuoterStaticConfig{}, nil)
@@ -451,7 +453,7 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 				return types.BatchGetLatestValuesResult{
 					types.BoundContract{Name: consts.ContractNameOffRamp}:   {},
 					types.BoundContract{Name: consts.ContractNameRMNProxy}:  {*rmnProxyResult},
-					types.BoundContract{Name: consts.ContractNameRMNRemote}: {*rmnDigestResult, *rmnConfigResult},
+					types.BoundContract{Name: consts.ContractNameRMNRemote}: {*rmnDigestResult, *rmnConfigResult, *rmnCurseResult},
 					types.BoundContract{Name: consts.ContractNameFeeQuoter}: {*feeQuoterResult},
 				}
 			},
@@ -478,6 +480,8 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 				rmnDigestResult.SetResult(&rmnDigestHeader{}, nil)
 				rmnConfigResult := &types.BatchReadResult{ReadName: consts.MethodNameGetVersionedConfig}
 				rmnConfigResult.SetResult(&versionedConfig{}, nil)
+				rmnCurseResult := &types.BatchReadResult{ReadName: consts.MethodNameGetCursedSubjects}
+				rmnCurseResult.SetResult(&RMNCurseResponse{}, nil)
 
 				feeQuoterResult := &types.BatchReadResult{ReadName: consts.MethodNameFeeQuoterGetStaticConfig}
 				feeQuoterResult.SetResult(&feeQuoterStaticConfig{}, nil)
@@ -487,7 +491,7 @@ func TestConfigCache_InvalidResults(t *testing.T) {
 						*result1, *result2, *result3, *result4,
 					},
 					types.BoundContract{Name: consts.ContractNameRMNProxy}:  {*rmnProxyResult},
-					types.BoundContract{Name: consts.ContractNameRMNRemote}: {*rmnDigestResult, *rmnConfigResult},
+					types.BoundContract{Name: consts.ContractNameRMNRemote}: {*rmnDigestResult, *rmnConfigResult, *rmnCurseResult},
 					types.BoundContract{Name: consts.ContractNameFeeQuoter}: {*feeQuoterResult},
 				}
 			},

@@ -1502,7 +1502,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 		// Setup readers with price responses
 		sourceReader1 := reader_mocks.NewMockExtended(t)
-		price1 := &plugintypes.TimestampedUnixBig{
+		price1 := plugintypes.TimestampedUnixBig{
 			Value:     big.NewInt(100),
 			Timestamp: uint32(time.Now().Unix()),
 		}
@@ -1520,12 +1520,12 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 				confidence primitives.ConfidenceLevel,
 				params any,
 				returnVal any) {
-				pricePtr := returnVal.(**plugintypes.TimestampedUnixBig)
+				pricePtr := returnVal.(*plugintypes.TimestampedUnixBig)
 				*pricePtr = price1
 			}).Return(nil)
 
 		sourceReader2 := reader_mocks.NewMockExtended(t)
-		price2 := &plugintypes.TimestampedUnixBig{
+		price2 := plugintypes.TimestampedUnixBig{
 			Value:     big.NewInt(200),
 			Timestamp: uint32(time.Now().Unix()),
 		}
@@ -1543,7 +1543,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 				confidence primitives.ConfidenceLevel,
 				params any,
 				returnVal any) {
-				pricePtr := returnVal.(**plugintypes.TimestampedUnixBig)
+				pricePtr := returnVal.(*plugintypes.TimestampedUnixBig)
 				*pricePtr = price2
 			}).Return(nil)
 
@@ -1575,7 +1575,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 		}, nil)
 
 		sourceReader2 := reader_mocks.NewMockExtended(t)
-		price2 := &plugintypes.TimestampedUnixBig{
+		price2 := plugintypes.TimestampedUnixBig{
 			Value:     big.NewInt(200),
 			Timestamp: uint32(time.Now().Unix()),
 		}
@@ -1592,7 +1592,7 @@ func TestCCIPChainReader_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			confidence primitives.ConfidenceLevel,
 			params any,
 			returnVal any) {
-			pricePtr := returnVal.(**plugintypes.TimestampedUnixBig)
+			pricePtr := returnVal.(*plugintypes.TimestampedUnixBig)
 			*pricePtr = price2
 		}).Return(nil)
 
