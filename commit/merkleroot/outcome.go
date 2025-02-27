@@ -299,8 +299,8 @@ func checkForReportTransmission(
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {
-	// Check that all sources have been updates using a set initialized from . We check that all have been updated
-	// in case there were multiple reports generated in the previous round.
+	// Check that all sources have been updates using a set initialized from the previous outcome.
+	// Check that all have been updated in case there were multiple reports generated in the previous round.
 	pendingSources := make(map[cciptypes.ChainSelector]struct{})
 	for _, root := range previousOutcome.RootsToReport {
 		pendingSources[root.ChainSel] = struct{}{}
@@ -309,12 +309,14 @@ func checkForReportTransmission(
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
-				delete(pendingSources, previousSeqNumChain.ChainSel)
-				// if there is only one report, stop checking after the first match by resetting
-				// the pendingSources set.
+				// if there are not multiple reports, a single update means the report has been transmitted.
 				if !multipleReports {
-					pendingSources = make(map[cciptypes.ChainSelector]struct{})
+					return Outcome{
+						OutcomeType: ReportTransmitted,
+					}
 				}
+
+				delete(pendingSources, previousSeqNumChain.ChainSel)
 			}
 
 			if previousSeqNumChain.SeqNum > currentSeqNum {

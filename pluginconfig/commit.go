@@ -159,6 +159,9 @@ type CommitOffchainConfig struct {
 	// MaxRootsPerReport is the maximum number of roots to include in a single report.
 	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
 	// Disable by setting to 0.
+	// Warning: if MaxRootsPerReport is non-zero, MultipleReportsEnabled should be set to true. In the future
+	// it may become an error to use MaxMerkleRootsPerReport without also using MultipleReportsEnabled. For now
+	// it is allowed for testing purposes.
 	// NOTE: this can only be used if RMNEnabled == false.
 	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
 
