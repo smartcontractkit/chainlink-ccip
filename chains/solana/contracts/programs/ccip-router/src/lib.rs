@@ -256,7 +256,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for the bump.
     /// * `dest_chain_selector` - The destination chain selector to bump version for.
     pub fn bump_ccip_version_for_dest_chain(
-        ctx: Context<UpdateDestChainSelectorConfigStatic>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
@@ -272,7 +272,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for the rollback.
     /// * `dest_chain_selector` - The destination chain selector to rollback the version for.
     pub fn rollback_ccip_version_for_dest_chain(
-        ctx: Context<UpdateDestChainSelectorConfigStatic>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)

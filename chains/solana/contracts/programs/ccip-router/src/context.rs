@@ -203,7 +203,7 @@ pub struct UpdateDestChainSelectorConfig<'info> {
 #[derive(Accounts)]
 #[instruction(new_chain_selector: u64)]
 // Similar to `UpdateDestChainSelectorConfig` but with no realloc
-pub struct UpdateDestChainSelectorConfigStatic<'info> {
+pub struct UpdateDestChainSelectorConfigNoRealloc<'info> {
     #[account(
         mut,
         seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
