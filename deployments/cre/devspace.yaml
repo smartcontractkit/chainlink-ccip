@@ -90,7 +90,6 @@ profiles:
             profiles:
               - version-from-env
               - network-generated
-              - cre-config-overrides
           workflow-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
@@ -99,11 +98,15 @@ profiles:
             profiles:
               - version-from-env
               - network-generated
-              - cre-config-overrides
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+  - name: cre-config-overrides
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${CRE_CONFIG_DIR}/cre-overrides.yaml
   - name: kind
     parents:
       - profile: base
