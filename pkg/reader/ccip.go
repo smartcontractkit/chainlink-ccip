@@ -224,7 +224,7 @@ func (r *ccipChainReader) processCommitReports(
 	lggr := r.lggr
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		ev, err := validateCommitReportAcceptedEvent(item, ts, r.destChain)
+		ev, err := validateCommitReportAcceptedEvent(item, ts)
 		if err != nil {
 			lggr.Errorw("validate commit report accepted event", "err", err, "ev", ev)
 			continue
@@ -1918,9 +1918,7 @@ func (r *ccipChainReader) processFeeQuoterResults(results []types.BatchReadResul
 	return FeeQuoterConfig{}, fmt.Errorf("invalid type for fee quoter static config: %T", val)
 }
 
-func validateCommitReportAcceptedEvent(
-	seq types.Sequence, gteTimestamp time.Time, destChain cciptypes.ChainSelector,
-) (*CommitReportAcceptedEvent, error) {
+func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
 	ev, is := (seq.Data).(*CommitReportAcceptedEvent)
 	if !is {
 		return nil, fmt.Errorf("unexpected type %T while expecting a commit report", seq)
