@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
@@ -68,7 +69,6 @@ func GetEnvConfig(env DevspaceEnv) (*devenv.EnvironmentConfig, error) {
 
 		chainConfigs = append(chainConfigs, *config)
 	}
-
 	nodeInfos := NewCLNodeConfigurer(env).GetNodeInfos()
 
 	var grpcUrl string
@@ -245,12 +245,19 @@ func (c ChainlinkNodeConfigurer) getNodeInfo(nodeName string, isBootstrap bool) 
 func NewChainConfigurer(env DevspaceEnv, chainID uint64, chainType ChainType, chainVariant, name string) ChainConfigurer {
 	// These are generally known private keys used for testing
 	testKey := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+<<<<<<< HEAD
 	var gasPrice *big.Int
 
 	if chainVariant == "besu" {
 		// the same key as used in the FWOG env alpha chain
 		testKey = "8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
 		gasPrice = big.NewInt(2000000)
+=======
+	solTestKey, err := solana.PrivateKeyFromBase58("57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC")
+
+	if err != nil {
+		panic("Could not decode private localnet private key")
+>>>>>>> 502b344 (rebase)
 	}
 
 	return ChainConfigurer{
@@ -301,7 +308,10 @@ func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {
 	}
 
 	err := chainConfig.SetDeployerKey(&c.deployerKey)
+<<<<<<< HEAD
 	chainConfig.DeployerKey.GasPrice = c.GasPrice
+=======
+>>>>>>> 502b344 (rebase)
 
 	if err != nil {
 		return nil, fmt.Errorf("unable to set deployer key, err: %s", err)

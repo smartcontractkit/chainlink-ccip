@@ -28,34 +28,34 @@ func TestBuildTemplateConfig(t *testing.T) {
 				overridesFilePath: path.Join(tmpDir, defaultOverrideFile),
 				chainsCount:       2,
 			}, want: ValuesTmplConfig{
-			Chains: []chain{
-				{NetworkId: 1001, BlockTime: 0},
-				{NetworkId: 1002, BlockTime: 0},
-			},
-		}},
+				Chains: []chain{
+					{NetworkId: 1001, BlockTime: 0},
+					{NetworkId: 1002, BlockTime: 0},
+				},
+			}},
 		{
 			name: "just one chain",
 			args: args{
 				overridesFilePath: path.Join(tmpDir, defaultOverrideFile),
 				chainsCount:       1,
 			}, want: ValuesTmplConfig{
-			Chains: []chain{
-				{NetworkId: 1001, BlockTime: 0},
-			},
-		}},
+				Chains: []chain{
+					{NetworkId: 1001, BlockTime: 0},
+				},
+			}},
 		{
 			name: "additional chains",
 			args: args{
 				overridesFilePath: path.Join(tmpDir, overrideFileWith2Chains),
 				chainsCount:       4,
 			}, want: ValuesTmplConfig{
-			Chains: []chain{
-				{NetworkId: 1001, BlockTime: 20},
-				{NetworkId: 1002, BlockTime: 14},
-				{NetworkId: 90000001, BlockTime: 0},
-				{NetworkId: 90000002, BlockTime: 0},
-			},
-		}},
+				Chains: []chain{
+					{NetworkId: 1001, BlockTime: 20},
+					{NetworkId: 1002, BlockTime: 14},
+					{NetworkId: 90000001, BlockTime: 0},
+					{NetworkId: 90000002, BlockTime: 0},
+				},
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
