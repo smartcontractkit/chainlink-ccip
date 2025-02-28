@@ -487,6 +487,10 @@ func (b *execReportBuilder) buildSingleChainReport(
 	}
 
 	// Unless there is a message limit, attempt to build a report for executing all ready messages.
+	// It is possible that the report produced here is invalid for some reason, such as
+	// report size or gas usage.
+	// In that case, we will execute the loop below to iteratively build a report
+	// with fewer messages until we find a valid report.
 	if b.maxMessages == 0 {
 		finalReport, err :=
 			buildSingleChainReportHelper(b.lggr, report, readyMessages)
@@ -532,8 +536,23 @@ func (b *execReportBuilder) buildSingleChainReport(
 			finalReport = finalReport2
 			meta = meta2
 
+			b.lggr.Infow(
+				"message added to report",
+				"sourceChain", report.Messages[i].Header.SourceChainSelector,
+				"seqNum", report.Messages[i].Header.SequenceNumber,
+				"messageID", report.Messages[i].Header.MessageID,
+				"nonce", report.Messages[i].Header.Nonce,
+				"sender", report.Messages[i].Sender.String(),
+				"reportSizeBytes", meta.encodedSizeBytes,
+				"reportGas", meta.gas,
+			)
 			// Stop searching if we reach the maximum number of messages.
 			if b.maxMessages > 0 && uint64(len(msgs)) >= b.maxMessages {
+				b.lggr.Infow(
+					"reached report builder's max messages, breaking",
+					"maxMessages", b.maxMessages,
+					"numMessages", len(msgs),
+				)
 				break
 			}
 		} else {
