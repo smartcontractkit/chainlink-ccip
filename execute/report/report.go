@@ -346,11 +346,63 @@ func (b *execReportBuilder) checkMessage(
 	return result, ReadyToExecute, nil
 }
 
+// we cannot have "skipped" nonces since these messages will be skipped onchain.
+// they will also end up in the inflight cache and "snoozed" until they
+// expire from the inflight cache TTL.
+func checkSkippedNonces(
+	execReport ccipocr3.ExecutePluginReportSingleChain,
+) error {
+	// note that the messages in the report _must_ be ordered correctly in nonce order,
+	// otherwise the report is invalid. this is because we loop through the messages in order
+	// onchain and try to execute each in turn.
+	// for that reason, we can use this map approach by checking the latest nonce for each sender,
+	// instead of accumulating the nonces in an array and searching for gaps.
+	// so this check catches incorrectly ordered messages as well as skipped nonces.
+	latestNoncePerSender := make(map[string]uint64)
+	for _, msg := range execReport.Messages {
+		if msg.Header.Nonce == 0 {
+			// nonce is zero means an out of order execution message, it doesn't affect nonce ordering.
+			// we can safely skip this check for this message.
+			continue
+		}
+
+		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(msg.Header.SourceChainSelector))
+		latestNonce, ok := latestNoncePerSender[sender]
+		if !ok {
+			// first time we ever see this sender, populate the nonce.
+			latestNoncePerSender[sender] = msg.Header.Nonce
+			continue
+		} else if latestNonce == 0 {
+			// this is a bug in this code, should never happen since we check if msg.Header.Nonce
+			// is zero before this check.
+			return fmt.Errorf("assumption violation: bug in the code, latestNonce is zero when it should never be")
+		} else if msg.Header.Nonce != latestNonce+1 {
+			// we've seen this sender before and the msg.Header.Nonce is not the expected value,
+			// it should be latestNonce + 1.
+			return fmt.Errorf(
+				"skipped nonce detected for sender %s: nonce in report %d != last nonce seen %d",
+				sender, msg.Header.Nonce, latestNonce)
+		}
+
+		// otherwise, the nonce is as expected, continue to the next message.
+		// update the map to reflect the latest seen nonce for this sender.
+		latestNoncePerSender[sender] = msg.Header.Nonce
+	}
+
+	return nil
+}
+
 // verifyReport is a final step to ensure the encoded message meets our exec criteria.
 func (b *execReportBuilder) verifyReport(
 	ctx context.Context,
 	execReport ccipocr3.ExecutePluginReportSingleChain,
 ) (bool, validationMetadata, error) {
+	err := checkSkippedNonces(execReport)
+	if err != nil {
+		b.lggr.Infow("invalid report, skipped nonce detected", "err", err)
+		return false, validationMetadata{}, nil
+	}
+
 	// Compute the size of the encoded report.
 	// Note: ExecutePluginReport is a strict array of data, so wrapping the final report
 	//       does not add any additional overhead to the size being computed here.
