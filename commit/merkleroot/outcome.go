@@ -79,8 +79,10 @@ func (p *Processor) getOutcome(
 
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
-		return checkForReportTransmission(
-			lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
+		attempts := p.offchainCfg.MaxReportTransmissionCheckAttempts
+		multipleReports := p.offchainCfg.MultipleReportsEnabled
+		outcome := checkForReportTransmission(lggr, attempts, multipleReports, previousOutcome, consObservation)
+		return outcome, nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
@@ -308,15 +310,28 @@ type rootKey struct {
 func checkForReportTransmission(
 	lggr logger.Logger,
 	maxReportTransmissionCheckAttempts uint,
+	multipleReports bool,
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {
-	offRampUpdated := false
+	// Check that all sources have been updates using a set initialized from the previous outcome.
+	// Check that all have been updated in case there were multiple reports generated in the previous round.
+	pendingSources := make(map[cciptypes.ChainSelector]struct{})
+	for _, root := range previousOutcome.RootsToReport {
+		pendingSources[root.ChainSel] = struct{}{}
+	}
+
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum < currentSeqNum {
-				offRampUpdated = true
-				break
+				// if there is only one report, any single update means the report has been transmitted.
+				if !multipleReports {
+					return Outcome{
+						OutcomeType: ReportTransmitted,
+					}
+				}
+
+				delete(pendingSources, previousSeqNumChain.ChainSel)
 			}
 
 			if previousSeqNumChain.SeqNum > currentSeqNum {
@@ -330,7 +345,8 @@ func checkForReportTransmission(
 		}
 	}
 
-	if offRampUpdated {
+	// All pending sources have been updated, we can move to the next state.
+	if len(pendingSources) == 0 {
 		return Outcome{
 			OutcomeType: ReportTransmitted,
 		}
