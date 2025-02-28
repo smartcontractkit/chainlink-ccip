@@ -208,6 +208,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,
+		p.addrCodec,
 	)
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
@@ -231,6 +232,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			p.rmnPeerClient,
 			config,
 			metricsReporter,
+			p.addrCodec,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{

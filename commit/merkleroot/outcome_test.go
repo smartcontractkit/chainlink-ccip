@@ -8,6 +8,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
@@ -580,6 +582,7 @@ func Test_Processor_Outcome(t *testing.T) {
 					MaxReportTransmissionCheckAttempts: uint(tc.maxReportTransmissionCheckAttempts),
 				},
 				metricsReporter: NoopMetrics{},
+				addressCodec:    internal.NewMockAddressCodec(t),
 			}
 
 			aos := make([]plugincommon.AttributedObservation[Observation], 0, len(tc.observations))
@@ -602,6 +605,7 @@ func Test_Processor_Outcome(t *testing.T) {
 }
 
 func Test_buildMerkleRootsOutcome(t *testing.T) {
+	mockAddrCodec := internal.NewMockAddressCodec(t)
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
 
@@ -624,11 +628,10 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 		}
 
 		lggr := logger.Test(t)
-
 		for i := 0; i < rounds; i++ {
-			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{})
+			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
-			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{})
+			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
 			require.Equal(t, report1, report2)
 		}
