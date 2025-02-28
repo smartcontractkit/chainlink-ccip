@@ -720,9 +720,6 @@ func TestMcmsCapacity(t *testing.T) {
 				perInstrOverhead := (totalCU - directCU - baselineOverhead) / uint32(count-1)
 				t.Logf("For %d heavy ops: totalCU=%d, baseline=%d, per-instruction overhead=%d",
 					count, totalCU, baselineOverhead, perInstrOverhead)
-				// Optionally, add assertions with acceptable tolerances:
-				// expectedCU := directCU + baselineOverhead + (uint32(count-1) * perInstrOverhead)
-				// require.InDelta(t, expectedCU, totalCU, someTolerance)
 			}
 		})
 	})
