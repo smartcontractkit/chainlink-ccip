@@ -18,6 +18,7 @@ pub fn uninitialized(v: u8) -> bool {
 /// Maximum acceptable config version accepted by this module: any accounts with higher
 /// version numbers than this will be rejected.
 pub const MAX_CONFIG_V: u8 = 1;
+pub const MAX_CURSES_V: u8 = 1;
 
 pub mod seed {
     pub const CONFIG: &[u8] = b"config";
@@ -41,6 +42,7 @@ pub struct Initialize<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Curses::INIT_SPACE,
+        constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,
     )]
     pub curses: Account<'info, Curses>,
 
@@ -70,8 +72,9 @@ pub struct UpdateConfig<'info> {
     #[account(
         seeds = [seed::CONFIG],
         bump,
+        constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,
     )]
-    pub cursed: Account<'info, Curses>,
+    pub curses: Account<'info, Curses>,
 
     // validate signer is registered admin
     #[account(address = config.owner @ RmnRemoteError::Unauthorized)]
@@ -113,6 +116,7 @@ pub struct Curse<'info> {
         realloc = ANCHOR_DISCRIMINATOR + curses.dynamic_len() + CurseSubject::INIT_SPACE,
         realloc::payer = authority,
         realloc::zero = false,
+        constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,
     )]
     pub curses: Account<'info, Curses>,
 
@@ -139,6 +143,7 @@ pub struct Uncurse<'info> {
         realloc = (ANCHOR_DISCRIMINATOR + curses.dynamic_len()).saturating_sub(CurseSubject::INIT_SPACE),
         realloc::payer = authority,
         realloc::zero = false,
+        constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,
     )]
     pub curses: Account<'info, Curses>,
 
@@ -150,6 +155,7 @@ pub struct InspectCurses<'info> {
     #[account(
         seeds = [seed::CURSES],
         bump,
+        constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,
     )]
     pub curses: Account<'info, Curses>,
 

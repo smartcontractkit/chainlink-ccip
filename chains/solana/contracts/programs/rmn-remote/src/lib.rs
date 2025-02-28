@@ -34,6 +34,8 @@ pub mod rmn_remote {
             default_code_version: CodeVersion::V1,
         });
 
+        ctx.accounts.curses.version = 1;
+
         emit!(ConfigSet {
             default_code_version: ctx.accounts.config.default_code_version,
         });

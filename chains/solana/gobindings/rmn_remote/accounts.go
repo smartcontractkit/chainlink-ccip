@@ -84,6 +84,7 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 }
 
 type Curses struct {
+	Version        uint8
 	CursedSubjects []CurseSubject
 }
 
@@ -92,6 +93,11 @@ var CursesDiscriminator = [8]byte{129, 28, 49, 58, 74, 237, 146, 202}
 func (obj Curses) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
 	err = encoder.WriteBytes(CursesDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
 	if err != nil {
 		return err
 	}
@@ -116,6 +122,11 @@ func (obj *Curses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 				"[129 28 49 58 74 237 146 202]",
 				fmt.Sprint(discriminator[:]))
 		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
 	}
 	// Deserialize `CursedSubjects`:
 	err = decoder.Decode(&obj.CursedSubjects)

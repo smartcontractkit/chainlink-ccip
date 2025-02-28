@@ -66,7 +66,7 @@ export type RmnRemote = {
           "isSigner": false
         },
         {
-          "name": "cursed",
+          "name": "curses",
           "isMut": false,
           "isSigner": false
         },
@@ -129,7 +129,7 @@ export type RmnRemote = {
           "isSigner": false
         },
         {
-          "name": "cursed",
+          "name": "curses",
           "isMut": false,
           "isSigner": false
         },
@@ -332,6 +332,10 @@ export type RmnRemote = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "cursedSubjects",
             "type": {
@@ -566,7 +570,7 @@ export const IDL: RmnRemote = {
           "isSigner": false
         },
         {
-          "name": "cursed",
+          "name": "curses",
           "isMut": false,
           "isSigner": false
         },
@@ -629,7 +633,7 @@ export const IDL: RmnRemote = {
           "isSigner": false
         },
         {
-          "name": "cursed",
+          "name": "curses",
           "isMut": false,
           "isSigner": false
         },
@@ -832,6 +836,10 @@ export const IDL: RmnRemote = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "cursedSubjects",
             "type": {

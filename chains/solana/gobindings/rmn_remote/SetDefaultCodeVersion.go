@@ -24,7 +24,7 @@ type SetDefaultCodeVersion struct {
 
 	// [0] = [WRITE] config
 	//
-	// [1] = [] cursed
+	// [1] = [] curses
 	//
 	// [2] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -55,14 +55,14 @@ func (inst *SetDefaultCodeVersion) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-// SetCursedAccount sets the "cursed" account.
-func (inst *SetDefaultCodeVersion) SetCursedAccount(cursed ag_solanago.PublicKey) *SetDefaultCodeVersion {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(cursed)
+// SetCursesAccount sets the "curses" account.
+func (inst *SetDefaultCodeVersion) SetCursesAccount(curses ag_solanago.PublicKey) *SetDefaultCodeVersion {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(curses)
 	return inst
 }
 
-// GetCursedAccount gets the "cursed" account.
-func (inst *SetDefaultCodeVersion) GetCursedAccount() *ag_solanago.AccountMeta {
+// GetCursesAccount gets the "curses" account.
+func (inst *SetDefaultCodeVersion) GetCursesAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
@@ -108,7 +108,7 @@ func (inst *SetDefaultCodeVersion) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Cursed is not set")
+			return errors.New("accounts.Curses is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -133,7 +133,7 @@ func (inst *SetDefaultCodeVersion) EncodeToTree(parent ag_treeout.Branches) {
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   cursed", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   curses", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
 					})
 				})
@@ -163,11 +163,11 @@ func NewSetDefaultCodeVersionInstruction(
 	codeVersion CodeVersion,
 	// Accounts:
 	config ag_solanago.PublicKey,
-	cursed ag_solanago.PublicKey,
+	curses ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetDefaultCodeVersion {
 	return NewSetDefaultCodeVersionInstructionBuilder().
 		SetCodeVersion(codeVersion).
 		SetConfigAccount(config).
-		SetCursedAccount(cursed).
+		SetCursesAccount(curses).
 		SetAuthorityAccount(authority)
 }

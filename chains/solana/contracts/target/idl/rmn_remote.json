@@ -66,7 +66,7 @@
           "isSigner": false
         },
         {
-          "name": "cursed",
+          "name": "curses",
           "isMut": false,
           "isSigner": false
         },
@@ -129,7 +129,7 @@
           "isSigner": false
         },
         {
-          "name": "cursed",
+          "name": "curses",
           "isMut": false,
           "isSigner": false
         },
@@ -332,6 +332,10 @@
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "cursedSubjects",
             "type": {

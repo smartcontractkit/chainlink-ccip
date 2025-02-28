@@ -66,6 +66,7 @@ pub struct Config {
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct Curses {
+    pub version: u8,
     #[max_len(0)]
     pub cursed_subjects: Vec<CurseSubject>,
 }
