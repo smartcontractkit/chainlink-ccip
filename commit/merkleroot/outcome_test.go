@@ -582,7 +582,7 @@ func Test_Processor_Outcome(t *testing.T) {
 					MaxReportTransmissionCheckAttempts: uint(tc.maxReportTransmissionCheckAttempts),
 				},
 				metricsReporter: NoopMetrics{},
-				addressCodec:    internal.NewMockAddressCodec(t),
+				addressCodec:    internal.NewMockAddressCodecHex(t),
 			}
 
 			aos := make([]plugincommon.AttributedObservation[Observation], 0, len(tc.observations))
@@ -605,7 +605,7 @@ func Test_Processor_Outcome(t *testing.T) {
 }
 
 func Test_buildMerkleRootsOutcome(t *testing.T) {
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
 

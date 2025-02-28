@@ -353,6 +353,7 @@ func (b *execReportBuilder) checkMessage(
 // they will also end up in the inflight cache and "snoozed" until they
 // expire from the inflight cache TTL.
 func checkSkippedNonces(
+	addressCodec ccipocr3.AddressCodec,
 	execReport ccipocr3.ExecutePluginReportSingleChain,
 ) error {
 	// note that the messages in the report _must_ be ordered correctly in nonce order,
@@ -369,7 +370,11 @@ func checkSkippedNonces(
 			continue
 		}
 
-		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(msg.Header.SourceChainSelector))
+		sender, err := addressCodec.AddressBytesToString(msg.Sender, msg.Header.SourceChainSelector)
+		if err != nil {
+			return fmt.Errorf("unable to convert sender address to string: %w, sender address: %v", err, msg.Sender)
+		}
+
 		latestNonce, ok := latestNoncePerSender[sender]
 		if !ok {
 			// first time we ever see this sender, populate the nonce.
@@ -400,7 +405,7 @@ func (b *execReportBuilder) verifyReport(
 	ctx context.Context,
 	execReport ccipocr3.ExecutePluginReportSingleChain,
 ) (bool, validationMetadata, error) {
-	err := checkSkippedNonces(execReport)
+	err := checkSkippedNonces(b.addressCodec, execReport)
 	if err != nil {
 		b.lggr.Infow("invalid report, skipped nonce detected", "err", err)
 		return false, validationMetadata{}, nil

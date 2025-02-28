@@ -855,10 +855,10 @@ func Test_Builder_Build(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// t.Parallel()
+			t.Parallel()
 			ctx := context.Background()
 			// look for error in Add or Build
 			foundError := false
@@ -872,7 +872,8 @@ func Test_Builder_Build(t *testing.T) {
 				hasher,
 				codec,
 				ep,
-				1,
+				1, // destChainSelector
+				mockAddrCodec,
 				WithMaxReportSizeBytes(tt.args.maxReportSize),
 				WithMaxGas(tt.args.maxGasLimit),
 				WithMaxMessages(tt.args.maxMessages),
@@ -1077,6 +1078,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				resolvedEncoder,
 				ep,
 				1,
+				internal.NewMockAddressCodecHex(t),
 				WithMaxReportSizeBytes(tt.fields.maxReportSizeBytes),
 				WithMaxGas(tt.fields.maxGas),
 			)
@@ -1299,7 +1301,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1315,6 +1317,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				nil,
 				nil,
 				1,
+				internal.NewMockAddressCodecHex(t),
 				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
 			)
 			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
@@ -1504,7 +1507,8 @@ func Test_checkSkippedNonces(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkSkippedNonces(tt.args.execReport)
+			mockAddrCodec := internal.NewMockAddressCodecHex(t)
+			err := checkSkippedNonces(mockAddrCodec, tt.args.execReport)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
