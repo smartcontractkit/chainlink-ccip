@@ -445,7 +445,7 @@ func TestCCIPRouter(t *testing.T) {
 				config.FeeQuoterProgram,
 				config.FqConfigPDA,
 				config.RMNRemoteProgram,
-				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
 				config.RMNRemoteCursesPDA,
 
 				// remaining accounts used on some price update
@@ -8206,7 +8206,7 @@ func TestCCIPRouter(t *testing.T) {
 				tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[receiver.PublicKey()])
 				require.NoError(t, err)
 				raw.AccountMetaSlice = append(raw.AccountMetaSlice, tokenMetas...)
-				maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
+				// maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)

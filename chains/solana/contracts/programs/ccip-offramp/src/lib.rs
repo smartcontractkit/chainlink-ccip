@@ -166,7 +166,10 @@ pub mod ccip_offramp {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for updating the reference addresses.
-    /// * `reference_addresses` - The new reference addresses to be set.
+    /// * `router` - The router address to be set.
+    /// * `fee_quoter` - The fee_quoter address to be set.
+    /// * `offramp_lookup_table` - The offramp_lookup_table address to be set.
+    /// * `rmn_remote` - The rmn_remote address to be set.
     pub fn update_reference_addresses(
         ctx: Context<UpdateReferenceAddresses>,
         router: Pubkey,
