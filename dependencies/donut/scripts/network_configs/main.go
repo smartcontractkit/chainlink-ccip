@@ -9,12 +9,10 @@ import (
 
 const tmplFile = "values.yaml.tmpl"
 const defaultFinalityDepth = 200
-const defaultLogPollerDepth = "1s"
 
 type EVMChain struct {
-	NetworkId       int64
-	FinalityDepth   int
-	LogPollInterval string
+	NetworkId     int64
+	FinalityDepth int
 }
 
 type SolanaChain struct {
@@ -86,18 +84,18 @@ func BuildEVMNetworkConfigs(chainsCount int) []EVMChain {
 
 	// Initialize the chains slice
 	chains := []EVMChain{
-		{NetworkId: 1337, FinalityDepth: defaultFinalityDepth, LogPollInterval: defaultLogPollerDepth},
+		{NetworkId: 1337, FinalityDepth: defaultFinalityDepth},
 	}
 
 	// Add the second chain if chainsCount > 1
 	if chainsCount > 1 {
-		chains = append(chains, EVMChain{NetworkId: 2337, FinalityDepth: defaultFinalityDepth, LogPollInterval: defaultLogPollerDepth})
+		chains = append(chains, EVMChain{NetworkId: 2337, FinalityDepth: defaultFinalityDepth})
 	}
 
 	// Add subsequent chains starting from 90000000 if chainsCount > 2
 	for i := 2; i < chainsCount; i++ {
 		networkId := int64(90000000 + i - 1)
-		chains = append(chains, EVMChain{NetworkId: networkId, FinalityDepth: defaultFinalityDepth, LogPollInterval: defaultLogPollerDepth})
+		chains = append(chains, EVMChain{NetworkId: networkId, FinalityDepth: defaultFinalityDepth})
 	}
 
 	return chains
