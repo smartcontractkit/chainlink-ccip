@@ -116,6 +116,8 @@ type TokenPriceUpdate struct {
 }
 
 type GasPriceUpdate struct {
+	// DestChainSelector is the chain that the gas price is for (some plugin source chain).
+	// Not the chain that the gas price is stored on.
 	DestChainSelector uint64
 	UsdPerUnitGas     *big.Int
 }
@@ -1947,10 +1949,6 @@ func validateCommitReportAcceptedEvent(
 	}
 
 	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
-		if gpus.DestChainSelector != uint64(destChain) {
-			return nil, fmt.Errorf("dest chain does not match the reader's one %d != %d",
-				gpus.DestChainSelector, destChain)
-		}
 		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
 			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
 		}
