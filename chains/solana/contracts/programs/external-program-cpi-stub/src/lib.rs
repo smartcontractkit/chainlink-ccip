@@ -3,6 +3,7 @@
  * Used to test CPIs made by other programs (with actual business logic).
  */
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::keccak;
 
 declare_id!("4HeqEoSyfYpeC2goFLj9eHgkxV33mR5G7JYAbRsN14uQ");
 
@@ -56,19 +57,25 @@ pub mod external_program_cpi_stub {
         Ok(())
     }
 
-    pub fn many_accounts_instruction(_ctx: Context<ManyAccounts>) -> Result<()> {
-        // Simply returns success, used to test maximum account references
+    /// no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)
+    pub fn no_op(_ctx: Context<Empty>) -> Result<()> {
         Ok(())
     }
 
     pub fn compute_heavy(_ctx: Context<Empty>, iterations: u32) -> Result<()> {
-        // perform some deterministic computation that uses CU predictably
-        let mut result = 0u64;
-        for i in 0..iterations {
-            result = result.wrapping_add((i as u64).wrapping_mul(i as u64));
+        let mut hash = [0u8; 32];
+
+        // Initialize with some data
+        for i in 0..32 {
+            hash[i] = i as u8;
         }
 
-        // don't log with msg!() - it adds variable CU consumption
+        // Perform multiple hash operations
+        for _ in 0..iterations {
+            hash = keccak::hash(&hash).to_bytes();
+        }
+
+        // Don't log with msg!() to avoid variable CU consumption
         Ok(())
     }
 }
@@ -123,11 +130,4 @@ pub struct AccountMut<'info> {
     pub stub_caller: Signer<'info>,
 
     pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts, Debug)]
-pub struct ManyAccounts<'info> {
-    // allow this to accept arbitrary number of remaining accounts
-    pub stub_caller: Signer<'info>,
-    // no other required accounts - will test with remaining_accounts
 }

@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
-// todo: test note
 func TestMcmsCapacity(t *testing.T) {
 	t.Parallel()
 	ctx := tests.Context(t)
@@ -427,8 +426,305 @@ func TestMcmsCapacity(t *testing.T) {
 		}
 	})
 
-	// todo: lookup table test
-	// todo: appending many accounts test
+	t.Run("overhead analysis", func(t *testing.T) {
+		// -------------------------
+		// Direct No-Op Overhead
+		// -------------------------
+		directNoOpOverhead := func(t *testing.T) uint32 {
+			// Create the no-op instruction.
+			noOpDirectIx, err := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			require.NoError(t, err)
+
+			// Measure its direct execution cost.
+			directCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{noOpDirectIx}, admin, config.DefaultCommitment)
+			t.Logf("Direct no-op CU: %d", directCU)
+
+			// Execute to confirm it works.
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{noOpDirectIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(directCU))
+			return uint32(directCU)
+		}
+
+		// -------------------------
+		// MCM Execute Overhead
+		// -------------------------
+		mcmExecuteOverhead := func(t *testing.T, directCU uint32) uint32 {
+			// Retrieve the executor multisig info.
+			executorMsig := msigs[timelock.Executor_Role].GetAnyMultisig()
+
+			// Get the current operation count.
+			var prevRootAndOpCount mcm.ExpiringRootAndOpCount
+			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, executorMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
+			require.NoError(t, err, "failed to get account info")
+			currOpCount := prevRootAndOpCount.OpCount
+
+			// Create a no-op instruction.
+			noOpIx, err := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			require.NoError(t, err)
+
+			// Wrap the no-op in an MCM operation node.
+			node, err := mcms.IxToMcmTestOpNode(
+				executorMsig.ConfigPDA,
+				executorMsig.SignerPDA,
+				noOpIx,
+				currOpCount,
+			)
+			require.NoError(t, err)
+			ops := []mcms.McmOpNode{node}
+
+			// Create the MCM root data.
+			validUntil := uint32(0xffffffff)
+			rootValidationData, err := mcms.CreateMcmRootData(mcms.McmRootInput{
+				Multisig:             executorMsig.ConfigPDA,
+				Operations:           ops,
+				PreOpCount:           currOpCount,
+				PostOpCount:          currOpCount + 1,
+				ValidUntil:           validUntil,
+				OverridePreviousRoot: false,
+			})
+			require.NoError(t, err)
+
+			// Sign and set the root.
+			signatures, err := mcms.BulkSignOnMsgHash(executorMsig.Signers, rootValidationData.EthMsgHash)
+			require.NoError(t, err)
+			signaturesPDA := executorMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
+			preloadIxs, err := mcms.GetMcmPreloadSignaturesIxs(
+				signatures,
+				executorMsig.PaddedID,
+				rootValidationData.Root,
+				validUntil,
+				admin.PublicKey(),
+				config.MaxAppendSignatureBatchSize,
+			)
+			require.NoError(t, err)
+			for _, ix := range preloadIxs {
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			}
+
+			setRootIx, err := mcm.NewSetRootInstruction(
+				executorMsig.PaddedID,
+				rootValidationData.Root,
+				validUntil,
+				rootValidationData.Metadata,
+				rootValidationData.MetadataProof,
+				signaturesPDA,
+				executorMsig.RootMetadataPDA,
+				mcms.GetSeenSignedHashesPDA(executorMsig.PaddedID, rootValidationData.Root, validUntil),
+				executorMsig.ExpiringRootAndOpCountPDA,
+				executorMsig.ConfigPDA,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
+
+			// Build the MCM execute instruction.
+			op := ops[0]
+			proofs, err := op.Proofs()
+			require.NoError(t, err)
+			executeIx := mcm.NewExecuteInstruction(
+				executorMsig.PaddedID,
+				config.TestChainID,
+				op.Nonce,
+				op.Data,
+				proofs,
+				executorMsig.ConfigPDA,
+				executorMsig.RootMetadataPDA,
+				executorMsig.ExpiringRootAndOpCountPDA,
+				op.To,
+				executorMsig.SignerPDA,
+				admin.PublicKey(),
+			)
+			executeIx.AccountMetaSlice = append(executeIx.AccountMetaSlice, op.RemainingAccounts...)
+			vIx, err := executeIx.ValidateAndBuild()
+			require.NoError(t, err)
+
+			// Measure and log the compute units (CU) for MCM execution.
+			mcmCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+			t.Logf("MCM execute CU: %d", mcmCU)
+
+			// Execute the MCM operation.
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(mcmCU))
+			overhead := uint32(mcmCU) - directCU
+			t.Logf("MCM overhead: %d", overhead)
+			return overhead
+		}
+
+		// -------------------------
+		// Timelock Execute Overhead
+		// -------------------------
+		timelockExecuteOverhead := func(t *testing.T, directCU uint32) uint32 {
+			// Build a timelock operation that wraps a no-op.
+			salt, serr := timelockutil.SimpleSalt()
+			require.NoError(t, serr)
+			op := timelockutil.Operation{
+				TimelockID:  config.TestTimelockID,
+				Predecessor: config.TimelockEmptyOpID,
+				Salt:        salt,
+				Delay:       uint64(1),
+			}
+			noOpIx, err := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			require.NoError(t, err)
+			op.AddInstruction(noOpIx, []solana.PublicKey{config.ExternalCpiStubProgram})
+
+			// Preload and schedule the timelock operation.
+			opIxs, err := timelockutil.GetPreloadOperationIxs(
+				config.TestTimelockID,
+				op,
+				admin.PublicKey(),
+				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+			)
+			require.NoError(t, err)
+			for _, ix := range opIxs {
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			}
+			scheduleIx, err := timelock.NewScheduleBatchInstruction(
+				config.TestTimelockID,
+				op.OperationID(),
+				op.Delay,
+				op.OperationPDA(),
+				timelockutil.GetConfigPDA(config.TestTimelockID),
+				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleIx}, admin, config.DefaultCommitment)
+
+			// Wait until the timelock operation is ready.
+			err = timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
+			require.NoError(t, err)
+
+			// Build and measure the timelock execute instruction.
+			timelockExeIx := timelock.NewExecuteBatchInstruction(
+				config.TestTimelockID,
+				op.OperationID(),
+				op.OperationPDA(),
+				config.TimelockEmptyOpID,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
+				timelockutil.GetSignerPDA(config.TestTimelockID),
+				msigs[timelock.Executor_Role].AccessController.PublicKey(),
+				admin.PublicKey(),
+			)
+			timelockExeIx.AccountMetaSlice = append(timelockExeIx.AccountMetaSlice, op.RemainingAccounts()...)
+			timelockExeVIx, err := timelockExeIx.ValidateAndBuild()
+			require.NoError(t, err)
+
+			timelockCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment)
+			t.Logf("Timelock execute CU: %d", timelockCU)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(timelockCU))
+			overhead := uint32(timelockCU) - directCU
+			t.Logf("Timelock overhead: %d", overhead)
+			return overhead
+		}
+
+		// -------------------------
+		// Helper function for the scaling test using compute-heavy instructions.
+		// Instead of adding many no-op instructions (which causes OOM),
+		// we create each instruction as a compute-heavy instruction.
+		// 'iterationsPerInstr' can be tuned to achieve desired CU usage.
+		// -------------------------
+		createTimelockOpWithHeavyOps := func(t *testing.T, count int, iterationsPerInstr uint32) timelockutil.Operation {
+			salt, serr := timelockutil.SimpleSalt()
+			require.NoError(t, serr)
+			op := timelockutil.Operation{
+				TimelockID:  config.TestTimelockID,
+				Predecessor: config.TimelockEmptyOpID,
+				Salt:        salt,
+				Delay:       uint64(1),
+			}
+			for i := 0; i < count; i++ {
+				heavyIx, err := external_program_cpi_stub.NewComputeHeavyInstruction(iterationsPerInstr).ValidateAndBuild()
+				require.NoError(t, err)
+				op.AddInstruction(heavyIx, []solana.PublicKey{config.ExternalCpiStubProgram})
+			}
+			return op
+		}
+
+		executeTimelockOpAndGetCU := func(t *testing.T, op timelockutil.Operation) uint32 {
+			opIxs, err := timelockutil.GetPreloadOperationIxs(
+				config.TestTimelockID,
+				op,
+				admin.PublicKey(),
+				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+			)
+			require.NoError(t, err)
+			for _, ix := range opIxs {
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			}
+			scheduleIx, err := timelock.NewScheduleBatchInstruction(
+				config.TestTimelockID,
+				op.OperationID(),
+				op.Delay,
+				op.OperationPDA(),
+				timelockutil.GetConfigPDA(config.TestTimelockID),
+				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleIx}, admin, config.DefaultCommitment)
+			err = timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
+			require.NoError(t, err)
+			timelockExeIx := timelock.NewExecuteBatchInstruction(
+				config.TestTimelockID,
+				op.OperationID(),
+				op.OperationPDA(),
+				config.TimelockEmptyOpID,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
+				timelockutil.GetSignerPDA(config.TestTimelockID),
+				msigs[timelock.Executor_Role].AccessController.PublicKey(),
+				admin.PublicKey(),
+			)
+			timelockExeIx.AccountMetaSlice = append(timelockExeIx.AccountMetaSlice, op.RemainingAccounts()...)
+			timelockExeVIx, err := timelockExeIx.ValidateAndBuild()
+			require.NoError(t, err)
+			cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
+			return uint32(cu)
+		}
+
+		// -------------------------
+		// Run the tests.
+		// -------------------------
+		t.Run("Direct No-Op", func(t *testing.T) {
+			directCU := directNoOpOverhead(t)
+			t.Logf("Direct no-op CU: %d", directCU)
+		})
+
+		t.Run("MCM Execute Overhead", func(t *testing.T) {
+			directCU := directNoOpOverhead(t)
+			overhead := mcmExecuteOverhead(t, directCU)
+			t.Logf("MCM Execute Overhead: %d", overhead)
+		})
+
+		t.Run("Timelock Execute Overhead", func(t *testing.T) {
+			directCU := directNoOpOverhead(t)
+			overhead := timelockExecuteOverhead(t, directCU)
+			t.Logf("Timelock Execute Overhead: %d", overhead)
+		})
+
+		t.Run("Timelock Scaling Test (Compute-Heavy Ops)", func(t *testing.T) {
+			// For scaling tests, we now use compute-heavy instructions instead of many no-ops.
+			// Each instruction in the timelock op will be a compute-heavy instruction with a fixed iteration count.
+			const iterationsPerInstr uint32 = 1000
+			directCU := directNoOpOverhead(t)
+
+			// Measure a timelock op with 1 compute-heavy instruction to establish baseline.
+			totalCU1 := executeTimelockOpAndGetCU(t, createTimelockOpWithHeavyOps(t, 1, iterationsPerInstr))
+			baselineOverhead := totalCU1 - directCU
+			t.Logf("Baseline overhead (1 heavy op): %d", baselineOverhead)
+
+			// Test with multiple instructions.
+			counts := []int{2, 5, 7, 8, 9}
+			for _, count := range counts {
+				totalCU := executeTimelockOpAndGetCU(t, createTimelockOpWithHeavyOps(t, count, iterationsPerInstr))
+				perInstrOverhead := (totalCU - directCU - baselineOverhead) / uint32(count-1)
+				t.Logf("For %d heavy ops: totalCU=%d, baseline=%d, per-instruction overhead=%d",
+					count, totalCU, baselineOverhead, perInstrOverhead)
+				// Optionally, add assertions with acceptable tolerances:
+				// expectedCU := directCU + baselineOverhead + (uint32(count-1) * perInstrOverhead)
+				// require.InDelta(t, expectedCU, totalCU, someTolerance)
+			}
+		})
+	})
 
 	/*
 		NOTE: Testing Transaction Size Limitations

@@ -96,14 +96,11 @@ export type ExternalProgramCpiStub = {
       ]
     },
     {
-      "name": "manyAccountsInstruction",
-      "accounts": [
-        {
-          "name": "stubCaller",
-          "isMut": false,
-          "isSigner": true
-        }
+      "name": "noOp",
+      "docs": [
+        "no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)"
       ],
+      "accounts": [],
       "args": []
     },
     {
@@ -231,14 +228,11 @@ export const IDL: ExternalProgramCpiStub = {
       ]
     },
     {
-      "name": "manyAccountsInstruction",
-      "accounts": [
-        {
-          "name": "stubCaller",
-          "isMut": false,
-          "isSigner": true
-        }
+      "name": "noOp",
+      "docs": [
+        "no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)"
       ],
+      "accounts": [],
       "args": []
     },
     {
