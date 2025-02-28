@@ -1,0 +1,305 @@
+---
+name: CRIB DaaS Provisioner
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: |
+          Kubernetes namespace to deploy to. Must start w/ crib-daas-*
+        default: ""
+        required: true
+      action:
+        description: |
+          Action to take: option=[create|destroy]
+        default: create
+        required: true
+      deployment-type:
+        description: |
+          Daas Deployment type: options=[demo,full]
+        default: demo
+        required: true
+      namespace-ttl:
+        description: |
+          Kubernetes namespace time-to-live. default=4h
+        default: 4h
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provisioner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Prevent running on draft or changesets PRs
+        id: precheck
+        env: {}
+        run: |
+          command=bypass
+          valid_inputs=false
+          should_run=true
+          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+
+          # debug
+          echo "namespace=${{ inputs.namespace }}"
+          echo "action=${{ inputs.action }}"
+          echo "deployment-type=${{ inputs.deployment-type }}"
+
+          # check namespace prefix
+          if [[ "${{ inputs.namespace }}" == "crib-daas-"* ]]; then
+            echo "The namespace starts with the 'crib-daas-' prefix."
+          else
+            echo "The namespace does not start with the 'crib-daas-' prefix."
+            echo "valid_inputs=$valid_inputs" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          # check action
+          case "${{ inputs.action }}" in
+            "create"|"destroy")
+              echo "The action is valid."
+              ;;
+            *)
+              echo "The action is not valid."
+              echo "valid_inputs=$valid_inputs" >> "$GITHUB_OUTPUT"
+              exit 1
+              ;;
+          esac
+
+          # check deployment-type
+          case "${{ inputs.deployment-type }}" in
+            "demo"|"full")
+              echo "The deployment-type is valid."
+              ;;
+            *)
+              echo "The deployment-type is not valid."
+              echo "valid_inputs=$valid_inputs" >> "$GITHUB_OUTPUT"
+              exit 1
+              ;;
+          esac
+
+          valid_inputs=true
+          echo "valid_inputs=$valid_inputs" >> "$GITHUB_OUTPUT"
+
+          if [[ "${{ inputs.action }}" == "destroy" ]]; then
+            echo "command=bypass" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ inputs.deployment-type }}" == "demo" ]]; then
+            echo "command=daas-aws-alt" >> "$GITHUB_OUTPUT"
+          else
+            echo "command=daas-aws" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install nix
+        uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b # v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Deploy and validate crib environment
+        if: steps.precheck.outputs.should_run == 'true'
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@a7000f52f913eda899bce69e17d8e1f33823c149 # unreleased
+        id: deploy
+        with:
+          # secrets
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-role-arn: ${{ secrets.AWS_OIDC_CRIB_ROLE_ARN_STAGE }}
+          aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
+          ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
+          k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
+          main-dns-zone: ${{ secrets.MAIN_DNS_ZONE_STAGE_PUBLIC }}
+          # misc
+          crib-repo-ref: ${{ github.ref }}
+          command: ${{ steps.precheck.outputs.command }}
+          command-args: "--skip-build"
+          product-dir: "daas"
+          chainlink-team: dona
+          chainlink-product: daas
+          ns-name-prefix: "crib-daas-ci"
+          ns-name-override: ${{ inputs.namespace }}
+          ns-ttl: ${{ inputs.namespace-ttl }}
+
+      - name: Destroy crib environment
+        if: inputs.action == 'destroy' && steps.deploy.outputs.devspace-namespace != ''
+        uses: smartcontractkit/.github/actions/crib-purge-environment@142671bc21953c8cc3edbd21848c50b5ec201c2a # crib-purge-environment@0.3.0
+        id: destroy
+        with:
+          namespace: ${{ steps.deploy.outputs.devspace-namespace }}
+
+      - name: Set slack
+        if: inputs.action == 'create' && steps.deploy.outputs.devspace-namespace != ''
+        id: set-slack
+        run: |
+          msg=""
+          if [[ ${{ inputs.deployment-type }} == "demo" ]]; then
+            msg+="Hub: https://${{ inputs.namespace }}-console.${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}/operatorhub/ns/daas\n"
+            msg+="Console: https://${{ inputs.namespace }}-console.${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}\n"
+            msg+="Anvil: https://${{ inputs.namespace }}-anvil.${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}"
+          elif [[ ${{ inputs.deployment-type }} == "full" ]]; then
+            msg+="Console: https://${{ inputs.namespace }}-console.${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}\n"
+            msg+="Anvil: https://${{ inputs.namespace }}-anvil.${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}\n"
+            msg+="Dapi: https://${{ inputs.namespace }}-dapi.${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}"
+          fi
+          echo "msg=$msg" >> "$GITHUB_OUTPUT"
+
+      - name: Notify slack - error
+        if: failure() && steps.precheck.valid_inputs != 'true'
+        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 #v1.27.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "CRIB DaaS Provisioner - Error",
+              "username": "Releng Bot",
+              "icon_emoji": ":releng:",
+              "attachments": [
+                {
+                  "pretext": "",
+                  "color": "ff0000",
+                  "fields": [
+                    {
+                      "title": "Github Actor",
+                      "short": true,
+                      "value": "${{ github.actor }}"
+                    },
+                    {
+                      "title": "Namespace",
+                      "short": true,
+                      "value": "${{ inputs.namespace }}"
+                    },
+                    {
+                      "title": "Action",
+                      "short": true,
+                      "value": "${{ inputs.action }}"
+                    },
+                    {
+                      "title": "Deployment Type",
+                      "short": true,
+                      "value": "${{ inputs.deployment-type }}"
+                    },
+                    {
+                      "title": "Error",
+                      "short": false,
+                      "value": "Input validation error."
+                    },
+                    {
+                      "title": "Github Run ID",
+                      "short": false,
+                      "value": "https://github.com/smartcontractkit/crib/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify slack - create
+        if: inputs.action == 'create' && steps.deploy.outputs.devspace-namespace != ''
+        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 #v1.27.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "CRIB DaaS Provisioner - Create",
+              "username": "Releng Bot",
+              "icon_emoji": ":releng:",
+              "attachments": [
+                {
+                  "pretext": "",
+                  "color": "28a745",
+                  "fields": [
+                    {
+                      "title": "Github Actor",
+                      "short": true,
+                      "value": "${{ github.actor }}"
+                    },
+                    {
+                      "title": "Namespace",
+                      "short": true,
+                      "value": "${{ inputs.namespace }}"
+                    },
+                    {
+                      "title": "Action",
+                      "short": true,
+                      "value": "${{ inputs.action }}"
+                    },
+                    {
+                      "title": "Deployment Type",
+                      "short": true,
+                      "value": "${{ inputs.deployment-type }}"
+                    },
+                    {
+                      "title": "Components",
+                      "short": false,
+                      "value": "${{ steps.set-slack.outputs.msg }}"
+                    },
+                    {
+                      "title": "Github Run ID",
+                      "short": false,
+                      "value": "https://github.com/smartcontractkit/crib/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify slack - destroy
+        if: inputs.action == 'destroy' && steps.deploy.outputs.devspace-namespace != ''
+        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 #v1.27.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "CRIB DaaS Provisioner - Destroy",
+              "username": "Releng Bot",
+              "icon_emoji": ":releng:",
+              "attachments": [
+                {
+                  "pretext": "",
+                  "color": "28a745",
+                  "fields": [
+                    {
+                      "title": "Github Actor",
+                      "short": true,
+                      "value": "${{ github.actor }}"
+                    },
+                    {
+                      "title": "Namespace",
+                      "short": true,
+                      "value": "${{ inputs.namespace }}"
+                    },
+                    {
+                      "title": "Action",
+                      "short": true,
+                      "value": "${{ inputs.action }}"
+                    },
+                    {
+                      "title": "Deployment Type",
+                      "short": true,
+                      "value": "${{ inputs.deployment-type }}"
+                    },
+                    {
+                      "title": "Message",
+                      "short": false,
+                      "value": "Successfully destroyed crib instance."
+                    },
+                    {
+                      "title": "Github Run ID",
+                      "short": false,
+                      "value": "https://github.com/smartcontractkit/crib/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

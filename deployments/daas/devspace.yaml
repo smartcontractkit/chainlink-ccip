@@ -191,6 +191,7 @@ profiles:
             profiles:
               - vcluster-crib-aws
               - deploy-cluster-services-console
+              - deploy-cluster-services-olm
               - deploy-blockchain-anvil
 
   - name: deps-blockchain
@@ -282,3 +283,6 @@ commands:
     command: devspace run-pipeline daas-api -p daas-api
     description: Run the daas api pipeline.
     appendArgs: true
+  bypass:
+    command: |-
+      echo bloop
