@@ -176,6 +176,7 @@ func (p *Plugin) getFilterOutcome(
 		p.reportCodec,
 		p.estimateProvider,
 		p.destChain,
+		p.addrCodec,
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),

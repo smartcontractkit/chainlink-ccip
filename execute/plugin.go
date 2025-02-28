@@ -139,7 +139,7 @@ func NewPlugin(
 		commitRootsCache: cache.NewCommitRootsCache(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
-			time.Minute*5,
+			offchainCfg.RootSnoozeTime.Duration(),
 		),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
 		ocrTypeCodec:         ocrTypCodec,
@@ -487,6 +487,11 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
+	if len(decodedOutcome.Report.ChainReports) == 0 {
+		lggr.Warn("empty report", "report", decodedOutcome.Report)
+		return nil, nil
+	}
+
 	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
@@ -531,37 +536,42 @@ func (p *Plugin) validateReport(
 	ctx context.Context,
 	lggr logger.Logger,
 	r ocr3types.ReportWithInfo[[]byte],
-) (valid bool, decodedReport cciptypes.ExecutePluginReport, err error) {
+) (decodedReport cciptypes.ExecutePluginReport, err error) {
 	// Just a safety check, should never happen.
 	if r.Report == nil {
 		lggr.Warn("skipping nil report")
-		return false, cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{}, plugincommon.NewErrInvalidReport("nil report")
 	}
 
 	decodedReport, err = p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
-		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("decode exec plugin report: %w", err)
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrValidatingReport(fmt.Errorf("decode exec plugin report: %w", err))
 	}
 
 	if len(decodedReport.ChainReports) == 0 {
 		lggr.Infow("skipping empty report")
-		return false, cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrInvalidReport("empty report")
 	}
 
 	// check if we support the dest, if not we can't do the checks needed.
 	supports, err := p.chainSupport.SupportsDestChain(p.reportingCfg.OracleID)
 	if err != nil {
-		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("supports dest chain: %w", err)
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrValidatingReport(fmt.Errorf("supports dest chain: %w", err))
 	}
 
 	if !supports {
 		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
-		return false, cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
 
 	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
 	if err != nil {
-		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("get offramp config digest: %w", err)
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrValidatingReport(fmt.Errorf("get offramp config digest: %w", err))
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
@@ -569,7 +579,8 @@ func (p *Plugin) validateReport(
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
 		)
-		return false, cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrInvalidReport("offramp config digest mismatch")
 	}
 
 	// check that the messages in the report are not already executed onchain.
@@ -581,14 +592,15 @@ func (p *Plugin) validateReport(
 		// been executed, so we don't want to re-execute them.
 		// This gives the exec plugin a chance to remedy the situation
 		// by selecting a different set of messages.
-		return false, decodedReport, nil
+		return decodedReport, plugincommon.NewErrInvalidReport(err.Error())
 	}
 	if err != nil {
 		// TODO: should we return true here if we couldn't check for already executed messages?
-		return false, decodedReport, fmt.Errorf("checking for already executed messages failed: %w", err)
+		err := fmt.Errorf("checking for already executed messages failed: %w", err)
+		return decodedReport, plugincommon.NewErrValidatingReport(err)
 	}
 
-	return true, decodedReport, nil
+	return decodedReport, nil
 }
 
 // checkAlreadyExecuted checks if the messages in the report have already been executed
@@ -675,14 +687,14 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
-	valid, decodedReport, err := p.validateReport(ctx, lggr, r)
-	if err != nil {
-		return false, fmt.Errorf("validate exec report: %w", err)
-	}
-
-	if !valid {
-		lggr.Infow("report is not accepted", "seqNr", seqNr)
+	decodedReport, err := p.validateReport(ctx, lggr, r)
+	if errors.Is(err, plugincommon.ErrInvalidReport) {
+		lggr.Infow("report not valid, not accepting: %w", err)
 		return false, nil
+	}
+	if err != nil {
+		lggr.Infow("validation error", "err", err)
+		return false, fmt.Errorf("validating report: %w", err)
 	}
 
 	// TODO: consider doing this in validateReport,
@@ -716,14 +728,14 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
 
-	valid, decodedReport, err := p.validateReport(ctx, lggr, r)
-	if err != nil {
-		return valid, fmt.Errorf("validate exec report: %w", err)
-	}
-
-	if !valid {
-		lggr.Infow("report not accepted for transmit")
+	decodedReport, err := p.validateReport(ctx, lggr, r)
+	if errors.Is(err, plugincommon.ErrInvalidReport) {
+		lggr.Infow("report not valid, not transmitting: %w", err)
 		return false, nil
+	}
+	if err != nil {
+		lggr.Infow("validation error", "err", err)
+		return false, fmt.Errorf("validating report: %w", err)
 	}
 
 	lggr.Infow("ShouldTransmitAttestedReport returns true, report accepted",

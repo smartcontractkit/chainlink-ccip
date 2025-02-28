@@ -901,7 +901,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
-	mockAddrCodec := internal.NewMockAddressCodec(params.t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(params.t)
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
