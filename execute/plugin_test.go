@@ -994,7 +994,11 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 		Return(nil, fmt.Errorf("test error"))
 	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: ocrTypeCodec}
 	report, err := ocrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
-		exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}))
+		exectypes.Unknown, nil,
+		cciptypes.ExecutePluginReport{ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+			{},
+			{},
+		}}))
 	require.NoError(t, err)
 
 	_, err = p.Reports(ctx, 0, report)
@@ -1016,7 +1020,7 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validate exec report: decode exec plugin report: test error")
+	assert.Contains(t, err.Error(), "report validation error: decode exec plugin report: test error")
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
@@ -1319,7 +1323,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_DecodeFailure(t *testing.T) {
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "validate exec report: decode exec plugin report: test error")
+	require.ErrorContains(t, err, "report validation error: decode exec plugin report: test error")
 }
 
 func TestPlugin_ShouldTransmitAcceptReport_SupportsDestChainCheckFails(t *testing.T) {
