@@ -75,12 +75,4 @@ impl Curses {
     pub fn dynamic_len(&self) -> usize {
         Self::INIT_SPACE + self.cursed_subjects.len() * CurseSubject::INIT_SPACE
     }
-
-    pub fn is_subject_cursed(&self, subject: CurseSubject) -> bool {
-        self.cursed_subjects.contains(&subject)
-    }
-
-    pub fn is_chain_globally_cursed(&self) -> bool {
-        self.cursed_subjects.contains(&CurseSubject::GLOBAL)
-    }
 }

@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::{instructions::interfaces::Public, CurseSubject, InspectCurses, RmnRemoteError};
+use crate::{
+    instructions::interfaces::Public, CurseSubject, Curses, InspectCurses, RmnRemoteError,
+};
 
 pub struct Impl;
 
@@ -12,11 +14,11 @@ impl Public for Impl {
     ) -> Result<()> {
         let curses = &ctx.accounts.curses;
         require!(
-            !curses.is_chain_globally_cursed(),
+            !is_chain_globally_cursed(curses),
             RmnRemoteError::GloballyCursed
         );
         require!(
-            !curses.is_subject_cursed(subject),
+            !is_subject_cursed(curses, subject),
             RmnRemoteError::SubjectCursed
         );
         Ok(())
@@ -25,4 +27,12 @@ impl Public for Impl {
     fn get_cursed_subjects(&self, ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>> {
         Ok(ctx.accounts.curses.cursed_subjects.clone())
     }
+}
+
+fn is_subject_cursed(curses: &Curses, subject: CurseSubject) -> bool {
+    curses.cursed_subjects.contains(&subject)
+}
+
+fn is_chain_globally_cursed(curses: &Curses) -> bool {
+    curses.cursed_subjects.contains(&CurseSubject::GLOBAL)
 }
