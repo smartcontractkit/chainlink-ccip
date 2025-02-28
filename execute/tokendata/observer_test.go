@@ -18,7 +18,7 @@ import (
 )
 
 func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	obs, err := tokendata.NewConfigBasedCompositeObservers(
 		tests.Context(t),
 		logger.Test(t),

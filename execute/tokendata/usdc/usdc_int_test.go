@@ -204,7 +204,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	fujiReader := mockReader(t, fujiTransmitter, fuji)
 	sepoliaReader := mockReader(t, sepoliaTransmitter, sepolia)
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	usdcReader, err := readerpkg.NewUSDCMessageReader(
 		tests.Context(t),
 		logger.Test(t),
