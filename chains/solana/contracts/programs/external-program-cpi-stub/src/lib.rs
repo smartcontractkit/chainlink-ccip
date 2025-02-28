@@ -66,9 +66,9 @@ pub mod external_program_cpi_stub {
         let mut hash = [0u8; 32];
 
         // Initialize with some data
-        for i in 0..32 {
-            hash[i] = i as u8;
-        }
+        hash.iter_mut().enumerate().for_each(|(i, byte)| {
+            *byte = i as u8;
+        });
 
         // Perform multiple hash operations
         for _ in 0..iterations {

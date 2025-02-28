@@ -432,8 +432,8 @@ func TestMcmsCapacity(t *testing.T) {
 		// -------------------------
 		directNoOpOverhead := func(t *testing.T) uint32 {
 			// Create the no-op instruction.
-			noOpDirectIx, err := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
-			require.NoError(t, err)
+			noOpDirectIx, nierr := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			require.NoError(t, nierr)
 
 			// Measure its direct execution cost.
 			directCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{noOpDirectIx}, admin, config.DefaultCommitment)
@@ -453,27 +453,27 @@ func TestMcmsCapacity(t *testing.T) {
 
 			// Get the current operation count.
 			var prevRootAndOpCount mcm.ExpiringRootAndOpCount
-			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, executorMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, executorMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
 			require.NoError(t, err, "failed to get account info")
 			currOpCount := prevRootAndOpCount.OpCount
 
 			// Create a no-op instruction.
-			noOpIx, err := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
-			require.NoError(t, err)
+			noOpIx, nierr := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			require.NoError(t, nierr)
 
 			// Wrap the no-op in an MCM operation node.
-			node, err := mcms.IxToMcmTestOpNode(
+			node, nerr := mcms.IxToMcmTestOpNode(
 				executorMsig.ConfigPDA,
 				executorMsig.SignerPDA,
 				noOpIx,
 				currOpCount,
 			)
-			require.NoError(t, err)
+			require.NoError(t, nerr)
 			ops := []mcms.McmOpNode{node}
 
 			// Create the MCM root data.
 			validUntil := uint32(0xffffffff)
-			rootValidationData, err := mcms.CreateMcmRootData(mcms.McmRootInput{
+			rootValidationData, rverr := mcms.CreateMcmRootData(mcms.McmRootInput{
 				Multisig:             executorMsig.ConfigPDA,
 				Operations:           ops,
 				PreOpCount:           currOpCount,
@@ -481,13 +481,13 @@ func TestMcmsCapacity(t *testing.T) {
 				ValidUntil:           validUntil,
 				OverridePreviousRoot: false,
 			})
-			require.NoError(t, err)
+			require.NoError(t, rverr)
 
 			// Sign and set the root.
-			signatures, err := mcms.BulkSignOnMsgHash(executorMsig.Signers, rootValidationData.EthMsgHash)
-			require.NoError(t, err)
+			signatures, serr := mcms.BulkSignOnMsgHash(executorMsig.Signers, rootValidationData.EthMsgHash)
+			require.NoError(t, serr)
 			signaturesPDA := executorMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
-			preloadIxs, err := mcms.GetMcmPreloadSignaturesIxs(
+			preloadIxs, perr := mcms.GetMcmPreloadSignaturesIxs(
 				signatures,
 				executorMsig.PaddedID,
 				rootValidationData.Root,
@@ -495,12 +495,12 @@ func TestMcmsCapacity(t *testing.T) {
 				admin.PublicKey(),
 				config.MaxAppendSignatureBatchSize,
 			)
-			require.NoError(t, err)
+			require.NoError(t, perr)
 			for _, ix := range preloadIxs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
-			setRootIx, err := mcm.NewSetRootInstruction(
+			setRootIx, srerr := mcm.NewSetRootInstruction(
 				executorMsig.PaddedID,
 				rootValidationData.Root,
 				validUntil,
@@ -514,13 +514,13 @@ func TestMcmsCapacity(t *testing.T) {
 				admin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()
-			require.NoError(t, err)
+			require.NoError(t, srerr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
 
 			// Build the MCM execute instruction.
 			op := ops[0]
-			proofs, err := op.Proofs()
-			require.NoError(t, err)
+			proofs, perr := op.Proofs()
+			require.NoError(t, perr)
 			executeIx := mcm.NewExecuteInstruction(
 				executorMsig.PaddedID,
 				config.TestChainID,
@@ -535,8 +535,8 @@ func TestMcmsCapacity(t *testing.T) {
 				admin.PublicKey(),
 			)
 			executeIx.AccountMetaSlice = append(executeIx.AccountMetaSlice, op.RemainingAccounts...)
-			vIx, err := executeIx.ValidateAndBuild()
-			require.NoError(t, err)
+			vIx, vierr := executeIx.ValidateAndBuild()
+			require.NoError(t, vierr)
 
 			// Measure and log the compute units (CU) for MCM execution.
 			mcmCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
@@ -562,22 +562,22 @@ func TestMcmsCapacity(t *testing.T) {
 				Salt:        salt,
 				Delay:       uint64(1),
 			}
-			noOpIx, err := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
-			require.NoError(t, err)
+			noOpIx, nierr := external_program_cpi_stub.NewNoOpInstruction().ValidateAndBuild()
+			require.NoError(t, nierr)
 			op.AddInstruction(noOpIx, []solana.PublicKey{config.ExternalCpiStubProgram})
 
 			// Preload and schedule the timelock operation.
-			opIxs, err := timelockutil.GetPreloadOperationIxs(
+			opIxs, oierr := timelockutil.GetPreloadOperationIxs(
 				config.TestTimelockID,
 				op,
 				admin.PublicKey(),
 				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
 			)
-			require.NoError(t, err)
+			require.NoError(t, oierr)
 			for _, ix := range opIxs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
-			scheduleIx, err := timelock.NewScheduleBatchInstruction(
+			scheduleIx, scerr := timelock.NewScheduleBatchInstruction(
 				config.TestTimelockID,
 				op.OperationID(),
 				op.Delay,
@@ -586,7 +586,7 @@ func TestMcmsCapacity(t *testing.T) {
 				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
 				admin.PublicKey(),
 			).ValidateAndBuild()
-			require.NoError(t, err)
+			require.NoError(t, scerr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleIx}, admin, config.DefaultCommitment)
 
 			// Wait until the timelock operation is ready.
@@ -605,8 +605,8 @@ func TestMcmsCapacity(t *testing.T) {
 				admin.PublicKey(),
 			)
 			timelockExeIx.AccountMetaSlice = append(timelockExeIx.AccountMetaSlice, op.RemainingAccounts()...)
-			timelockExeVIx, err := timelockExeIx.ValidateAndBuild()
-			require.NoError(t, err)
+			timelockExeVIx, tverr := timelockExeIx.ValidateAndBuild()
+			require.NoError(t, tverr)
 
 			timelockCU := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment)
 			t.Logf("Timelock execute CU: %d", timelockCU)
@@ -632,25 +632,25 @@ func TestMcmsCapacity(t *testing.T) {
 				Delay:       uint64(1),
 			}
 			for i := 0; i < count; i++ {
-				heavyIx, err := external_program_cpi_stub.NewComputeHeavyInstruction(iterationsPerInstr).ValidateAndBuild()
-				require.NoError(t, err)
+				heavyIx, hverr := external_program_cpi_stub.NewComputeHeavyInstruction(iterationsPerInstr).ValidateAndBuild()
+				require.NoError(t, hverr)
 				op.AddInstruction(heavyIx, []solana.PublicKey{config.ExternalCpiStubProgram})
 			}
 			return op
 		}
 
 		executeTimelockOpAndGetCU := func(t *testing.T, op timelockutil.Operation) uint32 {
-			opIxs, err := timelockutil.GetPreloadOperationIxs(
+			opIxs, oierr := timelockutil.GetPreloadOperationIxs(
 				config.TestTimelockID,
 				op,
 				admin.PublicKey(),
 				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
 			)
-			require.NoError(t, err)
+			require.NoError(t, oierr)
 			for _, ix := range opIxs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
-			scheduleIx, err := timelock.NewScheduleBatchInstruction(
+			scheduleIx, scerr := timelock.NewScheduleBatchInstruction(
 				config.TestTimelockID,
 				op.OperationID(),
 				op.Delay,
@@ -659,7 +659,7 @@ func TestMcmsCapacity(t *testing.T) {
 				msigs[timelock.Proposer_Role].AccessController.PublicKey(),
 				admin.PublicKey(),
 			).ValidateAndBuild()
-			require.NoError(t, err)
+			require.NoError(t, scerr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleIx}, admin, config.DefaultCommitment)
 			err = timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
 			require.NoError(t, err)
@@ -674,8 +674,8 @@ func TestMcmsCapacity(t *testing.T) {
 				admin.PublicKey(),
 			)
 			timelockExeIx.AccountMetaSlice = append(timelockExeIx.AccountMetaSlice, op.RemainingAccounts()...)
-			timelockExeVIx, err := timelockExeIx.ValidateAndBuild()
-			require.NoError(t, err)
+			timelockExeVIx, tverr := timelockExeIx.ValidateAndBuild()
+			require.NoError(t, tverr)
 			cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{timelockExeVIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 			return uint32(cu)
