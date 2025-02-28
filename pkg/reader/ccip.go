@@ -116,6 +116,8 @@ type TokenPriceUpdate struct {
 }
 
 type GasPriceUpdate struct {
+	// DestChainSelector is the chain that the gas price is for (some plugin source chain).
+	// Not the chain that the gas price is stored on.
 	DestChainSelector uint64
 	UsdPerUnitGas     *big.Int
 }
@@ -222,7 +224,7 @@ func (r *ccipChainReader) processCommitReports(
 	lggr := r.lggr
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		ev, err := validateCommitReportAcceptedEvent(item, ts, r.destChain)
+		ev, err := validateCommitReportAcceptedEvent(item, ts)
 		if err != nil {
 			lggr.Errorw("validate commit report accepted event", "err", err, "ev", ev)
 			continue
@@ -1916,9 +1918,7 @@ func (r *ccipChainReader) processFeeQuoterResults(results []types.BatchReadResul
 	return FeeQuoterConfig{}, fmt.Errorf("invalid type for fee quoter static config: %T", val)
 }
 
-func validateCommitReportAcceptedEvent(
-	seq types.Sequence, gteTimestamp time.Time, destChain cciptypes.ChainSelector,
-) (*CommitReportAcceptedEvent, error) {
+func validateCommitReportAcceptedEvent(seq types.Sequence, gteTimestamp time.Time) (*CommitReportAcceptedEvent, error) {
 	ev, is := (seq.Data).(*CommitReportAcceptedEvent)
 	if !is {
 		return nil, fmt.Errorf("unexpected type %T while expecting a commit report", seq)
@@ -1947,10 +1947,6 @@ func validateCommitReportAcceptedEvent(
 	}
 
 	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
-		if gpus.DestChainSelector != uint64(destChain) {
-			return nil, fmt.Errorf("dest chain does not match the reader's one %d != %d",
-				gpus.DestChainSelector, destChain)
-		}
 		if gpus.UsdPerUnitGas == nil || gpus.UsdPerUnitGas.Cmp(big.NewInt(0)) <= 0 {
 			return nil, fmt.Errorf("nil or non-positive usd per unit gas")
 		}
