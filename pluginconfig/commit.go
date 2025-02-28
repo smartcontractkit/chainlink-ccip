@@ -123,7 +123,7 @@ type CommitOffchainConfig struct {
 	// SignObservationPrefix is the prefix used by the RMN node to sign observations.
 	SignObservationPrefix string `json:"signObservationPrefix"`
 
-	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
+	// TransmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
 
 	// InflightPriceCheckRetries is the number of rounds we wait for a price report to get recorded on the blockchain.
@@ -155,6 +155,21 @@ type CommitOffchainConfig struct {
 
 	// TokenPriceAsyncObserverSyncTimeout defines the timeout for a single sync operation (e.g. fetch token prices).
 	TokenPriceAsyncObserverSyncTimeout commonconfig.Duration `json:"tokenPriceAsyncObserverSyncTimeout"`
+
+	// MaxRootsPerReport is the maximum number of roots to include in a single report.
+	// Set this to 1 for destination chains that cannot process more than one commit root per report (e.g, Solana)
+	// Disable by setting to 0.
+	// Warning: if MaxRootsPerReport is non-zero, MultipleReportsEnabled should be set to true. In the future
+	// it may become an error to use MaxMerkleRootsPerReport without also using MultipleReportsEnabled. For now
+	// it is allowed for testing purposes.
+	// NOTE: this can only be used if RMNEnabled == false.
+	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
+
+	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
+	// This is typically set to true on chains that use 'MaxMerkleRootsPerReport'
+	// in order to avoid delays when there are reports from multiple sources.
+	// NOTE: this can only be used if RMNEnabled == false.
+	MultipleReportsEnabled bool `json:"multipleReports"`
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -272,6 +287,22 @@ func (c *CommitOffchainConfig) Validate() error {
 		(c.ChainFeeAsyncObserverSyncFreq == 0 || c.ChainFeeAsyncObserverSyncTimeout == 0) {
 		return fmt.Errorf("chain fee async observer sync freq (%s) or sync timeout (%s) not set",
 			c.ChainFeeAsyncObserverSyncFreq, c.ChainFeeAsyncObserverSyncTimeout)
+	}
+
+	// Options for multiple reports. These settings were added so that Solana can be configured
+	// to split merkle roots across multiple reports. The functions do not support RMN, so it is
+	// an error to use them unless RMNEnabled == false.
+	var errs []error
+	if c.RMNEnabled {
+		if c.MultipleReportsEnabled {
+			errs = append(errs, fmt.Errorf("multipleReports is set with RMN enabled"))
+		}
+		if c.MaxMerkleRootsPerReport != 0 {
+			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport is set with RMN enabled"))
+		}
+		if len(errs) > 0 {
+			return errors.Join(errs...)
+		}
 	}
 
 	return nil

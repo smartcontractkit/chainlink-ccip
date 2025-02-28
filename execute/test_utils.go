@@ -224,7 +224,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	ctx := tests.Context(it.t)
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
-	mockAddrCodec := internal.NewMockAddressCodec(it.t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(it.t)
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
 		it.lggr,

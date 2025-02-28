@@ -150,7 +150,7 @@ func TestObservationSize(t *testing.T) {
 
 	// separate sender for each message
 	noncesObs := make(exectypes.NonceObservations, maxMessages)
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	for i := 0; i < maxMessages; i++ {
 		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
 		if nil == noncesObs[idx] {
