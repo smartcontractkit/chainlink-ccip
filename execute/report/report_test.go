@@ -1562,7 +1562,7 @@ func Test_checkSkippedNonces(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockAddrCodec := internal.NewMockAddressCodecHex(t)
-			err := checkSkippedNonces(mockAddrCodec, tt.args.execReport)
+			err := verifyReportNonceContinuity(mockAddrCodec, tt.args.execReport)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

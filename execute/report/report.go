@@ -238,7 +238,7 @@ func CheckTokenData() Check {
 // * 8, 9, 10, 11, 12
 // then the messages 8, 9, 10 will be skipped because their nonces are <= the onchain nonce.
 //
-// TODO: CCIP-5374. There is some duplication w/ checkSkippedNonces below.
+// TODO: CCIP-5374. There is some duplication w/ verifyReportNonceContinuity below.
 func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64, addressCodec ccipocr3.AddressCodec) Check {
 	// temporary map to store state between nonce checks for this round.
 	expectedNonce := make(map[ccipocr3.ChainSelector]map[string]uint64)
@@ -363,7 +363,7 @@ func (b *execReportBuilder) checkMessage(
 	return result, ReadyToExecute, nil
 }
 
-// checkSkippedNonces returns an error if the provided report contains a single skipped
+// verifyReportNonceContinuity returns an error if the provided report contains a single skipped
 // nonce from a single sender, rendering the report invalid.
 //
 // we cannot have "skipped" nonces since these messages will be skipped onchain.
@@ -371,7 +371,7 @@ func (b *execReportBuilder) checkMessage(
 // expire from the inflight cache TTL.
 //
 // TODO: CCIP-5374. There is some duplication with CheckNonces above.
-func checkSkippedNonces(
+func verifyReportNonceContinuity(
 	addressCodec ccipocr3.AddressCodec,
 	execReport ccipocr3.ExecutePluginReportSingleChain,
 ) error {
@@ -424,7 +424,7 @@ func (b *execReportBuilder) verifyReport(
 	ctx context.Context,
 	execReport ccipocr3.ExecutePluginReportSingleChain,
 ) (bool, validationMetadata, error) {
-	err := checkSkippedNonces(b.addressCodec, execReport)
+	err := verifyReportNonceContinuity(b.addressCodec, execReport)
 	if err != nil {
 		b.lggr.Infow("invalid report, skipped nonce detected", "err", err)
 		return false, validationMetadata{}, nil
