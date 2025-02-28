@@ -28,16 +28,6 @@ type CommitsRootsCache interface {
 	CanExecute(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) bool
 	MarkAsExecuted(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32)
 	Snooze(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32)
-
-	// GetTimestampToQueryFrom returns the timestamp that should be used when querying for commit reports.
-	// If the latest finalized fully executed commit root's timestamp is before the message visibility window,
-	// the message visibility window is used as the timestamp.
-	// Otherwise, the latest finalized fully executed commit root's timestamp is used.
-	GetTimestampToQueryFrom() time.Time
-
-	// UpdateLatestFinalizedTimestamp updates the cached latest finalized timestamp.
-	// This is used to optimize commit report queries by tracking the newest finalized report.
-	UpdateLatestFinalizedTimestamp(timestamp time.Time)
 }
 
 func NewCommitRootsCache(
@@ -65,13 +55,12 @@ func internalNewCommitRootsCache(
 	executedRoots := cache.New(messageVisibilityInterval+evictionGracePeriod, cleanupInterval)
 
 	return &commitRootsCache{
-		lggr:                             lggr,
-		rootSnoozeTime:                   rootSnoozeTime,
-		executedRoots:                    executedRoots,
-		snoozedRoots:                     snoozedRoots,
-		messageVisibilityInterval:        messageVisibilityInterval,
-		latestFinalizedFullyExecutedRoot: time.Time{}, // Zero value (not set)
-		cacheMu:                          sync.Mutex{},
+		lggr:                      lggr,
+		rootSnoozeTime:            rootSnoozeTime,
+		executedRoots:             executedRoots,
+		snoozedRoots:              snoozedRoots,
+		messageVisibilityInterval: messageVisibilityInterval,
+		cacheMu:                   sync.RWMutex{},
 	}
 }
 
@@ -80,7 +69,7 @@ type commitRootsCache struct {
 	messageVisibilityInterval time.Duration
 	rootSnoozeTime            time.Duration
 
-	cacheMu sync.Mutex
+	cacheMu sync.RWMutex
 
 	// snoozedRoots used only for temporary snoozing roots. It's a cache with TTL (usually around 5 minutes,
 	// but this configuration is set up on chain using rootSnoozeTime)
@@ -89,9 +78,6 @@ type commitRootsCache struct {
 	// messageVisibilityInterval). We keep executed roots there to make sure we don't accidentally try to reprocess
 	// already executed CommitReport
 	executedRoots *cache.Cache
-	// latestFinalizedFullyExecutedRoot tracks the timestamp of the latest finalized commit root
-	// to optimize database queries by starting from this timestamp
-	latestFinalizedFullyExecutedRoot time.Time
 }
 
 func getKey(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) string {
@@ -133,40 +119,4 @@ func (r *commitRootsCache) isSnoozed(key string) bool {
 func (r *commitRootsCache) isExecuted(key string) bool {
 	_, executed := r.executedRoots.Get(key)
 	return executed
-}
-
-func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
-	r.cacheMu.Lock()
-	defer r.cacheMu.Unlock()
-
-	messageVisibilityWindow := time.Now().Add(-r.messageVisibilityInterval)
-	if r.latestFinalizedFullyExecutedRoot.Before(messageVisibilityWindow) {
-		r.latestFinalizedFullyExecutedRoot = messageVisibilityWindow
-	}
-	commitRootsFilterTimestamp := r.latestFinalizedFullyExecutedRoot
-
-	r.lggr.Debugw("Getting timestamp to query from",
-		"latestFinalizedTimestamp", r.latestFinalizedFullyExecutedRoot,
-		"messageVisibilityWindow", messageVisibilityWindow,
-		"commitRootsFilterTimestamp", commitRootsFilterTimestamp)
-
-	// Otherwise use the visibility window based on latest finalized timestamp
-	return commitRootsFilterTimestamp
-}
-
-func (r *commitRootsCache) UpdateLatestFinalizedTimestamp(timestamp time.Time) {
-	if timestamp.IsZero() {
-		return
-	}
-
-	r.cacheMu.Lock()
-	defer r.cacheMu.Unlock()
-
-	// Update if not set or if the new timestamp is newer
-	if r.latestFinalizedFullyExecutedRoot.IsZero() || timestamp.After(r.latestFinalizedFullyExecutedRoot) {
-		r.lggr.Debugw("Updating latest finalized timestamp",
-			"oldTimestamp", r.latestFinalizedFullyExecutedRoot,
-			"newTimestamp", timestamp)
-		r.latestFinalizedFullyExecutedRoot = timestamp
-	}
 }
