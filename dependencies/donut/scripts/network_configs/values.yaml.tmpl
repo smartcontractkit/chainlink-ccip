@@ -12,6 +12,7 @@ deployments:
                   MinContractPayment = '0'
                   AutoCreateKey = true
                   FinalityDepth = {{ .FinalityDepth }}
+                  LogPollInterval = '1s'
 
                   [[EVM.Nodes]]
                   Name = 'node-{{ .NetworkId }}'
