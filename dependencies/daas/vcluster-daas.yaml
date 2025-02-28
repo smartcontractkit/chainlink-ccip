@@ -127,6 +127,29 @@ profiles:
                     - path: /
                       pathType: Prefix
 
+  - name: deploy-cluster-services-olm
+    patches:
+      - op: add
+        path: deployments.vcluster-daas.helm.values.experimental.deploy.vcluster.helm
+        value:
+          chart:
+            name: olm
+            repo: oci://ghcr.io/ajgrande924/registry
+            version: 0.31.0
+          release:
+            name: olm
+            namespace: daas
+          values: |-
+            extraManifests:
+              - apiVersion: operators.coreos.com/v1alpha1
+                kind: CatalogSource
+                metadata:
+                  name: daas-catalog
+                  namespace: olm
+                spec:
+                  sourceType: grpc
+                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas-operator-catalog@sha256:8c372224e14ad4bdce354ffc6b7308ddae568dd940f2d5faaead38dd3ffc9d84 # v0.0.8
+
   - name: deploy-blockchain-anvil
     patches:
       - op: add
