@@ -61,6 +61,14 @@ func internalNewCommitRootsCache(
 	cleanupInterval time.Duration,
 	evictionGracePeriod time.Duration,
 ) *commitRootsCache {
+	lggr.Debugw(
+		"Creating CommitRootsCache",
+		"messageVisibilityInterval", messageVisibilityInterval,
+		"rootSnoozeTime", rootSnoozeTime,
+		"cleanupInterval", cleanupInterval,
+		"evictionGracePeriod", evictionGracePeriod,
+	)
+
 	snoozedRoots := cache.New(rootSnoozeTime, cleanupInterval)
 	executedRoots := cache.New(messageVisibilityInterval+evictionGracePeriod, cleanupInterval)
 
