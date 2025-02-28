@@ -23,10 +23,6 @@ impl Public for Impl {
         );
         Ok(())
     }
-
-    fn get_cursed_subjects(&self, ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>> {
-        Ok(ctx.accounts.curses.cursed_subjects.clone())
-    }
 }
 
 fn is_subject_cursed(curses: &Curses, subject: CurseSubject) -> bool {

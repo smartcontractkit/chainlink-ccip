@@ -121,16 +121,6 @@ pub mod rmn_remote {
     pub fn verify_not_cursed(ctx: Context<InspectCurses>, subject: CurseSubject) -> Result<()> {
         router::public(ctx.accounts.config.default_code_version).verify_not_cursed(ctx, subject)
     }
-
-    /// Retrieves a list of cursed subjects. Note this function will not revert if there's an active
-    /// curse: It is to be used to retrieve information only.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The context containing the accounts required to inspect curses.
-    pub fn get_cursed_subjects(ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>> {
-        router::public(ctx.accounts.config.default_code_version).get_cursed_subjects(ctx)
-    }
 }
 
 #[error_code]

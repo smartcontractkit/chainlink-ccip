@@ -6,7 +6,6 @@ use crate::{
 
 pub trait Public {
     fn verify_not_cursed(&self, ctx: Context<InspectCurses>, subject: CurseSubject) -> Result<()>;
-    fn get_cursed_subjects(&self, ctx: Context<InspectCurses>) -> Result<Vec<CurseSubject>>;
 }
 
 pub trait Admin {
