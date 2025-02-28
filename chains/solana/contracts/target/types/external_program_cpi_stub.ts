@@ -94,6 +94,27 @@ export type ExternalProgramCpiStub = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "manyAccountsInstruction",
+      "accounts": [
+        {
+          "name": "stubCaller",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "computeHeavy",
+      "accounts": [],
+      "args": [
+        {
+          "name": "iterations",
+          "type": "u32"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -206,6 +227,27 @@ export const IDL: ExternalProgramCpiStub = {
         {
           "name": "data",
           "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "manyAccountsInstruction",
+      "accounts": [
+        {
+          "name": "stubCaller",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "computeHeavy",
+      "accounts": [],
+      "args": [
+        {
+          "name": "iterations",
+          "type": "u32"
         }
       ]
     }

@@ -42,6 +42,10 @@ var (
 
 	// instruction that accepts arbitrarily large instruction data.
 	Instruction_BigInstructionData = ag_binary.TypeID([8]byte{250, 215, 200, 174, 42, 217, 129, 182})
+
+	Instruction_ManyAccountsInstruction = ag_binary.TypeID([8]byte{46, 3, 73, 180, 79, 141, 234, 82})
+
+	Instruction_ComputeHeavy = ag_binary.TypeID([8]byte{114, 240, 76, 252, 181, 175, 211, 78})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -61,6 +65,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "AccountMut"
 	case Instruction_BigInstructionData:
 		return "BigInstructionData"
+	case Instruction_ManyAccountsInstruction:
+		return "ManyAccountsInstruction"
+	case Instruction_ComputeHeavy:
+		return "ComputeHeavy"
 	default:
 		return ""
 	}
@@ -101,6 +109,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"big_instruction_data", (*BigInstructionData)(nil),
+		},
+		{
+			"many_accounts_instruction", (*ManyAccountsInstruction)(nil),
+		},
+		{
+			"compute_heavy", (*ComputeHeavy)(nil),
 		},
 	},
 )

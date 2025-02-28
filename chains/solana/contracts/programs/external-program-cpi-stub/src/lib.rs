@@ -55,6 +55,22 @@ pub mod external_program_cpi_stub {
         );
         Ok(())
     }
+
+    pub fn many_accounts_instruction(_ctx: Context<ManyAccounts>) -> Result<()> {
+        // Simply returns success, used to test maximum account references
+        Ok(())
+    }
+
+    pub fn compute_heavy(_ctx: Context<Empty>, iterations: u32) -> Result<()> {
+        // perform some deterministic computation that uses CU predictably
+        let mut result = 0u64;
+        for i in 0..iterations {
+            result = result.wrapping_add((i as u64).wrapping_mul(i as u64));
+        }
+
+        // don't log with msg!() - it adds variable CU consumption
+        Ok(())
+    }
 }
 
 const VALUE_SEED: &[u8] = b"u8_value";
@@ -107,4 +123,11 @@ pub struct AccountMut<'info> {
     pub stub_caller: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts, Debug)]
+pub struct ManyAccounts<'info> {
+    // allow this to accept arbitrary number of remaining accounts
+    pub stub_caller: Signer<'info>,
+    // no other required accounts - will test with remaining_accounts
 }
