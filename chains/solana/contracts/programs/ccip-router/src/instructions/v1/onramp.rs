@@ -244,8 +244,7 @@ mod helpers {
         rmn_remote::cpi::verify_not_cursed(
             cpi_context,
             CurseSubject::from_chain_selector(dest_chain_selector),
-        )?;
-        Ok(())
+        )
     }
 
     pub(super) fn token_transfer(

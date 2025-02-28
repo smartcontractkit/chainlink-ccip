@@ -618,8 +618,7 @@ pub fn verify_uncursed_cpi<'info>(
     rmn_remote::cpi::verify_not_cursed(
         cpi_context,
         CurseSubject::from_chain_selector(chain_selector),
-    )?;
-    Ok(())
+    )
 }
 
 #[cfg(test)]

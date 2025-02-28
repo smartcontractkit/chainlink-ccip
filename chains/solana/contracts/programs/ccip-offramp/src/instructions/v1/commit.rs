@@ -331,7 +331,6 @@ mod helpers {
         rmn_remote::cpi::verify_not_cursed(
             cpi_context,
             CurseSubject::from_chain_selector(chain_selector),
-        )?;
-        Ok(())
+        )
     }
 }

@@ -269,35 +269,6 @@ export type RmnRemote = {
           }
         }
       ]
-    },
-    {
-      "name": "getCursedSubjects",
-      "docs": [
-        "Retrieves a list of cursed subjects. Note this function will not revert if there's an active",
-        "curse: It is to be used to retrieve information only.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required to inspect curses."
-      ],
-      "accounts": [
-        {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": {
-        "vec": {
-          "defined": "CurseSubject"
-        }
-      }
     }
   ],
   "accounts": [
@@ -773,35 +744,6 @@ export const IDL: RmnRemote = {
           }
         }
       ]
-    },
-    {
-      "name": "getCursedSubjects",
-      "docs": [
-        "Retrieves a list of cursed subjects. Note this function will not revert if there's an active",
-        "curse: It is to be used to retrieve information only.",
-        "",
-        "# Arguments",
-        "",
-        "* `ctx` - The context containing the accounts required to inspect curses."
-      ],
-      "accounts": [
-        {
-          "name": "curses",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [],
-      "returns": {
-        "vec": {
-          "defined": "CurseSubject"
-        }
-      }
     }
   ],
   "accounts": [

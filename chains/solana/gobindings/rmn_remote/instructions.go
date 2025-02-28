@@ -100,14 +100,6 @@ var (
 	// * `subject` - The subject to verify. Note that this instruction will revert if the chain
 	// is globally cursed too, even if the provided subject is not explicitly cursed.
 	Instruction_VerifyNotCursed = ag_binary.TypeID([8]byte{86, 200, 58, 143, 7, 109, 155, 125})
-
-	// Retrieves a list of cursed subjects. Note this function will not revert if there's an active
-	// curse: It is to be used to retrieve information only.
-	//
-	// # Arguments
-	//
-	// * `ctx` - The context containing the accounts required to inspect curses.
-	Instruction_GetCursedSubjects = ag_binary.TypeID([8]byte{149, 110, 49, 14, 236, 37, 92, 103})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -127,8 +119,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Uncurse"
 	case Instruction_VerifyNotCursed:
 		return "VerifyNotCursed"
-	case Instruction_GetCursedSubjects:
-		return "GetCursedSubjects"
 	default:
 		return ""
 	}
@@ -169,9 +159,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"verify_not_cursed", (*VerifyNotCursed)(nil),
-		},
-		{
-			"get_cursed_subjects", (*GetCursedSubjects)(nil),
 		},
 	},
 )
