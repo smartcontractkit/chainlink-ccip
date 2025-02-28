@@ -225,6 +225,8 @@ func makeTestCommitReportWithSenders(
 
 // makeTestCommitReport creates a basic commit report with messages given different parameters. This function
 // will panic if the input parameters are inconsistent.
+// if zeroNonces is set to true, nonces will be zero for all messages.
+// if its false, they will increment starting from 1.
 func makeTestCommitReport(
 	hasher cciptypes.MessageHasher,
 	numMessages,
@@ -741,13 +743,13 @@ func Test_Builder_Build(t *testing.T) {
 			wantErr: "merkle root mismatch: expected 0x00000000000000000",
 		},
 		{
-			name: "skip over one large messages",
+			name: "skip over one large message in OOO",
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
-					setMessageData(5, 20000,
+					setMessageData(5, 20000, // message at index 5 is too big.
 						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 							sender,
 							cciptypes.Bytes32{}, // generate a correct root.
@@ -759,10 +761,36 @@ func Test_Builder_Build(t *testing.T) {
 			expectedExecReports:   1,
 			expectedCommitReports: 0,
 			expectedExecThings:    []int{9},
-			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 108, 109},
+			// seq num 105 is skipped due to size.
+			// because of out of order execution, the rest can be safely included.
+			lastReportExecuted: []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 108, 109},
 		},
 		{
-			name: "skip over two large messages",
+			name: "skip over one large messages in ordered execution",
+			args: args{
+				maxReportSize: 10000,
+				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					setMessageData(5, 20000,
+						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+							sender,
+							cciptypes.Bytes32{}, // generate a correct root.
+							nil,                 // executed
+							false,               // zeroNonces
+						)),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 0,
+			// message at index 5 is the large one, and because its skipped, so are the rest, due to nonce check.
+			expectedExecThings: []int{5},
+			// seq num 105 is initially skipped due to size.
+			// the rest are skipped due to skipped nonce checks.
+			lastReportExecuted: []cciptypes.SeqNum{100, 101, 102, 103, 104},
+		},
+		{
+			name: "skip over two large messages in OOO",
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
@@ -781,7 +809,33 @@ func Test_Builder_Build(t *testing.T) {
 			expectedExecReports:   1,
 			expectedCommitReports: 0,
 			expectedExecThings:    []int{8},
-			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 109},
+			// seq num 105 and 108 are skipped due to size.
+			// because of out of order execution, the rest can be safely included.
+			lastReportExecuted: []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 109},
+		},
+		{
+			name: "skip over two large messages in ordered execution",
+			args: args{
+				maxReportSize: 10000,
+				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					setMessageData(8, 20000,
+						setMessageData(5, 20000,
+							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+								sender,
+								cciptypes.Bytes32{}, // generate a correct root.
+								nil,                 // executed
+								false,               // zeroNonces
+							))),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 0,
+			expectedExecThings:    []int{5},
+			// seq num 105 is skipped due to size.
+			// the rest are skipped due to skipped nonce checks.
+			lastReportExecuted: []cciptypes.SeqNum{100, 101, 102, 103, 104},
 		},
 		{
 			name: "report num message limiting",

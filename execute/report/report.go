@@ -112,7 +112,9 @@ func buildSingleChainReportHelper(
 		ProofFlagBits:       ccipocr3.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
 	}
 
-	lggr.Debugw("final report", "sourceChain", report.SourceChain, "report", finalReport)
+	lggr.Debugw("in-progress report built",
+		"sourceChain", report.SourceChain,
+		"report", finalReport)
 
 	return finalReport, nil
 }
@@ -225,6 +227,18 @@ func CheckTokenData() Check {
 // initialized using a list of sender nonces from the destination chain. In
 // order to check multiple messages from the same sender, a copy of the initial
 // list is maintained with incremented nonces after each message.
+//
+// NOTE: this check is currently only applied prior to the report generation process.
+// Its function is _not_ to check that nonces are skipped, but to make sure that we
+// skip messages that have an invalid nonce - i.e the nonce of the message is _not_
+// the expected nonce, which starts as the onchain nonce + 1.
+// As it stands now, this is a well-formedness check of the commit report w/ data
+// and also a filterer of messages w/ invalid nonces from the getgo, relative to onchain nonces.
+// for example: if the onchain nonce is 10, and the report has the messages:
+// * 8, 9, 10, 11, 12
+// then the messages 8, 9, 10 will be skipped because their nonces are <= the onchain nonce.
+//
+// TODO: CCIP-5374. There is some duplication w/ checkSkippedNonces below.
 func CheckNonces(sendersNonce map[ccipocr3.ChainSelector]map[string]uint64, addressCodec ccipocr3.AddressCodec) Check {
 	// temporary map to store state between nonce checks for this round.
 	expectedNonce := make(map[ccipocr3.ChainSelector]map[string]uint64)
@@ -349,9 +363,14 @@ func (b *execReportBuilder) checkMessage(
 	return result, ReadyToExecute, nil
 }
 
+// checkSkippedNonces returns an error if the provided report contains a single skipped
+// nonce from a single sender, rendering the report invalid.
+//
 // we cannot have "skipped" nonces since these messages will be skipped onchain.
 // they will also end up in the inflight cache and "snoozed" until they
 // expire from the inflight cache TTL.
+//
+// TODO: CCIP-5374. There is some duplication with CheckNonces above.
 func checkSkippedNonces(
 	addressCodec ccipocr3.AddressCodec,
 	execReport ccipocr3.ExecutePluginReportSingleChain,
@@ -463,7 +482,7 @@ func (b *execReportBuilder) verifyReport(
 //nolint:gocyclo // todo
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
-	report exectypes.CommitData,
+	commitData exectypes.CommitData,
 ) (ccipocr3.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
 	finalize := func(
 		execReport ccipocr3.ExecutePluginReportSingleChain,
@@ -476,14 +495,14 @@ func (b *execReportBuilder) buildSingleChainReport(
 	}
 
 	// Check which messages are ready to execute, and update report with any additional metadata needed for execution.
-	readyMessages, err := b.checkMessages(ctx, report)
+	readyMessages, err := b.checkMessages(ctx, commitData)
 	if err != nil {
 		return ccipocr3.ExecutePluginReportSingleChain{},
 			exectypes.CommitData{},
 			fmt.Errorf("unable to check message: %w", err)
 	}
 	if len(readyMessages) == 0 {
-		return ccipocr3.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
+		return ccipocr3.ExecutePluginReportSingleChain{}, commitData, ErrEmptyReport
 	}
 
 	// Unless there is a message limit, attempt to build a report for executing all ready messages.
@@ -493,7 +512,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 	// with fewer messages until we find a valid report.
 	if b.maxMessages == 0 {
 		finalReport, err :=
-			buildSingleChainReportHelper(b.lggr, report, readyMessages)
+			buildSingleChainReportHelper(b.lggr, commitData, readyMessages)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
@@ -506,21 +525,21 @@ func (b *execReportBuilder) buildSingleChainReport(
 				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
-			return finalize(finalReport, report, meta)
+			return finalize(finalReport, commitData, meta)
 		}
 	}
 
 	var finalReport ccipocr3.ExecutePluginReportSingleChain
 	var meta validationMetadata
 	msgs := make(map[int]struct{})
-	for i := range report.Messages {
+	for i := range commitData.Messages {
 		if _, ok := readyMessages[i]; !ok {
 			continue
 		}
 
 		msgs[i] = struct{}{}
 
-		finalReport2, err := buildSingleChainReportHelper(b.lggr, report, msgs)
+		finalReport2, err := buildSingleChainReportHelper(b.lggr, commitData, msgs)
 		if err != nil {
 			return ccipocr3.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
@@ -538,11 +557,11 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 			b.lggr.Infow(
 				"message added to report",
-				"sourceChain", report.Messages[i].Header.SourceChainSelector,
-				"seqNum", report.Messages[i].Header.SequenceNumber,
-				"messageID", report.Messages[i].Header.MessageID,
-				"nonce", report.Messages[i].Header.Nonce,
-				"sender", report.Messages[i].Sender.String(),
+				"sourceChain", commitData.Messages[i].Header.SourceChainSelector,
+				"seqNum", commitData.Messages[i].Header.SequenceNumber,
+				"messageID", commitData.Messages[i].Header.MessageID,
+				"nonce", commitData.Messages[i].Header.Nonce,
+				"sender", commitData.Messages[i].Sender.String(),
 				"reportSizeBytes", meta.encodedSizeBytes,
 				"reportGas", meta.gas,
 			)
@@ -562,8 +581,8 @@ func (b *execReportBuilder) buildSingleChainReport(
 	}
 
 	if len(msgs) == 0 {
-		return ccipocr3.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
+		return ccipocr3.ExecutePluginReportSingleChain{}, commitData, ErrEmptyReport
 	}
 
-	return finalize(finalReport, report, meta)
+	return finalize(finalReport, commitData, meta)
 }
