@@ -7,6 +7,7 @@ use super::ocr3impl::Ocr3ReportForCommit;
 use crate::context::{seed, CommitInput, CommitReportContext, OcrPluginType};
 use crate::event::CommitReportAccepted;
 use crate::instructions::interfaces::Commit;
+use crate::instructions::v1::rmn::verify_uncursed_cpi;
 use crate::state::GlobalState;
 use crate::{CcipOfframpError, PriceOnlyCommitReportContext};
 
@@ -27,7 +28,7 @@ impl Commit for Impl {
         // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
         let source_chain = &mut ctx.accounts.source_chain;
 
-        helpers::verify_uncursed_cpi(
+        verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
             ctx.accounts.rmn_remote_config.to_account_info(),
             ctx.accounts.rmn_remote_curses.to_account_info(),
@@ -168,7 +169,7 @@ impl Commit for Impl {
         let report = CommitInput::deserialize(&mut raw_report.as_ref())
             .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
 
-        helpers::verify_uncursed_cpi(
+        verify_uncursed_cpi(
             ctx.accounts.rmn_remote.to_account_info(),
             ctx.accounts.rmn_remote_config.to_account_info(),
             ctx.accounts.rmn_remote_curses.to_account_info(),
@@ -235,7 +236,6 @@ impl Commit for Impl {
 
 mod helpers {
     use fee_quoter::cpi::accounts::UpdatePrices;
-    use rmn_remote::state::CurseSubject;
 
     use super::*;
     pub(super) fn update_prices<'info>(
@@ -315,22 +315,5 @@ mod helpers {
         }
 
         Ok(())
-    }
-
-    pub(super) fn verify_uncursed_cpi<'info>(
-        rmn_remote: AccountInfo<'info>,
-        rmn_remote_config: AccountInfo<'info>,
-        rmn_remote_curses: AccountInfo<'info>,
-        chain_selector: u64,
-    ) -> Result<()> {
-        let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
-            config: rmn_remote_config,
-            curses: rmn_remote_curses,
-        };
-        let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
-        rmn_remote::cpi::verify_not_cursed(
-            cpi_context,
-            CurseSubject::from_chain_selector(chain_selector),
-        )
     }
 }

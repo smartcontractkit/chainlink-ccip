@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use rmn_remote::state::CurseSubject;
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 
@@ -20,6 +19,7 @@ use super::pools::{
     calculate_token_pool_account_indices, get_balance, interact_with_pool,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_POOL_V1_RET_BYTES,
 };
+use super::rmn::verify_uncursed_cpi;
 
 pub struct Impl;
 impl Execute for Impl {
@@ -602,23 +602,6 @@ mod execution_state {
             get(&commit_report, 65);
         }
     }
-}
-
-pub fn verify_uncursed_cpi<'info>(
-    rmn_remote: AccountInfo<'info>,
-    rmn_remote_config: AccountInfo<'info>,
-    rmn_remote_curses: AccountInfo<'info>,
-    chain_selector: u64,
-) -> Result<()> {
-    let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
-        config: rmn_remote_config,
-        curses: rmn_remote_curses,
-    };
-    let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
-    rmn_remote::cpi::verify_not_cursed(
-        cpi_context,
-        CurseSubject::from_chain_selector(chain_selector),
-    )
 }
 
 #[cfg(test)]
