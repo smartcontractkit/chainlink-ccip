@@ -20,13 +20,15 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-bt-{{ $i }}
-            - chainlink:
+              chainlink:
                 v2Config:
                   99-config-override.toml: |
-  {{ file.Read (printf "%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) }}
+                    {{- printf "\n" }}
+                    {{- file.Read (printf "%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
                 v2Secret:
-                99-secrets-override.toml: |
-  {{ file.Read (printf "%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) }}
+                  99-secrets-override.toml: |
+                    {{- printf "\n" }}
+                    {{- file.Read (printf "%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
           {{- end }}
           {{- end }}
           {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
@@ -36,13 +38,15 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-{{ $i }}
-            - chainlink:
+              chainlink:
                 v2Config:
                   99-config-override.toml: |
-  {{ file.Read (printf "%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) }}
+                    {{- printf "\n" }}
+                    {{- file.Read (printf "%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
                 v2Secret:
-                99-secrets-override.toml: |
-  {{ file.Read (printf "%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) }}
+                  99-secrets-override.toml: |
+                    {{- printf "\n" }}
+                    {{- file.Read (printf "%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
           {{- end }}
           {{- end }}
     {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
