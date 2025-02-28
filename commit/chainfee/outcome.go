@@ -256,7 +256,7 @@ func (p *processor) getGasPricesToUpdate(
 			continue
 		}
 
-		gasDeviates := p.gasComponentsDeviate(currentChainFee, lastUpdate, ci)
+		gasDeviates := p.gasComponentsDeviate(lggr, chain, currentChainFee, lastUpdate, ci)
 		if gasDeviates {
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
@@ -269,6 +269,8 @@ func (p *processor) getGasPricesToUpdate(
 }
 
 func (p *processor) gasComponentsDeviate(
+	lggr logger.Logger,
+	chain cciptypes.ChainSelector,
 	currentChainFee ComponentsUSDPrices,
 	lastUpdate Update,
 	ci pluginconfig.FeeInfo,
@@ -284,6 +286,23 @@ func (p *processor) gasComponentsDeviate(
 			currentChainFee.DataAvFeePriceUSD,
 			lastUpdate.ChainFee.DataAvFeePriceUSD,
 			p.cfg.DataAvNoDeviationThresholdUSDWei.Int,
+		)
+		// Log the deviation check info while we potentially still need to fine-tune the curve.
+		lggr.Debugf(
+			"using curve based deviation check for chain %d - "+
+				"executionFeeDeviates: %t, "+
+				"currentChainFee.executionFeePriceUSD: %s, "+
+				"lastUpdate.executionFeePriceUSD: %s, "+
+				"dataAvFeeDeviates: %t, "+
+				"currentChainFee.dataAvFeePriceUSD: %s, "+
+				"lastUpdate.dataAvFeePriceUSD: %s",
+			chain,
+			executionFeeDeviates,
+			currentChainFee.ExecutionFeePriceUSD.String(),
+			lastUpdate.ChainFee.ExecutionFeePriceUSD.String(),
+			dataAvFeeDeviates,
+			currentChainFee.DataAvFeePriceUSD.String(),
+			lastUpdate.ChainFee.DataAvFeePriceUSD.String(),
 		)
 	} else {
 		executionFeeDeviates = mathslib.Deviates(
