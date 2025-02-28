@@ -779,6 +779,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ReferenceAddressesSet", &refAddrEvent, config.PrintEvents))
 				require.Equal(t, config.CcipRouterProgram, refAddrEvent.Router)
 				require.Equal(t, config.FeeQuoterProgram, refAddrEvent.FeeQuoter)
+				require.Equal(t, config.RMNRemoteProgram, refAddrEvent.RMNRemote)
 				require.Equal(t, lookupTableAddr, refAddrEvent.OfframpLookupTable)
 
 				// check state
@@ -787,6 +788,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, config.FeeQuoterProgram, referenceAddresses.FeeQuoter)
 				require.Equal(t, lookupTableAddr, referenceAddresses.OfframpLookupTable)
 				require.Equal(t, config.CcipRouterProgram, referenceAddresses.Router)
+				require.Equal(t, config.RMNRemoteProgram, referenceAddresses.RmnRemote)
 			})
 		})
 

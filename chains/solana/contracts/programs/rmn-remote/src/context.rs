@@ -42,7 +42,6 @@ pub struct Initialize<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Curses::INIT_SPACE,
-        constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,
     )]
     pub curses: Account<'info, Curses>,
 
