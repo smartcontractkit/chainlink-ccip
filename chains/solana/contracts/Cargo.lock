@@ -893,6 +893,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "dummy"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "ethnum",
+ "hex",
+ "solana-program",
+]
+
+[[package]]
 name = "ed25519"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
