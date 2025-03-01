@@ -27,4 +27,4 @@ url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "Localnet"
-wallet = "/Users/chainlink/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
