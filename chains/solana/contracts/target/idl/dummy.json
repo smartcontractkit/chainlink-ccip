@@ -5,7 +5,16 @@
     {
       "name": "triggerAllEvents",
       "docs": [
-        "This is our single entrypoint that will emit each of the events once."
+        "Emit events gracefully. Will mark transaction as succeded."
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "triggerAllEventsReverts",
+      "docs": [
+        "Emit events and reverts. Will mark transaction as failed if client has sent the tx",
+        "with SkipPreflight disabled (simulation before sending)"
       ],
       "accounts": [],
       "args": []
@@ -648,6 +657,13 @@
           "index": false
         }
       ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 10100,
+      "name": "TestRevert",
+      "msg": "This is a forced revert for testing log persistence."
     }
   ],
   "metadata": {
