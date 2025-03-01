@@ -96,7 +96,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
@@ -186,7 +186,7 @@ func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 		},
 	}
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders, mockAddrCodec)
 	require.NoError(t, err)
 

@@ -56,7 +56,8 @@ func CounterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.Histogr
 	return int(pb.GetHistogram().GetSampleCount())
 }
 
-func NewMockAddressCodec(t *testing.T) *ccipocr3.MockAddressCodec {
+// NewMockAddressCodecHex returns a mock address codec that hex-encodes and decodes addresses.
+func NewMockAddressCodecHex(t *testing.T) *ccipocr3.MockAddressCodec {
 	mockAddrCodec := ccipocr3.NewMockAddressCodec(t)
 	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
 		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {

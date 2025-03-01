@@ -17,7 +17,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
-	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
 
 	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
@@ -1192,8 +1191,9 @@ func newRequestID(lggr logger.Logger) uint64 {
 		lggr.Warnw("failed to generate random request id, falling back to golang.org/x/exp/rand",
 			"err", err,
 		)
-		rand2.Seed(uint64(time.Now().UnixNano()))
-		return rand2.Uint64()
+		//nolint:gosec // this is unlikely to occur and is not a security concern.
+		rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+		return rnd.Uint64()
 	}
 	randomUint64 := binary.LittleEndian.Uint64(b)
 	return randomUint64

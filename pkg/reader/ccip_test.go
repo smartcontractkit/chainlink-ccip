@@ -78,7 +78,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		return results, nil
 	})
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
@@ -113,7 +113,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 	ecr := reader_mocks.NewMockExtended(t)
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	ccipReader := ccipChainReader{
 		lggr: logger.Test(t),
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
@@ -180,7 +180,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
 	require.NoError(t, err)
 	destExtended := reader_mocks.NewMockExtended(t)
@@ -252,7 +252,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 
 	destNonceMgr := []byte{0x3}
 	destExtended := reader_mocks.NewMockExtended(t)
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
 	require.NoError(t, err)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
@@ -313,7 +313,7 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
 	destExtended := reader_mocks.NewMockExtended(t)
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 
 	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
 	require.NoError(t, err)
@@ -371,7 +371,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	destNonceMgrAddrStr, err := mockAddrCodec.AddressBytesToString(destNonceMgr, destChain)
 	require.NoError(t, err)
 	destExtended := reader_mocks.NewMockExtended(t)
@@ -811,7 +811,7 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	}
 	mockCache.On("GetChainConfig", mock.Anything, chainC).Return(chainConfig, nil)
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 
 	offrampAddressStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, chainC)
 	require.NoError(t, err)
@@ -860,7 +860,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	offrampAddress := []byte{0x3}
 	feeQuoterAddress := []byte{0x4}
 
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
@@ -903,7 +903,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
-		internal.NewMockAddressCodec(t),
+		internal.NewMockAddressCodecHex(t),
 	)
 
 	ctx := context.Background()
@@ -932,7 +932,7 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
-		internal.NewMockAddressCodec(t),
+		internal.NewMockAddressCodecHex(t),
 	)
 
 	ctx := context.Background()
@@ -975,7 +975,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	}))
 
 	// Setup ccipReader with both cache and contract readers
-	mockAddrCodec := internal.NewMockAddressCodec(t)
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	offrampAddressStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, chainC)
 	require.NoError(t, err)
 	ccipReader := &ccipChainReader{
@@ -1294,7 +1294,7 @@ func TestCCIPChainReader_Nonces(t *testing.T) {
 			chainB: destReader,
 		},
 		destChain: chainB,
-		addrCodec: internal.NewMockAddressCodec(t),
+		addrCodec: internal.NewMockAddressCodecHex(t),
 	}
 
 	// Bind the contract first
