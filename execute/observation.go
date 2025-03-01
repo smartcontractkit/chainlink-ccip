@@ -167,9 +167,15 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// TODO: set fetchFrom to the oldest pending commit report.
-	// TODO: or, cache commit reports so that we don't need to fetch them again.
-	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
+	// Calculate the message visibility window
+	messageVisibilityWindow := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
+
+	// Get the optimized timestamp using the cache
+	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom(messageVisibilityWindow)
+
+	lggr.Infow("Querying commit reports",
+		"messageVisibilityWindow", messageVisibilityWindow,
+		"queryTimestamp", fetchFrom)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 	//          a valid execution report.
@@ -232,6 +238,9 @@ func (p *Plugin) getCommitReportsObservation(
 			delete(groupedCommits, chainSelector)
 		}
 	}
+
+	// Update the earliest unexecuted root based on remaining reports
+	p.commitRootsCache.UpdateEarliestUnexecutedRoot(groupedCommits)
 
 	observation.CommitReports = groupedCommits
 

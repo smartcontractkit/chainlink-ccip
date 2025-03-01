@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
@@ -827,20 +828,33 @@ func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
 func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	lggr := logger.Test(t)
 
+	// Mock all necessary dependencies
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
 	mockHomeChain.EXPECT().GetFChain().Return(map[cciptypes.ChainSelector]int{}, nil)
 
+	// Create a mock commit roots cache
+	mockCommitRootsCache := cache.NewCommitRootsCache(
+		lggr,
+		8*time.Hour,   // messageVisibilityInterval
+		5*time.Minute, // rootSnoozeTime
+	)
+
+	// Create the plugin
 	p := &Plugin{
-		homeChain:       mockHomeChain,
-		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{},
-		lggr:            lggr,
-		ocrTypeCodec:    ocrTypeCodec,
+		homeChain:        mockHomeChain,
+		oracleIDToP2pID:  map[commontypes.OracleID]libocrtypes.PeerID{},
+		lggr:             lggr,
+		ocrTypeCodec:     ocrTypeCodec,
+		commitRootsCache: mockCommitRootsCache,
 	}
 
+	// Run the test
 	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{}, nil)
 	require.Error(t, err)
-	//nolint:lll // error message
-	assert.Contains(t, err.Error(), "unable to determine if the destination chain is supported: error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
+	assert.Contains(t,
+		err.Error(),
+		"unable to determine if the destination chain is supported: "+
+			"error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
 }
 
 func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
@@ -1667,4 +1681,181 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 		merkleRoots[commitReport.MerkleRoot.String()] = struct{}{}
 	}
 	require.Equal(t, len(merkleRoots), len(decodedOutcome.CommitReports))
+}
+
+func TestCommitRootsCache_SkippedRootScenario(t *testing.T) {
+	lggr := logger.Test(t)
+
+	// Create a timeline matching the colleague's scenario
+	now := time.Now()
+	messageVisibilityInterval := 8 * time.Hour
+	messageVisibilityWindow := now.Add(-messageVisibilityInterval)
+
+	// Create timestamps that match the scenario
+	// Root1 at 10:30am, Root2 at 10:40am, Root3 at 10:50am
+	timestamp1 := now.Add(-30 * time.Minute) // 10:30am
+	timestamp2 := now.Add(-20 * time.Minute) // 10:40am
+	timestamp3 := now.Add(-10 * time.Minute) // 10:50am
+
+	// Create chain selector and roots
+	selector := cciptypes.ChainSelector(1)
+	root1 := cciptypes.Bytes32{1}
+	root2 := cciptypes.Bytes32{2}
+	root3 := cciptypes.Bytes32{3}
+
+	// Create commit data objects
+	report1 := exectypes.CommitData{
+		SourceChain:         selector,
+		MerkleRoot:          root1,
+		SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+		Timestamp:           timestamp1,
+	}
+	report2 := exectypes.CommitData{
+		SourceChain:         selector,
+		MerkleRoot:          root2,
+		SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20),
+		Timestamp:           timestamp2,
+	}
+	report3 := exectypes.CommitData{
+		SourceChain:         selector,
+		MerkleRoot:          root3,
+		SequenceNumberRange: cciptypes.NewSeqNumRange(21, 30),
+		Timestamp:           timestamp3,
+	}
+
+	// Create the cache
+	rootSnoozeTime := 5 * time.Minute
+	cache := cache.NewCommitRootsCache(
+		lggr,
+		messageVisibilityInterval,
+		rootSnoozeTime,
+	)
+
+	t.Run("Colleague's scenario - Root2 is not missed when Root1 and Root3 are executed", func(t *testing.T) {
+		// Update with all reports
+		allReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+			selector: {report1, report2, report3},
+		}
+		cache.UpdateEarliestUnexecutedRoot(allReports)
+
+		// Initial query should use earliest timestamp (Root1)
+		queryTimestamp := cache.GetTimestampToQueryFrom(messageVisibilityWindow)
+		assert.Equal(t, timestamp1, queryTimestamp,
+			"Initial query should use earliest root timestamp (Root1)")
+
+		// Execute Root1 and Root3, but not Root2
+		cache.MarkAsExecuted(selector, root1)
+		cache.MarkAsExecuted(selector, root3)
+
+		// Update with remaining unexecuted report (just Root2)
+		remainingReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+			selector: {report2},
+		}
+		cache.UpdateEarliestUnexecutedRoot(remainingReports)
+
+		// Query should now use Root2's timestamp
+		queryTimestamp = cache.GetTimestampToQueryFrom(messageVisibilityWindow)
+		assert.Equal(t, timestamp2, queryTimestamp,
+			"Query should use Root2's timestamp even though Root3 was executed")
+
+		// Verify Root2 is still marked as executable
+		assert.True(t, cache.CanExecute(selector, root2),
+			"Root2 should still be executable")
+		assert.False(t, cache.CanExecute(selector, root1),
+			"Root1 should not be executable")
+		assert.False(t, cache.CanExecute(selector, root3),
+			"Root3 should not be executable")
+
+		// Now execute Root2
+		cache.MarkAsExecuted(selector, root2)
+
+		// Update with empty reports
+		cache.UpdateEarliestUnexecutedRoot(map[cciptypes.ChainSelector][]exectypes.CommitData{})
+
+		// Query should now fall back to visibility window
+		queryTimestamp = cache.GetTimestampToQueryFrom(messageVisibilityWindow)
+		assert.Equal(t, messageVisibilityWindow, queryTimestamp,
+			"Query should use visibility window after all roots executed")
+	})
+}
+
+// This is a simplified test that focuses on verifying that the core behavior
+// that prevents missing of unexecuted roots is working correctly.
+func TestCommitRootsCache_CoreOptimizationBehavior(t *testing.T) {
+	lggr := logger.Test(t)
+
+	// Create a test timeline with just two roots - one before and one after visibility window
+	now := time.Now()
+	messageVisibilityInterval := 8 * time.Hour
+	messageVisibilityWindow := now.Add(-messageVisibilityInterval)
+
+	// Create a root before visibility window and one after
+	beforeTimestamp := messageVisibilityWindow.Add(-30 * time.Minute)
+	afterTimestamp := messageVisibilityWindow.Add(30 * time.Minute)
+
+	// Create chain selector and roots
+	selector := cciptypes.ChainSelector(1)
+	beforeRoot := cciptypes.Bytes32{1}
+	afterRoot := cciptypes.Bytes32{2}
+
+	// Create commit data objects
+	beforeReport := exectypes.CommitData{
+		SourceChain:         selector,
+		MerkleRoot:          beforeRoot,
+		SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
+		Timestamp:           beforeTimestamp,
+	}
+	afterReport := exectypes.CommitData{
+		SourceChain:         selector,
+		MerkleRoot:          afterRoot,
+		SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20),
+		Timestamp:           afterTimestamp,
+	}
+
+	// Create the cache
+	rootSnoozeTime := 5 * time.Minute
+	cache := cache.NewCommitRootsCache(
+		lggr,
+		messageVisibilityInterval,
+		rootSnoozeTime,
+	)
+
+	t.Run("Core optimization behaviors", func(t *testing.T) {
+		// Test 1: Initial state uses visibility window
+		queryTimestamp := cache.GetTimestampToQueryFrom(messageVisibilityWindow)
+		assert.Equal(t, messageVisibilityWindow, queryTimestamp,
+			"Initial query should use visibility window")
+
+		// Test 2: With roots before and after visibility window, use after
+		allReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+			selector: {beforeReport, afterReport},
+		}
+		cache.UpdateEarliestUnexecutedRoot(allReports)
+
+		// Since the default is to track the earliest unexecuted root,
+		// the cache will have beforeTimestamp as the earliest.
+		// But GetTimestampToQueryFrom should return messageVisibilityWindow
+		// since beforeTimestamp is before that.
+		queryTimestamp = cache.GetTimestampToQueryFrom(messageVisibilityWindow)
+		assert.Equal(t, messageVisibilityWindow, queryTimestamp,
+			"Query should use visibility window when earliest root is before it")
+
+		// Test 3: When only after root remains, use its timestamp
+		cache.MarkAsExecuted(selector, beforeRoot)
+
+		remainingReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
+			selector: {afterReport},
+		}
+		cache.UpdateEarliestUnexecutedRoot(remainingReports)
+
+		queryTimestamp = cache.GetTimestampToQueryFrom(messageVisibilityWindow)
+		assert.Equal(t, afterTimestamp, queryTimestamp,
+			"Query should use after root's timestamp when it's the only root and after visibility window")
+
+		// Test 4: When visibility window moves past all roots, use visibility window
+		laterVisibilityWindow := afterTimestamp.Add(10 * time.Minute)
+		queryTimestamp = cache.GetTimestampToQueryFrom(laterVisibilityWindow)
+		assert.Equal(t, laterVisibilityWindow, queryTimestamp,
+			"Query should use later visibility window when it's after all roots")
+	})
 }
