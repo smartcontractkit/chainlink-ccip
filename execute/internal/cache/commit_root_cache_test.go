@@ -84,8 +84,6 @@ func TestCommitRootsCache_GetTimestampToQueryFrom(t *testing.T) {
 				lggr,
 				messageVisibilityInterval,
 				rootSnoozeTime,
-				CleanupInterval,
-				EvictionGracePeriod,
 			)
 
 			// Set the earliestUnexecutedRoot directly for testing
@@ -203,8 +201,6 @@ func TestCommitRootsCache_UpdateEarliestUnexecutedRoot(t *testing.T) {
 				lggr,
 				messageVisibilityInterval,
 				rootSnoozeTime,
-				CleanupInterval,
-				EvictionGracePeriod,
 			)
 
 			// Set initial value
@@ -253,8 +249,6 @@ func TestCommitRootsCache_ScenarioTests(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Initial state - all roots unexecuted
@@ -290,8 +284,6 @@ func TestCommitRootsCache_ScenarioTests(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Initial state - all roots unexecuted
@@ -319,8 +311,6 @@ func TestCommitRootsCache_ScenarioTests(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Initial state - all roots unexecuted
@@ -353,8 +343,6 @@ func TestCommitRootsCache_ScenarioTests(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Initial state - all roots unexecuted
@@ -377,8 +365,6 @@ func TestCommitRootsCache_ScenarioTests(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Create roots on different chains
@@ -454,8 +440,6 @@ func TestCommitRootsCache_IntegrationScenario(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Message visibility window is 8 hours ago
@@ -534,8 +518,6 @@ func TestCommitRootsCache_AdditionalEdgeCases(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Create a root exactly at the visibility window
@@ -556,8 +538,6 @@ func TestCommitRootsCache_AdditionalEdgeCases(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Create two roots with identical timestamps
@@ -591,8 +571,6 @@ func TestCommitRootsCache_AdditionalEdgeCases(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Create two roots after the initial visibility window
@@ -657,8 +635,6 @@ func TestCommitRootsCache_AdditionalEdgeCases(t *testing.T) {
 			lggr,
 			messageVisibilityInterval,
 			rootSnoozeTime,
-			CleanupInterval,
-			EvictionGracePeriod,
 		)
 
 		// Create 20 roots with gradually increasing timestamps

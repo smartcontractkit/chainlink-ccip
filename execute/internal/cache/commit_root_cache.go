@@ -49,8 +49,6 @@ func NewCommitRootsCache(
 		lggr,
 		messageVisibilityInterval,
 		rootSnoozeTime,
-		CleanupInterval,
-		EvictionGracePeriod,
 	)
 }
 
@@ -58,19 +56,17 @@ func internalNewCommitRootsCache(
 	lggr logger.Logger,
 	messageVisibilityInterval time.Duration,
 	rootSnoozeTime time.Duration,
-	cleanupInterval time.Duration,
-	evictionGracePeriod time.Duration,
 ) *commitRootsCache {
 	lggr.Debugw(
 		"Creating CommitRootsCache",
 		"messageVisibilityInterval", messageVisibilityInterval,
 		"rootSnoozeTime", rootSnoozeTime,
-		"cleanupInterval", cleanupInterval,
-		"evictionGracePeriod", evictionGracePeriod,
+		"cleanupInterval", CleanupInterval,
+		"evictionGracePeriod", EvictionGracePeriod,
 	)
 
-	snoozedRoots := cache.New(rootSnoozeTime, cleanupInterval)
-	executedRoots := cache.New(messageVisibilityInterval+evictionGracePeriod, cleanupInterval)
+	snoozedRoots := cache.New(rootSnoozeTime, CleanupInterval)
+	executedRoots := cache.New(messageVisibilityInterval+EvictionGracePeriod, CleanupInterval)
 
 	return &commitRootsCache{
 		lggr:                      lggr,
@@ -177,7 +173,8 @@ func (r *commitRootsCache) GetTimestampToQueryFrom(messageVisibilityWindow time.
 
 // UpdateEarliestUnexecutedRoot updates the earliest unexecuted root timestamp
 // based on the remaining unexecuted reports.
-func (r *commitRootsCache) UpdateEarliestUnexecutedRoot(remainingReports map[ccipocr3.ChainSelector][]exectypes.CommitData) {
+func (r *commitRootsCache) UpdateEarliestUnexecutedRoot(
+	remainingReports map[ccipocr3.ChainSelector][]exectypes.CommitData) {
 	r.cacheMu.Lock()
 	defer r.cacheMu.Unlock()
 
