@@ -1690,7 +1690,6 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 func TestCommitRootsCache_SkippedRootScenario(t *testing.T) {
 	lggr := logger.Test(t)
 
-	// Create a timeline matching the colleague's scenario
 	now := time.Now()
 	messageVisibilityInterval := 8 * time.Hour
 	messageVisibilityWindow := now.Add(-messageVisibilityInterval)
@@ -1735,7 +1734,7 @@ func TestCommitRootsCache_SkippedRootScenario(t *testing.T) {
 		rootSnoozeTime,
 	)
 
-	t.Run("Colleague's scenario - Root2 is not missed when Root1 and Root3 are executed", func(t *testing.T) {
+	t.Run("Root2 is not missed when Root1 and Root3 are executed", func(t *testing.T) {
 		// Update with all reports
 		allReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 			selector: {report1, report2, report3},
