@@ -67,6 +67,7 @@ pub trait Admin {
         router: Pubkey,
         fee_quoter: Pubkey,
         offramp_lookup_table: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()>;
 
     fn add_source_chain(

@@ -136,6 +136,21 @@
           "isSigner": false
         },
         {
+          "name": "ccipRmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ccipRmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ccipRmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "ccipTokenPoolsSigner",
           "isMut": true,
           "isSigner": false
