@@ -134,6 +134,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		TokenPriceAsyncObservedDisabled    bool
 		TokenPriceAsyncObserverSyncFreq    commonconfig.Duration
 		TokenPriceAsyncObserverSyncTimeout commonconfig.Duration
+		CurveBasedGasDeviationEnabled      bool
+		ExecNoDeviationThresholdUSDWei     cciptypes.BigInt
+		DataAvNoDeviationThresholdUSDWei   cciptypes.BigInt
 	}
 	remoteTokenAddress := rand.RandomAddress()
 	aggregatorAddress := rand.RandomAddress()
@@ -165,6 +168,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				CurveBasedGasDeviationEnabled:      false,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
 			},
 			false,
 		},
@@ -184,6 +190,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				CurveBasedGasDeviationEnabled:      false,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
 			},
 			false,
 		},
@@ -286,6 +295,66 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			},
 			true,
 		},
+		{
+			"valid, curve based gas deviation turned on",
+			fields{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
+				TokenInfo:                          map[cciptypes.UnknownEncodedAddress]TokenInfo{},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				CurveBasedGasDeviationEnabled:      true,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
+			},
+			false,
+		},
+		{
+			"invalid, curve based gas deviation nil",
+			fields{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
+				TokenInfo:                          map[cciptypes.UnknownEncodedAddress]TokenInfo{},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				CurveBasedGasDeviationEnabled:      false,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: nil},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: nil},
+			},
+			true,
+		},
+		{
+			"invalid, curve based gas deviation turned on but no threshold values are 0",
+			fields{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
+				TokenInfo:                          map[cciptypes.UnknownEncodedAddress]TokenInfo{},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				CurveBasedGasDeviationEnabled:      true,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(0)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(0)},
+			},
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -304,6 +373,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				ChainFeeAsyncObserverDisabled:      tt.fields.ChainFeeAsyncObserverDisabled,
 				ChainFeeAsyncObserverSyncFreq:      tt.fields.ChainFeeAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncTimeout:   tt.fields.ChainFeeAsyncObserverSyncTimeout,
+				CurveBasedGasDeviationEnabled:      tt.fields.CurveBasedGasDeviationEnabled,
+				ExecNoDeviationThresholdUSDWei:     tt.fields.ExecNoDeviationThresholdUSDWei,
+				DataAvNoDeviationThresholdUSDWei:   tt.fields.DataAvNoDeviationThresholdUSDWei,
 			}
 			err := c.Validate()
 			if tt.wantErr {
@@ -398,6 +470,9 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				CurveBasedGasDeviationEnabled:      false,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
 			},
 		},
 		{
@@ -421,6 +496,9 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MerkleRootAsyncObserverDisabled:    true,
 				ChainFeeAsyncObserverDisabled:      true,
 				TokenPriceAsyncObserverDisabled:    true,
+				CurveBasedGasDeviationEnabled:      false,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
 			},
 		},
 		{
@@ -453,6 +531,9 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(10 * time.Minute),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
+				CurveBasedGasDeviationEnabled:      false,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
 			},
 		},
 		{
@@ -480,6 +561,59 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
 				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				CurveBasedGasDeviationEnabled:      false,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
+			},
+		},
+		{
+			name: "Curve based validation turned on, no threshold values not set",
+			input: CommitOffchainConfig{
+				CurveBasedGasDeviationEnabled: true,
+			},
+			expected: CommitOffchainConfig{
+				RMNSignaturesTimeout:               0,
+				NewMsgScanBatchSize:                defaultNewMsgScanBatchSize,
+				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
+				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
+				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
+				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				CurveBasedGasDeviationEnabled:      true,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
+			},
+		},
+		{
+			name: "Curve based validation turned off",
+			input: CommitOffchainConfig{
+				CurveBasedGasDeviationEnabled: false,
+			},
+			expected: CommitOffchainConfig{
+				RMNSignaturesTimeout:               0,
+				NewMsgScanBatchSize:                defaultNewMsgScanBatchSize,
+				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
+				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
+				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
+				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
+				CurveBasedGasDeviationEnabled:      false,
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)},
 			},
 		},
 	}
