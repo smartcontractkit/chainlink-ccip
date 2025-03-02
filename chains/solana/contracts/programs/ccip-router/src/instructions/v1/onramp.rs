@@ -28,6 +28,8 @@ impl OnRamp for Impl {
         message: SVM2AnyMessage,
         token_indexes: Vec<u8>,
     ) -> Result<[u8; 32]> {
+        helpers::verify_uncursed_cpi(&ctx, dest_chain_selector)?;
+
         let sender = ctx.accounts.authority.key.to_owned();
         let dest_chain = &mut ctx.accounts.dest_chain_state;
 
@@ -184,6 +186,9 @@ impl OnRamp for Impl {
                     current_token_accounts.mint.to_account_info(),
                     current_token_accounts.pool_signer.to_account_info(),
                     current_token_accounts.pool_token_account.to_account_info(),
+                    ctx.accounts.rmn_remote.to_account_info(),
+                    ctx.accounts.rmn_remote_curses.to_account_info(),
+                    ctx.accounts.rmn_remote_config.to_account_info(),
                     current_token_accounts.pool_chain_config.to_account_info(),
                 ]);
                 acc_infos.extend_from_slice(current_token_accounts.remaining_accounts);
@@ -220,9 +225,27 @@ impl OnRamp for Impl {
 }
 
 mod helpers {
+    use rmn_remote::state::CurseSubject;
+
     use super::*;
 
     pub const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
+
+    pub fn verify_uncursed_cpi<'info>(
+        ctx: &Context<'_, '_, 'info, 'info, CcipSend<'_>>,
+        dest_chain_selector: u64,
+    ) -> Result<()> {
+        let cpi_program = ctx.accounts.rmn_remote.to_account_info();
+        let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
+            config: ctx.accounts.rmn_remote_config.to_account_info(),
+            curses: ctx.accounts.rmn_remote_curses.to_account_info(),
+        };
+        let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
+        rmn_remote::cpi::verify_not_cursed(
+            cpi_context,
+            CurseSubject::from_chain_selector(dest_chain_selector),
+        )
+    }
 
     pub(super) fn token_transfer(
         lock_or_burn_out_data: LockOrBurnOutV1,
