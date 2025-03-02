@@ -244,7 +244,7 @@ func TestCommitRootsCache_ScenarioTests(t *testing.T) {
 	report2 := createCommitData(timestamp2, selector, root2)
 	report3 := createCommitData(timestamp3, selector, root3)
 
-	t.Run("Colleague's Scenario: Root1 and Root3 executed, Root2 skipped", func(t *testing.T) {
+	t.Run("Root1 and Root3 executed, Root2 skipped", func(t *testing.T) {
 		cache := internalNewCommitRootsCache(
 			lggr,
 			messageVisibilityInterval,
