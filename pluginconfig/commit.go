@@ -29,11 +29,14 @@ const (
 	defaultInflightPriceCheckRetries          = 5
 	defaultAsyncObserverSyncFreq              = 5 * time.Second
 	defaultAsyncObserverSyncTimeout           = 10 * time.Second
+	defaultExecNoDeviationThresholdUSDWei     = 10e9
+	defaultDataAvNoDeviationThresholdUSDWei   = 20e9
 )
 
 type FeeInfo struct {
-	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
-	DataAvailabilityDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
+	ExecDeviationPPB              cciptypes.BigInt `json:"execDeviationPPB"`
+	DataAvailabilityDeviationPPB  cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
+	DisableChainFeeDeviationCheck bool             `json:"disableChainFeeDeviationCheck"`
 }
 
 type TokenInfo struct {
@@ -170,6 +173,18 @@ type CommitOffchainConfig struct {
 	// in order to avoid delays when there are reports from multiple sources.
 	// NOTE: this can only be used if RMNEnabled == false.
 	MultipleReportsEnabled bool `json:"multipleReports"`
+
+	// ExecNoDeviationThresholdUSDWei is the lower bound *no* deviation threshold for exec gas. If the exec gas price is
+	// less than this value, we should never trigger a deviation. A value of 5e9 would correspond to 0.000000005 USD.
+	ExecNoDeviationThresholdUSDWei cciptypes.BigInt `json:"execNoDeviationThresholdUSDWei"`
+
+	// DataAvNoDeviationThresholdUSDWei is the lower bound *no* deviation threshold for DA gas. If the DA gas price is
+	// less than this value, we should never trigger a deviation. A value of 5e9 would correspond to 0.000000005 USD.
+	DataAvNoDeviationThresholdUSDWei cciptypes.BigInt `json:"dataAvNoDeviationThresholdUSDWei"`
+
+	// CurveBasedGasDeviationEnabled determines whether or not we should use the deviation curve or the fixed PPB values
+	// when determining whether or not the gas price has deviated.
+	CurveBasedGasDeviationEnabled bool `json:"curveBasedGasDeviationEnabled"`
 }
 
 //nolint:gocyclo // it is considered ok since we don't have complicated logic here
@@ -232,6 +247,13 @@ func (c *CommitOffchainConfig) applyDefaults() {
 		if c.TokenPriceAsyncObserverSyncTimeout.Duration() == 0 {
 			c.TokenPriceAsyncObserverSyncTimeout = *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout)
 		}
+	}
+
+	if c.ExecNoDeviationThresholdUSDWei.Int == nil {
+		c.ExecNoDeviationThresholdUSDWei = cciptypes.BigInt{Int: big.NewInt(defaultExecNoDeviationThresholdUSDWei)}
+	}
+	if c.DataAvNoDeviationThresholdUSDWei.Int == nil {
+		c.DataAvNoDeviationThresholdUSDWei = cciptypes.BigInt{Int: big.NewInt(defaultDataAvNoDeviationThresholdUSDWei)}
 	}
 }
 
@@ -302,6 +324,21 @@ func (c *CommitOffchainConfig) Validate() error {
 		}
 		if len(errs) > 0 {
 			return errors.Join(errs...)
+		}
+	}
+
+	if c.CurveBasedGasDeviationEnabled {
+		if c.ExecNoDeviationThresholdUSDWei.Int == nil {
+			return fmt.Errorf("curveBasedGasDeviationEnabled is true but execNoDeviationThresholdUSDWei not set")
+		}
+		if c.DataAvNoDeviationThresholdUSDWei.Int == nil {
+			return fmt.Errorf("curveBasedGasDeviationEnabled is true but dataAvNoDeviationThresholdUSDWei not set")
+		}
+		if c.ExecNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) < 0 {
+			return fmt.Errorf("execNoDeviationThresholdUSDWei must be non-negative")
+		}
+		if c.DataAvNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) < 0 {
+			return fmt.Errorf("dataAvNoDeviationThresholdUSDWei must be non-negative")
 		}
 	}
 
