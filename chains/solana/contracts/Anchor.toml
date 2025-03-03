@@ -7,6 +7,7 @@ skip-lint = false
 
 [programs.localnet]
 access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
+base-token-pool-dummy-emitter = "CTw4kTVDnSrBohARHWWPwnvRjNYbBx79rDHMR7XcLYDa"
 ccip-offramp-dummy-emitter = "7h44xjUiJHH5wJCNpewaEDmgYLbUd7DDp6URuBKEenMT"
 ccip-router-dummy-emitter = "BZH9p8zsEgCmYaThPCZ25qZcUdZeGHNxv56STNg7bURr"
 ccip_offramp = "offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5"

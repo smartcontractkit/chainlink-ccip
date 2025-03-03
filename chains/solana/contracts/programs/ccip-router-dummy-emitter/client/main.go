@@ -21,15 +21,16 @@ const (
 )
 
 var programIDs = map[string]string{
-	"ccip-router":  "7sDY5A5S5NZe1zcqEuZybW6ZxAna1NWUZxU4ypdn8UQU",
-	"ccip-offramp": "7h44xjUiJHH5wJCNpewaEDmgYLbUd7DDp6URuBKEenMT",
+	"ccip-router":     "7sDY5A5S5NZe1zcqEuZybW6ZxAna1NWUZxU4ypdn8UQU",
+	"ccip-offramp":    "7h44xjUiJHH5wJCNpewaEDmgYLbUd7DDp6URuBKEenMT",
+	"base-token-pool": "CTw4kTVDnSrBohARHWWPwnvRjNYbBx79rDHMR7XcLYDa",
 }
 
 func main() {
 	// Define command-line flags
 	contractName := flag.String("contract", "ccip-router", "Contract name to emit events from (e.g., ccip-router)")
 	resultType := flag.String("result", "OK", "Result type (OK or REVERT)")
-	keypairPath := flag.String("keypair", "/path/to/solana/keypair.json", "Path to the keypair file. Needs to be funded first: https://faucet.solana.com/")
+	keypairPath := flag.String("keypair", "~/.config/solana/id.json", "Path to the keypair file. Needs to be funded first: https://faucet.solana.com/")
 	numTx := flag.Int("num-tx", 2, "Number of transactions to send")
 
 	flag.Parse()
@@ -77,9 +78,12 @@ func main() {
 	// Loop to send multiple transactions
 	for i := range *numTx {
 		fmt.Printf("\nSending transaction %d of %d\n", i+1, *numTx)
-		if err := sendTransaction(ctx, rpcClient, wsClient, wallet, programID, methodName); err != nil {
-			log.Printf("Failed to send transaction %d: %v", i+1, err)
-			continue // Continue with next transaction even if this one fails
+		err := sendTransaction(ctx, rpcClient, wsClient, wallet, programID, methodName)
+		if err != nil {
+			if *resultType != "REVERT" {
+				log.Printf("Failed to send transaction %d: %v", i+1, err)
+				continue // Continue with next transaction even if this one fails
+			}
 		}
 		time.Sleep(time.Second * 10)
 	}
@@ -145,6 +149,10 @@ func sendTransaction(ctx context.Context, rpcClient *rpc.Client, wsClient *ws.Cl
 		nil,
 	)
 	if err != nil {
+		if methodName == TRIGGER_EVENTS_REVERTS {
+			fmt.Printf("Transaction reverted as expected! Signature: %s\n", sig)
+			return fmt.Errorf("intentional revert")
+		}
 		return fmt.Errorf("failed to send transaction: %v", err)
 	}
 
