@@ -327,20 +327,18 @@ func (c *CommitOffchainConfig) Validate() error {
 		}
 	}
 
-	if c.ExecNoDeviationThresholdUSDWei.Int == nil {
-		return fmt.Errorf("execNoDeviationThresholdUSDWei not set")
-	}
-
-	if c.DataAvNoDeviationThresholdUSDWei.Int == nil {
-		return fmt.Errorf("dataAvNoDeviationThresholdUSDWei not set")
-	}
-
 	if c.CurveBasedGasDeviationEnabled {
-		if c.ExecNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) <= 0 {
-			return fmt.Errorf("execNoDeviationThresholdUSDWei must be greater than 0")
+		if c.ExecNoDeviationThresholdUSDWei.Int == nil {
+			return fmt.Errorf("curveBasedGasDeviationEnabled is true but execNoDeviationThresholdUSDWei not set")
 		}
-		if c.DataAvNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) <= 0 {
-			return fmt.Errorf("dataAvNoDeviationThresholdUSDWei must be greater than 0")
+		if c.DataAvNoDeviationThresholdUSDWei.Int == nil {
+			return fmt.Errorf("curveBasedGasDeviationEnabled is true but dataAvNoDeviationThresholdUSDWei not set")
+		}
+		if c.ExecNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) < 0 {
+			return fmt.Errorf("execNoDeviationThresholdUSDWei must be non-negative")
+		}
+		if c.DataAvNoDeviationThresholdUSDWei.Int.Cmp(big.NewInt(0)) < 0 {
+			return fmt.Errorf("dataAvNoDeviationThresholdUSDWei must be non-negative")
 		}
 	}
 

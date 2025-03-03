@@ -316,7 +316,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			false,
 		},
 		{
-			"invalid, curve based gas deviation nil",
+			"valid, curve turned off and no deviation values are nil",
 			fields{
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
@@ -333,10 +333,10 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: nil},
 				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: nil},
 			},
-			true,
+			false,
 		},
 		{
-			"invalid, curve based gas deviation turned on but no threshold values are 0",
+			"invalid, curve based gas deviation turned on but no threshold values are negative",
 			fields{
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
@@ -350,8 +350,8 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
 				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
 				CurveBasedGasDeviationEnabled:      true,
-				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(0)},
-				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(0)},
+				ExecNoDeviationThresholdUSDWei:     cciptypes.BigInt{Int: big.NewInt(-1)},
+				DataAvNoDeviationThresholdUSDWei:   cciptypes.BigInt{Int: big.NewInt(-1)},
 			},
 			true,
 		},
