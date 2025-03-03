@@ -662,6 +662,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ccip-offramp-dummy-emitter"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "ethnum",
+ "hex",
+ "solana-program",
+]
+
+[[package]]
 name = "ccip_offramp"
 version = "0.1.0-dev"
 dependencies = [

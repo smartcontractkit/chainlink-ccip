@@ -1,0 +1,312 @@
+{
+  "version": "0.1.0",
+  "name": "ccip_offramp_dummy_emitter",
+  "instructions": [
+    {
+      "name": "triggerAllEvents",
+      "docs": [
+        "Emit events gracefully. Will mark transaction as succeeded."
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "triggerAllEventsReverts",
+      "docs": [
+        "Emit events and reverts. Will mark transaction as failed."
+      ],
+      "accounts": [],
+      "args": []
+    }
+  ],
+  "types": [
+    {
+      "name": "PriceUpdates",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenPricesUsd",
+            "type": {
+              "vec": "u128"
+            }
+          },
+          {
+            "name": "gasPricesUsd",
+            "type": {
+              "vec": "u128"
+            }
+          },
+          {
+            "name": "destTokenPrices",
+            "type": {
+              "vec": "u128"
+            }
+          },
+          {
+            "name": "destNativePrices",
+            "type": {
+              "vec": "u128"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SourceChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "isEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "laneCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
+          },
+          {
+            "name": "onRamp",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    64
+                  ]
+                },
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CodeVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Default"
+          },
+          {
+            "name": "V1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MessageExecutionState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Untouched"
+          },
+          {
+            "name": "InProgress"
+          },
+          {
+            "name": "Success"
+          },
+          {
+            "name": "Failure"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "SourceChainConfigUpdated",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sourceChainConfig",
+          "type": {
+            "defined": "SourceChainConfig"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "SourceChainAdded",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sourceChainConfig",
+          "type": {
+            "defined": "SourceChainConfig"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "svmChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "enableManualExecutionAfter",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ReferenceAddressesSet",
+      "fields": [
+        {
+          "name": "router",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "offrampLookupTable",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CommitReportAccepted",
+      "fields": [
+        {
+          "name": "merkleRoot",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "priceUpdates",
+          "type": {
+            "defined": "PriceUpdates"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "SkippedAlreadyExecutedMessage",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sequenceNumber",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ExecutionStateChanged",
+      "fields": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sequenceNumber",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "messageId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "messageHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "state",
+          "type": {
+            "defined": "MessageExecutionState"
+          },
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "IntentionalRevert",
+      "msg": "Transaction intentionally reverted for testing"
+    }
+  ],
+  "metadata": {
+    "address": "7h44xjUiJHH5wJCNpewaEDmgYLbUd7DDp6URuBKEenMT"
+  }
+}

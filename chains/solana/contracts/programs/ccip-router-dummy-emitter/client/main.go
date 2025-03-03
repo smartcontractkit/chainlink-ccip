@@ -16,12 +16,13 @@ import (
 )
 
 const (
-	TRIGGER_CCIP_ROUTER_EVENTS_OK      = "trigger_all_events"
-	TRIGGER_CCIP_ROUTER_EVENTS_REVERTS = "trigger_all_events_reverts"
+	TRIGGER_EVENTS         = "trigger_all_events"
+	TRIGGER_EVENTS_REVERTS = "trigger_all_events_reverts"
 )
 
 var programIDs = map[string]string{
-	"ccip-router": "7sDY5A5S5NZe1zcqEuZybW6ZxAna1NWUZxU4ypdn8UQU",
+	"ccip-router":  "7sDY5A5S5NZe1zcqEuZybW6ZxAna1NWUZxU4ypdn8UQU",
+	"ccip-offramp": "7h44xjUiJHH5wJCNpewaEDmgYLbUd7DDp6URuBKEenMT",
 }
 
 func main() {
@@ -43,9 +44,9 @@ func main() {
 	var methodName string
 	switch *resultType {
 	case "OK":
-		methodName = TRIGGER_CCIP_ROUTER_EVENTS_OK
+		methodName = TRIGGER_EVENTS
 	case "REVERT":
-		methodName = TRIGGER_CCIP_ROUTER_EVENTS_REVERTS
+		methodName = TRIGGER_EVENTS_REVERTS
 	default:
 		log.Fatalf("Invalid result type: %s", *resultType)
 	}
