@@ -167,15 +167,10 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// Calculate the message visibility window
-	messageVisibilityWindow := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
-
 	// Get the optimized timestamp using the cache
-	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom(messageVisibilityWindow)
+	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
 
-	lggr.Infow("Querying commit reports",
-		"messageVisibilityWindow", messageVisibilityWindow,
-		"queryTimestamp", fetchFrom)
+	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 	//          a valid execution report.

@@ -12,6 +12,18 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+// TimeProvider interface to make time testable
+type TimeProvider interface {
+	Now() time.Time
+}
+
+// RealTimeProvider provides actual current time
+type RealTimeProvider struct{}
+
+func (r *RealTimeProvider) Now() time.Time {
+	return time.Now()
+}
+
 const (
 	// EvictionGracePeriod defines how long after the messageVisibilityInterval a root is still kept in the cache
 	EvictionGracePeriod = 1 * time.Hour
@@ -33,7 +45,7 @@ type CommitsRootsCache interface {
 	// GetTimestampToQueryFrom returns the timestamp that should be used when querying for commit reports.
 	// It will return the message visibility window or the earliest unexecuted root timestamp,
 	// whichever is later, to optimize the query window.
-	GetTimestampToQueryFrom(messageVisibilityWindow time.Time) time.Time
+	GetTimestampToQueryFrom() time.Time
 
 	// UpdateEarliestUnexecutedRoot updates the earliest unexecuted root timestamp
 	// based on the remaining unexecuted reports.
@@ -49,6 +61,22 @@ func NewCommitRootsCache(
 		lggr,
 		messageVisibilityInterval,
 		rootSnoozeTime,
+		&RealTimeProvider{},
+	)
+}
+
+// For testing - create with custom time provider
+func NewCommitRootsCacheWithTimeProvider(
+	lggr logger.Logger,
+	messageVisibilityInterval time.Duration,
+	rootSnoozeTime time.Duration,
+	timeProvider TimeProvider,
+) CommitsRootsCache {
+	return internalNewCommitRootsCache(
+		lggr,
+		messageVisibilityInterval,
+		rootSnoozeTime,
+		timeProvider,
 	)
 }
 
@@ -56,6 +84,7 @@ func internalNewCommitRootsCache(
 	lggr logger.Logger,
 	messageVisibilityInterval time.Duration,
 	rootSnoozeTime time.Duration,
+	timeProvider TimeProvider,
 ) *commitRootsCache {
 	lggr.Debugw(
 		"Creating CommitRootsCache",
@@ -75,6 +104,7 @@ func internalNewCommitRootsCache(
 		snoozedRoots:              snoozedRoots,
 		messageVisibilityInterval: messageVisibilityInterval,
 		cacheMu:                   sync.RWMutex{},
+		timeProvider:              timeProvider,
 	}
 }
 
@@ -82,6 +112,7 @@ type commitRootsCache struct {
 	lggr                      logger.Logger
 	messageVisibilityInterval time.Duration
 	rootSnoozeTime            time.Duration
+	timeProvider              TimeProvider
 
 	cacheMu sync.RWMutex
 
@@ -142,9 +173,12 @@ func (r *commitRootsCache) isExecuted(key string) bool {
 // It optimizes the query window by using the later of:
 // 1. The message visibility window
 // 2. The earliest unexecuted root timestamp (if available)
-func (r *commitRootsCache) GetTimestampToQueryFrom(messageVisibilityWindow time.Time) time.Time {
+func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
 	r.cacheMu.RLock()
 	defer r.cacheMu.RUnlock()
+
+	// Calculate current visibility window based on stored interval
+	messageVisibilityWindow := r.timeProvider.Now().Add(-r.messageVisibilityInterval).UTC()
 
 	// Start with message visibility window as the default (lower bound)
 	commitRootsFilterTimestamp := messageVisibilityWindow
@@ -154,10 +188,6 @@ func (r *commitRootsCache) GetTimestampToQueryFrom(messageVisibilityWindow time.
 	if !r.earliestUnexecutedRoot.IsZero() && r.earliestUnexecutedRoot.After(messageVisibilityWindow) {
 		commitRootsFilterTimestamp = r.earliestUnexecutedRoot
 		r.lggr.Debugw("Using earliest unexecuted root as query timestamp",
-			"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
-			"messageVisibilityWindow", messageVisibilityWindow)
-	} else {
-		r.lggr.Debugw("Using message visibility window as query timestamp",
 			"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
 			"messageVisibilityWindow", messageVisibilityWindow)
 	}
@@ -178,13 +208,9 @@ func (r *commitRootsCache) UpdateEarliestUnexecutedRoot(
 	r.cacheMu.Lock()
 	defer r.cacheMu.Unlock()
 
-	// If no unexecuted reports remain, reset the earliest unexecuted root
+	// If no unexecuted reports remain, we keep the current value
+	// as it represents the last known earliest unexecuted root
 	if len(remainingReports) == 0 {
-		if !r.earliestUnexecutedRoot.IsZero() {
-			r.lggr.Debugw("Resetting earliest unexecuted root, no pending reports",
-				"oldTimestamp", r.earliestUnexecutedRoot)
-			r.earliestUnexecutedRoot = time.Time{}
-		}
 		return
 	}
 
