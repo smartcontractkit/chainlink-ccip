@@ -1,8 +1,9 @@
 package merkleroot
 
 import (
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
 	"github.com/stretchr/testify/require"
 
