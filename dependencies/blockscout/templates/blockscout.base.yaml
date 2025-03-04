@@ -20,7 +20,7 @@ in: |
         chart:
           repo: https://blockscout.github.io/helm-charts
           name: blockscout-stack
-          version: 1.10.0
+          version: 2.0.0
         values:
           fullnameOverride: blockscout-{{ .Env.ETHEREUM_VARIANT }}-chain-{{ .Env.CHAIN_NAME }}-{{ .Env.CHAIN_ID }}
           config:
