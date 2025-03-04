@@ -25,6 +25,7 @@ var programIDs = map[string]string{
 	"ccip-offramp":    "7h44xjUiJHH5wJCNpewaEDmgYLbUd7DDp6URuBKEenMT",
 	"base-token-pool": "CTw4kTVDnSrBohARHWWPwnvRjNYbBx79rDHMR7XcLYDa",
 	"fee-quoter":      "9ykZ4KUXJUtACe5Cg3UuTM14t5bxk1Amf6uaawGpGR5d",
+	"mcm":             "EqaAbT4NkoDU7WeKTHK9DrJEZ6xgSmZzoufpZQ7GPQE6",
 }
 
 func main() {

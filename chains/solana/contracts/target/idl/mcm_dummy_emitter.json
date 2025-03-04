@@ -1,0 +1,165 @@
+{
+  "version": "0.1.0",
+  "name": "mcm_dummy_emitter",
+  "instructions": [
+    {
+      "name": "triggerAllEvents",
+      "docs": [
+        "Emit events gracefully. Will mark transaction as succeeded."
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "triggerAllEventsReverts",
+      "docs": [
+        "Emit events and reverts. Will mark transaction as failed."
+      ],
+      "accounts": [],
+      "args": []
+    }
+  ],
+  "types": [
+    {
+      "name": "McmSigner",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "evmAddress",
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u8"
+          },
+          {
+            "name": "group",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "NewRoot",
+      "fields": [
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "validUntil",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "metadataChainId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "metadataMultisig",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "metadataPreOpCount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "metadataPostOpCount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "metadataOverridePreviousRoot",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "groupParents",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "groupQuorums",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "isRootCleared",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "signers",
+          "type": {
+            "vec": {
+              "defined": "McmSigner"
+            }
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OpExecuted",
+      "fields": [
+        {
+          "name": "nonce",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "data",
+          "type": "bytes",
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "IntentionalRevert",
+      "msg": "Transaction intentionally reverted for testing"
+    }
+  ],
+  "metadata": {
+    "address": "EqaAbT4NkoDU7WeKTHK9DrJEZ6xgSmZzoufpZQ7GPQE6"
+  }
+}
