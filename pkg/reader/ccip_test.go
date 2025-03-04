@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 
@@ -445,12 +444,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	destRMNRemote := []byte{0x4}
 	destFeeQuoter := []byte{0x5}
 	destRouter := []byte{0x6}
-	srcRouters := [][]byte{{0x7}, {0x8}}
 
 	sourceChainConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig, len(sourceChain))
 	for i, chain := range sourceChain {
 		sourceChainConfigs[chain] = SourceChainConfig{
-			Router:    srcRouters[i],
+			Router:    destRouter,
 			IsEnabled: true,
 			MinSeqNr:  0,
 			OnRamp:    onramps[i],
@@ -485,29 +483,13 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 			},
 		},
 	}
-	mockReaders[destChain].EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
-		"0x1234567890123456789012345678901234567890",
-		[]any{&SourceChainConfig{
-			OnRamp:    onramps[0],
-			Router:    destRouter,
-			IsEnabled: true,
-		}, &SourceChainConfig{
-			OnRamp:    onramps[1],
-			Router:    destRouter,
-			IsEnabled: true,
-		}},
-	))
-
 	// Set up cache expectations for destination chain and source chains
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(destChainConfig, nil).Once()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[0]).Return(
 		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[1]).Return(
 		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
+	mockCache.On("GetSourceChainConfigs", mock.Anything, destChain, sourceChain[:]).Return(sourceChainConfigs, nil).Once()
 
 	castToExtended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for sel, v := range mockReaders {
@@ -562,6 +544,16 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
 	srcRouters := [2][]byte{{0x9}, {0x10}}
 
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig, len(sourceChain))
+	for i, chain := range sourceChain {
+		sourceChainConfigs[chain] = SourceChainConfig{
+			Router:    destRouter[i], // Using the corresponding router from destRouter array
+			IsEnabled: true,
+			MinSeqNr:  0,
+			OnRamp:    onramps[i],
+		}
+	}
+
 	// Build expected addresses.
 	var expectedContractAddresses ContractAddresses
 	for i := range onramps {
@@ -600,6 +592,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	}
 	// Set up destination chain expectation
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(destChainConfig, nil).Once()
+	mockCache.On("GetSourceChainConfigs", mock.Anything, destChain, sourceChain[:]).Return(sourceChainConfigs, nil).Once()
 
 	// Set up source chain expectations with proper OnRamp configs
 	for i, chain := range sourceChain {
@@ -620,24 +613,6 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		}
 		mockCache.On("GetChainConfig", mock.Anything, chain).Return(srcChainConfig, nil).Once()
 	}
-
-	mockReaders[destChain].EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
-		"0x1234567890123456789012345678901234567890",
-		[]any{&SourceChainConfig{
-			OnRamp:    onramps[0],
-			Router:    destRouter[0],
-			IsEnabled: true,
-		},
-			&SourceChainConfig{
-				OnRamp:    onramps[1],
-				Router:    destRouter[1],
-				IsEnabled: true,
-			},
-		}))
 
 	castToExtended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for sel, v := range mockReaders {
@@ -678,11 +653,9 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 	// Setup mock cache to return an error
 	destExtended := reader_mocks.NewMockExtended(t)
 	getLatestValueErr := errors.New("some error")
-	destExtended.EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Return(nil, nil, getLatestValueErr)
+	mockCache.On("GetSourceChainConfigs", mock.Anything, destChain,
+		[]cciptypes.ChainSelector{sourceChain1, sourceChain2}).
+		Return(map[cciptypes.ChainSelector]SourceChainConfig{}, getLatestValueErr).Once()
 
 	// create the reader with cache
 	ccipChainReader := &ccipChainReader{
@@ -753,42 +726,6 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 		params,
 		returnVal interface{}) {
 		mapper(returnVal)
-	}
-}
-
-// withBatchGetLatestValuesRetValues returns a mock ExtendedBatchGetLatestValues() method
-// which can be passed to RunAndReturn(), given a set of return values and an address as input
-// Only supports a single contract
-func withBatchGetLatestValuesRetValues(
-	t testing.TB,
-	address string,
-	retVals []any) func(
-	context.Context,
-	contractreader.ExtendedBatchGetLatestValuesRequest,
-	bool) (types.BatchGetLatestValuesResult, []string, error) {
-	return func(
-		ctx context.Context, req contractreader.ExtendedBatchGetLatestValuesRequest, graceful bool,
-	) (types.BatchGetLatestValuesResult, []string, error) {
-		require.GreaterOrEqual(t, len(retVals), 1)
-		_, ok := retVals[0].(*SourceChainConfig)
-		require.True(t, ok)
-		require.Len(t, req, 1)
-		contract := maps.Keys(req)[0]
-		batchRequest := maps.Values(req)[0]
-		require.Equal(t, len(retVals), len(batchRequest))
-
-		results := make(types.ContractBatchResults, 0, len(retVals))
-		for i, retVal := range retVals {
-			res := types.BatchReadResult{ReadName: batchRequest[i].ReadName}
-			res.SetResult(retVal, nil)
-			results = append(results, res)
-		}
-		boundContract := types.BoundContract{
-			Address: address,
-			Name:    contract,
-		}
-
-		return types.BatchGetLatestValuesResult{boundContract: results}, nil, nil
 	}
 }
 
@@ -1343,10 +1280,20 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 		},
 	}
 
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig, len(sourceChains))
+	for i, chain := range sourceChains {
+		sourceChainConfigs[chain] = SourceChainConfig{
+			Router:    []byte{0x6}, // Same router for all source chains
+			IsEnabled: true,
+			MinSeqNr:  0,
+			OnRamp:    []byte{byte(i + 1)}, // 0x1, 0x2, 0x3 as in the batch response
+		}
+	}
+
 	// Set up destination chain expectation with delay
 	mockCache.On("GetChainConfig", mock.Anything, destChain).
 		Run(func(args mock.Arguments) {
-			time.Sleep(100 * time.Millisecond) // Simulate network delay
+			time.Sleep(75 * time.Millisecond) // Simulate network delay
 		}).
 		Return(destChainConfig, nil).Once()
 
@@ -1366,7 +1313,7 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 		}
 		mockCache.On("GetChainConfig", mock.Anything, chain).
 			Run(func(args mock.Arguments) {
-				time.Sleep(100 * time.Millisecond) // Simulate network delay
+				time.Sleep(75 * time.Millisecond) // Simulate network delay
 			}).
 			Return(srcChainConfig, nil).Once()
 	}
@@ -1386,30 +1333,11 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 	}
 
 	// Setup dest chain batch get values expectation
-	mockReaders[destChain].EXPECT().ExtendedBatchGetLatestValues(
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).RunAndReturn(withBatchGetLatestValuesRetValues(t,
-		"0x1234567890123456789012345678901234567890",
-		[]any{
-			&SourceChainConfig{
-				OnRamp:    []byte{0x1},
-				Router:    []byte{0x6},
-				IsEnabled: true,
-			},
-			&SourceChainConfig{
-				OnRamp:    []byte{0x2},
-				Router:    []byte{0x6},
-				IsEnabled: true,
-			},
-			&SourceChainConfig{
-				OnRamp:    []byte{0x3},
-				Router:    []byte{0x6},
-				IsEnabled: true,
-			},
-		},
-	))
+	mockCache.On("GetSourceChainConfigs", mock.Anything, destChain, sourceChains).
+		Run(func(args mock.Arguments) {
+			time.Sleep(100 * time.Millisecond) // Simulate network delay
+		}).
+		Return(sourceChainConfigs, nil).Once()
 
 	ccipReader := &ccipChainReader{
 		destChain:       destChain,
