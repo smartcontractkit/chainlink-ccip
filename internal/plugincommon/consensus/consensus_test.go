@@ -57,6 +57,81 @@ func Test_fChainConsensus(t *testing.T) {
 	}
 }
 
+func Test_SeqNumConsensus(t *testing.T) {
+	lggr := logger.Test(t)
+
+	testCases := []struct {
+		name           string
+		f              int
+		inputMap       map[cciptypes.ChainSelector][]cciptypes.SeqNum
+		expectedOutput map[cciptypes.ChainSelector]cciptypes.SeqNum
+	}{
+		{
+			name: "single chain with seqNum values",
+			f:    3,
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {1, 1, 1, 2, 1, 3},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 1,
+			},
+		},
+		{
+			name: "single chain with minimal seqNum",
+			f:    3,
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {1, 1, 1, 1, 1, 2, 2, 3, 3},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 2,
+			},
+		},
+		{
+			name: "unsorted single chain with minimal seqNum",
+			f:    3,
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {3, 2, 1, 3, 2, 1},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 2,
+			},
+		},
+		{
+			name: "single chain with max seqNum",
+			f:    3,
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {1, 2, 2, 3, 3, 3, 3},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 3,
+			},
+		},
+		{
+			name: "multiple unsorted chains with min seqNum",
+			f:    3,
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {1, 1, 2, 2, 3, 3},
+				cciptypes.ChainSelector(2): {1, 2, 2, 2, 2, 3},
+				cciptypes.ChainSelector(3): {1, 1}, // not enough observations, should skip
+				cciptypes.ChainSelector(4): {1, 2, 2, 3, 3, 3},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 2,
+				cciptypes.ChainSelector(2): 2,
+				cciptypes.ChainSelector(4): 3,
+			},
+		},
+	}
+
+	for _, scenario := range testCases {
+		t.Run(scenario.name, func(t *testing.T) {
+			minObs := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(scenario.f))
+			result := GetMaxSqNrWithConsensus(lggr, "fChain", scenario.inputMap, minObs)
+			assert.Equal(t, scenario.expectedOutput, result)
+		})
+	}
+}
+
 func Test_GetConsensusMapMedianTimestamp(t *testing.T) {
 	lggr := logger.Test(t)
 	f := 3

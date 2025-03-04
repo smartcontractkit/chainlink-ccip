@@ -83,6 +83,35 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 	return valsCopy[len(valsCopy)/2]
 }
 
+func GetMaxSqNrWithConsensus[K comparable](
+	lggr logger.Logger,
+	objectName string,
+	itemsByKey map[K][]cciptypes.SeqNum,
+	minObs MultiThreshold[K]) map[K]cciptypes.SeqNum {
+	result := make(map[K]cciptypes.SeqNum)
+
+	for key, items := range itemsByKey {
+		if minThresh, exists := minObs.Get(key); exists {
+			if len(items) < int(minThresh) {
+				lggr.Debugf("failed to reach consensus on a %s's for key %+v "+
+					"because no single item was observed more than the expected min (%d) times, "+
+					"all observed items: %v",
+					objectName, key, minThresh, items)
+				continue
+			}
+
+			sort.Slice(items, func(i, j int) bool {
+				return items[i] > items[j]
+			})
+
+			result[key] = items[int(minThresh)-1]
+		} else {
+			lggr.Warnf("getConsensus(%s): min not found for chain %d", objectName, key)
+		}
+	}
+	return result
+}
+
 func TimestampComparator(a, b time.Time) bool {
 	return a.Before(b)
 }
