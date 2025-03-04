@@ -83,6 +83,8 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 	return valsCopy[len(valsCopy)/2]
 }
 
+// GetMaxSqNrWithConsensus returns the greatest sequence number for each chain that meets the min obs threshold
+// We do this by sorting the array in ascending order, then returning the value of item[minObs]
 func GetMaxSqNrWithConsensus[K comparable](
 	lggr logger.Logger,
 	objectName string,
