@@ -1,0 +1,420 @@
+{
+  "version": "0.1.0",
+  "name": "fee_quoter_dummy_emitter",
+  "instructions": [
+    {
+      "name": "triggerAllEvents",
+      "docs": [
+        "Emit events gracefully. Will mark transaction as succeeded."
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "triggerAllEventsReverts",
+      "docs": [
+        "Emit events and reverts. Will mark transaction as failed."
+      ],
+      "accounts": [],
+      "args": []
+    }
+  ],
+  "types": [
+    {
+      "name": "DestChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "isEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "laneCodeVersion",
+            "type": {
+              "defined": "CodeVersion"
+            }
+          },
+          {
+            "name": "maxNumberOfTokensPerMsg",
+            "type": "u16"
+          },
+          {
+            "name": "maxDataBytes",
+            "type": "u32"
+          },
+          {
+            "name": "maxPerMsgGasLimit",
+            "type": "u32"
+          },
+          {
+            "name": "destGasOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteBase",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteHigh",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByteThreshold",
+            "type": "u32"
+          },
+          {
+            "name": "destDataAvailabilityOverheadGas",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerDataAvailabilityByte",
+            "type": "u16"
+          },
+          {
+            "name": "destDataAvailabilityMultiplierBps",
+            "type": "u16"
+          },
+          {
+            "name": "defaultTokenFeeUsdcents",
+            "type": "u16"
+          },
+          {
+            "name": "defaultTokenDestGasOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "defaultTxGasLimit",
+            "type": "u32"
+          },
+          {
+            "name": "gasMultiplierWeiPerEth",
+            "type": "u64"
+          },
+          {
+            "name": "networkFeeUsdcents",
+            "type": "u32"
+          },
+          {
+            "name": "gasPriceStalenessThreshold",
+            "type": "u32"
+          },
+          {
+            "name": "enforceOutOfOrder",
+            "type": "bool"
+          },
+          {
+            "name": "chainFamilySelector",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenTransferFeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "minFeeUsdcents",
+            "type": "u32"
+          },
+          {
+            "name": "maxFeeUsdcents",
+            "type": "u32"
+          },
+          {
+            "name": "deciBps",
+            "type": "u16"
+          },
+          {
+            "name": "destGasOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "destBytesOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "isEnabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CodeVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Default"
+          },
+          {
+            "name": "V1"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "onramp",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "defaultCodeVersion",
+          "type": {
+            "defined": "CodeVersion"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FeeTokenAdded",
+      "fields": [
+        {
+          "name": "feeToken",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FeeTokenEnabled",
+      "fields": [
+        {
+          "name": "feeToken",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FeeTokenDisabled",
+      "fields": [
+        {
+          "name": "feeToken",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FeeTokenRemoved",
+      "fields": [
+        {
+          "name": "feeToken",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DestChainAdded",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "destChainConfig",
+          "type": {
+            "defined": "DestChainConfig"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DestChainConfigUpdated",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "destChainConfig",
+          "type": {
+            "defined": "DestChainConfig"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UsdPerUnitGasUpdated",
+      "fields": [
+        {
+          "name": "destChain",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UsdPerTokenUpdated",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenTransferFeeConfigUpdated",
+      "fields": [
+        {
+          "name": "destChainSelector",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenTransferFeeConfig",
+          "type": {
+            "defined": "TokenTransferFeeConfig"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PremiumMultiplierWeiPerEthUpdated",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "premiumMultiplierWeiPerEth",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PriceUpdaterAdded",
+      "fields": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PriceUpdaterRemoved",
+      "fields": [
+        {
+          "name": "priceUpdater",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "IntentionalRevert",
+      "msg": "Transaction intentionally reverted for testing"
+    }
+  ],
+  "metadata": {
+    "address": "9ykZ4KUXJUtACe5Cg3UuTM14t5bxk1Amf6uaawGpGR5d"
+  }
+}
