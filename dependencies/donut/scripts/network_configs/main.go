@@ -60,7 +60,6 @@ func BuildNetworkConfigs(besuChainsCount int, gethChainsCount int, solanaChainsC
 	gethChains := BuildEVMNetworkConfigs(gethChainsCount)
 	solanaChains := BuildSolanaNetworkConfigs(solanaChainsCount)
 
-
 	c := Config{
 		BesuChains:   besuChains,
 		GethChains:   gethChains,
