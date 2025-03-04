@@ -396,7 +396,7 @@ func getConsensusObservation(
 	consensusObs := consensusObservation{
 		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
 		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
-		OnRampMaxSeqNums: consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFChainPlus1),
+		OnRampMaxSeqNums: GetMaximumSequenceNumberWithConsensus(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFChainPlus1),
 		OffRampNextSeqNums: consensus.GetConsensusMap(
 			lggr,
 			"OffRamp Next Seq Nums",
@@ -407,4 +407,33 @@ func getConsensusObservation(
 	}
 
 	return consensusObs, nil
+}
+
+func GetMaximumSequenceNumberWithConsensus[K comparable](
+	lggr logger.Logger,
+	objectName string,
+	itemsByKey map[K][]cciptypes.SeqNum,
+	minObs consensus.MultiThreshold[K]) map[K]cciptypes.SeqNum {
+	result := make(map[K]cciptypes.SeqNum)
+
+	for key, items := range itemsByKey {
+		if minThresh, exists := minObs.Get(key); exists {
+			if len(items) < int(minThresh) {
+				lggr.Debugf("failed to reach consensus on a %s's for key %+v "+
+					"because no single item was observed more than the expected min (%d) times, "+
+					"all observed items: %v",
+					objectName, key, minThresh, items)
+				continue
+			}
+
+			sort.Slice(items, func(i, j int) bool {
+				return items[i] > items[j]
+			})
+
+			result[key] = items[int(minThresh)-1]
+		} else {
+			lggr.Warnf("getConsensus(%s): min not found for chain %d", objectName, key)
+		}
+	}
+	return result
 }
