@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
@@ -831,19 +830,11 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
 	mockHomeChain.EXPECT().GetFChain().Return(map[cciptypes.ChainSelector]int{}, nil)
 
-	// Create a mock commit roots cache
-	mockCommitRootsCache := cache.NewCommitRootsCache(
-		lggr,
-		8*time.Hour,   // messageVisibilityInterval
-		5*time.Minute, // rootSnoozeTime
-	)
-
 	p := &Plugin{
-		homeChain:        mockHomeChain,
-		oracleIDToP2pID:  map[commontypes.OracleID]libocrtypes.PeerID{},
-		lggr:             lggr,
-		ocrTypeCodec:     ocrTypeCodec,
-		commitRootsCache: mockCommitRootsCache,
+		homeChain:       mockHomeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{},
+		lggr:            lggr,
+		ocrTypeCodec:    ocrTypeCodec,
 	}
 
 	_, err := p.Observation(tests.Context(t), ocr3types.OutcomeContext{}, nil)
@@ -1003,7 +994,11 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 		Return(nil, fmt.Errorf("test error"))
 	p := &Plugin{reportCodec: codec, lggr: logger.Test(t), ocrTypeCodec: ocrTypeCodec}
 	report, err := ocrTypeCodec.EncodeOutcome(exectypes.NewOutcome(
-		exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}))
+		exectypes.Unknown, nil,
+		cciptypes.ExecutePluginReport{ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+			{},
+			{},
+		}}))
 	require.NoError(t, err)
 
 	_, err = p.Reports(ctx, 0, report)
@@ -1025,7 +1020,7 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validate exec report: decode exec plugin report: test error")
+	assert.Contains(t, err.Error(), "report validation error: decode exec plugin report: test error")
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
@@ -1328,7 +1323,7 @@ func TestPlugin_ShouldTransmitAcceptedReport_DecodeFailure(t *testing.T) {
 		Report: []byte("will not decode"), // faked out, see mock above
 	})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "validate exec report: decode exec plugin report: test error")
+	require.ErrorContains(t, err, "report validation error: decode exec plugin report: test error")
 }
 
 func TestPlugin_ShouldTransmitAcceptReport_SupportsDestChainCheckFails(t *testing.T) {
@@ -1676,58 +1671,4 @@ func TestPlugin_Outcome_RealworldObservation(t *testing.T) {
 		merkleRoots[commitReport.MerkleRoot.String()] = struct{}{}
 	}
 	require.Equal(t, len(merkleRoots), len(decodedOutcome.CommitReports))
-}
-
-func TestPlugin_GetTimestampToQueryFrom(t *testing.T) {
-	lggr := logger.Test(t)
-
-	// Define standard test parameters
-	messageVisibilityInterval := 8 * time.Hour
-	rootSnoozeTime := 5 * time.Minute
-
-	// Create the cache
-	commitRootsCache := cache.NewCommitRootsCache(
-		lggr,
-		messageVisibilityInterval,
-		rootSnoozeTime,
-	)
-
-	// Create a minimal plugin with just the cache
-	p := &Plugin{
-		lggr:             lggr,
-		commitRootsCache: commitRootsCache,
-	}
-
-	// First test: initial query should use message visibility window
-	initialTs := p.commitRootsCache.GetTimestampToQueryFrom()
-	visibilityWindow := time.Now().Add(-messageVisibilityInterval)
-
-	// Check that initial timestamp is approximately equal to visibility window
-	timeDiff := initialTs.Sub(visibilityWindow)
-	assert.True(t, timeDiff > -time.Second && timeDiff < time.Second,
-		"Initial timestamp should be close to visibility window")
-
-	// Second test: update with a more recent timestamp
-	updatedTime := time.Now().Add(-4 * time.Hour) // More recent than visibility window
-	p.commitRootsCache.UpdateLatestFinalizedTimestamp(updatedTime)
-
-	// Get new timestamp
-	updatedTs := p.commitRootsCache.GetTimestampToQueryFrom()
-
-	// Should use the more recent timestamp now
-	timeDiff = updatedTs.Sub(updatedTime)
-	assert.True(t, timeDiff > -time.Second && timeDiff < time.Second,
-		"Updated timestamp should be close to the explicitly set timestamp")
-
-	// Third test: update with an older timestamp (shouldn't change the timestamp)
-	olderTime := time.Now().Add(-12 * time.Hour) // Older than visibility window
-	p.commitRootsCache.UpdateLatestFinalizedTimestamp(olderTime)
-
-	// Get latest timestamp
-	latestTs := p.commitRootsCache.GetTimestampToQueryFrom()
-
-	// Should still use the previously set more recent timestamp rather than the older one
-	timeDiff = latestTs.Sub(updatedTime)
-	assert.True(t, timeDiff > -time.Second && timeDiff < time.Second,
-		"After updating with older timestamp, should retain the more recent timestamp")
 }

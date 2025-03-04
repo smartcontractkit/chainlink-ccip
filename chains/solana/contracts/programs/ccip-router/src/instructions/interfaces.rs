@@ -34,6 +34,12 @@ pub trait Admin {
         fee_aggregator: Pubkey,
     ) -> Result<()>;
 
+    fn update_rmn_remote(
+        &self,
+        ctx: Context<UpdateConfigCCIPRouter>,
+        rmn_remote: Pubkey,
+    ) -> Result<()>;
+
     fn add_chain_selector(
         &self,
         ctx: Context<AddChainSelector>,
