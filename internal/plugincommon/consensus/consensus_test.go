@@ -80,7 +80,7 @@ func Test_SeqNumConsensus(t *testing.T) {
 			name: "single chain with minimal seqNum",
 			f:    3,
 			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
-				cciptypes.ChainSelector(1): {1, 1, 1, 1, 1, 2, 2, 3, 3},
+				cciptypes.ChainSelector(1): {1, 1, 1, 1, 1, 1, 2, 3, 3},
 			},
 			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
 				cciptypes.ChainSelector(1): 2,
@@ -94,6 +94,16 @@ func Test_SeqNumConsensus(t *testing.T) {
 			},
 			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
 				cciptypes.ChainSelector(1): 2,
+			},
+		},
+		{
+			name: "reverse single chain with ascending seqNum",
+			f:    3,
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {7, 6, 5, 4, 3, 2, 1},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 5,
 			},
 		},
 		{
