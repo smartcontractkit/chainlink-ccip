@@ -416,6 +416,31 @@ pub struct CcipSend<'info> {
     )]
     pub fee_quoter_link_token_config: UncheckedAccount<'info>,
 
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = config.rmn_remote @ CcipRouterError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = config.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = config.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
+
     /// CPI signers, optional if no tokens are being transferred.
     /// CHECK: Using this to sign.
     #[account(mut, seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]

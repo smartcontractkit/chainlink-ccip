@@ -74,6 +74,10 @@
         {
           "name": "linkTokenMint",
           "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
         }
       ]
     },
@@ -205,6 +209,41 @@
       "args": [
         {
           "name": "feeAggregator",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "updateRmnRemote",
+      "docs": [
+        "Updates the RMN remote program in the router configuration.",
+        "The Admin is the only one able to update the RMN remote program.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `rmn_remote,` - The new RMN remote address."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rmnRemote",
           "type": "publicKey"
         }
       ]
@@ -970,6 +1009,21 @@
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenPoolsSigner",
           "isMut": true,
           "isSigner": false,
@@ -1039,6 +1093,10 @@
           },
           {
             "name": "feeQuoter",
+            "type": "publicKey"
+          },
+          {
+            "name": "rmnRemote",
             "type": "publicKey"
           },
           {
@@ -1417,6 +1475,11 @@
           "index": false
         },
         {
+          "name": "rmnRemote",
+          "type": "publicKey",
+          "index": false
+        },
+        {
           "name": "linkTokenMint",
           "type": "publicKey",
           "index": false
@@ -1693,126 +1756,131 @@
     },
     {
       "code": 7001,
+      "name": "InvalidRMNRemoteAddress",
+      "msg": "Invalid RMN Remote Address"
+    },
+    {
+      "code": 7002,
       "name": "InvalidInputsMint",
       "msg": "Mint account input is invalid"
     },
     {
-      "code": 7002,
+      "code": 7003,
       "name": "InvalidVersion",
       "msg": "Invalid version of the onchain state"
     },
     {
-      "code": 7003,
+      "code": 7004,
       "name": "FeeTokenMismatch",
       "msg": "Fee token doesn't match transfer token"
     },
     {
-      "code": 7004,
+      "code": 7005,
       "name": "RedundantOwnerProposal",
       "msg": "Proposed owner is the current owner"
     },
     {
-      "code": 7005,
+      "code": 7006,
       "name": "ReachedMaxSequenceNumber",
       "msg": "Reached max sequence number"
     },
     {
-      "code": 7006,
+      "code": 7007,
       "name": "InvalidInputsTokenIndices",
       "msg": "Invalid pool account account indices"
     },
     {
-      "code": 7007,
+      "code": 7008,
       "name": "InvalidInputsPoolAccounts",
       "msg": "Invalid pool accounts"
     },
     {
-      "code": 7008,
+      "code": 7009,
       "name": "InvalidInputsTokenAccounts",
       "msg": "Invalid token accounts"
     },
     {
-      "code": 7009,
+      "code": 7010,
       "name": "InvalidInputsConfigAccounts",
       "msg": "Invalid config account"
     },
     {
-      "code": 7010,
+      "code": 7011,
       "name": "InvalidInputsTokenAdminRegistryAccounts",
       "msg": "Invalid Token Admin Registry account"
     },
     {
-      "code": 7011,
+      "code": 7012,
       "name": "InvalidInputsLookupTableAccounts",
       "msg": "Invalid LookupTable account"
     },
     {
-      "code": 7012,
+      "code": 7013,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
     },
     {
-      "code": 7013,
+      "code": 7014,
       "name": "InvalidInputsTokenAmount",
       "msg": "Cannot send zero tokens"
     },
     {
-      "code": 7014,
+      "code": 7015,
       "name": "InvalidInputsTransferAllAmount",
       "msg": "Must specify zero amount to send alongside transfer_all"
     },
     {
-      "code": 7015,
+      "code": 7016,
       "name": "InvalidInputsAtaAddress",
       "msg": "Invalid Associated Token Account address"
     },
     {
-      "code": 7016,
+      "code": 7017,
       "name": "InvalidInputsAtaWritable",
       "msg": "Invalid Associated Token Account writable flag"
     },
     {
-      "code": 7017,
+      "code": 7018,
       "name": "InvalidInputsChainSelector",
       "msg": "Chain selector is invalid"
     },
     {
-      "code": 7018,
+      "code": 7019,
       "name": "InsufficientLamports",
       "msg": "Insufficient lamports"
     },
     {
-      "code": 7019,
+      "code": 7020,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 7020,
+      "code": 7021,
       "name": "SourceTokenDataTooLarge",
       "msg": "Source token data is too large"
     },
     {
-      "code": 7021,
+      "code": 7022,
       "name": "InvalidTokenAdminRegistryInputsZeroAddress",
       "msg": "New Admin can not be zero address"
     },
     {
-      "code": 7022,
+      "code": 7023,
       "name": "InvalidTokenAdminRegistryProposedAdmin",
       "msg": "An already owned registry can not be proposed"
     },
     {
-      "code": 7023,
+      "code": 7024,
       "name": "SenderNotAllowed",
       "msg": "Sender not allowed for that destination chain"
     },
     {
-      "code": 7024,
+      "code": 7025,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     },
     {
-      "code": 7025,
+      "code": 7026,
       "name": "InvalidCcipVersionRollback",
       "msg": "Invalid rollback attempt on the CCIP version of the onramp to the destination chain"
     }

@@ -89,7 +89,10 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for updating the reference addresses.
-	// * `reference_addresses` - The new reference addresses to be set.
+	// * `router` - The router address to be set.
+	// * `fee_quoter` - The fee_quoter address to be set.
+	// * `offramp_lookup_table` - The offramp_lookup_table address to be set.
+	// * `rmn_remote` - The rmn_remote address to be set.
 	Instruction_UpdateReferenceAddresses = ag_binary.TypeID([8]byte{119, 179, 218, 249, 217, 184, 181, 9})
 
 	// Adds a new source chain selector with its config to the offramp.

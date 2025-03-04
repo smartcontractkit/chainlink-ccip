@@ -19,6 +19,7 @@ use super::pools::{
     calculate_token_pool_account_indices, get_balance, interact_with_pool,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_POOL_V1_RET_BYTES,
 };
+use super::rmn::verify_uncursed_cpi;
 
 pub struct Impl;
 impl Execute for Impl {
@@ -33,6 +34,13 @@ impl Execute for Impl {
             ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
                 .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
         let report_context = ReportContext::from_byte_words(report_context_byte_words);
+        verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            execution_report.source_chain_selector,
+        )?;
+
         // limit borrowing of ctx
         {
             let config = ctx.accounts.config.load()?;
@@ -76,6 +84,12 @@ impl Execute for Impl {
         let execution_report =
             ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
                 .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+        verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            execution_report.source_chain_selector,
+        )?;
         internal_execute(ctx, execution_report, token_indexes)
     }
 }
@@ -140,8 +154,8 @@ fn internal_execute<'info>(
     // token_indexes = [2, 4] where remaining_accounts is [custom_account, custom_account, token1_account1, token1_account2, token2_account1, token2_account2] for example
     for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
         let accs = get_token_accounts_for(
-            ctx.accounts.reference_addresses.router,
-            ctx.accounts.reference_addresses.fee_quoter,
+            ctx.accounts.reference_addresses.load()?.router,
+            ctx.accounts.reference_addresses.load()?.fee_quoter,
             ctx.remaining_accounts,
             execution_report.message.token_receiver,
             execution_report.message.header.source_chain_selector,
@@ -173,6 +187,9 @@ fn internal_execute<'info>(
             accs.pool_signer.to_account_info(),
             accs.pool_token_account.to_account_info(),
             accs.pool_chain_config.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             accs.user_token_account.to_account_info(),
         ];
         acc_infos.extend_from_slice(accs.remaining_accounts);
