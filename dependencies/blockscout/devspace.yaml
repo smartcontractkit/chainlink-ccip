@@ -9,10 +9,10 @@ vars:
   #  https://docs.blockscout.com/setup/requirements/back-front-compatibility-matrix
   BLOCKSCOUT_BACKEND_IMAGE_TAG:
     source: env
-    value: "6.10.2"
+    value: "v7.0.2"
   BLOCKSCOUT_FRONTEND_IMAGE_TAG:
     source: env
-    value: "latest"
+    value: "v1.38.0"
   CHAIN_ID:
     source: env
     default: ""
