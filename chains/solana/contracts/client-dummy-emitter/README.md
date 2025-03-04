@@ -58,6 +58,12 @@ go run main.go --contract=mcm --result=OK --keypair=/path/to/solana/keypair.json
 ```
 [View on Explorer](https://explorer.solana.com/address/EqaAbT4NkoDU7WeKTHK9DrJEZ6xgSmZzoufpZQ7GPQE6?cluster=devnet)
 
+#### Timelock
+```sh
+go run main.go --contract=timelock --result=OK --keypair=/path/to/solana/keypair.json --num-tx=2
+```
+[View on Explorer](https://explorer.solana.com/address/8hNnreBcZRQgcWnKaEkzsQwZA6B9ngjXFhSkToVu8V67?cluster=devnet)
+
 ### Testing Reverts
 
 To test event emission followed by a revert, use `--result=REVERT` instead of `--result=OK`.:

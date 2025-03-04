@@ -2548,6 +2548,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "timelock-dummy-emitter"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
 name = "tiny-bip39"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -25,6 +25,7 @@ test_ccip_invalid_receiver = "9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8"
 test_ccip_receiver = "CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"
 test_token_pool = "GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH"
 timelock = "LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn"
+timelock-dummy-emitter = "8hNnreBcZRQgcWnKaEkzsQwZA6B9ngjXFhSkToVu8V67"
 
 [registry]
 url = "https://anchor.projectserum.com"

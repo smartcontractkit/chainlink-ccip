@@ -1,0 +1,199 @@
+{
+  "version": "0.1.0",
+  "name": "timelock_dummy_emitter",
+  "instructions": [
+    {
+      "name": "triggerAllEvents",
+      "docs": [
+        "Emit events gracefully. Will mark transaction as succeeded."
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "triggerAllEventsReverts",
+      "docs": [
+        "Emit events and reverts. Will mark transaction as failed."
+      ],
+      "accounts": [],
+      "args": []
+    }
+  ],
+  "events": [
+    {
+      "name": "CallScheduled",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "index",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "target",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "predecessor",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "delay",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "data",
+          "type": "bytes",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CallExecuted",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "index",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "target",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "data",
+          "type": "bytes",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "BypasserCallExecuted",
+      "fields": [
+        {
+          "name": "index",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "target",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "data",
+          "type": "bytes",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "Cancelled",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "MinDelayChange",
+      "fields": [
+        {
+          "name": "oldDuration",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "newDuration",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FunctionSelectorBlocked",
+      "fields": [
+        {
+          "name": "selector",
+          "type": {
+            "array": [
+              "u8",
+              8
+            ]
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FunctionSelectorUnblocked",
+      "fields": [
+        {
+          "name": "selector",
+          "type": {
+            "array": [
+              "u8",
+              8
+            ]
+          },
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "IntentionalRevert",
+      "msg": "Transaction intentionally reverted for testing"
+    }
+  ],
+  "metadata": {
+    "address": "8hNnreBcZRQgcWnKaEkzsQwZA6B9ngjXFhSkToVu8V67"
+  }
+}

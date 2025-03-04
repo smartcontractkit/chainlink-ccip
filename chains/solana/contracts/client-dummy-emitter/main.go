@@ -26,6 +26,7 @@ var programIDs = map[string]string{
 	"base-token-pool": "CTw4kTVDnSrBohARHWWPwnvRjNYbBx79rDHMR7XcLYDa",
 	"fee-quoter":      "9ykZ4KUXJUtACe5Cg3UuTM14t5bxk1Amf6uaawGpGR5d",
 	"mcm":             "EqaAbT4NkoDU7WeKTHK9DrJEZ6xgSmZzoufpZQ7GPQE6",
+	"timelock":        "8hNnreBcZRQgcWnKaEkzsQwZA6B9ngjXFhSkToVu8V67",
 }
 
 func main() {
