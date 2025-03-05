@@ -179,13 +179,6 @@ func TestCommitRootsCache_UpdateEarliestUnexecutedRoot(t *testing.T) {
 			expectChange:         true,
 		},
 		{
-			name:                 "New earliest is earlier than current",
-			initialValue:         timestamp2,
-			remainingReports:     createCommitReports(report1, report3), // report1 is earlier than initialValue
-			expectedUpdatedValue: timestamp1,
-			expectChange:         true,
-		},
-		{
 			name:                 "New earliest is later than current",
 			initialValue:         timestamp1,
 			remainingReports:     createCommitReports(report2, report3), // report2 is later than initialValue
@@ -451,6 +444,56 @@ func TestCommitRootsCache_ScenarioTests(t *testing.T) {
 		assert.False(t, cache.CanExecute(selector, root2), "Root2 should not be executable")
 		assert.False(t, cache.CanExecute(selector, root3), "Root3 should not be executable")
 		assert.False(t, cache.CanExecute(selector, root4), "Root4 should not be executable")
+	})
+
+	t.Run("Edge Case: Reorg brings back previously executed root", func(t *testing.T) {
+		cache := internalNewCommitRootsCache(
+			lggr,
+			messageVisibilityInterval,
+			rootSnoozeTime,
+			fixedTimeProvider,
+		)
+
+		// Initial state - all roots unexecuted
+		allReports := createCommitReports(report1, report2, report3)
+		cache.UpdateEarliestUnexecutedRoot(allReports)
+
+		// Verify initial state
+		assert.Equal(t, timestamp1, cache.earliestUnexecutedRoot,
+			"Initial earliest should be oldest root (1)")
+
+		// Update with remaining reports + report1 (as executed but unfinalized)
+		remainingReports := createCommitReports(report1, report2, report3)
+		cache.UpdateEarliestUnexecutedRoot(remainingReports)
+
+		// Verify state after execution
+		assert.Equal(t, timestamp1, cache.earliestUnexecutedRoot,
+			"After execution, earliest should still be root1 as it is not finalized")
+
+		// Get query timestamp
+		queryTimestamp1 := cache.GetTimestampToQueryFrom()
+		assert.Equal(t, timestamp1, queryTimestamp1,
+			"Query timestamp should be root1's timestamp")
+
+		// Simulate a reorg: rootA is now unexecuted again
+		// In a real system, this would happen because the blockchain
+		// reorganized and the transaction that executed rootA was reverted
+
+		// We now have rootA, rootB, and rootC all unexecuted
+		reorgReports := createCommitReports(report1, report2, report3)
+		cache.UpdateEarliestUnexecutedRoot(reorgReports)
+
+		// Verify that we're now tracking the earliest root again
+		assert.Equal(t, timestamp1, cache.earliestUnexecutedRoot,
+			"After reorg, earliest should be back to root1")
+
+		// Verify all roots can be executed again
+		assert.True(t, cache.CanExecute(selector, root1),
+			"After reorg, root1 should be executable again")
+		assert.True(t, cache.CanExecute(selector, root2),
+			"Root2 should be executable")
+		assert.True(t, cache.CanExecute(selector, root3),
+			"Root3 should be executable")
 	})
 }
 
