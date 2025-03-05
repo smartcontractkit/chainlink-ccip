@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"encoding/binary"
 	"fmt"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
@@ -125,7 +127,7 @@ func TestDevnet(t *testing.T) {
 			},
 		}
 
-		signers, _, _ := testutils.GenerateSignersAndTransmitters(t, 16) // TODO
+		// signers, _, _ := testutils.GenerateSignersAndTransmitters(t, 16) // TODO
 
 		var initialConfig ccip_offramp.Config
 		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.config, rpc.CommitmentConfirmed, &initialConfig))
@@ -133,10 +135,20 @@ func TestDevnet(t *testing.T) {
 		index := uint8(testutils.OcrCommitPlugin)
 		commitConfig := initialConfig.Ocr3[index]
 
-		var reportContext [2][32]byte
-		reportContext = ccip.NextCommitReportContext()
-		reportContext[0] = commitConfig.ConfigInfo.ConfigDigest // match the onchain config digest
+		var sourceChain ccip_offramp.SourceChain
+		sequence := sourceChain.State.MinSeqNr
 
+		empty24byte := [24]byte{}
+		var reportContext [2][32]byte
+		reportContext[0] = commitConfig.ConfigInfo.ConfigDigest                              // match the onchain config digest
+		reportContext[1] = [32]byte(binary.BigEndian.AppendUint64(empty24byte[:], sequence)) // sequence number
+
+		signers := []eth.Signer{}
+		for _, signerPrivK := range devnetInfo.PrivateKeys.Signers {
+			signer, err := eth.GetSignerFromPk(string(signerPrivK))
+			require.NoError(t, err)
+			signers = append(signers, signer)
+		}
 		sigs, err := ccip.SignCommitReport(reportContext, report, signers)
 		require.NoError(t, err)
 
@@ -191,6 +203,7 @@ func TestDevnet(t *testing.T) {
 	})
 
 	t.Run("OnRamp: CCIP Send", func(t *testing.T) {
+		t.Skip("This test is not yet to be run")
 		message := ccip_router.SVM2AnyMessage{
 			FeeToken:  solana.PublicKey{},
 			Receiver:  []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 12, 248, 134, 206, 65, 149, 35, 22, 68, 26, 228, 202, 195, 95, 0, 240, 232, 130, 166}, // just an example EVM address

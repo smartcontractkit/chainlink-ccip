@@ -33,7 +33,10 @@ func SignCommitReport(ctx [2][32]byte, report ccip_offramp.CommitInput, baseSign
 	})
 
 	for i := uint8(0); i < config.OcrF+1; i++ {
-		baseSig := ecdsa.SignCompact(secp256k1.PrivKeyFromBytes(signers[i].PrivateKey), hash, false)
+		sigPrivk := signers[i].PrivateKey
+		baseSig := ecdsa.SignCompact(
+			secp256k1.PrivKeyFromBytes(sigPrivk),
+			hash, false)
 		sigs.RawVs[i] = baseSig[0] - 27 // key signs 27 or 28, but verification expects 0 or 1 (remove offset)
 		sigs.Rs = append(sigs.Rs, [32]byte(baseSig[1:33]))
 		sigs.Ss = append(sigs.Ss, [32]byte(baseSig[33:65]))

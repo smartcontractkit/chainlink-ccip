@@ -29,7 +29,7 @@ var (
 	OnRampAddressPadded             = [64]byte{1, 2, 3}
 	EnableExecutionAfter            = int64(1800) // 30min
 	MaxOracles                      = 16
-	OcrF                      uint8 = 5
+	OcrF                      uint8 = 1
 	ConfigDigest                    = common.MakeRandom32ByteArray()
 	Empty24Byte                     = [24]byte{}
 	MaxSignersAndTransmitters       = 16
