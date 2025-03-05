@@ -502,11 +502,6 @@ export type CcipRouter = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -543,11 +538,6 @@ export type CcipRouter = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -2401,11 +2391,6 @@ export const IDL: CcipRouter = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -2442,11 +2427,6 @@ export const IDL: CcipRouter = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [

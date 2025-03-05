@@ -201,6 +201,29 @@ pub struct UpdateDestChainSelectorConfig<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(new_chain_selector: u64)]
+// Similar to `UpdateDestChainSelectorConfig` but with no realloc
+pub struct UpdateDestChainSelectorConfigNoRealloc<'info> {
+    #[account(
+        mut,
+        seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub dest_chain_state: Account<'info, DestChain>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct UpdateConfigCCIPRouter<'info> {
     #[account(
         mut,
