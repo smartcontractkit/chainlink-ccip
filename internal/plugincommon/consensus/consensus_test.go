@@ -29,8 +29,8 @@ func Test_fChainConsensus(t *testing.T) {
 			inputMap: map[cciptypes.ChainSelector][]int{
 				cciptypes.ChainSelector(1): {5, 5, 5, 5, 5},
 				cciptypes.ChainSelector(2): {5, 5, 5, 3, 5},
-				cciptypes.ChainSelector(3): {5, 5},             // not enough observations, must be observed at least f times.
-				cciptypes.ChainSelector(4): {5, 3, 5, 3, 5, 3}, // both values appear at least f times, no consensus
+				cciptypes.ChainSelector(3): {5, 5},             // not enough observations, must be observed at least thresholds times.
+				cciptypes.ChainSelector(4): {5, 3, 5, 3, 5, 3}, // both values appear at least thresholds times, no consensus
 			},
 			expectedOutput: map[cciptypes.ChainSelector]int{
 				cciptypes.ChainSelector(1): 5,
@@ -63,13 +63,13 @@ func Test_SeqNumConsensus(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		f              int
+		thresholds     MultiThreshold[cciptypes.ChainSelector]
 		inputMap       map[cciptypes.ChainSelector][]cciptypes.SeqNum
 		expectedOutput map[cciptypes.ChainSelector]cciptypes.SeqNum
 	}{
 		{
-			name: "single chain with seqNum values",
-			f:    1,
+			name:       "single chain with seqNum values",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(1)),
 			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				cciptypes.ChainSelector(1): {1, 1, 1, 2},
 			},
@@ -78,16 +78,16 @@ func Test_SeqNumConsensus(t *testing.T) {
 			},
 		},
 		{
-			name: "nil f should not reach consensus",
-			f:    0,
+			name:       "nil thresholds should not reach consensus",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(0)),
 			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				cciptypes.ChainSelector(1): {7, 6, 5, 4, 3, 2, 1},
 			},
 			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{},
 		},
 		{
-			name: "single chain with max seqNum",
-			f:    2,
+			name:       "single chain with max seqNum",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(2)),
 			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				cciptypes.ChainSelector(1): {1, 2, 3, 4, 5},
 				cciptypes.ChainSelector(2): {2, 1, 1, 1, 4},
@@ -99,8 +99,8 @@ func Test_SeqNumConsensus(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple unsorted chains with min seqNum",
-			f:    1,
+			name:       "multiple unsorted chains with min seqNum",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(1)),
 			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				cciptypes.ChainSelector(1): {1, 2, 3, 4},
 				cciptypes.ChainSelector(2): {1, 4, 4, 4},
@@ -114,8 +114,8 @@ func Test_SeqNumConsensus(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple unsorted chains with min seqNum",
-			f:    3,
+			name:       "multiple unsorted chains with min seqNum",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(3)),
 			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				cciptypes.ChainSelector(1): {1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 				cciptypes.ChainSelector(2): {1, 1, 1, 2, 2, 2, 3, 3, 3, 4},
@@ -132,8 +132,7 @@ func Test_SeqNumConsensus(t *testing.T) {
 
 	for _, scenario := range testCases {
 		t.Run(scenario.name, func(t *testing.T) {
-			minObs := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(scenario.f))
-			result := GetConservativelyOrderedConsensus(lggr, "fChain", scenario.inputMap, minObs)
+			result := GetConservativelyOrderedConsensus(lggr, "fChain", scenario.inputMap, scenario.thresholds)
 			require.Equal(t, scenario.expectedOutput, result)
 		})
 	}
@@ -150,7 +149,7 @@ func Test_GetConsensusMapMedianTimestamp(t *testing.T) {
 	timeValues := map[int][]time.Time{
 		1: {ts1, ts1, ts1, ts1, ts1},
 		2: {ts2, ts2, ts1, ts1, ts1},
-		3: {ts1, ts1}, // not enough observations, must be observed at least f times.
+		3: {ts1, ts1}, // not enough observations, must be observed at least thresholds times.
 		4: {ts1, ts2, ts3},
 	}
 
@@ -175,7 +174,7 @@ func Test_GetConsensusMapMedianInt(t *testing.T) {
 	intValues := map[int][]int{
 		1: {5, 5, 5, 5, 5},
 		2: {5, 5, 5, 3, 5},
-		3: {5, 5}, // not enough observations, must be observed at least f times.
+		3: {5, 5}, // not enough observations, must be observed at least thresholds times.
 		4: {1, 2, 3, 4, 5, 6},
 		5: {5, 4, 3, 2, 1},
 	}
@@ -352,7 +351,7 @@ func TestMakeMultiThreshold_GenericKey(t *testing.T) {
 
 func Test_GetConsensusMapAggregator(t *testing.T) {
 	lggr := logger.Test(t)
-	//f := 3
+	//thresholds := 3
 
 	testCases := []struct {
 		name           string

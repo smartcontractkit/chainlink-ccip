@@ -88,18 +88,18 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 }
 
 // GetConservativelyOrderedConsensus returns the greatest sequence number for each chain that meets the min obs threshold
-// taking into account f which is the maximum number of faults across the whole DON.
-// OCR itself won't call Report unless there are 2*f+1 observations
+// taking into account thresholds which is the maximum number of faults across the whole DON.
+// OCR itself won't call Report unless there are 2*thresholds+1 observations
 // https://github.com/smartcontractkit/libocr/blob/master/offchainreporting2/internal/protocol/report_generation_follower.go#L415
-// and f of those observations may be either unparseable or adversarially set values. That means
-// we'll either have f+1 parsed honest values here, 2f+1 parsed values with f adversarial values or somewhere
+// and thresholds of those observations may be either unparseable or adversarially set values. That means
+// we'll either have thresholds+1 parsed honest values here, 2f+1 parsed values with thresholds adversarial values or somewhere
 // in between.
-// We choose the more "conservative" sorted_maxes[f] so:
+// We choose the more "conservative" sorted_maxes[thresholds] so:
 // - We are ensured that at least one honest oracle has seen the max, so adversary cannot set it lower and
 // cause the maxSeqNum < minSeqNum errors
-// - If an honest oracle reports sorted_max[f] which happens to be stale i.e. that oracle
+// - If an honest oracle reports sorted_max[thresholds] which happens to be stale i.e. that oracle
 // has a delayed view of the source chain, then we simply lose a little bit of throughput.
-// - If we were to pick sorted_max[-f] i.e. the maximum honest node view (a more "aggressive" setting in terms of throughput),
+// - If we were to pick sorted_max[-thresholds] i.e. the maximum honest node view (a more "aggressive" setting in terms of throughput),
 // then an adversary can continually send high values e.g. imagine we have observations from all 4 nodes
 // [honest 1, honest 1, honest 2, malicious 2], in this case we pick 2, but it's not enough to be able
 // to build a report since the first 2 honest nodes are unaware of message 2.
