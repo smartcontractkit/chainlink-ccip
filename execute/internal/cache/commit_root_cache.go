@@ -21,7 +21,7 @@ type TimeProvider interface {
 type RealTimeProvider struct{}
 
 func (r *RealTimeProvider) Now() time.Time {
-	return time.Now()
+	return time.Now().UTC()
 }
 
 const (

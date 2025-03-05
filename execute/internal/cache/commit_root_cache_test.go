@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	cachemock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/cache"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -34,21 +34,11 @@ func createCommitReports(reports ...exectypes.CommitData) map[ccipocr3.ChainSele
 	return result
 }
 
-// Mock time provider for testing
-type mockTimeProvider struct {
-	mock.Mock
-}
-
-func (m *mockTimeProvider) Now() time.Time {
-	args := m.Called()
-	return args.Get(0).(time.Time)
-}
-
-// Helper to create a fixed time provider
-func newFixedTimeProvider(fixedTime time.Time) *mockTimeProvider {
-	m := &mockTimeProvider{}
-	m.On("Now").Return(fixedTime)
-	return m
+// Helper to create a fixed time provider using mockery
+func newFixedTimeProvider(t *testing.T, fixedTime time.Time) *cachemock.MockTimeProvider {
+	mockTime := cachemock.NewMockTimeProvider(t)
+	mockTime.EXPECT().Now().Return(fixedTime).Maybe()
+	return mockTime
 }
 
 func TestCommitRootsCache_GetTimestampToQueryFrom(t *testing.T) {
@@ -56,8 +46,8 @@ func TestCommitRootsCache_GetTimestampToQueryFrom(t *testing.T) {
 	messageVisibilityInterval := 8 * time.Hour
 	rootSnoozeTime := 5 * time.Minute
 
-	now := time.Now()
-	fixedTimeProvider := newFixedTimeProvider(now)
+	now := time.Now().UTC()
+	fixedTimeProvider := newFixedTimeProvider(t, now)
 	messageVisibilityWindow := now.Add(-messageVisibilityInterval)
 
 	tests := []struct {
@@ -123,7 +113,7 @@ func TestCommitRootsCache_UpdateEarliestUnexecutedRoot(t *testing.T) {
 	lggr := logger.Nop()
 	messageVisibilityInterval := 8 * time.Hour
 	rootSnoozeTime := 5 * time.Minute
-	fixedTimeProvider := newFixedTimeProvider(time.Now())
+	fixedTimeProvider := newFixedTimeProvider(t, time.Now().UTC())
 
 	now := time.Now()
 
@@ -246,8 +236,8 @@ func TestCommitRootsCache_ScenarioTests(t *testing.T) {
 	messageVisibilityInterval := 8 * time.Hour
 	rootSnoozeTime := 5 * time.Minute
 
-	now := time.Now()
-	fixedTimeProvider := newFixedTimeProvider(now)
+	now := time.Now().UTC()
+	fixedTimeProvider := newFixedTimeProvider(t, now)
 
 	// Create test data for the colleague's scenario
 	selector := ccipocr3.ChainSelector(1)
@@ -470,7 +460,7 @@ func TestCommitRootsCache_IntegrationScenario(t *testing.T) {
 	rootSnoozeTime := 5 * time.Minute
 
 	now := time.Now().UTC() // Use UTC time for all times in the test
-	fixedTimeProvider := newFixedTimeProvider(now)
+	fixedTimeProvider := newFixedTimeProvider(t, now)
 
 	// Create a timeline with 5 roots
 	selector := ccipocr3.ChainSelector(1)
@@ -569,8 +559,8 @@ func TestCommitRootsCache_AdditionalEdgeCases(t *testing.T) {
 	messageVisibilityInterval := 8 * time.Hour
 	rootSnoozeTime := 5 * time.Minute
 
-	now := time.Now()
-	fixedTimeProvider := newFixedTimeProvider(now)
+	now := time.Now().UTC()
+	fixedTimeProvider := newFixedTimeProvider(t, now)
 	messageVisibilityWindow := now.Add(-messageVisibilityInterval).UTC()
 
 	selector := ccipocr3.ChainSelector(1)
@@ -632,7 +622,7 @@ func TestCommitRootsCache_AdditionalEdgeCases(t *testing.T) {
 
 	t.Run("Edge Case: Visibility window moves forward", func(t *testing.T) {
 		// For this test, we need to update the time as the test progresses
-		timeProvider := &mockTimeProvider{}
+		timeProvider := &cachemock.MockTimeProvider{}
 
 		cache := internalNewCommitRootsCache(
 			lggr,
@@ -825,7 +815,7 @@ func TestCanExecuteAndMarking(t *testing.T) {
 	lggr := logger.Nop()
 	messageVisibilityInterval := 8 * time.Hour
 	rootSnoozeTime := 5 * time.Minute
-	fixedTimeProvider := newFixedTimeProvider(time.Now())
+	fixedTimeProvider := newFixedTimeProvider(t, time.Now().UTC())
 
 	selector := ccipocr3.ChainSelector(1)
 	root1 := ccipocr3.Bytes32{1}
