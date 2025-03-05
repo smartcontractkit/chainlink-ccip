@@ -1094,6 +1094,77 @@ func TestCCIPRouter(t *testing.T) {
 			})
 		})
 
+		t.Run("Onramp lane ccip version", func(t *testing.T) {
+			var initial ccip_router.DestChain
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &initial))
+			require.Equal(t, ccip_router.None_RestoreOnAction, initial.State.RestoreOnAction)
+
+			t.Run("When a non-admin tries to bump the onramp ccip version for a dest chain, it fails", func(t *testing.T) {
+				ix, err := ccip_router.NewBumpCcipVersionForDestChainInstruction(
+					config.SvmChainSelector,
+					config.SvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					user.PublicKey(), // not the admin
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
+			})
+
+			t.Run("When an admin bumps the onramp ccip version for a dest chain, it succeeds", func(t *testing.T) {
+				ix, err := ccip_router.NewBumpCcipVersionForDestChainInstruction(
+					config.SvmChainSelector,
+					config.SvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				var routerDestChain ccip_router.DestChain
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &routerDestChain))
+				require.Equal(t, ccip_router.Rollback_RestoreOnAction, routerDestChain.State.RestoreOnAction)
+			})
+
+			t.Run("When a non-admin tries to rollback the onramp ccip version for a dest chain, it fails", func(t *testing.T) {
+				ix, err := ccip_router.NewRollbackCcipVersionForDestChainInstruction(
+					config.SvmChainSelector,
+					config.SvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					user.PublicKey(), // not the admin
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_CcipRouterError.String()})
+			})
+
+			t.Run("When an admin rollbacks the onramp ccip version for a dest chain, it succeeds", func(t *testing.T) {
+				ix, err := ccip_router.NewRollbackCcipVersionForDestChainInstruction(
+					config.SvmChainSelector,
+					config.SvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				require.NotNil(t, result)
+
+				var routerDestChain ccip_router.DestChain
+				require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SvmDestChainStatePDA, config.DefaultCommitment, &routerDestChain))
+				require.Equal(t, ccip_router.Upgrade_RestoreOnAction, routerDestChain.State.RestoreOnAction)
+			})
+
+			t.Run("When an admin tries to rollback again the onramp ccip version for a dest chain, it fails", func(t *testing.T) {
+				ix, err := ccip_router.NewRollbackCcipVersionForDestChainInstruction(
+					config.SvmChainSelector,
+					config.SvmDestChainStatePDA,
+					config.RouterConfigPDA,
+					legacyAdmin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidCcipVersionRollback_CcipRouterError.String()})
+			})
+		})
+
 		t.Run("When a non-admin tries to disable the chain selector, it fails", func(t *testing.T) {
 			t.Run("Offramp: Source", func(t *testing.T) {
 				ix, err := ccip_offramp.NewDisableSourceChainSelectorInstruction(

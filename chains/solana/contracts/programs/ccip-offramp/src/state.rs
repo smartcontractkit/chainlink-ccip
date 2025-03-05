@@ -173,7 +173,7 @@ pub enum MessageExecutionState {
     Untouched = 0,
     InProgress = 1, // Not used in SVM, but used in EVM
     Success = 2,
-    Failure = 3,
+    Failure = 3, // Not used in SVM, but used in EVM
 }
 
 impl TryFrom<u128> for MessageExecutionState {
