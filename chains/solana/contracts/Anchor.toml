@@ -5,35 +5,26 @@ anchor_version = "0.29.0"
 seeds = false
 skip-lint = false
 
+[programs.localnet]
+access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
+ccip_offramp = "offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5"
+ccip_router = "C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"
+example_burnmint_token_pool = "TokenPooL11111111111111111111111111BurnMint"
+example_ccip_receiver = "CcipReceiver1111111111111111111111111111111"
+example_ccip_sender = "CcipSender111111111111111111111111111111111"
+example_lockrelease_token_pool = "TokenPooL11111111111111111111111LockReLease"
+external_program_cpi_stub = "4HeqEoSyfYpeC2goFLj9eHgkxV33mR5G7JYAbRsN14uQ"
+fee_quoter = "FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw"
+mcm = "6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX"
+rmn_remote = "CPkyVFQmyzmb6HfDE5TQr3NmZAsydcYspBoc3bf6Zo5x"
+test_ccip_invalid_receiver = "9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8"
+test_ccip_receiver = "CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"
+test_token_pool = "GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH"
+timelock = "LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn"
+
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "localnet"
+cluster = "Localnet"
 wallet = "id.json"
-# wallet = "~/.config/solana/id.json"
-
-# [programs.mainnet]
-# TODO: add pubkeys
-
-# [programs.testnet]
-# TODO: add pubkeys
-
-# [programs.devnet]
-# TODO: add pubkeys
-
-[programs.localnet]
-access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
-ccip_router = "C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"
-ccip_offramp = "offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5"
-mcm = "6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX"
-timelock = "LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn"
-fee_quoter = "FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw"
-example_burnmint_token_pool = "TokenPooL11111111111111111111111111BurnMint"
-example_lockrelease_token_pool = "TokenPooL11111111111111111111111LockReLease"
-test_token_pool = "GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH"
-example_ccip_sender = "CcipSender111111111111111111111111111111111"
-example_ccip_receiver = "CcipReceiver1111111111111111111111111111111"
-test_ccip_receiver = "CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"
-test_ccip_invalid_receiver = "9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8"
-external_program_cpi_stub  = "4HeqEoSyfYpeC2goFLj9eHgkxV33mR5G7JYAbRsN14uQ"

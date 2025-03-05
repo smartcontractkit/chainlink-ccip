@@ -305,7 +305,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
-		mockAddrCodec := internal.NewMockAddressCodec(t)
+		mockAddrCodec := internal.NewMockAddressCodecHex(t)
 		p := &PluginFactory{
 			baseLggr: lggr,
 			ocrConfig: reader.OCR3ConfigWithMeta{
