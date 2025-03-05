@@ -102,7 +102,6 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 // [honest 1, honest 1, honest 2, malicious 2], in this case we pick 2, but it's not enough to be able
 // to build a report since the first 2 honest nodes are unaware of message 2.
 // In an observation of [1, 2, 3, 4], we would pick 1, which is the most conservative choice.
-// https://github.com/smartcontractkit/chainlink/blob/5156cfe5ce0f8e060255b39e6b6ce2160da4a3b5/core/services/ocr2/plugins/ccip/ccipcommit/ocr2.go#L329
 func GetOrderedConsensus[K comparable, T cmp.Ordered](
 	lggr logger.Logger,
 	objectName string,
