@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	_ "embed"
 	"fmt"
 	"testing"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
@@ -21,26 +19,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
-//go:embed devnet.config.yaml
-var devnetInfoBuffer []byte
-
-type DevnetInfo struct {
-	Offramp        string `yaml:"offramp"`
-	UserPrivK      []byte `yaml:"user_privk"`
-	ChainSelectors struct {
-		Sepolia uint64 `yaml:"sepolia"`
-		Svm     uint64 `yaml:"svm"`
-	} `yaml:"chain_selectors"`
-	RPC string `yaml:"rpc"`
-}
-
-var devnetInfo DevnetInfo
-
 func TestDevnet(t *testing.T) {
-	t.Run("Read Devnet Config Info", func(t *testing.T) {
-		require.NoError(t, yaml.Unmarshal(devnetInfoBuffer, &devnetInfo))
-		fmt.Printf("Config: %+v\n", devnetInfo)
-	})
+	devnetInfo, err := getDevnetInfo()
+	require.NoError(t, err)
 
 	ctx := tests.Context(t)
 	client := rpc.New(devnetInfo.RPC)
@@ -51,18 +32,18 @@ func TestDevnet(t *testing.T) {
 	// this makes it so that instructions for the router target the right program id in devnet
 	ccip_offramp.SetProgramID(offrampAddress)
 
-	offrampReferenceAddressesPDA, _, err := state.FindOfframpReferenceAddressesPDA(offrampAddress)
+	offrampPDAs, err := getOfframpPDAs(offrampAddress)
 	require.NoError(t, err)
 
 	var referenceAddresses ccip_offramp.ReferenceAddresses
 	t.Run("Read Reference Addresses", func(t *testing.T) {
-		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampReferenceAddressesPDA, rpc.CommitmentConfirmed, &referenceAddresses))
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.referenceAddresses, rpc.CommitmentConfirmed, &referenceAddresses))
 		fmt.Printf("Reference Addresses: %+v\n", referenceAddresses)
 	})
 
 	ccip_router.SetProgramID(referenceAddresses.Router)
 
-	user := solana.PrivateKey(devnetInfo.UserPrivK)
+	user := solana.PrivateKey(devnetInfo.PrivateKeys.User)
 	require.True(t, user.IsValid())
 
 	configPDA, _, err := state.FindConfigPDA(referenceAddresses.Router)
@@ -146,24 +127,22 @@ func TestDevnet(t *testing.T) {
 
 		signers, _, _ := testutils.GenerateSignersAndTransmitters(t, 16) // TODO
 
+		var initialConfig ccip_offramp.Config
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.config, rpc.CommitmentConfirmed, &initialConfig))
+
+		index := uint8(testutils.OcrCommitPlugin)
+		commitConfig := initialConfig.Ocr3[index]
+
 		var reportContext [2][32]byte
 		reportContext = ccip.NextCommitReportContext()
+		reportContext[0] = commitConfig.ConfigInfo.ConfigDigest // match the onchain config digest
 
 		sigs, err := ccip.SignCommitReport(reportContext, report, signers)
 		require.NoError(t, err)
 
-		transmitter := user // TODO
+		transmitter := solana.PrivateKey(devnetInfo.PrivateKeys.Transmitter)
 
-		offrampConfigPDA, _, err := state.FindOfframpConfigPDA(offrampAddress)
-		require.NoError(t, err)
-
-		offrampBillingSignerPDA, _, err := state.FindOfframpBillingSignerPDA(offrampAddress)
-		require.NoError(t, err)
-
-		offrampStatePDA, _, err := state.FindOfframpStatePDA(offrampAddress)
-		require.NoError(t, err)
-
-		fqAllowedPriceUpdater, _, err := state.FindFqAllowedPriceUpdaterPDA(offrampBillingSignerPDA, referenceAddresses.FeeQuoter)
+		fqAllowedPriceUpdater, _, err := state.FindFqAllowedPriceUpdaterPDA(offrampPDAs.billingSigner, referenceAddresses.FeeQuoter)
 		require.NoError(t, err)
 
 		fqConfigPDA, _, err := state.FindFqConfigPDA(referenceAddresses.FeeQuoter)
@@ -175,19 +154,19 @@ func TestDevnet(t *testing.T) {
 			sigs.Rs,
 			sigs.Ss,
 			sigs.RawVs,
-			offrampConfigPDA,
-			offrampReferenceAddressesPDA,
+			offrampPDAs.config,
+			offrampPDAs.referenceAddresses,
 			transmitter.PublicKey(),
 			solana.SystemProgramID,
 			solana.SysVarInstructionsPubkey,
-			offrampBillingSignerPDA,
+			offrampPDAs.billingSigner,
 			referenceAddresses.FeeQuoter,
 			fqAllowedPriceUpdater,
 			fqConfigPDA,
 		)
 
 		remainingAccounts := []solana.PublicKey{
-			offrampStatePDA,
+			offrampPDAs.state,
 			fqWsolBillingTokenConfigPDA,
 			fqLinkBillingConfigPDA,
 			fqDestChainPDA,
