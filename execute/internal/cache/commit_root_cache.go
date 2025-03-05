@@ -226,8 +226,7 @@ func (r *commitRootsCache) UpdateEarliestUnexecutedRoot(
 
 	// If we found an earliest timestamp, update our tracking
 	if !earliestTimestamp.IsZero() {
-		if r.earliestUnexecutedRoot.IsZero() ||
-			!earliestTimestamp.Equal(r.earliestUnexecutedRoot) {
+		if r.earliestUnexecutedRoot.IsZero() || earliestTimestamp.Before(r.earliestUnexecutedRoot) {
 			r.lggr.Debugw("Updating earliest unexecuted root",
 				"oldTimestamp", r.earliestUnexecutedRoot,
 				"newTimestamp", earliestTimestamp)
