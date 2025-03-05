@@ -29,8 +29,8 @@ func Test_fChainConsensus(t *testing.T) {
 			inputMap: map[cciptypes.ChainSelector][]int{
 				cciptypes.ChainSelector(1): {5, 5, 5, 5, 5},
 				cciptypes.ChainSelector(2): {5, 5, 5, 3, 5},
-				cciptypes.ChainSelector(3): {5, 5},             // not enough observations, must be observed at least thresholds times.
-				cciptypes.ChainSelector(4): {5, 3, 5, 3, 5, 3}, // both values appear at least thresholds times, no consensus
+				cciptypes.ChainSelector(3): {5, 5},             // not enough observations, must be observed at least f times.
+				cciptypes.ChainSelector(4): {5, 3, 5, 3, 5, 3}, // both values appear at least f times, no consensus
 			},
 			expectedOutput: map[cciptypes.ChainSelector]int{
 				cciptypes.ChainSelector(1): 5,
@@ -132,7 +132,7 @@ func Test_SeqNumConsensus(t *testing.T) {
 
 	for _, scenario := range testCases {
 		t.Run(scenario.name, func(t *testing.T) {
-			result := GetConservativelyOrderedConsensus(lggr, "fChain", scenario.inputMap, scenario.thresholds)
+			result := GetOrderedConsensus(lggr, "fChain", scenario.inputMap, scenario.thresholds)
 			require.Equal(t, scenario.expectedOutput, result)
 		})
 	}
@@ -149,7 +149,7 @@ func Test_GetConsensusMapMedianTimestamp(t *testing.T) {
 	timeValues := map[int][]time.Time{
 		1: {ts1, ts1, ts1, ts1, ts1},
 		2: {ts2, ts2, ts1, ts1, ts1},
-		3: {ts1, ts1}, // not enough observations, must be observed at least thresholds times.
+		3: {ts1, ts1}, // not enough observations, must be observed at least f times.
 		4: {ts1, ts2, ts3},
 	}
 
@@ -174,7 +174,7 @@ func Test_GetConsensusMapMedianInt(t *testing.T) {
 	intValues := map[int][]int{
 		1: {5, 5, 5, 5, 5},
 		2: {5, 5, 5, 3, 5},
-		3: {5, 5}, // not enough observations, must be observed at least thresholds times.
+		3: {5, 5}, // not enough observations, must be observed at least f times.
 		4: {1, 2, 3, 4, 5, 6},
 		5: {5, 4, 3, 2, 1},
 	}
@@ -351,7 +351,7 @@ func TestMakeMultiThreshold_GenericKey(t *testing.T) {
 
 func Test_GetConsensusMapAggregator(t *testing.T) {
 	lggr := logger.Test(t)
-	//thresholds := 3
+	//f := 3
 
 	testCases := []struct {
 		name           string

@@ -398,12 +398,12 @@ func getConsensusObservation(
 	consensusObs := consensusObservation{
 		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
 		RMNEnabledChains: consensus.GetConsensusMap(lggr, "RMNEnabledChains", aggObs.RMNEnabledChains, twoFChainPlus1),
-		OnRampMaxSeqNums: consensus.GetConservativelyOrderedConsensus(
+		OnRampMaxSeqNums: consensus.GetOrderedConsensus(
 			lggr,
 			"OnRamp Max Seq Nums",
 			aggObs.OnRampMaxSeqNums,
 			FChain),
-		OffRampNextSeqNums: consensus.GetConservativelyOrderedConsensus(
+		OffRampNextSeqNums: consensus.GetOrderedConsensus(
 			lggr,
 			"OffRamp Next Seq Nums",
 			aggObs.OffRampNextSeqNums,

@@ -87,24 +87,23 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 	return valsCopy[len(valsCopy)/2]
 }
 
-// GetConservativelyOrderedConsensus returns the greatest sequence number for each chain that meets the min obs threshold
+// GetOrderedConsensus returns the max sequence number for each chain that meets the min obs threshold
 // taking into account thresholds which is the maximum number of faults across the whole DON.
-// OCR itself won't call Report unless there are 2*thresholds+1 observations
-// https://github.com/smartcontractkit/libocr/blob/master/offchainreporting2/internal/protocol/report_generation_follower.go#L415
-// and thresholds of those observations may be either unparseable or adversarially set values. That means
-// we'll either have thresholds+1 parsed honest values here, 2f+1 parsed values with thresholds adversarial values or somewhere
-// in between.
-// We choose the more "conservative" sorted_maxes[thresholds] so:
+// Here we'll either have thresholds+1 parsed honest values here,
+// 2f+1 parsed values with thresholds adversarial values or somewhere in between.
+// We choose the more "conservative" seqNum[thresholds] so:
 // - We are ensured that at least one honest oracle has seen the max, so adversary cannot set it lower and
 // cause the maxSeqNum < minSeqNum errors
 // - If an honest oracle reports sorted_max[thresholds] which happens to be stale i.e. that oracle
 // has a delayed view of the source chain, then we simply lose a little bit of throughput.
-// - If we were to pick sorted_max[-thresholds] i.e. the maximum honest node view (a more "aggressive" setting in terms of throughput),
+// - If we were to pick sorted_max[-thresholds]
+// i.e. the maximum honest node view (a more "aggressive" setting in terms of throughput),
 // then an adversary can continually send high values e.g. imagine we have observations from all 4 nodes
 // [honest 1, honest 1, honest 2, malicious 2], in this case we pick 2, but it's not enough to be able
 // to build a report since the first 2 honest nodes are unaware of message 2.
 // In an observation of [1, 2, 3, 4], we would pick 1, which is the most conservative choice.
-func GetConservativelyOrderedConsensus[K comparable, T cmp.Ordered](
+// https://github.com/smartcontractkit/chainlink/blob/5156cfe5ce0f8e060255b39e6b6ce2160da4a3b5/core/services/ocr2/plugins/ccip/ccipcommit/ocr2.go#L329
+func GetOrderedConsensus[K comparable, T cmp.Ordered](
 	lggr logger.Logger,
 	objectName string,
 	itemsByKey map[K][]T,

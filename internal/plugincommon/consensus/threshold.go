@@ -9,13 +9,13 @@ type MultiThreshold[T any] interface {
 	Get(key T) (Threshold, bool)
 }
 
-// TwoFPlus1 is a common threshold mapping function that returns 2*thresholds + 1.
+// TwoFPlus1 is a common threshold mapping function that returns 2*f + 1.
 // See ocr3types.QuorumTwoFPlusOne - guarantees an honest majority of observations
 func TwoFPlus1(f int) Threshold {
 	return Threshold(2*f + 1)
 }
 
-// FPlus1 is a common threshold mapping function that returns thresholds + 1.
+// FPlus1 is a common threshold mapping function that returns f + 1.
 // See ocr3types.QuorumFPlusOne - Guarantees at least one honest observation
 func FPlus1(f int) Threshold {
 	return Threshold(f + 1)
