@@ -119,7 +119,7 @@ func Test_SeqNumConsensus(t *testing.T) {
 			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
 				cciptypes.ChainSelector(1): {1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 				cciptypes.ChainSelector(2): {1, 1, 1, 2, 2, 2, 3, 3, 3, 4},
-				cciptypes.ChainSelector(3): {1, 1}, // not enough observations, should skip
+				cciptypes.ChainSelector(3): {1, 1, 5}, // should skip
 				cciptypes.ChainSelector(4): {4, 3, 2, 1, 4, 3, 2, 1, 4, 3},
 			},
 			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
