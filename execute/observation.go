@@ -235,7 +235,21 @@ func (p *Plugin) getCommitReportsObservation(
 		}
 	}
 
-	// Create a combined map for updating the earliest unexecuted root
+	// Update the earliest unexecuted root based on remaining reports
+	combinedReports := p.buildCombinedReports(groupedCommits, fullyExecutedUnfinalized)
+	p.commitRootsCache.UpdateEarliestUnexecutedRoot(combinedReports)
+
+	observation.CommitReports = groupedCommits
+
+	// TODO: truncate grouped to a maximum observation size?
+	return observation, nil
+}
+
+// buildCombinedReports creates a combined map for updating the earliest unexecuted root
+func (p *Plugin) buildCombinedReports(
+	groupedCommits map[ccipocr3.ChainSelector][]exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
+) map[ccipocr3.ChainSelector][]exectypes.CommitData {
 	combinedReports := make(map[ccipocr3.ChainSelector][]exectypes.CommitData)
 
 	// Add all unexecuted commits
@@ -255,13 +269,7 @@ func (p *Plugin) getCommitReportsObservation(
 		)
 	}
 
-	// Update the earliest unexecuted root based on remaining reports
-	p.commitRootsCache.UpdateEarliestUnexecutedRoot(combinedReports)
-
-	observation.CommitReports = groupedCommits
-
-	// TODO: truncate grouped to a maximum observation size?
-	return observation, nil
+	return combinedReports
 }
 
 // regroup converts the previous outcome to the observation format.
