@@ -393,7 +393,7 @@ func getConsensusObservation(
 
 	// Get consensus using strict 2fChain+1 threshold.
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
-	FChain := consensus.MakeMultiThreshold(fChains, consensus.F)
+	fChain := consensus.MakeMultiThreshold(fChains, consensus.F)
 
 	consensusObs := consensusObservation{
 		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
@@ -402,12 +402,12 @@ func getConsensusObservation(
 			lggr,
 			"OnRamp Max Seq Nums",
 			aggObs.OnRampMaxSeqNums,
-			FChain),
+			fChain),
 		OffRampNextSeqNums: consensus.GetOrderedConsensus(
 			lggr,
 			"OffRamp Next Seq Nums",
 			aggObs.OffRampNextSeqNums,
-			FChain),
+			fChain),
 		RMNRemoteConfig: consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
 		FChain:          fChains,
 	}
