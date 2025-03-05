@@ -155,6 +155,9 @@ func TestTransactionSizing(t *testing.T) {
 			mustRandomPubkey(),                 // fee quoter dest chain
 			mustRandomPubkey(),                 // fee quoter billing token config
 			routerTable["fqLinkConfig"],        // fee quoter link token config
+			config.RMNRemoteProgram,
+			config.RMNRemoteCursesPDA,
+			config.RMNRemoteConfigPDA,
 			routerTable["routerTokenPoolSigner"],
 		)
 
@@ -207,6 +210,9 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable["feeQuoterProgram"],
 			offrampTable["fqAllowedPriceUpdater"],
 			offrampTable["fqConfigPDA"],
+			config.RMNRemoteProgram,
+			config.RMNRemoteCursesPDA,
+			config.RMNRemoteConfigPDA,
 		)
 
 		for _, v := range addAccounts {
@@ -238,7 +244,6 @@ func TestTransactionSizing(t *testing.T) {
 			},
 		},
 		OffchainTokenData: [][]byte{},
-		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
 	}
 	executeSingleToken := ccip_offramp.ExecutionReportSingleChain{
@@ -267,7 +272,6 @@ func TestTransactionSizing(t *testing.T) {
 			},
 		},
 		OffchainTokenData: [][]byte{},
-		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
 	}
 
@@ -287,6 +291,9 @@ func TestTransactionSizing(t *testing.T) {
 			offrampTable["systemProgram"],
 			offrampTable["sysVarInstruction"],
 			offrampTable["tokenPoolSigner"],
+			config.RMNRemoteProgram,
+			config.RMNRemoteCursesPDA,
+			config.RMNRemoteConfigPDA,
 		)
 
 		for _, v := range addAccounts {
@@ -323,7 +330,7 @@ func TestTransactionSizing(t *testing.T) {
 				mustRandomPubkey():            maps.Values(routerTable),
 				tokenTable["poolLookupTable"]: maps.Values(tokenTable),
 			},
-			failOnExcessAlways,
+			failOnExcessOnlyWithTables, // without lookup tables, we already know it exceeds the max tx size
 		},
 		{
 			"commit:noPrices",

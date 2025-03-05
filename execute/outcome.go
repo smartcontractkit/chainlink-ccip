@@ -98,7 +98,9 @@ func (p *Plugin) Outcome(
 	}
 
 	p.observer.TrackOutcome(outcome, state)
-	lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
+	lggr.Infow("generated outcome", "execPluginState", state, "outcome",
+		outcome, "numCommitReports", len(outcome.CommitReports), "numChainReports",
+		len(outcome.Report.ChainReports), "numMessages", len(observation.Messages))
 
 	return p.ocrTypeCodec.EncodeOutcome(outcome)
 }
@@ -174,9 +176,10 @@ func (p *Plugin) getFilterOutcome(
 		p.reportCodec,
 		p.estimateProvider,
 		p.destChain,
+		p.addrCodec,
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
-		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces)),
+		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),
 		report.WithExtraMessageCheck(report.CheckIfInflight(p.inflightMessageCache.IsInflight)),
 		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),

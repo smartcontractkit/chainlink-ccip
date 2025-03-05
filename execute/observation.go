@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -116,16 +115,19 @@ func (p *Plugin) Observation(
 
 	p.observer.TrackObservation(observation, state)
 	lggr.Infow("execute plugin got observation", "observation", observation,
-		"duration", time.Since(tStart), "state", state)
+		"duration", time.Since(tStart),
+		"state", state,
+		"numCommitReports", len(observation.CommitReports),
+		"numMessages", len(observation.Messages))
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
-func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.CurseInfo, error) {
+func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (reader.CurseInfo, error) {
 	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
 		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
-		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
 	}
 
 	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx)
@@ -134,7 +136,7 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 			"err", err,
 			"sourceChains", allSourceChains,
 		)
-		return nil, fmt.Errorf("nothing to observe: rmn read error: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("nothing to observe: rmn read error: %w", err)
 	}
 
 	return curseInfo, nil
@@ -195,7 +197,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingExecutedReports(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingReportsForExecution(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
@@ -382,7 +384,12 @@ func (p *Plugin) getFilterObservation(
 		}
 
 		for _, msg := range commitReport.Messages {
-			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(commitReport.SourceChain))
+			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], commitReport.SourceChain)
+			if err != nil {
+				lggr.Errorw("unable to convert sender address to string", "err", err, "sender address", msg.Sender)
+				continue
+			}
+
 			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
 		}
 	}

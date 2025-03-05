@@ -17,11 +17,15 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for updating the reference addresses.
-// * `reference_addresses` - The new reference addresses to be set.
+// * `router` - The router address to be set.
+// * `fee_quoter` - The fee_quoter address to be set.
+// * `offramp_lookup_table` - The offramp_lookup_table address to be set.
+// * `rmn_remote` - The rmn_remote address to be set.
 type UpdateReferenceAddresses struct {
 	Router             *ag_solanago.PublicKey
 	FeeQuoter          *ag_solanago.PublicKey
 	OfframpLookupTable *ag_solanago.PublicKey
+	RmnRemote          *ag_solanago.PublicKey
 
 	// [0] = [] config
 	//
@@ -54,6 +58,12 @@ func (inst *UpdateReferenceAddresses) SetFeeQuoter(feeQuoter ag_solanago.PublicK
 // SetOfframpLookupTable sets the "offrampLookupTable" parameter.
 func (inst *UpdateReferenceAddresses) SetOfframpLookupTable(offrampLookupTable ag_solanago.PublicKey) *UpdateReferenceAddresses {
 	inst.OfframpLookupTable = &offrampLookupTable
+	return inst
+}
+
+// SetRmnRemote sets the "rmnRemote" parameter.
+func (inst *UpdateReferenceAddresses) SetRmnRemote(rmnRemote ag_solanago.PublicKey) *UpdateReferenceAddresses {
+	inst.RmnRemote = &rmnRemote
 	return inst
 }
 
@@ -119,6 +129,9 @@ func (inst *UpdateReferenceAddresses) Validate() error {
 		if inst.OfframpLookupTable == nil {
 			return errors.New("OfframpLookupTable parameter is not set")
 		}
+		if inst.RmnRemote == nil {
+			return errors.New("RmnRemote parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -145,10 +158,11 @@ func (inst *UpdateReferenceAddresses) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("            Router", *inst.Router))
 						paramsBranch.Child(ag_format.Param("         FeeQuoter", *inst.FeeQuoter))
 						paramsBranch.Child(ag_format.Param("OfframpLookupTable", *inst.OfframpLookupTable))
+						paramsBranch.Child(ag_format.Param("         RmnRemote", *inst.RmnRemote))
 					})
 
 					// Accounts of the instruction:
@@ -177,6 +191,11 @@ func (obj UpdateReferenceAddresses) MarshalWithEncoder(encoder *ag_binary.Encode
 	if err != nil {
 		return err
 	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *UpdateReferenceAddresses) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -195,6 +214,11 @@ func (obj *UpdateReferenceAddresses) UnmarshalWithDecoder(decoder *ag_binary.Dec
 	if err != nil {
 		return err
 	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -204,6 +228,7 @@ func NewUpdateReferenceAddressesInstruction(
 	router ag_solanago.PublicKey,
 	feeQuoter ag_solanago.PublicKey,
 	offrampLookupTable ag_solanago.PublicKey,
+	rmnRemote ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	referenceAddresses ag_solanago.PublicKey,
@@ -212,6 +237,7 @@ func NewUpdateReferenceAddressesInstruction(
 		SetRouter(router).
 		SetFeeQuoter(feeQuoter).
 		SetOfframpLookupTable(offrampLookupTable).
+		SetRmnRemote(rmnRemote).
 		SetConfigAccount(config).
 		SetReferenceAddressesAccount(referenceAddresses).
 		SetAuthorityAccount(authority)

@@ -555,14 +555,16 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	mu := &sync.Mutex{}
 	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
-	eg := &errgroup.Group{}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(len(sourceChains))
 	for _, sourceChain := range sourceChains {
-		eg.Go(func() error {
+		go func() {
+			defer wg.Done()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
 				lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
-				return nil
+				return
 			}
 
 			mu.Lock()
@@ -571,15 +573,9 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				plugintypes.NewSeqNumChain(sourceChain, latestOnRampSeqNum),
 			)
 			mu.Unlock()
-
-			return nil
-		})
+		}()
 	}
-
-	if err := eg.Wait(); err != nil {
-		lggr.Warnw("call to GetExpectedNextSequenceNumber failed", "err", err)
-		return nil
-	}
+	wg.Wait()
 
 	sort.Slice(latestOnRampSeqNums, func(i, j int) bool {
 		return latestOnRampSeqNums[i].ChainSel < latestOnRampSeqNums[j].ChainSel
@@ -699,7 +695,7 @@ func (o observerImpl) computeMerkleRoot(
 
 			msgHash, err := o.msgHasher.Hash(ctx, msg)
 			if err != nil {
-				lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+				lggr.Warnw("failed to hash message", "message", msg, "err", err)
 				return fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
 			}
 

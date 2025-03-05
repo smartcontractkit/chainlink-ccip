@@ -76,6 +76,7 @@ type Plugin struct {
 	estimateProvider  cciptypes.EstimateProvider
 	lggr              logger.Logger
 	ocrTypeCodec      ocrtypecodec.ExecCodec
+	addrCodec         cciptypes.AddressCodec
 
 	// state
 
@@ -100,6 +101,7 @@ func NewPlugin(
 	estimateProvider cciptypes.EstimateProvider,
 	lggr logger.Logger,
 	metricsReporter metrics.Reporter,
+	addrCodec cciptypes.AddressCodec,
 ) ocr3types.ReportingPlugin[[]byte] {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
@@ -124,6 +126,7 @@ func NewPlugin(
 			destChain,
 			reportingCfg.F,
 			oracleIDToP2pID,
+			metricsReporter,
 		),
 		chainSupport: plugincommon.NewChainSupport(
 			logutil.WithComponent(lggr, "ChainSupport"),
@@ -136,9 +139,11 @@ func NewPlugin(
 		commitRootsCache: cache.NewCommitRootsCache(
 			logutil.WithComponent(lggr, "CommitRootsCache"),
 			offchainCfg.MessageVisibilityInterval.Duration(),
-			time.Minute*5),
+			offchainCfg.RootSnoozeTime.Duration(),
+		),
 		inflightMessageCache: cache.NewInflightMessageCache(offchainCfg.InflightCacheExpiry.Duration()),
 		ocrTypeCodec:         ocrTypCodec,
+		addrCodec:            addrCodec,
 	}
 	return NewTrackedPlugin(p, lggr, metricsReporter, ocrTypCodec)
 }
@@ -149,7 +154,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
 
-// getPendingExecutedReports is used to find commit reports which need to be executed.
+// getPendingReportsForExecution is used to find commit reports which need to be executed.
 //
 // The function checks execution status at two levels:
 // 1. Gets all executed messages (both finalized and unfinalized) via primitives.Unconfirmed
@@ -159,23 +164,25 @@ type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.B
 // - fullyExecutedFinalized: All messages executed with finality (mark as executed)
 // - fullyExecutedUnfinalized: All messages executed but not finalized (snooze)
 // - groupedCommits: Reports with unexecuted messages (available for execution)
-func getPendingExecutedReports(
+func getPendingReportsForExecution(
 	ctx context.Context,
 	ccipReader readerpkg.CCIPReader,
 	canExecute CanExecuteHandle,
 	ts time.Time,
 	lggr logger.Logger,
-) (exectypes.CommitObservations, []exectypes.CommitData, []exectypes.CommitData, error) {
-	var fullyExecutedFinalized []exectypes.CommitData
-	var fullyExecutedUnfinalized []exectypes.CommitData
-
+) (
+	groupedCommits exectypes.CommitObservations,
+	fullyExecutedFinalized []exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
+	err error,
+) {
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, ts, 1000) // todo: configurable limit
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
-	groupedCommits := groupByChainSelector(commitReports)
+	groupedCommits = groupByChainSelector(commitReports)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
@@ -284,8 +291,8 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	state := previousOutcome.State.Next()
-	if state == exectypes.Initialized || state == exectypes.GetCommitReports {
+	nextState := previousOutcome.State.Next()
+	if nextState == exectypes.GetCommitReports {
 		err = validateNoMessageRelatedObservations(
 			decodedObservation.Messages,
 			decodedObservation.TokenData,
@@ -301,7 +308,7 @@ func (p *Plugin) ValidateObservation(
 	}
 
 	// check message related validations when states can contain messages
-	if state == exectypes.GetMessages || state == exectypes.Filter {
+	if nextState == exectypes.GetMessages || nextState == exectypes.Filter {
 		if err = validateMsgsReadingEligibility(supportedChains, decodedObservation.Messages); err != nil {
 			return fmt.Errorf("validate observer reading eligibility: %w", err)
 		}
@@ -335,7 +342,7 @@ func validateCommonStateObservations(
 		return fmt.Errorf("validate commit reports reading eligibility: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
+	if err := validateObservedSequenceNumbers(supportedChains, decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
@@ -439,6 +446,7 @@ func selectReport(
 
 	execReports, selectedReports, err := builder.Build()
 
+	lggr.Debugw("selected report to be executed", "reports", selectedReports)
 	lggr.Infow(
 		"reports have been selected",
 		"numReports", len(execReports),
@@ -479,12 +487,18 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
+	if len(decodedOutcome.Report.ChainReports) == 0 {
+		lggr.Warn("empty report", "report", decodedOutcome.Report)
+		return nil, nil
+	}
+
 	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
 	reportInfo := extractReportInfo(decodedOutcome)
+	p.lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
 	encodedInfo, err := reportInfo.Encode()
 	if err != nil {
 		return nil, err
@@ -522,37 +536,42 @@ func (p *Plugin) validateReport(
 	ctx context.Context,
 	lggr logger.Logger,
 	r ocr3types.ReportWithInfo[[]byte],
-) (valid bool, decodedReport cciptypes.ExecutePluginReport, err error) {
+) (decodedReport cciptypes.ExecutePluginReport, err error) {
 	// Just a safety check, should never happen.
 	if r.Report == nil {
 		lggr.Warn("skipping nil report")
-		return false, cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{}, plugincommon.NewErrInvalidReport("nil report")
 	}
 
 	decodedReport, err = p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
-		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("decode exec plugin report: %w", err)
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrValidatingReport(fmt.Errorf("decode exec plugin report: %w", err))
 	}
 
 	if len(decodedReport.ChainReports) == 0 {
 		lggr.Infow("skipping empty report")
-		return false, cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrInvalidReport("empty report")
 	}
 
 	// check if we support the dest, if not we can't do the checks needed.
 	supports, err := p.chainSupport.SupportsDestChain(p.reportingCfg.OracleID)
 	if err != nil {
-		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("supports dest chain: %w", err)
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrValidatingReport(fmt.Errorf("supports dest chain: %w", err))
 	}
 
 	if !supports {
 		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
-		return false, cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrInvalidReport("dest chain not supported")
 	}
 
 	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
 	if err != nil {
-		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("get offramp config digest: %w", err)
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrValidatingReport(fmt.Errorf("get offramp config digest: %w", err))
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
@@ -560,7 +579,8 @@ func (p *Plugin) validateReport(
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
 		)
-		return false, cciptypes.ExecutePluginReport{}, nil
+		return cciptypes.ExecutePluginReport{},
+			plugincommon.NewErrInvalidReport("offramp config digest mismatch")
 	}
 
 	// check that the messages in the report are not already executed onchain.
@@ -572,14 +592,15 @@ func (p *Plugin) validateReport(
 		// been executed, so we don't want to re-execute them.
 		// This gives the exec plugin a chance to remedy the situation
 		// by selecting a different set of messages.
-		return false, decodedReport, nil
+		return decodedReport, plugincommon.NewErrInvalidReport(err.Error())
 	}
 	if err != nil {
 		// TODO: should we return true here if we couldn't check for already executed messages?
-		return false, decodedReport, fmt.Errorf("checking for already executed messages failed: %w", err)
+		err := fmt.Errorf("checking for already executed messages failed: %w", err)
+		return decodedReport, plugincommon.NewErrValidatingReport(err)
 	}
 
-	return true, decodedReport, nil
+	return decodedReport, nil
 }
 
 // checkAlreadyExecuted checks if the messages in the report have already been executed
@@ -666,14 +687,14 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldAccept)
 
-	valid, decodedReport, err := p.validateReport(ctx, lggr, r)
-	if err != nil {
-		return false, fmt.Errorf("validate exec report: %w", err)
-	}
-
-	if !valid {
-		lggr.Infow("report is not accepted", "seqNr", seqNr)
+	decodedReport, err := p.validateReport(ctx, lggr, r)
+	if errors.Is(err, plugincommon.ErrInvalidReport) {
+		lggr.Infow("report not valid, not accepting: %w", err)
 		return false, nil
+	}
+	if err != nil {
+		lggr.Infow("validation error", "err", err)
+		return false, fmt.Errorf("validating report: %w", err)
 	}
 
 	// TODO: consider doing this in validateReport,
@@ -707,14 +728,14 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 ) (bool, error) {
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, seqNr, logutil.PhaseShouldTransmit)
 
-	valid, decodedReport, err := p.validateReport(ctx, lggr, r)
-	if err != nil {
-		return valid, fmt.Errorf("validate exec report: %w", err)
-	}
-
-	if !valid {
-		lggr.Infow("report not accepted for transmit")
+	decodedReport, err := p.validateReport(ctx, lggr, r)
+	if errors.Is(err, plugincommon.ErrInvalidReport) {
+		lggr.Infow("report not valid, not transmitting: %w", err)
 		return false, nil
+	}
+	if err != nil {
+		lggr.Infow("validation error", "err", err)
+		return false, fmt.Errorf("validating report: %w", err)
 	}
 
 	lggr.Infow("ShouldTransmitAttestedReport returns true, report accepted",

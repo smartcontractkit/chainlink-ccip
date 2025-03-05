@@ -17,8 +17,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
-	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
+
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -28,8 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -400,7 +399,9 @@ func (c *controller) sendObservationRequests(
 			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: request.LaneSource.SourceChainSelector,
-					OnrampAddress:       typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
+					// TODO check if we can remove the call for keepNRightBytes
+					// https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
+					OnrampAddress: typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
 				},
 				ClosedInterval: request.ClosedInterval,
 			})
@@ -661,6 +662,9 @@ func (c *controller) validateSignedObservationResponse(
 
 		// todo: The original updateReq contains abi encoded onRamp address, the one in the RMN response
 		// is 20 bytes evm address. This is chain specific and should be handled in a chain specific way.
+
+		// TODO check if we can remove the call for keepNRightBytes
+		// https://github.com/smartcontractkit/chainlink-ccip/pull/647/files#r1966165319
 		expOnRampAddress := typconv.KeepNRightBytes(updateReq.Data.LaneSource.OnrampAddress, 20)
 		if !bytes.Equal(expOnRampAddress, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
@@ -824,7 +828,7 @@ func transformAndSortObservations(
 	return attrSigObservations
 }
 
-// selectsRoots selects the roots from the signed observations.
+// selectRoots selects the roots from the signed observations.
 // If there are more than one valid roots based on the provided F it returns an error.
 func selectRoots(
 	observations []rmnSignedObservationWithMeta,
@@ -1187,8 +1191,9 @@ func newRequestID(lggr logger.Logger) uint64 {
 		lggr.Warnw("failed to generate random request id, falling back to golang.org/x/exp/rand",
 			"err", err,
 		)
-		rand2.Seed(uint64(time.Now().UnixNano()))
-		return rand2.Uint64()
+		//nolint:gosec // this is unlikely to occur and is not a security concern.
+		rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+		return rnd.Uint64()
 	}
 	randomUint64 := binary.LittleEndian.Uint64(b)
 	return randomUint64
