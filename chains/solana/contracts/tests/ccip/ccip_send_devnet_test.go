@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
@@ -44,6 +45,7 @@ func TestDevnet(t *testing.T) {
 	})
 
 	ccip_router.SetProgramID(referenceAddresses.Router)
+	fee_quoter.SetProgramID(referenceAddresses.FeeQuoter)
 
 	user := solana.PrivateKey(devnetInfo.PrivateKeys.User)
 	require.True(t, user.IsValid())
@@ -135,8 +137,9 @@ func TestDevnet(t *testing.T) {
 		index := uint8(testutils.OcrCommitPlugin)
 		commitConfig := initialConfig.Ocr3[index]
 
-		var sourceChain ccip_offramp.SourceChain
-		sequence := sourceChain.State.MinSeqNr
+		var globalState ccip_offramp.GlobalState
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.state, rpc.CommitmentConfirmed, &globalState))
+		sequence := globalState.LatestPriceSequenceNumber + 1
 
 		empty24byte := [24]byte{}
 		var reportContext [2][32]byte
@@ -203,7 +206,14 @@ func TestDevnet(t *testing.T) {
 	})
 
 	t.Run("OnRamp: CCIP Send", func(t *testing.T) {
-		t.Skip("This test is not yet to be run")
+		// t.Skip("This test is not yet to be run")
+
+		t.Run("Read WSOL price", func(t *testing.T) {
+			var billingTokenConfig fee_quoter.BillingTokenConfigWrapper
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, client, fqWsolBillingTokenConfigPDA, rpc.CommitmentConfirmed, &billingTokenConfig))
+			fmt.Printf("WSOL Billing Token Config Price: %+v\n", billingTokenConfig.Config.UsdPerToken)
+		})
+
 		message := ccip_router.SVM2AnyMessage{
 			FeeToken:  solana.PublicKey{},
 			Receiver:  []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 12, 248, 134, 206, 65, 149, 35, 22, 68, 26, 228, 202, 195, 95, 0, 240, 232, 130, 166}, // just an example EVM address
