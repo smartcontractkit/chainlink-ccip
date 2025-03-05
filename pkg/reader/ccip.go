@@ -273,13 +273,9 @@ func (r *ccipChainReader) processMerkleRoots(
 	blessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
 	unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
 	for _, mr := range allMerkleRoots {
-		onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, cciptypes.ChainSelector(mr.SourceChainSelector))
-		if err != nil {
-			continue
-		}
 		mrc := cciptypes.MerkleRootChain{
 			ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
-			OnRampAddress: onRampAddress,
+			OnRampAddress: mr.OnRampAddress,
 			SeqNumsRange: cciptypes.NewSeqNumRange(
 				cciptypes.SeqNum(mr.MinSeqNr),
 				cciptypes.SeqNum(mr.MaxSeqNr),
