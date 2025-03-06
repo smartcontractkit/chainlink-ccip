@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Accepts the ownership of the fee quoter by the proposed owner.
+// Accepts the ownership of the rmn remote by the proposed owner.
 //
 // Shared func signature with other programs.
 //

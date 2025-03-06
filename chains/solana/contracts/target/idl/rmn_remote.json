@@ -50,7 +50,7 @@
     {
       "name": "transferOwnership",
       "docs": [
-        "Transfers the ownership of the fee quoter to a new proposed owner.",
+        "Transfers the ownership of the rmn remote to a new proposed owner.",
         "",
         "Shared func signature with other programs.",
         "",
@@ -63,11 +63,6 @@
         {
           "name": "config",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "curses",
-          "isMut": false,
           "isSigner": false
         },
         {
@@ -86,7 +81,7 @@
     {
       "name": "acceptOwnership",
       "docs": [
-        "Accepts the ownership of the fee quoter by the proposed owner.",
+        "Accepts the ownership of the rmn remote by the proposed owner.",
         "",
         "Shared func signature with other programs.",
         "",

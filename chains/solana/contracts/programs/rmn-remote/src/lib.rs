@@ -42,7 +42,7 @@ pub mod rmn_remote {
         Ok(())
     }
 
-    /// Transfers the ownership of the fee quoter to a new proposed owner.
+    /// Transfers the ownership of the rmn remote to a new proposed owner.
     ///
     /// Shared func signature with other programs.
     ///
@@ -50,11 +50,11 @@ pub mod rmn_remote {
     ///
     /// * `ctx` - The context containing the accounts required for the transfer.
     /// * `proposed_owner` - The public key of the new proposed owner.
-    pub fn transfer_ownership(ctx: Context<UpdateConfig>, new_owner: Pubkey) -> Result<()> {
+    pub fn transfer_ownership(ctx: Context<TransferOwnership>, new_owner: Pubkey) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version).transfer_ownership(ctx, new_owner)
     }
 
-    /// Accepts the ownership of the fee quoter by the proposed owner.
+    /// Accepts the ownership of the rmn remote by the proposed owner.
     ///
     /// Shared func signature with other programs.
     ///

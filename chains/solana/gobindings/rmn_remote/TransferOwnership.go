@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Transfers the ownership of the fee quoter to a new proposed owner.
+// Transfers the ownership of the rmn remote to a new proposed owner.
 //
 // Shared func signature with other programs.
 //
@@ -23,16 +23,14 @@ type TransferOwnership struct {
 
 	// [0] = [WRITE] config
 	//
-	// [1] = [] curses
-	//
-	// [2] = [SIGNER] authority
+	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewTransferOwnershipInstructionBuilder creates a new `TransferOwnership` instruction builder.
 func NewTransferOwnershipInstructionBuilder() *TransferOwnership {
 	nd := &TransferOwnership{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
@@ -54,26 +52,15 @@ func (inst *TransferOwnership) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-// SetCursesAccount sets the "curses" account.
-func (inst *TransferOwnership) SetCursesAccount(curses ag_solanago.PublicKey) *TransferOwnership {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(curses)
-	return inst
-}
-
-// GetCursesAccount gets the "curses" account.
-func (inst *TransferOwnership) GetCursesAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
-}
-
 // SetAuthorityAccount sets the "authority" account.
 func (inst *TransferOwnership) SetAuthorityAccount(authority ag_solanago.PublicKey) *TransferOwnership {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *TransferOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[1]
 }
 
 func (inst TransferOwnership) Build() *Instruction {
@@ -107,9 +94,6 @@ func (inst *TransferOwnership) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Curses is not set")
-		}
-		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -130,10 +114,9 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   curses", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
@@ -162,11 +145,9 @@ func NewTransferOwnershipInstruction(
 	newOwner ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
-	curses ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *TransferOwnership {
 	return NewTransferOwnershipInstructionBuilder().
 		SetNewOwner(newOwner).
 		SetConfigAccount(config).
-		SetCursesAccount(curses).
 		SetAuthorityAccount(authority)
 }
