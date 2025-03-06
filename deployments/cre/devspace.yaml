@@ -74,7 +74,7 @@ pipelines:
       run_dependency_pipelines capability-don
       run_dependency_pipelines job-distributor
 profiles:
-  - name: base
+  - name: chains
     patches:
       - op: add
         path: dependencies
@@ -85,6 +85,12 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             vars:
               CHAINS_COUNT: ${GETH_CHAINS_COUNT}
+              ENABLE_DON_BASE: "false"
+  - name: dons
+    patches:
+      - op: add
+        path: dependencies
+        value:
           capability-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
@@ -92,22 +98,13 @@ profiles:
             pipeline: deploy
             profiles:
               - version-from-env
-              - network-generated
-          workflow-don:
-            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-            pipeline: deploy
-            profiles:
-              - version-from-env
-              - network-generated
+#              - network-generated
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+
   - name: kind
-    parents:
-      - profile: base
     patches:
       - op: add
         path: dependencies
@@ -121,8 +118,6 @@ profiles:
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
   - name: aws
-    parents:
-      - profile: base
     patches:
       - op: add
         path: dependencies.ccip-don.profiles
@@ -130,10 +125,10 @@ profiles:
 
 commands:
   deploy-chains:
-    command: devspace run-pipeline chains -p ${PROVIDER}
+    command: devspace run-pipeline chains -p chains -p ${PROVIDER}
     description: Deploy all chains
     appendArgs: true
   deploy-dons:
-    command: devspace run-pipeline dons -p ${PROVIDER}
+    command: devspace run-pipeline dons -p dons -p ${PROVIDER}
     description: Deploy all DONs
     appendArgs: true

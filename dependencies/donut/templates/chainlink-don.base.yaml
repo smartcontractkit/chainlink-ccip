@@ -6,6 +6,9 @@ in: |
         valuesFiles:
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
         values:
+          gatewayMode:
+            enabled: true
+            rdsCidr: 10.0.0.0/8
           fullnameOverride: ${DON_TYPE}
           nodeCount: {{ .Env.DON_NODE_COUNT }}
           bootNodeCount: {{ .Env.DON_BOOT_NODE_COUNT }}
@@ -24,11 +27,11 @@ in: |
                 v2Config:
                   99-config-override.toml: |
                     {{- printf "\n" }}
-                    {{- file.Read (printf "%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
+                    {{- file.Read (printf "%s/config-override-bt-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
                 v2Secret:
                   99-secrets-override.toml: |
                     {{- printf "\n" }}
-                    {{- file.Read (printf "%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
+                    {{- file.Read (printf "%s/secrets-override-bt-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
           {{- end }}
           {{- end }}
           {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
