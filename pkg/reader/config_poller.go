@@ -340,13 +340,14 @@ func (c *configPoller) fetchSourceChainConfigs(
 
 	// Prepare batch requests for the sourceChains
 	contractBatch := make([]types.BatchRead, 0, len(sourceChains))
-	chainToIndexMap := make(map[cciptypes.ChainSelector]int)
+	validSourceChains := make([]cciptypes.ChainSelector, 0, len(sourceChains))
 
-	for i, chain := range sourceChains {
+	for _, chain := range sourceChains {
 		if chain == destChain {
 			continue
 		}
 
+		validSourceChains = append(validSourceChains, chain)
 		contractBatch = append(contractBatch, types.BatchRead{
 			ReadName: consts.MethodNameGetSourceChainConfig,
 			Params: map[string]any{
@@ -354,8 +355,6 @@ func (c *configPoller) fetchSourceChainConfigs(
 			},
 			ReturnVal: new(SourceChainConfig),
 		})
-
-		chainToIndexMap[chain] = i
 	}
 
 	// Execute batch request
@@ -375,19 +374,18 @@ func (c *configPoller) fetchSourceChainConfigs(
 	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
 
 	for _, readResult := range results {
-		for i, result := range readResult {
-			if i >= len(sourceChains) {
-				continue
-			}
+		if len(readResult) != len(validSourceChains) {
+			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, results=%v",
+				validSourceChains, results)
+		}
 
-			chain := sourceChains[i]
-
-			v, err := result.GetResult()
+		for i, chain := range validSourceChains {
+			v, err := readResult[i].GetResult()
 			if err != nil {
 				c.lggr.Errorw("Failed to get source chain config",
 					"chain", chain,
 					"error", err)
-				continue
+				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
 			}
 
 			cfg, ok := v.(*SourceChainConfig)
@@ -395,10 +393,10 @@ func (c *configPoller) fetchSourceChainConfigs(
 				c.lggr.Errorw("Invalid result type from GetSourceChainConfig",
 					"chain", chain,
 					"type", fmt.Sprintf("%T", v))
-				continue
+				return nil, fmt.Errorf("invalid result type from GetSourceChainConfig for chainSelector=%d", chain)
 			}
 
-			// Store the config
+			// Store the config - we don't filter here as that's done at the reader level
 			configs[chain] = *cfg
 		}
 	}

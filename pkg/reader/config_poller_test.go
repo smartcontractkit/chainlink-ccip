@@ -1041,14 +1041,17 @@ func TestConfigCache_GetSourceChainConfigs_InvalidResults(t *testing.T) {
 		false,
 	).Return(response, []string{}, nil).Once()
 
-	// Should succeed but return empty map since result type was invalid
+	// Should return an error since the result type was invalid
 	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
-	require.NoError(t, err)
 
-	// Result should be empty since the type was invalid
+	// Expect an error about invalid result type
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid result type")
+
+	// Result should be empty due to the error
 	assert.Empty(t, configs)
-	assert.NotContains(t, configs, chainB)
 }
+
 func TestConfigCache_FetchPartialResults(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
@@ -1074,12 +1077,15 @@ func TestConfigCache_FetchPartialResults(t *testing.T) {
 		false,
 	).Return(response, []string{}, nil).Once()
 
-	// Should succeed with partial results
+	// Should fail because the number of results doesn't match requested chains
 	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
-	require.NoError(t, err)
 
-	// Only 2 chains should be in the result
-	require.Len(t, configs, 2)
+	// Expect an error about mismatch
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "length mismatch")
+
+	// Result should be empty due to the error
+	assert.Empty(t, configs)
 }
 
 func TestConfigCache_GetSourceChainConfigs_ErrorHandling(t *testing.T) {
@@ -1107,12 +1113,13 @@ func TestConfigCache_GetSourceChainConfigs_ErrorHandling(t *testing.T) {
 		false,
 	).Return(response, []string{}, nil).Once()
 
-	// Should return just the successful chain
+	// Should fail with error from the failing chain
 	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
-	require.NoError(t, err)
 
-	// Only the successful chain should be in the result
-	require.Len(t, configs, 1)
-	assert.Contains(t, configs, chainB)
-	assert.NotContains(t, configs, chainC)
+	// Expect an error related to the failing chain
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "read error")
+
+	// Result should be empty due to the error
+	assert.Empty(t, configs)
 }
