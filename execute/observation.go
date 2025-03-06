@@ -236,8 +236,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Update the earliest unexecuted root based on remaining reports
-	combinedReports := p.buildCombinedReports(groupedCommits, fullyExecutedUnfinalized)
-	p.commitRootsCache.UpdateEarliestUnexecutedRoot(combinedReports)
+	p.commitRootsCache.UpdateEarliestUnexecutedRoot(buildCombinedReports(groupedCommits, fullyExecutedUnfinalized))
 
 	observation.CommitReports = groupedCommits
 
@@ -246,7 +245,7 @@ func (p *Plugin) getCommitReportsObservation(
 }
 
 // buildCombinedReports creates a combined map for updating the earliest unexecuted root
-func (p *Plugin) buildCombinedReports(
+func buildCombinedReports(
 	groupedCommits map[ccipocr3.ChainSelector][]exectypes.CommitData,
 	fullyExecutedUnfinalized []exectypes.CommitData,
 ) map[ccipocr3.ChainSelector][]exectypes.CommitData {

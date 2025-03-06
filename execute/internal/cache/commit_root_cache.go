@@ -48,7 +48,7 @@ type CommitsRootsCache interface {
 	GetTimestampToQueryFrom() time.Time
 
 	// UpdateEarliestUnexecutedRoot updates the earliest unexecuted root timestamp
-	// based on the remaining unexecuted reports.
+	// based on the remaining unexecuted and executed but not finalized reports.
 	UpdateEarliestUnexecutedRoot(remainingReports map[ccipocr3.ChainSelector][]exectypes.CommitData)
 }
 
@@ -224,13 +224,16 @@ func (r *commitRootsCache) UpdateEarliestUnexecutedRoot(
 		}
 	}
 
-	// If we found an earliest timestamp, update our tracking
-	if !earliestTimestamp.IsZero() {
-		if r.earliestUnexecutedRoot.IsZero() || earliestTimestamp.After(r.earliestUnexecutedRoot) {
-			r.lggr.Debugw("Updating earliest unexecuted root",
-				"oldTimestamp", r.earliestUnexecutedRoot,
-				"newTimestamp", earliestTimestamp)
-			r.earliestUnexecutedRoot = earliestTimestamp
-		}
+	// Check if we found a valid timestamp
+	if earliestTimestamp.IsZero() {
+		return
+	}
+
+	// Only update if the new timestamp is later than the current one
+	if earliestTimestamp.After(r.earliestUnexecutedRoot) {
+		r.lggr.Debugw("Updating earliest unexecuted root",
+			"oldTimestamp", r.earliestUnexecutedRoot,
+			"newTimestamp", earliestTimestamp)
+		r.earliestUnexecutedRoot = earliestTimestamp
 	}
 }
