@@ -92,7 +92,7 @@ pub mod rmn_remote {
     ///
     /// * `ctx` - The context containing the accounts required for adding a new curse.
     /// * `subject` - The subject to curse.
-    pub fn curse(ctx: Context<Curse>, subject: CurseSubject) -> Result<()> {
+    pub fn curse(ctx: Context<Curse>, subject: Vec<u8>) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version).curse(ctx, subject)
     }
 
@@ -106,7 +106,7 @@ pub mod rmn_remote {
     ///
     /// * `ctx` - The context containing the accounts required for removing a curse.
     /// * `subject` - The subject to uncurse.
-    pub fn uncurse(ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()> {
+    pub fn uncurse(ctx: Context<Uncurse>, subject: Vec<u8>) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version).uncurse(ctx, subject)
     }
 
@@ -118,7 +118,7 @@ pub mod rmn_remote {
     /// * `ctx` - The context containing the accounts required to inspect curses.
     /// * `subject` - The subject to verify. Note that this instruction will revert if the chain
     ///   is globally cursed too, even if the provided subject is not explicitly cursed.
-    pub fn verify_not_cursed(ctx: Context<InspectCurses>, subject: CurseSubject) -> Result<()> {
+    pub fn verify_not_cursed(ctx: Context<InspectCurses>, subject: Vec<u8>) -> Result<()> {
         router::public(ctx.accounts.config.default_code_version).verify_not_cursed(ctx, subject)
     }
 }

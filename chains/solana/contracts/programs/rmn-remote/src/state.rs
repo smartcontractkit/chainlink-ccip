@@ -2,39 +2,19 @@ use std::fmt::Display;
 
 use anchor_lang::prelude::*;
 
-/// Abstract curse subject.
-///
-/// In particular, a curse subject can be constructed from a chain
-/// selector to signify that any lane involving that chain as `destination` or `source` is
-/// cursed.
-///
-/// The above is not exhaustive: there may be other ways to define subjects.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, AnchorDeserialize, AnchorSerialize)]
-pub struct CurseSubject {
-    pub value: [u8; 16],
+// Global curse subject, standardized across chains and chain families. If this subject is
+// cursed, all lanes starting to or ending in this chain are disabled.
+pub fn global_curse_subject() -> Vec<u8> {
+    vec![
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x01,
+    ]
 }
 
-impl CurseSubject {
-    // Global curse subject, standardized across chains and chain families. If this subject is
-    // cursed, all lanes starting to or ending in this chain are disabled.
-    pub const GLOBAL: Self = {
-        Self {
-            value: [
-                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x00, 0x01,
-            ],
-        }
-    };
+pub const SUBJECT_SPACE: usize = 4 + 16;
 
-    pub const fn from_chain_selector(selector: u64) -> Self {
-        Self {
-            value: (selector as u128).to_le_bytes(),
-        }
-    }
-
-    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
-        Self { value: bytes }
-    }
+pub fn curse_from_chain_selector(selector: u64) -> Vec<u8> {
+    (selector as u128).to_le_bytes().to_vec()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, AnchorDeserialize, AnchorSerialize)]
@@ -67,12 +47,12 @@ pub struct Config {
 #[derive(InitSpace, Debug)]
 pub struct Curses {
     pub version: u8,
-    #[max_len(0)]
-    pub cursed_subjects: Vec<CurseSubject>,
+    #[max_len(0, 0)]
+    pub cursed_subjects: Vec<Vec<u8>>,
 }
 
 impl Curses {
     pub fn dynamic_len(&self) -> usize {
-        Self::INIT_SPACE + self.cursed_subjects.len() * CurseSubject::INIT_SPACE
+        Self::INIT_SPACE + self.cursed_subjects.len() * SUBJECT_SPACE
     }
 }

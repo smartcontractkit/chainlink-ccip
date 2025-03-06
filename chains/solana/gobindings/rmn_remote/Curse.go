@@ -20,7 +20,7 @@ import (
 // * `ctx` - The context containing the accounts required for adding a new curse.
 // * `subject` - The subject to curse.
 type Curse struct {
-	Subject *CurseSubject
+	Subject *[]byte
 
 	// [0] = [] config
 	//
@@ -41,7 +41,7 @@ func NewCurseInstructionBuilder() *Curse {
 }
 
 // SetSubject sets the "subject" parameter.
-func (inst *Curse) SetSubject(subject CurseSubject) *Curse {
+func (inst *Curse) SetSubject(subject []byte) *Curse {
 	inst.Subject = &subject
 	return inst
 }
@@ -177,7 +177,7 @@ func (obj *Curse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 // NewCurseInstruction declares a new Curse instruction with the provided parameters and accounts.
 func NewCurseInstruction(
 	// Parameters:
-	subject CurseSubject,
+	subject []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,

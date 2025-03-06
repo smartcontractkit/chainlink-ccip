@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{CodeVersion, CurseSubject};
+use crate::CodeVersion;
 
 #[event]
 pub struct OwnershipTransferRequested {
@@ -21,10 +21,10 @@ pub struct ConfigSet {
 
 #[event]
 pub struct SubjectCursed {
-    pub subject: CurseSubject,
+    pub subject: Vec<u8>,
 }
 
 #[event]
 pub struct SubjectUncursed {
-    pub subject: CurseSubject,
+    pub subject: Vec<u8>,
 }

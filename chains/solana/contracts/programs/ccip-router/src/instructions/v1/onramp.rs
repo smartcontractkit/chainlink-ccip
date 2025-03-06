@@ -226,7 +226,7 @@ impl OnRamp for Impl {
 }
 
 mod helpers {
-    use rmn_remote::state::CurseSubject;
+    use rmn_remote::state::curse_from_chain_selector;
 
     use super::*;
 
@@ -244,7 +244,7 @@ mod helpers {
         let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
         rmn_remote::cpi::verify_not_cursed(
             cpi_context,
-            CurseSubject::from_chain_selector(dest_chain_selector),
+            curse_from_chain_selector(dest_chain_selector),
         )
     }
 

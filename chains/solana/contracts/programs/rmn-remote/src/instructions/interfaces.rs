@@ -1,11 +1,9 @@
 use anchor_lang::prelude::*;
 
-use crate::{
-    state::CodeVersion, AcceptOwnership, Curse, CurseSubject, InspectCurses, Uncurse, UpdateConfig,
-};
+use crate::{state::CodeVersion, AcceptOwnership, Curse, InspectCurses, Uncurse, UpdateConfig};
 
 pub trait Public {
-    fn verify_not_cursed(&self, ctx: Context<InspectCurses>, subject: CurseSubject) -> Result<()>;
+    fn verify_not_cursed(&self, ctx: Context<InspectCurses>, subject: Vec<u8>) -> Result<()>;
 }
 
 pub trait Admin {
@@ -19,6 +17,6 @@ pub trait Admin {
         code_version: CodeVersion,
     ) -> Result<()>;
 
-    fn curse(&self, ctx: Context<Curse>, subject: CurseSubject) -> Result<()>;
-    fn uncurse(&self, ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()>;
+    fn curse(&self, ctx: Context<Curse>, subject: Vec<u8>) -> Result<()>;
+    fn uncurse(&self, ctx: Context<Uncurse>, subject: Vec<u8>) -> Result<()>;
 }

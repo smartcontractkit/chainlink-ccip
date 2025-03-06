@@ -186,9 +186,7 @@ export type RmnRemote = {
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -231,9 +229,7 @@ export type RmnRemote = {
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -264,9 +260,7 @@ export type RmnRemote = {
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     }
@@ -310,9 +304,7 @@ export type RmnRemote = {
           {
             "name": "cursedSubjects",
             "type": {
-              "vec": {
-                "defined": "CurseSubject"
-              }
+              "vec": "bytes"
             }
           }
         ]
@@ -320,32 +312,6 @@ export type RmnRemote = {
     }
   ],
   "types": [
-    {
-      "name": "CurseSubject",
-      "docs": [
-        "Abstract curse subject.",
-        "",
-        "In particular, a curse subject can be constructed from a chain",
-        "selector to signify that any lane involving that chain as `destination` or `source` is",
-        "cursed.",
-        "",
-        "The above is not exhaustive: there may be other ways to define subjects."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
-          }
-        ]
-      }
-    },
     {
       "name": "CodeVersion",
       "type": {
@@ -409,9 +375,7 @@ export type RmnRemote = {
       "fields": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          },
+          "type": "bytes",
           "index": false
         }
       ]
@@ -421,9 +385,7 @@ export type RmnRemote = {
       "fields": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          },
+          "type": "bytes",
           "index": false
         }
       ]
@@ -661,9 +623,7 @@ export const IDL: RmnRemote = {
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -706,9 +666,7 @@ export const IDL: RmnRemote = {
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -739,9 +697,7 @@ export const IDL: RmnRemote = {
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     }
@@ -785,9 +741,7 @@ export const IDL: RmnRemote = {
           {
             "name": "cursedSubjects",
             "type": {
-              "vec": {
-                "defined": "CurseSubject"
-              }
+              "vec": "bytes"
             }
           }
         ]
@@ -795,32 +749,6 @@ export const IDL: RmnRemote = {
     }
   ],
   "types": [
-    {
-      "name": "CurseSubject",
-      "docs": [
-        "Abstract curse subject.",
-        "",
-        "In particular, a curse subject can be constructed from a chain",
-        "selector to signify that any lane involving that chain as `destination` or `source` is",
-        "cursed.",
-        "",
-        "The above is not exhaustive: there may be other ways to define subjects."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
-          }
-        ]
-      }
-    },
     {
       "name": "CodeVersion",
       "type": {
@@ -884,9 +812,7 @@ export const IDL: RmnRemote = {
       "fields": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          },
+          "type": "bytes",
           "index": false
         }
       ]
@@ -896,9 +822,7 @@ export const IDL: RmnRemote = {
       "fields": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          },
+          "type": "bytes",
           "index": false
         }
       ]

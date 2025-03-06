@@ -21,7 +21,7 @@ import (
 // * `ctx` - The context containing the accounts required for removing a curse.
 // * `subject` - The subject to uncurse.
 type Uncurse struct {
-	Subject *CurseSubject
+	Subject *[]byte
 
 	// [0] = [] config
 	//
@@ -42,7 +42,7 @@ func NewUncurseInstructionBuilder() *Uncurse {
 }
 
 // SetSubject sets the "subject" parameter.
-func (inst *Uncurse) SetSubject(subject CurseSubject) *Uncurse {
+func (inst *Uncurse) SetSubject(subject []byte) *Uncurse {
 	inst.Subject = &subject
 	return inst
 }
@@ -178,7 +178,7 @@ func (obj *Uncurse) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 // NewUncurseInstruction declares a new Uncurse instruction with the provided parameters and accounts.
 func NewUncurseInstruction(
 	// Parameters:
-	subject CurseSubject,
+	subject []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,

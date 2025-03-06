@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::Mint,
 };
-use rmn_remote::state::CurseSubject;
+use rmn_remote::state::curse_from_chain_selector;
 use spl_math::uint::U256;
 use std::ops::Deref;
 
@@ -508,10 +508,7 @@ pub fn verify_uncursed_cpi<'info>(
         curses: rmn_remote_curses,
     };
     let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
-    rmn_remote::cpi::verify_not_cursed(
-        cpi_context,
-        CurseSubject::from_chain_selector(chain_selector),
-    )
+    rmn_remote::cpi::verify_not_cursed(cpi_context, curse_from_chain_selector(chain_selector))
 }
 
 pub fn to_svm_token_amount(

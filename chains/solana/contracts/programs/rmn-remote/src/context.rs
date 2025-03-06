@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{program::RmnRemote, Config, CurseSubject, Curses, RmnRemoteError};
+use crate::{program::RmnRemote, Config, Curses, RmnRemoteError, SUBJECT_SPACE};
 
 /// Static space allocated to any account: must always be added to space calculations.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
@@ -112,7 +112,7 @@ pub struct Curse<'info> {
         mut,
         seeds = [seed::CURSES],
         bump,
-        realloc = ANCHOR_DISCRIMINATOR + curses.dynamic_len() + CurseSubject::INIT_SPACE,
+        realloc = ANCHOR_DISCRIMINATOR + curses.dynamic_len() + SUBJECT_SPACE,
         realloc::payer = authority,
         realloc::zero = false,
         constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,
@@ -139,7 +139,7 @@ pub struct Uncurse<'info> {
         mut,
         seeds = [seed::CURSES],
         bump,
-        realloc = (ANCHOR_DISCRIMINATOR + curses.dynamic_len()).saturating_sub(CurseSubject::INIT_SPACE),
+        realloc = (ANCHOR_DISCRIMINATOR + curses.dynamic_len()).saturating_sub(SUBJECT_SPACE),
         realloc::payer = authority,
         realloc::zero = false,
         constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,

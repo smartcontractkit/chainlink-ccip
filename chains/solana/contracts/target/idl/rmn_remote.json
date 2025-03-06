@@ -186,9 +186,7 @@
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -231,9 +229,7 @@
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -264,9 +260,7 @@
       "args": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          }
+          "type": "bytes"
         }
       ]
     }
@@ -310,9 +304,7 @@
           {
             "name": "cursedSubjects",
             "type": {
-              "vec": {
-                "defined": "CurseSubject"
-              }
+              "vec": "bytes"
             }
           }
         ]
@@ -320,32 +312,6 @@
     }
   ],
   "types": [
-    {
-      "name": "CurseSubject",
-      "docs": [
-        "Abstract curse subject.",
-        "",
-        "In particular, a curse subject can be constructed from a chain",
-        "selector to signify that any lane involving that chain as `destination` or `source` is",
-        "cursed.",
-        "",
-        "The above is not exhaustive: there may be other ways to define subjects."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
-          }
-        ]
-      }
-    },
     {
       "name": "CodeVersion",
       "type": {
@@ -409,9 +375,7 @@
       "fields": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          },
+          "type": "bytes",
           "index": false
         }
       ]
@@ -421,9 +385,7 @@
       "fields": [
         {
           "name": "subject",
-          "type": {
-            "defined": "CurseSubject"
-          },
+          "type": "bytes",
           "index": false
         }
       ]

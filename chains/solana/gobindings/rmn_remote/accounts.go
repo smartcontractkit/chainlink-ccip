@@ -85,7 +85,7 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 
 type Curses struct {
 	Version        uint8
-	CursedSubjects []CurseSubject
+	CursedSubjects [][]byte
 }
 
 var CursesDiscriminator = [8]byte{129, 28, 49, 58, 74, 237, 146, 202}

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use rmn_remote::state::CurseSubject;
+use rmn_remote::state::curse_from_chain_selector;
 
 pub fn verify_uncursed_cpi<'info>(
     rmn_remote: AccountInfo<'info>,
@@ -12,8 +12,5 @@ pub fn verify_uncursed_cpi<'info>(
         curses: rmn_remote_curses,
     };
     let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
-    rmn_remote::cpi::verify_not_cursed(
-        cpi_context,
-        CurseSubject::from_chain_selector(chain_selector),
-    )
+    rmn_remote::cpi::verify_not_cursed(cpi_context, curse_from_chain_selector(chain_selector))
 }

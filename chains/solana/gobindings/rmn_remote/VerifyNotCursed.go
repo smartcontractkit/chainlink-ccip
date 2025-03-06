@@ -19,7 +19,7 @@ import (
 // * `subject` - The subject to verify. Note that this instruction will revert if the chain
 // is globally cursed too, even if the provided subject is not explicitly cursed.
 type VerifyNotCursed struct {
-	Subject *CurseSubject
+	Subject *[]byte
 
 	// [0] = [] curses
 	//
@@ -36,7 +36,7 @@ func NewVerifyNotCursedInstructionBuilder() *VerifyNotCursed {
 }
 
 // SetSubject sets the "subject" parameter.
-func (inst *VerifyNotCursed) SetSubject(subject CurseSubject) *VerifyNotCursed {
+func (inst *VerifyNotCursed) SetSubject(subject []byte) *VerifyNotCursed {
 	inst.Subject = &subject
 	return inst
 }
@@ -142,7 +142,7 @@ func (obj *VerifyNotCursed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewVerifyNotCursedInstruction declares a new VerifyNotCursed instruction with the provided parameters and accounts.
 func NewVerifyNotCursedInstruction(
 	// Parameters:
-	subject CurseSubject,
+	subject []byte,
 	// Accounts:
 	curses ag_solanago.PublicKey,
 	config ag_solanago.PublicKey) *VerifyNotCursed {

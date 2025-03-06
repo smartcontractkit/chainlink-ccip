@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet, Curse, CurseSubject,
+    instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet, Curse,
     OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, SubjectCursed,
     SubjectUncursed, Uncurse, UpdateConfig,
 };
@@ -52,7 +52,7 @@ impl Admin for Impl {
         Ok(())
     }
 
-    fn curse(&self, ctx: Context<Curse>, subject: CurseSubject) -> Result<()> {
+    fn curse(&self, ctx: Context<Curse>, subject: Vec<u8>) -> Result<()> {
         let curses = &mut ctx.accounts.curses;
 
         require!(
@@ -60,12 +60,12 @@ impl Admin for Impl {
             RmnRemoteError::SubjectIsAlreadyCursed
         );
 
-        curses.cursed_subjects.push(subject);
+        curses.cursed_subjects.push(subject.clone());
         emit!(SubjectCursed { subject });
         Ok(())
     }
 
-    fn uncurse(&self, ctx: Context<Uncurse>, subject: CurseSubject) -> Result<()> {
+    fn uncurse(&self, ctx: Context<Uncurse>, subject: Vec<u8>) -> Result<()> {
         let curses = &mut ctx.accounts.curses;
 
         require!(
