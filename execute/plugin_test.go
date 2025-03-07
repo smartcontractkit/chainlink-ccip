@@ -42,7 +42,6 @@ import (
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -73,13 +72,13 @@ func genRandomChainReports(numReports, numMsgsPerReport int) []cciptypes.Execute
 
 func Test_getMinMaxSeqNrRangesBySource_emptyMsgs(t *testing.T) {
 	chainReports := genRandomChainReports(1, 0)
-	minMaxSeqNrRanges := getSnRangeSetPairsBySource(chainReports)
+	minMaxSeqNrRanges := getSeqNrRangesBySource(chainReports)
 	require.Len(t, minMaxSeqNrRanges, 0)
 }
 
-func Test_getMinMaxSeqNrRangesBySource(t *testing.T) {
+func Test_getSeqNrRangesBySource(t *testing.T) {
 	chainReports := genRandomChainReports(10, 15)
-	minMaxSeqNrRanges := getSnRangeSetPairsBySource(chainReports)
+	minMaxSeqNrRanges := getSeqNrRangesBySource(chainReports)
 	require.Len(t, minMaxSeqNrRanges, len(chainReports))
 	for _, chainReport := range chainReports {
 		seqNrRange, ok := minMaxSeqNrRanges[chainReport.SourceChainSelector]
@@ -89,8 +88,8 @@ func Test_getMinMaxSeqNrRangesBySource(t *testing.T) {
 		// check the range.
 		expectedMin := chainReport.Messages[0].Header.SequenceNumber
 		expectedMax := chainReport.Messages[len(chainReport.Messages)-1].Header.SequenceNumber
-		require.Equal(t, expectedMin, seqNrRange.snRange.Start())
-		require.Equal(t, expectedMax, seqNrRange.snRange.End())
+		require.Equal(t, expectedMin, seqNrRange.Start())
+		require.Equal(t, expectedMax, seqNrRange.End())
 
 		// check the set.
 		expectedSet := make(map[cciptypes.SeqNum]struct{})
@@ -98,7 +97,7 @@ func Test_getMinMaxSeqNrRangesBySource(t *testing.T) {
 			expectedSet[msg.Header.SequenceNumber] = struct{}{}
 		}
 		expectedSetSlice := maps.Keys(expectedSet)
-		actualSetSlice := seqNrRange.set.ToSlice()
+		actualSetSlice := seqNrRange.ToSlice()
 		sort.Slice(expectedSetSlice, func(i, j int) bool {
 			return expectedSetSlice[i] < expectedSetSlice[j]
 		})
@@ -114,15 +113,15 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 		name           string
 		mockReaderFunc func(
 			t *testing.T,
-			snRangeSetPairBySource map[cciptypes.ChainSelector]snRangeSetPair,
+			snRangeSetPairBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange,
 		) *readerpkg_mock.MockCCIPReader
 		shouldErr bool
 	}{
 		{
-			name: "full range executed",
+			name: "full range executed, rest unexecuted, should not error",
 			mockReaderFunc: func(
 				t *testing.T,
-				snRangeSetPairBySource map[cciptypes.ChainSelector]snRangeSetPair) *readerpkg_mock.MockCCIPReader {
+				snRangeSetPairBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange) *readerpkg_mock.MockCCIPReader {
 				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
 				// need to setup assertions like this because map iteration
 				// order is undefined.
@@ -130,26 +129,26 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				// rest are not.
 				midPoint := len(snRangeSetPairBySource) / 2
 				i := 0
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
+				for sourceSel, seqNrRange := range snRangeSetPairBySource {
 					if i == midPoint {
 						ccipReaderMock.
 							EXPECT().
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRangePair.snRange,
+								seqNrRange,
 								primitives.Unconfirmed,
 							).Return(
-							seqNrRangePair.snRange.ToSlice(),
+							seqNrRange.ToSlice(),
 							nil,
-						)
+						).Maybe()
 					} else {
 						ccipReaderMock.
 							EXPECT().
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRangePair.snRange,
+								seqNrRange,
 								primitives.Unconfirmed,
 							).Return(nil, nil). // not executed
 							Maybe()
@@ -158,13 +157,13 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				}
 				return ccipReaderMock
 			},
-			shouldErr: true,
+			shouldErr: false,
 		},
 		{
-			name: "subset of range executed",
+			name: "subset of range executed, rest unexecuted, should not error",
 			mockReaderFunc: func(
 				t *testing.T,
-				snRangeSetPairBySource map[cciptypes.ChainSelector]snRangeSetPair) *readerpkg_mock.MockCCIPReader {
+				snRangeSetPairBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange) *readerpkg_mock.MockCCIPReader {
 				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
 				// need to setup assertions like this because map iteration
 				// order is undefined.
@@ -172,27 +171,27 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				// rest are not.
 				midPoint := len(snRangeSetPairBySource) / 2
 				i := 0
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
+				for sourceSel, seqNrRange := range snRangeSetPairBySource {
 					if i == midPoint {
-						fullRange := seqNrRangePair.snRange.ToSlice()
+						fullRange := seqNrRange.ToSlice()
 						ccipReaderMock.
 							EXPECT().
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRangePair.snRange,
+								seqNrRange,
 								primitives.Unconfirmed,
 							).Return(
 							fullRange[:len(fullRange)/2],
 							nil,
-						)
+						).Maybe()
 					} else {
 						ccipReaderMock.
 							EXPECT().
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRangePair.snRange,
+								seqNrRange,
 								primitives.Unconfirmed,
 							).Return(nil, nil).Maybe() // not executed
 					}
@@ -200,40 +199,60 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				}
 				return ccipReaderMock
 			},
-			shouldErr: true,
+			shouldErr: false,
 		},
 		{
-			name: "none executed",
+			name: "none executed, should not error",
 			mockReaderFunc: func(
 				t *testing.T,
-				snRangeSetPairBySource map[cciptypes.ChainSelector]snRangeSetPair) *readerpkg_mock.MockCCIPReader {
+				snRangeSetPairBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange) *readerpkg_mock.MockCCIPReader {
 				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
+				for sourceSel, seqNrRange := range snRangeSetPairBySource {
 					ccipReaderMock.
 						EXPECT().
 						ExecutedMessages(
 							mock.Anything,
 							sourceSel,
-							seqNrRangePair.snRange,
+							seqNrRange,
 							primitives.Unconfirmed,
-						).Return(nil, nil)
+						).Return(nil, nil).Maybe()
 				}
 				return ccipReaderMock
 			},
 			shouldErr: false,
+		},
+		{
+			name: "all executed, should error",
+			mockReaderFunc: func(
+				t *testing.T,
+				snRangeSetPairBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange) *readerpkg_mock.MockCCIPReader {
+				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
+				for sourceSel, seqNrRange := range snRangeSetPairBySource {
+					ccipReaderMock.
+						EXPECT().
+						ExecutedMessages(
+							mock.Anything,
+							sourceSel,
+							seqNrRange,
+							primitives.Unconfirmed,
+						).Return(seqNrRange.ToSlice(), nil)
+				}
+				return ccipReaderMock
+			},
+			shouldErr: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			chainReports := genRandomChainReports(10, 15)
-			snRangeSetPairs := getSnRangeSetPairsBySource(chainReports)
+			snRangeSetPairs := getSeqNrRangesBySource(chainReports)
 			ccipReaderMock := tc.mockReaderFunc(t, snRangeSetPairs)
 			p := &Plugin{
 				lggr:       logger.Test(t),
 				ccipReader: ccipReaderMock,
 			}
-			err := p.checkAlreadyExecuted(tests.Context(t), p.lggr, snRangeSetPairs)
+			err := p.checkAlreadyExecuted(tests.Context(t), p.lggr, chainReports)
 			if tc.shouldErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "already executed")
@@ -1105,6 +1124,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			configDigest,
 			nil,
 		)
+		// by default, the message is not executed.
 		ccipReaderMock.
 			EXPECT().
 			ExecutedMessages(
@@ -1262,7 +1282,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 				require.NoError(t, err) // error is logged, but not returned
 				require.False(t, b)
 			},
-			logsContain: []string{"some messages in report already executed"},
+			logsContain: []string{"all messages from source already executed, checking next source"},
 		},
 	}
 	for _, tc := range testcases {
@@ -1802,9 +1822,9 @@ func TestCommitRootsCache_CoreOptimizationBehavior(t *testing.T) {
 	afterTimestamp := expectedVisibilityWindow.Add(30 * time.Minute)
 
 	// Create chain selector and roots
-	selector := ccipocr3.ChainSelector(1)
-	beforeRoot := ccipocr3.Bytes32{1}
-	afterRoot := ccipocr3.Bytes32{2}
+	selector := cciptypes.ChainSelector(1)
+	beforeRoot := cciptypes.Bytes32{1}
+	afterRoot := cciptypes.Bytes32{2}
 
 	// Create commit data objects
 	beforeReport := createCommitData(beforeTimestamp, selector, beforeRoot)
@@ -1882,8 +1902,8 @@ func (p *customTimeProvider) Now() time.Time {
 }
 
 // Helper function to create commit reports
-func createCommitReports(reports ...exectypes.CommitData) map[ccipocr3.ChainSelector][]exectypes.CommitData {
-	result := make(map[ccipocr3.ChainSelector][]exectypes.CommitData)
+func createCommitReports(reports ...exectypes.CommitData) map[cciptypes.ChainSelector][]exectypes.CommitData {
+	result := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for _, report := range reports {
 		selector := report.SourceChain
 		result[selector] = append(result[selector], report)
@@ -1894,12 +1914,12 @@ func createCommitReports(reports ...exectypes.CommitData) map[ccipocr3.ChainSele
 // Helper function to create commit data
 func createCommitData(
 	timestamp time.Time,
-	selector ccipocr3.ChainSelector,
-	merkleRoot ccipocr3.Bytes32) exectypes.CommitData {
+	selector cciptypes.ChainSelector,
+	merkleRoot cciptypes.Bytes32) exectypes.CommitData {
 	return exectypes.CommitData{
 		SourceChain:         selector,
 		MerkleRoot:          merkleRoot,
-		SequenceNumberRange: ccipocr3.NewSeqNumRange(1, 10),
+		SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
 		Timestamp:           timestamp,
 	}
 }
