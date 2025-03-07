@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
@@ -163,6 +167,43 @@ var (
 		attestationResponse:       `Internal Server Error`,
 		attestationResponseStatus: 500,
 	}
+
+	// malformed responses below
+	m8 = usdcMessage{
+		sourceDomain:              0, // Ethereum Sepolia
+		nonce:                     266463,
+		eventPayload:              "00000000000000000000000600000000000410DF0000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000005931822F394BABC2AACF4588E98FC77A9F5AA8C9000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C7238000000000000000000000000ABC1BCD3E0A2E25003E679E0D2CD6BF67350B22900000000000000000000000000000000000000000000000000000000000F4240000000000000000000000000AFF3FE524EA94118EF09DADBE3C77BA6AA0005EC",
+		urlMessageHash:            "0x099a94f15947bf3c51dd32a39eebc9ba5b630bd7d56dbb7bbbc6adc7639a84ec",
+		attestationResponse:       `{ "error": "some error" }`,
+		attestationResponseStatus: 200,
+	}
+
+	m9 = usdcMessage{
+		sourceDomain:              0, // Ethereum Sepolia
+		nonce:                     265012,
+		eventPayload:              "0000000000000000000000060000000000040B340000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000005931822F394BABC2AACF4588E98FC77A9F5AA8C9000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C72380000000000000000000000002D356B3FBFF7C93B750331B4FA32C59AFC59DB430000000000000000000000000000000000000000000000000000000000000001000000000000000000000000AFF3FE524EA94118EF09DADBE3C77BA6AA0005EC",
+		urlMessageHash:            "0x8b5ca0ad74898bd2126b547c2869ea18b2ced2b484f6b8d64e818ee0401c8805",
+		attestationResponse:       `{ "status": "complete", "attestation": "0" }`,
+		attestationResponseStatus: 200,
+	}
+
+	m10 = usdcMessage{
+		sourceDomain:              0, // Ethereum Sepolia
+		nonce:                     265013,
+		eventPayload:              "0000000000000000000000060000000000040B350000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000005931822F394BABC2AACF4588E98FC77A9F5AA8C9000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C72380000000000000000000000002D356B3FBFF7C93B750331B4FA32C59AFC59DB430000000000000000000000000000000000000000000000000000000000000001000000000000000000000000AFF3FE524EA94118EF09DADBE3C77BA6AA0005EC",
+		urlMessageHash:            "0xab14e391c81233cfabe30056ddd28a0a33c11313e24c4a2435a17c82d9d74900",
+		attestationResponse:       `{ "status": "", "attestation": "0x720502893578a89a8a87982982ef781c18b193" }`,
+		attestationResponseStatus: 200,
+	}
+
+	m11 = usdcMessage{
+		sourceDomain:              0, // Ethereum Sepolia
+		nonce:                     265014,
+		eventPayload:              "0000000000000000000000060000000000040B360000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000005931822F394BABC2AACF4588E98FC77A9F5AA8C9000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C72380000000000000000000000002D356B3FBFF7C93B750331B4FA32C59AFC59DB430000000000000000000000000000000000000000000000000000000000000001000000000000000000000000AFF3FE524EA94118EF09DADBE3C77BA6AA0005EC",
+		urlMessageHash:            "0x422ad18cd36a4009033711848e85126430516aa84292cfb75c92d45d14e29601",
+		attestationResponse:       `{ "field": 2137 }`,
+		attestationResponseStatus: 200,
+	}
 )
 
 // This test focuses on almost e2e flows for USDC message
@@ -181,56 +222,47 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 
 	baseChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector)
 
-	config := map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-		fujiChain: {
-			SourcePoolAddress:            fujiPool,
-			SourceMessageTransmitterAddr: fujiTransmitter,
-		},
-		sepoliaChain: {
-			SourcePoolAddress:            sepoliaPool,
-			SourceMessageTransmitterAddr: sepoliaTransmitter,
-		},
-	}
-
 	fuji := []usdcMessage{m1, m2, m3}
-	sepolia := []usdcMessage{m4, m5, m6, m7}
-	httpMessages := []usdcMessage{m1, m2, m3, m4, m5, m6, m7}
+	sepolia := []usdcMessage{m4, m5, m6, m7, m8, m9, m10, m11}
+	httpMessages := []usdcMessage{m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11}
 
 	// Mock http server to return proper payloads
 	server := mockHTTPServerResponse(t, httpMessages)
 	defer server.Close()
 
-	// Always return events per chain
-	fujiReader := mockReader(t, fujiTransmitter, fuji)
-	sepoliaReader := mockReader(t, sepoliaTransmitter, sepolia)
+	config := pluginconfig.USDCCCTPObserverConfig{
+		AttestationConfig: pluginconfig.AttestationConfig{
+			AttestationAPI:         server.URL,
+			AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Microsecond),
+			AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+			AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
+		},
+		Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+			fujiChain: {
+				SourcePoolAddress:            fujiPool,
+				SourceMessageTransmitterAddr: fujiTransmitter,
+			},
+			sepoliaChain: {
+				SourcePoolAddress:            sepoliaPool,
+				SourceMessageTransmitterAddr: sepoliaTransmitter,
+			},
+		},
+	}
 
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	usdcReader, err := readerpkg.NewUSDCMessageReader(
+	tkReader, err := usdc.NewUSDCTokenDataObserver(
 		tests.Context(t),
-		logger.Test(t),
-		config,
-		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			fujiChain:    fujiReader,
-			sepoliaChain: sepoliaReader,
-		},
-		mockAddrCodec)
-	require.NoError(t, err)
-
-	attestation, err := usdc.NewSequentialAttestationClient(logger.Test(t), pluginconfig.USDCCCTPObserverConfig{
-		AttestationAPI:         server.URL,
-		AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Microsecond),
-		AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
-	})
-	require.NoError(t, err)
-
-	tkReader := usdc.NewTokenDataObserver(
 		logger.Test(t),
 		baseChain,
 		config,
 		testhelpers.USDCEncoder,
-		usdcReader,
-		attestation,
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			fujiChain:    mockReader(t, fujiTransmitter, fuji),
+			sepoliaChain: mockReader(t, sepoliaTransmitter, sepolia),
+		},
+		mockAddrCodec,
 	)
+	require.NoError(t, err)
 
 	tt := []struct {
 		name     string
@@ -402,24 +434,77 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 						TokenData: []exectypes.TokenData{
 							exectypes.NewSuccessTokenData(m1.tokenData()),
 							exectypes.NotSupportedTokenData(),
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 					2: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 				},
 				sepoliaChain: {
 					10: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
 						},
 					},
 					11: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+							exectypes.NewErrorTokenData(tokendata.ErrDataMissing),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "usdc attestation api malformed responses",
+			messages: exectypes.MessageObservations{
+				sepoliaChain: {
+					1: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m8.nonce, m8.sourceDomain, sepoliaPool),
+						},
+					},
+					2: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m9.nonce, m9.sourceDomain, sepoliaPool),
+						},
+					},
+					3: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m10.nonce, m10.sourceDomain, sepoliaPool),
+						},
+					},
+					4: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m11.nonce, m11.sourceDomain, sepoliaPool),
+						},
+					},
+				},
+			},
+			want: exectypes.TokenDataObservations{
+				sepoliaChain: {
+					1: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewErrorTokenData(errors.New("attestation API error: some error")),
+						},
+					},
+					2: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewErrorTokenData(fmt.Errorf("failed to decode attestation hex: %w",
+								errors.New("Bytes must be of at least length 2 (i.e, '0x' prefix): 0"),
+							)),
+						},
+					},
+					3: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewErrorTokenData(errors.New("invalid attestation response")),
+						},
+					},
+					4: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewErrorTokenData(errors.New("invalid attestation response")),
 						},
 					},
 				},
