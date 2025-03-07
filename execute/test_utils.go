@@ -35,8 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
-	typepkgmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	cciptypesmocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -236,7 +235,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	)
 	require.NoError(it.t, err)
 
-	ep := gasmock.NewMockEstimateProvider(it.t)
+	ep := cciptypesmocks.NewMockEstimateProvider(it.t)
 	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 
@@ -277,7 +276,7 @@ func (it *IntTest) newNode(
 	id int,
 	N int,
 	configDigest [32]byte,
-	mockCodec *typepkgmock.MockAddressCodec,
+	mockCodec *cciptypesmocks.MockAddressCodec,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
 	rCfg := ocr3types.ReportingPluginConfig{
