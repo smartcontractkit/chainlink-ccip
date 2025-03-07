@@ -19,7 +19,7 @@ MessageDetails = [
  {Ratio = 5,  MsgType = "Messaging", DataLengthBytes = 10_000, DestGasLimit=2_500_000},
 ]
 # each destination chain will receive 1 incoming request per RequestFrequency for the duration of LoadDuration
-RequestFrequency = "1s"
+RequestFrequency = "5s"
 LoadDuration = "10m"
 # destination chain selectors to send messages to
 NumDestinationChains = 6
