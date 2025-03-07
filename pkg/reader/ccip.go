@@ -1304,7 +1304,10 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	if !includeDisabled {
 		for chain, cfg := range configs {
 			enabled, err := cfg.check()
-			if err != nil || !enabled {
+			if err != nil {
+				return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chain, err)
+			}
+			if !enabled {
 				lggr.Debugw("Filtering out disabled source chain",
 					"chain", chain,
 					"error", err,
