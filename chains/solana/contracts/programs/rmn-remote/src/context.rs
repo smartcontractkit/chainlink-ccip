@@ -69,7 +69,7 @@ pub struct UpdateConfig<'info> {
     pub config: Account<'info, Config>,
 
     #[account(
-        seeds = [seed::CONFIG],
+        seeds = [seed::CURSES],
         bump,
         constraint = valid_version(curses.version, MAX_CURSES_V) @ RmnRemoteError::InvalidVersion,
     )]
