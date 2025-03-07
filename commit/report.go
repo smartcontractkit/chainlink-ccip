@@ -440,7 +440,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, not accepting: %w", err)
+		lggr.Infow("report not valid, not accepting", "err", err)
 		return false, nil
 	}
 	if err != nil {
@@ -516,7 +516,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	decodedReport, err := p.validateReport(ctx, lggr, seqNr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, transmitting: %w", err)
+		lggr.Infow("report not valid, transmitting", "err", err)
 		return false, nil
 	}
 	if err != nil {
