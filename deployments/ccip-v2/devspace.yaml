@@ -288,8 +288,8 @@ commands:
     command: devspace -p k8s-remote-tester run-pipeline k8s-remote-tester
     description: Run CCIP tests in k8s cluster
   stop-remote-tests:
-    command: kubectl delete job k8s-tester
-    description: stop remote tester job
+    command: kubectl delete job k8s-tester && kubectl delete NetworkChaos --all && kubectl delete PodChaos --all
+    description: stop remote tester job including chaos
   remote-tester-logs:
     command: kubectl logs -f -l app.kubernetes.io/name=k8s-remote-tester
     description: tail remote-tester logs
