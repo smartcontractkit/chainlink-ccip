@@ -1,4 +1,4 @@
-package tokendata
+package observer
 
 import (
 	"fmt"

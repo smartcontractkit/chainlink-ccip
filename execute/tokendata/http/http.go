@@ -1,10 +1,9 @@
-package usdc
+package http
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -16,18 +15,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const (
-	apiVersion      = "v1"
-	attestationPath = "attestations"
-
-	// defaultCoolDownDurationSec defines the default time to wait after getting rate limited.
-	// this value is only used if the 429 response does not contain the Retry-After header
-	defaultCoolDownDuration = 5 * time.Minute
-
 	// maxCoolDownDuration defines the maximum duration we can wait till firing the next request
 	maxCoolDownDuration = 10 * time.Minute
 )
@@ -44,7 +38,7 @@ type HTTPClient interface {
 	//
 	//	https://developers.circle.com/stablecoins/reference/getattestation
 	//	https://developers.circle.com/stablecoins/docs/transfer-usdc-on-testnet-from-ethereum-to-avalanche
-	Get(ctx context.Context, messageHash cciptypes.Bytes32) (cciptypes.Bytes, HTTPStatus, error)
+	Get(ctx context.Context, path string) (cciptypes.Bytes, HTTPStatus, error)
 }
 
 // httpClient is a client for the USDC attestation API. It encapsulates all the details specific to the Attestation API:
@@ -54,10 +48,11 @@ type HTTPClient interface {
 // Therefore AttestationClient is a higher level abstraction that uses httpClient to fetch attestations and can be more
 // oriented around caching/processing the attestation data instead of handling the API specifics.
 type httpClient struct {
-	lggr       logger.Logger
-	apiURL     *url.URL
-	apiTimeout time.Duration
-	rate       *rate.Limiter
+	lggr             logger.Logger
+	apiURL           *url.URL
+	apiTimeout       time.Duration
+	rate             *rate.Limiter
+	coolDownDuration time.Duration
 	// coolDownUntil defines whether requests are blocked or not.
 	coolDownUntil time.Time
 	coolDownMu    *sync.RWMutex
@@ -78,6 +73,7 @@ func GetHTTPClient(
 	api string,
 	apiInterval time.Duration,
 	apiTimeout time.Duration,
+	coolDownDuration time.Duration,
 ) (HTTPClient, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -86,7 +82,7 @@ func GetHTTPClient(
 		return client, nil
 	}
 
-	client, err := newHTTPClient(lggr, api, apiInterval, apiTimeout)
+	client, err := newHTTPClient(lggr, api, apiInterval, apiTimeout, coolDownDuration)
 	if err != nil {
 		return nil, err
 	}
@@ -100,89 +96,32 @@ func newHTTPClient(
 	api string,
 	apiInterval time.Duration,
 	apiTimeout time.Duration,
+	coolDownDuration time.Duration,
 ) (HTTPClient, error) {
 	u, err := url.ParseRequestURI(api)
 	if err != nil {
 		return nil, err
 	}
-
-	client := &httpClient{
-		lggr:       lggr,
-		apiURL:     u,
-		apiTimeout: apiTimeout,
-		rate:       rate.NewLimiter(rate.Every(apiInterval), 1),
-		coolDownMu: &sync.RWMutex{},
-	}
-	return newObservedHTTPClient(client, lggr), nil
+	return &httpClient{
+		lggr:             lggr,
+		apiURL:           u,
+		apiTimeout:       apiTimeout,
+		coolDownDuration: coolDownDuration,
+		rate:             rate.NewLimiter(rate.Every(apiInterval), 1),
+		coolDownMu:       &sync.RWMutex{},
+	}, nil
 }
 
-type attestationStatus string
-
-const (
-	attestationStatusSuccess attestationStatus = "complete"
-	attestationStatusPending attestationStatus = "pending_confirmations"
-)
-
-type httpResponse struct {
-	Status      attestationStatus `json:"status"`
-	Attestation string            `json:"attestation"`
-	Error       string            `json:"error"`
-}
-
-func (r httpResponse) validate() error {
-	if r.Error != "" {
-		return fmt.Errorf("attestation API error: %s", r.Error)
-	}
-	if r.Status == "" {
-		return fmt.Errorf("invalid attestation response")
-	}
-	if r.Status != attestationStatusSuccess {
-		return ErrNotReady
-	}
-	return nil
-}
-
-func (r httpResponse) attestationToBytes() (cciptypes.Bytes, error) {
-	attestationBytes, err := cciptypes.NewBytesFromString(r.Attestation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode attestation hex: %w", err)
-	}
-	return attestationBytes, nil
-}
-
-func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cciptypes.Bytes, HTTPStatus, error) {
+func (h *httpClient) Get(ctx context.Context, requestPath string) (cciptypes.Bytes, HTTPStatus, error) {
 	lggr := logutil.WithContextValues(ctx, h.lggr)
 
-	// Terminate immediately when rate limited
-	if coolDown, duration := h.inCoolDownPeriod(); coolDown {
-		lggr.Errorw(
-			"Rate limited by the Attestation API, dropping all requests",
-			"coolDownDuration", duration,
-		)
-		return nil, http.StatusTooManyRequests, ErrRateLimit
-	}
-
-	if h.rate != nil {
-		// Wait blocks until it the attestation API can be called or the
-		// context is Done.
-		if waitErr := h.rate.Wait(ctx); waitErr != nil {
-			lggr.Warnw("Self rate-limited, sending too many requests to the Attestation API")
-			return nil, http.StatusTooManyRequests, ErrRateLimit
-		}
-	}
-
-	// Use a timeout to guard against attestation API hanging, causing observation timeout and
-	// failing to make any progress.
-	timeoutCtx, cancel := context.WithTimeoutCause(ctx, h.apiTimeout, ErrTimeout)
-	defer cancel()
-
 	requestURL := *h.apiURL
-	requestURL.Path = path.Join(requestURL.Path, apiVersion, attestationPath, messageHash.String())
+	requestURL.Path = path.Join(requestURL.Path, requestPath)
 
-	response, httpStatus, err := h.callAPI(timeoutCtx, lggr, requestURL)
+	response, httpStatus, err := h.callAPI(ctx, lggr, http.MethodGet, requestURL, nil)
 	lggr.Debugw(
 		"Response from attestation API",
-		"messageHash", messageHash,
+		"requestURL", requestURL.String(),
 		"status", httpStatus,
 		"err", err,
 	)
@@ -192,9 +131,34 @@ func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cc
 func (h *httpClient) callAPI(
 	ctx context.Context,
 	lggr logger.Logger,
+	method string,
 	url url.URL,
+	body io.Reader,
 ) (cciptypes.Bytes, HTTPStatus, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
+	// Terminate immediately when rate limited
+	if coolDown, duration := h.inCoolDownPeriod(); coolDown {
+		lggr.Errorw(
+			"Rate limited by API, dropping all requests",
+			"coolDownDuration", duration,
+		)
+		return nil, http.StatusTooManyRequests, tokendata.ErrRateLimit
+	}
+
+	if h.rate != nil {
+		// Wait blocks until it the attestation API can be called or the
+		// context is Done.
+		if waitErr := h.rate.Wait(ctx); waitErr != nil {
+			lggr.Warnw("Self rate-limited, sending too many requests to the API")
+			return nil, http.StatusTooManyRequests, tokendata.ErrRateLimit
+		}
+	}
+
+	// Use a timeout to guard against attestation API hanging, causing observation timeout and
+	// failing to make any progress.
+	timeoutCtx, cancel := context.WithTimeoutCause(ctx, h.apiTimeout, tokendata.ErrTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(timeoutCtx, method, url.String(), body)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
 	}
@@ -202,54 +166,36 @@ func (h *httpClient) callAPI(
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if ctx.Err() != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, http.StatusRequestTimeout, ErrTimeout
-		} else if errors.Is(err, ErrTimeout) {
-			return nil, http.StatusRequestTimeout, ErrTimeout
+			return nil, http.StatusRequestTimeout, tokendata.ErrTimeout
+		} else if errors.Is(err, tokendata.ErrTimeout) {
+			return nil, http.StatusRequestTimeout, tokendata.ErrTimeout
 		}
 		// On error, res is nil in most cases, do not read res.StatusCode, return BadRequest
 		return nil, http.StatusBadRequest, err
 	}
 
 	var status HTTPStatus
-	if res != nil {
-		defer res.Body.Close()
-		status = HTTPStatus(res.StatusCode)
-	}
+	defer res.Body.Close()
+	status = HTTPStatus(res.StatusCode)
+
 	// Explicitly signal if the API is being rate limited
 	if res.StatusCode == http.StatusTooManyRequests {
 		h.setCoolDownPeriod(lggr, res.Header)
-		return nil, status, ErrRateLimit
+		return nil, status, tokendata.ErrRateLimit
 	}
 	if res.StatusCode == http.StatusNotFound {
-		return nil, status, ErrNotReady
+		return nil, status, tokendata.ErrNotReady
 	}
 	if res.StatusCode != http.StatusOK {
-		return nil, status, ErrUnknownResponse
+		return nil, status, tokendata.ErrUnknownResponse
 	}
 
-	response, err := h.parsePayload(res)
-	return response, status, err
-}
-
-func (h *httpClient) parsePayload(res *http.Response) (cciptypes.Bytes, error) {
-	if res == nil {
-		return nil, ErrUnknownResponse
-	}
-
-	var response httpResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("failed to decode json: %w", err)
-	}
-
-	if err := response.validate(); err != nil {
-		return nil, err
-	}
-
-	return response.attestationToBytes()
+	payloadBytes, err := io.ReadAll(res.Body)
+	return payloadBytes, status, err
 }
 
 func (h *httpClient) setCoolDownPeriod(lggr logger.Logger, headers http.Header) {
-	coolDownDuration := defaultCoolDownDuration
+	coolDownDuration := h.coolDownDuration
 	if retryAfterHeader, exists := headers["Retry-After"]; exists && len(retryAfterHeader) > 0 {
 		retryAfterSec, errParseInt := strconv.ParseInt(retryAfterHeader[0], 10, 64)
 		if errParseInt == nil {
