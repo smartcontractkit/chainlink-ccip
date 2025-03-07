@@ -2955,7 +2955,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
@@ -3092,7 +3092,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
@@ -3115,7 +3115,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
@@ -3132,7 +3132,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
@@ -3149,7 +3149,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
@@ -3241,7 +3241,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
@@ -6817,12 +6817,12 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := rmn_remote.NewCurseInstruction(
 					globalCurse,
 					config.RMNRemoteConfigPDA,
-					legacyAdmin.PublicKey(),
+					ccipAdmin.PublicKey(),
 					config.RMNRemoteCursesPDA,
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
@@ -6899,12 +6899,12 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err = rmn_remote.NewUncurseInstruction(
 					globalCurse,
 					config.RMNRemoteConfigPDA,
-					legacyAdmin.PublicKey(),
+					ccipAdmin.PublicKey(),
 					config.RMNRemoteCursesPDA,
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 				require.NotNil(t, result)
 			})
 
