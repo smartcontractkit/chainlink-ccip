@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    state::CodeVersion, AcceptOwnership, Curse, CurseSubject, InspectCurses, Uncurse, UpdateConfig, TransferOwnership,
+    state::CodeVersion, AcceptOwnership, Curse, CurseSubject, InspectCurses, TransferOwnership,
+    Uncurse, UpdateConfig,
 };
 
 pub trait Public {
@@ -9,7 +10,11 @@ pub trait Public {
 }
 
 pub trait Admin {
-    fn transfer_ownership(&self, ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()>;
+    fn transfer_ownership(
+        &self,
+        ctx: Context<TransferOwnership>,
+        proposed_owner: Pubkey,
+    ) -> Result<()>;
 
     fn accept_ownership(&self, ctx: Context<AcceptOwnership>) -> Result<()>;
 
