@@ -2950,7 +2950,7 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewCurseInstruction(
 				globalCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -3087,7 +3087,7 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewUncurseInstruction(
 				globalCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -3110,7 +3110,7 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewCurseInstruction(
 				svmCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -3127,7 +3127,7 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err = rmn_remote.NewCurseInstruction(
 				evmCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -3144,7 +3144,7 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err = rmn_remote.NewUncurseInstruction(
 				svmCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -3236,7 +3236,7 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewUncurseInstruction(
 				evmCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
