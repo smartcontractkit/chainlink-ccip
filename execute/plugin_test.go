@@ -129,17 +129,17 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				// rest are not.
 				midPoint := len(snRangeSetPairBySource) / 2
 				i := 0
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
+				for sourceSel, seqNrRange := range snRangeSetPairBySource {
 					if i == midPoint {
 						ccipReaderMock.
 							EXPECT().
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRangePair,
+								seqNrRange,
 								primitives.Unconfirmed,
 							).Return(
-							seqNrRangePair.ToSlice(),
+							seqNrRange.ToSlice(),
 							nil,
 						).Maybe()
 					} else {
@@ -148,7 +148,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRangePair,
+								seqNrRange,
 								primitives.Unconfirmed,
 							).Return(nil, nil). // not executed
 							Maybe()
@@ -171,15 +171,15 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				// rest are not.
 				midPoint := len(snRangeSetPairBySource) / 2
 				i := 0
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
+				for sourceSel, seqNrRange := range snRangeSetPairBySource {
 					if i == midPoint {
-						fullRange := seqNrRangePair.ToSlice()
+						fullRange := seqNrRange.ToSlice()
 						ccipReaderMock.
 							EXPECT().
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRangePair,
+								seqNrRange,
 								primitives.Unconfirmed,
 							).Return(
 							fullRange[:len(fullRange)/2],
@@ -191,7 +191,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRangePair,
+								seqNrRange,
 								primitives.Unconfirmed,
 							).Return(nil, nil).Maybe() // not executed
 					}
@@ -207,13 +207,13 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				t *testing.T,
 				snRangeSetPairBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange) *readerpkg_mock.MockCCIPReader {
 				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
+				for sourceSel, seqNrRange := range snRangeSetPairBySource {
 					ccipReaderMock.
 						EXPECT().
 						ExecutedMessages(
 							mock.Anything,
 							sourceSel,
-							seqNrRangePair,
+							seqNrRange,
 							primitives.Unconfirmed,
 						).Return(nil, nil).Maybe()
 				}
@@ -227,15 +227,15 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 				t *testing.T,
 				snRangeSetPairBySource map[cciptypes.ChainSelector]cciptypes.SeqNumRange) *readerpkg_mock.MockCCIPReader {
 				ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-				for sourceSel, seqNrRangePair := range snRangeSetPairBySource {
+				for sourceSel, seqNrRange := range snRangeSetPairBySource {
 					ccipReaderMock.
 						EXPECT().
 						ExecutedMessages(
 							mock.Anything,
 							sourceSel,
-							seqNrRangePair,
+							seqNrRange,
 							primitives.Unconfirmed,
-						).Return(seqNrRangePair.ToSlice(), nil)
+						).Return(seqNrRange.ToSlice(), nil)
 				}
 				return ccipReaderMock
 			},
