@@ -50,7 +50,7 @@ export type RmnRemote = {
     {
       "name": "transferOwnership",
       "docs": [
-        "Transfers the ownership of the rmn remote to a new proposed owner.",
+        "Transfers the ownership of the fee quoter to a new proposed owner.",
         "",
         "Shared func signature with other programs.",
         "",
@@ -63,6 +63,11 @@ export type RmnRemote = {
         {
           "name": "config",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "curses",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -81,7 +86,7 @@ export type RmnRemote = {
     {
       "name": "acceptOwnership",
       "docs": [
-        "Accepts the ownership of the rmn remote by the proposed owner.",
+        "Accepts the ownership of the fee quoter by the proposed owner.",
         "",
         "Shared func signature with other programs.",
         "",
@@ -520,7 +525,7 @@ export const IDL: RmnRemote = {
     {
       "name": "transferOwnership",
       "docs": [
-        "Transfers the ownership of the rmn remote to a new proposed owner.",
+        "Transfers the ownership of the fee quoter to a new proposed owner.",
         "",
         "Shared func signature with other programs.",
         "",
@@ -533,6 +538,11 @@ export const IDL: RmnRemote = {
         {
           "name": "config",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "curses",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -551,7 +561,7 @@ export const IDL: RmnRemote = {
     {
       "name": "acceptOwnership",
       "docs": [
-        "Accepts the ownership of the rmn remote by the proposed owner.",
+        "Accepts the ownership of the fee quoter by the proposed owner.",
         "",
         "Shared func signature with other programs.",
         "",

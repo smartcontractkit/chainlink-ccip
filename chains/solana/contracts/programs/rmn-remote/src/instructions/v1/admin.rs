@@ -3,16 +3,12 @@ use anchor_lang::prelude::*;
 use crate::{
     instructions::interfaces::Admin, AcceptOwnership, CodeVersion, ConfigSet, Curse, CurseSubject,
     OwnershipTransferRequested, OwnershipTransferred, RmnRemoteError, SubjectCursed,
-    SubjectUncursed, TransferOwnership, Uncurse, UpdateConfig,
+    SubjectUncursed, Uncurse, UpdateConfig,
 };
 
 pub struct Impl;
 impl Admin for Impl {
-    fn transfer_ownership(
-        &self,
-        ctx: Context<TransferOwnership>,
-        proposed_owner: Pubkey,
-    ) -> Result<()> {
+    fn transfer_ownership(&self, ctx: Context<UpdateConfig>, proposed_owner: Pubkey) -> Result<()> {
         let config = &mut ctx.accounts.config;
         require!(
             proposed_owner != config.owner,

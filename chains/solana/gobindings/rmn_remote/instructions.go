@@ -37,7 +37,7 @@ var (
 	// * `ctx` - The context containing the accounts required for initialization.
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
-	// Transfers the ownership of the rmn remote to a new proposed owner.
+	// Transfers the ownership of the fee quoter to a new proposed owner.
 	//
 	// Shared func signature with other programs.
 	//
@@ -47,7 +47,7 @@ var (
 	// * `proposed_owner` - The public key of the new proposed owner.
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
-	// Accepts the ownership of the rmn remote by the proposed owner.
+	// Accepts the ownership of the fee quoter by the proposed owner.
 	//
 	// Shared func signature with other programs.
 	//

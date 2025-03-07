@@ -1584,6 +1584,7 @@ func TestCCIPRouter(t *testing.T) {
 			instruction, err := rmn_remote.NewTransferOwnershipInstruction(
 				ccipAdmin.PublicKey(),
 				config.RMNRemoteConfigPDA,
+				config.RMNRemoteCursesPDA,
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
@@ -1593,6 +1594,7 @@ func TestCCIPRouter(t *testing.T) {
 			// successfully transfer ownership
 			instruction, err = rmn_remote.NewTransferOwnershipInstruction(
 				ccipAdmin.PublicKey(),
+				config.RMNRemoteConfigPDA,
 				config.RMNRemoteCursesPDA,
 				legacyAdmin.PublicKey(),
 			).ValidateAndBuild()
@@ -1632,6 +1634,7 @@ func TestCCIPRouter(t *testing.T) {
 			instruction, err = rmn_remote.NewTransferOwnershipInstruction(
 				ccipAdmin.PublicKey(),
 				config.RMNRemoteConfigPDA,
+				config.RMNRemoteCursesPDA,
 				ccipAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
