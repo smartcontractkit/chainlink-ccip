@@ -552,6 +552,7 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
 	}
 
+	lggr.Debugw("chain reader returning latest message sequence number", "seqNum", msg.Message.Header.SequenceNumber)
 	return msg.SequenceNumber, nil
 }
 
@@ -585,6 +586,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 			sourceChainSelector, r.destChain)
 	}
 
+	r.lggr.Debugw("chain reader returning expected next sequence number", "seqNum", expectedNextSequenceNumber)
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
