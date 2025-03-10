@@ -1,9 +1,8 @@
 package optimizers
 
 import (
-	"sort"
-
 	"golang.org/x/exp/maps"
+	"sort"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -64,7 +63,7 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 // Errors are returned if the observation cannot be encoded.
 //
 //nolint:gocyclo
-func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observation) (exectypes.Observation, error) {
+func (op *ObservationOptimizer) TruncateObservation(observation exectypes.Observation) (exectypes.Observation, error) {
 	obs := observation
 	encodedObs, err := op.ocrTypeCodec.EncodeObservation(obs)
 	if err != nil {
@@ -97,7 +96,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 					op.lggr.Errorw("missing message", "seqNum", seqNum, "chain", chain)
 					continue
 				}
-				op.lggr.Debugw("truncating message", "seqNum", seqNum, "chain", chain)
+				//op.lggr.Debugw("truncating message", "seqNum", seqNum, "chain", chain)
 				obs.Messages[chain][seqNum] = cciptypes.Message{}
 				obs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 				// Subtract the removed message and token size
@@ -107,12 +106,12 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 				seqNum++
 				// Once we assert the estimation is less than the max size we double-check with actual encoding size.
 				// Otherwise, we short circuit after checking the estimation only
-				if encodedObsSize <= op.maxEncodedSize && fitsWithinSize(op.ocrTypeCodec, obs, op.maxEncodedSize) {
+				if encodedObsSize <= op.maxEncodedSize && op.fitsWithinSize(op.ocrTypeCodec, obs, op.maxEncodedSize) {
 					return obs, nil
 				}
 			}
 
-			op.lggr.Debugw("truncating last commit report", "chain", chain)
+			//op.lggr.Debugw("truncating last commit report", "chain", chain)
 			var bytesTruncated int
 			// Reaching here means that all messages in the report are truncated, truncate the last commit
 			obs, bytesTruncated = op.truncateLastCommit(obs, chain)
@@ -127,7 +126,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 
 			// Once we assert the estimation is less than the max size we double-check with actual encoding size.
 			// Otherwise, we short circuit after checking the estimation only
-			if encodedObsSize <= op.maxEncodedSize && fitsWithinSize(op.ocrTypeCodec, obs, op.maxEncodedSize) {
+			if encodedObsSize <= op.maxEncodedSize && op.fitsWithinSize(op.ocrTypeCodec, obs, op.maxEncodedSize) {
 				return obs, nil
 			}
 		}
@@ -147,7 +146,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 	return obs, nil
 }
 
-func fitsWithinSize(codec ocrtypecodec.ExecCodec, obs exectypes.Observation, maxEncodedSize int) bool {
+func (op *ObservationOptimizer) fitsWithinSize(codec ocrtypecodec.ExecCodec, obs exectypes.Observation, maxEncodedSize int) bool {
 	encodedObs, err := codec.EncodeObservation(obs)
 	if err != nil {
 		return false
@@ -157,7 +156,7 @@ func fitsWithinSize(codec ocrtypecodec.ExecCodec, obs exectypes.Observation, max
 
 // truncateLastCommit removes the last commit from the observation.
 // returns observation and the number of bytes truncated.
-func (op ObservationOptimizer) truncateLastCommit(
+func (op *ObservationOptimizer) truncateLastCommit(
 	obs exectypes.Observation,
 	chain cciptypes.ChainSelector,
 ) (exectypes.Observation, int) {
@@ -193,7 +192,7 @@ func (op ObservationOptimizer) truncateLastCommit(
 
 // truncateChain removes all data related to the given chain from the observation.
 // returns true if the chain was found and truncated, false otherwise.
-func (op ObservationOptimizer) truncateChain(
+func (op *ObservationOptimizer) truncateChain(
 	obs exectypes.Observation,
 	chain cciptypes.ChainSelector,
 ) exectypes.Observation {
