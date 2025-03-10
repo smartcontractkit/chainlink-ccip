@@ -532,7 +532,7 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 		return 0, fmt.Errorf("failed to query onRamp: %w", err)
 	}
 
-	lggr.Infow("queried latest message from source",
+	lggr.Debugw("queried latest message from source",
 		"numMsgs", len(seq), "sourceChainSelector", chain)
 	if len(seq) > 1 {
 		return 0, fmt.Errorf("more than one message found for the latest message query")
@@ -552,6 +552,8 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
 	}
 
+	lggr.Infow("chain reader returning latest onramp sequence number",
+		"seqNum", msg.Message.Header.SequenceNumber, "sourceChainSelector", chain)
 	return msg.SequenceNumber, nil
 }
 
@@ -560,6 +562,8 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
 	sourceChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+
 	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return 0, err
 	}
@@ -585,6 +589,8 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 			sourceChainSelector, r.destChain)
 	}
 
+	lggr.Debugw("chain reader returning expected next sequence number",
+		"seqNum", expectedNextSequenceNumber, "sourceChainSelector", sourceChainSelector)
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
