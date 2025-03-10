@@ -33,6 +33,12 @@ vars:
   DON_VERSION:
     source: env
     default: ccip-dev
+  DON_TYPE_CRE:
+    source: env
+    default: cre
+  DON_VERSION_CRE:
+    source: env
+    default: latest
   CCIP_TOOLING_VERSION:
     source: env
     default: v2
@@ -57,6 +63,12 @@ vars:
   CHAINLINK_PRODUCT:
     source: env
     default: ccip
+  DON_GATEWAY_NODE_COUNT:
+    source: env
+    default: 0
+  DON_GATEWAY_NODE_COUNT_CRE:
+    source: env
+    default: 1
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -84,6 +96,10 @@ pipelines:
   ccip-infra-only:
     run: |-
       run_dependency_pipelines ccip-don --set-flag infraOnly="true"
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
+  cre:
+    run: |-
+      run_dependency_pipelines cre-don
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
 profiles:
@@ -166,6 +182,32 @@ profiles:
         path: vars
         value:
           ENV: sandbox
+
+  - name: cre
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          cre-don:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles:
+              - network-besu-chain-alpha
+              - network-besu-chain-beta
+              - version-from-env
+      - op: replace
+        path: vars
+        value:
+          DON_TYPE: ${DON_TYPE_CRE}
+          DON_VERSION: ${DON_VERSION_CRE}
+      - op: add
+        path: vars
+        value:
+          ENV: sandbox
+          DON_GATEWAY_NODE_COUNT: ${DON_GATEWAY_NODE_COUNT_CRE}
+
 commands:
   besu:
     command: |-
@@ -188,4 +230,8 @@ commands:
   ccip-infra:
     command: devspace run-pipeline ccip-infra-only -p ccip
     description: Deploy CCIP v1.6 DON infrastructure only (no onchain deployment)
+    appendArgs: true
+  cre:
+    command: devspace run-pipeline cre -p cre
+    description: Deploy the workflow/capability CRE DON infrastructure with a gateway node
     appendArgs: true

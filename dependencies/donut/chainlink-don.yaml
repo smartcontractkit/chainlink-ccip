@@ -49,6 +49,9 @@ vars:
   DON_NODE_COUNT:
     source: env
     default: 1
+  DON_GATEWAY_NODE_COUNT:
+    source: env
+    default: 0
   # chains
   # Option to generate variable number of networks to be configured in Node config
   # It is required when network-generated profile is activated
@@ -118,13 +121,13 @@ pipelines:
         # we're resuming existing deployment
         # ccip-v2-scripts configure-ocr
       fi
-
   deploy-ccip-v2-don-with-overrides:
     run: |-
       echo "Redeploying DON with overrides"
       NODE_TOML_OVERRIDES=$(cat ${TMP_DIR}/ccip-v2-scripts-node-overrides.toml) \
         gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${TMP_DIR}/ccip-v2-node-overrides.yaml
       create_deployments chainlink-don --from-file="${TMP_DIR}/ccip-v2-node-overrides.yaml"
+
 deployments:
   chainlink-don:
     updateImageTags: false
@@ -177,6 +180,7 @@ profiles:
       $(
         CRIB_EKS_CLUSTER_NAME="${CRIB_EKS_CLUSTER_NAME}" \
         DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
+        DON_GATEWAY_NODE_COUNT=${DON_GATEWAY_NODE_COUNT} \
         DON_NODE_COUNT=${DON_NODE_COUNT} \
         ENV=${ENV} \
         LOCAL_VALUES_DIR="${LOCAL_VALUES_DIR}" \
@@ -259,6 +263,14 @@ profiles:
     merge:
       deployments:
         chainlink-don:
+          helm:
+            values:
+              common:
+                image:
+                  repository: ${DEVSPACE_IMAGE}
+                  tag: ${DEVSPACE_IMAGE_TAG}
+                  pullPolicy: Always
+        chainlink-don-gateway:
           helm:
             values:
               common:
