@@ -1,8 +1,9 @@
 package optimizers
 
 import (
-	"golang.org/x/exp/maps"
 	"sort"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -146,7 +147,11 @@ func (op *ObservationOptimizer) TruncateObservation(observation exectypes.Observ
 	return obs, nil
 }
 
-func (op *ObservationOptimizer) fitsWithinSize(codec ocrtypecodec.ExecCodec, obs exectypes.Observation, maxEncodedSize int) bool {
+func (op *ObservationOptimizer) fitsWithinSize(
+	codec ocrtypecodec.ExecCodec,
+	obs exectypes.Observation,
+	maxEncodedSize int,
+) bool {
 	encodedObs, err := codec.EncodeObservation(obs)
 	if err != nil {
 		return false
