@@ -6,7 +6,7 @@ use anchor_spl::token_2022::spl_token_2022::{
 };
 use base_token_pool::{common::*, rate_limiter::*};
 
-declare_id!("TokenPooL11111111111111111111111111BurnMint");
+declare_id!("95ad7W2eqp7k7vrdEtxqyXdLScjmhbjR4zYiuGEY8Gok");
 
 pub mod context;
 use crate::context::*;

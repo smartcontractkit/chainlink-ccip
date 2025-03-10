@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX");
+declare_id!("AkwMmLhvwiPxANuuMmMzy9QTJVv7J5ZBNRsfyi2USMg7");
 
 use program::Mcm;
 
