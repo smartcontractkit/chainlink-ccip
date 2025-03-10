@@ -536,7 +536,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 					return m.Sender
 				}),
 				"nonces", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) uint64 {
-					return uint64(m.Header.Nonce)
+					return m.Header.Nonce
 				}),
 				"sourceChain", commitData.SourceChain,
 				"reportSizeBytes", meta.encodedSizeBytes,
