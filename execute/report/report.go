@@ -35,11 +35,6 @@ func buildSingleChainReportHelper(
 		}
 	}
 
-	if len(readyMessages) == 0 {
-		lggr.Infow("no messages ready for execution", "sourceChain", report.SourceChain)
-		return ccipocr3.ExecutePluginReportSingleChain{}, nil
-	}
-
 	numMsg := len(report.Messages)
 	if len(report.MessageTokenData) != numMsg {
 		return ccipocr3.ExecutePluginReportSingleChain{},
