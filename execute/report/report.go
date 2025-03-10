@@ -525,6 +525,22 @@ func (b *execReportBuilder) buildSingleChainReport(
 				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
+			b.lggr.Infow("messages added to report",
+				"messageIDs", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.Bytes32 {
+					return m.Header.MessageID
+				}),
+				"seqNums", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.SeqNum {
+					return m.Header.SequenceNumber
+				}),
+				"senders", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.UnknownAddress {
+					return m.Sender
+				}),
+				"nonces", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) uint64 {
+					return uint64(m.Header.Nonce)
+				}),
+				"sourceChain", commitData.SourceChain,
+				"reportSizeBytes", meta.encodedSizeBytes,
+				"reportGas", meta.gas)
 			return finalize(finalReport, commitData, meta)
 		}
 	}
