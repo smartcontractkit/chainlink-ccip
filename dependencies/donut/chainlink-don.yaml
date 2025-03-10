@@ -132,7 +132,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
-        version: 2.6.0-preview-1896-0fbbbbd
+        version: 2.6.0-preview-1896-f6cd441
       valuesFiles: []
       values: {}
 hooks:
