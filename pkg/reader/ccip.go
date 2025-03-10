@@ -1297,7 +1297,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	}
 
 	// Use the ConfigPoller to handle caching
-	configs, err := r.configPoller.GetSourceChainConfigs(ctx, r.destChain, chains)
+	configs, err := r.configPoller.GetOfframpSourceChainConfigs(ctx, r.destChain, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chain configs: %w", err)
 	}

@@ -671,7 +671,7 @@ func TestConfigCache_RefreshPeriod(t *testing.T) {
 	}
 }
 
-func TestConfigCache_GetSourceChainConfigs_CacheHit(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_CacheHit(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
@@ -697,7 +697,7 @@ func TestConfigCache_GetSourceChainConfigs_CacheHit(t *testing.T) {
 	).Return(responses, []string{}, nil).Once()
 
 	// First call should fetch
-	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.NoError(t, err)
 	require.Len(t, configs, 2)
 	assert.True(t, configs[chainB].IsEnabled)
@@ -706,7 +706,7 @@ func TestConfigCache_GetSourceChainConfigs_CacheHit(t *testing.T) {
 	assert.Equal(t, cciptypes.UnknownAddress{4, 5, 6}, configs[chainC].OnRamp)
 
 	// Second call within refresh period should hit cache
-	configs2, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs2, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.NoError(t, err)
 	require.Len(t, configs2, 2)
 	assert.Equal(t, configs, configs2)
@@ -715,7 +715,7 @@ func TestConfigCache_GetSourceChainConfigs_CacheHit(t *testing.T) {
 	reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", 1)
 }
 
-func TestConfigCache_GetSourceChainConfigs_CacheMiss(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_CacheMiss(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
@@ -740,7 +740,7 @@ func TestConfigCache_GetSourceChainConfigs_CacheMiss(t *testing.T) {
 	).Return(firstResponse, []string{}, nil).Once()
 
 	// First call should fetch
-	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.NoError(t, err)
 	require.Len(t, configs, 2)
 
@@ -766,7 +766,7 @@ func TestConfigCache_GetSourceChainConfigs_CacheMiss(t *testing.T) {
 	).Return(secondResponse, []string{}, nil).Once()
 
 	// Second call after refresh period should fetch new configs
-	configs2, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs2, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.NoError(t, err)
 	require.Len(t, configs2, 2)
 	assert.NotEqual(t, configs, configs2)
@@ -777,7 +777,7 @@ func TestConfigCache_GetSourceChainConfigs_CacheMiss(t *testing.T) {
 	reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", 2)
 }
 
-func TestConfigCache_GetSourceChainConfigs_MixedSet(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_MixedSet(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
@@ -803,7 +803,7 @@ func TestConfigCache_GetSourceChainConfigs_MixedSet(t *testing.T) {
 	).Return(firstResponse, []string{}, nil).Once()
 
 	// First call should fetch both B and C
-	configs1, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains1)
+	configs1, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains1)
 	require.NoError(t, err)
 	require.Len(t, configs1, 2)
 
@@ -827,7 +827,7 @@ func TestConfigCache_GetSourceChainConfigs_MixedSet(t *testing.T) {
 	).Return(secondResponse, []string{}, nil).Once()
 
 	// Second call should only fetch chain D and use cached value for B
-	configs2, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains2)
+	configs2, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains2)
 	require.NoError(t, err)
 	require.Len(t, configs2, 2)
 
@@ -899,14 +899,14 @@ func TestConfigCache_RefreshSourceChainConfigs(t *testing.T) {
 	assert.Equal(t, cciptypes.UnknownAddress{10, 11, 12}, configs2[chainC].OnRamp)
 
 	// Getting from cache now should give the refreshed values
-	configs3, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs3, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.NoError(t, err)
 	assert.Equal(t, configs2, configs3)
 
 	reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", 2)
 }
 
-func TestConfigCache_GetSourceChainConfigs_Error(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_Error(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
@@ -921,7 +921,7 @@ func TestConfigCache_GetSourceChainConfigs_Error(t *testing.T) {
 	).Return(nil, nil, expectedErr).Once()
 
 	// Should return error on first fetch
-	_, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	_, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
 
@@ -944,7 +944,7 @@ func TestConfigCache_GetSourceChainConfigs_Error(t *testing.T) {
 	).Return(response, []string{}, nil).Once()
 
 	// Second call should succeed
-	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.NoError(t, err)
 	require.Len(t, configs, 2)
 
@@ -959,34 +959,34 @@ func TestConfigCache_GetSourceChainConfigs_Error(t *testing.T) {
 	).Return(nil, nil, expectedErr).Once()
 
 	// Should return error after cache expired
-	_, err = cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	_, err = cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
 
 	reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", 3)
 }
 
-func TestConfigCache_GetSourceChainConfigs_NoReader(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_NoReader(t *testing.T) {
 	cache, _ := setupBasicCache(t)
 	ctx := tests.Context(t)
 
 	// Test with a chain that has no reader
-	_, err := cache.GetSourceChainConfigs(ctx, chainB, []cciptypes.ChainSelector{chainC})
+	_, err := cache.GetOfframpSourceChainConfigs(ctx, chainB, []cciptypes.ChainSelector{chainC})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no contract reader for destination chain")
 }
 
-func TestConfigCache_GetSourceChainConfigs_EmptyChains(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_EmptyChains(t *testing.T) {
 	cache, _ := setupBasicCache(t)
 	ctx := tests.Context(t)
 
 	// Test with empty source chains slice
-	configs, err := cache.GetSourceChainConfigs(ctx, chainA, []cciptypes.ChainSelector{})
+	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, []cciptypes.ChainSelector{})
 	require.NoError(t, err)
 	assert.Empty(t, configs)
 }
 
-func TestConfigCache_GetSourceChainConfigs_SkippedContracts(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_SkippedContracts(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
@@ -1012,14 +1012,14 @@ func TestConfigCache_GetSourceChainConfigs_SkippedContracts(t *testing.T) {
 	).Return(response, skippedContracts, nil).Once()
 
 	// Should succeed even with skipped contracts
-	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 	require.NoError(t, err)
 	require.Len(t, configs, 2)
 	assert.Equal(t, cciptypes.UnknownAddress{1, 2, 3}, configs[chainB].OnRamp)
 	assert.Equal(t, cciptypes.UnknownAddress{4, 5, 6}, configs[chainC].OnRamp)
 }
 
-func TestConfigCache_GetSourceChainConfigs_InvalidResults(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_InvalidResults(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
@@ -1042,7 +1042,7 @@ func TestConfigCache_GetSourceChainConfigs_InvalidResults(t *testing.T) {
 	).Return(response, []string{}, nil).Once()
 
 	// Should return an error since the result type was invalid
-	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 
 	// Expect an error about invalid result type
 	require.Error(t, err)
@@ -1078,7 +1078,7 @@ func TestConfigCache_FetchPartialResults(t *testing.T) {
 	).Return(response, []string{}, nil).Once()
 
 	// Should fail because the number of results doesn't match requested chains
-	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 
 	// Expect an error about mismatch
 	require.Error(t, err)
@@ -1088,7 +1088,7 @@ func TestConfigCache_FetchPartialResults(t *testing.T) {
 	assert.Empty(t, configs)
 }
 
-func TestConfigCache_GetSourceChainConfigs_ErrorHandling(t *testing.T) {
+func TestConfigCache_GetOfframpSourceChainConfigs_ErrorHandling(t *testing.T) {
 	cache, reader := setupBasicCache(t)
 	ctx := tests.Context(t)
 
@@ -1114,7 +1114,7 @@ func TestConfigCache_GetSourceChainConfigs_ErrorHandling(t *testing.T) {
 	).Return(response, []string{}, nil).Once()
 
 	// Should fail with error from the failing chain
-	configs, err := cache.GetSourceChainConfigs(ctx, chainA, sourceChains)
+	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
 
 	// Expect an error related to the failing chain
 	require.Error(t, err)
@@ -1122,4 +1122,171 @@ func TestConfigCache_GetSourceChainConfigs_ErrorHandling(t *testing.T) {
 
 	// Result should be empty due to the error
 	assert.Empty(t, configs)
+}
+
+func TestConfigCache_GlobalSourceChainRefreshTime(t *testing.T) {
+	cache, reader := setupBasicCache(t)
+	ctx := tests.Context(t)
+
+	// First set of chains to request
+	sourceChains1 := []cciptypes.ChainSelector{chainB, chainC}
+
+	// Setup mock response for first fetch
+	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
+	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
+	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
+
+	firstResponse := types.BatchGetLatestValuesResult{
+		types.BoundContract{Name: consts.ContractNameOffRamp}: {
+			*result1, *result2,
+		},
+	}
+
+	reader.On("ExtendedBatchGetLatestValues",
+		mock.Anything,
+		mock.MatchedBy(func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+			batch, ok := req[consts.ContractNameOffRamp]
+			return ok && len(batch) == 2
+		}),
+		false,
+	).Return(firstResponse, []string{}, nil).Once()
+
+	// First call should fetch B and C
+	configs1, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains1)
+	require.NoError(t, err)
+	require.Len(t, configs1, 2)
+
+	// Wait briefly
+	time.Sleep(100 * time.Millisecond)
+
+	// Request for a new chain D - should only fetch D
+	sourceChains2 := []cciptypes.ChainSelector{chainD}
+
+	// Setup mock for D fetch only
+	resultD := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
+	resultD.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{7, 8, 9}}, nil)
+
+	secondResponse := types.BatchGetLatestValuesResult{
+		types.BoundContract{Name: consts.ContractNameOffRamp}: {
+			*resultD,
+		},
+	}
+
+	reader.On("ExtendedBatchGetLatestValues",
+		mock.Anything,
+		mock.MatchedBy(func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+			batch, ok := req[consts.ContractNameOffRamp]
+			return ok && len(batch) == 1
+		}),
+		false,
+	).Return(secondResponse, []string{}, nil).Once()
+
+	// Should only fetch D
+	configs2, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains2)
+	require.NoError(t, err)
+	require.Len(t, configs2, 1)
+	assert.Equal(t, cciptypes.UnknownAddress{7, 8, 9}, configs2[chainD].OnRamp)
+
+	// Instead of waiting for refresh period, directly force the refresh timestamp to be expired
+	chainCache := cache.getOrCreateChainCache(chainA)
+	chainCache.sourceChainMu.Lock()
+	// Set timestamp to be well in the past (expired)
+	chainCache.sourceChainRefresh = time.Now().Add(-2 * time.Second)
+	chainCache.sourceChainMu.Unlock()
+
+	// Request all chains (B, C, D) - all should be refreshed due to explicitly expired global timestamp
+	sourceChains3 := []cciptypes.ChainSelector{chainB, chainC, chainD}
+
+	// Setup mock for full refresh
+	resultB2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
+	resultB2.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{10, 11, 12}}, nil)
+	resultC2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
+	resultC2.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{13, 14, 15}}, nil)
+	resultD2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
+	resultD2.SetResult(&SourceChainConfig{IsEnabled: false, OnRamp: cciptypes.UnknownAddress{16, 17, 18}}, nil)
+
+	thirdResponse := types.BatchGetLatestValuesResult{
+		types.BoundContract{Name: consts.ContractNameOffRamp}: {
+			*resultB2, *resultC2, *resultD2,
+		},
+	}
+
+	reader.On("ExtendedBatchGetLatestValues",
+		mock.Anything,
+		mock.MatchedBy(func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+			batch, ok := req[consts.ContractNameOffRamp]
+			return ok && len(batch) == 3
+		}),
+		false,
+	).Return(thirdResponse, []string{}, nil).Once()
+
+	// Should refresh all chains due to expired global timestamp
+	configs3, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains3)
+	require.NoError(t, err)
+	require.Len(t, configs3, 3)
+
+	// Verify all configs have been refreshed with the new data
+	assert.Equal(t, cciptypes.UnknownAddress{10, 11, 12}, configs3[chainB].OnRamp)
+	assert.Equal(t, cciptypes.UnknownAddress{13, 14, 15}, configs3[chainC].OnRamp)
+	assert.Equal(t, cciptypes.UnknownAddress{16, 17, 18}, configs3[chainD].OnRamp)
+	assert.False(t, configs3[chainB].IsEnabled)
+	assert.False(t, configs3[chainC].IsEnabled)
+	assert.False(t, configs3[chainD].IsEnabled)
+
+	// Verify the calls were made as expected
+	reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", 3)
+}
+
+func TestConfigCache_GetOrCreateChainCache_InitializesSourceChainConfig(t *testing.T) {
+	cache, _ := setupBasicCache(t)
+
+	// Get a cache entry
+	chainCache := cache.getOrCreateChainCache(chainA)
+	require.NotNil(t, chainCache)
+
+	// Verify the sourceChainConfigs map is initialized
+	require.NotNil(t, chainCache.sourceChainConfigs)
+	assert.Len(t, chainCache.sourceChainConfigs, 0)
+
+	// Verify the initial refresh time is zero
+	assert.True(t, chainCache.sourceChainRefresh.IsZero())
+}
+
+func TestConfigCache_RefreshSourceChainConfigs_SetsGlobalTimestamp(t *testing.T) {
+	cache, reader := setupBasicCache(t)
+	ctx := tests.Context(t)
+
+	sourceChains := []cciptypes.ChainSelector{chainB}
+
+	// Setup mock response
+	result := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
+	result.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
+
+	response := types.BatchGetLatestValuesResult{
+		types.BoundContract{Name: consts.ContractNameOffRamp}: {
+			*result,
+		},
+	}
+
+	reader.On("ExtendedBatchGetLatestValues",
+		mock.Anything,
+		mock.Anything,
+		false,
+	).Return(response, []string{}, nil).Once()
+
+	// Before refresh, get the chainCache
+	chainCache := cache.getOrCreateChainCache(chainA)
+	initialRefreshTime := chainCache.sourceChainRefresh
+	assert.True(t, initialRefreshTime.IsZero())
+
+	// Refresh the source chain configs
+	configs, err := cache.RefreshSourceChainConfigs(ctx, chainA, sourceChains)
+	require.NoError(t, err)
+	require.Len(t, configs, 1)
+
+	// Verify the global timestamp was updated
+	updatedRefreshTime := chainCache.sourceChainRefresh
+	assert.False(t, updatedRefreshTime.IsZero())
+	assert.True(t, updatedRefreshTime.After(initialRefreshTime))
 }

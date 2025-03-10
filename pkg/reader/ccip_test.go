@@ -489,7 +489,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
 	mockCache.On("GetChainConfig", mock.Anything, sourceChain[1]).Return(
 		ChainConfigSnapshot{}, contractreader.ErrNoBindings).Maybe()
-	mockCache.On("GetSourceChainConfigs", mock.Anything, destChain, sourceChain[:]).Return(sourceChainConfigs, nil).Once()
+	mockCache.On(
+		"GetOfframpSourceChainConfigs",
+		mock.Anything,
+		destChain,
+		sourceChain[:]).Return(sourceChainConfigs, nil).Once()
 
 	castToExtended := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for sel, v := range mockReaders {
@@ -592,7 +596,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	}
 	// Set up destination chain expectation
 	mockCache.On("GetChainConfig", mock.Anything, destChain).Return(destChainConfig, nil).Once()
-	mockCache.On("GetSourceChainConfigs", mock.Anything, destChain, sourceChain[:]).Return(sourceChainConfigs, nil).Once()
+	mockCache.On(
+		"GetOfframpSourceChainConfigs",
+		mock.Anything,
+		destChain,
+		sourceChain[:]).Return(sourceChainConfigs, nil).Once()
 
 	// Set up source chain expectations with proper OnRamp configs
 	for i, chain := range sourceChain {
@@ -653,7 +661,7 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 	// Setup mock cache to return an error
 	destExtended := reader_mocks.NewMockExtended(t)
 	getLatestValueErr := errors.New("some error")
-	mockCache.On("GetSourceChainConfigs", mock.Anything, destChain,
+	mockCache.On("GetOfframpSourceChainConfigs", mock.Anything, destChain,
 		[]cciptypes.ChainSelector{sourceChain1, sourceChain2}).
 		Return(map[cciptypes.ChainSelector]SourceChainConfig{}, getLatestValueErr).Once()
 
@@ -1333,7 +1341,7 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 	}
 
 	// Setup dest chain batch get values expectation
-	mockCache.On("GetSourceChainConfigs", mock.Anything, destChain, sourceChains).
+	mockCache.On("GetOfframpSourceChainConfigs", mock.Anything, destChain, sourceChains).
 		Run(func(args mock.Arguments) {
 			time.Sleep(100 * time.Millisecond) // Simulate network delay
 		}).
@@ -1675,7 +1683,7 @@ func (m *mockConfigCache) RefreshChainConfig(
 	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
 }
 
-func (m *mockConfigCache) GetSourceChainConfigs(
+func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
