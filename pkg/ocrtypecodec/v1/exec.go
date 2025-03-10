@@ -25,23 +25,16 @@ type ExecCodec interface {
 }
 
 type ExecCodecProto struct {
-	encodeObsMu     sync.Mutex
-	decodeObsMu     sync.Mutex
-	encodeOutcomeMu sync.Mutex
-	decodeOutcomeMu sync.Mutex
-	tr              *protoTranslator
+	tr *protoTranslator
 }
 
 func NewExecCodecProto() *ExecCodecProto {
 	return &ExecCodecProto{
-		encodeObsMu: sync.Mutex{},
-		decodeObsMu: sync.Mutex{},
-		tr:          newProtoTranslator(),
+		tr: newProtoTranslator(),
 	}
 }
 
 func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([]byte, error) {
-	e.encodeObsMu.Lock()
 	pbObs := &ocrtypecodecpb.ExecObservation{
 		CommitReports: e.tr.commitReportsToProto(observation.CommitReports),
 		SeqNumsToMsgs: e.tr.messageObservationsToProto(observation.Messages),
@@ -59,8 +52,6 @@ func (e *ExecCodecProto) EncodeObservation(observation exectypes.Observation) ([
 		FChain: e.tr.fChainToProto(observation.FChain),
 	}
 	encoded, err := proto.Marshal(pbObs)
-	e.encodeObsMu.Unlock()
-
 	return encoded, err
 }
 
@@ -70,7 +61,6 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 	}
 
 	pbObs := &ocrtypecodecpb.ExecObservation{}
-	e.decodeObsMu.Lock()
 	if err := proto.Unmarshal(data, pbObs); err != nil {
 		return exectypes.Observation{}, fmt.Errorf("proto unmarshal ExecObservation: %w", err)
 	}
@@ -86,15 +76,12 @@ func (e *ExecCodecProto) DecodeObservation(data []byte) (exectypes.Observation, 
 		},
 		FChain: e.tr.fChainFromProto(pbObs.FChain),
 	}
-	e.decodeObsMu.Unlock()
-
 	return decoded, nil
 }
 
 func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error) {
 	outcome = exectypes.NewSortedOutcome(outcome.State, outcome.CommitReports, outcome.Report)
 
-	e.encodeOutcomeMu.Lock()
 	pbObs := &ocrtypecodecpb.ExecOutcome{
 		PluginState:   string(outcome.State),
 		CommitReports: e.tr.commitDataSliceToProto(outcome.CommitReports),
@@ -103,7 +90,6 @@ func (e *ExecCodecProto) EncodeOutcome(outcome exectypes.Outcome) ([]byte, error
 		},
 	}
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(pbObs)
-	e.encodeOutcomeMu.Unlock()
 
 	return encoded, err
 }
@@ -113,7 +99,6 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 		return exectypes.Outcome{}, nil
 	}
 
-	e.decodeOutcomeMu.Lock()
 	pbOutc := &ocrtypecodecpb.ExecOutcome{}
 	if err := proto.Unmarshal(data, pbOutc); err != nil {
 		return exectypes.Outcome{}, fmt.Errorf("proto unmarshal ExecOutcome: %w", err)
@@ -126,7 +111,6 @@ func (e *ExecCodecProto) DecodeOutcome(data []byte) (exectypes.Outcome, error) {
 			ChainReports: e.tr.chainReportsFromProto(pbOutc.ExecutePluginReport.ChainReports),
 		},
 	}
-	e.decodeOutcomeMu.Unlock()
 	return outc, nil
 }
 
