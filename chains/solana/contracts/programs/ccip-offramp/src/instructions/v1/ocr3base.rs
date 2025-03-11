@@ -4,8 +4,8 @@ use anchor_lang::solana_program::{keccak, secp256k1_recover::*};
 
 use crate::ocr3base::{ConfigSet, Transmitted, MAX_ORACLES};
 use crate::state::{Ocr3Config, Ocr3ConfigInfo};
-use crate::OcrPluginType;
 use crate::CcipOfframpError;
+use crate::OcrPluginType;
 
 pub const MAX_SIGNERS: usize = MAX_ORACLES;
 pub const MAX_TRANSMITTERS: usize = MAX_ORACLES;
