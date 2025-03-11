@@ -507,7 +507,9 @@ export type CcipOfframp = {
       "args": [
         {
           "name": "pluginType",
-          "type": "u8"
+          "type": {
+            "defined": "OcrPluginType"
+          }
         },
         {
           "name": "configInfo",
@@ -1391,6 +1393,22 @@ export type CcipOfframp = {
       }
     },
     {
+      "name": "ConfigOcrPluginType",
+      "docs": [
+        "It's not possible to store enums in zero_copy accounts, so we wrap the discriminant",
+        "in a struct to store in config."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discriminant",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "ExecutionReportSingleChain",
       "docs": [
         "Report that is submitted by the execution DON at the execution phase. (including chain selector data)"
@@ -1616,7 +1634,9 @@ export type CcipOfframp = {
         "fields": [
           {
             "name": "pluginType",
-            "type": "u8"
+            "type": {
+              "defined": "ConfigOcrPluginType"
+            }
           },
           {
             "name": "configInfo",
@@ -1954,7 +1974,9 @@ export type CcipOfframp = {
       "fields": [
         {
           "name": "ocrPluginType",
-          "type": "u8",
+          "type": {
+            "defined": "OcrPluginType"
+          },
           "index": false
         },
         {
@@ -1998,7 +2020,9 @@ export type CcipOfframp = {
       "fields": [
         {
           "name": "ocrPluginType",
-          "type": "u8",
+          "type": {
+            "defined": "OcrPluginType"
+          },
           "index": false
         },
         {
@@ -2807,7 +2831,9 @@ export const IDL: CcipOfframp = {
       "args": [
         {
           "name": "pluginType",
-          "type": "u8"
+          "type": {
+            "defined": "OcrPluginType"
+          }
         },
         {
           "name": "configInfo",
@@ -3691,6 +3717,22 @@ export const IDL: CcipOfframp = {
       }
     },
     {
+      "name": "ConfigOcrPluginType",
+      "docs": [
+        "It's not possible to store enums in zero_copy accounts, so we wrap the discriminant",
+        "in a struct to store in config."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discriminant",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "ExecutionReportSingleChain",
       "docs": [
         "Report that is submitted by the execution DON at the execution phase. (including chain selector data)"
@@ -3916,7 +3958,9 @@ export const IDL: CcipOfframp = {
         "fields": [
           {
             "name": "pluginType",
-            "type": "u8"
+            "type": {
+              "defined": "ConfigOcrPluginType"
+            }
           },
           {
             "name": "configInfo",
@@ -4254,7 +4298,9 @@ export const IDL: CcipOfframp = {
       "fields": [
         {
           "name": "ocrPluginType",
-          "type": "u8",
+          "type": {
+            "defined": "OcrPluginType"
+          },
           "index": false
         },
         {
@@ -4298,7 +4344,9 @@ export const IDL: CcipOfframp = {
       "fields": [
         {
           "name": "ocrPluginType",
-          "type": "u8",
+          "type": {
+            "defined": "OcrPluginType"
+          },
           "index": false
         },
         {
