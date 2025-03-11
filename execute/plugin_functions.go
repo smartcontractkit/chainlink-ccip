@@ -538,7 +538,7 @@ func initResultsAndValidators(
 			messageTokenID := reader.NewMessageTokenID(seqNr, tokenIndex)
 			if _, ok := validators[selector][messageTokenID]; !ok {
 				validators[selector][messageTokenID] =
-					consensus.NewOracleMinObservation[exectypes.TokenData](consensus.TwoFPlus1(f), exectypes.TokenDataHash)
+					consensus.NewOracleMinObservation(consensus.TwoFPlus1(f), exectypes.TokenDataHash)
 			}
 			validators[selector][messageTokenID].Add(tokenData, oracleID)
 		}

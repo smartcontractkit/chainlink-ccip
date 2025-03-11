@@ -17,7 +17,6 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -246,10 +245,10 @@ func (p *Plugin) getCommitReportsObservation(
 
 // buildCombinedReports creates a combined map for updating the earliest unexecuted root
 func buildCombinedReports(
-	groupedCommits map[ccipocr3.ChainSelector][]exectypes.CommitData,
+	groupedCommits map[cciptypes.ChainSelector][]exectypes.CommitData,
 	fullyExecutedUnfinalized []exectypes.CommitData,
-) map[ccipocr3.ChainSelector][]exectypes.CommitData {
-	combinedReports := make(map[ccipocr3.ChainSelector][]exectypes.CommitData)
+) map[cciptypes.ChainSelector][]exectypes.CommitData {
+	combinedReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 
 	// Add all unexecuted commits
 	for chain, commits := range groupedCommits {
