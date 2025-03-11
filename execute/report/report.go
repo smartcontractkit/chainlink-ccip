@@ -407,8 +407,8 @@ func verifyReportNonceContinuity(
 			// we've seen this sender before and the msg.Header.Nonce is not the expected value,
 			// it should be latestNonce + 1.
 			return fmt.Errorf(
-				"skipped nonce detected for sender %s: nonce in report %d != last nonce seen %d",
-				sender, msg.Header.Nonce, latestNonce)
+				"skipped nonce detected for sender %s (source chain %d): nonce in report %d != last nonce seen %d",
+				sender, msg.Header.SourceChainSelector, msg.Header.Nonce, latestNonce)
 		}
 
 		// otherwise, the nonce is as expected, continue to the next message.
@@ -426,7 +426,9 @@ func (b *execReportBuilder) verifyReport(
 ) (bool, validationMetadata, error) {
 	err := verifyReportNonceContinuity(b.addressCodec, execReport)
 	if err != nil {
-		b.lggr.Infow("invalid report, skipped nonce detected", "err", err)
+		b.lggr.Infow("invalid report, skipped nonce detected",
+			"err", err,
+			"sourceChain", execReport.SourceChainSelector)
 		return false, validationMetadata{}, nil
 	}
 

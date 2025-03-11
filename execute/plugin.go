@@ -498,7 +498,7 @@ func (p *Plugin) Reports(
 	}
 
 	reportInfo := extractReportInfo(decodedOutcome)
-	p.lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
+	lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
 	encodedInfo, err := reportInfo.Encode()
 	if err != nil {
 		return nil, err
