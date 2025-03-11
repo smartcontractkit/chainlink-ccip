@@ -197,36 +197,32 @@ func (p *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 
 // shouldSkipRMNVerification checks whether RMN verification should be skipped based on the current state and query.
 func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Outcome) (bool, error) {
-	// Skip verification if RMN signatures are not expected in the current state.
-	if nextState != buildingReport && q.RMNSignatures == nil {
-		return true, nil
-	}
+	emptySigs := !q.ContainsRmnSignatures()
 
-	// Skip verification if we are retrying RMN signatures in the next round.
-	if nextState == buildingReport && q.RetryRMNSignatures {
-		if q.RMNSignatures != nil {
+	switch nextState {
+	case buildingReport:
+		if q.RetryRMNSignatures {
+			if emptySigs {
+				return true, nil
+			}
 			return false, fmt.Errorf("RMN signatures are provided but not expected if retrying is set to true")
 		}
-		return true, nil
-	}
 
-	// If in the BuildingReport state and RMN signatures are required but not provided, return an error.
-	if nextState == buildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
-		return false, ErrSignaturesNotProvidedByLeader
-	}
+		if prevOutcome.RMNRemoteCfg.IsEmpty() {
+			return false, fmt.Errorf("RMN report config is not provided from the previous outcome")
+		}
 
-	// If in the BuildingReport state but RMN remote config is not available, return an error.
-	if nextState == buildingReport && prevOutcome.RMNRemoteCfg.IsEmpty() {
-		return false, fmt.Errorf("RMN report config is not provided from the previous outcome")
-	}
+		// we don't want to check for empty sigs since at this point we don't know which chains are RMN-disabled.
+		// if signatures are missing for specific chains they will be caught in the outcome phase.
 
-	// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
-	if nextState != buildingReport && q.RMNSignatures != nil {
+		return false, nil
+	default:
+		if emptySigs {
+			return true, nil // Sigs not expected
+		}
+		// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
 		return false, fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
 	}
-
-	// Proceed with RMN verification.
-	return false, nil
 }
 
 func (p *Processor) getObservation(
@@ -501,7 +497,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
+	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
@@ -559,14 +555,16 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 
 	mu := &sync.Mutex{}
 	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
-	eg := &errgroup.Group{}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(len(sourceChains))
 	for _, sourceChain := range sourceChains {
-		eg.Go(func() error {
+		go func() {
+			defer wg.Done()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
 			if err != nil {
 				lggr.Errorf("failed to get latest msg seq num for source chain %d: %s", sourceChain, err)
-				return nil
+				return
 			}
 
 			mu.Lock()
@@ -575,15 +573,9 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 				plugintypes.NewSeqNumChain(sourceChain, latestOnRampSeqNum),
 			)
 			mu.Unlock()
-
-			return nil
-		})
+		}()
 	}
-
-	if err := eg.Wait(); err != nil {
-		lggr.Warnw("call to GetExpectedNextSequenceNumber failed", "err", err)
-		return nil
-	}
+	wg.Wait()
 
 	sort.Slice(latestOnRampSeqNums, func(i, j int) bool {
 		return latestOnRampSeqNums[i].ChainSel < latestOnRampSeqNums[j].ChainSel
@@ -703,7 +695,7 @@ func (o observerImpl) computeMerkleRoot(
 
 			msgHash, err := o.msgHasher.Hash(ctx, msg)
 			if err != nil {
-				lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+				lggr.Warnw("failed to hash message", "message", msg, "err", err)
 				return fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
 			}
 

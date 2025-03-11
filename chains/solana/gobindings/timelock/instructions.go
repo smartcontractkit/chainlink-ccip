@@ -141,13 +141,26 @@ var (
 	// - `id`: The operation identifier (precalculated).
 	Instruction_Cancel = ag_binary.TypeID([8]byte{232, 219, 223, 41, 219, 236, 220, 190})
 
-	// Execute a scheduled batch of instructions.
+	// Executes a scheduled batch of operations after validating readiness and predecessor dependencies.
+	//
+	// This function:
+	// 1. Verifies the operation is ready for execution (delay period has passed)
+	// 2. Validates that any predecessor operation has been completed
+	// 3. Executes each instruction in the operation using the timelock signer PDA
+	// 4. Emits events for each executed instruction
 	//
 	// # Parameters
 	//
-	// - `ctx`: The context containing the accounts required for execution.
-	// - `timelock_id`: The timelock identifier.
-	// - `id`: The operation identifier.
+	// - `ctx`: Context containing operation accounts and signer information
+	// - `timelock_id`: Identifier for the timelock instance
+	// - `_id`: Operation ID (used for PDA derivation)
+	//
+	// # Security Considerations
+	//
+	// This instruction uses PDA signing to create a trusted execution environment.
+	// The timelock's signer PDA will replace any account marked as a signer in the
+	// original instructions, providing the necessary privileges while maintaining
+	// security through program derivation.
 	Instruction_ExecuteBatch = ag_binary.TypeID([8]byte{112, 159, 211, 51, 238, 70, 212, 60})
 
 	// Initialize a bypasser operation.
@@ -207,13 +220,25 @@ var (
 	// - `_id`: The operation identifier.
 	Instruction_ClearBypasserOperation = ag_binary.TypeID([8]byte{200, 21, 249, 130, 56, 13, 128, 32})
 
-	// Execute a bypasser operation immediately.
+	// Execute operations immediately using the bypasser flow, bypassing time delays
+	// and predecessor checks.
+	//
+	// This function provides an emergency execution mechanism that:
+	// 1. Skips the timelock waiting period required for standard operations
+	// 2. Does not enforce predecessor dependencies
+	// 3. Closes the operation account after execution
+	//
+	// # Emergency Use Only
+	//
+	// The bypasser flow is intended strictly for emergency situations where
+	// waiting for the standard timelock delay would cause harm. Access to this
+	// function is tightly controlled through the Bypasser role.
 	//
 	// # Parameters
 	//
-	// - `ctx`: The context containing the bypasser execution account.
-	// - `timelock_id`: The timelock identifier.
-	// - `id`: The operation identifier.
+	// - `ctx`: Context containing operation accounts and signer information
+	// - `timelock_id`: Identifier for the timelock instance
+	// - `_id`: Operation ID (used for PDA derivation)
 	Instruction_BypasserExecuteBatch = ag_binary.TypeID([8]byte{90, 62, 66, 6, 227, 174, 30, 194})
 
 	// Update the minimum delay required for scheduled operations.
@@ -249,7 +274,7 @@ var (
 	// - `selector`: The function selector to unblock.
 	Instruction_UnblockFunctionSelector = ag_binary.TypeID([8]byte{53, 84, 245, 196, 149, 52, 30, 57})
 
-	// Propose a new owner for the timelock.
+	// Propose a new owner for the timelock instance config.
 	//
 	// Only the current owner (admin) can propose a new owner.
 	//
@@ -260,7 +285,7 @@ var (
 	// - `proposed_owner`: The public key of the proposed new owner.
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
-	// Accept ownership of the timelock.
+	// Accept ownership of the timelock config.
 	//
 	// The proposed new owner must call this function to assume ownership.
 	//

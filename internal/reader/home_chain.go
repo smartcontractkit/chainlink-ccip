@@ -103,6 +103,9 @@ func (r *homeChainPoller) poll() {
 	if err := r.fetchAndSetConfigs(ctx); err != nil {
 		// Just log, don't return error as we want to keep polling
 		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
+		r.failedPolls.Add(1)
+	} else {
+		r.failedPolls.Store(0)
 	}
 
 	ticker := time.NewTicker(r.pollingDuration)

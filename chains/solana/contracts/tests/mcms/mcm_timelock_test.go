@@ -552,10 +552,10 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					signatures, bulkSignErr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, bulkSignErr)
-					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 					t.Run("mcm:preload signatures", func(t *testing.T) {
-						preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+						preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 						require.NoError(t, plerr)
 
 						for _, ix := range preloadIxs {
@@ -592,8 +592,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						).ValidateAndBuild()
 						require.NoError(t, setRootIxErr)
 
-						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment)
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 						require.NotNil(t, tx)
 
 						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -740,8 +739,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						vIx, vErr := ix.ValidateAndBuild()
 						require.NoError(t, vErr)
 
-						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 						require.NotNil(t, tx)
 
 						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -974,7 +972,7 @@ func TestMcmWithTimelock(t *testing.T) {
 			////////////////////////////////////////////////
 			// mcm::set_root - with preloading signatures //
 			////////////////////////////////////////////////
-			preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+			preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 			require.NoError(t, plerr)
 
 			for _, ix := range preloadIxs {
@@ -982,7 +980,7 @@ func TestMcmWithTimelock(t *testing.T) {
 			}
 
 			var sigAccount mcm.RootSignatures
-			queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), config.DefaultCommitment, &sigAccount)
+			queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey()), config.DefaultCommitment, &sigAccount)
 			require.NoError(t, queryErr, "failed to get account info")
 
 			require.Equal(t, true, sigAccount.IsFinalized)
@@ -1001,7 +999,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				validUntil,
 				rootValidationData.Metadata,
 				rootValidationData.MetadataProof,
-				proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil),
+				proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey()),
 				proposerMsig.RootMetadataPDA,
 				mcms.GetSeenSignedHashesPDA(proposerMsig.PaddedID, rootValidationData.Root, validUntil),
 				proposerMsig.ExpiringRootAndOpCountPDA,
@@ -1011,8 +1009,7 @@ func TestMcmWithTimelock(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, setRootIxErr)
 
-			cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment)
-			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
+			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 			require.NotNil(t, tx)
 
 			parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -1152,9 +1149,9 @@ func TestMcmWithTimelock(t *testing.T) {
 				signatures, serr := mcms.BulkSignOnMsgHash(canceller.Signers, rootValidationData.EthMsgHash)
 				require.NoError(t, serr)
 
-				signaturesPDA := canceller.RootSignaturesPDA(rootValidationData.Root, validUntil)
+				signaturesPDA := canceller.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
-				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, canceller.PaddedID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, canceller.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 
 				for _, ix := range preloadIxs {
@@ -1309,10 +1306,10 @@ func TestMcmWithTimelock(t *testing.T) {
 				signatures, serr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 				require.NoError(t, serr)
 
-				signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+				signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 				// preload signatures
-				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -1771,7 +1768,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					signatures, sigerr := mcms.BulkSignOnMsgHash(executorMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, sigerr)
 
-					signaturesPDA := executorMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+					signaturesPDA := executorMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 					// preload signatures
 					preloadIxs, prerr := mcms.GetMcmPreloadSignaturesIxs(
@@ -1779,7 +1776,6 @@ func TestMcmWithTimelock(t *testing.T) {
 						executorMsig.PaddedID,
 						rootValidationData.Root,
 						validUntil,
-						signaturesPDA,
 						admin.PublicKey(),
 						config.MaxAppendSignatureBatchSize,
 					)
@@ -1836,8 +1832,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					if tc.expectError {
 						testutils.SendAndFailWithRPCError(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"solana_sdk::transaction::versioned::VersionedTransaction too large"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
-						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
 						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
 							[]common.EventMapping{
@@ -2116,7 +2111,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					signatures, serr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, serr)
 
-					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 					// preload signatures
 					preloadIxs, prerr := mcms.GetMcmPreloadSignaturesIxs(
@@ -2124,7 +2119,6 @@ func TestMcmWithTimelock(t *testing.T) {
 						proposerMsig.PaddedID,
 						rootValidationData.Root,
 						validUntil,
-						signaturesPDA,
 						admin.PublicKey(),
 						config.MaxAppendSignatureBatchSize,
 					)
@@ -2203,9 +2197,9 @@ func TestMcmWithTimelock(t *testing.T) {
 					tcResult.timelockTxSize = measureInstructionSize(tivIx)
 
 					if tc.expectError {
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
-						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tivIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 
 						// verify recipients final balances,
 						// note: we can't verify the exact amount of treasury balance(tests in parallel execution)
@@ -2326,10 +2320,10 @@ func TestMcmWithTimelock(t *testing.T) {
 					signatures, serr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, serr)
 
-					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
+					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil, admin.PublicKey())
 
 					// preload signatures
-					preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+					preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 					require.NoError(t, plerr)
 					for _, ix := range preloadIxs {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -2454,7 +2448,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					require.NoError(t, vErr)
 
 					if tc.expectError {
-						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"})
+						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, []string{"Program log: Error: memory allocation failed, out of memory"}, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 					} else {
 						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
 

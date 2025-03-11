@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -34,7 +34,8 @@ func validateCommitReportsReadingEligibility(
 		}
 		for _, data := range observedData[chainSel] {
 			if data.SourceChain != chainSel {
-				return fmt.Errorf("observer not allowed to read from chain %d", data.SourceChain)
+				return fmt.Errorf("invalid observed data, key=%d but data chain=%d",
+					chainSel, data.SourceChain)
 			}
 		}
 	}
@@ -90,24 +91,6 @@ func validateTokenDataObservations(
 	return nil
 }
 
-// validateCostlyMessagesObservations validates that all costly messages belong to already observed messages
-func validateCostlyMessagesObservations(
-	observedMsgs exectypes.MessageObservations,
-	costlyMessages []cciptypes.Bytes32,
-) error {
-	msgs := observedMsgs.Flatten()
-	msgsIDMap := make(map[cciptypes.Bytes32]struct{})
-	for _, msg := range msgs {
-		msgsIDMap[msg.Header.MessageID] = struct{}{}
-	}
-	for _, id := range costlyMessages {
-		if _, ok := msgsIDMap[id]; !ok {
-			return fmt.Errorf("costly message %s not found in observed messages", id)
-		}
-	}
-	return nil
-}
-
 // validateHashesExist checks if the hashes exist for all the messages in the observation.
 func validateHashesExist(
 	observedMsgs exectypes.MessageObservations,
@@ -119,14 +102,23 @@ func validateHashesExist(
 	}
 
 	for chain, msgs := range observedMsgs {
-		_, ok := hashes[chain]
+		hashesForChain, ok := hashes[chain]
 		if !ok {
 			return fmt.Errorf("hash not found for chain %d", chain)
 		}
 
+		if len(msgs) != len(hashesForChain) {
+			return fmt.Errorf("unexpected number of message hashes for chain %d: expected %d, got %d",
+				chain, len(msgs), len(hashesForChain))
+		}
+
 		for seq, msg := range msgs {
-			if _, ok := hashes[chain][seq]; !ok {
+			h, exists := hashes[chain][seq]
+			if !exists {
 				return fmt.Errorf("hash not found for message %s", msg)
+			}
+			if h.IsEmpty() {
+				return fmt.Errorf("hash is empty for message %s", msg)
 			}
 		}
 	}
@@ -141,6 +133,11 @@ func validateMessagesConformToCommitReports(
 	observedData exectypes.CommitObservations,
 	observedMsgs exectypes.MessageObservations,
 ) error {
+	if len(observedData) != len(observedMsgs) {
+		return fmt.Errorf("count of observed data=%d and observed msgs=%d do not match",
+			len(observedData), len(observedMsgs))
+	}
+
 	msgsCount := 0
 	for chain, report := range observedData {
 		for _, data := range report {
@@ -172,9 +169,14 @@ func validateMessagesConformToCommitReports(
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain
 // and that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedData map[cciptypes.ChainSelector][]exectypes.CommitData,
 ) error {
-	for _, commitData := range observedData {
+	for chainSel, commitData := range observedData {
+		if !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observed a non-supported chain %d", chainSel)
+		}
+
 		// observed commitData must not contain duplicates
 
 		observedMerkleRoots := mapset.NewSet[string]()
@@ -288,16 +290,13 @@ func groupByChainSelector(
 // The provided reports must be sorted by sequence number range starting sequence number.
 func combineReportsAndMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum,
-) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData) {
+) (pending []exectypes.CommitData, fullyExecuted []exectypes.CommitData) {
 	if len(executedMessages) == 0 {
 		return reports, nil
 	}
 
 	// filtered contains the reports with fully executed messages removed
 	// and the executed messages appended to the report sorted by sequence number.
-	var pending []exectypes.CommitData
-	var fullyExecuted []exectypes.CommitData
-
 	for i, report := range reports {
 		reportRange := report.SequenceNumberRange
 
@@ -342,7 +341,7 @@ func mergeMessageObservations(
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]consensus.OracleMinObservation[cciptypes.Message])
 	for selector, f := range fChain {
-		validators[selector] = consensus.NewOracleMinObservation[cciptypes.Message](consensus.FPlus1(f), nil)
+		validators[selector] = consensus.NewOracleMinObservation[cciptypes.Message](consensus.TwoFPlus1(f), nil)
 	}
 
 	// Add messages to the validator for each chain selector.
@@ -389,7 +388,7 @@ func mergeCommitObservations(
 	validators := make(map[cciptypes.ChainSelector]consensus.OracleMinObservation[exectypes.CommitData])
 	for selector, f := range fChain {
 		validators[selector] =
-			consensus.NewOracleMinObservation[exectypes.CommitData](consensus.FPlus1(f), nil)
+			consensus.NewOracleMinObservation[exectypes.CommitData](consensus.TwoFPlus1(f), nil)
 	}
 
 	// Add reports to the validator for each chain selector.
@@ -449,7 +448,7 @@ func mergeMessageHashes(
 			for seqNr, hash := range seqMap {
 				if _, ok := validators[selector][seqNr]; !ok {
 					validators[selector][seqNr] =
-						consensus.NewOracleMinObservation[cciptypes.Bytes32](consensus.FPlus1(f), nil)
+						consensus.NewOracleMinObservation[cciptypes.Bytes32](consensus.TwoFPlus1(f), nil)
 				}
 				validators[selector][seqNr].Add(hash, ao.OracleID)
 			}
@@ -539,7 +538,7 @@ func initResultsAndValidators(
 			messageTokenID := reader.NewMessageTokenID(seqNr, tokenIndex)
 			if _, ok := validators[selector][messageTokenID]; !ok {
 				validators[selector][messageTokenID] =
-					consensus.NewOracleMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
+					consensus.NewOracleMinObservation(consensus.TwoFPlus1(f), exectypes.TokenDataHash)
 			}
 			validators[selector][messageTokenID].Add(tokenData, oracleID)
 		}
@@ -560,7 +559,7 @@ func mergeNonceObservations(
 	}
 
 	// Create one validator because nonces are only observed from the destination chain.
-	validator := consensus.NewOracleMinObservation[NonceTriplet](consensus.FPlus1(fChainDest), nil)
+	validator := consensus.NewOracleMinObservation[NonceTriplet](consensus.TwoFPlus1(fChainDest), nil)
 
 	// Add reports to the validator for each chain selector.
 	for _, ao := range daos {
@@ -594,30 +593,6 @@ func mergeNonceObservations(
 	}
 
 	return results
-}
-
-// mergeCostlyMessages merges all costly message observations. A message is considered costly if it is observed by more
-// than `fChainDest` observers.
-func mergeCostlyMessages(
-	aos []plugincommon.AttributedObservation[exectypes.Observation],
-	fChainDest int,
-) []cciptypes.Bytes32 {
-	costlyMessages := mapset.NewSet[cciptypes.Bytes32]()
-	counts := make(map[cciptypes.Bytes32]int)
-	for _, ao := range aos {
-		for _, costlyMessage := range ao.Observation.CostlyMessages {
-			counts[costlyMessage]++
-			if consensus.GteFPlusOne(fChainDest, counts[costlyMessage]) {
-				costlyMessages.Add(costlyMessage)
-			}
-		}
-	}
-
-	if costlyMessages.Cardinality() == 0 {
-		return nil
-	}
-
-	return costlyMessages.ToSlice()
 }
 
 // getConsensusObservation merges all attributed observations into a single observation based on which values have
@@ -661,9 +636,6 @@ func getConsensusObservation(
 	mergedHashes := mergeMessageHashes(lggr, aos, fChain)
 	lggr.Debugw("merged message hashes", "mergedHashes", mergedHashes)
 
-	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])
-	lggr.Debugw("merged costly messages", "mergedCostlyMessages", mergedCostlyMessages)
-
 	mergedNonceObservations :=
 		mergeNonceObservations(aos, fChain[destChainSelector])
 	lggr.Debugw("merged nonce observations", "mergedNonceObservations", mergedNonceObservations)
@@ -671,7 +643,6 @@ func getConsensusObservation(
 	observation := exectypes.NewObservation(
 		mergedCommitObservations,
 		mergedMessageObservations,
-		mergedCostlyMessages,
 		mergedTokenObservations,
 		mergedNonceObservations,
 		dt.Observation{},

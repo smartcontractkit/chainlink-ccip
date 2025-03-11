@@ -41,6 +41,11 @@
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "offrampLookupTable",
           "isMut": false,
           "isSigner": false
@@ -227,9 +232,59 @@
       ]
     },
     {
+      "name": "updateReferenceAddresses",
+      "docs": [
+        "Updates reference addresses in the offramp contract, such as",
+        "the CCIP router, Fee Quoter, and the Offramp Lookup Table.",
+        "Only the Admin may update these addresses.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the reference addresses.",
+        "* `router` - The router address to be set.",
+        "* `fee_quoter` - The fee_quoter address to be set.",
+        "* `offramp_lookup_table` - The offramp_lookup_table address to be set.",
+        "* `rmn_remote` - The rmn_remote address to be set."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "referenceAddresses",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "feeQuoter",
+          "type": "publicKey"
+        },
+        {
+          "name": "offrampLookupTable",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "addSourceChain",
       "docs": [
-        "Config //",
         "Adds a new source chain selector with its config to the offramp.",
         "",
         "The Admin needs to add any new chain supported.",
@@ -567,6 +622,21 @@
           "name": "feeQuoterConfig",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -689,6 +759,21 @@
         },
         {
           "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
         }
@@ -830,6 +915,21 @@
           "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -930,6 +1030,21 @@
         },
         {
           "name": "tokenPoolsSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
         }
@@ -1036,6 +1151,10 @@
           },
           {
             "name": "offrampLookupTable",
+            "type": "publicKey"
+          },
+          {
+            "name": "rmnRemote",
             "type": "publicKey"
           }
         ]
@@ -1314,15 +1433,6 @@
             }
           },
           {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
             "name": "proofs",
             "type": {
               "vec": {
@@ -1421,10 +1531,6 @@
             "type": {
               "defined": "Any2SVMRampExtraArgs"
             }
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
           }
         ]
       }
@@ -1589,14 +1695,32 @@
             "type": {
               "array": [
                 {
-                  "array": [
-                    "u8",
-                    64
-                  ]
+                  "defined": "OnRampAddress"
                 },
                 2
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnRampAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u32"
           }
         ]
       }
@@ -1657,125 +1781,6 @@
           },
           {
             "name": "V1"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CcipOfframpError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "InvalidSequenceInterval"
-          },
-          {
-            "name": "RootNotCommitted"
-          },
-          {
-            "name": "ExistingMerkleRoot"
-          },
-          {
-            "name": "Unauthorized"
-          },
-          {
-            "name": "InvalidNonce"
-          },
-          {
-            "name": "InvalidInputsMissingWritable"
-          },
-          {
-            "name": "OnrampNotConfigured"
-          },
-          {
-            "name": "FailedToDeserializeReport"
-          },
-          {
-            "name": "InvalidPluginType"
-          },
-          {
-            "name": "InvalidVersion"
-          },
-          {
-            "name": "MissingExpectedPriceUpdates"
-          },
-          {
-            "name": "MissingExpectedMerkleRoot"
-          },
-          {
-            "name": "UnexpectedMerkleRoot"
-          },
-          {
-            "name": "RedundantOwnerProposal"
-          },
-          {
-            "name": "UnsupportedSourceChainSelector"
-          },
-          {
-            "name": "UnsupportedDestinationChainSelector"
-          },
-          {
-            "name": "InvalidProof"
-          },
-          {
-            "name": "InvalidMessage"
-          },
-          {
-            "name": "ReachedMaxSequenceNumber"
-          },
-          {
-            "name": "ManualExecutionNotAllowed"
-          },
-          {
-            "name": "InvalidInputsNumberOfAccounts"
-          },
-          {
-            "name": "InvalidInputsGlobalStateAccount"
-          },
-          {
-            "name": "InvalidInputsTokenIndices"
-          },
-          {
-            "name": "InvalidInputsPoolAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAccounts"
-          },
-          {
-            "name": "InvalidInputsSysvarAccount"
-          },
-          {
-            "name": "InvalidInputsFeeQuoterAccount"
-          },
-          {
-            "name": "InvalidInputsAllowedOfframpAccount"
-          },
-          {
-            "name": "InvalidInputsConfigAccounts"
-          },
-          {
-            "name": "InvalidInputsTokenAdminRegistryAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccounts"
-          },
-          {
-            "name": "InvalidInputsLookupTableAccountWritable"
-          },
-          {
-            "name": "OfframpReleaseMintBalanceMismatch"
-          },
-          {
-            "name": "OfframpInvalidDataLength"
-          },
-          {
-            "name": "StaleCommitReport"
-          },
-          {
-            "name": "InvalidWritabilityBitmap"
-          },
-          {
-            "name": "InvalidCodeVersion"
           }
         ]
       }
@@ -1878,6 +1883,11 @@
           "name": "offrampLookupTable",
           "type": "publicKey",
           "index": false
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1887,7 +1897,9 @@
         {
           "name": "merkleRoot",
           "type": {
-            "defined": "MerkleRoot"
+            "option": {
+              "defined": "MerkleRoot"
+            }
           },
           "index": false
         },
@@ -2033,84 +2045,279 @@
   ],
   "errors": [
     {
-      "code": 6000,
-      "name": "InvalidConfigFMustBePositive",
+      "code": 9000,
+      "name": "InvalidSequenceInterval",
+      "msg": "The given sequence interval is invalid"
+    },
+    {
+      "code": 9001,
+      "name": "RootNotCommitted",
+      "msg": "The given Merkle Root is missing"
+    },
+    {
+      "code": 9002,
+      "name": "InvalidRMNRemoteAddress",
+      "msg": "Invalid RMN Remote Address"
+    },
+    {
+      "code": 9003,
+      "name": "ExistingMerkleRoot",
+      "msg": "The given Merkle Root is already committed"
+    },
+    {
+      "code": 9004,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
+    },
+    {
+      "code": 9005,
+      "name": "InvalidNonce",
+      "msg": "Invalid Nonce"
+    },
+    {
+      "code": 9006,
+      "name": "InvalidInputsMissingWritable",
+      "msg": "Account should be writable"
+    },
+    {
+      "code": 9007,
+      "name": "OnrampNotConfigured",
+      "msg": "Onramp was not configured"
+    },
+    {
+      "code": 9008,
+      "name": "FailedToDeserializeReport",
+      "msg": "Failed to deserialize report"
+    },
+    {
+      "code": 9009,
+      "name": "InvalidPluginType",
+      "msg": "Invalid plugin type"
+    },
+    {
+      "code": 9010,
+      "name": "InvalidVersion",
+      "msg": "Invalid version of the onchain state"
+    },
+    {
+      "code": 9011,
+      "name": "MissingExpectedPriceUpdates",
+      "msg": "Commit report is missing expected price updates"
+    },
+    {
+      "code": 9012,
+      "name": "MissingExpectedMerkleRoot",
+      "msg": "Commit report is missing expected merkle root"
+    },
+    {
+      "code": 9013,
+      "name": "UnexpectedMerkleRoot",
+      "msg": "Commit report contains unexpected merkle root"
+    },
+    {
+      "code": 9014,
+      "name": "RedundantOwnerProposal",
+      "msg": "Proposed owner is the current owner"
+    },
+    {
+      "code": 9015,
+      "name": "UnsupportedSourceChainSelector",
+      "msg": "Source chain selector not supported"
+    },
+    {
+      "code": 9016,
+      "name": "UnsupportedDestinationChainSelector",
+      "msg": "Destination chain selector not supported"
+    },
+    {
+      "code": 9017,
+      "name": "InvalidProof",
+      "msg": "Invalid Proof for Merkle Root"
+    },
+    {
+      "code": 9018,
+      "name": "InvalidMessage",
+      "msg": "Invalid message format"
+    },
+    {
+      "code": 9019,
+      "name": "ReachedMaxSequenceNumber",
+      "msg": "Reached max sequence number"
+    },
+    {
+      "code": 9020,
+      "name": "ManualExecutionNotAllowed",
+      "msg": "Manual execution not allowed"
+    },
+    {
+      "code": 9021,
+      "name": "InvalidInputsNumberOfAccounts",
+      "msg": "Number of accounts is invalid"
+    },
+    {
+      "code": 9022,
+      "name": "InvalidInputsGlobalStateAccount",
+      "msg": "Invalid global state account address"
+    },
+    {
+      "code": 9023,
+      "name": "InvalidInputsTokenIndices",
+      "msg": "Invalid pool account account indices"
+    },
+    {
+      "code": 9024,
+      "name": "InvalidInputsPoolAccounts",
+      "msg": "Invalid pool accounts"
+    },
+    {
+      "code": 9025,
+      "name": "InvalidInputsTokenAccounts",
+      "msg": "Invalid token accounts"
+    },
+    {
+      "code": 9026,
+      "name": "InvalidInputsSysvarAccount",
+      "msg": "Invalid sysvar instructions account"
+    },
+    {
+      "code": 9027,
+      "name": "InvalidInputsFeeQuoterAccount",
+      "msg": "Invalid fee quoter account"
+    },
+    {
+      "code": 9028,
+      "name": "InvalidInputsAllowedOfframpAccount",
+      "msg": "Invalid offramp authorization account"
+    },
+    {
+      "code": 9029,
+      "name": "InvalidInputsConfigAccounts",
+      "msg": "Invalid config account"
+    },
+    {
+      "code": 9030,
+      "name": "InvalidInputsTokenAdminRegistryAccounts",
+      "msg": "Invalid Token Admin Registry account"
+    },
+    {
+      "code": 9031,
+      "name": "InvalidInputsLookupTableAccounts",
+      "msg": "Invalid LookupTable account"
+    },
+    {
+      "code": 9032,
+      "name": "InvalidInputsLookupTableAccountWritable",
+      "msg": "Invalid LookupTable account writable access"
+    },
+    {
+      "code": 9033,
+      "name": "OfframpReleaseMintBalanceMismatch",
+      "msg": "Release or mint balance mismatch"
+    },
+    {
+      "code": 9034,
+      "name": "OfframpInvalidDataLength",
+      "msg": "Invalid data length"
+    },
+    {
+      "code": 9035,
+      "name": "StaleCommitReport",
+      "msg": "Stale commit report"
+    },
+    {
+      "code": 9036,
+      "name": "InvalidWritabilityBitmap",
+      "msg": "Invalid writability bitmap"
+    },
+    {
+      "code": 9037,
+      "name": "InvalidCodeVersion",
+      "msg": "Invalid code version"
+    },
+    {
+      "code": 9038,
+      "name": "Ocr3InvalidConfigFMustBePositive",
       "msg": "Invalid config: F must be positive"
     },
     {
-      "code": 6001,
-      "name": "InvalidConfigTooManyTransmitters",
+      "code": 9039,
+      "name": "Ocr3InvalidConfigTooManyTransmitters",
       "msg": "Invalid config: Too many transmitters"
     },
     {
-      "code": 6002,
-      "name": "InvalidConfigTooManySigners",
+      "code": 9040,
+      "name": "Ocr3InvalidConfigTooManySigners",
       "msg": "Invalid config: Too many signers"
     },
     {
-      "code": 6003,
-      "name": "InvalidConfigFIsTooHigh",
+      "code": 9041,
+      "name": "Ocr3InvalidConfigFIsTooHigh",
       "msg": "Invalid config: F is too high"
     },
     {
-      "code": 6004,
-      "name": "InvalidConfigRepeatedOracle",
+      "code": 9042,
+      "name": "Ocr3InvalidConfigRepeatedOracle",
       "msg": "Invalid config: Repeated oracle address"
     },
     {
-      "code": 6005,
-      "name": "WrongMessageLength",
+      "code": 9043,
+      "name": "Ocr3WrongMessageLength",
       "msg": "Wrong message length"
     },
     {
-      "code": 6006,
-      "name": "ConfigDigestMismatch",
+      "code": 9044,
+      "name": "Ocr3ConfigDigestMismatch",
       "msg": "Config digest mismatch"
     },
     {
-      "code": 6007,
-      "name": "WrongNumberOfSignatures",
+      "code": 9045,
+      "name": "Ocr3WrongNumberOfSignatures",
       "msg": "Wrong number signatures"
     },
     {
-      "code": 6008,
-      "name": "UnauthorizedTransmitter",
+      "code": 9046,
+      "name": "Ocr3UnauthorizedTransmitter",
       "msg": "Unauthorized transmitter"
     },
     {
-      "code": 6009,
-      "name": "UnauthorizedSigner",
+      "code": 9047,
+      "name": "Ocr3UnauthorizedSigner",
       "msg": "Unauthorized signer"
     },
     {
-      "code": 6010,
-      "name": "NonUniqueSignatures",
+      "code": 9048,
+      "name": "Ocr3NonUniqueSignatures",
       "msg": "Non unique signatures"
     },
     {
-      "code": 6011,
-      "name": "OracleCannotBeZeroAddress",
+      "code": 9049,
+      "name": "Ocr3OracleCannotBeZeroAddress",
       "msg": "Oracle cannot be zero address"
     },
     {
-      "code": 6012,
-      "name": "StaticConfigCannotBeChanged",
+      "code": 9050,
+      "name": "Ocr3StaticConfigCannotBeChanged",
       "msg": "Static config cannot be changed"
     },
     {
-      "code": 6013,
-      "name": "InvalidPluginType",
+      "code": 9051,
+      "name": "Ocr3InvalidPluginType",
       "msg": "Incorrect plugin type"
     },
     {
-      "code": 6014,
-      "name": "InvalidSignature",
+      "code": 9052,
+      "name": "Ocr3InvalidSignature",
       "msg": "Invalid signature"
     },
     {
-      "code": 6015,
-      "name": "SignaturesOutOfRegistration",
+      "code": 9053,
+      "name": "Ocr3SignaturesOutOfRegistration",
       "msg": "Signatures out of registration"
+    },
+    {
+      "code": 9054,
+      "name": "InvalidOnrampAddress",
+      "msg": "Invalid onramp address"
     }
   ]
 }

@@ -120,7 +120,26 @@ pub fn bypasser_execute_batch<'info>(
     Ok(())
 }
 
-/// execute each instruction to target program with timelock signer
+/// Executes each instruction with the timelock signer as the signing authority.
+///
+/// This function is the core execution mechanism for both standard and bypasser operations.
+/// It performs the critical replacement of signers in the instruction, ensuring that:
+/// 1. The timelock signer PDA becomes the only valid signer in the CPI
+/// 2. Original signer designations are preserved only for the timelock PDA
+/// 3. The instruction is executed with the proper signing authority
+///
+/// # Parameters
+///
+/// - `instruction`: The instruction data to be executed
+/// - `remaining_accounts`: All accounts needed for the instruction execution
+/// - `signer_seeds`: Seeds used to derive and sign with the PDA
+/// - `timelock_signer`: Public key of the timelock signer PDA
+///
+/// # Note
+///
+/// This signer substitution is critical for security - it ensures that only
+/// properly authorized and verified operations can execute with the
+/// timelock's signing authority.
 fn execute(
     instruction: &InstructionData,
     remaining_accounts: &[AccountInfo],
@@ -158,7 +177,7 @@ pub struct ExecuteBatch<'info> {
     pub predecessor_operation: UncheckedAccount<'info>,
 
     #[account( seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref(),], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     /// CHECK: program signer PDA that can hold balance
     #[account(
@@ -187,7 +206,7 @@ pub struct BypasserExecuteBatch<'info> {
     pub operation: Account<'info, Operation>,
 
     #[account( seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref(),], bump)]
-    pub config: Account<'info, Config>,
+    pub config: AccountLoader<'info, Config>,
 
     /// CHECK: program signer PDA that can hold balance
     #[account(

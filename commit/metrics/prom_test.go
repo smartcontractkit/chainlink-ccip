@@ -416,18 +416,24 @@ func Test_LatencyAndErrors(t *testing.T) {
 }
 
 func Test_SequenceNumbers(t *testing.T) {
+	chain1 := "2337"
+	selector1 := cciptypes.ChainSelector(12922642891491394802)
+	chain2 := "3337"
+	selector2 := cciptypes.ChainSelector(4793464827907405086)
+	selector3 := cciptypes.ChainSelector(909606746561742123)
+
 	tt := []struct {
 		name   string
 		obs    committypes.Observation
 		out    committypes.Outcome
 		method plugincommon.MethodType
-		exp    map[cciptypes.ChainSelector]cciptypes.SeqNum
+		exp    map[string]cciptypes.SeqNum
 	}{
 		{
 			name:   "empty observation should not report anything",
 			obs:    committypes.Observation{},
 			method: plugincommon.ObservationMethod,
-			exp:    map[cciptypes.ChainSelector]cciptypes.SeqNum{},
+			exp:    map[string]cciptypes.SeqNum{},
 		},
 		{
 			name: "single chain observation with seq nr",
@@ -435,15 +441,15 @@ func Test_SequenceNumbers(t *testing.T) {
 				MerkleRootObs: merkleroot.Observation{
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{
-							ChainSel:     cciptypes.ChainSelector(123),
+							ChainSel:     selector1,
 							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
 						},
 					},
 				},
 			},
 			method: plugincommon.ObservationMethod,
-			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				123: 2,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
 			},
 		},
 		{
@@ -452,24 +458,24 @@ func Test_SequenceNumbers(t *testing.T) {
 				MerkleRootObs: merkleroot.Observation{
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{
-							ChainSel:     cciptypes.ChainSelector(123),
+							ChainSel:     selector1,
 							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
 						},
 						{
-							ChainSel:     cciptypes.ChainSelector(456),
+							ChainSel:     selector2,
 							SeqNumsRange: cciptypes.NewSeqNumRange(3, 4),
 						},
 						{
-							ChainSel:     cciptypes.ChainSelector(789),
+							ChainSel:     selector3,
 							SeqNumsRange: cciptypes.NewSeqNumRange(0, 0),
 						},
 					},
 				},
 			},
 			method: plugincommon.ObservationMethod,
-			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				123: 2,
-				456: 4,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
+				chain2: 4,
 			},
 		},
 		{
@@ -478,15 +484,15 @@ func Test_SequenceNumbers(t *testing.T) {
 				MerkleRootOutcome: merkleroot.Outcome{
 					RootsToReport: []cciptypes.MerkleRootChain{
 						{
-							ChainSel:     cciptypes.ChainSelector(123),
+							ChainSel:     selector1,
 							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
 						},
 					},
 				},
 			},
 			method: plugincommon.OutcomeMethod,
-			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				123: 2,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
 			},
 		},
 		{
@@ -495,20 +501,20 @@ func Test_SequenceNumbers(t *testing.T) {
 				MerkleRootOutcome: merkleroot.Outcome{
 					RootsToReport: []cciptypes.MerkleRootChain{
 						{
-							ChainSel:     cciptypes.ChainSelector(123),
+							ChainSel:     selector1,
 							SeqNumsRange: cciptypes.NewSeqNumRange(1, 2),
 						},
 						{
-							ChainSel:     cciptypes.ChainSelector(456),
+							ChainSel:     selector2,
 							SeqNumsRange: cciptypes.NewSeqNumRange(3, 4),
 						},
 					},
 				},
 			},
 			method: plugincommon.OutcomeMethod,
-			exp: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				123: 2,
-				456: 4,
+			exp: map[string]cciptypes.SeqNum{
+				chain1: 2,
+				chain2: 4,
 			},
 		},
 	}
@@ -527,9 +533,9 @@ func Test_SequenceNumbers(t *testing.T) {
 				reporter.TrackOutcome(tc.out)
 			}
 
-			for sourceChainSelector, maxSeqNr := range tc.exp {
+			for sourceChain, maxSeqNr := range tc.exp {
 				seqNum := testutil.ToFloat64(
-					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChainSelector.String(), tc.method),
+					reporter.sequenceNumbers.WithLabelValues(chainID, sourceChain, tc.method),
 				)
 				require.Equal(t, float64(maxSeqNr), seqNum)
 			}

@@ -7,7 +7,7 @@ use arrayvec::arrayvec;
 use crate::constants::{MAX_SELECTORS, TIMELOCK_ID_PADDED};
 use crate::error::TimelockError;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum Role {
     Admin = 0,
     Proposer = 1,
@@ -16,8 +16,8 @@ pub enum Role {
     Bypasser = 4,
 }
 
-#[account]
-#[derive(InitSpace)]
+#[account(zero_copy)]
+#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct Config {
     pub timelock_id: [u8; TIMELOCK_ID_PADDED],
 
@@ -46,7 +46,8 @@ impl Config {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct BlockedSelectors {
     pub xs: [[u8; 8]; MAX_SELECTORS],
     pub len: u64,

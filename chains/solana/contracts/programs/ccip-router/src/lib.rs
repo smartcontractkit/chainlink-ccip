@@ -58,6 +58,7 @@ pub mod ccip_router {
         fee_aggregator: Pubkey,
         fee_quoter: Pubkey,
         link_token_mint: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             version: 1,
@@ -66,6 +67,7 @@ pub mod ccip_router {
             proposed_owner: Pubkey::default(),
             svm_chain_selector,
             fee_quoter,
+            rmn_remote,
             link_token_mint,
             fee_aggregator,
         });
@@ -73,6 +75,7 @@ pub mod ccip_router {
         emit!(events::admin::ConfigSet {
             svm_chain_selector: ctx.accounts.config.svm_chain_selector,
             fee_quoter: ctx.accounts.config.fee_quoter,
+            rmn_remote: ctx.accounts.config.rmn_remote,
             link_token_mint: ctx.accounts.config.link_token_mint,
             fee_aggregator: ctx.accounts.config.fee_aggregator,
         });
@@ -142,6 +145,20 @@ pub mod ccip_router {
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
             .update_fee_aggregator(ctx, fee_aggregator)
+    }
+
+    /// Updates the RMN remote program in the router configuration.
+    /// The Admin is the only one able to update the RMN remote program.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `rmn_remote,` - The new RMN remote address.
+    pub fn update_rmn_remote(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        rmn_remote: Pubkey,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version).update_rmn_remote(ctx, rmn_remote)
     }
 
     /// Adds a new chain selector to the router.
@@ -256,7 +273,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for the bump.
     /// * `dest_chain_selector` - The destination chain selector to bump version for.
     pub fn bump_ccip_version_for_dest_chain(
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
@@ -272,7 +289,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for the rollback.
     /// * `dest_chain_selector` - The destination chain selector to rollback the version for.
     pub fn rollback_ccip_version_for_dest_chain(
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
@@ -444,18 +461,14 @@ pub mod ccip_router {
     }
 }
 
-// TODO this is a hack because Anchor + Anchor-Go fail to include all errors in the IDL and the gobindings.
-// By having this first (though unused) error enum here, it does pick up the actual (second) error enum
-#[error_code]
-pub enum AnchorErrorHack {
-    Something,
-    Else,
-}
-
 #[error_code]
 pub enum CcipRouterError {
     #[msg("The signer is unauthorized")]
-    Unauthorized,
+    // offset error code so that they don't clash with other programs
+    // (Anchor's base custom error code 6000 + offset 1000 = start at 7000)
+    Unauthorized = 1000,
+    #[msg("Invalid RMN Remote Address")]
+    InvalidRMNRemoteAddress,
     #[msg("Mint account input is invalid")]
     InvalidInputsMint,
     #[msg("Invalid version of the onchain state")]

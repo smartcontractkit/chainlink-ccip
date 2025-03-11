@@ -23,13 +23,14 @@ pub struct Config {
     pub ocr3: [Ocr3Config; 2],
 }
 
-#[account]
+#[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct ReferenceAddresses {
     pub version: u8,
     pub router: Pubkey,
     pub fee_quoter: Pubkey,
     pub offramp_lookup_table: Pubkey,
+    pub rmn_remote: Pubkey,
 }
 
 #[zero_copy]
@@ -94,8 +95,60 @@ pub struct SourceChainConfig {
 
     // OnRamp addresses supported from the source chain, each of them has a 64 byte address. So this can hold 2 addresses.
     // If only one address is configured, then the space for the second address must be zeroed.
-    // Each address must be right padded with zeros if it is less than 64 bytes.
-    pub on_ramp: [[u8; 64]; 2],
+    pub on_ramp: [OnRampAddress; 2],
+}
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
+pub struct OnRampAddress {
+    bytes: [u8; 64],
+    len: u32,
+}
+
+impl OnRampAddress {
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes[0..self.len as usize]
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub const EMPTY: Self = Self {
+        bytes: [0u8; 64],
+        len: 0,
+    };
+}
+
+impl TryInto<OnRampAddress> for Vec<u8> {
+    type Error = CcipOfframpError;
+
+    fn try_into(self) -> std::result::Result<OnRampAddress, Self::Error> {
+        let mut address = OnRampAddress {
+            bytes: [0u8; 64],
+            len: 0,
+        };
+        if self.is_empty() || self.len() > address.bytes.len() {
+            return Err(CcipOfframpError::InvalidOnrampAddress);
+        }
+
+        address.len = self.len() as u32;
+        address.bytes[0..address.len as usize].copy_from_slice(&self);
+
+        Ok(address)
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for OnRampAddress {
+    fn from(val: [u8; N]) -> Self {
+        assert!(N <= 64 && N > 0);
+        let mut address = Self {
+            bytes: [0u8; 64],
+            len: N as u32,
+        };
+
+        address.bytes[0..N].copy_from_slice(&val);
+        address
+    }
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
@@ -131,7 +184,7 @@ pub enum MessageExecutionState {
     Untouched = 0,
     InProgress = 1, // Not used in SVM, but used in EVM
     Success = 2,
-    Failure = 3,
+    Failure = 3, // Not used in SVM, but used in EVM
 }
 
 impl TryFrom<u128> for MessageExecutionState {

@@ -74,7 +74,7 @@ type CommitReportInfo struct {
 	// RemoteF Max number of faulty RMN nodes; f+1 signers are required to verify a report.
 	RemoteF     uint64            `json:"remoteF"`
 	MerkleRoots []MerkleRootChain `json:"merkleRoots"`
-	TokenPrices []TokenPrice      `json:"tokenPrices"`
+	PriceUpdates
 }
 
 func (cri CommitReportInfo) Encode() ([]byte, error) {

@@ -128,6 +128,12 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		MerkleRootAsyncObserverDisabled    bool
 		MerkleRootAsyncObserverSyncFreq    time.Duration
 		MerkleRootAsyncObserverSyncTimeout time.Duration
+		ChainFeeAsyncObserverDisabled      bool
+		ChainFeeAsyncObserverSyncFreq      time.Duration
+		ChainFeeAsyncObserverSyncTimeout   time.Duration
+		TokenPriceAsyncObservedDisabled    bool
+		TokenPriceAsyncObserverSyncFreq    commonconfig.Duration
+		TokenPriceAsyncObserverSyncTimeout commonconfig.Duration
 	}
 	remoteTokenAddress := rand.RandomAddress()
 	aggregatorAddress := rand.RandomAddress()
@@ -153,8 +159,12 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				SignObservationPrefix:              defaultSignObservationPrefix,
-				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
-				MerkleRootAsyncObserverSyncFreq:    defaultMerkleRootAsyncObserverSyncFreq,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 			false,
 		},
@@ -168,8 +178,12 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				SignObservationPrefix:              defaultSignObservationPrefix,
-				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
-				MerkleRootAsyncObserverSyncFreq:    defaultMerkleRootAsyncObserverSyncFreq,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 			false,
 		},
@@ -183,7 +197,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				SignObservationPrefix:              defaultSignObservationPrefix,
-				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
 				MerkleRootAsyncObserverSyncFreq:    0,
 			},
 			true,
@@ -287,6 +301,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MerkleRootAsyncObserverDisabled:    tt.fields.MerkleRootAsyncObserverDisabled,
 				MerkleRootAsyncObserverSyncFreq:    tt.fields.MerkleRootAsyncObserverSyncFreq,
 				MerkleRootAsyncObserverSyncTimeout: tt.fields.MerkleRootAsyncObserverSyncTimeout,
+				ChainFeeAsyncObserverDisabled:      tt.fields.ChainFeeAsyncObserverDisabled,
+				ChainFeeAsyncObserverSyncFreq:      tt.fields.ChainFeeAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   tt.fields.ChainFeeAsyncObserverSyncTimeout,
 			}
 			err := c.Validate()
 			if tt.wantErr {
@@ -375,8 +392,12 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
-				MerkleRootAsyncObserverSyncFreq:    defaultMerkleRootAsyncObserverSyncFreq,
-				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 		},
 		{
@@ -384,6 +405,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 			input: CommitOffchainConfig{
 				RMNEnabled:                      true,
 				MerkleRootAsyncObserverDisabled: true,
+				ChainFeeAsyncObserverDisabled:   true,
+				TokenPriceAsyncObserverDisabled: true,
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -396,6 +419,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 				MerkleRootAsyncObserverDisabled:    true,
+				ChainFeeAsyncObserverDisabled:      true,
+				TokenPriceAsyncObserverDisabled:    true,
 			},
 		},
 		{
@@ -408,6 +433,9 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  1000,
 				TransmissionDelayMultiplier:        20,
 				InflightPriceCheckRetries:          5,
+				ChainFeeAsyncObserverSyncFreq:      12 * time.Minute,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(10 * time.Minute),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -419,8 +447,12 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        20,
 				InflightPriceCheckRetries:          5,
-				MerkleRootAsyncObserverSyncTimeout: defaultMerkleRootAsyncObserverSyncTimeout,
-				MerkleRootAsyncObserverSyncFreq:    defaultMerkleRootAsyncObserverSyncFreq,
+				MerkleRootAsyncObserverSyncTimeout: defaultAsyncObserverSyncTimeout,
+				MerkleRootAsyncObserverSyncFreq:    defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncFreq:      12 * time.Minute,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(10 * time.Minute),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(10 * time.Second),
 			},
 		},
 		{
@@ -444,6 +476,10 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 				MerkleRootAsyncObserverSyncFreq:    5 * time.Minute,
 				MerkleRootAsyncObserverSyncTimeout: 10 * time.Minute,
+				ChainFeeAsyncObserverSyncFreq:      defaultAsyncObserverSyncFreq,
+				ChainFeeAsyncObserverSyncTimeout:   defaultAsyncObserverSyncTimeout,
+				TokenPriceAsyncObserverSyncFreq:    *commonconfig.MustNewDuration(defaultAsyncObserverSyncFreq),
+				TokenPriceAsyncObserverSyncTimeout: *commonconfig.MustNewDuration(defaultAsyncObserverSyncTimeout),
 			},
 		},
 	}

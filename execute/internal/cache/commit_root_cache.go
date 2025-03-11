@@ -8,8 +8,21 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
+
+// TimeProvider interface to make time testable
+type TimeProvider interface {
+	Now() time.Time
+}
+
+// RealTimeProvider provides actual current time
+type RealTimeProvider struct{}
+
+func (r *RealTimeProvider) Now() time.Time {
+	return time.Now().UTC()
+}
 
 const (
 	// EvictionGracePeriod defines how long after the messageVisibilityInterval a root is still kept in the cache
@@ -28,6 +41,15 @@ type CommitsRootsCache interface {
 	CanExecute(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) bool
 	MarkAsExecuted(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32)
 	Snooze(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32)
+
+	// GetTimestampToQueryFrom returns the timestamp that should be used when querying for commit reports.
+	// It will return the message visibility window or the earliest unexecuted root timestamp,
+	// whichever is later, to optimize the query window.
+	GetTimestampToQueryFrom() time.Time
+
+	// UpdateEarliestUnexecutedRoot updates the earliest unexecuted root timestamp
+	// based on the remaining unexecuted and executed but not finalized reports.
+	UpdateEarliestUnexecutedRoot(remainingReports map[ccipocr3.ChainSelector][]exectypes.CommitData)
 }
 
 func NewCommitRootsCache(
@@ -39,8 +61,22 @@ func NewCommitRootsCache(
 		lggr,
 		messageVisibilityInterval,
 		rootSnoozeTime,
-		CleanupInterval,
-		EvictionGracePeriod,
+		&RealTimeProvider{},
+	)
+}
+
+// For testing - create with custom time provider
+func NewCommitRootsCacheWithTimeProvider(
+	lggr logger.Logger,
+	messageVisibilityInterval time.Duration,
+	rootSnoozeTime time.Duration,
+	timeProvider TimeProvider,
+) CommitsRootsCache {
+	return internalNewCommitRootsCache(
+		lggr,
+		messageVisibilityInterval,
+		rootSnoozeTime,
+		timeProvider,
 	)
 }
 
@@ -48,11 +84,18 @@ func internalNewCommitRootsCache(
 	lggr logger.Logger,
 	messageVisibilityInterval time.Duration,
 	rootSnoozeTime time.Duration,
-	cleanupInterval time.Duration,
-	evictionGracePeriod time.Duration,
+	timeProvider TimeProvider,
 ) *commitRootsCache {
-	snoozedRoots := cache.New(rootSnoozeTime, cleanupInterval)
-	executedRoots := cache.New(messageVisibilityInterval+evictionGracePeriod, cleanupInterval)
+	lggr.Debugw(
+		"Creating CommitRootsCache",
+		"messageVisibilityInterval", messageVisibilityInterval,
+		"rootSnoozeTime", rootSnoozeTime,
+		"cleanupInterval", CleanupInterval,
+		"evictionGracePeriod", EvictionGracePeriod,
+	)
+
+	snoozedRoots := cache.New(rootSnoozeTime, CleanupInterval)
+	executedRoots := cache.New(messageVisibilityInterval+EvictionGracePeriod, CleanupInterval)
 
 	return &commitRootsCache{
 		lggr:                      lggr,
@@ -61,6 +104,7 @@ func internalNewCommitRootsCache(
 		snoozedRoots:              snoozedRoots,
 		messageVisibilityInterval: messageVisibilityInterval,
 		cacheMu:                   sync.RWMutex{},
+		timeProvider:              timeProvider,
 	}
 }
 
@@ -68,6 +112,7 @@ type commitRootsCache struct {
 	lggr                      logger.Logger
 	messageVisibilityInterval time.Duration
 	rootSnoozeTime            time.Duration
+	timeProvider              TimeProvider
 
 	cacheMu sync.RWMutex
 
@@ -78,6 +123,9 @@ type commitRootsCache struct {
 	// messageVisibilityInterval). We keep executed roots there to make sure we don't accidentally try to reprocess
 	// already executed CommitReport
 	executedRoots *cache.Cache
+	// earliestUnexecutedRoot tracks the timestamp of the earliest unexecuted root
+	// to optimize database queries by potentially starting from a later timestamp
+	earliestUnexecutedRoot time.Time
 }
 
 func getKey(source ccipocr3.ChainSelector, merkleRoot ccipocr3.Bytes32) string {
@@ -119,4 +167,73 @@ func (r *commitRootsCache) isSnoozed(key string) bool {
 func (r *commitRootsCache) isExecuted(key string) bool {
 	_, executed := r.executedRoots.Get(key)
 	return executed
+}
+
+// GetTimestampToQueryFrom returns the timestamp to use when querying for commit reports.
+// It optimizes the query window by using the later of:
+// 1. The message visibility window
+// 2. The earliest unexecuted root timestamp (if available)
+func (r *commitRootsCache) GetTimestampToQueryFrom() time.Time {
+	r.cacheMu.RLock()
+	defer r.cacheMu.RUnlock()
+
+	// Calculate current visibility window based on stored interval
+	messageVisibilityWindow := r.timeProvider.Now().Add(-r.messageVisibilityInterval).UTC()
+
+	// Start with message visibility window as the default (lower bound)
+	commitRootsFilterTimestamp := messageVisibilityWindow
+
+	// If we know the earliest unexecuted root and it's AFTER the visibility window,
+	// we can optimize by starting our query from that timestamp instead
+	if !r.earliestUnexecutedRoot.IsZero() && r.earliestUnexecutedRoot.After(messageVisibilityWindow) {
+		commitRootsFilterTimestamp = r.earliestUnexecutedRoot
+		r.lggr.Debugw("Using earliest unexecuted root as query timestamp",
+			"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
+			"messageVisibilityWindow", messageVisibilityWindow)
+	}
+
+	r.lggr.Debugw("Getting timestamp to query from",
+		"earliestUnexecutedRoot", r.earliestUnexecutedRoot,
+		"messageVisibilityWindow", messageVisibilityWindow,
+		"commitRootsFilterTimestamp", commitRootsFilterTimestamp,
+		"optimized", commitRootsFilterTimestamp.After(messageVisibilityWindow))
+
+	return commitRootsFilterTimestamp
+}
+
+// UpdateEarliestUnexecutedRoot updates the earliest unexecuted root timestamp
+// based on the remaining unexecuted reports.
+func (r *commitRootsCache) UpdateEarliestUnexecutedRoot(
+	remainingReports map[ccipocr3.ChainSelector][]exectypes.CommitData) {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+
+	// If no unexecuted reports remain, we keep the current value
+	// as it represents the last known earliest unexecuted root
+	if len(remainingReports) == 0 {
+		return
+	}
+
+	// Find the earliest timestamp among all remaining reports
+	var earliestTimestamp time.Time
+	for _, reports := range remainingReports {
+		for _, report := range reports {
+			if earliestTimestamp.IsZero() || report.Timestamp.Before(earliestTimestamp) {
+				earliestTimestamp = report.Timestamp
+			}
+		}
+	}
+
+	// Check if we found a valid timestamp
+	if earliestTimestamp.IsZero() {
+		return
+	}
+
+	// Only update if the new timestamp is later than the current one
+	if earliestTimestamp.After(r.earliestUnexecutedRoot) {
+		r.lggr.Debugw("Updating earliest unexecuted root",
+			"oldTimestamp", r.earliestUnexecutedRoot,
+			"newTimestamp", earliestTimestamp)
+		r.earliestUnexecutedRoot = earliestTimestamp
+	}
 }

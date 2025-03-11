@@ -18,6 +18,7 @@ import (
 )
 
 func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	obs, err := tokendata.NewConfigBasedCompositeObservers(
 		tests.Context(t),
 		logger.Test(t),
@@ -25,6 +26,7 @@ func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
 		[]pluginconfig.TokenDataObserverConfig{},
 		nil,
 		nil,
+		mockAddrCodec,
 	)
 	require.NoError(t, err)
 

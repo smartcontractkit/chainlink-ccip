@@ -124,6 +124,7 @@ func Test_processor_Observation(t *testing.T) {
 				oracleID:        oracleID,
 				homeChain:       homeChain,
 				metricsReporter: plugincommon2.NoopReporter{},
+				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)
@@ -134,6 +135,10 @@ func Test_processor_Observation(t *testing.T) {
 			supportedSet.Remove(tc.dstChain)
 			slicesWithoutDst := supportedSet.ToSlice()
 			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
+
+			if len(slicesWithoutDst) == 0 {
+				slicesWithoutDst = []ccipocr3.ChainSelector(nil)
+			}
 
 			ccipReader.EXPECT().GetChainsFeeComponents(ctx, slicesWithoutDst).
 				Return(tc.chainFeeComponents).Maybe()
@@ -318,6 +323,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				oracleID:        oracleID,
 				homeChain:       homeChain,
 				metricsReporter: plugincommon2.NoopReporter{},
+				obs:             newBaseObserver(ccipReader, tc.dstChain, oracleID, cs),
 			}
 
 			supportedSet := mapset.NewSet(tc.supportedChains...)

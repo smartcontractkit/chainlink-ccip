@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -53,6 +54,86 @@ func Test_fChainConsensus(t *testing.T) {
 			minObs := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(scenario.f))
 			result := GetConsensusMap(lggr, "fChain", scenario.inputMap, minObs)
 			assert.Equal(t, scenario.expectedOutput, result)
+		})
+	}
+}
+
+func Test_SeqNumConsensus(t *testing.T) {
+	lggr := logger.Test(t)
+
+	testCases := []struct {
+		name           string
+		thresholds     MultiThreshold[cciptypes.ChainSelector]
+		inputMap       map[cciptypes.ChainSelector][]cciptypes.SeqNum
+		expectedOutput map[cciptypes.ChainSelector]cciptypes.SeqNum
+	}{
+		{
+			name:       "single chain with seqNum values",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(1)),
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {1, 1, 1, 2},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 1,
+			},
+		},
+		{
+			name:       "nil thresholds should not reach consensus",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(0)),
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {7, 6, 5, 4, 3, 2, 1},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{},
+		},
+		{
+			name:       "single chain with max seqNum",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(2)),
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {1, 2, 3, 4, 5},
+				cciptypes.ChainSelector(2): {2, 1, 1, 1, 4},
+				cciptypes.ChainSelector(3): {2, 1, 1, 1},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 3,
+				cciptypes.ChainSelector(2): 1,
+			},
+		},
+		{
+			name:       "multiple unsorted chains with min seqNum",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(1)),
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {1, 2, 3, 4},
+				cciptypes.ChainSelector(2): {1, 4, 4, 4},
+				cciptypes.ChainSelector(3): {1, 1}, // not enough observations, should skip
+				cciptypes.ChainSelector(4): {4, 3, 2, 1},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 2,
+				cciptypes.ChainSelector(2): 4,
+				cciptypes.ChainSelector(4): 2,
+			},
+		},
+		{
+			name:       "multiple unsorted chains with min seqNum",
+			thresholds: MakeConstantThreshold[cciptypes.ChainSelector](Threshold(3)),
+			inputMap: map[cciptypes.ChainSelector][]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): {1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+				cciptypes.ChainSelector(2): {1, 1, 1, 2, 2, 2, 3, 3, 3, 4},
+				cciptypes.ChainSelector(3): {1, 1, 5}, // should skip
+				cciptypes.ChainSelector(4): {4, 3, 2, 1, 4, 3, 2, 1, 4, 3},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				cciptypes.ChainSelector(1): 4,
+				cciptypes.ChainSelector(2): 2,
+				cciptypes.ChainSelector(4): 2,
+			},
+		},
+	}
+
+	for _, scenario := range testCases {
+		t.Run(scenario.name, func(t *testing.T) {
+			result := GetOrderedConsensus(lggr, "fChain", scenario.inputMap, scenario.thresholds)
+			require.Equal(t, scenario.expectedOutput, result)
 		})
 	}
 }

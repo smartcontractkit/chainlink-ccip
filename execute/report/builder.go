@@ -62,13 +62,13 @@ func newBuilderInternal(
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider cciptypes.EstimateProvider,
 	destChainSelector cciptypes.ChainSelector,
+	addressCodec cciptypes.AddressCodec,
 	options ...Option,
 ) *execReportBuilder {
 	defaultChecks := []Check{
 		CheckIfPseudoDeleted(),
 		CheckAlreadyExecuted(),
 		CheckTokenData(),
-		CheckTooCostly(),
 	}
 
 	builder := &execReportBuilder{
@@ -78,6 +78,7 @@ func newBuilderInternal(
 		hasher:            hasher,
 		estimateProvider:  estimateProvider,
 		destChainSelector: destChainSelector,
+		addressCodec:      addressCodec,
 	}
 
 	for _, option := range options {
@@ -96,9 +97,10 @@ func NewBuilder(
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider cciptypes.EstimateProvider,
 	destChainSelector cciptypes.ChainSelector,
+	addressCodec cciptypes.AddressCodec,
 	options ...Option,
 ) ExecReportBuilder {
-	return newBuilderInternal(logger, hasher, encoder, estimateProvider, destChainSelector, options...)
+	return newBuilderInternal(logger, hasher, encoder, estimateProvider, destChainSelector, addressCodec, options...)
 }
 
 // validationMetadata contains all metadata needed to accumulate results across multiple reports and messages.
@@ -121,6 +123,7 @@ type execReportBuilder struct {
 	encoder          cciptypes.ExecutePluginCodec
 	hasher           cciptypes.MessageHasher
 	estimateProvider cciptypes.EstimateProvider
+	addressCodec     cciptypes.AddressCodec
 
 	// Config
 	checks                []Check

@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -33,6 +34,7 @@ type ChainConfigSnapshot struct {
 	FeeQuoter FeeQuoterConfig
 	OnRamp    OnRampConfig
 	Router    RouterConfig
+	CurseInfo CurseInfo
 }
 
 type OnRampConfig struct {
@@ -83,6 +85,7 @@ func NewCCIPChainReader(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
+	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
 	return NewObservedCCIPReader(
 		newCCIPChainReaderInternal(
@@ -92,7 +95,9 @@ func NewCCIPChainReader(
 			contractWriters,
 			destChain,
 			offrampAddress,
+			addrCodec,
 		),
+		lggr,
 		destChain,
 	)
 }
@@ -105,8 +110,9 @@ func NewCCIPReaderWithExtendedContractReaders(
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
+	addrCodec cciptypes.AddressCodec,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress)
+	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}
@@ -128,6 +134,7 @@ type CCIPReader interface {
 		ctx context.Context,
 		source cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
+		confidence primitives.ConfidenceLevel,
 	) ([]cciptypes.SeqNum, error)
 
 	// MsgsBetweenSeqNums reads the provided chains, finds and returns ccip messages
@@ -154,6 +161,7 @@ type CCIPReader interface {
 		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
+	// WARNING: This function will fail if the oracle does not support the requested chain.
 	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
 
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
@@ -190,7 +198,7 @@ type CCIPReader interface {
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(ctx context.Context, sourceChainSelectors []cciptypes.ChainSelector) (*CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context) (CurseInfo, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

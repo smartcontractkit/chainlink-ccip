@@ -55,6 +55,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     token_receiver: Pubkey,
     chain_selector: u64,
     router: Pubkey,
+    fee_quoter: Pubkey,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
     // accounts based on user or chain
@@ -116,7 +117,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
                 fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
                 mint.key.as_ref(),
             ],
-            &fee_quoter::ID,
+            &fee_quoter,
         );
         require_eq!(
             fee_token_config.key(),
@@ -158,7 +159,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
                 chain_selector.to_le_bytes().as_ref(),
                 mint.key().as_ref(),
             ],
-            &fee_quoter::ID,
+            &fee_quoter,
         );
         let (expected_pool_chain_config, _) = Pubkey::find_program_address(
             &[

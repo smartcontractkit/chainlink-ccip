@@ -183,7 +183,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
-          rm -rf target/idl &&\
+          rm -rf target/idl target/types &&\
           anchor build"
 
           go install github.com/gagliardetto/anchor-go@v0.2.3
@@ -192,7 +192,7 @@ jobs:
           git diff --exit-code
       - name: Install linter
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.62.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.5
       - name: Run linter
         run: make lint-go
       - name: Print lint report artifact

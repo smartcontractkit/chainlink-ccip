@@ -79,9 +79,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 
 func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
-		name         string
-		observedData map[cciptypes.ChainSelector][]exectypes.CommitData
-		expErr       bool
+		name            string
+		observedData    map[cciptypes.ChainSelector][]exectypes.CommitData
+		supportedChains mapset.Set[cciptypes.ChainSelector]
+		expErr          bool
 	}{
 		{
 			name: "ValidData",
@@ -101,6 +102,28 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 					},
 				},
 			},
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+		},
+		{
+			name: "UnsupportedChain",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 3},
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+					},
+				},
+				2: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{2},
+						SequenceNumberRange: cciptypes.SeqNumRange{11, 15},
+						ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
+					},
+				},
+			},
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1)), // <-- 2 is missing
+			expErr:          true,
 		},
 		{
 			name: "DuplicateMerkleRoot",
@@ -118,7 +141,8 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 					},
 				},
 			},
-			expErr: true,
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+			expErr:          true,
 		},
 		{
 			name: "OverlappingSequenceNumberRange",
@@ -136,7 +160,8 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 					},
 				},
 			},
-			expErr: true,
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+			expErr:          true,
 		},
 		{
 			name: "ExecutedMessageOutsideObservedRange",
@@ -149,23 +174,26 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 					},
 				},
 			},
-			expErr: true,
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+			expErr:          true,
 		},
 		{
 			name: "NoCommitData",
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
 				1: {},
 			},
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
 		},
 		{
-			name:         "EmptyObservedData",
-			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{},
+			name:            "EmptyObservedData",
+			observedData:    map[cciptypes.ChainSelector][]exectypes.CommitData{},
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedSequenceNumbers(tc.observedData)
+			err := validateObservedSequenceNumbers(tc.supportedChains, tc.observedData)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -187,6 +215,7 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
 				1: {},
 			},
+			expErr: true,
 		},
 		{
 			name:         "EmptyObservedData",
@@ -628,7 +657,7 @@ func Test_combineReportsAndMessages(t *testing.T) {
 
 func Test_decodeAttributedObservations(t *testing.T) {
 	mustEncode := func(obs exectypes.Observation) []byte {
-		enc, err := jsonOcrTypeCodec.EncodeObservation(obs)
+		enc, err := ocrTypeCodec.EncodeObservation(obs)
 		if err != nil {
 			t.Fatal("Unable to encode")
 		}
@@ -663,7 +692,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							1: {{MerkleRoot: cciptypes.Bytes32{1}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
 						},
 					},
 				},
@@ -695,7 +724,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							1: {{MerkleRoot: cciptypes.Bytes32{1}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
 						},
 					},
 				},
@@ -703,7 +732,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(2),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							2: {{MerkleRoot: cciptypes.Bytes32{2}, OnRampAddress: cciptypes.UnknownAddress{}}},
+							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
 						},
 					},
 				},
@@ -724,7 +753,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := decodeAttributedObservations(tt.args, jsonOcrTypeCodec)
+			got, err := decodeAttributedObservations(tt.args, ocrTypeCodec)
 			if !tt.wantErr(t, err, fmt.Sprintf("decodeAttributedObservations(%v)", tt.args)) {
 				return
 			}
@@ -782,20 +811,20 @@ func Test_getConsensusObservation(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "consensus when exactly f+1",
+			name: "consensus when exactly 2f+1",
 			args: args{
 				observation: []exectypes.Observation{
 					{
 						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
-						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 1},
 					},
 					{
 						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
-						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 1},
 					},
 					{
 						Nonces: exectypes.NonceObservations{dstChain: {"0x1": 1}},
-						FChain: map[cciptypes.ChainSelector]int{dstChain: 2},
+						FChain: map[cciptypes.ChainSelector]int{dstChain: 1},
 					},
 				},
 			},
@@ -845,9 +874,9 @@ func Test_getConsensusObservation(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "3 observers required to reach consensus on 4 sender values",
+			name: "3 observers required to reach consensus on 4 sender values (with 2f+1)",
 			args: args{
-				// Across 3 observers
+				// Across 3 observers, need all 3 observers to agree for consensus (2f+1 = 3)
 				observation: []exectypes.Observation{
 					{
 						Nonces: exectypes.NonceObservations{
@@ -863,6 +892,8 @@ func Test_getConsensusObservation(t *testing.T) {
 						Nonces: exectypes.NonceObservations{
 							1: {
 								"0x1": 1,
+								"0x2": 2,
+								"0x3": 3,
 								"0x4": 4,
 							},
 						},
@@ -870,8 +901,10 @@ func Test_getConsensusObservation(t *testing.T) {
 					}, {
 						Nonces: exectypes.NonceObservations{
 							1: {
+								"0x1": 1,
 								"0x2": 2,
 								"0x3": 3,
+								"0x4": 4,
 							},
 						},
 						FChain: defaultFChain,
@@ -1005,6 +1038,11 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewNoopTokenData(),
 					),
 				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+				},
 			},
 			expected: map[cciptypes.SeqNum]expected{
 				1: {ready: true, data: [][]byte{{}}},
@@ -1041,9 +1079,23 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewSuccessTokenData([]byte{32}),
 						exectypes.NewSuccessTokenData([]byte{33}),
 					),
-					4: exectypes.NewMessageTokenData(
-						exectypes.NewSuccessTokenData([]byte{41}),
-						exectypes.NewSuccessTokenData([]byte{42}),
+					5: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{51}),
+						exectypes.NewSuccessTokenData([]byte{52}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewNoopTokenData(),
+					),
+					3: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{31}),
+						exectypes.NewSuccessTokenData([]byte{32}),
+						exectypes.NewSuccessTokenData([]byte{33}),
 					),
 					5: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{51}),
@@ -1055,7 +1107,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 				1: {ready: false},
 				2: {ready: false},
 				3: {ready: false},
-				4: {ready: false},
 				5: {ready: true, data: [][]byte{{51}, {52}}},
 			},
 		},
@@ -1080,6 +1131,13 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					1: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{11}),
 						exectypes.NewSuccessTokenData([]byte{12}),
+						exectypes.NewSuccessTokenData([]byte{13}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewNoopTokenData(),
 						exectypes.NewSuccessTokenData([]byte{13}),
 					),
 				},
@@ -1173,6 +1231,13 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 						exectypes.NewSuccessTokenData([]byte{3}),
 					),
 				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
 			},
 			expected: map[cciptypes.SeqNum]expected{
 				1: {ready: true, data: [][]byte{{1}, {2}, {3}}},
@@ -1188,6 +1253,14 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					),
 					2: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{90}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
 					),
 				},
 				{
@@ -1233,6 +1306,11 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					),
 				},
 				{
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+				{
 					1: exectypes.NewMessageTokenData(
 						exectypes.NewErrorTokenData(fmt.Errorf("error")),
 					),
@@ -1254,6 +1332,14 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					1: exectypes.NewMessageTokenData(
 						exectypes.TokenData{Ready: true, Data: []byte{1}},
 					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: true, Data: []byte{2}, Supported: true},
+					),
+					3: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: true, Data: []byte{3}, Supported: false},
+					),
+				},
+				{
 					2: exectypes.NewMessageTokenData(
 						exectypes.TokenData{Ready: true, Data: []byte{2}, Supported: true},
 					),
@@ -1315,80 +1401,6 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 	}
 }
 
-func Test_mergeCostlyMessages(t *testing.T) {
-	tests := []struct {
-		name       string
-		aos        []plugincommon.AttributedObservation[exectypes.Observation]
-		fChainDest int
-		want       []cciptypes.Bytes32
-	}{
-		{
-			name:       "no observations",
-			aos:        []plugincommon.AttributedObservation[exectypes.Observation]{},
-			fChainDest: 1,
-			want:       nil,
-		},
-		{
-			name: "observations below threshold",
-			aos: []plugincommon.AttributedObservation[exectypes.Observation]{
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-			},
-			fChainDest: 3,
-			want:       nil,
-		},
-		{
-			name: "observations above threshold",
-			aos: []plugincommon.AttributedObservation[exectypes.Observation]{
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-				{
-					Observation: exectypes.Observation{
-						CostlyMessages: []cciptypes.Bytes32{
-							{0x01},
-						},
-					},
-				},
-			},
-			fChainDest: 2,
-			want: []cciptypes.Bytes32{
-				{0x01},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := mergeCostlyMessages(tt.aos, tt.fChainDest)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func Test_allSeqNrsObserved(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -1437,64 +1449,6 @@ func Test_allSeqNrsObserved(t *testing.T) {
 	}
 }
 
-func Test_validateCostlyMessagesObservations(t *testing.T) {
-	tests := []struct {
-		name           string
-		observedMsgs   exectypes.MessageObservations
-		costlyMessages []cciptypes.Bytes32
-		expErr         bool
-	}{
-		{
-			name: "ValidCostlyMessages",
-			observedMsgs: exectypes.MessageObservations{
-				1: {
-					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
-					2: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x02}}},
-				},
-			},
-			costlyMessages: []cciptypes.Bytes32{{0x01}, {0x02}},
-			expErr:         false,
-		},
-		{
-			name: "CostlyMessageNotFound",
-			observedMsgs: exectypes.MessageObservations{
-				1: {
-					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
-				},
-			},
-			costlyMessages: []cciptypes.Bytes32{{0x02}},
-			expErr:         true,
-		},
-		{
-			name: "EmptyCostlyMessages",
-			observedMsgs: exectypes.MessageObservations{
-				1: {
-					1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
-				},
-			},
-			costlyMessages: []cciptypes.Bytes32{},
-			expErr:         false,
-		},
-		{
-			name:           "EmptyObservedMessages",
-			observedMsgs:   exectypes.MessageObservations{},
-			costlyMessages: []cciptypes.Bytes32{{0x01}},
-			expErr:         true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			err := validateCostlyMessagesObservations(tc.observedMsgs, tc.costlyMessages)
-			if tc.expErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
 func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -1532,7 +1486,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 					{SourceChain: 2},
 				},
 			},
-			expErr: "observer not allowed to read from chain 2",
+			expErr: "invalid observed data, key=1 but data chain=2",
 		},
 	}
 

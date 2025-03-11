@@ -45,15 +45,15 @@ const (
 	// that assumes estimatedMaxNumberOfSourceChains source chains and
 	// estimatedMaxRmnNodesCount (theoretical max) RMN nodes.
 	// check factory_test for the calculation
-	maxQueryLength = 559_320
+	maxQueryLength = 242_869
 
 	// maxObservationLength is set to the maximum size of an observation
 	// check factory_test for the calculation
-	maxObservationLength = 1_047_206
+	maxObservationLength = 650_307
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 1_167_845
+	maxOutcomeLength = 700_620
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation
@@ -69,6 +69,7 @@ type PluginFactory struct {
 	ocrConfig         reader.OCR3ConfigWithMeta
 	commitCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
+	addrCodec         cciptypes.AddressCodec
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -83,6 +84,7 @@ type CommitPluginFactoryParams struct {
 	OcrConfig         reader.OCR3ConfigWithMeta
 	CommitCodec       cciptypes.CommitPluginCodec
 	MsgHasher         cciptypes.MessageHasher
+	AddrCodec         cciptypes.AddressCodec
 	HomeChainReader   reader.HomeChain
 	HomeChainSelector cciptypes.ChainSelector
 	ContractReaders   map[cciptypes.ChainSelector]types.ContractReader
@@ -100,6 +102,7 @@ func NewCommitPluginFactory(params CommitPluginFactoryParams) *PluginFactory {
 		ocrConfig:         params.OcrConfig,
 		commitCodec:       params.CommitCodec,
 		msgHasher:         params.MsgHasher,
+		addrCodec:         params.AddrCodec,
 		homeChainReader:   params.HomeChainReader,
 		homeChainSelector: params.HomeChainSelector,
 		contractReaders:   params.ContractReaders,
@@ -180,6 +183,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
+		p.addrCodec,
 	)
 
 	// The node supports the chain that the token prices are on.
@@ -204,6 +208,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,
+		p.addrCodec,
 	)
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
@@ -227,6 +232,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			p.rmnPeerClient,
 			config,
 			metricsReporter,
+			p.addrCodec,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{
