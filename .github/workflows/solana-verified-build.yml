@@ -20,15 +20,14 @@ jobs:
       id: cache-target
       uses: actions/cache@v4 # v4
       with:
-        path: |
-            chains/solana/contracts/target
-            !chains/solana/contracts/target/deploy/*-keypair.json
+        path: chains/solana/contracts/target
         key: ${{ runner.os }}-solana-contract-verified-${{ hashFiles('**/Cargo.lock') }}
     - name: Build Verified Artifacts
       if: steps.cache-target.outputs.cache-hit != 'true'
       run: |
         cd chains/solana/contracts
         solana-verify build
+        rm target/deploy/*-keypair.json
     - name: Upload artifact # so non-GHA jobs can download the verified artifacts
       continue-on-error: true # don't fail if the upload fails, it might conflict with another job
       uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
