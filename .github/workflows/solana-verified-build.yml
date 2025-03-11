@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - tt/verified
   workflow_dispatch:
 
 jobs:
