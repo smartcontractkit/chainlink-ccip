@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest-8cores-32GB
     steps:
     - uses: actions/checkout@v4
-    - uses: actions-rust-lang/setup-rust-toolchain@v1
+    - uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1
     - name: Install Solana Verify
       run: |
         cargo install solana-verify
