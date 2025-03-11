@@ -1,0 +1,106 @@
+---
+nodeCount: 1
+bootNodeCount: 0
+
+fullnameOverride: null
+
+networkPolicy:
+  enabled: false
+
+rollout:
+  enabled: false
+
+common:
+  chainlink:
+    v2Config:
+      00-defaults-node-config.toml: |
+        RootDir = '/home/chainlink'
+
+        [Database]
+        MaxIdleConns = 20
+        MaxOpenConns = 40
+        MigrateOnStartup = true
+
+        [Log]
+        Level = 'info'
+        JSONConsole = true
+
+        [Log.File]
+        MaxSize = '0b'
+
+        [WebServer]
+        AllowOrigins = '*'
+        HTTPPort = 6688
+        SecureCookies = false
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 100
+
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+  chainlinkNode:
+    enabled: false
+    metadata:
+      annotations:
+        chainlinknode.k8s.chain.link/disable-tls: "false"
+    spec:
+      database:
+        config:
+          database: chainlink
+          host: null
+          password: JGVgp7M2Emcg7Av8KKVUgMZb
+          port: '5432'
+          user: chainlink
+      credentials:
+        config:
+          api:
+            key: .api
+            user: 'admin@chain.link'
+            password: hWDmgcub2gUhyrG6cxriqt7T
+          keystore:
+            key: .keystore
+            password: cdz7KhvF4ATje2TjrwGMJh2Q
+          vrf:
+            key: .vrf
+            password: cdz7KhvF4ATje2TjrwGMJh2Q
+
+  requiredLabels:
+    app.kubernetes.io/component: chainlink
+    app.chain.link/team: infra
+    app.chain.link/product: base
+    app.chain.link/blockchain: multichain
+    app.chain.link/network: multichain
+    app.chain.link/network-type: testnet
+
+  service:
+    private:
+      type: ClusterIP
+
+  resources:
+    requests:
+      cpu: "0.1"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  tolerations: []
+    # - key: "node-role"
+    #   operator: "Equal"
+    #   value: "nodes"
+    #   effect: "NoSchedule"
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 14933
+    runAsGroup: 14933
+
+  servicemonitor:
+    enabled: false
+
+  nodeSelector: {}
+  affinity: {}
+
+overrides: []
