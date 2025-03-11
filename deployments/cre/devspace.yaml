@@ -15,7 +15,7 @@ vars:
     default: "${CRIB_DIR}/imports"
   TMP_DIR:
     source: env
-    default: "${CRIB_DIR}/deployments/ccip-v2/.tmp"
+    default: "${CRIB_DIR}/deployments/cre/.tmp"
   # "The provider being used to deploy CRIB"
   PROVIDER:
     source: all
@@ -32,21 +32,33 @@ vars:
   DON_VERSION:
     source: env
     default: latest
-  DON_NODE_COUNT:
-    source: env
-    default: 4
-  DON_BOOT_NODE_COUNT:
-    source: env
-    default: 1
-  GETH_CHAINS_COUNT:
+  WORKFLOW_DON_NODE_COUNT:
     source: env
     default: 2
+  WORKFLOW_DON_BOOT_NODE_COUNT:
+    source: env
+    default: 1
+  CAPABILITY_DON_NODE_COUNT:
+    source: env
+    default: 4
+  CAPABILITY_DON_BOOT_NODE_COUNT:
+    source: env
+    default: 1
+  # DON_NODE_COUNT:
+  #   source: env
+  #   default: 4
+  # DON_BOOT_NODE_COUNT:
+  #   source: env
+  #   default: 1
+  GETH_CHAINS_COUNT:
+    source: env
+    default: 1
   CHAINLINK_PRODUCT:
     source: env
     default: chainlink
   CRE_CONFIG_DIR:
     source: env
-    default: "${CRIB_DIR}/deployments/cre/config"
+    default: "${CRIB_DIR}/deployments/cre/.tmp/config"
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -67,11 +79,38 @@ pipelines:
       run_pipelines maybe-kind
 
       run_dependency_pipelines geth-chains
-  dons:
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
+  all-dons:
+    run: |-
+      run_pipelines maybe-kind
+
+      echo "Workflow DON bootstrap/worker node count: $WORKFLOW_DON_BOOT_NODE_COUNT/$WORKFLOW_DON_NODE_COUNT"
+
+      if { [[ "$WORKFLOW_DON_NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$WORKFLOW_DON_NODE_COUNT" -gt 0 ]; } || { [[ "$WORKFLOW_DON_BOOT_NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$WORKFLOW_DON_BOOT_NODE_COUNT" -gt 0 ]; }; then
+       run_dependency_pipelines workflow-don
+      fi
+
+      echo "Capability DON bootstrap/worker node count: $CAPABILITY_DON_BOOT_NODE_COUNT/$CAPABILITY_DON_NODE_COUNT"
+
+      if { [[ "$CAPABILITY_DON_NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$CAPABILITY_DON_NODE_COUNT" -gt 0 ]; } || { [[ "$CAPABILITY_DON_BOOT_NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$CAPABILITY_DON_BOOT_NODE_COUNT" -gt 0 ]; }; then
+        run_dependency_pipelines capability-don
+      fi
+
+      run_dependency_pipelines job-distributor
+  workflow-don:
+    run: |-
+      run_pipelines maybe-kind
+
+      run_dependency_pipelines workflow-don
+  capability-don:
     run: |-
       run_pipelines maybe-kind
 
       run_dependency_pipelines capability-don
+  jd:
+    run: |-
+      run_pipelines maybe-kind
+
       run_dependency_pipelines job-distributor
 profiles:
   - name: chains
@@ -91,6 +130,18 @@ profiles:
       - op: add
         path: dependencies
         value:
+          workflow-don:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles:
+              - version-from-env
+              # - network-generated
+            vars:
+              DON_NODE_COUNT: ${WORKFLOW_DON_NODE_COUNT}
+              DON_BOOT_NODE_COUNT: ${WORKFLOW_DON_BOOT_NODE_COUNT}
+              DON_TYPE: workflow
           capability-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
@@ -98,11 +149,15 @@ profiles:
             pipeline: deploy
             profiles:
               - version-from-env
-#              - network-generated
+              # - network-generated
+            vars:
+              DON_NODE_COUNT: ${CAPABILITY_DON_NODE_COUNT}
+              DON_BOOT_NODE_COUNT: ${CAPABILITY_DON_BOOT_NODE_COUNT}
+              DON_TYPE: capability
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
+            namespace: ${DEVSPACE_NAMESPACE}-jd
 
   - name: kind
     patches:
@@ -128,7 +183,19 @@ commands:
     command: devspace run-pipeline chains -p chains -p ${PROVIDER}
     description: Deploy all chains
     appendArgs: true
+  deploy-workflow-don:
+    command: devspace run-pipeline workflow-don -p dons -p ${PROVIDER}
+    description: Deploy first DON
+    appendArgs: true
+  deploy-capability-don:
+    command: devspace run-pipeline capability-don -p dons -p ${PROVIDER}
+    description: Deploy second DON
+    appendArgs: true
+  deploy-jd:
+    command: devspace run-pipeline jd -p dons -p ${PROVIDER}
+    description: Deploy JD
+    appendArgs: true
   deploy-dons:
-    command: devspace run-pipeline dons -p dons -p ${PROVIDER}
+    command: devspace run-pipeline all-dons -p dons -p ${PROVIDER}
     description: Deploy all DONs
     appendArgs: true

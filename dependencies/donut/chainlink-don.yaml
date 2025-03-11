@@ -187,7 +187,7 @@ profiles:
     patches:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
-        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/type.${DON_TYPE}.yaml
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
   - name: don-base-version
     activation: *enableDonBase
     patches:

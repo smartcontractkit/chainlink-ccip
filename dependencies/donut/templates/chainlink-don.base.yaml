@@ -23,15 +23,16 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-bt-{{ $i }}
+                  nodeName: ${DON_TYPE}-bt-{{ $i }}
               chainlink:
                 v2Config:
                   99-config-override.toml: |
                     {{- printf "\n" }}
-                    {{- file.Read (printf "%s/config-override-bt-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
+                    {{- file.Read (printf "%s/%s/config-override-bt-%d.toml" (getenv "CRE_CONFIG_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
                 v2Secret:
                   99-secrets-override.toml: |
                     {{- printf "\n" }}
-                    {{- file.Read (printf "%s/secrets-override-bt-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
+                    {{- file.Read (printf "%s/%s/secrets-override-bt-%d.toml" (getenv "CRE_CONFIG_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
           {{- end }}
           {{- end }}
           {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
@@ -41,20 +42,21 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-{{ $i }}
+                  nodeName: ${DON_TYPE}-{{ $i }}
               chainlink:
                 v2Config:
                   99-config-override.toml: |
                     {{- printf "\n" }}
-                    {{- file.Read (printf "%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
+                    {{- file.Read (printf "%s/%s/config-override-%d.toml" (getenv "CRE_CONFIG_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
                 v2Secret:
                   99-secrets-override.toml: |
                     {{- printf "\n" }}
-                    {{- file.Read (printf "%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") $i) | strings.Indent 18 }}
+                    {{- file.Read (printf "%s/%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
           {{- end }}
           {{- end }}
     {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
     {{- range $i := seq 0 (math.Sub .Env.DON_BOOT_NODE_COUNT 1) }}
-    chainlink-don-db-bt-{{ $i }}:
+    chainlink-don-db-bt-{{ strings.ToLower (getenv "DON_TYPE") }}-{{ $i }}:
       updateImageTags: false
       namespace: ${DEVSPACE_NAMESPACE}
       helm:
@@ -75,7 +77,7 @@ in: |
     {{- end }}
     {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
     {{- range $i := seq 0 (math.Sub .Env.DON_NODE_COUNT 1) }}
-    chainlink-don-db-{{ $i }}:
+    chainlink-don-db-{{ strings.ToLower (getenv "DON_TYPE") }}-{{ $i }}:
       updateImageTags: false
       namespace: ${DEVSPACE_NAMESPACE}
       helm:
