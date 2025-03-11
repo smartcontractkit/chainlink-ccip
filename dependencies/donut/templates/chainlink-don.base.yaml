@@ -133,7 +133,7 @@ in: |
           fullnameOverride: ${DON_TYPE}-gateway-db-{{ $i }}
     {{- end }}
     {{- end }}
-  {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
+  {{- if gt (conv.ToInt .Env.DON_GATEWAY_NODE_COUNT) 0 }}
   hooks:
     # This hook will ensure that every time the deployment
     # chainlink-don-gateway is deployed that DevSpace will wait until
