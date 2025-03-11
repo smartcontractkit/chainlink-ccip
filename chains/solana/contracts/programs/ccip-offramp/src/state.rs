@@ -23,13 +23,14 @@ pub struct Config {
     pub ocr3: [Ocr3Config; 2],
 }
 
-#[account]
+#[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct ReferenceAddresses {
     pub version: u8,
     pub router: Pubkey,
     pub fee_quoter: Pubkey,
     pub offramp_lookup_table: Pubkey,
+    pub rmn_remote: Pubkey,
 }
 
 #[zero_copy]
@@ -172,7 +173,7 @@ pub enum MessageExecutionState {
     Untouched = 0,
     InProgress = 1, // Not used in SVM, but used in EVM
     Success = 2,
-    Failure = 3,
+    Failure = 3, // Not used in SVM, but used in EVM
 }
 
 impl TryFrom<u128> for MessageExecutionState {

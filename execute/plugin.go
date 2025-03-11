@@ -498,7 +498,7 @@ func (p *Plugin) Reports(
 	}
 
 	reportInfo := extractReportInfo(decodedOutcome)
-	p.lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
+	lggr.Debugw("report info in Reports()", "reportInfo", reportInfo)
 	encodedInfo, err := reportInfo.Encode()
 	if err != nil {
 		return nil, err
@@ -585,8 +585,7 @@ func (p *Plugin) validateReport(
 
 	// check that the messages in the report are not already executed onchain.
 	// note that this involves a set of DB queries, hence why its last in the checks.
-	seqNrRangesBySource := getSnRangeSetPairsBySource(decodedReport.ChainReports)
-	err = p.checkAlreadyExecuted(ctx, lggr, seqNrRangesBySource)
+	err = p.checkAlreadyExecuted(ctx, lggr, decodedReport.ChainReports)
 	if errors.Is(err, errAlreadyExecuted) {
 		// Some messages in the report have already
 		// been executed, so we don't want to re-execute them.
@@ -603,55 +602,66 @@ func (p *Plugin) validateReport(
 	return decodedReport, nil
 }
 
-// checkAlreadyExecuted checks if the messages in the report have already been executed
+// checkAlreadyExecuted checks if all the messages from all source chains in the report have already been executed
 // on the destination chain. It queries the DB for executed messages in the given sequence
 // number range for each source chain in the report.
+//
+// The reasoning behind the "all or nothing" approach is that if some messages have already been executed
+// and some have not, its possible that messages with skipped nonces have been executed. This could happen
+// due to out of order transmissions. Giving the transmission another shot would mean we won't have
+// extended delays due to skipped nonces.
+//
+// However, if all messages in the report are already executed, which is the usual case, we can safely skip
+// transmitting the report.
 func (p *Plugin) checkAlreadyExecuted(
 	ctx context.Context,
 	lggr logger.Logger,
-	seqNrRangesBySource map[cciptypes.ChainSelector]snRangeSetPair,
+	reports []cciptypes.ExecutePluginReportSingleChain,
 ) error {
+	seqNrRangesBySource := getSeqNrRangesBySource(reports)
+
 	// TODO: batch these queries? these are all DB reads.
 	// maybe some alternative queries exist.
 	for sourceChainSelector, seqNrRange := range seqNrRangesBySource {
-		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange.snRange, primitives.Unconfirmed)
+		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange, primitives.Unconfirmed)
 		if err != nil {
 			return fmt.Errorf("couldn't check if messages already executed: %w", err)
 		}
 
-		if intersection := mapset.NewSet(executed...).Intersect(seqNrRange.set); !intersection.IsEmpty() {
-			// Some messages in the report have been executed, don't accept it.
-			reportSeqNrsSlice := seqNrRange.set.ToSlice()
-			lggr.Warnw("some messages in report already executed",
-				"alreadyExecuted", executed,
-				"reportSeqNrs", reportSeqNrsSlice,
+		executedSet := mapset.NewSet(executed...)
+		snRangeSet := mapset.NewSet(seqNrRange.ToSlice()...)
+		intersection := executedSet.Intersect(snRangeSet)
+		if intersection.Cardinality() != seqNrRange.Length() {
+			// Some messages have not been executed, return early to accept/transmit the report.
+			notYetExecuted := snRangeSet.Difference(executedSet)
+			lggr.Debugw("some messages from source not yet executed",
+				"sourceChain", sourceChainSelector,
+				"seqNrRange", seqNrRange,
+				"executed", executed,
+				"notYetExecuted", notYetExecuted,
 			)
-			return fmt.Errorf("%w: already executed messages %+v report seq nrs %+v",
-				errAlreadyExecuted, executed, reportSeqNrsSlice)
+			return nil
 		}
+
+		// All messages from this source have been executed, check the next source chain.
+		lggr.Debugw("all messages from source already executed, checking next source",
+			"sourceChain", sourceChainSelector,
+			"seqNrRange", seqNrRange,
+			"executed", executed,
+		)
 	}
 
-	return nil
+	return fmt.Errorf(
+		"%w: all messages from all sources in provided reports already executed, not accepting/transmitting",
+		errAlreadyExecuted)
 }
 
-// snRangeSetPair is an internal data structure used to store a sequence number range
-// and a set of sequence numbers simultaneously.
-type snRangeSetPair struct {
-	// snRange is a range of [min, max] sequence numbers of the messages in the report for a particular source chain.
-	// it is used to query the CCIPReader for executed messages.
-	snRange cciptypes.SeqNumRange
-	// set is the sequence numbers of the messages in the report for a particular source chain.
-	// it is used to check whether the returned array from CCIPReader has a non-empty intersection
-	// with the set of sequence numbers in the report.
-	set mapset.Set[cciptypes.SeqNum]
-}
-
-// getSnRangeSetPairsBySource returns a map of source chain selector to
+// getSeqNrRangesBySource returns a map of source chain selector to
 // the sequence number range of the messages in the report.
-func getSnRangeSetPairsBySource(
+func getSeqNrRangesBySource(
 	chainReports []cciptypes.ExecutePluginReportSingleChain,
-) map[cciptypes.ChainSelector]snRangeSetPair {
-	seqNrRangesBySource := make(map[cciptypes.ChainSelector]snRangeSetPair)
+) map[cciptypes.ChainSelector]cciptypes.SeqNumRange {
+	seqNrRangesBySource := make(map[cciptypes.ChainSelector]cciptypes.SeqNumRange)
 	for _, chainReport := range chainReports {
 		// This should never happen, indicates a bug in the report building and accepting process.
 		// But we sanity check since slices.Min/Max will panic on empty slices.
@@ -664,20 +674,9 @@ func getSnRangeSetPairsBySource(
 		}
 		minMsg := slices.MinFunc(chainReport.Messages, cmpr)
 		maxMsg := slices.MaxFunc(chainReport.Messages, cmpr)
-		seqNrSet := mapset.NewSet(
-			slicelib.Map(
-				chainReport.Messages,
-				func(msg cciptypes.Message) cciptypes.SeqNum {
-					return msg.Header.SequenceNumber
-				},
-			)...,
-		)
-		seqNrRangesBySource[chainReport.SourceChainSelector] = snRangeSetPair{
-			snRange: cciptypes.NewSeqNumRange(
-				minMsg.Header.SequenceNumber,
-				maxMsg.Header.SequenceNumber),
-			set: seqNrSet,
-		}
+		seqNrRangesBySource[chainReport.SourceChainSelector] = cciptypes.NewSeqNumRange(
+			minMsg.Header.SequenceNumber,
+			maxMsg.Header.SequenceNumber)
 	}
 	return seqNrRangesBySource
 }
@@ -689,7 +688,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	decodedReport, err := p.validateReport(ctx, lggr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, not accepting: %w", err)
+		lggr.Infow("report not valid, not accepting", "err", err)
 		return false, nil
 	}
 	if err != nil {
@@ -730,7 +729,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	decodedReport, err := p.validateReport(ctx, lggr, r)
 	if errors.Is(err, plugincommon.ErrInvalidReport) {
-		lggr.Infow("report not valid, not transmitting: %w", err)
+		lggr.Infow("report not valid, not transmitting", "err", err)
 		return false, nil
 	}
 	if err != nil {

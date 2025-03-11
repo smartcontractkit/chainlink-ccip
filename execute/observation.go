@@ -167,9 +167,10 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// TODO: set fetchFrom to the oldest pending commit report.
-	// TODO: or, cache commit reports so that we don't need to fetch them again.
-	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
+	// Get the optimized timestamp using the cache
+	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
+
+	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 	//          a valid execution report.
@@ -233,10 +234,40 @@ func (p *Plugin) getCommitReportsObservation(
 		}
 	}
 
+	// Update the earliest unexecuted root based on remaining reports
+	p.commitRootsCache.UpdateEarliestUnexecutedRoot(buildCombinedReports(groupedCommits, fullyExecutedUnfinalized))
+
 	observation.CommitReports = groupedCommits
 
 	// TODO: truncate grouped to a maximum observation size?
 	return observation, nil
+}
+
+// buildCombinedReports creates a combined map for updating the earliest unexecuted root
+func buildCombinedReports(
+	groupedCommits map[cciptypes.ChainSelector][]exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
+) map[cciptypes.ChainSelector][]exectypes.CommitData {
+	combinedReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
+
+	// Add all unexecuted commits
+	for chain, commits := range groupedCommits {
+		combinedReports[chain] = append(combinedReports[chain], commits...)
+	}
+
+	// Add all unfinalized executions
+	for _, commit := range fullyExecutedUnfinalized {
+		combinedReports[commit.SourceChain] = append(
+			combinedReports[commit.SourceChain],
+			exectypes.CommitData{
+				Timestamp:   commit.Timestamp,
+				SourceChain: commit.SourceChain,
+				MerkleRoot:  commit.MerkleRoot,
+			},
+		)
+	}
+
+	return combinedReports
 }
 
 // regroup converts the previous outcome to the observation format.
