@@ -20,7 +20,6 @@ jobs:
       id: cache-target
       uses: actions/cache@v4 # v4
       with:
-        lookup-only: true
         path: chains/solana/contracts/target
         key: ${{ runner.os }}-solana-contract-verified-${{ hashFiles('**/Cargo.lock') }}
     - name: Build Verified Artifacts
