@@ -66,9 +66,9 @@ func Test_USDC_Transfer(t *testing.T) {
 		}`,
 	}
 
-	intTest := SetupSimpleTest(t, logger2.Test(t), sourceChain, destChain)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1)
-	intTest.WithUSDC(randomEthAddress, attestation104, events)
+	intTest := SetupSimpleTest(t, logger2.Test(t), []cciptypes.ChainSelector{sourceChain}, destChain)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1, sourceChain)
+	intTest.WithUSDC(randomEthAddress, attestation104, events, sourceChain)
 	runner := intTest.Start()
 	defer intTest.Close()
 
