@@ -31,6 +31,15 @@ vars:
   CHAINS_COUNT:
     source: env
     default: 2
+  CHAIN_ID:
+    source: env
+    default: 1337
+  BLOCK_TIME:
+    source: env
+    default: 2
+  GENSIS_BALANCE:
+    source: env
+    default: 115792089237316195423570985008687907853269984665640564039457584007913129639935
 
 pipelines:
   maybe-kind:
@@ -77,4 +86,17 @@ profiles:
         else
           echo "deployments:"
         fi
+      )
+  - name: custom-chain
+    activation:
+      - vars:
+          ENABLE_CUSTOM_CHAIN: "true"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DEVSPACE_INGRESS_BASE_DOMAIN=${DEVSPACE_INGRESS_BASE_DOMAIN} \
+        CHAINLINK_HELM_REGISTRY_URI=${CHAINLINK_HELM_REGISTRY_URI} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/minimal.yaml.tmpl \
+          --context 'Chains=[{\"NetworkId\":\"your_network_id\"}]'
       )

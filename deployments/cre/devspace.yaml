@@ -32,24 +32,12 @@ vars:
   DON_VERSION:
     source: env
     default: latest
-  WORKFLOW_DON_NODE_COUNT:
-    source: env
-    default: 2
-  WORKFLOW_DON_BOOT_NODE_COUNT:
-    source: env
-    default: 1
-  CAPABILITY_DON_NODE_COUNT:
+  DON_NODE_COUNT:
     source: env
     default: 4
-  CAPABILITY_DON_BOOT_NODE_COUNT:
+  DON_BOOT_NODE_COUNT:
     source: env
     default: 1
-  # DON_NODE_COUNT:
-  #   source: env
-  #   default: 4
-  # DON_BOOT_NODE_COUNT:
-  #   source: env
-  #   default: 1
   GETH_CHAINS_COUNT:
     source: env
     default: 1
@@ -59,6 +47,9 @@ vars:
   CRE_CONFIG_DIR:
     source: env
     default: "${CRIB_DIR}/deployments/cre/.tmp/config"
+  JOB_DISTRIBUTOR_IMAGE_TAG:
+    source: env
+    default: 0.9.0
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -74,39 +65,17 @@ pipelines:
           run_dependency_pipelines kind-monitoring
         fi
       fi
-  chains:
+  chain:
     run: |-
       run_pipelines maybe-kind
 
-      run_dependency_pipelines geth-chains
+      run_dependency_pipelines geth-chain
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
-  all-dons:
+  don:
     run: |-
       run_pipelines maybe-kind
 
-      echo "Workflow DON bootstrap/worker node count: $WORKFLOW_DON_BOOT_NODE_COUNT/$WORKFLOW_DON_NODE_COUNT"
-
-      if { [[ "$WORKFLOW_DON_NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$WORKFLOW_DON_NODE_COUNT" -gt 0 ]; } || { [[ "$WORKFLOW_DON_BOOT_NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$WORKFLOW_DON_BOOT_NODE_COUNT" -gt 0 ]; }; then
-       run_dependency_pipelines workflow-don
-      fi
-
-      echo "Capability DON bootstrap/worker node count: $CAPABILITY_DON_BOOT_NODE_COUNT/$CAPABILITY_DON_NODE_COUNT"
-
-      if { [[ "$CAPABILITY_DON_NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$CAPABILITY_DON_NODE_COUNT" -gt 0 ]; } || { [[ "$CAPABILITY_DON_BOOT_NODE_COUNT" =~ ^[0-9]+$ ]] && [ "$CAPABILITY_DON_BOOT_NODE_COUNT" -gt 0 ]; }; then
-        run_dependency_pipelines capability-don
-      fi
-
-      run_dependency_pipelines job-distributor
-  workflow-don:
-    run: |-
-      run_pipelines maybe-kind
-
-      run_dependency_pipelines workflow-don
-  capability-don:
-    run: |-
-      run_pipelines maybe-kind
-
-      run_dependency_pipelines capability-don
+      run_dependency_pipelines don
   jd:
     run: |-
       run_pipelines maybe-kind
@@ -118,42 +87,45 @@ profiles:
       - op: add
         path: dependencies
         value:
-          geth-chains:
+          geth-chain:
             path: ${DEPENDENCIES_DIR}/geth-v2
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             vars:
-              CHAINS_COUNT: ${GETH_CHAINS_COUNT}
+              CHAINS_COUNT: 1
               ENABLE_DON_BASE: "false"
+              CHAIN_OVERRIDES_FILENAME: ${CRE_CONFIG_DIR}/chain-overrides.yaml
+
+  - name: custom_chain
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          geth-chain:
+            path: ${DEPENDENCIES_DIR}/geth-v2
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              ENABLE_DON_BASE: "false"
+              CHAIN_ID: 2337
+              ENABLE_BASE_PROFILE: "false"
+              ENABLE_CUSTOM_CHAIN: "true"
+              LOCAL_TEMPLATES_DIR: ${DEPENDENCIES_DIR}/geth-v2/templates
+
   - name: dons
     patches:
       - op: add
         path: dependencies
         value:
-          workflow-don:
+          don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             pipeline: deploy
             profiles:
               - version-from-env
-              # - network-generated
             vars:
-              DON_NODE_COUNT: ${WORKFLOW_DON_NODE_COUNT}
-              DON_BOOT_NODE_COUNT: ${WORKFLOW_DON_BOOT_NODE_COUNT}
               DON_TYPE: workflow
-          capability-don:
-            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-            pipeline: deploy
-            profiles:
-              - version-from-env
-              # - network-generated
-            vars:
-              DON_NODE_COUNT: ${CAPABILITY_DON_NODE_COUNT}
-              DON_BOOT_NODE_COUNT: ${CAPABILITY_DON_BOOT_NODE_COUNT}
-              DON_TYPE: capability
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
@@ -179,23 +151,19 @@ profiles:
         value: monitoring-service-monitor
 
 commands:
-  deploy-chains:
-    command: devspace run-pipeline chains -p chains -p ${PROVIDER}
-    description: Deploy all chains
+  deploy-geth-chain:
+    command: devspace run-pipeline geth-chain -p chains -p ${PROVIDER}
+    description: Deploy a single Geth chain
     appendArgs: true
-  deploy-workflow-don:
-    command: devspace run-pipeline workflow-don -p dons -p ${PROVIDER}
-    description: Deploy first DON
-    appendArgs: true
-  deploy-capability-don:
-    command: devspace run-pipeline capability-don -p dons -p ${PROVIDER}
-    description: Deploy second DON
+  deploy-custom-chain:
+    command: devspace run-pipeline geth-chain -p custom_chain -p ${PROVIDER}
+    description: Deploy a single Geth chain
     appendArgs: true
   deploy-jd:
     command: devspace run-pipeline jd -p dons -p ${PROVIDER}
     description: Deploy JD
     appendArgs: true
   deploy-dons:
-    command: devspace run-pipeline all-dons -p dons -p ${PROVIDER}
-    description: Deploy all DONs
+    command: devspace run-pipeline don -p dons -p ${PROVIDER}
+    description: Deploy a single DONs
     appendArgs: true

@@ -1,0 +1,64 @@
+deployments:
+  geth-{{ env "NETWORK_ID" }}:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: "geth-${NETWORK_ID}"
+      chart:
+        # todo: Add conditional here for local charts support
+        name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-geth"
+        version: "2.2.0"
+      values:
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+        version: v1.12.0
+        wsRpcPort: 8546
+        httpRpcPort: 8544
+        blockchain:
+          networkId: "${NETWORK_ID}"
+          genesis:
+            balance: "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        networkPolicyDefault:
+          ingress:
+            allowCustomCidrs: true
+            # Should be a comma separated list of CIDR blocks. To include
+            # AWS ALB private CIDRs and optionally other custom CIDRs.
+            # Example format: 10.0.0.0/16,192.168.0.1/24
+            customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+        networkPolicy:
+          enabled: true
+          extraIngressSelectors:
+            # whitelist chainlink-don deployment from donut dependency
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: chainlink-don
+            # whitelist blockscout
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: blockscout-stack
+        ingress:
+          enabled: true
+          hosts:
+            - host: ${DEVSPACE_NAMESPACE}-geth-${NETWORK_ID}-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: "geth-${NETWORK_ID}"
+                        port:
+                          number: 8544
+            - host: ${DEVSPACE_NAMESPACE}-geth-${NETWORK_ID}-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: "geth-${NETWORK_ID}"
+                        port:
+                          number: 8546

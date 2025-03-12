@@ -67,6 +67,8 @@ vars:
     default: "true"
   CRE_CONFIG_DIR:
     source: env
+  JOB_DISTRIBUTOR_IMAGE_TAG:
+    source: env
 
 pipelines:
   maybe-kind:
@@ -316,6 +318,8 @@ profiles:
           path: ${DEPENDENCIES_DIR}/job-distributor
           overwriteVars: true
           namespace: ${DEVSPACE_NAMESPACE}
+          vars:
+            JOB_DISTRIBUTOR_IMAGE_TAG: ${JOB_DISTRIBUTOR_IMAGE_TAG}
   - name: crib-staging
     activation:
       - vars:
