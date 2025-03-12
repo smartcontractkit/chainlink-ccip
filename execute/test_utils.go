@@ -121,6 +121,7 @@ func (it *IntTest) WithMessages(
 			Messages:         msgs,
 			Hashes:           hashes,
 			MessageTokenData: make([]exectypes.MessageTokenData, len(msgs)),
+			Timestamp:        crTimestamp.Add(time.Duration(i+1) * time.Minute),
 		}
 
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))

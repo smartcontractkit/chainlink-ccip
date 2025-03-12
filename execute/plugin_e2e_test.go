@@ -188,3 +188,79 @@ func TestPlugin_FinalizedUnfinalizedCaching(t *testing.T) {
 	report := outcome.CommitReports[0]
 	require.Equal(t, cciptypes.NewSeqNumRange(200, 201), report.SequenceNumberRange)
 }
+
+func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcChainA := cciptypes.ChainSelector(1)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	// Create messages for multiple commit reports with different timestamps
+	baseTime := time.Now().Add(-4 * time.Hour)
+	msgSets := []struct {
+		messages  []inmem.MessagesWithMetadata
+		timestamp time.Time
+		blockNum  uint64
+	}{
+		{
+			// Latest messages
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(100, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(101, srcChainA, dstSelector, false),
+			},
+			timestamp: baseTime.Add(2 * time.Hour),
+			blockNum:  1002,
+		},
+		{
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(102, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(103, srcChainA, dstSelector, false),
+			},
+			timestamp: baseTime,
+			blockNum:  1000,
+		},
+		{
+			// Middle messages
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(104, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(105, srcChainA, dstSelector, false),
+			},
+			timestamp: baseTime.Add(time.Hour),
+			blockNum:  1001,
+		},
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), srcChainA, dstSelector)
+
+	// Add messages in non-chronological order
+	for _, set := range msgSets {
+		intTest.WithMessages(set.messages, set.blockNum, set.timestamp, 1)
+	}
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// GetCommitReports round - should return chronologically ordered reports
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	require.Len(t, outcome.CommitReports, 3)
+
+	// Verify timestamps are in ascending order
+	for i := 0; i < len(outcome.CommitReports)-1; i++ {
+		require.True(t, outcome.CommitReports[i].Timestamp.Before(
+			outcome.CommitReports[i+1].Timestamp),
+			"commit reports should be ordered by timestamp")
+	}
+
+	// Verify the specific order matches our expected chronological order
+	require.Equal(t, cciptypes.SeqNum(102),
+		outcome.CommitReports[0].SequenceNumberRange.Start(), "oldest report should be first")
+	require.Equal(t, cciptypes.SeqNum(104),
+		outcome.CommitReports[1].SequenceNumberRange.Start(), "middle report should be second")
+	require.Equal(t, cciptypes.SeqNum(100),
+		outcome.CommitReports[2].SequenceNumberRange.Start(), "newest report should be last")
+}
