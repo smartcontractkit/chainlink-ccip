@@ -63,12 +63,6 @@ vars:
   CHAINLINK_PRODUCT:
     source: env
     default: ccip
-  DON_GATEWAY_NODE_COUNT:
-    source: env
-    default: 0
-  DON_GATEWAY_NODE_COUNT_CRE:
-    source: env
-    default: 1
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -97,10 +91,12 @@ pipelines:
     run: |-
       run_dependency_pipelines ccip-don --set-flag infraOnly="true"
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
-  cre:
+  cre-don:
     run: |-
       run_dependency_pipelines cre-don
-      crib devspace ingress-check --nsTimeout=2m --timeout=4m
+  cre-don-gateway:
+    run: |-
+      run_dependency_pipelines cre-don-gateway
 
 profiles:
   - name: chain-alpha
@@ -206,7 +202,30 @@ profiles:
         path: vars
         value:
           ENV: sandbox
-          DON_GATEWAY_NODE_COUNT: ${DON_GATEWAY_NODE_COUNT_CRE}
+
+  - name: cre-gateway
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          cre-don-gateway:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles:
+              - version-from-env
+      - op: replace
+        path: vars
+        value:
+          DON_TYPE: gateway
+          DON_VERSION: ${DON_VERSION_CRE}
+          DON_BOOT_NODE_COUNT: 0
+      - op: add
+        path: vars
+        value:
+          ENV: sandbox
+          DON_NODE_COUNT: 1
 
 commands:
   besu:
@@ -232,6 +251,8 @@ commands:
     description: Deploy CCIP v1.6 DON infrastructure only (no onchain deployment)
     appendArgs: true
   cre:
-    command: devspace run-pipeline cre -p cre
+    command: |-
+      devspace run-pipeline cre-don -p cre
+      devspace run-pipeline cre-don-gateway -p cre-gateway
     description: Deploy the workflow/capability CRE DON infrastructure with a gateway node
     appendArgs: true

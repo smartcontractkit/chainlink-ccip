@@ -49,9 +49,6 @@ vars:
   DON_NODE_COUNT:
     source: env
     default: 1
-  DON_GATEWAY_NODE_COUNT:
-    source: env
-    default: 0
   # chains
   # Option to generate variable number of networks to be configured in Node config
   # It is required when network-generated profile is activated
@@ -139,6 +136,7 @@ deployments:
         version: "2.4.4"
       valuesFiles: []
       values: {}
+
 hooks:
   # This hook will ensure that every time the deployment
   # chainlink-don is deployed that DevSpace will wait until
@@ -180,8 +178,8 @@ profiles:
       $(
         CRIB_EKS_CLUSTER_NAME="${CRIB_EKS_CLUSTER_NAME}" \
         DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
-        DON_GATEWAY_NODE_COUNT=${DON_GATEWAY_NODE_COUNT} \
         DON_NODE_COUNT=${DON_NODE_COUNT} \
+        DON_TYPE=${DON_TYPE} \
         ENV=${ENV} \
         LOCAL_VALUES_DIR="${LOCAL_VALUES_DIR}" \
         POSTGRES_CHART_VERSION="15.5.9" \
@@ -270,14 +268,6 @@ profiles:
                   repository: ${DEVSPACE_IMAGE}
                   tag: ${DEVSPACE_IMAGE_TAG}
                   pullPolicy: Always
-        chainlink-don-gateway:
-          helm:
-            values:
-              common:
-                image:
-                  repository: ${DEVSPACE_IMAGE}
-                  tag: ${DEVSPACE_IMAGE_TAG}
-                  pullPolicy: Always
   # monitoring
   - name: monitoring-service-monitor
     patches:
@@ -324,6 +314,7 @@ profiles:
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging.yaml
       )
@@ -342,6 +333,7 @@ profiles:
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-main-fwog.yaml
       )
@@ -353,6 +345,7 @@ profiles:
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-sandbox.yaml
       )
@@ -360,6 +353,7 @@ profiles:
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip-load-tests.yaml
       )
@@ -370,6 +364,7 @@ profiles:
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-kind.yaml
       )
