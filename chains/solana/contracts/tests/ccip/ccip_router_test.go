@@ -1579,6 +1579,76 @@ func TestCCIPRouter(t *testing.T) {
 			}
 			require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
 		})
+		t.Run("RMNRemote: Can transfer ownership", func(t *testing.T) {
+			// Fail to transfer ownership when not owner
+			instruction, err := rmn_remote.NewTransferOwnershipInstruction(
+				ccipAdmin.PublicKey(),
+				config.RMNRemoteConfigPDA,
+				config.RMNRemoteCursesPDA,
+				user.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_RmnRemoteError.String()})
+			require.NotNil(t, result)
+
+			// successfully transfer ownership
+			instruction, err = rmn_remote.NewTransferOwnershipInstruction(
+				ccipAdmin.PublicKey(),
+				config.RMNRemoteConfigPDA,
+				config.RMNRemoteCursesPDA,
+				legacyAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			transferEvent := ccip.OwnershipTransferRequested{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "OwnershipTransferRequested", &transferEvent, config.PrintEvents))
+			require.Equal(t, legacyAdmin.PublicKey(), transferEvent.From)
+			require.Equal(t, ccipAdmin.PublicKey(), transferEvent.To)
+
+			// Fail to accept ownership when not proposed_owner
+			instruction, err = rmn_remote.NewAcceptOwnershipInstruction(
+				config.RMNRemoteConfigPDA,
+				user.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip.Unauthorized_RmnRemoteError.String()})
+			require.NotNil(t, result)
+
+			// Successfully accept ownership
+			// ccipAdmin becomes owner for remaining tests
+			instruction, err = rmn_remote.NewAcceptOwnershipInstruction(
+				config.RMNRemoteConfigPDA,
+				ccipAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
+			acceptEvent := ccip.OwnershipTransferred{}
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "OwnershipTransferred", &acceptEvent, config.PrintEvents))
+			require.Equal(t, legacyAdmin.PublicKey(), transferEvent.From)
+			require.Equal(t, ccipAdmin.PublicKey(), transferEvent.To)
+
+			// Current owner cannot propose self
+			instruction, err = rmn_remote.NewTransferOwnershipInstruction(
+				ccipAdmin.PublicKey(),
+				config.RMNRemoteConfigPDA,
+				config.RMNRemoteCursesPDA,
+				ccipAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result = testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.RedundantOwnerProposal_CcipOfframpError.String()})
+			require.NotNil(t, result)
+
+			// Validate proposed set to 0-address
+			var configAccount rmn_remote.Config
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteConfigPDA, config.DefaultCommitment, &configAccount)
+			if err != nil {
+				require.NoError(t, err, "failed to get account info")
+			}
+			require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
+		})
 	})
 
 	//////////////////////////
@@ -1867,7 +1937,7 @@ func TestCCIPRouter(t *testing.T) {
 			for _, v := range inputs {
 				t.Run(v.plugin.String(), func(t *testing.T) {
 					instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-						uint8(v.plugin),
+						ccip_offramp.OcrPluginType(v.plugin),
 						ccip_offramp.Ocr3ConfigInfo{
 							ConfigDigest:                   config.ConfigDigest,
 							F:                              config.OcrF,
@@ -1928,7 +1998,7 @@ func TestCCIPRouter(t *testing.T) {
 			t.Run("It rejects an invalid plugin type", func(t *testing.T) {
 				t.Parallel()
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(100),
+					ccip_offramp.OcrPluginType(100),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1941,13 +2011,13 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + ccip.InvalidPluginType_CcipOfframpError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: InstructionDidNotDeserialize"})
 			})
 
 			t.Run("It rejects F = 0", func(t *testing.T) {
 				t.Parallel()
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            0,
@@ -1970,7 +2040,7 @@ func TestCCIPRouter(t *testing.T) {
 					invalidTransmitters[i] = getTransmitter().PublicKey()
 				}
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -1994,7 +2064,7 @@ func TestCCIPRouter(t *testing.T) {
 				}
 
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -2016,7 +2086,7 @@ func TestCCIPRouter(t *testing.T) {
 				invalidSigners[0] = signerAddresses[0]
 
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -2041,7 +2111,7 @@ func TestCCIPRouter(t *testing.T) {
 					invalidTransmitters[i] = transmitter
 				}
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -2066,7 +2136,7 @@ func TestCCIPRouter(t *testing.T) {
 				oneTransmitter := []solana.PublicKey{transmitterPubKeys[0]}
 
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -2087,7 +2157,7 @@ func TestCCIPRouter(t *testing.T) {
 				invalidTransmitterPubKeys := []solana.PublicKey{transmitterPubKeys[0], common.ZeroAddress}
 
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -2110,7 +2180,7 @@ func TestCCIPRouter(t *testing.T) {
 					invalidSignerAddresses = append(invalidSignerAddresses, v.Address)
 				}
 				instruction, err := ccip_offramp.NewSetOcrConfigInstruction(
-					uint8(testutils.OcrCommitPlugin),
+					ccip_offramp.OcrPluginType(testutils.OcrCommitPlugin),
 					ccip_offramp.Ocr3ConfigInfo{
 						ConfigDigest: config.ConfigDigest,
 						F:            config.OcrF,
@@ -2880,12 +2950,12 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewCurseInstruction(
 				globalCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
@@ -3017,12 +3087,12 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewUncurseInstruction(
 				globalCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
@@ -3040,12 +3110,12 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewCurseInstruction(
 				svmCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
@@ -3057,12 +3127,12 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err = rmn_remote.NewCurseInstruction(
 				evmCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
@@ -3074,12 +3144,12 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err = rmn_remote.NewUncurseInstruction(
 				svmCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RMNRemoteCursesPDA, config.DefaultCommitment, &curses)
@@ -3166,12 +3236,12 @@ func TestCCIPRouter(t *testing.T) {
 			ix, err := rmn_remote.NewUncurseInstruction(
 				evmCurse,
 				config.RMNRemoteConfigPDA,
-				legacyAdmin.PublicKey(),
+				ccipAdmin.PublicKey(),
 				config.RMNRemoteCursesPDA,
 				solana.SystemProgramID,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var curses rmn_remote.Curses
@@ -6747,12 +6817,12 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := rmn_remote.NewCurseInstruction(
 					globalCurse,
 					config.RMNRemoteConfigPDA,
-					legacyAdmin.PublicKey(),
+					ccipAdmin.PublicKey(),
 					config.RMNRemoteCursesPDA,
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
 				executionReport := ccip_offramp.ExecutionReportSingleChain{
@@ -6829,12 +6899,12 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err = rmn_remote.NewUncurseInstruction(
 					globalCurse,
 					config.RMNRemoteConfigPDA,
-					legacyAdmin.PublicKey(),
+					ccipAdmin.PublicKey(),
 					config.RMNRemoteCursesPDA,
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, legacyAdmin, config.DefaultCommitment)
+				result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment)
 				require.NotNil(t, result)
 			})
 

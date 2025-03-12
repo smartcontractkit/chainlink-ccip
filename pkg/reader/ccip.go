@@ -273,13 +273,9 @@ func (r *ccipChainReader) processMerkleRoots(
 	blessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(isBlessed))
 	unblessedMerkleRoots = make([]cciptypes.MerkleRootChain, 0, len(allMerkleRoots)-len(isBlessed))
 	for _, mr := range allMerkleRoots {
-		onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, cciptypes.ChainSelector(mr.SourceChainSelector))
-		if err != nil {
-			continue
-		}
 		mrc := cciptypes.MerkleRootChain{
 			ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),
-			OnRampAddress: onRampAddress,
+			OnRampAddress: mr.OnRampAddress,
 			SeqNumsRange: cciptypes.NewSeqNumRange(
 				cciptypes.SeqNum(mr.MinSeqNr),
 				cciptypes.SeqNum(mr.MaxSeqNr),
@@ -536,7 +532,7 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 		return 0, fmt.Errorf("failed to query onRamp: %w", err)
 	}
 
-	lggr.Infow("queried latest message from source",
+	lggr.Debugw("queried latest message from source",
 		"numMsgs", len(seq), "sourceChainSelector", chain)
 	if len(seq) > 1 {
 		return 0, fmt.Errorf("more than one message found for the latest message query")
@@ -556,6 +552,8 @@ func (r *ccipChainReader) LatestMsgSeqNum(
 		return 0, fmt.Errorf("message invalid msg %v: %w", msg, err)
 	}
 
+	lggr.Infow("chain reader returning latest onramp sequence number",
+		"seqNum", msg.Message.Header.SequenceNumber, "sourceChainSelector", chain)
 	return msg.SequenceNumber, nil
 }
 
@@ -564,6 +562,8 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
 	sourceChainSelector cciptypes.ChainSelector,
 ) (cciptypes.SeqNum, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+
 	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return 0, err
 	}
@@ -589,6 +589,8 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 			sourceChainSelector, r.destChain)
 	}
 
+	lggr.Debugw("chain reader returning expected next sequence number",
+		"seqNum", expectedNextSequenceNumber, "sourceChainSelector", sourceChainSelector)
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
@@ -1294,65 +1296,26 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
-	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
-	contractBatch := make(types.ContractBatch, 0, len(chains))
-	sourceChains := make([]any, 0, len(chains))
-
-	for _, chain := range chains {
-		if chain == r.destChain {
-			continue
-		}
-		sourceChains = append(sourceChains, chain)
-
-		contractBatch = append(contractBatch, types.BatchRead{
-			ReadName: consts.MethodNameGetSourceChainConfig,
-			Params: map[string]any{
-				"sourceChainSelector": chain,
-			},
-			ReturnVal: new(SourceChainConfig),
-		})
-	}
-
-	results, _, err := r.contractReaders[r.destChain].ExtendedBatchGetLatestValues(
-		ctx, contractreader.ExtendedBatchGetLatestValuesRequest{consts.ContractNameOffRamp: contractBatch},
-		false,
-	)
-
+	// Use the ConfigPoller to handle caching
+	configs, err := r.configPoller.GetOfframpSourceChainConfigs(ctx, r.destChain, chains)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs for dest chain %d: %w",
-			r.destChain, err)
+		return nil, fmt.Errorf("get source chain configs: %w", err)
 	}
 
-	lggr.Debugw("got source chain configs", "configs", results)
-
-	// Populate the map.
-	for _, readResult := range results {
-		if len(readResult) != len(sourceChains) {
-			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, configs=%v",
-				sourceChains, results)
-		}
-		for i, chainSel := range sourceChains {
-			v, err := readResult[i].GetResult()
-			if err != nil {
-				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chainSel, err)
-			}
-
-			cfg, ok := v.(*SourceChainConfig)
-			if !ok {
-				return nil, fmt.Errorf("invalid result type from GetSourceChainConfig for chainSelector=%d: %w", chainSel, err)
-			}
-
+	// Filter out disabled chains if needed
+	if !includeDisabled {
+		for chain, cfg := range configs {
 			enabled, err := cfg.check()
 			if err != nil {
-				return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
+				return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chain, err)
 			}
-			if !enabled && !includeDisabled {
-				// We don't want to process disabled chains prematurely.
-				lggr.Debugw("source chain is disabled", "chain", chainSel)
-				continue
+			if !enabled {
+				lggr.Debugw("Filtering out disabled source chain",
+					"chain", chain,
+					"error", err,
+					"enabled", enabled)
+				delete(configs, chain)
 			}
-
-			configs[chainSel.(cciptypes.ChainSelector)] = *cfg
 		}
 	}
 

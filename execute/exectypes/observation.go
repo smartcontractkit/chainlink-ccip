@@ -43,6 +43,15 @@ func (mo MessageObservations) Flatten() []cciptypes.Message {
 	return results
 }
 
+// Count the number of messages in the observation.
+func (mo MessageObservations) Count() int {
+	count := 0
+	for _, msgs := range mo {
+		count += len(msgs)
+	}
+	return count
+}
+
 func (mo MessageObservations) Stats() map[string]int {
 	messagesCount := 0
 	for _, chainMessages := range mo {

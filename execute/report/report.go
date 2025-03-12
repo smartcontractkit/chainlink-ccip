@@ -407,8 +407,8 @@ func verifyReportNonceContinuity(
 			// we've seen this sender before and the msg.Header.Nonce is not the expected value,
 			// it should be latestNonce + 1.
 			return fmt.Errorf(
-				"skipped nonce detected for sender %s: nonce in report %d != last nonce seen %d",
-				sender, msg.Header.Nonce, latestNonce)
+				"skipped nonce detected for sender %s (source chain %d): nonce in report %d != last nonce seen %d",
+				sender, msg.Header.SourceChainSelector, msg.Header.Nonce, latestNonce)
 		}
 
 		// otherwise, the nonce is as expected, continue to the next message.
@@ -426,7 +426,9 @@ func (b *execReportBuilder) verifyReport(
 ) (bool, validationMetadata, error) {
 	err := verifyReportNonceContinuity(b.addressCodec, execReport)
 	if err != nil {
-		b.lggr.Infow("invalid report, skipped nonce detected", "err", err)
+		b.lggr.Infow("invalid report, skipped nonce detected",
+			"err", err,
+			"sourceChain", execReport.SourceChainSelector)
 		return false, validationMetadata{}, nil
 	}
 
@@ -525,6 +527,22 @@ func (b *execReportBuilder) buildSingleChainReport(
 				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
+			b.lggr.Infow("messages added to report",
+				"messageIDs", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.Bytes32 {
+					return m.Header.MessageID
+				}),
+				"seqNums", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.SeqNum {
+					return m.Header.SequenceNumber
+				}),
+				"senders", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) ccipocr3.UnknownAddress {
+					return m.Sender
+				}),
+				"nonces", slicelib.Map(finalReport.Messages, func(m ccipocr3.Message) uint64 {
+					return m.Header.Nonce
+				}),
+				"sourceChain", commitData.SourceChain,
+				"reportSizeBytes", meta.encodedSizeBytes,
+				"reportGas", meta.gas)
 			return finalize(finalReport, commitData, meta)
 		}
 	}
@@ -576,6 +594,11 @@ func (b *execReportBuilder) buildSingleChainReport(
 			}
 		} else {
 			// this message didn't work, continue to the next one
+			b.lggr.Debugw("message did not fit in report, deleting from in-progress report built",
+				"sourceChain", commitData.Messages[i].Header.SourceChainSelector,
+				"messageID", commitData.Messages[i].Header.MessageID,
+				"seqNum", commitData.Messages[i].Header.SequenceNumber,
+			)
 			delete(msgs, i)
 		}
 	}
