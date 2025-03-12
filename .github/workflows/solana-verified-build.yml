@@ -1,16 +1,21 @@
 name: Solana Verified Build
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      sha:
+        description: 'SHA to build'
+        required: true
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest-8cores-32GB
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.sha }}
+        fetch-depth: 0
     - uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1
     - name: Install Solana Verify
       run: |
@@ -26,9 +31,15 @@ jobs:
       run: |
         cd chains/solana/contracts
         solana-verify build
-    - name: Upload artifact # so non-GHA jobs can download the verified artifacts
-      continue-on-error: true # don't fail if the upload fails, it might conflict with another job
-      uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+    - name: Generate release files
+      run: |
+        cd chains/solana/contracts
+        tar cfvz artifacts.tar.gz target/deploy/*.so target/idl/*
+    - name: Publish Release
+      uses: softprops/action-gh-release@v2
       with:
-        name: solana-ccip-${{ github.sha }}
-        path: chains/solana/contracts/target/deploy/*.so
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag_name: solana-artifacts-test-${{ github.event.inputs.sha }}
+        files: |
+          chains/solana/contracts/artifacts.tar.gz
+          chains/solana/contracts/target/deploy/*.so
