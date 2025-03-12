@@ -103,7 +103,7 @@ func (p *Plugin) Outcome(
 		"outcome", outcome,
 		"numCommitReports", len(outcome.CommitReports),
 		"numChainReports", len(outcome.Report.ChainReports),
-		"numMessages", len(observation.Messages),
+		"numMessages", observation.Messages.Count(),
 	)
 
 	return p.ocrTypeCodec.EncodeOutcome(outcome)
