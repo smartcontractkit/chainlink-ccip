@@ -555,7 +555,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("FeeQuoter is initialized", func(t *testing.T) {
-			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
+			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000000000000, Hi: 0, Endianness: nil}
 
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.FeeQuoterProgram, &rpc.GetAccountInfoOpts{
@@ -4210,8 +4210,11 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, wsol.mint, ccipMessageSentEvent.Message.FeeToken)
 				require.Equal(t, tokens.ToLittleEndianU256(36333028), ccipMessageSentEvent.Message.FeeTokenAmount.LeBytes)
 				// The difference is the ratio between the fee token value (wsol) and link token value (signified by link22 in these tests).
-				// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels
-				require.Equal(t, tokens.ToLittleEndianU256(3633302), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
+				// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels.
+				// Then, they differ again by 9 decimals due to the solana denomiation being 1e9 divisions = 1 LINK, compared to 1e18 juels = 1 LINK
+				// in EVM. Note how some precision is lost in the translation, because the price in solana is stored with respect to the native
+				// decimals.
+				require.Equal(t, tokens.ToLittleEndianU256(3633302000000000), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
 				require.Equal(t, token0.PoolConfig, ta.SourcePoolAddress)
 				require.Equal(t, []byte{1, 2, 3}, ta.DestTokenAddress)
 				require.Equal(t, 0, len(ta.ExtraData))
