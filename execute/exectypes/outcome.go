@@ -104,7 +104,10 @@ func NewSortedOutcome(
 	sort.Slice(
 		pendingCommitsCP,
 		func(i, j int) bool {
-			return pendingCommitsCP[i].Timestamp.Before(pendingCommitsCP[j].Timestamp)
+			if !pendingCommitsCP[i].Timestamp.Equal(pendingCommitsCP[j].Timestamp) {
+				return pendingCommitsCP[i].Timestamp.Before(pendingCommitsCP[j].Timestamp)
+			}
+			return pendingCommitsCP[i].SequenceNumberRange.Start() < pendingCommitsCP[j].SequenceNumberRange.Start()
 		})
 	sort.Slice(
 		reportCP,
