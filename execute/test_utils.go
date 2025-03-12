@@ -60,7 +60,11 @@ type IntTest struct {
 	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
 }
 
-func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelectors []cciptypes.ChainSelector, dstSelector cciptypes.ChainSelector) *IntTest {
+func SetupSimpleTest(t *testing.T,
+	lggr logger.Logger,
+	srcSelectors []cciptypes.ChainSelector,
+	dstSelector cciptypes.ChainSelector,
+) *IntTest {
 	donID := uint32(1)
 
 	messagesMap := make(map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata)
