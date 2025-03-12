@@ -34,6 +34,8 @@ pub const SVM_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
 
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
+// 1e18 Juels = 1 LINK natively (in EVM.) In SVM, the LINK mint likely has different decimals.
+pub const NATIVE_LINK_DECIMALS: u8 = 18;
 
 pub struct Impl;
 impl Public for Impl {
@@ -77,18 +79,14 @@ impl Public for Impl {
             &per_chain_per_token_config_accounts,
         )?;
 
-        let juels = convert(
+        let fee_juels = fee_juels(
             &fee,
             &ctx.accounts.billing_token_config.config,
             &ctx.accounts.link_token_config.config,
-        )?
-        .amount;
-
-        require_gte!(
+            ctx.accounts.config.link_token_local_decimals,
+            ctx.accounts.config.link_token_mint,
             ctx.accounts.config.max_fee_juels_per_msg,
-            juels as u128,
-            FeeQuoterError::MessageFeeTooHigh
-        );
+        )?;
 
         let token_transfer_additional_data = per_chain_per_token_config_accounts
             .iter()
@@ -115,11 +113,38 @@ impl Public for Impl {
         Ok(GetFeeResult {
             token: fee.token,
             amount: fee.amount,
-            juels,
+            juels: fee_juels,
             token_transfer_additional_data,
             processed_extra_args,
         })
     }
+}
+
+fn fee_juels(
+    fee: &SVMTokenAmount,
+    source_config: &BillingTokenConfig,
+    link_config: &BillingTokenConfig,
+    link_local_decimals: u8,
+    link_mint: Pubkey,
+    max_fee_juels_per_msg: u128,
+) -> Result<u128> {
+    require_eq!(
+        link_mint.key(),
+        link_config.mint.key(),
+        FeeQuoterError::InvalidInputsMint
+    );
+    let link_fee = convert(fee, source_config, link_config)?.amount;
+    let fee_juels =
+        (link_fee as u128) * 1u32.e(NATIVE_LINK_DECIMALS.saturating_sub(link_local_decimals));
+    let fee_juels: u128 = fee_juels
+        .try_into()
+        .expect("Impossible to surpass the 128 bit space with a maximum of 18 decimals.");
+    require_gte!(
+        max_fee_juels_per_msg,
+        fee_juels,
+        FeeQuoterError::MessageFeeTooHigh
+    );
+    Ok(fee_juels)
 }
 
 // Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
@@ -893,5 +918,46 @@ mod tests {
 
         assert_eq!(price.execution_gas_price, Usd18Decimals(1u32.e(18)));
         assert_eq!(price.data_availability_gas_price, Usd18Decimals(2u32.e(18)));
+    }
+
+    #[test]
+    fn converting_fee_to_juels() {
+        let fee_billing_token_config = sample_billing_config();
+        let fee = SVMTokenAmount {
+            token: fee_billing_token_config.mint,
+            amount: 100,
+        };
+
+        let link_mint = Pubkey::new_unique();
+        let mut link_billing_config = sample_billing_config();
+        link_billing_config.mint = link_mint;
+
+        let link_local_decimals = 9;
+
+        let juels = fee_juels(
+            &fee,
+            &fee_billing_token_config,
+            &link_billing_config,
+            link_local_decimals,
+            link_mint,
+            (200u128 * 1u32.e(9)).try_into().unwrap(),
+        )
+        .unwrap();
+
+        // As per this test, both the fee token and LINK have the same value, so the difference in amount
+        // will be proportional to the difference in decimals between solana's representation (1e9 divisions = 1 LINK)
+        // and the canonical one in evm (1e18 juels = 1 LINK).
+        assert_eq!(juels, fee.amount as u128 * 1u32.e(9));
+
+        // Fails if it exceeds the maximum
+        fee_juels(
+            &fee,
+            &fee_billing_token_config,
+            &link_billing_config,
+            link_local_decimals,
+            link_mint,
+            (50u128 * 1u32.e(9)).try_into().unwrap(),
+        )
+        .unwrap_err();
     }
 }

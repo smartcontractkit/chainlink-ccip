@@ -952,7 +952,7 @@
           },
           {
             "name": "juels",
-            "type": "u64"
+            "type": "u128"
           },
           {
             "name": "tokenTransferAdditionalData",

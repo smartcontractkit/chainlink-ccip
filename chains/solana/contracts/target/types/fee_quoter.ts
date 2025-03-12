@@ -952,7 +952,7 @@ export type FeeQuoter = {
           },
           {
             "name": "juels",
-            "type": "u64"
+            "type": "u128"
           },
           {
             "name": "tokenTransferAdditionalData",
@@ -2607,7 +2607,7 @@ export const IDL: FeeQuoter = {
           },
           {
             "name": "juels",
-            "type": "u64"
+            "type": "u128"
           },
           {
             "name": "tokenTransferAdditionalData",
