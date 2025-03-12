@@ -108,6 +108,9 @@ func NewSortedOutcome(
 			if !pendingCommitsCP[i].Timestamp.Equal(pendingCommitsCP[j].Timestamp) {
 				return pendingCommitsCP[i].Timestamp.Before(pendingCommitsCP[j].Timestamp)
 			}
+			if pendingCommitsCP[i].SourceChain != pendingCommitsCP[j].SourceChain {
+				return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
+			}
 			return pendingCommitsCP[i].SequenceNumberRange.Start() < pendingCommitsCP[j].SequenceNumberRange.Start()
 		})
 	sort.Slice(
