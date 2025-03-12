@@ -118,7 +118,7 @@ func (p *Plugin) Observation(
 		"duration", time.Since(tStart),
 		"state", state,
 		"numCommitReports", len(observation.CommitReports),
-		"numMessages", len(observation.Messages.Flatten()))
+		"numMessages", observation.Messages.Count())
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
