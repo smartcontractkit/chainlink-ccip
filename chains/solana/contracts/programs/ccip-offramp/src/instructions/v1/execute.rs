@@ -48,7 +48,7 @@ impl Execute for Impl {
                 &config.ocr3[OcrPluginType::Execution as usize],
                 &ctx.accounts.sysvar_instructions,
                 ctx.accounts.authority.key(),
-                OcrPluginType::Execution as u8,
+                OcrPluginType::Execution,
                 report_context,
                 &Ocr3ReportForExecutionReportSingleChain(&execution_report),
                 Signatures {

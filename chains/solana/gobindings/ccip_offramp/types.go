@@ -237,6 +237,28 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
+type ConfigOcrPluginType struct {
+	Discriminant uint8
+}
+
+func (obj ConfigOcrPluginType) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Discriminant` param:
+	err = encoder.Encode(obj.Discriminant)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigOcrPluginType) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Discriminant`:
+	err = decoder.Decode(&obj.Discriminant)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type ExecutionReportSingleChain struct {
 	SourceChainSelector uint64
 	Message             Any2SVMRampMessage
@@ -645,7 +667,7 @@ func (obj *Ocr3ConfigInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 }
 
 type Ocr3Config struct {
-	PluginType   uint8
+	PluginType   ConfigOcrPluginType
 	ConfigInfo   Ocr3ConfigInfo
 	Signers      [16][20]uint8
 	Transmitters [16][32]uint8
