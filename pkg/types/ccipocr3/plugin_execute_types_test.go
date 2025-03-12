@@ -38,7 +38,6 @@ func TestDecodeExecuteReportInfo(t *testing.T) {
 }
 
 func TestExecuteReportInfo_EncodeDecode(t *testing.T) {
-
 	tests := []struct {
 		name       string
 		reportInfo ExecuteReportInfo

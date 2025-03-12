@@ -205,16 +205,16 @@ func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
 		{
 			// Latest messages
 			messages: []inmem.MessagesWithMetadata{
-				makeMsgWithMetadata(100, srcChainA, dstSelector, false),
-				makeMsgWithMetadata(101, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(104, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(105, srcChainA, dstSelector, false),
 			},
 			timestamp: baseTime.Add(2 * time.Hour),
 			blockNum:  1002,
 		},
 		{
 			messages: []inmem.MessagesWithMetadata{
-				makeMsgWithMetadata(102, srcChainA, dstSelector, false),
-				makeMsgWithMetadata(103, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(100, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(101, srcChainA, dstSelector, false),
 			},
 			timestamp: baseTime,
 			blockNum:  1000,
@@ -222,8 +222,8 @@ func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
 		{
 			// Middle messages
 			messages: []inmem.MessagesWithMetadata{
-				makeMsgWithMetadata(104, srcChainA, dstSelector, false),
-				makeMsgWithMetadata(105, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(102, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(103, srcChainA, dstSelector, false),
 			},
 			timestamp: baseTime.Add(time.Hour),
 			blockNum:  1001,
@@ -257,10 +257,10 @@ func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
 	}
 
 	// Verify the specific order matches our expected chronological order
-	require.Equal(t, cciptypes.SeqNum(102),
-		outcome.CommitReports[0].SequenceNumberRange.Start(), "oldest report should be first")
-	require.Equal(t, cciptypes.SeqNum(104),
-		outcome.CommitReports[1].SequenceNumberRange.Start(), "middle report should be second")
 	require.Equal(t, cciptypes.SeqNum(100),
+		outcome.CommitReports[0].SequenceNumberRange.Start(), "oldest report should be first")
+	require.Equal(t, cciptypes.SeqNum(102),
+		outcome.CommitReports[1].SequenceNumberRange.Start(), "middle report should be second")
+	require.Equal(t, cciptypes.SeqNum(104),
 		outcome.CommitReports[2].SequenceNumberRange.Start(), "newest report should be last")
 }
