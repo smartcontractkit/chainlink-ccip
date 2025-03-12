@@ -103,10 +103,10 @@ func (t *TokenDataObserverConfig) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON is a custom JSON unmarshaller for TokenDataObserverConfig.
-// It first reads top-level fields, then allocates the correct embedded config pointer
-// (USDCCCTPObserverConfig or LBTCObserverConfig) before finally unmarshalling into that pointer.
-// Custom unmarshaller is needed because default golang marshaller doesn't unmarshal clashing fields of
-// pointer embeddings
+// It first reads top-level fields, then allocates the correct embedded config pointer.
+// (only USDCCCTPObserverConfig for now) before finally unmarshalling into that pointer.
+// Custom unmarshaller is needed because default golang marshaller doesn't unmarshal clashing fields
+// (when they appear beside USDC) of pointer embeddings
 func (t *TokenDataObserverConfig) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Type    string `json:"type"`

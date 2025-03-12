@@ -32,7 +32,7 @@ func runRoundAndGetOutcome(ctx context.Context, ocrTypeCodec ocrtypecodec.ExecCo
 	return outcome
 }
 
-func Test_LBTC_USDC_Transfer(t *testing.T) {
+func Test_USDC_Transfer(t *testing.T) {
 	ocrTypeCodec := ocrtypecodec.DefaultExecCodec
 	ctx := tests.Context(t)
 
