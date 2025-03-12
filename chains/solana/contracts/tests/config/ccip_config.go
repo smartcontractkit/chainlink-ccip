@@ -45,7 +45,7 @@ var (
 
 	// example programs
 	CcipBaseSender          = solana.MustPublicKeyFromBase58("4LfBQWYaU6zQZbDyYjX8pbY4qjzrhoumUFYZEZEqMNhJ")
-	CcipBaseReceiver        = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+	CcipBaseReceiver        = solana.MustPublicKeyFromBase58("48LGpn6tPn5SjTtK2wL9uUx48JUWZdZBv11sboy2orCc")
 	CcipBasePoolBurnMint    = solana.MustPublicKeyFromBase58("41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB")
 	CcipBasePoolLockRelease = solana.MustPublicKeyFromBase58("8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC")
 
