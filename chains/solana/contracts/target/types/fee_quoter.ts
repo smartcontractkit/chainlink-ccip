@@ -24,6 +24,11 @@ export type FeeQuoter = {
           "isSigner": false
         },
         {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -45,10 +50,6 @@ export type FeeQuoter = {
         }
       ],
       "args": [
-        {
-          "name": "linkTokenMint",
-          "type": "publicKey"
-        },
         {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128"
@@ -674,6 +675,10 @@ export type FeeQuoter = {
             "type": "publicKey"
           },
           {
+            "name": "linkTokenLocalDecimals",
+            "type": "u8"
+          },
+          {
             "name": "onramp",
             "type": "publicKey"
           },
@@ -1201,6 +1206,11 @@ export type FeeQuoter = {
         {
           "name": "linkTokenMint",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "linkTokenLocalDecimals",
+          "type": "u8",
           "index": false
         },
         {
@@ -1669,6 +1679,11 @@ export const IDL: FeeQuoter = {
           "isSigner": false
         },
         {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1690,10 +1705,6 @@ export const IDL: FeeQuoter = {
         }
       ],
       "args": [
-        {
-          "name": "linkTokenMint",
-          "type": "publicKey"
-        },
         {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128"
@@ -2319,6 +2330,10 @@ export const IDL: FeeQuoter = {
             "type": "publicKey"
           },
           {
+            "name": "linkTokenLocalDecimals",
+            "type": "u8"
+          },
+          {
             "name": "onramp",
             "type": "publicKey"
           },
@@ -2846,6 +2861,11 @@ export const IDL: FeeQuoter = {
         {
           "name": "linkTokenMint",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "linkTokenLocalDecimals",
+          "type": "u8",
           "index": false
         },
         {

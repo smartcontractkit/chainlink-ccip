@@ -38,7 +38,6 @@ pub mod fee_quoter {
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<Initialize>,
-        link_token_mint: Pubkey,
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
     ) -> Result<()> {
@@ -47,14 +46,16 @@ pub mod fee_quoter {
             owner: ctx.accounts.authority.key(),
             proposed_owner: Pubkey::default(),
             max_fee_juels_per_msg,
-            link_token_mint,
+            link_token_mint: ctx.accounts.link_token_mint.key(),
+            link_token_local_decimals: ctx.accounts.link_token_mint.decimals,
             onramp,
             default_code_version: CodeVersion::V1,
         });
 
         emit!(ConfigSet {
             max_fee_juels_per_msg,
-            link_token_mint,
+            link_token_mint: ctx.accounts.link_token_mint.key(),
+            link_token_local_decimals: ctx.accounts.link_token_mint.decimals,
             onramp,
             default_code_version: CodeVersion::V1,
         });

@@ -22,34 +22,29 @@ import (
 // * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
 // * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
 type Initialize struct {
-	LinkTokenMint     *ag_solanago.PublicKey
 	MaxFeeJuelsPerMsg *ag_binary.Uint128
 	Onramp            *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [] linkTokenMint
 	//
-	// [2] = [] systemProgram
+	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] program
+	// [3] = [] systemProgram
 	//
-	// [4] = [] programData
+	// [4] = [] program
+	//
+	// [5] = [] programData
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
-}
-
-// SetLinkTokenMint sets the "linkTokenMint" parameter.
-func (inst *Initialize) SetLinkTokenMint(linkTokenMint ag_solanago.PublicKey) *Initialize {
-	inst.LinkTokenMint = &linkTokenMint
-	return inst
 }
 
 // SetMaxFeeJuelsPerMsg sets the "maxFeeJuelsPerMsg" parameter.
@@ -75,48 +70,59 @@ func (inst *Initialize) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetLinkTokenMintAccount sets the "linkTokenMint" account.
+func (inst *Initialize) SetLinkTokenMintAccount(linkTokenMint ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(linkTokenMint)
+	return inst
+}
+
+// GetLinkTokenMintAccount gets the "linkTokenMint" account.
+func (inst *Initialize) GetLinkTokenMintAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *Initialize) SetAuthorityAccount(authority ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Initialize) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetProgramAccount sets the "program" account.
 func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(program)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(program)
 	return inst
 }
 
 // GetProgramAccount gets the "program" account.
 func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 // SetProgramDataAccount sets the "programData" account.
 func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(programData)
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(programData)
 	return inst
 }
 
 // GetProgramDataAccount gets the "programData" account.
 func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[5]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -139,9 +145,6 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 func (inst *Initialize) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.LinkTokenMint == nil {
-			return errors.New("LinkTokenMint parameter is not set")
-		}
 		if inst.MaxFeeJuelsPerMsg == nil {
 			return errors.New("MaxFeeJuelsPerMsg parameter is not set")
 		}
@@ -156,15 +159,18 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.LinkTokenMint is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.SystemProgram is not set")
+			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.Program is not set")
+			return errors.New("accounts.SystemProgram is not set")
 		}
 		if inst.AccountMetaSlice[4] == nil {
+			return errors.New("accounts.Program is not set")
+		}
+		if inst.AccountMetaSlice[5] == nil {
 			return errors.New("accounts.ProgramData is not set")
 		}
 	}
@@ -180,30 +186,25 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("    LinkTokenMint", *inst.LinkTokenMint))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("MaxFeeJuelsPerMsg", *inst.MaxFeeJuelsPerMsg))
 						paramsBranch.Child(ag_format.Param("           Onramp", *inst.Onramp))
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("      program", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("linkTokenMint", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("      program", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("  programData", inst.AccountMetaSlice[5]))
 					})
 				})
 		})
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `LinkTokenMint` param:
-	err = encoder.Encode(obj.LinkTokenMint)
-	if err != nil {
-		return err
-	}
 	// Serialize `MaxFeeJuelsPerMsg` param:
 	err = encoder.Encode(obj.MaxFeeJuelsPerMsg)
 	if err != nil {
@@ -217,11 +218,6 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `LinkTokenMint`:
-	err = decoder.Decode(&obj.LinkTokenMint)
-	if err != nil {
-		return err
-	}
 	// Deserialize `MaxFeeJuelsPerMsg`:
 	err = decoder.Decode(&obj.MaxFeeJuelsPerMsg)
 	if err != nil {
@@ -238,20 +234,20 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	linkTokenMint ag_solanago.PublicKey,
 	maxFeeJuelsPerMsg ag_binary.Uint128,
 	onramp ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
+	linkTokenMint ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	program ag_solanago.PublicKey,
 	programData ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetLinkTokenMint(linkTokenMint).
 		SetMaxFeeJuelsPerMsg(maxFeeJuelsPerMsg).
 		SetOnramp(onramp).
 		SetConfigAccount(config).
+		SetLinkTokenMintAccount(linkTokenMint).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).
 		SetProgramAccount(program).

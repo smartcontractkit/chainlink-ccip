@@ -568,11 +568,11 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 			ix, err := fee_quoter.NewInitializeInstruction(
-				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
+				link22.mint,
 				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
 				config.FeeQuoterProgram,
@@ -587,6 +587,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
 			require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, uint8(9), configSetEvent.LinkTokenDecimals)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
 			require.Equal(t, fee_quoter.V1_CodeVersion, configSetEvent.DefaultCodeVersion)
 
