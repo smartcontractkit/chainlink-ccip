@@ -52,8 +52,8 @@ func TestMessageHashing(t *testing.T) {
 			},
 		},
 			[]solana.PublicKey{
-				solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
-				solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
+				solana.MustPublicKeyFromBase58("7gtMT88cNmZVmVUzkcC6MKZ4NY27ynwodKBVJFQdq8R2"),
+				solana.MustPublicKeyFromBase58("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui"),
 			})
 
 		require.NoError(t, err)

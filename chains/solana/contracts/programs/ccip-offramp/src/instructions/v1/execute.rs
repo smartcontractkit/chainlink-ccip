@@ -650,8 +650,8 @@ mod tests {
             },
         };
         let remaining_account_keys = [
-            Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8").unwrap(),
-            Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
+            Pubkey::try_from("7gtMT88cNmZVmVUzkcC6MKZ4NY27ynwodKBVJFQdq8R2").unwrap(),
+            Pubkey::try_from("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui").unwrap(),
         ]
         .into_iter();
 

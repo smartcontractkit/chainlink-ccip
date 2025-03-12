@@ -114,12 +114,12 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			{
 				ExpectedMethod:    "U8InstructionData",
 				Data:              getAnchorInstructionData("u8_instruction_data", []byte{123}),
-				ExpectedLogSubstr: "Called `u8_instruction_data` Context { program_id: 4HeqEoSyfYpeC2goFLj9eHgkxV33mR5G7JYAbRsN14uQ, accounts: Empty, remaining_accounts: [], bumps: EmptyBumps } and data 123",
+				ExpectedLogSubstr: "Called `u8_instruction_data` Context { program_id: 2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm, accounts: Empty, remaining_accounts: [], bumps: EmptyBumps } and data 123",
 			},
 			{
 				ExpectedMethod:    "StructInstructionData",
 				Data:              getAnchorInstructionData("struct_instruction_data", []byte{234}),
-				ExpectedLogSubstr: "Called `struct_instruction_data` Context { program_id: 4HeqEoSyfYpeC2goFLj9eHgkxV33mR5G7JYAbRsN14uQ, accounts: Empty, remaining_accounts: [], bumps: EmptyBumps } and data Value { value: 234 }",
+				ExpectedLogSubstr: "Called `struct_instruction_data` Context { program_id: 2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm, accounts: Empty, remaining_accounts: [], bumps: EmptyBumps } and data Value { value: 234 }",
 			},
 			{
 				ExpectedMethod: "AccountRead",

@@ -170,7 +170,7 @@ pub mod test_ccip_invalid_receiver {
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
-const TEST_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
+const TEST_ROUTER: Pubkey = pubkey!("7gtMT88cNmZVmVUzkcC6MKZ4NY27ynwodKBVJFQdq8R2");
 
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]
