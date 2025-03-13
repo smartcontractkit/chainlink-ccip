@@ -65,6 +65,9 @@ vars:
   ENABLE_DON_BASE:
     source: env
     default: "true"
+  ENABLE_JOB_DISTRIBUTOR:
+    source: env
+    default: "false"
 
 pipelines:
   maybe-kind:
@@ -306,6 +309,27 @@ profiles:
           path: ${DEPENDENCIES_DIR}/job-distributor
           overwriteVars: true
           namespace: ${DEVSPACE_NAMESPACE}
+  - name: job-distributor-enabled
+    activation:
+      - vars:
+          ENABLE_JOB_DISTRIBUTOR: "true"
+    merge:
+      dependencies:
+        job-distributor:
+          path: ${DEPENDENCIES_DIR}/job-distributor
+          overwriteVars: true
+          namespace: ${DEVSPACE_NAMESPACE}
+  - name: job-distributor-aws-staging
+    activation:
+      - vars:
+          ENABLE_JOB_DISTRIBUTOR: "true"
+          PROVIDER: "aws"
+          CRIB_EKS_CLUSTER_NAME: "main-stage-cluster"
+    merge:
+      dependencies:
+        job-distributor:
+          profiles:
+          #  - size-medium
   - name: crib-staging
     activation:
       - vars:
