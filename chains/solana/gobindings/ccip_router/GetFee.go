@@ -26,7 +26,7 @@ type GetFee struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] destChainState
+	// [1] = [] destChainState
 	//
 	// [2] = [] feeQuoter
 	//
@@ -73,7 +73,7 @@ func (inst *GetFee) GetConfigAccount() *ag_solanago.AccountMeta {
 
 // SetDestChainStateAccount sets the "destChainState" account.
 func (inst *GetFee) SetDestChainStateAccount(destChainState ag_solanago.PublicKey) *GetFee {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(destChainState).WRITE()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(destChainState)
 	return inst
 }
 

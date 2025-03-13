@@ -1078,7 +1078,7 @@ export type CcipRouter = {
         },
         {
           "name": "destChainState",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -3035,7 +3035,7 @@ export const IDL: CcipRouter = {
         },
         {
           "name": "destChainState",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {

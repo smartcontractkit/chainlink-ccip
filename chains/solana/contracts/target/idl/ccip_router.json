@@ -1078,7 +1078,7 @@
         },
         {
           "name": "destChainState",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
