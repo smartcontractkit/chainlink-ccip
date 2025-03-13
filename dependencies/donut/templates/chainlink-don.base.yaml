@@ -3,6 +3,7 @@ in: |
   deployments:
     chainlink-don:
       helm:
+        releaseName: ${DON_TYPE}
         valuesFiles:
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
         values:
@@ -57,6 +58,7 @@ in: |
     {{- if gt (conv.ToInt .Env.DON_GATEWAY_NODE_COUNT) 0 }}
     chainlink-don-gateway:
       helm:
+        releaseName: ${DON_TYPE}-gateway
         chart:
           name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
           version: "2.4.4"
@@ -92,6 +94,7 @@ in: |
       updateImageTags: false
       namespace: ${DEVSPACE_NAMESPACE}
       helm:
+        releaseName: ${DON_TYPE}-db-bt-{{ $i }}
         chart:
           name: oci://registry-1.docker.io/bitnamicharts/postgresql
           version: {{ $.Env.POSTGRES_CHART_VERSION }}
@@ -113,6 +116,7 @@ in: |
       updateImageTags: false
       namespace: ${DEVSPACE_NAMESPACE}
       helm:
+        releaseName: ${DON_TYPE}-db-{{ $i }}
         chart:
           name: oci://registry-1.docker.io/bitnamicharts/postgresql
           version: {{ $.Env.POSTGRES_CHART_VERSION }}
@@ -134,6 +138,7 @@ in: |
       updateImageTags: false
       namespace: ${DEVSPACE_NAMESPACE}
       helm:
+        releaseName: ${DON_TYPE}-gateway-db-{{ $i }}
         chart:
           name: oci://registry-1.docker.io/bitnamicharts/postgresql
           version: {{ $.Env.POSTGRES_CHART_VERSION }}
