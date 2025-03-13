@@ -1,0 +1,12 @@
+---
+# chainlink toml config for the gateway node
+common:
+  chainlink:
+    v2Config:
+      03-overrides.toml: |
+        [Feature]
+        FeedsManager = false
+        LogPoller = false
+
+        [P2P.V2]
+        Enabled = false
