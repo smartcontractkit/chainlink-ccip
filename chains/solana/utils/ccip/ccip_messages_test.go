@@ -52,12 +52,12 @@ func TestMessageHashing(t *testing.T) {
 			},
 		},
 			[]solana.PublicKey{
-				solana.MustPublicKeyFromBase58("7gtMT88cNmZVmVUzkcC6MKZ4NY27ynwodKBVJFQdq8R2"),
-				solana.MustPublicKeyFromBase58("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui"),
+				solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
+				solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
 			})
 
 		require.NoError(t, err)
-		require.Equal(t, "088a485369cc2f2222e9fd1c997d317d6de29ff9d1d4181fbb4a45018277a3da", hex.EncodeToString(h))
+		require.Equal(t, "7c1572c33e52696603008269d3dfb2936811891af29c263bfb83e38ae6b36321", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {
@@ -95,6 +95,6 @@ func TestMessageHashing(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "a43d7d70b20ea71a61a1ac3eb1de4b04126678460487157b6a93d4cb10b73609", hex.EncodeToString(h))
+		require.Equal(t, "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7", hex.EncodeToString(h))
 	})
 }
