@@ -6,7 +6,7 @@ use rmn_remote::state::CurseSubject;
 use spl_math::uint::U256;
 use std::ops::Deref;
 
-use crate::rate_limiter::{validate_token_bucket_config, RateLimitConfig, RateLimitTokenBucket};
+use crate::rate_limiter::{RateLimitConfig, RateLimitTokenBucket};
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
 pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed used by CCIP to provide correct chain config to pool
@@ -213,11 +213,10 @@ impl BaseChain {
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
-        validate_token_bucket_config(&inbound)?;
-        validate_token_bucket_config(&outbound)?;
-
-        self.inbound_rate_limit.cfg = inbound.clone();
-        self.outbound_rate_limit.cfg = outbound.clone();
+        self.inbound_rate_limit
+            .set_token_bucket_config(inbound.clone())?;
+        self.outbound_rate_limit
+            .set_token_bucket_config(outbound.clone())?;
 
         emit!(RateLimitConfigured {
             chain_selector: remote_chain_selector,

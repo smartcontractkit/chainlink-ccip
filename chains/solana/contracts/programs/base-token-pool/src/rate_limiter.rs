@@ -80,6 +80,8 @@ impl RateLimitTokenBucket {
 
     // set_token_bucket_config sets + validates a new config and updates the number of tokens in the bucket
     pub fn set_token_bucket_config(&mut self, config: RateLimitConfig) -> Result<()> {
+        validate_token_bucket_config(&config)?;
+
         let clock: Clock = Clock::get()?;
         let current_timestamp = clock.unix_timestamp as u64; // positive part of i64 will always fit in u64
         let time_diff = current_timestamp.checked_sub(self.last_updated).unwrap();
