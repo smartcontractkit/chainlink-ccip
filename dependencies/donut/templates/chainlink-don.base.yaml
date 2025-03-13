@@ -5,7 +5,11 @@ in: |
       helm:
         releaseName: ${DON_TYPE}
         valuesFiles:
+        {{- if eq (getenv "DON_TYPE") "gateway" }}
+          - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.gateway.yaml
+        {{- else }}
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
+        {{- end }}
         values:
           fullnameOverride: ${DON_TYPE}
           nodeCount: {{ .Env.DON_NODE_COUNT }}
@@ -122,28 +126,6 @@ in: |
           {{- if ne $.Env.PROVIDER "kind" }}
           - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
           {{- end }}
-          {{- if eq $.Env.PROVIDER "aws" }}
-          - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
-          {{- end }}
-        values:
-          fullnameOverride: ${DON_TYPE}-db-{{ $i }}
-    {{- end }}
-    {{- end }}
-    {{- if gt (conv.ToInt .Env.DON_GATEWAY_NODE_COUNT) 0 }}
-    {{- range $i := seq 0 (math.Sub .Env.DON_GATEWAY_NODE_COUNT 1) }}
-    chainlink-don-gateway-db-{{ $i }}:
-      updateImageTags: false
-      namespace: ${DEVSPACE_NAMESPACE}
-      helm:
-        releaseName: ${DON_TYPE}-gateway-db-{{ $i }}
-        chart:
-          name: oci://registry-1.docker.io/bitnamicharts/postgresql
-          version: {{ $.Env.POSTGRES_CHART_VERSION }}
-        valuesFiles:
-          - ${LOCAL_VALUES_DIR}/postgresql/type.dev.yaml
-          {{- if ne $.Env.PROVIDER "kind" }}
-          - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
-          {{- end }}
           {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.CRIB_EKS_CLUSTER_NAME "main-stage-cluster") }}
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
           {{- else if and (eq $.Env.PROVIDER "aws") (eq $.Env.ENV "sandbox") }}
@@ -153,22 +135,16 @@ in: |
           fullnameOverride: ${DON_TYPE}-gateway-db-{{ $i }}
     {{- end }}
     {{- end }}
-  {{- if gt (conv.ToInt .Env.DON_GATEWAY_NODE_COUNT) 0 }}
-  hooks:
-    # This hook will ensure that every time the deployment
-    # chainlink-don-gateway is deployed that DevSpace will wait until
-    # all pods and containers that match the labelSelector
-    # app.kubernetes.io/name: chainlink-don-gateway are running
-    # https://www.devspace.sh/docs/configuration/hooks/#wait-for-a-pod-to-be-running
-    - wait:
-        running: true
-        timeout: 300
-        # This can be needed for init containers
-        # that terminate instead of become running.
-        terminatedWithCode: 0
-      container:
-        labelSelector:
-          "app.kubernetes.io/name": "chainlink-don-gateway"
-      name: "wait-for-chainlink-don-gateway-pods"
-      events: ["after:deploy:chainlink-don-gateway"]
+    {{- if eq (getenv "DON_TYPE") "gateway" }}
+    gateway-ingress:
+      helm:
+        releaseName: gateway-ingress
+        displayOutput: true
+        chart:
+          name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-gateway-ingress
+          version: "0.4.2"
+        values:
+          clusterNamePrefix: gateway
+          host: "${DEVSPACE_NAMESPACE}-gateway.${DEVSPACE_INGRESS_BASE_DOMAIN}"
+          clusterSize: {{ .Env.DON_NODE_COUNT }}
     {{- end }}

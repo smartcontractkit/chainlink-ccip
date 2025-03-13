@@ -141,6 +141,7 @@ deployments:
         version: 2.6.0-preview-1896-f6cd441
       valuesFiles: []
       values: {}
+
 hooks:
   # This hook will ensure that every time the deployment
   # chainlink-don is deployed that DevSpace will wait until
@@ -182,7 +183,10 @@ profiles:
       $(
         DON_NODE_COUNT=${DON_NODE_COUNT} \
         DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
-        DON_GATEWAY_NODE_COUNT=${DON_GATEWAY_NODE_COUNT} \
+        DON_TYPE=${DON_TYPE} \
+        ENV=${ENV} \
+        LOCAL_VALUES_DIR="${LOCAL_VALUES_DIR}" \
+        POSTGRES_CHART_VERSION="15.5.9" \
         PROVIDER=${PROVIDER} \
         POSTGRES_CHART_VERSION="15.5.9" \
         CRE_CONFIG_DIR="${CRE_CONFIG_DIR}" \
@@ -324,6 +328,7 @@ profiles:
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging.yaml
       )
@@ -334,10 +339,35 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip.yaml
       )
+  - name: crib-aws-main-fwog
+    activation:
+      - vars:
+          PROVIDER: "aws"
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-main-fwog.yaml
+      )
+  - name: crib-aws-sandbox
+    activation:
+      - vars:
+          PROVIDER: "aws"
+          ENV: "sand"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-sandbox.yaml
+      )
   - name: ccip-load-testing-aws-staging
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging-ccip-load-tests.yaml
       )
@@ -348,6 +378,7 @@ profiles:
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DON_TYPE="${DON_TYPE}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-kind.yaml
       )
