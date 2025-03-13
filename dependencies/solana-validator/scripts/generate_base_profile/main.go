@@ -1,19 +1,21 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"text/template"
+
+	"gopkg.in/yaml.v3"
 )
 
 const templatesPath = "../../templates/"
 
 type chain struct {
-	NetworkId int64 `yaml:"networkId"`
-	BlockTime int   `yaml:"blockTime"`
+	NetworkId int `yaml:"networkId"`
+	BlockTime int `yaml:"blockTime"`
 }
 type ValuesTmplConfig struct {
 	Chains   []chain `yaml:"chains"`
@@ -66,6 +68,9 @@ func GenerateConfig(overridesFilePath string, templateFile string, chainsCount i
 }
 
 func BuildTemplateConfig(overridesFilePath string, chainsCount int, provider string, product string, useCase string) (ValuesTmplConfig, error) {
+	if chainsCount > 3 {
+		return ValuesTmplConfig{}, errors.New("Can't set more than 3 sol chains")
+	}
 	data, err := os.ReadFile(overridesFilePath)
 	if err != nil {
 		fmt.Printf("Error reading chain overrides file: %s : %s\n", overridesFilePath, err)
@@ -87,15 +92,11 @@ func BuildTemplateConfig(overridesFilePath string, chainsCount int, provider str
 	}
 
 	chains := []chain{
-		{NetworkId: 1001},
+		{NetworkId: 1000},
 	}
 
-	if chainsCount > 1 {
-		chains = append(chains, chain{NetworkId: 1002})
-
-		for i := 1; i < chainsCount-1; i++ {
-			chains = append(chains, chain{NetworkId: int64(90000000 + i)})
-		}
+	for i := 1; i < chainsCount-1; i++ {
+		chains = append(chains, chain{NetworkId: 1000 + i})
 	}
 
 	for i := 0; i < chainsCount; i++ {

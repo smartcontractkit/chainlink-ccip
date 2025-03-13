@@ -29,6 +29,7 @@ mkShell' {
     gopls
     delve
     github-cli
+    solana-cli
     jq
     gomplate
     go-task

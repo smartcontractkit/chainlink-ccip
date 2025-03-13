@@ -29,6 +29,6 @@ deployments:
 
                   [[Solana.Nodes]]
                   Name = 'node-{{ .ChainId }}'
-                  URL = "http://solana-{{ .ChainId }}:8544"
+                  URL = "http://solana-{{ .PodId }}:8544"
                 {{- end }}
 

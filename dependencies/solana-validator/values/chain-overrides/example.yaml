@@ -1,7 +1,4 @@
 chains:
   # Fast network
-  - networkId: 1001
-    someSolanaOption: abcd
-  # Slow network
-  - networkId: 1002
-    someSolanaOption: xyz
+  - networkId: 22222222222222222222222222222222222222222222
+  - networkId: 33333333333333333333333333333333333333333333

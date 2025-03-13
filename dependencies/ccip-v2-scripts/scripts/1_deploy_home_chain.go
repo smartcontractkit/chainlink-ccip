@@ -64,7 +64,6 @@ func (h HomeChainDeployer) Deploy() {
 		h.logger.Fatal(err)
 		os.Exit(1)
 	}
-
 	homeChainID := uint64(1337)
 	feedChainID := uint64(2337)
 	homeChainSelector := config.ChainSelector(homeChainID)

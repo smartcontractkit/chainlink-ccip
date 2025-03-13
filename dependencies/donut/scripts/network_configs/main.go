@@ -9,6 +9,7 @@ import (
 
 const tmplFile = "values.yaml.tmpl"
 const defaultFinalityDepth = 200
+const SolStartingPodId = 1000
 
 type EVMChain struct {
 	NetworkId     int64
@@ -16,7 +17,9 @@ type EVMChain struct {
 }
 
 type SolanaChain struct {
-	ChainId int64
+	NetworkId string
+	ChainId   string
+	PodId     int
 }
 
 type Config struct {
@@ -69,9 +72,13 @@ func BuildNetworkConfigs(besuChainsCount int, gethChainsCount int, solanaChainsC
 }
 
 func BuildSolanaNetworkConfigs(count int) []SolanaChain {
+	if count > 3 {
+		panic("Up to 3 sol chains are supported")
+	}
+	selectors := []string{"22222222222222222222222222222222222222222222", "33333333333333333333333333333333333333333333", "44444444444444444444444444444444444444444444"}
 	chains := make([]SolanaChain, 0, count)
-	for i := 1; i <= count; i++ {
-		chains = append(chains, SolanaChain{ChainId: int64(1000 + i)})
+	for i := 0; i <= count-1; i++ {
+		chains = append(chains, SolanaChain{NetworkId: selectors[i], ChainId: selectors[i], PodId: SolStartingPodId + i})
 	}
 	return chains
 }
