@@ -21,16 +21,31 @@ pub struct RateLimitConfig {
     pub rate: u64,     // Number of tokens per second that the bucket is refilled.
 }
 
+pub trait Timestamper: Sized {
+    fn unix_timestamp(&self) -> u64;
+    fn sysvar_get() -> std::result::Result<Self, ProgramError>;
+}
+
+impl Timestamper for Clock {
+    fn unix_timestamp(&self) -> u64 {
+        self.unix_timestamp as u64
+    }
+
+    fn sysvar_get() -> std::result::Result<Self, ProgramError> {
+        Self::get()
+    }
+}
+
 impl RateLimitTokenBucket {
     // consume calculates the new amount of tokens in a bucket (up to the capacity)
     // and validates that the bucket has enough to fulfill the request
-    pub fn consume(&mut self, request_tokens: u64) -> Result<()> {
+    pub fn consume<C: Timestamper>(&mut self, request_tokens: u64) -> Result<()> {
         if !self.cfg.enabled || request_tokens == 0 {
             return Ok(());
         }
 
-        let clock: Clock = Clock::get()?;
-        let current_timestamp = clock.unix_timestamp as u64; // positive part of i64 will always fit in u64
+        let clock = C::sysvar_get()?;
+        let current_timestamp = clock.unix_timestamp();
 
         let mut tokens = self.tokens;
         let capacity = self.cfg.capacity;
@@ -128,4 +143,58 @@ pub struct TokensConsumed {
 #[event]
 pub struct ConfigChanged {
     pub config: RateLimitConfig,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use super::*;
+
+    #[derive(Default)]
+    struct MockTimestamper;
+
+    // Persistent state per test thread.
+    thread_local! {
+        static TIMESTAMP: RefCell<u64> = Default::default();
+    }
+
+    impl Timestamper for MockTimestamper {
+        fn unix_timestamp(&self) -> u64 {
+            TIMESTAMP.with(|ts| *ts.borrow())
+        }
+
+        fn sysvar_get() -> std::result::Result<Self, ProgramError> {
+            TIMESTAMP.with(|ts| *ts.borrow_mut() = 0);
+            Ok(Self)
+        }
+    }
+
+    fn elapse(seconds: u64) {
+        TIMESTAMP.with(|ts| *ts.borrow_mut() += seconds)
+    }
+
+    #[test]
+    fn bucket_grows_even_during_failing_attempts() {
+        let mut bucket = RateLimitTokenBucket {
+            tokens: 0,
+            last_updated: 0,
+            cfg: RateLimitConfig {
+                enabled: true,
+                capacity: 50,
+                // Refills one token per second
+                rate: 1,
+            },
+        };
+
+        for _ in 0..5 {
+            assert_eq!(
+                bucket.consume::<MockTimestamper>(5),
+                Err(CcipTokenPoolError::RLRateLimitReached.into())
+            );
+            elapse(1);
+        }
+        // Finally enough time has passed and the bucket is full.
+        bucket.consume::<MockTimestamper>(5).unwrap();
+    }
 }

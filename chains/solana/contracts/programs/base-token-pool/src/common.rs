@@ -456,7 +456,7 @@ pub fn validate_lock_or_burn<'info>(
         lock_or_burn_in.remote_chain_selector,
     )?;
 
-    outbound_rate_limit.consume(lock_or_burn_in.amount)
+    outbound_rate_limit.consume::<Clock>(lock_or_burn_in.amount)
 }
 
 // validate_lock_or_burn checks for correctness on inputs
@@ -494,7 +494,7 @@ pub fn validate_release_or_mint<'info>(
         release_or_mint_in.remote_chain_selector,
     )?;
 
-    inbound_rate_limit.consume(parsed_amount)
+    inbound_rate_limit.consume::<Clock>(parsed_amount)
 }
 
 pub fn verify_uncursed_cpi<'info>(
