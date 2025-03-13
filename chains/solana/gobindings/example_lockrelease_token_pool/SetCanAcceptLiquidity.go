@@ -16,14 +16,16 @@ type SetCanAcceptLiquidity struct {
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [SIGNER] authority
+	// [1] = [] mint
+	//
+	// [2] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetCanAcceptLiquidityInstructionBuilder creates a new `SetCanAcceptLiquidity` instruction builder.
 func NewSetCanAcceptLiquidityInstructionBuilder() *SetCanAcceptLiquidity {
 	nd := &SetCanAcceptLiquidity{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -45,15 +47,26 @@ func (inst *SetCanAcceptLiquidity) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetMintAccount sets the "mint" account.
+func (inst *SetCanAcceptLiquidity) SetMintAccount(mint ag_solanago.PublicKey) *SetCanAcceptLiquidity {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(mint)
+	return inst
+}
+
+// GetMintAccount gets the "mint" account.
+func (inst *SetCanAcceptLiquidity) GetMintAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *SetCanAcceptLiquidity) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetCanAcceptLiquidity {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetCanAcceptLiquidity) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst SetCanAcceptLiquidity) Build() *Instruction {
@@ -87,6 +100,9 @@ func (inst *SetCanAcceptLiquidity) Validate() error {
 			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.Mint is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -107,9 +123,10 @@ func (inst *SetCanAcceptLiquidity) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("     mint", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -138,9 +155,11 @@ func NewSetCanAcceptLiquidityInstruction(
 	allow bool,
 	// Accounts:
 	state ag_solanago.PublicKey,
+	mint ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetCanAcceptLiquidity {
 	return NewSetCanAcceptLiquidityInstructionBuilder().
 		SetAllow(allow).
 		SetStateAccount(state).
+		SetMintAccount(mint).
 		SetAuthorityAccount(authority)
 }
