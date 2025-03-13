@@ -159,6 +159,15 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
+		err = saveToFile("don-api-credentials.json", targetDir, DonAPICredentials{
+			Username: os.Getenv("DON_API_USERNAME"),
+			Password: os.Getenv("DON_API_PASSWORD"),
+		})
+
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 

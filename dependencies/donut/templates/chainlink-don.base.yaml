@@ -56,42 +56,9 @@ in: |
                     {{- file.Read (printf "%s/%s/secrets-override-%d.toml" (getenv "CRE_CONFIG_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
           {{- end }}
           {{- end }}
-    {{- if gt (conv.ToInt .Env.DON_GATEWAY_NODE_COUNT) 0 }}
-    chainlink-don-gateway:
-      helm:
-        releaseName: ${DON_TYPE}-gateway
-        chart:
-          name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
-          version: 2.6.0-preview-1896-f6cd441
-        valuesFiles:
-          - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
-          - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.gateway.yaml
-        values:
-          fullnameOverride: ${DON_TYPE}-gateway
-          nodeCount: {{ $.Env.DON_GATEWAY_NODE_COUNT }}
-          bootNodeCount: 0
-          serviceAccount:
-            enabled: false
-            name: 'default'
-          gatewayMode:
-            enabled: true
-            public: true
-            rdsCidr: 10.0.0.0/8
-            serviceType: NodePort
-          networkPolicy:
-            enabled: false
-          overrides:
-          {{- range $i := seq 0 (math.Sub $.Env.DON_GATEWAY_NODE_COUNT 1) }}
-            - chainlinkNode:
-                spec:
-                  database:
-                    config:
-                      host: ${DON_TYPE}-gateway-db-{{ $i }}
-          {{- end }}
-    {{- end }}
     {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
     {{- range $i := seq 0 (math.Sub .Env.DON_BOOT_NODE_COUNT 1) }}
-    chainlink-don-db-bt-{{ strings.ToLower (getenv "DON_TYPE") }}-{{ $i }}:
+    chainlink-don-db-bt-{{ $i }}:
       updateImageTags: false
       namespace: ${DEVSPACE_NAMESPACE}
       helm:
@@ -104,8 +71,10 @@ in: |
           {{- if ne $.Env.PROVIDER "kind" }}
           - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
           {{- end }}
-          {{- if eq $.Env.PROVIDER "aws" }}
+          {{- if and (eq $.Env.PROVIDER "aws") (eq $.Env.CRIB_EKS_CLUSTER_NAME "main-stage-cluster") }}
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-staging.yaml
+          {{- else if and (eq $.Env.PROVIDER "aws") (eq $.Env.ENV "sandbox") }}
+          - ${LOCAL_VALUES_DIR}/postgresql/env.crib-sandbox.yaml
           {{- end }}
         values:
           fullnameOverride: ${DON_TYPE}-db-bt-{{ $i }}
@@ -113,7 +82,7 @@ in: |
     {{- end }}
     {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
     {{- range $i := seq 0 (math.Sub .Env.DON_NODE_COUNT 1) }}
-    chainlink-don-db-{{ strings.ToLower (getenv "DON_TYPE") }}-{{ $i }}:
+    chainlink-don-db-{{ $i }}:
       updateImageTags: false
       namespace: ${DEVSPACE_NAMESPACE}
       helm:
@@ -132,7 +101,7 @@ in: |
           - ${LOCAL_VALUES_DIR}/postgresql/env.crib-sandbox.yaml
           {{- end }}
         values:
-          fullnameOverride: ${DON_TYPE}-gateway-db-{{ $i }}
+          fullnameOverride: ${DON_TYPE}-db-{{ $i }}
     {{- end }}
     {{- end }}
     {{- if eq (getenv "DON_TYPE") "gateway" }}

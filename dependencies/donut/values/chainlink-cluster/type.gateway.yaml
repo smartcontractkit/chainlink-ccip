@@ -60,11 +60,11 @@ common:
 
       03-overrides.toml: |
         [Feature]
-        FeedsManager = false
+        FeedsManager = true
         LogPoller = false
 
         [P2P.V2]
-        Enabled = false
+        Enabled = true
 
   requiredLabels:
     app.kubernetes.io/component: chainlink
