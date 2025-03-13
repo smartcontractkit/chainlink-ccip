@@ -1,0 +1,12 @@
+{
+  "bootstrap_nodes": [],
+  "worker_nodes": [],
+  "gateway_nodes": [
+    {
+      "host_url": "http://crib-local-gateway-gateway-0.main.stage.cldev.sh:80",
+      "internal_url": "http://crib-local-gateway-gateway-0:80",
+      "p2p_internal_url": "http://crib-local-gateway-gateway-0:6690",
+      "internal_ip": "gateway-gateway-0"
+    }
+  ]
+}
