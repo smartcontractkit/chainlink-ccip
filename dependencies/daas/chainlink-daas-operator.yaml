@@ -55,7 +55,7 @@ deployments:
     helm:
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/daas-operator
-        version: 0.1.2
+        version: 0.1.3
       values:
         image: {}
         imagePullSecrets: []
@@ -93,7 +93,7 @@ profiles:
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.8
+          tag: 0.0.9
 
   - name: use-aws-registry-on-local
     activation: # match all
@@ -110,7 +110,7 @@ profiles:
         value:
           repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/daas
           pullPolicy: Always
-          tag: 0.0.8
+          tag: 0.0.9
 
   - name: use-localhost-registry
     activation: # match all
