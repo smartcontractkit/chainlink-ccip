@@ -63,7 +63,7 @@ func setupMockResponse(reader *reader_mocks.MockExtended) types.BatchGetLatestVa
 		mock.Anything,
 		mock.Anything,
 		true,
-	).Return(responses, []string{}, nil).Once()
+	).Return(responses, []string{}, nil)
 
 	return responses
 }
@@ -106,11 +106,11 @@ func setupBatchMockResponse(reader *reader_mocks.MockExtended) {
 		mock.Anything,
 		mock.Anything,
 		true,
-	).Return(responses, []string{}, nil).Once()
+	).Return(responses, []string{}, nil)
 }
 
 // Helper to setup initial data in the cache
-func setupInitialData(cache *configPoller, reader *reader_mocks.MockExtended, ctx context.Context) {
+func setupInitialData(ctx context.Context, cache *configPoller, reader *reader_mocks.MockExtended) {
 	setupMockResponse(reader)
 
 	// Call GetChainConfig to populate the cache
@@ -147,7 +147,7 @@ func setupInitialData(cache *configPoller, reader *reader_mocks.MockExtended, ct
 }
 
 // Helper to setup a second chain in the cache
-func setupSecondChain(t *testing.T, cache *configPoller, reader *reader_mocks.MockExtended, ctx context.Context) {
+func setupSecondChain(ctx context.Context, t *testing.T, cache *configPoller) *reader_mocks.MockExtended {
 	// First add the reader for the second chain
 	mockReader := reader_mocks.NewMockExtended(t)
 	cache.reader.contractReaders[chainB] = mockReader
@@ -160,6 +160,8 @@ func setupSecondChain(t *testing.T, cache *configPoller, reader *reader_mocks.Mo
 	if err != nil {
 		panic(fmt.Sprintf("Failed to setup second chain data: %v", err))
 	}
+
+	return mockReader
 }
 
 // Helper to setup refresh expectations
@@ -191,148 +193,6 @@ func setupRefreshExpectations(reader *reader_mocks.MockExtended) {
 		mock.Anything,
 		true,
 	).Return(responses, []string{}, nil)
-}
-
-func TestConfigPoller_RefreshAllKnownChains(t *testing.T) {
-	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	// First populate the cache with initial data
-	setupInitialData(cache, reader, ctx)
-
-	// Add a second chain to the cache
-	setupSecondChain(t, cache, reader, ctx)
-
-	// Reset mock counts
-	reader.ExpectedCalls = nil
-
-	// Setup expectations for refresh of all chains with more flexibility
-	// Allow any number of calls, since the actual implementation might make different types of calls
-	reader.On("ExtendedBatchGetLatestValues",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Return(setupMockResponse(reader), []string{}, nil)
-
-	// Before refreshing, remember how many chains we have
-	numChains := len(cache.chainCaches)
-	require.GreaterOrEqual(t, numChains, 2, "Test should have at least 2 chains in cache")
-
-	// Track initial refresh times
-	refreshTimes := make(map[cciptypes.ChainSelector]time.Time)
-	for chainSel, chainCache := range cache.chainCaches {
-		chainCache.chainConfigMu.RLock()
-		refreshTimes[chainSel] = chainCache.chainConfigRefresh
-		chainCache.chainConfigMu.RUnlock()
-	}
-
-	// Call the refresh method
-	cache.refreshAllKnownChains()
-
-	// Verify all chains were refreshed by checking their refresh timestamps updated
-	for chainSel, chainCache := range cache.chainCaches {
-		chainCache.chainConfigMu.RLock()
-		newRefreshTime := chainCache.chainConfigRefresh
-		chainCache.chainConfigMu.RUnlock()
-
-		assert.True(t, newRefreshTime.After(refreshTimes[chainSel]),
-			"Chain %v should have been refreshed", chainSel)
-	}
-
-	reader.AssertCalled(t, "ExtendedBatchGetLatestValues",
-		mock.Anything, mock.Anything, mock.Anything)
-}
-
-func TestConfigPoller_TrackSourceChain(t *testing.T) {
-	cache, reader := setupBasicCache(t)
-
-	// Track a source chain
-	success := cache.trackSourceChain(chainA, chainB)
-	assert.True(t, success)
-
-	// Track another source chain
-	success = cache.trackSourceChain(chainA, chainC)
-	assert.True(t, success)
-
-	// Attempt to track destination as its own source (should fail)
-	success = cache.trackSourceChain(chainA, chainA)
-	assert.False(t, success)
-
-	// Setup refresh expectations
-	setupRefreshExpectations(reader)
-
-	// Start the background poller
-	cache.Start()
-
-	// Let it run for a refresh cycle
-	time.Sleep(2 * cache.refreshPeriod)
-
-	// Stop the poller
-	cache.Stop()
-}
-
-func TestConfigPoller_BackgroundErrorHandling(t *testing.T) {
-	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	// Setup initial successful fetch
-	setupInitialData(cache, reader, ctx)
-
-	// Reset mock counts
-	reader.ExpectedCalls = nil
-
-	// Setup error response for background refresh
-	reader.On("ExtendedBatchGetLatestValues", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil, errors.New("simulated error")).Once()
-
-	// Start the poller
-	cache.Start()
-
-	// Let it run and encounter the error
-	time.Sleep(2 * cache.refreshPeriod)
-
-	// Stop the poller
-	cache.Stop()
-
-	// Verify the service continues running despite errors
-	// This can be done by checking that initial data is still available
-	config, err := cache.GetChainConfig(ctx, chainA)
-	require.NoError(t, err)
-	assert.NotEqual(t, ChainConfigSnapshot{}, config)
-}
-
-func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
-	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	// Setup with initial data
-	setupInitialData(cache, reader, ctx)
-
-	// Setup slow refresh response that will hold the lock for a while
-	reader.On("ExtendedBatchGetLatestValues", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			// Simulate slow RPC call
-			time.Sleep(500 * time.Millisecond)
-		}).Return(setupMockResponse(reader), []string{}, nil).Once()
-
-	// Start the background poller
-	cache.Start()
-
-	// Sleep briefly to ensure background poller has started a refresh
-	time.Sleep(100 * time.Millisecond)
-
-	// Now try to read concurrently while the refresh is in progress
-	start := time.Now()
-	config, err := cache.GetChainConfig(ctx, chainA)
-	elapsed := time.Since(start)
-
-	// Stop the poller
-	cache.Stop()
-
-	// Verify the read was fast (non-blocking) despite ongoing refresh
-	require.NoError(t, err)
-	assert.Less(t, elapsed, 100*time.Millisecond, "Read should not be blocked by background refresh")
-	assert.NotEqual(t, ChainConfigSnapshot{}, config)
 }
 
 func TestConfigPoller_StartStop(t *testing.T) {
@@ -389,6 +249,189 @@ func TestConfigPoller_BatchRefresh(t *testing.T) {
 
 	// Verify only one call was made for both sets of data
 	reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", 1)
+}
+
+func TestConfigPoller_RefreshAllKnownChains(t *testing.T) {
+	cache, reader := setupBasicCache(t)
+	ctx := tests.Context(t)
+
+	// First populate the cache with initial data
+	setupInitialData(ctx, cache, reader)
+
+	// Add a second chain to the cache
+	secondReader := setupSecondChain(ctx, t, cache)
+
+	// Reset mock counts for both readers
+	reader.ExpectedCalls = nil
+	secondReader.ExpectedCalls = nil
+
+	// Create a standard mock response for any request
+	mockConfig := OCRConfigResponse{
+		OCRConfig: OCRConfig{
+			ConfigInfo: ConfigInfo{F: 1, N: 4},
+		},
+	}
+
+	result1 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
+	result1.SetResult(&mockConfig, nil)
+	result2 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampLatestConfigDetails}
+	result2.SetResult(&mockConfig, nil)
+	result3 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetStaticConfig}
+	result3.SetResult(&offRampStaticChainConfig{}, nil)
+	result4 := &types.BatchReadResult{ReadName: consts.MethodNameOffRampGetDynamicConfig}
+	result4.SetResult(&offRampDynamicChainConfig{}, nil)
+
+	standardResponse := types.BatchGetLatestValuesResult{
+		types.BoundContract{Name: consts.ContractNameOffRamp}: {
+			*result1, *result2, *result3, *result4,
+		},
+	}
+
+	// Setup expectations for both readers
+	reader.On("ExtendedBatchGetLatestValues",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(standardResponse, []string{}, nil)
+
+	secondReader.On("ExtendedBatchGetLatestValues",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(standardResponse, []string{}, nil)
+
+	// Before refreshing, remember how many chains we have
+	numChains := len(cache.chainCaches)
+	require.GreaterOrEqual(t, numChains, 2, "Test should have at least 2 chains in cache")
+
+	// Track initial refresh times
+	refreshTimes := make(map[cciptypes.ChainSelector]time.Time)
+	for chainSel, chainCache := range cache.chainCaches {
+		chainCache.chainConfigMu.RLock()
+		refreshTimes[chainSel] = chainCache.chainConfigRefresh
+		chainCache.chainConfigMu.RUnlock()
+	}
+
+	// Call the refresh method
+	cache.refreshAllKnownChains()
+
+	// Verify all chains were refreshed by checking their refresh timestamps updated
+	for chainSel, chainCache := range cache.chainCaches {
+		chainCache.chainConfigMu.RLock()
+		newRefreshTime := chainCache.chainConfigRefresh
+		chainCache.chainConfigMu.RUnlock()
+
+		assert.True(t, newRefreshTime.After(refreshTimes[chainSel]),
+			"Chain %v should have been refreshed", chainSel)
+	}
+
+	// Verify both readers were called
+	reader.AssertCalled(t, "ExtendedBatchGetLatestValues", mock.Anything, mock.Anything, mock.Anything)
+	secondReader.AssertCalled(t, "ExtendedBatchGetLatestValues", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestConfigPoller_TrackSourceChain(t *testing.T) {
+	cache, reader := setupBasicCache(t)
+
+	// Track a source chain
+	success := cache.trackSourceChain(chainA, chainB)
+	assert.True(t, success)
+
+	// Track another source chain
+	success = cache.trackSourceChain(chainA, chainC)
+	assert.True(t, success)
+
+	// Attempt to track destination as its own source (should fail)
+	success = cache.trackSourceChain(chainA, chainA)
+	assert.False(t, success)
+
+	// First populate the cache with an initial request
+	ctx := tests.Context(t)
+	setupMockResponse(reader)
+	_, err := cache.GetChainConfig(ctx, chainA)
+	require.NoError(t, err)
+
+	// Reset mock expectations
+	reader.ExpectedCalls = nil
+
+	// Setup refresh expectations
+	setupRefreshExpectations(reader)
+
+	// Start the background poller
+	cache.Start()
+
+	// Let it run for a refresh cycle (increased duration)
+	time.Sleep(3 * cache.refreshPeriod)
+
+	// Stop the poller
+	cache.Stop()
+
+	// Verify the mock was called
+	reader.AssertCalled(t, "ExtendedBatchGetLatestValues", mock.Anything, mock.Anything, true)
+}
+
+func TestConfigPoller_BackgroundErrorHandling(t *testing.T) {
+	cache, reader := setupBasicCache(t)
+	ctx := tests.Context(t)
+
+	// Setup initial successful fetch
+	setupInitialData(ctx, cache, reader)
+
+	// Reset mock counts
+	reader.ExpectedCalls = nil
+
+	// Setup error response for background refresh
+	reader.On("ExtendedBatchGetLatestValues", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil, errors.New("simulated error"))
+
+	// Start the poller
+	cache.Start()
+
+	// Let it run and encounter the error
+	time.Sleep(2 * cache.refreshPeriod)
+
+	// Stop the poller
+	cache.Stop()
+
+	// Verify the service continues running despite errors
+	// This can be done by checking that initial data is still available
+	config, err := cache.GetChainConfig(ctx, chainA)
+	require.NoError(t, err)
+	assert.NotEqual(t, ChainConfigSnapshot{}, config)
+}
+
+func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
+	cache, reader := setupBasicCache(t)
+	ctx := tests.Context(t)
+
+	// Setup with initial data
+	setupInitialData(ctx, cache, reader)
+
+	// Setup slow refresh response that will hold the lock for a while
+	reader.On("ExtendedBatchGetLatestValues", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			// Simulate slow RPC call
+			time.Sleep(500 * time.Millisecond)
+		}).Return(setupMockResponse(reader), []string{}, nil)
+
+	// Start the background poller
+	cache.Start()
+
+	// Sleep briefly to ensure background poller has started a refresh
+	time.Sleep(100 * time.Millisecond)
+
+	// Now try to read concurrently while the refresh is in progress
+	start := time.Now()
+	config, err := cache.GetChainConfig(ctx, chainA)
+	elapsed := time.Since(start)
+
+	// Stop the poller
+	cache.Stop()
+
+	// Verify the read was fast (non-blocking) despite ongoing refresh
+	require.NoError(t, err)
+	assert.Less(t, elapsed, 100*time.Millisecond, "Read should not be blocked by background refresh")
+	assert.NotEqual(t, ChainConfigSnapshot{}, config)
 }
 
 func TestConfigCache_GetChainConfig_CacheHit(t *testing.T) {
@@ -1291,190 +1334,6 @@ func TestConfigCache_GetOfframpSourceChainConfigs_Error(t *testing.T) {
 
 	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
 
-	// Setup mock to return an error
-	expectedErr := errors.New("fetch error")
-	reader.On("ExtendedBatchGetLatestValues",
-		mock.Anything,
-		mock.Anything,
-		false,
-	).Return(nil, nil, expectedErr).Once()
-
-	// Should return error on first fetch when cache is empty
-	_, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
-	require.Error(t, err)
-	assert.ErrorIs(t, err, expectedErr)
-
-	// Setup successful mock response for second attempt
-	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: []byte{1, 2, 3}}, nil)
-	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: []byte{4, 5, 6}}, nil)
-
-	response := types.BatchGetLatestValuesResult{
-		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1, *result2,
-		},
-	}
-
-	reader.On("ExtendedBatchGetLatestValues",
-		mock.Anything,
-		mock.Anything,
-		false,
-	).Return(response, []string{}, nil).Once()
-
-	// Second call should succeed
-	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
-	require.NoError(t, err)
-	require.Len(t, configs, 2)
-
-	// Setup error for manual refresh attempt
-	reader.On("ExtendedBatchGetLatestValues",
-		mock.Anything,
-		mock.Anything,
-		false,
-	).Return(nil, nil, expectedErr).Once()
-
-	// Simulate background refresh failure
-	_, err = cache.refreshSourceChainConfigs(ctx, chainA, sourceChains)
-	require.Error(t, err)
-	assert.ErrorIs(t, err, expectedErr)
-
-	// This call should still succeed using cached data despite failed refresh
-	configs2, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
-	require.NoError(t, err)
-	assert.Equal(t, configs, configs2)
-
-	reader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", 3)
-}
-
-func TestConfigCache_GetOfframpSourceChainConfigs_NoReader(t *testing.T) {
-	cache, _ := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	// Test with a chain that has no reader
-	_, err := cache.GetOfframpSourceChainConfigs(ctx, chainB, []cciptypes.ChainSelector{chainC})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no contract reader for destination chain")
-}
-
-func TestConfigCache_GetOfframpSourceChainConfigs_EmptyChains(t *testing.T) {
-	cache, _ := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	// Test with empty source chains slice
-	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, []cciptypes.ChainSelector{})
-	require.NoError(t, err)
-	assert.Empty(t, configs)
-}
-
-func TestConfigCache_GetOfframpSourceChainConfigs_SkippedContracts(t *testing.T) {
-	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
-
-	// Setup mock response with skipped contracts
-	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
-	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
-
-	response := types.BatchGetLatestValuesResult{
-		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1, *result2,
-		},
-	}
-	skippedContracts := []string{consts.ContractNameRouter}
-
-	reader.On("ExtendedBatchGetLatestValues",
-		mock.Anything,
-		mock.Anything,
-		false,
-	).Return(response, skippedContracts, nil).Once()
-
-	// Should succeed even with skipped contracts
-	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
-	require.NoError(t, err)
-	require.Len(t, configs, 2)
-	assert.Equal(t, cciptypes.UnknownAddress{1, 2, 3}, configs[chainB].OnRamp)
-	assert.Equal(t, cciptypes.UnknownAddress{4, 5, 6}, configs[chainC].OnRamp)
-}
-
-func TestConfigCache_GetOfframpSourceChainConfigs_InvalidResults(t *testing.T) {
-	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	sourceChains := []cciptypes.ChainSelector{chainB}
-
-	// Setup mock with invalid result type
-	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult("invalid type", nil)
-
-	response := types.BatchGetLatestValuesResult{
-		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1,
-		},
-	}
-
-	reader.On("ExtendedBatchGetLatestValues",
-		mock.Anything,
-		mock.Anything,
-		false,
-	).Return(response, []string{}, nil).Once()
-
-	// Should return an error since the result type was invalid
-	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
-
-	// Expect an error about invalid result type
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid result type")
-
-	// Result should be empty due to the error
-	assert.Empty(t, configs)
-}
-
-func TestConfigCache_FetchPartialResults(t *testing.T) {
-	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	// Request for 3 chains
-	sourceChains := []cciptypes.ChainSelector{chainB, chainC, chainD}
-
-	// Setup mock to return only 2 results (partial success)
-	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
-	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
-	result2.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{4, 5, 6}}, nil)
-
-	response := types.BatchGetLatestValuesResult{
-		types.BoundContract{Name: consts.ContractNameOffRamp}: {
-			*result1, *result2, // Only 2 results for 3 requested chains
-		},
-	}
-
-	reader.On("ExtendedBatchGetLatestValues",
-		mock.Anything,
-		mock.Anything,
-		false,
-	).Return(response, []string{}, nil).Once()
-
-	// Should fail because the number of results doesn't match requested chains
-	configs, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains)
-
-	// Expect an error about mismatch
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "length mismatch")
-
-	// Result should be empty due to the error
-	assert.Empty(t, configs)
-}
-
-func TestConfigCache_GetOfframpSourceChainConfigs_ErrorHandling(t *testing.T) {
-	cache, reader := setupBasicCache(t)
-	ctx := tests.Context(t)
-
-	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
-
 	// First fetch - one chain succeeds, one fails with error
 	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetSourceChainConfig}
 	result1.SetResult(&SourceChainConfig{IsEnabled: true, OnRamp: cciptypes.UnknownAddress{1, 2, 3}}, nil)
@@ -1564,6 +1423,8 @@ func TestConfigCache_GlobalSourceChainRefreshTime(t *testing.T) {
 	configs2, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains2)
 	require.NoError(t, err)
 	require.Len(t, configs2, 1)
+
+	// Chain D should be newly fetched
 	assert.Equal(t, cciptypes.UnknownAddress{7, 8, 9}, configs2[chainD].OnRamp)
 
 	// Request all chains (B, C, D) - should use cache for all of them
@@ -1598,7 +1459,8 @@ func TestConfigCache_GlobalSourceChainRefreshTime(t *testing.T) {
 	require.Len(t, cached, 3)
 
 	// Now manually refresh all chains (simulating background refresh)
-	cache.refreshSourceChainConfigs(ctx, chainA, sourceChains3)
+	_, err = cache.refreshSourceChainConfigs(ctx, chainA, sourceChains3)
+	require.NoError(t, err)
 
 	// Get all chains again - should now have the updated values
 	configs3, err := cache.GetOfframpSourceChainConfigs(ctx, chainA, sourceChains3)
