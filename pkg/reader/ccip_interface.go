@@ -230,4 +230,7 @@ type CCIPReader interface {
 	// If a config was not found it will be missing from the returned map.
 	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
 	) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+
+	// Close closes the reader.
+	Close() error
 }

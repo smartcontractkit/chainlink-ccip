@@ -88,6 +88,10 @@ func newCCIPChainReaderInternal(
 		lggr.Errorw("failed to sync contracts", "err", err)
 	}
 
+	// After contracts are synced, start the background polling
+	reader.configPoller.Start()
+	lggr.Info("Started config background polling")
+
 	return reader
 }
 
@@ -96,6 +100,16 @@ func (r *ccipChainReader) WithExtendedContractReader(
 	ch cciptypes.ChainSelector, cr contractreader.Extended) *ccipChainReader {
 	r.contractReaders[ch] = cr
 	return r
+}
+
+func (r *ccipChainReader) Close() error {
+	// Stop the background poller
+	r.configPoller.Stop()
+	r.lggr.Info("Stopped config background polling")
+
+	// Add any other cleanup here
+
+	return nil
 }
 
 // ---------------------------------------------------

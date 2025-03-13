@@ -1698,3 +1698,11 @@ func (m *mockConfigCache) RefreshSourceChainConfigs(
 	args := m.Called(ctx, destChain, sourceChains)
 	return args.Get(0).(map[cciptypes.ChainSelector]SourceChainConfig), args.Error(1)
 }
+
+func (m *mockConfigCache) Start() {
+	m.Called()
+}
+
+func (m *mockConfigCache) Stop() {
+	m.Called()
+}
