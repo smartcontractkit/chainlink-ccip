@@ -1,3 +1,0 @@
-{{ range $i, $city := (ds "cities").city -}}
-{{ add 1 $i }}: {{ include "weather" (print $city "?0") }}
-{{ end }}

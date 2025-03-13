@@ -7,9 +7,6 @@ in: |
         valuesFiles:
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
         values:
-          gatewayMode:
-            enabled: true
-            rdsCidr: 10.0.0.0/8
           fullnameOverride: ${DON_TYPE}
           nodeCount: {{ .Env.DON_NODE_COUNT }}
           bootNodeCount: {{ .Env.DON_BOOT_NODE_COUNT }}
@@ -61,7 +58,7 @@ in: |
         releaseName: ${DON_TYPE}-gateway
         chart:
           name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
-          version: "2.4.4"
+          version: 2.6.0-preview-1896-f6cd441
         valuesFiles:
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
           - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.gateway.yaml
@@ -74,7 +71,7 @@ in: |
             name: 'default'
           gatewayMode:
             enabled: true
-            public: false
+            public: true
             rdsCidr: 10.0.0.0/8
             serviceType: NodePort
           networkPolicy:

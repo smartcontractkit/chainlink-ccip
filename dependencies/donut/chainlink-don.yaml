@@ -69,6 +69,7 @@ vars:
     source: env
   JOB_DISTRIBUTOR_IMAGE_TAG:
     source: env
+    default: 0.9.0
 
 pipelines:
   maybe-kind:
@@ -157,10 +158,10 @@ hooks:
         "app.kubernetes.io/name": "chainlink-don"
     name: "wait-for-chainlink-don-pods"
     events: ["after:deploy:chainlink-don"]
-  - name: Wait for ingress hosts
-    events: ["after:deploy:chainlink-don"]
-    command: crib
-    args: ["devspace", "ingress-check"]
+  # - name: Wait for ingress hosts
+  #   events: ["after:deploy:chainlink-don"]
+  #   command: crib
+  #   args: ["devspace", "ingress-check"]
 profiles:
   # charts
   - name: local-charts
@@ -181,10 +182,6 @@ profiles:
       $(
         DON_NODE_COUNT=${DON_NODE_COUNT} \
         DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
-<<<<<<< HEAD
-        DON_NODE_COUNT=${DON_NODE_COUNT} \
-=======
->>>>>>> 61c9cf8 (broken)
         DON_GATEWAY_NODE_COUNT=${DON_GATEWAY_NODE_COUNT} \
         PROVIDER=${PROVIDER} \
         POSTGRES_CHART_VERSION="15.5.9" \

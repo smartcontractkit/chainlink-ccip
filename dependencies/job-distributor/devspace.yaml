@@ -13,7 +13,7 @@ vars:
     default: "main.stage.cldev.sh"
   JOB_DISTRIBUTOR_IMAGE_TAG:
     source: env
-    default: "0.9.0"
+    default: 0.9.0
 
 dependencies:
   postgres:

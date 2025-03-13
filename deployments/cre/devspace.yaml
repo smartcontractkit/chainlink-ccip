@@ -76,11 +76,14 @@ pipelines:
       run_pipelines maybe-kind
 
       run_dependency_pipelines don
+      # add a check for the ingress
   jd:
     run: |-
       run_pipelines maybe-kind
 
       run_dependency_pipelines job-distributor
+       # add a check for the ingress
+
 profiles:
   - name: chains
     patches:
@@ -94,23 +97,6 @@ profiles:
             vars:
               CHAINS_COUNT: 1
               ENABLE_DON_BASE: "false"
-              CHAIN_OVERRIDES_FILENAME: ${CRE_CONFIG_DIR}/chain-overrides.yaml
-
-  - name: custom_chain
-    patches:
-      - op: add
-        path: dependencies
-        value:
-          geth-chain:
-            path: ${DEPENDENCIES_DIR}/geth-v2
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-            vars:
-              ENABLE_DON_BASE: "false"
-              CHAIN_ID: 2337
-              ENABLE_BASE_PROFILE: "false"
-              ENABLE_CUSTOM_CHAIN: "true"
-              LOCAL_TEMPLATES_DIR: ${DEPENDENCIES_DIR}/geth-v2/templates
 
   - name: dons
     patches:
@@ -125,11 +111,13 @@ profiles:
             profiles:
               - version-from-env
             vars:
-              DON_TYPE: workflow
+              DON_TYPE: ${DON_TYPE}
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}-jd
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              JOB_DISTRIBUTOR_IMAGE_TAG: ${JOB_DISTRIBUTOR_IMAGE_TAG}
 
   - name: kind
     patches:
@@ -144,26 +132,17 @@ profiles:
             path: ${DEPENDENCIES_DIR}/kind-monitoring
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-  - name: aws
-    patches:
-      - op: add
-        path: dependencies.ccip-don.profiles
-        value: monitoring-service-monitor
 
 commands:
   deploy-geth-chain:
-    command: devspace run-pipeline geth-chain -p chains -p ${PROVIDER}
-    description: Deploy a single Geth chain
-    appendArgs: true
-  deploy-custom-chain:
-    command: devspace run-pipeline geth-chain -p custom_chain -p ${PROVIDER}
+    command: devspace run-pipeline chain -p chains -p ${PROVIDER}
     description: Deploy a single Geth chain
     appendArgs: true
   deploy-jd:
     command: devspace run-pipeline jd -p dons -p ${PROVIDER}
     description: Deploy JD
     appendArgs: true
-  deploy-dons:
+  deploy-don:
     command: devspace run-pipeline don -p dons -p ${PROVIDER}
     description: Deploy a single DONs
     appendArgs: true
