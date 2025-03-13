@@ -122,7 +122,7 @@ impl BaseConfig {
         let old_router = self.router;
         self.router = new_router;
         (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[POOL_SIGNER_SEED], &new_router);
+            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &new_router);
         emit!(RouterUpdated {
             old_router,
             new_router,
