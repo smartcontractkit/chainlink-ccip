@@ -177,9 +177,12 @@ profiles:
           ENABLE_DON_BASE: "true"
     merge: |-
       $(
-        CRIB_EKS_CLUSTER_NAME="${CRIB_EKS_CLUSTER_NAME}" \
-        DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
         DON_NODE_COUNT=${DON_NODE_COUNT} \
+        DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
+<<<<<<< HEAD
+        DON_NODE_COUNT=${DON_NODE_COUNT} \
+=======
+>>>>>>> 61c9cf8 (broken)
         DON_GATEWAY_NODE_COUNT=${DON_GATEWAY_NODE_COUNT} \
         PROVIDER=${PROVIDER} \
         POSTGRES_CHART_VERSION="15.5.9" \
