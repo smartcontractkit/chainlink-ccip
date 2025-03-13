@@ -5,9 +5,9 @@ import (
 )
 
 var (
-	McmProgram = solana.MustPublicKeyFromBase58("5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk")
+	McmProgram = GetProgramID("mcm")
 	// For testing CPIs made by other programs (with actual business logic).
-	ExternalCpiStubProgram = solana.MustPublicKeyFromBase58("2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm")
+	ExternalCpiStubProgram = GetProgramID("external_program_cpi_stub")
 	StubAccountPDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("u8_value")}, ExternalCpiStubProgram)
 
 	// ChainID Configuration
