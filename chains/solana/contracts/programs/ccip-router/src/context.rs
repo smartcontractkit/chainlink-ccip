@@ -472,8 +472,8 @@ pub struct GetFee<'info> {
     )]
     pub config: Account<'info, Config>,
 
+    // Only used to retrieve the lane version to select the correct program version.
     #[account(
-        mut,
         seeds = [seed::DEST_CHAIN_STATE, destination_chain_selector.to_le_bytes().as_ref()],
         bump,
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,

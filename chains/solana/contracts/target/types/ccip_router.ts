@@ -1068,8 +1068,7 @@ export type CcipRouter = {
         "",
         "* `ctx` - The context containing the accounts required for obtaining the message fee.",
         "* `dest_chain_selector` - The chain selector for the destination chain.",
-        "* `message` - The message to be sent. The size limit of data is 256 bytes.",
-        "* `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins."
+        "* `message` - The message to be sent. The size limit of data is 256 bytes."
       ],
       "accounts": [
         {
@@ -1118,10 +1117,6 @@ export type CcipRouter = {
           "type": {
             "defined": "SVM2AnyMessage"
           }
-        },
-        {
-          "name": "tokenIndexes",
-          "type": "bytes"
         }
       ],
       "returns": {
@@ -3030,8 +3025,7 @@ export const IDL: CcipRouter = {
         "",
         "* `ctx` - The context containing the accounts required for obtaining the message fee.",
         "* `dest_chain_selector` - The chain selector for the destination chain.",
-        "* `message` - The message to be sent. The size limit of data is 256 bytes.",
-        "* `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins."
+        "* `message` - The message to be sent. The size limit of data is 256 bytes."
       ],
       "accounts": [
         {
@@ -3080,10 +3074,6 @@ export const IDL: CcipRouter = {
           "type": {
             "defined": "SVM2AnyMessage"
           }
-        },
-        {
-          "name": "tokenIndexes",
-          "type": "bytes"
         }
       ],
       "returns": {

@@ -473,18 +473,16 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for obtaining the message fee.
     /// * `dest_chain_selector` - The chain selector for the destination chain.
     /// * `message` - The message to be sent. The size limit of data is 256 bytes.
-    /// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
     pub fn get_fee<'info>(
         ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
-        token_indexes: Vec<u8>,
     ) -> Result<GetFeeResult> {
         router::onramp(
             ctx.accounts.dest_chain_state.config.lane_code_version,
             ctx.accounts.config.default_code_version,
         )
-        .get_fee(ctx, dest_chain_selector, message, token_indexes)
+        .get_fee(ctx, dest_chain_selector, message)
     }
 }
 

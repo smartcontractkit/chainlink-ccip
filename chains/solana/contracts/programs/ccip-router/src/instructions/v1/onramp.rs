@@ -247,37 +247,7 @@ impl OnRamp for Impl {
         ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
-        token_indexes: Vec<u8>,
     ) -> Result<GetFeeResult> {
-        let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
-
-        for (i, token_amount) in message.token_amounts.iter().enumerate() {
-            require!(
-                token_amount.amount != 0,
-                CcipRouterError::InvalidInputsTokenAmount
-            );
-
-            // Calculate the indexes for the additional accounts of the current token index `i`
-            let (start, end) = calculate_token_pool_account_indices(
-                i,
-                &token_indexes,
-                ctx.remaining_accounts.len(),
-            )?;
-
-            // This makes one of the validations tautological, but it's OK as we're only querying for
-            // the fee in a permissionless call.
-            let sender = ctx.remaining_accounts[start].key();
-            let current_token_accounts = validate_and_parse_token_accounts(
-                sender,
-                dest_chain_selector,
-                ctx.program_id.key(),
-                ctx.accounts.config.fee_quoter,
-                &ctx.remaining_accounts[start..end],
-            )?;
-
-            accounts_per_sent_token.push(current_token_accounts);
-        }
-
         get_fee_cpi(
             ctx.accounts.fee_quoter.to_account_info(),
             ctx.accounts.fee_quoter_config.to_account_info(),

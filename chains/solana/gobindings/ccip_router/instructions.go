@@ -279,7 +279,6 @@ var (
 	// * `ctx` - The context containing the accounts required for obtaining the message fee.
 	// * `dest_chain_selector` - The chain selector for the destination chain.
 	// * `message` - The message to be sent. The size limit of data is 256 bytes.
-	// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 )
 

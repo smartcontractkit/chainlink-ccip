@@ -20,11 +20,9 @@ import (
 // * `ctx` - The context containing the accounts required for obtaining the message fee.
 // * `dest_chain_selector` - The chain selector for the destination chain.
 // * `message` - The message to be sent. The size limit of data is 256 bytes.
-// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
 type GetFee struct {
 	DestChainSelector *uint64
 	Message           *SVM2AnyMessage
-	TokenIndexes      *[]byte
 
 	// [0] = [] config
 	//
@@ -59,12 +57,6 @@ func (inst *GetFee) SetDestChainSelector(destChainSelector uint64) *GetFee {
 // SetMessage sets the "message" parameter.
 func (inst *GetFee) SetMessage(message SVM2AnyMessage) *GetFee {
 	inst.Message = &message
-	return inst
-}
-
-// SetTokenIndexes sets the "tokenIndexes" parameter.
-func (inst *GetFee) SetTokenIndexes(tokenIndexes []byte) *GetFee {
-	inst.TokenIndexes = &tokenIndexes
 	return inst
 }
 
@@ -171,9 +163,6 @@ func (inst *GetFee) Validate() error {
 		if inst.Message == nil {
 			return errors.New("Message parameter is not set")
 		}
-		if inst.TokenIndexes == nil {
-			return errors.New("TokenIndexes parameter is not set")
-		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -212,10 +201,9 @@ func (inst *GetFee) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("DestChainSelector", *inst.DestChainSelector))
 						paramsBranch.Child(ag_format.Param("          Message", *inst.Message))
-						paramsBranch.Child(ag_format.Param("     TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
@@ -243,11 +231,6 @@ func (obj GetFee) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `TokenIndexes` param:
-	err = encoder.Encode(obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *GetFee) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -261,11 +244,6 @@ func (obj *GetFee) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenIndexes`:
-	err = decoder.Decode(&obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -274,7 +252,6 @@ func NewGetFeeInstruction(
 	// Parameters:
 	destChainSelector uint64,
 	message SVM2AnyMessage,
-	tokenIndexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	destChainState ag_solanago.PublicKey,
@@ -286,7 +263,6 @@ func NewGetFeeInstruction(
 	return NewGetFeeInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
 		SetMessage(message).
-		SetTokenIndexes(tokenIndexes).
 		SetConfigAccount(config).
 		SetDestChainStateAccount(destChainState).
 		SetFeeQuoterAccount(feeQuoter).

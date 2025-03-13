@@ -111,7 +111,6 @@ pub trait OnRamp {
         ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
-        token_indexes: Vec<u8>,
     ) -> Result<GetFeeResult>;
 }
 
