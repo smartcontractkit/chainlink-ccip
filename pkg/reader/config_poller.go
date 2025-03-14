@@ -6,12 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 // ConfigPoller defines the interface for caching chain configuration data
@@ -339,85 +336,6 @@ func (c *configPoller) fetchChainConfig(
 	}
 
 	return c.reader.processConfigResults(chainSel, batchResult)
-}
-
-// fetchSourceChainConfigs fetches source chain configs directly from contracts
-func (c *configPoller) xx(
-	ctx context.Context,
-	destChain cciptypes.ChainSelector,
-	sourceChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
-	reader, exists := c.reader.contractReaders[destChain]
-	if !exists {
-		return nil, fmt.Errorf("no contract reader for chain %d", destChain)
-	}
-
-	// Filter out destination chain
-	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
-	if len(filteredSourceChains) == 0 {
-		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
-	}
-
-	// Prepare batch requests for the sourceChains
-	contractBatch := make([]types.BatchRead, 0, len(sourceChains))
-	validSourceChains := make([]cciptypes.ChainSelector, 0, len(sourceChains))
-
-	for _, chain := range filteredSourceChains {
-		validSourceChains = append(validSourceChains, chain)
-		contractBatch = append(contractBatch, types.BatchRead{
-			ReadName: consts.MethodNameGetSourceChainConfig,
-			Params: map[string]any{
-				"sourceChainSelector": chain,
-			},
-			ReturnVal: new(SourceChainConfig),
-		})
-	}
-
-	// Execute batch request
-	results, _, err := reader.ExtendedBatchGetLatestValues(
-		ctx,
-		contractreader.ExtendedBatchGetLatestValuesRequest{
-			consts.ContractNameOffRamp: contractBatch,
-		},
-		false,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
-	}
-
-	// Process results
-	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
-
-	for _, readResult := range results {
-		if len(readResult) != len(validSourceChains) {
-			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, results=%v",
-				validSourceChains, results)
-		}
-
-		for i, chain := range validSourceChains {
-			v, err := readResult[i].GetResult()
-			if err != nil {
-				c.lggr.Errorw("Failed to get source chain config",
-					"chain", chain,
-					"error", err)
-				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
-			}
-
-			cfg, ok := v.(*SourceChainConfig)
-			if !ok {
-				c.lggr.Errorw("Invalid result type from GetSourceChainConfig",
-					"chain", chain,
-					"type", fmt.Sprintf("%T", v))
-				return nil, fmt.Errorf("invalid result type from GetSourceChainConfig for chainSelector=%d", chain)
-			}
-
-			// Store the config - we don't filter here as that's done at the reader level
-			configs[chain] = *cfg
-		}
-	}
-
-	return configs, nil
 }
 
 // filterOutChainSelector removes a specified chain selector from a slice of chain selectors
