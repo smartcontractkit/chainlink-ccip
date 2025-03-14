@@ -35,7 +35,7 @@ pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3
 
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
 // 1e18 Juels = 1 LINK natively (in EVM.) In SVM, the LINK mint likely has different decimals.
-pub const NATIVE_LINK_DECIMALS: u8 = 18;
+pub const LINK_JUEL_DECIMALS: u8 = 18;
 
 pub struct Impl;
 impl Public for Impl {
@@ -134,8 +134,10 @@ fn fee_juels(
         FeeQuoterError::InvalidInputsMint
     );
     let link_fee = convert(fee, source_config, link_config)?.amount;
-    let fee_juels =
-        (link_fee as u128) * 1u32.e(NATIVE_LINK_DECIMALS.saturating_sub(link_local_decimals));
+    let fee_juels = (link_fee as u128)
+        * 1u32.e(LINK_JUEL_DECIMALS
+            .checked_sub(link_local_decimals)
+            .ok_or(FeeQuoterError::InvalidLinkDecimals)?);
     let fee_juels: u128 = fee_juels
         .try_into()
         .expect("Impossible to surpass the 128 bit space with a maximum of 18 decimals.");

@@ -392,6 +392,8 @@ pub enum FeeQuoterError {
     InvalidSVMAddress,
     #[msg("The caller is not an authorized price updater")]
     UnauthorizedPriceUpdater,
+    #[msg("The LINK mint uses an unsupported number of decimals")]
+    InvalidLinkDecimals,
     #[msg("Invalid code version")]
     InvalidCodeVersion,
 }
