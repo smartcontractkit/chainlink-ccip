@@ -18,8 +18,8 @@ type ConfigPoller interface {
 	// RefreshChainConfig forces a refresh of the chain configuration
 	RefreshChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error)
 	// GetOfframpSourceChainConfigs retrieves cached source chain configurations.
-	// WARNING: The MinSeqNr values returned may be stale when retrieved from cache.
-	// For accurate sequence numbers, use ccipChainReader.fetchDirectSourceChainConfigs instead.
+	// This method returns StaticSourceChainConfig objects which deliberately exclude MinSeqNr.
+	// For obtaining sequence numbers, use ccipChainReader.GetLatestMinSeqNrs instead.
 	GetOfframpSourceChainConfigs(
 		ctx context.Context,
 		destChain cciptypes.ChainSelector,
@@ -222,7 +222,7 @@ func (c *configPoller) RefreshSourceChainConfigs(
 
 	// Fetch configs from the contract
 	startTime := time.Now()
-	sourceChainConfigs, err := c.reader.fetchDirectSourceChainConfigs(ctx, destChain, chainsToFetch)
+	sourceChainConfigs, err := c.reader.fetchFreshSourceChainConfigs(ctx, destChain, chainsToFetch)
 	fetchConfigLatency := time.Since(startTime)
 
 	if err != nil {

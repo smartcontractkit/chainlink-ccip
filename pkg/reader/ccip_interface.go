@@ -269,7 +269,8 @@ type CCIPReader interface {
 	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
 	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
 
-	// GetOffRampSourceChainsConfig returns the sourceChains config for all the provided source chains.
+	// GetOffRampSourceChainsConfig returns the source chain static configs for all the provided source chains.
+	// This method returns StaticSourceChainConfig objects which deliberately exclude MinSeqNr.
 	// If a config was not found it will be missing from the returned map.
 	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
 	) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)

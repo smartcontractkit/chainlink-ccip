@@ -603,7 +603,7 @@ func (r *ccipChainReader) NextSeqNum(
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
 	// Use our direct fetch method that doesn't affect the cache
-	cfgs, err := r.fetchDirectSourceChainConfigs(ctx, r.destChain, chains)
+	cfgs, err := r.fetchFreshSourceChainConfigs(ctx, r.destChain, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
@@ -1261,12 +1261,16 @@ type SourceChainConfig struct {
 	OnRamp                    cciptypes.UnknownAddress
 }
 
+// GetOffRampSourceChainsConfig returns the static source chain configs for all the provided source chains.
+// This method returns configurations without the MinSeqNr field, which should be fetched separately when needed.
 func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	return r.getOffRampSourceChainsConfig(ctx, r.lggr, chains, true)
 }
 
-// getOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for dest chain
+// getOffRampSourceChainsConfig gets static source chain configs from the configPoller cache.
+// These configs deliberately exclude MinSeqNr to prevent usage of potentially stale sequence numbers.
+// For obtaining fresh sequence numbers, use ccipChainReader.GetLatestMinSeqNrs.
 //
 //nolint:revive
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
@@ -1305,10 +1309,10 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	return configs, nil
 }
 
-// fetchDirectSourceChainConfigs always fetches fresh source chain configs directly from contracts
+// fetchFreshSourceChainConfigs always fetches fresh source chain configs directly from contracts
 // without using any cached values. Use this when up-to-date data is critical, especially
 // for sequence number accuracy.
-func (r *ccipChainReader) fetchDirectSourceChainConfigs(
+func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 	sourceChains []cciptypes.ChainSelector,
