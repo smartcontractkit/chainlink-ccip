@@ -8,7 +8,7 @@ deployments:
                 {{- range .GethChains  }}
                 01-network-geth-chain-{{ .NetworkId }}.toml: |
                   [Feature]
-                  MultiFeedsManagers = false
+                  MultiFeedsManagers = true
                   [[EVM]]
                   ChainID = {{ .NetworkId }}
                   MinContractPayment = '0'
