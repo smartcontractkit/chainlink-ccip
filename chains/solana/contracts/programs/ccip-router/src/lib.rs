@@ -37,6 +37,8 @@ declare_id!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
 pub mod ccip_router {
     #![warn(missing_docs)]
 
+    use fee_quoter::messages::GetFeeResult;
+
     use super::*;
 
     //////////////////////////
@@ -447,6 +449,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for sending the message.
     /// * `dest_chain_selector` - The chain selector for the destination chain.
     /// * `message` - The message to be sent. The size limit of data is 256 bytes.
+    /// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
     pub fn ccip_send<'info>(
         ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
         dest_chain_selector: u64,
@@ -458,6 +461,28 @@ pub mod ccip_router {
             ctx.accounts.config.default_code_version,
         )
         .ccip_send(ctx, dest_chain_selector, message, token_indexes)
+    }
+
+    /// Queries the onramp for the fee required to send a message.
+    ///
+    /// This call is permissionless. Note it does not verify whether there's a curse active
+    /// in order to avoid the RMN CPI overhead.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for obtaining the message fee.
+    /// * `dest_chain_selector` - The chain selector for the destination chain.
+    /// * `message` - The message to be sent. The size limit of data is 256 bytes.
+    pub fn get_fee<'info>(
+        ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+    ) -> Result<GetFeeResult> {
+        router::onramp(
+            ctx.accounts.dest_chain_state.config.lane_code_version,
+            ctx.accounts.config.default_code_version,
+        )
+        .get_fee(ctx, dest_chain_selector, message)
     }
 }
 
