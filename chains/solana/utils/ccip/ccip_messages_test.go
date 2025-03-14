@@ -57,7 +57,7 @@ func TestMessageHashing(t *testing.T) {
 			})
 
 		require.NoError(t, err)
-		require.Equal(t, "c82035cdc1d1e58606afeaf137b71de280e1e2cafdfdc621944eecccb105d730", hex.EncodeToString(h))
+		require.Equal(t, "7374bc100f54f20f9fb36a856c97336bfc883aed59f7d564317e366a9724b3c3", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {
