@@ -446,7 +446,7 @@ fn hash(
     use anchor_lang::solana_program::keccak;
 
     // Calculate vectors size to ensure that the hash is unique
-    let sender_size = [msg.sender.len() as u8];
+    let sender_size = msg.sender.len() as u16; // it should fit in a u8, but it's safer to use u16
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -473,7 +473,7 @@ fn hash(
         msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialized
         &header_nonce,
         // message
-        &sender_size,
+        &sender_size.to_be_bytes(),
         &msg.sender,
         &data_size.to_be_bytes(),
         &msg.data,
@@ -658,7 +658,7 @@ mod tests {
         let hash_result = hash(&message, remaining_account_keys);
 
         assert_eq!(
-            "088a485369cc2f2222e9fd1c997d317d6de29ff9d1d4181fbb4a45018277a3da",
+            "c82035cdc1d1e58606afeaf137b71de280e1e2cafdfdc621944eecccb105d730",
             hex::encode(hash_result)
         );
     }

@@ -241,6 +241,7 @@ func TestTokenPool(t *testing.T) {
 						instruction, err := test_token_pool.NewTransferOwnershipInstruction(
 							anotherAdmin.PublicKey(),
 							poolConfig,
+							mint,
 							admin.PublicKey(),
 						).ValidateAndBuild()
 						require.NoError(t, err)
@@ -251,6 +252,7 @@ func TestTokenPool(t *testing.T) {
 						// anotherAdmin becomes owner for remaining tests
 						instruction, err = test_token_pool.NewAcceptOwnershipInstruction(
 							poolConfig,
+							mint,
 							anotherAdmin.PublicKey(),
 						).ValidateAndBuild()
 						require.NoError(t, err)
@@ -662,7 +664,7 @@ func TestTokenPool(t *testing.T) {
 						ixDelete, err := test_token_pool.NewDeleteChainConfigInstruction(config.EvmChainSelector, mint, poolConfig, p.Chain[config.EvmChainSelector], anotherAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
-						ixRouterChange, err := test_token_pool.NewSetRouterInstruction(config.CcipRouterProgram, poolConfig, anotherAdmin.PublicKey()).ValidateAndBuild()
+						ixRouterChange, err := test_token_pool.NewSetRouterInstruction(config.CcipRouterProgram, poolConfig, mint, anotherAdmin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixDelete, ixRouterChange}, anotherAdmin, config.DefaultCommitment)

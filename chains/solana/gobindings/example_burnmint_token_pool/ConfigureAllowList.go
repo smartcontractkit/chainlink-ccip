@@ -17,16 +17,18 @@ type ConfigureAllowList struct {
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [] mint
 	//
-	// [2] = [] systemProgram
+	// [2] = [WRITE, SIGNER] authority
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewConfigureAllowListInstructionBuilder creates a new `ConfigureAllowList` instruction builder.
 func NewConfigureAllowListInstructionBuilder() *ConfigureAllowList {
 	nd := &ConfigureAllowList{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -54,26 +56,37 @@ func (inst *ConfigureAllowList) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetMintAccount sets the "mint" account.
+func (inst *ConfigureAllowList) SetMintAccount(mint ag_solanago.PublicKey) *ConfigureAllowList {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(mint)
+	return inst
+}
+
+// GetMintAccount gets the "mint" account.
+func (inst *ConfigureAllowList) GetMintAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *ConfigureAllowList) SetAuthorityAccount(authority ag_solanago.PublicKey) *ConfigureAllowList {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ConfigureAllowList) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *ConfigureAllowList) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *ConfigureAllowList {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *ConfigureAllowList) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst ConfigureAllowList) Build() *Instruction {
@@ -110,9 +123,12 @@ func (inst *ConfigureAllowList) Validate() error {
 			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.Mint is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.Authority is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -134,10 +150,11 @@ func (inst *ConfigureAllowList) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("         mint", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -177,12 +194,14 @@ func NewConfigureAllowListInstruction(
 	enabled bool,
 	// Accounts:
 	state ag_solanago.PublicKey,
+	mint ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *ConfigureAllowList {
 	return NewConfigureAllowListInstructionBuilder().
 		SetAdd(add).
 		SetEnabled(enabled).
 		SetStateAccount(state).
+		SetMintAccount(mint).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)
 }
