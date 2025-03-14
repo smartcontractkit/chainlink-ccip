@@ -1,4 +1,4 @@
-package tokendata_test
+package observer_test
 
 import (
 	"context"
@@ -10,8 +10,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -19,7 +20,7 @@ import (
 
 func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
 	mockAddrCodec := internal.NewMockAddressCodecHex(t)
-	obs, err := tokendata.NewConfigBasedCompositeObservers(
+	obs, err := observer.NewConfigBasedCompositeObservers(
 		tests.Context(t),
 		logger.Test(t),
 		100,
@@ -93,7 +94,7 @@ func Test_CompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 	linkAvalancheTokenSourcePool := internal.RandBytes().String()
 	usdcEthereumTokenSourcePool := internal.RandBytes().String()
 
-	composite := tokendata.NewCompositeObservers(
+	composite := observer.NewCompositeObservers(
 		logger.Test(t),
 		fake(
 			"LINK",
@@ -258,13 +259,13 @@ func Test_CompositeTokenDataObserver_Failures(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		observers           []tokendata.TokenDataObserver
+		observers           []observer.TokenDataObserver
 		messageObservations exectypes.MessageObservations
 		expectedTokenData   exectypes.TokenDataObservations
 	}{
 		{
 			name: "single observer returns an error but no tokens in messages",
-			observers: []tokendata.TokenDataObserver{
+			observers: []observer.TokenDataObserver{
 				faulty(
 					"stLINK",
 					map[cciptypes.ChainSelector]string{
@@ -286,7 +287,7 @@ func Test_CompositeTokenDataObserver_Failures(t *testing.T) {
 		},
 		{
 			name: "faulty observer doesn't affect other tokens",
-			observers: []tokendata.TokenDataObserver{
+			observers: []observer.TokenDataObserver{
 				faulty(
 					"LINK",
 					map[cciptypes.ChainSelector]string{
@@ -319,7 +320,7 @@ func Test_CompositeTokenDataObserver_Failures(t *testing.T) {
 		},
 		{
 			name: "single observer returns an error for tokens for different chains",
-			observers: []tokendata.TokenDataObserver{
+			observers: []observer.TokenDataObserver{
 				faulty(
 					"LINK",
 					map[cciptypes.ChainSelector]string{
@@ -356,7 +357,7 @@ func Test_CompositeTokenDataObserver_Failures(t *testing.T) {
 		},
 		{
 			name: "multiple observers return an error for tokens for different chains",
-			observers: []tokendata.TokenDataObserver{
+			observers: []observer.TokenDataObserver{
 				faulty(
 					"LINK",
 					map[cciptypes.ChainSelector]string{
@@ -407,7 +408,7 @@ func Test_CompositeTokenDataObserver_Failures(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			composite := tokendata.NewCompositeObservers(logger.Test(t), test.observers...)
+			composite := observer.NewCompositeObservers(logger.Test(t), test.observers...)
 
 			tkData, err := composite.Observe(context.Background(), test.messageObservations)
 			require.NoError(t, err)
@@ -418,7 +419,7 @@ func Test_CompositeTokenDataObserver_Failures(t *testing.T) {
 	}
 }
 
-func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) tokendata.TokenDataObserver {
+func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) observer.TokenDataObserver {
 	return fakeObserver{
 		prefix:          prefix,
 		faulty:          true,
@@ -426,7 +427,7 @@ func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) t
 	}
 }
 
-func fake(prefix string, supportedTokens map[cciptypes.ChainSelector]string) tokendata.TokenDataObserver {
+func fake(prefix string, supportedTokens map[cciptypes.ChainSelector]string) observer.TokenDataObserver {
 	return fakeObserver{
 		prefix:          prefix,
 		faulty:          false,
