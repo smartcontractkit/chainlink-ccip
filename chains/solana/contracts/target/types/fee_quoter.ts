@@ -1647,6 +1647,11 @@ export type FeeQuoter = {
     },
     {
       "code": 8036,
+      "name": "InvalidLinkDecimals",
+      "msg": "The LINK mint uses an unsupported number of decimals"
+    },
+    {
+      "code": 8037,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
@@ -3302,6 +3307,11 @@ export const IDL: FeeQuoter = {
     },
     {
       "code": 8036,
+      "name": "InvalidLinkDecimals",
+      "msg": "The LINK mint uses an unsupported number of decimals"
+    },
+    {
+      "code": 8037,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
