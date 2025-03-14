@@ -7,6 +7,8 @@ deployments:
               v2Config:
                 {{- range .GethChains  }}
                 01-network-geth-chain-{{ .NetworkId }}.toml: |
+                  [Feature]
+                  MultiFeedsManagers = false
                   [[EVM]]
                   ChainID = {{ .NetworkId }}
                   MinContractPayment = '0'
