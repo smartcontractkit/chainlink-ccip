@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use fee_quoter::messages::GetFeeResult;
 
 use crate::context::{
     AcceptOwnership, AddChainSelector, AddOfframp, CcipSend, RemoveOfframp, TransferOwnership,
@@ -13,6 +14,7 @@ use crate::token_context::{
     RegisterTokenAdminRegistryByCCIPAdmin, RegisterTokenAdminRegistryByOwner,
     SetPoolTokenAdminRegistry,
 };
+use crate::GetFee;
 
 pub trait Admin {
     fn transfer_ownership(
@@ -103,6 +105,13 @@ pub trait OnRamp {
         message: SVM2AnyMessage,
         token_indexes: Vec<u8>,
     ) -> Result<[u8; 32]>;
+
+    fn get_fee<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+    ) -> Result<GetFeeResult>;
 }
 
 pub trait TokenAdminRegistry {
