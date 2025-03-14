@@ -90,6 +90,15 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
 
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		if ccipReader.configPoller != nil {
+			ccipReader.configPoller.Stop()
+		}
+		// Allow some time for goroutines to stop
+		time.Sleep(50 * time.Millisecond)
+	})
+
 	addrStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, 111_111)
 	require.NoError(t, err)
 
@@ -852,6 +861,15 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		internal.NewMockAddressCodecHex(t),
 	)
 
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		if ccipReader.configPoller != nil {
+			ccipReader.configPoller.Stop()
+		}
+		// Allow some time for goroutines to stop
+		time.Sleep(50 * time.Millisecond)
+	})
+
 	ctx := context.Background()
 	feeComponents := ccipReader.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{chainA, chainB, chainC})
 	assert.Len(t, feeComponents, 2)
@@ -880,6 +898,15 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		[]byte{0x3},
 		internal.NewMockAddressCodecHex(t),
 	)
+
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		if ccipReader.configPoller != nil {
+			ccipReader.configPoller.Stop()
+		}
+		// Allow some time for goroutines to stop
+		time.Sleep(50 * time.Millisecond)
+	})
 
 	ctx := context.Background()
 	_, err := ccipReader.GetDestChainFeeComponents(ctx)
@@ -1697,4 +1724,12 @@ func (m *mockConfigCache) RefreshSourceChainConfigs(
 	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	args := m.Called(ctx, destChain, sourceChains)
 	return args.Get(0).(map[cciptypes.ChainSelector]SourceChainConfig), args.Error(1)
+}
+
+func (m *mockConfigCache) Start() {
+	m.Called()
+}
+
+func (m *mockConfigCache) Stop() {
+	m.Called()
 }
