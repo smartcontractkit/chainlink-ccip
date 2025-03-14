@@ -1332,9 +1332,9 @@ func (r *ccipChainReader) fetchDirectSourceChainConfigs(
 ) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 
-	reader, exists := r.contractReaders[r.destChain]
+	reader, exists := r.contractReaders[destChain]
 	if !exists {
-		return nil, fmt.Errorf("no contract reader for chain %d", r.destChain)
+		return nil, fmt.Errorf("no contract reader for chain %d", destChain)
 	}
 
 	// Filter out destination chain
@@ -1344,8 +1344,8 @@ func (r *ccipChainReader) fetchDirectSourceChainConfigs(
 	}
 
 	// Prepare batch requests for the sourceChains
-	contractBatch := make([]types.BatchRead, 0, len(sourceChains))
-	validSourceChains := make([]cciptypes.ChainSelector, 0, len(sourceChains))
+	contractBatch := make([]types.BatchRead, 0, len(filteredSourceChains))
+	validSourceChains := make([]cciptypes.ChainSelector, 0, len(filteredSourceChains))
 
 	for _, chain := range filteredSourceChains {
 		validSourceChains = append(validSourceChains, chain)
