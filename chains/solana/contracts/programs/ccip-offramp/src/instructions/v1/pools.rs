@@ -95,18 +95,20 @@ pub struct TokenPoolAccounts<'info> {
         bump
     )]
     pub pool_chain_config: AccountInfo<'info>,
-    // /// CHECK: Lookup table
-    // pub lookup_table: AccountInfo<'info>,
 
-    // // Token admin registry
-    // #[account(
-    //     seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
-    //     bump,
-    //     owner = router.key(),
-    //     constraint = token_admin_registry.lookup_table == lookup_table.key() @ CcipOfframpError::InvalidInputsLookupTableAccounts
-    // )]
-    // pub token_admin_registry: Account<'info, router_state::TokenAdminRegistry>,
+    /// CHECK: Lookup table
+    pub lookup_table: UncheckedAccount<'info>,
 
+    /// CHECK: Token admin registry
+    #[account(
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds::program = router.key(),
+        bump,
+        constraint = *token_admin_registry.to_account_info().owner == router.key() @ CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts,
+        // todo: can't deserialize here, manual validation needed
+        // constraint = token_admin_registry.lookup_table == lookup_table.key() @ CcipOfframpError::InvalidInputsLookupTableAccounts
+    )]
+    pub token_admin_registry: AccountInfo<'info>,
     // /// CHECK: Pool program
     // pub pool_program: AccountInfo<'info>,
 
@@ -171,6 +173,9 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     // todo: AccountInfo or UncheckedAccount
     // todo: do we have extra remaining accounts after validation?
 
+    // deserialize accounts
+    let mut input_accounts: &[AccountInfo] = accounts[..].as_ref();
+
     // accounts based on user or chain
     let (user_token_account, remaining_accounts) = accounts.split_first().unwrap();
     let (token_billing_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
@@ -191,17 +196,11 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     let mut bumps = <TokenPoolAccounts as anchor_lang::Bumps>::Bumps::default();
     let mut reallocs = std::collections::BTreeSet::new();
 
-    // deserialize accounts
-    let mut input_accounts: &[AccountInfo] = accounts;
     let program_id = crate::id();
 
     // todo: check if we can do this
     let mut ix_data = Vec::new();
 
-    // let preimage = "instruction:token_pool_accounts";
-    // let mut discriminator = [0u8; 8];
-    // discriminator.copy_from_slice(&hash(preimage.as_bytes()).to_bytes()[..8]);
-    // ix_data.extend_from_slice(&discriminator);
     ix_data.extend_from_slice(&chain_selector.to_le_bytes()); // 8 bytes
     ix_data.extend_from_slice(router.as_ref()); // 32 bytes
     ix_data.extend_from_slice(fee_quoter.as_ref()); // 32 bytes
@@ -210,7 +209,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     ix_data.extend_from_slice(token_program.key().as_ref()); // 32 bytes
     ix_data.extend_from_slice(pool_program.key().as_ref()); // 32 bytes
 
-    let mut _validated_accounts = TokenPoolAccounts::try_accounts(
+    let validated_accounts = TokenPoolAccounts::try_accounts(
         &program_id,
         &mut input_accounts,
         &ix_data,
@@ -218,6 +217,12 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         &mut reallocs,
     )?;
 
+    // Check Lookup Table Entries
+    let lookup_table_data = &mut &validated_accounts.lookup_table.data.borrow()[..];
+    let lookup_table_account = AddressLookupTable::deserialize(lookup_table_data)
+        .map_err(|_| CcipOfframpError::InvalidInputsLookupTableAccounts)?;
+
+    // todo: remove legacy manual validation
     // Account validations (using remaining_accounts does not facilitate built-in anchor checks)
     {
         // Check Token Admin Registry
@@ -342,10 +347,10 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             CcipOfframpError::InvalidInputsLookupTableAccounts
         );
 
-        // Check Lookup Table Entries
-        let lookup_table_data = &mut &lookup_table.data.borrow()[..];
-        let lookup_table_account = AddressLookupTable::deserialize(lookup_table_data)
-            .map_err(|_| CcipOfframpError::InvalidInputsLookupTableAccounts)?;
+        // // Check Lookup Table Entries
+        // let lookup_table_data = &mut &lookup_table.data.borrow()[..];
+        // let lookup_table_account = AddressLookupTable::deserialize(lookup_table_data)
+        //     .map_err(|_| CcipOfframpError::InvalidInputsLookupTableAccounts)?;
 
         // reconstruct + validate expected values in token pool lookup table
         // base set of constant accounts (9)
