@@ -230,7 +230,7 @@ func (c *configPoller) RefreshSourceChainConfigs(
 
 	// Fetch configs from the contract
 	startTime := time.Now()
-	newConfigs, err := c.fetchSourceChainConfigs(ctx, destChain, chainsToFetch)
+	newConfigs, err := c.reader.fetchDirectSourceChainConfigs(ctx, destChain, chainsToFetch)
 	fetchConfigLatency := time.Since(startTime)
 
 	if err != nil {
@@ -342,7 +342,7 @@ func (c *configPoller) fetchChainConfig(
 }
 
 // fetchSourceChainConfigs fetches source chain configs directly from contracts
-func (c *configPoller) fetchSourceChainConfigs(
+func (c *configPoller) xx(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 	sourceChains []cciptypes.ChainSelector,

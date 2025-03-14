@@ -598,7 +598,9 @@ func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	cfgs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains, false)
+
+	// Use our direct fetch method that doesn't affect the cache
+	cfgs, err := r.fetchDirectSourceChainConfigs(ctx, r.destChain, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
@@ -1316,6 +1318,87 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 					"enabled", enabled)
 				delete(configs, chain)
 			}
+		}
+	}
+
+	return configs, nil
+}
+
+// fetchDirectSourceChainConfigs fetches source chain configs directly from contracts
+func (r *ccipChainReader) fetchDirectSourceChainConfigs(
+	ctx context.Context,
+	destChain cciptypes.ChainSelector,
+	sourceChains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+
+	reader, exists := r.contractReaders[r.destChain]
+	if !exists {
+		return nil, fmt.Errorf("no contract reader for chain %d", r.destChain)
+	}
+
+	// Filter out destination chain
+	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
+	if len(filteredSourceChains) == 0 {
+		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
+	}
+
+	// Prepare batch requests for the sourceChains
+	contractBatch := make([]types.BatchRead, 0, len(sourceChains))
+	validSourceChains := make([]cciptypes.ChainSelector, 0, len(sourceChains))
+
+	for _, chain := range filteredSourceChains {
+		validSourceChains = append(validSourceChains, chain)
+		contractBatch = append(contractBatch, types.BatchRead{
+			ReadName: consts.MethodNameGetSourceChainConfig,
+			Params: map[string]any{
+				"sourceChainSelector": chain,
+			},
+			ReturnVal: new(SourceChainConfig),
+		})
+	}
+
+	// Execute batch request
+	results, _, err := reader.ExtendedBatchGetLatestValues(
+		ctx,
+		contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameOffRamp: contractBatch,
+		},
+		false,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
+	}
+
+	// Process results
+	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
+
+	for _, readResult := range results {
+		if len(readResult) != len(validSourceChains) {
+			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, results=%v",
+				validSourceChains, results)
+		}
+
+		for i, chain := range validSourceChains {
+			v, err := readResult[i].GetResult()
+			if err != nil {
+				lggr.Errorw("Failed to get source chain config",
+					"chain", chain,
+					"error", err)
+				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
+			}
+
+			cfg, ok := v.(*SourceChainConfig)
+			if !ok {
+				lggr.Errorw("Invalid result type from GetSourceChainConfig",
+					"chain", chain,
+					"type", fmt.Sprintf("%T", v))
+				return nil, fmt.Errorf("invalid result type from GetSourceChainConfig for chainSelector=%d", chain)
+			}
+
+			// Store the config - we don't filter here as that's done at the reader level
+			configs[chain] = *cfg
 		}
 	}
 
