@@ -29,7 +29,6 @@ mkShell' {
     gopls
     delve
     github-cli
-    solana-cli
     jq
     gomplate
     go-task
@@ -71,6 +70,15 @@ mkShell' {
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
     export GOBIN=$(go env GOPATH)/bin
     export PATH=$PATH:$repo_root/scripts:$GOBIN
+
+      # If the solana binary isn't found, install it
+    if ! command -v solana &>/dev/null; then
+      echo "Installing solana-cli..."
+      sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.0/install)"
+    fi
+
+    export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
 
     if [ "$CRIB_CI_ENV" = "true" ] && [ "$CLI_CHANGED" != "true" ]; then
       # in CI, download the CLI from the corresponding GH release if the CLI hasn't changed
