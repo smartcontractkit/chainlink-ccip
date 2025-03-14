@@ -487,6 +487,65 @@ func (_c *MockCCIPReader_GetExpectedNextSequenceNumber_Call) RunAndReturn(run fu
 	return _c
 }
 
+// GetLatestMinSeqNrs provides a mock function with given fields: ctx, sourceChains
+func (_m *MockCCIPReader) GetLatestMinSeqNrs(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]uint64, error) {
+	ret := _m.Called(ctx, sourceChains)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLatestMinSeqNrs")
+	}
+
+	var r0 map[ccipocr3.ChainSelector]uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]uint64, error)); ok {
+		return rf(ctx, sourceChains)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]uint64); ok {
+		r0 = rf(ctx, sourceChains)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]uint64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, sourceChains)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_GetLatestMinSeqNrs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLatestMinSeqNrs'
+type MockCCIPReader_GetLatestMinSeqNrs_Call struct {
+	*mock.Call
+}
+
+// GetLatestMinSeqNrs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sourceChains []ccipocr3.ChainSelector
+func (_e *MockCCIPReader_Expecter) GetLatestMinSeqNrs(ctx interface{}, sourceChains interface{}) *MockCCIPReader_GetLatestMinSeqNrs_Call {
+	return &MockCCIPReader_GetLatestMinSeqNrs_Call{Call: _e.mock.On("GetLatestMinSeqNrs", ctx, sourceChains)}
+}
+
+func (_c *MockCCIPReader_GetLatestMinSeqNrs_Call) Run(run func(ctx context.Context, sourceChains []ccipocr3.ChainSelector)) *MockCCIPReader_GetLatestMinSeqNrs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_GetLatestMinSeqNrs_Call) Return(_a0 map[ccipocr3.ChainSelector]uint64, _a1 error) *MockCCIPReader_GetLatestMinSeqNrs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_GetLatestMinSeqNrs_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]uint64, error)) *MockCCIPReader_GetLatestMinSeqNrs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLatestPriceSeqNr provides a mock function with given fields: ctx
 func (_m *MockCCIPReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
 	ret := _m.Called(ctx)
@@ -659,23 +718,23 @@ func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) RunAndReturn(run func(cont
 }
 
 // GetOffRampSourceChainsConfig provides a mock function with given fields: ctx, sourceChains
-func (_m *MockCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error) {
+func (_m *MockCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error) {
 	ret := _m.Called(ctx, sourceChains)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOffRampSourceChainsConfig")
 	}
 
-	var r0 map[ccipocr3.ChainSelector]reader.SourceChainConfig
+	var r0 map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error)); ok {
 		return rf(ctx, sourceChains)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]reader.SourceChainConfig); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig); ok {
 		r0 = rf(ctx, sourceChains)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]reader.SourceChainConfig)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig)
 		}
 	}
 
@@ -707,12 +766,12 @@ func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Return(_a0 map[ccipocr3.ChainSelector]reader.SourceChainConfig, _a1 error) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Return(_a0 map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, _a1 error) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

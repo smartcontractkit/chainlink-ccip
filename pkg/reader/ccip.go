@@ -1261,32 +1261,8 @@ type SourceChainConfig struct {
 	OnRamp                    cciptypes.UnknownAddress
 }
 
-func (scc SourceChainConfig) check() (bool /* enabled */, error) {
-	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
-	if !scc.IsEnabled {
-		return false, nil
-	}
-	// This may happen due to some sort of regression in the codec that unmarshals
-	// chain data -> go struct.
-	if len(scc.OnRamp) == 0 {
-		return false, fmt.Errorf(
-			"onRamp misconfigured/didn't unmarshal: %x",
-			scc.OnRamp,
-		)
-	}
-
-	if len(scc.Router) == 0 {
-		return false, fmt.Errorf("router is empty: %v", scc.Router)
-	}
-
-	return scc.IsEnabled, nil
-}
-
-// getOffRampSourceChainsConfig gets all enabled source chain configs from the offRamp for dest chain
-// NOTE: The MinSeqNr value may be stale when retrieved from cache.
-// For accurate sequence numbers, use ccipChainReader.fetchDirectSourceChainConfigs instead.
 func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	return r.getOffRampSourceChainsConfig(ctx, r.lggr, chains, true)
 }
 
@@ -1298,7 +1274,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	lggr logger.Logger,
 	chains []cciptypes.ChainSelector,
 	includeDisabled bool,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}

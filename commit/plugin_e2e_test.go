@@ -88,7 +88,7 @@ var (
 		Decimals:          decimals18,
 	}
 
-	sourceChainConfigs = map[ccipocr3.ChainSelector]reader2.SourceChainConfig{
+	sourceChainConfigs = map[ccipocr3.ChainSelector]reader2.StaticSourceChainConfig{
 		sourceChain1: {IsEnabled: true, IsRMNVerificationDisabled: true},
 		sourceChain2: {IsEnabled: true, IsRMNVerificationDisabled: true},
 	}

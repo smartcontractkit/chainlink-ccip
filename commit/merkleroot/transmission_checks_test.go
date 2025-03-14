@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -14,7 +15,7 @@ import (
 )
 
 func Test_validateMerkleRootsState(t *testing.T) {
-	sourceChainConfig := map[cciptypes.ChainSelector]reader2.SourceChainConfig{
+	sourceChainConfig := map[cciptypes.ChainSelector]reader2.StaticSourceChainConfig{
 		10: {IsRMNVerificationDisabled: false, IsEnabled: true},
 		20: {IsRMNVerificationDisabled: false, IsEnabled: true},
 		30: {IsRMNVerificationDisabled: true, IsEnabled: true},
