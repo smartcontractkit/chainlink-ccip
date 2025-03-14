@@ -17,7 +17,9 @@ type ConfigPoller interface {
 	GetChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error)
 	// RefreshChainConfig forces a refresh of the chain configuration
 	RefreshChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error)
-	// GetOfframpSourceChainConfigs retrieves cached source chain configurations
+	// GetOfframpSourceChainConfigs retrieves cached source chain configurations.
+	// WARNING: The MinSeqNr values returned may be stale when retrieved from cache.
+	// For accurate sequence numbers, use ccipChainReader.fetchDirectSourceChainConfigs instead.
 	GetOfframpSourceChainConfigs(
 		ctx context.Context,
 		destChain cciptypes.ChainSelector,

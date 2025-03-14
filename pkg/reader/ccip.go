@@ -594,6 +594,9 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
+// NextSeqNum returns the current sequence numbers for chains.
+// This always fetches fresh data directly from contracts to ensure accuracy.
+// Critical for proper message sequencing.
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
@@ -1279,7 +1282,9 @@ func (scc SourceChainConfig) check() (bool /* enabled */, error) {
 	return scc.IsEnabled, nil
 }
 
-// GetOffRampSourceChainsConfig returns all the source chains configs including disabled chains.
+// getOffRampSourceChainsConfig gets all enabled source chain configs from the offRamp for dest chain
+// NOTE: The MinSeqNr value may be stale when retrieved from cache.
+// For accurate sequence numbers, use ccipChainReader.fetchDirectSourceChainConfigs instead.
 func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
 	return r.getOffRampSourceChainsConfig(ctx, r.lggr, chains, true)
@@ -1324,7 +1329,9 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	return configs, nil
 }
 
-// fetchDirectSourceChainConfigs fetches source chain configs directly from contracts
+// fetchDirectSourceChainConfigs always fetches fresh source chain configs directly from contracts
+// without using any cached values. Use this when up-to-date data is critical, especially
+// for sequence number accuracy.
 func (r *ccipChainReader) fetchDirectSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
