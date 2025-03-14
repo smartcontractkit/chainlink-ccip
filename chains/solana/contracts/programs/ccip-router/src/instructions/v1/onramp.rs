@@ -1,7 +1,7 @@
 use crate::events::on_ramp as events;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
-use fee_quoter::messages::TokenTransferAdditionalData;
+use fee_quoter::messages::{GetFeeResult, TokenTransferAdditionalData};
 
 use super::super::interfaces::OnRamp;
 use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
@@ -11,7 +11,7 @@ use super::pools::{
     validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
 
-use crate::seed;
+use crate::{seed, GetFee};
 use crate::{
     CcipRouterError, CcipSend, Nonce, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
     SVM2AnyTokenTransfer, SVMTokenAmount,
@@ -65,11 +65,29 @@ impl OnRamp for Impl {
             accounts_per_sent_token.push(current_token_accounts);
         }
 
+        let billing_token_config_accs: Vec<AccountInfo<'info>> = accounts_per_sent_token
+            .iter()
+            .map(|a| a.fee_token_config.to_account_info())
+            .collect();
+        let per_chain_per_token_config_accs: Vec<AccountInfo<'info>> = accounts_per_sent_token
+            .iter()
+            .map(|a| a.token_billing_config.to_account_info())
+            .collect();
+
+        let mut get_fee_remaining_accounts = billing_token_config_accs;
+        get_fee_remaining_accounts.extend(per_chain_per_token_config_accs);
+
         let get_fee_result = get_fee_cpi(
-            &ctx,
+            ctx.accounts.fee_quoter.to_account_info(),
+            ctx.accounts.fee_quoter_config.to_account_info(),
+            ctx.accounts.fee_quoter_dest_chain.to_account_info(),
+            ctx.accounts
+                .fee_quoter_billing_token_config
+                .to_account_info(),
+            ctx.accounts.fee_quoter_link_token_config.to_account_info(),
             dest_chain_selector,
             &message,
-            &accounts_per_sent_token,
+            get_fee_remaining_accounts,
         )?;
 
         let is_paying_with_native_sol = message.fee_token == Pubkey::default();
@@ -222,6 +240,26 @@ impl OnRamp for Impl {
         });
 
         Ok(*message_id)
+    }
+
+    fn get_fee<'info>(
+        &self,
+        ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+    ) -> Result<GetFeeResult> {
+        get_fee_cpi(
+            ctx.accounts.fee_quoter.to_account_info(),
+            ctx.accounts.fee_quoter_config.to_account_info(),
+            ctx.accounts.fee_quoter_dest_chain.to_account_info(),
+            ctx.accounts
+                .fee_quoter_billing_token_config
+                .to_account_info(),
+            ctx.accounts.fee_quoter_link_token_config.to_account_info(),
+            dest_chain_selector,
+            &message,
+            ctx.remaining_accounts.to_vec(),
+        )
     }
 }
 
