@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use anchor_spl::token::Mint;
 use anchor_spl::token_interface::TokenAccount;
 use solana_program::program::get_return_data;
 use solana_program::{
@@ -58,6 +59,105 @@ pub(super) struct TokenAccounts<'a> {
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
+#[derive(Accounts)]
+#[instruction(chain_selector: u64, router: Pubkey, fee_quoter: Pubkey, token_receiver: Pubkey)]
+// todo: order matters
+pub struct TokenPoolAccounts<'info> {
+    // User token account - validate it's the ata for token_receiver
+    #[account(
+        constraint = user_token_account.key() == get_associated_token_address_with_program_id(
+            &token_receiver.key(),
+            &mint.key(),
+            &token_program.key()
+        ) @ CcipOfframpError::InvalidInputsTokenAccounts
+    )]
+    pub user_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK: Per chain token billing config
+    #[account(
+        seeds = [
+            fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
+            chain_selector.to_le_bytes().as_ref(),
+            mint.key().as_ref(),
+        ],
+        seeds::program = fee_quoter.key(),
+        bump
+    )]
+    pub token_billing_config: AccountInfo<'info>,
+
+    /// CHECK: Pool chain config
+    #[account(
+        seeds = [
+            seed::TOKEN_POOL_CONFIG,
+            chain_selector.to_le_bytes().as_ref(),
+            mint.key().as_ref(),
+        ],
+        seeds::program = pool_program.key(),
+        bump
+    )]
+    pub pool_chain_config: AccountInfo<'info>,
+
+    /// CHECK: Lookup table
+    pub lookup_table: AccountInfo<'info>,
+
+    // Token admin registry
+    #[account(
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        bump,
+        owner = router.key(),
+        constraint = token_admin_registry.lookup_table == lookup_table.key() @ CcipOfframpError::InvalidInputsLookupTableAccounts
+    )]
+    pub token_admin_registry: Account<'info, router_state::TokenAdminRegistry>,
+
+    /// CHECK: Pool program
+    pub pool_program: AccountInfo<'info>,
+
+    /// CHECK: Pool config
+    #[account(
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
+        seeds::program = pool_program.key(),
+        bump,
+        owner = pool_program.key() @ CcipOfframpError::InvalidInputsPoolAccounts
+    )]
+    pub pool_config: AccountInfo<'info>,
+
+    /// CHECK: Pool token account
+    #[account(
+        address = get_associated_token_address_with_program_id(
+            &pool_signer.key(),
+            &mint.key(),
+            &token_program.key()
+        ) @ CcipOfframpError::InvalidInputsTokenAccounts
+    )]
+    pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK: Pool signer
+    #[account(
+        seeds = [seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
+        seeds::program = pool_program.key(),
+        bump
+    )]
+    pub pool_signer: AccountInfo<'info>,
+
+    /// CHECK: Token program
+    pub token_program: AccountInfo<'info>,
+
+    /// CHECK: Mint
+    #[account(owner = token_program.key() @ CcipOfframpError::InvalidInputsTokenAccounts)]
+    pub mint: Account<'info, Mint>,
+
+    /// CHECK: Fee token config
+    #[account(
+        seeds = [
+            fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+            mint.key().as_ref()
+        ],
+        seeds::program = fee_quoter.key(),
+        bump
+    )]
+    pub fee_token_config: AccountInfo<'info>,
+}
+
 pub(super) fn validate_and_parse_token_accounts<'info>(
     token_receiver: Pubkey,
     chain_selector: u64,
@@ -65,6 +165,36 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     fee_quoter: Pubkey,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
+    // todo: run account validation via anchor context
+    // todo: programs/ccip-offramp/src/instructions/v1/pools.rs
+    // todo: programs/ccip-router/src/instructions/v1/pools.rs
+    // todo: setup iterative test suites for account validation
+    // todo: validate functionality in the integration tests
+    // todo: AccountInfo or UncheckedAccount
+    // todo: do we have extra remaining accounts after validation?
+
+    let mut bumps = <TokenPoolAccounts as anchor_lang::Bumps>::Bumps::default();
+    let mut reallocs = std::collections::BTreeSet::new();
+
+    // deserialize accounts
+    let mut remaining_accounts: &[AccountInfo] = accounts;
+    let program_id = crate::id();
+
+    // todo: check if we can do this
+    let mut ix_data = Vec::new();
+    ix_data.extend_from_slice(&chain_selector.to_le_bytes()); // 8 bytes
+    ix_data.extend_from_slice(token_receiver.as_ref()); // 32 bytes
+    ix_data.extend_from_slice(router.as_ref()); // 32 bytes
+    ix_data.extend_from_slice(fee_quoter.as_ref()); // 32 bytes
+
+    let mut _validated_accounts = TokenPoolAccounts::try_accounts(
+        &program_id,
+        &mut remaining_accounts,
+        &ix_data,
+        &mut bumps,
+        &mut reallocs,
+    )?;
+
     // accounts based on user or chain
     let (user_token_account, remaining_accounts) = accounts.split_first().unwrap();
     let (token_billing_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
