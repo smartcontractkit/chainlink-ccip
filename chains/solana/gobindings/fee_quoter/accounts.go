@@ -9,13 +9,14 @@ import (
 )
 
 type Config struct {
-	Version            uint8
-	Owner              ag_solanago.PublicKey
-	ProposedOwner      ag_solanago.PublicKey
-	MaxFeeJuelsPerMsg  ag_binary.Uint128
-	LinkTokenMint      ag_solanago.PublicKey
-	Onramp             ag_solanago.PublicKey
-	DefaultCodeVersion CodeVersion
+	Version                uint8
+	Owner                  ag_solanago.PublicKey
+	ProposedOwner          ag_solanago.PublicKey
+	MaxFeeJuelsPerMsg      ag_binary.Uint128
+	LinkTokenMint          ag_solanago.PublicKey
+	LinkTokenLocalDecimals uint8
+	Onramp                 ag_solanago.PublicKey
+	DefaultCodeVersion     CodeVersion
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -48,6 +49,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `LinkTokenMint` param:
 	err = encoder.Encode(obj.LinkTokenMint)
+	if err != nil {
+		return err
+	}
+	// Serialize `LinkTokenLocalDecimals` param:
+	err = encoder.Encode(obj.LinkTokenLocalDecimals)
 	if err != nil {
 		return err
 	}
@@ -100,6 +106,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `LinkTokenMint`:
 	err = decoder.Decode(&obj.LinkTokenMint)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LinkTokenLocalDecimals`:
+	err = decoder.Decode(&obj.LinkTokenLocalDecimals)
 	if err != nil {
 		return err
 	}
