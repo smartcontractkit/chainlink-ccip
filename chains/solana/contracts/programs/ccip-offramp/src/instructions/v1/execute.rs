@@ -650,15 +650,15 @@ mod tests {
             },
         };
         let remaining_account_keys = [
-            Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8").unwrap(),
-            Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
+            Pubkey::try_from("7gtMT88cNmZVmVUzkcC6MKZ4NY27ynwodKBVJFQdq8R2").unwrap(),
+            Pubkey::try_from("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui").unwrap(),
         ]
         .into_iter();
 
         let hash_result = hash(&message, remaining_account_keys);
 
         assert_eq!(
-            "c82035cdc1d1e58606afeaf137b71de280e1e2cafdfdc621944eecccb105d730",
+            "7374bc100f54f20f9fb36a856c97336bfc883aed59f7d564317e366a9724b3c3",
             hex::encode(hash_result)
         );
     }

@@ -6,7 +6,7 @@ use solana_program::{
     program::{get_return_data, invoke, invoke_signed},
 };
 
-declare_id!("CcipSender111111111111111111111111111111111");
+declare_id!("4LfBQWYaU6zQZbDyYjX8pbY4qjzrhoumUFYZEZEqMNhJ");
 
 #[cfg(target_os = "solana")]
 #[global_allocator]
