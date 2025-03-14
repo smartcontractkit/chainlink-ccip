@@ -94,6 +94,24 @@ export type ExternalProgramCpiStub = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "noOp",
+      "docs": [
+        "no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)"
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "computeHeavy",
+      "accounts": [],
+      "args": [
+        {
+          "name": "iterations",
+          "type": "u32"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -206,6 +224,24 @@ export const IDL: ExternalProgramCpiStub = {
         {
           "name": "data",
           "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "noOp",
+      "docs": [
+        "no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)"
+      ],
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "computeHeavy",
+      "accounts": [],
+      "args": [
+        {
+          "name": "iterations",
+          "type": "u32"
         }
       ]
     }
