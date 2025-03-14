@@ -18,7 +18,7 @@ import (
 type TokenPool struct {
 	// token details
 	Program        solana.PublicKey
-	Mint           solana.PrivateKey
+	Mint           solana.PublicKey
 	FeeTokenConfig solana.PublicKey
 
 	// admin registry PDA
@@ -50,36 +50,36 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 		tp.PoolTokenAccount, // 4 - writable
 		tp.PoolSigner,       // 5
 		tp.Program,          // 6
-		tp.Mint.PublicKey(), // 7 - writable
+		tp.Mint,             // 7 - writable
 		tp.FeeTokenConfig,   // 8
 	}
 	return append(list, tp.AdditionalAccounts...)
 }
 
 // NewTokenPool returns token + pool addresses. however, the token still needs to be deployed
-func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, mint solana.PrivateKey) (TokenPool, error) {
-	tokenAdminRegistryPDA, _, err := state.FindTokenAdminRegistryPDA(mint.PublicKey(), config.CcipRouterProgram)
+func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, mint solana.PublicKey) (TokenPool, error) {
+	tokenAdminRegistryPDA, _, err := state.FindTokenAdminRegistryPDA(mint, config.CcipRouterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
 	// preload with defined config.EvmChainSelector
-	evmChainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint.PublicKey(), poolProgram)
+	evmChainPDA, _, err := TokenPoolChainConfigPDA(config.EvmChainSelector, mint, poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	svmChainPDA, _, err := TokenPoolChainConfigPDA(config.SvmChainSelector, mint.PublicKey(), poolProgram)
+	svmChainPDA, _, err := TokenPoolChainConfigPDA(config.SvmChainSelector, mint, poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	evmBillingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
+	evmBillingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.EvmChainSelector, mint, config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	svmBillingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.SvmChainSelector, mint.PublicKey(), config.FeeQuoterProgram)
+	svmBillingPDA, _, err := state.FindFqPerChainPerTokenConfigPDA(config.SvmChainSelector, mint, config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	tokenConfigPda, _, err := state.FindFqBillingTokenConfigPDA(mint.PublicKey(), config.FeeQuoterProgram)
+	tokenConfigPda, _, err := state.FindFqBillingTokenConfigPDA(mint, config.FeeQuoterProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
@@ -100,11 +100,11 @@ func NewTokenPool(tokenProgram solana.PublicKey, poolProgram solana.PublicKey, m
 	p.Chain[config.SvmChainSelector] = svmChainPDA
 	p.Billing[config.EvmChainSelector] = evmBillingPDA
 	p.Billing[config.SvmChainSelector] = svmBillingPDA
-	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey(), poolProgram)
+	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint, poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
-	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey(), poolProgram)
+	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint, poolProgram)
 	if err != nil {
 		return TokenPool{}, err
 	}
