@@ -27,7 +27,6 @@ type ChainURLs struct {
 type DonURLs struct {
 	BootstrapNodes []DonURL `json:"bootstrap_nodes"`
 	WorkerNodes    []DonURL `json:"worker_nodes"`
-	GatewayNodes   []DonURL `json:"gateway_nodes"`
 }
 
 type DonAPICredentials struct {
@@ -41,6 +40,9 @@ type DonURL struct {
 	P2PInternalURL string `json:"p2p_internal_url"`
 	InternalIP     string `json:"internal_ip"`
 }
+
+var noOpFn = func(string) {}
+var printFn = func(s string) { fmt.Println(s) }
 
 func main() {
 	// main flags
@@ -80,7 +82,7 @@ func main() {
 		fmt.Println("JD URLs:")
 		jdUrls := generateJDUrls(namespace, ingressDomain)
 
-		err := saveToFile("jd-urls.json", targetDir, jdUrls)
+		err := saveToFile("jd-urls.json", targetDir, jdUrls, printFn)
 		if err != nil {
 			panic(err)
 		}
@@ -110,7 +112,7 @@ func main() {
 		chainUrls := generateChainUrls(namespace, ingressDomain, *chainTypeFlagPtr, chainID, chainVariantFlagPtr, chainNameFlagPtr)
 		fmt.Println("Chain URLs:")
 
-		err = saveToFile(fmt.Sprintf("chain-%s-urls.json", chainID), targetDir, chainUrls)
+		err = saveToFile(fmt.Sprintf("chain-%s-urls.json", chainID), targetDir, chainUrls, printFn)
 		if err != nil {
 			panic(err)
 		}
@@ -137,33 +139,31 @@ func main() {
 			panic("DON_NODE_COUNT is not a number")
 		}
 
-		gatewayNodeCountStr := os.Getenv("DON_GATEWAY_NODE_COUNT")
-		if gatewayNodeCountStr == "" {
-			panic("DON_GATEWAY_NODE_COUNT is not set")
-		}
-
-		gatewayNodeCount, err := strconv.Atoi(gatewayNodeCountStr)
-		if err != nil {
-			panic("DON_GATEWAY_NODE_COUNT is not a number")
-		}
-
 		donType := os.Getenv("DON_TYPE")
 		if donType == "" {
 			panic("DON_TYPE is not set")
 		}
 
-		donUrls := generateDONUrls(namespace, ingressDomain, donType, boostrapNodeCount, workerNodeCount, gatewayNodeCount)
+		donUrls := generateDONUrls(namespace, ingressDomain, donType, boostrapNodeCount, workerNodeCount)
 		fmt.Println("DON URLs:")
 
-		err = saveToFile(fmt.Sprintf("don-%s-urls.json", donType), targetDir, donUrls)
+		err = saveToFile(fmt.Sprintf("don-%s-urls.json", donType), targetDir, donUrls, printFn)
 		if err != nil {
 			panic(err)
+		}
+
+		if os.Getenv("DON_API_USERNAME") == "" {
+			panic("DON_API_USERNAME is not set")
+		}
+
+		if os.Getenv("DON_API_PASSWORD") == "" {
+			panic("DON_API_PASSWORD is not set")
 		}
 
 		err = saveToFile("don-api-credentials.json", targetDir, DonAPICredentials{
 			Username: os.Getenv("DON_API_USERNAME"),
 			Password: os.Getenv("DON_API_PASSWORD"),
-		})
+		}, noOpFn)
 
 		if err != nil {
 			panic(err)
@@ -171,16 +171,15 @@ func main() {
 	}
 }
 
-func generateDONUrls(namespace, ingressDomain, donType string, boostrapNodeCount, workerNodeCount, gatewayNodeCount int) DonURLs {
+func generateDONUrls(namespace, ingressDomain, donType string, boostrapNodeCount, workerNodeCount int) DonURLs {
 	bootstrapNodes := make([]DonURL, boostrapNodeCount)
 	workerNodes := make([]DonURL, workerNodeCount)
-	gatewayNodes := make([]DonURL, gatewayNodeCount)
 
 	for i := range boostrapNodeCount {
 		bootstrapNodes[i] = DonURL{
-			HostURL:        fmt.Sprintf("http://%s-bt-%s-%d.%s:80", namespace, donType, i, ingressDomain),
-			InternalURL:    fmt.Sprintf("http://%s-bt-%s-%d:80", namespace, donType, i),
-			P2PInternalURL: fmt.Sprintf("http://%s-bt-%s-%d:6690", namespace, donType, i),
+			HostURL:        fmt.Sprintf("http://%s-%s-bt-%d.%s:80", namespace, donType, i, ingressDomain),
+			InternalURL:    fmt.Sprintf("http://%s-%s-bt-%d:80", namespace, donType, i),
+			P2PInternalURL: fmt.Sprintf("http://%s-%s-bt-%d:6690", namespace, donType, i),
 			InternalIP:     fmt.Sprintf("%s-bt-%d", donType, i),
 		}
 	}
@@ -194,35 +193,24 @@ func generateDONUrls(namespace, ingressDomain, donType string, boostrapNodeCount
 		}
 	}
 
-	for i := range gatewayNodeCount {
-		gatewayNodes[i] = DonURL{
-			HostURL:        fmt.Sprintf("http://%s-gateway-%s-%d.%s:80", namespace, donType, i, ingressDomain),
-			InternalURL:    fmt.Sprintf("http://%s-gateway-%s-%d:80", namespace, donType, i),
-			P2PInternalURL: fmt.Sprintf("http://%s-gateway-%s-%d:6690", namespace, donType, i),
-			InternalIP:     fmt.Sprintf("%s-gateway-%d", donType, i),
-		}
-	}
-
 	return DonURLs{
 		BootstrapNodes: bootstrapNodes,
 		WorkerNodes:    workerNodes,
-		GatewayNodes:   gatewayNodes,
 	}
 
 }
 
-func generateChainUrls(namespace, ingressDomain string, chainType, chainID string, chainVariant, chainName *string) []ChainURLs {
-	return []ChainURLs{
-		{
-			HTTPHostURL:     externalHTTPRPC(chainType, chainVariant, namespace, ingressDomain, chainID, chainName),
-			WSHostURL:       externalChainWSRPC(chainType, chainVariant, namespace, ingressDomain, chainID, chainName),
-			HTTPInternalURL: mustInternalHTTPRPC(chainType, chainVariant, chainID, chainName),
-			WSInternalURL:   mustInternalWSRPC(chainType, chainVariant, chainID, chainName),
-		},
+func generateChainUrls(namespace, ingressDomain string, chainType, chainID string, chainVariant, chainName *string) ChainURLs {
+	return ChainURLs{
+
+		HTTPHostURL:     externalHTTPRPC(chainType, chainVariant, namespace, ingressDomain, chainID, chainName),
+		WSHostURL:       externalChainWSRPC(chainType, chainVariant, namespace, ingressDomain, chainID, chainName),
+		HTTPInternalURL: mustInternalHTTPRPC(chainType, chainVariant, chainID, chainName),
+		WSInternalURL:   mustInternalWSRPC(chainType, chainVariant, chainID, chainName),
 	}
 }
 
-func saveToFile(filename, targetDir string, data any) error {
+func saveToFile(filename, targetDir string, data any, afterSaveHook func(string)) error {
 	filePath := filepath.Join(targetDir, filename)
 	f, err := os.Create(filePath)
 	if err != nil {
@@ -240,7 +228,7 @@ func saveToFile(filename, targetDir string, data any) error {
 		return err
 	}
 
-	fmt.Println(string(marshalled))
+	afterSaveHook(string(marshalled))
 	fmt.Printf("File %s saved\n", filePath)
 
 	return nil
@@ -248,7 +236,7 @@ func saveToFile(filename, targetDir string, data any) error {
 
 func generateJDUrls(namespace, ingressDomain string) JdURLs {
 	return JdURLs{
-		GRPCHostURL:     fmt.Sprintf("%s-jd-job-distributor-grpc.%s:443", namespace, ingressDomain),
+		GRPCHostURL:     fmt.Sprintf("%s-job-distributor-grpc.%s:443", namespace, ingressDomain),
 		WSHostURL:       "", // empty on purpose, since it is not exposed to the outside world
 		GRCPInternalUrl: "job-distributor:80",
 		WSInternalURL:   "job-distributor-noderpc-lb:80",

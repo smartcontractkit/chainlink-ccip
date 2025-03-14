@@ -7,6 +7,9 @@ vars:
     source: env
     default: "${CRIB_DIR}/scripts"
   DEVSPACE_ENV_FILE: .env
+  DEVSPACE_INGRESS_DOMAIN:
+    source: env
+    default: "main.stage.cldev.sh"
   DEPENDENCIES_DIR:
     source: env
     default: "${CRIB_DIR}/dependencies"
@@ -52,7 +55,14 @@ vars:
     default: 0.9.0
   CHAIN_ID:
     source: env
-    default: 2337
+    default: 1337
+  # TODO make it possible to pass it upstream to donut
+  DON_API_USERNAME:
+    source: env
+    default: "admin@chain.link"
+  DON_API_PASSWORD:
+    source: env
+    default: "hWDmgcub2gUhyrG6cxriqt7T"
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -74,6 +84,11 @@ pipelines:
 
       run_dependency_pipelines geth-chain
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+
+      CHAIN_ID=${CHAIN_ID} \
+      DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
+      DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+      go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -chain -chain-variant=geth -chain-type=evm -target-dir=${CRE_CONFIG_DIR}
   custom-chain:
     run: |-
       run_pipelines maybe-kind
@@ -87,6 +102,13 @@ pipelines:
       run_dependency_pipelines don
       # add a check for the ingress
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+
+      DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
+      DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+      DON_TYPE=${DON_TYPE} \
+      DON_NODE_COUNT=${DON_NODE_COUNT} \
+      DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
+      go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -don -target-dir=${CRE_CONFIG_DIR}
   jd:
     run: |-
       run_pipelines maybe-kind
@@ -94,6 +116,9 @@ pipelines:
       run_dependency_pipelines job-distributor
        # add a check for the ingress
        crib devspace ingress-check --nsTimeout=2m --timeout=4m
+      DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
+      DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+      go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -jd -target-dir=${CRE_CONFIG_DIR}
 
 profiles:
   - name: chains

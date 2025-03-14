@@ -1,6 +1,0 @@
-{
-  "grpc_host_url": "crib-local-jd-job-distributor-grpc.main.stage.cldev.sh:443",
-  "grpc_internal_url": "job-distributor:80",
-  "ws_host_url": "",
-  "ws_internal_url": "job-distributor-noderpc-lb:80"
-}
