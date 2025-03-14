@@ -191,7 +191,7 @@ profiles:
                 ingressClassName: nginx-internal
                 extra_annotations:
                   nginx.ingress.kubernetes.io/backend-protocol: HTTP
-                  external-dns.alpha.kubernetes.io/ttl: "120"
+                  external-dns.alpha.kubernetes.io/ttl: "30"
   - name: ccip-v2-load-tests
     merge:
       deployments:

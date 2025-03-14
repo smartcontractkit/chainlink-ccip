@@ -50,6 +50,9 @@ vars:
   JOB_DISTRIBUTOR_IMAGE_TAG:
     source: env
     default: 0.9.0
+  CHAIN_ID:
+    source: env
+    default: 2337
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -71,18 +74,26 @@ pipelines:
 
       run_dependency_pipelines geth-chain
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+  custom-chain:
+    run: |-
+      run_pipelines maybe-kind
+
+      run_dependency_pipelines custom-geth-chain
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
   don:
     run: |-
       run_pipelines maybe-kind
 
       run_dependency_pipelines don
       # add a check for the ingress
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
   jd:
     run: |-
       run_pipelines maybe-kind
 
       run_dependency_pipelines job-distributor
        # add a check for the ingress
+       crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
 profiles:
   - name: chains
@@ -97,6 +108,21 @@ profiles:
             vars:
               CHAINS_COUNT: 1
               ENABLE_DON_BASE: "false"
+
+  - name: custom_geth
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          custom-geth-chain:
+            path: ${DEPENDENCIES_DIR}/geth-v2
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              ENABLE_DON_BASE: "false"
+              ENABLE_BASE_PROFILE: "false"
+              ENABLE_CUSTOM_PROFILE: "true"
+              CHAIN_ID: ${CHAIN_ID}
 
   - name: dons
     patches:
@@ -119,6 +145,8 @@ profiles:
             vars:
               JOB_DISTRIBUTOR_IMAGE_TAG: ${JOB_DISTRIBUTOR_IMAGE_TAG}
 
+  - name: aws
+
   - name: kind
     patches:
       - op: add
@@ -136,6 +164,10 @@ profiles:
 commands:
   deploy-geth-chain:
     command: devspace run-pipeline chain -p chains -p ${PROVIDER}
+    description: Deploy a single Geth chain
+    appendArgs: true
+  deploy-custom-geth-chain:
+    command: devspace run-pipeline custom-chain -p custom_geth -p ${PROVIDER}
     description: Deploy a single Geth chain
     appendArgs: true
   deploy-jd:
