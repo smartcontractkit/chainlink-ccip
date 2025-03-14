@@ -3364,6 +3364,32 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotNil(t, result)
 			}
 		})
+
+		t.Run("Can retrieve fee through router CPI", func(t *testing.T) {
+			message := ccip_router.SVM2AnyMessage{
+				Receiver:  validReceiverAddress[:],
+				FeeToken:  wsol.mint,
+				ExtraArgs: emptyEVMExtraArgsV2,
+			}
+
+			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector,
+				message,
+				config.RouterConfigPDA,
+				config.EvmDestChainStatePDA,
+				config.FeeQuoterProgram,
+				config.FqConfigPDA,
+				config.FqEvmDestChainPDA,
+				wsol.fqBillingConfigPDA,
+				link22.fqBillingConfigPDA,
+			)
+			instruction, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+
+			feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
+			require.NotNil(t, feeResult)
+			fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.FeeQuoterProgram.String(), binary.LittleEndian.Uint64)
+			require.Greater(t, fee, uint64(0))
+		})
 	})
 
 	//////////////////////////

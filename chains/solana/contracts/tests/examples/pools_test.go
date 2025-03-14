@@ -270,7 +270,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						approveIx, err := tokens.TokenApproveChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], p.Mint.PublicKey(), poolSigner, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
-						acceptIx, err := tokenpool.NewSetCanAcceptLiquidityInstruction(true, poolConfig, admin.PublicKey()).ValidateAndBuild()
+						acceptIx, err := tokenpool.NewSetCanAcceptLiquidityInstruction(true, poolConfig, mint, admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						provideIx, err := tokenpool.NewProvideLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint.PublicKey(), poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()

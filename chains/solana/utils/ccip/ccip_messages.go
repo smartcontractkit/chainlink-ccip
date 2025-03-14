@@ -153,7 +153,7 @@ func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, msgAccounts []sola
 		return nil, err
 	}
 	// Push Sender Size to ensure that the hash is unique
-	if _, err := hash.Write([]byte{uint8(len(msg.Sender))}); err != nil { //nolint:gosec
+	if err := binary.Write(hash, binary.BigEndian, uint16(len(msg.Sender))); err != nil { //nolint:gosec
 		return nil, err
 	}
 	if _, err := hash.Write(msg.Sender); err != nil {
