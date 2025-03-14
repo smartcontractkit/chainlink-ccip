@@ -2,12 +2,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use solana_program::{program::invoke, system_instruction};
 
-use crate::context::{seed, CcipSend};
 use crate::messages::SVM2AnyMessage;
 use crate::seed::FEE_BILLING_SIGNER;
 use crate::{CcipRouterError, SVMTokenAmount};
-
-use super::pools::TokenAccounts;
 
 /// Invokes Fee Quoter to:
 /// - validate the message,
@@ -16,41 +13,26 @@ use super::pools::TokenAccounts;
 ///
 /// # Returns
 ///  GetFeeResult with fee quoter's response
+#[allow(clippy::too_many_arguments)]
 pub(super) fn get_fee_cpi<'info>(
-    ctx: &Context<'_, '_, 'info, 'info, CcipSend<'info>>,
+    fee_quoter_program: AccountInfo<'info>,
+    fee_quoter_config: AccountInfo<'info>,
+    fee_quoter_dest_chain: AccountInfo<'info>,
+    billing_token_config: AccountInfo<'info>,
+    link_token_config: AccountInfo<'info>,
     dest_chain_selector: u64,
     message: &SVM2AnyMessage,
-    accounts_per_token: &[TokenAccounts<'info>],
+    get_fee_remaining_accounts: Vec<AccountInfo<'info>>,
 ) -> Result<fee_quoter::messages::GetFeeResult> {
-    let get_fee_seeds = &[seed::FEE_BILLING_SIGNER, &[ctx.bumps.fee_billing_signer]];
-
-    let get_fee_signer = &[&get_fee_seeds[..]];
-
-    let cpi_program = ctx.accounts.fee_quoter.to_account_info();
-
     let cpi_accounts = fee_quoter::cpi::accounts::GetFee {
-        config: ctx.accounts.fee_quoter_config.to_account_info(),
-        dest_chain: ctx.accounts.fee_quoter_dest_chain.to_account_info(),
-        billing_token_config: ctx
-            .accounts
-            .fee_quoter_billing_token_config
-            .to_account_info(),
-        link_token_config: ctx.accounts.fee_quoter_link_token_config.to_account_info(),
+        config: fee_quoter_config,
+        dest_chain: fee_quoter_dest_chain,
+        billing_token_config,
+        link_token_config,
     };
 
-    let billing_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut accounts_per_token
-        .iter()
-        .map(|a| a.fee_token_config.to_account_info())
-        .collect();
-    let per_chain_per_token_config_accs: &mut Vec<AccountInfo<'info>> = &mut accounts_per_token
-        .iter()
-        .map(|a| a.token_billing_config.to_account_info())
-        .collect();
-    let remaining_accounts = billing_token_config_accs;
-    remaining_accounts.append(per_chain_per_token_config_accs);
-
-    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, get_fee_signer)
-        .with_remaining_accounts(remaining_accounts.to_vec());
+    let cpi_ctx = CpiContext::new(fee_quoter_program, cpi_accounts)
+        .with_remaining_accounts(get_fee_remaining_accounts);
 
     let cpi_message = fee_quoter::messages::SVM2AnyMessage {
         receiver: message.receiver.clone(),
