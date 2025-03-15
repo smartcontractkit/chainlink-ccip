@@ -1330,7 +1330,7 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
 	}
 
-	// Prepare batch requests for the sourceChains
+	// Prepare batch requests for the sourceChains to fetch the latest Unfinalized config values.
 	contractBatch := make([]types.BatchRead, 0, len(filteredSourceChains))
 	validSourceChains := make([]cciptypes.ChainSelector, 0, len(filteredSourceChains))
 
