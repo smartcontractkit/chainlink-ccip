@@ -623,7 +623,11 @@ func (p *Plugin) checkAlreadyExecuted(
 	// TODO: batch these queries? these are all DB reads.
 	// maybe some alternative queries exist.
 	for sourceChainSelector, seqNrRange := range seqNrRangesBySource {
-		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, []cciptypes.SeqNumRange{seqNrRange}, primitives.Unconfirmed)
+		executed, err := p.ccipReader.ExecutedMessages(
+			ctx,
+			sourceChainSelector,
+			[]cciptypes.SeqNumRange{seqNrRange},
+			primitives.Unconfirmed)
 		if err != nil {
 			return fmt.Errorf("couldn't check if messages already executed: %w", err)
 		}

@@ -345,7 +345,7 @@ func (r *ccipChainReader) ExecutedMessages(
 	dataTyp := ExecutionStateChangedEvent{}
 
 	var seqRangeExpressions []query.Expression
-	var countSqNrs uint64 = 0
+	var countSqNrs uint64
 	for _, seqNr := range seqNumRanges {
 		expr := query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
 			Value:    seqNr.Start(),
