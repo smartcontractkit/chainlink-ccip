@@ -156,9 +156,9 @@ func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// ExecutedMessages provides a mock function with given fields: ctx, source, seqNumRange, confidence
-func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.ChainSelector, seqNumRange []ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error) {
-	ret := _m.Called(ctx, source, seqNumRange, confidence)
+// ExecutedMessages provides a mock function with given fields: ctx, source, seqNumRanges, confidence
+func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.ChainSelector, seqNumRanges []ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error) {
+	ret := _m.Called(ctx, source, seqNumRanges, confidence)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecutedMessages")
@@ -167,10 +167,10 @@ func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.
 	var r0 []ccipocr3.SeqNum
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNumRange, primitives.ConfidenceLevel) ([]ccipocr3.SeqNum, error)); ok {
-		return rf(ctx, source, seqNumRange, confidence)
+		return rf(ctx, source, seqNumRanges, confidence)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNumRange, primitives.ConfidenceLevel) []ccipocr3.SeqNum); ok {
-		r0 = rf(ctx, source, seqNumRange, confidence)
+		r0 = rf(ctx, source, seqNumRanges, confidence)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]ccipocr3.SeqNum)
@@ -178,7 +178,7 @@ func (_m *MockCCIPReader) ExecutedMessages(ctx context.Context, source ccipocr3.
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNumRange, primitives.ConfidenceLevel) error); ok {
-		r1 = rf(ctx, source, seqNumRange, confidence)
+		r1 = rf(ctx, source, seqNumRanges, confidence)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -194,13 +194,13 @@ type MockCCIPReader_ExecutedMessages_Call struct {
 // ExecutedMessages is a helper method to define mock.On call
 //   - ctx context.Context
 //   - source ccipocr3.ChainSelector
-//   - seqNumRange []ccipocr3.SeqNumRange
+//   - seqNumRanges []ccipocr3.SeqNumRange
 //   - confidence primitives.ConfidenceLevel
-func (_e *MockCCIPReader_Expecter) ExecutedMessages(ctx interface{}, source interface{}, seqNumRange interface{}, confidence interface{}) *MockCCIPReader_ExecutedMessages_Call {
-	return &MockCCIPReader_ExecutedMessages_Call{Call: _e.mock.On("ExecutedMessages", ctx, source, seqNumRange, confidence)}
+func (_e *MockCCIPReader_Expecter) ExecutedMessages(ctx interface{}, source interface{}, seqNumRanges interface{}, confidence interface{}) *MockCCIPReader_ExecutedMessages_Call {
+	return &MockCCIPReader_ExecutedMessages_Call{Call: _e.mock.On("ExecutedMessages", ctx, source, seqNumRanges, confidence)}
 }
 
-func (_c *MockCCIPReader_ExecutedMessages_Call) Run(run func(ctx context.Context, source ccipocr3.ChainSelector, seqNumRange []ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel)) *MockCCIPReader_ExecutedMessages_Call {
+func (_c *MockCCIPReader_ExecutedMessages_Call) Run(run func(ctx context.Context, source ccipocr3.ChainSelector, seqNumRanges []ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel)) *MockCCIPReader_ExecutedMessages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].([]ccipocr3.SeqNumRange), args[3].(primitives.ConfidenceLevel))
 	})
