@@ -212,7 +212,7 @@ func (r InMemoryCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginTy
 }
 
 func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]reader.SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]reader.StaticSourceChainConfig, error) {
 	return nil, nil
 }
 

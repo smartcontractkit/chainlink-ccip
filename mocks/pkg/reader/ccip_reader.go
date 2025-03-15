@@ -659,23 +659,23 @@ func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) RunAndReturn(run func(cont
 }
 
 // GetOffRampSourceChainsConfig provides a mock function with given fields: ctx, sourceChains
-func (_m *MockCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error) {
+func (_m *MockCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error) {
 	ret := _m.Called(ctx, sourceChains)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOffRampSourceChainsConfig")
 	}
 
-	var r0 map[ccipocr3.ChainSelector]reader.SourceChainConfig
+	var r0 map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error)); ok {
 		return rf(ctx, sourceChains)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]reader.SourceChainConfig); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig); ok {
 		r0 = rf(ctx, sourceChains)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]reader.SourceChainConfig)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig)
 		}
 	}
 
@@ -707,12 +707,12 @@ func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Return(_a0 map[ccipocr3.ChainSelector]reader.SourceChainConfig, _a1 error) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) Return(_a0 map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, _a1 error) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.SourceChainConfig, error)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
+func (_c *MockCCIPReader_GetOffRampSourceChainsConfig_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]reader.StaticSourceChainConfig, error)) *MockCCIPReader_GetOffRampSourceChainsConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

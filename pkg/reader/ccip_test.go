@@ -445,12 +445,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	destFeeQuoter := []byte{0x5}
 	destRouter := []byte{0x6}
 
-	sourceChainConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig, len(sourceChain))
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChain))
 	for i, chain := range sourceChain {
-		sourceChainConfigs[chain] = SourceChainConfig{
+		sourceChainConfigs[chain] = StaticSourceChainConfig{
 			Router:    destRouter,
 			IsEnabled: true,
-			MinSeqNr:  0,
 			OnRamp:    onramps[i],
 		}
 	}
@@ -548,12 +547,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
 	srcRouters := [2][]byte{{0x9}, {0x10}}
 
-	sourceChainConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig, len(sourceChain))
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChain))
 	for i, chain := range sourceChain {
-		sourceChainConfigs[chain] = SourceChainConfig{
+		sourceChainConfigs[chain] = StaticSourceChainConfig{
 			Router:    destRouter[i], // Using the corresponding router from destRouter array
 			IsEnabled: true,
-			MinSeqNr:  0,
 			OnRamp:    onramps[i],
 		}
 	}
@@ -663,7 +661,7 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 	getLatestValueErr := errors.New("some error")
 	mockCache.On("GetOfframpSourceChainConfigs", mock.Anything, destChain,
 		[]cciptypes.ChainSelector{sourceChain1, sourceChain2}).
-		Return(map[cciptypes.ChainSelector]SourceChainConfig{}, getLatestValueErr).Once()
+		Return(map[cciptypes.ChainSelector]StaticSourceChainConfig{}, getLatestValueErr).Once()
 
 	// create the reader with cache
 	ccipChainReader := &ccipChainReader{
@@ -1288,12 +1286,11 @@ func TestCCIPChainReader_DiscoverContracts_Parallel(t *testing.T) {
 		},
 	}
 
-	sourceChainConfigs := make(map[cciptypes.ChainSelector]SourceChainConfig, len(sourceChains))
+	sourceChainConfigs := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChains))
 	for i, chain := range sourceChains {
-		sourceChainConfigs[chain] = SourceChainConfig{
+		sourceChainConfigs[chain] = StaticSourceChainConfig{
 			Router:    []byte{0x6}, // Same router for all source chains
 			IsEnabled: true,
-			MinSeqNr:  0,
 			OnRamp:    []byte{byte(i + 1)}, // 0x1, 0x2, 0x3 as in the batch response
 		}
 	}
@@ -1686,15 +1683,15 @@ func (m *mockConfigCache) RefreshChainConfig(
 func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
-	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	args := m.Called(ctx, destChain, sourceChains)
-	return args.Get(0).(map[cciptypes.ChainSelector]SourceChainConfig), args.Error(1)
+	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
 }
 
 func (m *mockConfigCache) RefreshSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
-	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	args := m.Called(ctx, destChain, sourceChains)
-	return args.Get(0).(map[cciptypes.ChainSelector]SourceChainConfig), args.Error(1)
+	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
 }
