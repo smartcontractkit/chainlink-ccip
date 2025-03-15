@@ -133,7 +133,7 @@ type CCIPReader interface {
 	ExecutedMessages(
 		ctx context.Context,
 		source cciptypes.ChainSelector,
-		seqNumRange cciptypes.SeqNumRange,
+		seqNumRanges []cciptypes.SeqNumRange,
 		confidence primitives.ConfidenceLevel,
 	) ([]cciptypes.SeqNum, error)
 

@@ -63,7 +63,7 @@ func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 }
 
 func (r InMemoryCCIPReader) ExecutedMessages(
-	ctx context.Context, source cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange, _ primitives.ConfidenceLevel,
+	ctx context.Context, source cciptypes.ChainSelector, seqNumRanges []cciptypes.SeqNumRange, _ primitives.ConfidenceLevel,
 ) ([]cciptypes.SeqNum, error) {
 	msgs, ok := r.Messages[source]
 	// no messages for chain
@@ -71,7 +71,15 @@ func (r InMemoryCCIPReader) ExecutedMessages(
 		return nil, nil
 	}
 	filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
-		return seqNumRange.Contains(msg.Header.SequenceNumber) && msg.Destination == r.Dest && msg.Executed
+		if msg.Destination != r.Dest || !msg.Executed {
+			return false
+		}
+		for _, r := range seqNumRanges {
+			if r.Contains(msg.Header.SequenceNumber) {
+				return true
+			}
+		}
+		return false
 	})
 
 	// Build executed ranges

@@ -227,32 +227,32 @@ func getPendingReportsForExecution(
 		finalizedMsgSet := mapset.NewSet[cciptypes.SeqNum]()
 		allExecutedMsgSet := mapset.NewSet[cciptypes.SeqNum]()
 
-		for _, seqRange := range ranges {
+		if len(ranges) != 0 {
 			// Get all executed messages
-			allMessages, err := ccipReader.ExecutedMessages(ctx, selector, seqRange, primitives.Unconfirmed)
+			allMessages, err := ccipReader.ExecutedMessages(ctx, selector, ranges, primitives.Unconfirmed)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err)
+				return nil, nil, nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, ranges, err)
 			}
-			allExecutedMsgSet = allExecutedMsgSet.Union(mapset.NewSet(allMessages...))
+			allExecutedMsgSet = mapset.NewSet(allMessages...)
 
 			// Get finalized messages
-			finalizedMessages, err := ccipReader.ExecutedMessages(ctx, selector, seqRange, primitives.Finalized)
+			finalizedMessages, err := ccipReader.ExecutedMessages(ctx, selector, ranges, primitives.Finalized)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("get finalized %d executed messages in range %v: %w", selector, seqRange, err)
+				return nil, nil, nil, fmt.Errorf("get finalized %d executed messages in range %v: %w", selector, ranges, err)
 			}
-			finalizedMsgSet = finalizedMsgSet.Union(mapset.NewSet(finalizedMessages...))
+			finalizedMsgSet = mapset.NewSet(finalizedMessages...)
 		}
 
 		// Get unfinalized messages by taking the difference
 		unfinalizedMsgSet := allExecutedMsgSet.Difference(finalizedMsgSet)
 
-		finalizedMessages := slicelib.ToSortedSlice(finalizedMsgSet)
+		sortedFinalizedMessages := slicelib.ToSortedSlice(finalizedMsgSet)
 
 		unfinalizedMessages := slicelib.ToSortedSlice(unfinalizedMsgSet)
 
 		// Fully finalized roots are removed from the reports and set in groupedCommits
 		var executedCommitsFinalized []exectypes.CommitData
-		remainingReports, executedCommitsFinalized := combineReportsAndMessages(reports, finalizedMessages)
+		remainingReports, executedCommitsFinalized := combineReportsAndMessages(reports, sortedFinalizedMessages)
 		fullyExecutedFinalized = append(fullyExecutedFinalized, executedCommitsFinalized...)
 
 		// Process unfinalized messages
@@ -602,7 +602,7 @@ func (p *Plugin) validateReport(
 	return decodedReport, nil
 }
 
-// checkAlreadyExecuted checks if all the messages from all source chains in the report have already been executed
+// checkAlreadyExecuted checks if all the messages from all source chains in a single report have already been executed
 // on the destination chain. It queries the DB for executed messages in the given sequence
 // number range for each source chain in the report.
 //
@@ -623,7 +623,7 @@ func (p *Plugin) checkAlreadyExecuted(
 	// TODO: batch these queries? these are all DB reads.
 	// maybe some alternative queries exist.
 	for sourceChainSelector, seqNrRange := range seqNrRangesBySource {
-		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange, primitives.Unconfirmed)
+		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, []cciptypes.SeqNumRange{seqNrRange}, primitives.Unconfirmed)
 		if err != nil {
 			return fmt.Errorf("couldn't check if messages already executed: %w", err)
 		}

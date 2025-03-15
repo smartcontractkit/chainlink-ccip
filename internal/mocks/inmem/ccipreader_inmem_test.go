@@ -129,7 +129,7 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 	type args struct {
 		source      cciptypes.ChainSelector
 		dest        cciptypes.ChainSelector
-		seqNumRange cciptypes.SeqNumRange
+		seqNumRange []cciptypes.SeqNumRange
 	}
 	tests := []struct {
 		name    string
@@ -148,7 +148,7 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 			args: args{
 				source:      1,
 				dest:        2,
-				seqNumRange: cciptypes.NewSeqNumRange(1, 100),
+				seqNumRange: []cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(1, 100)},
 			},
 			fields: fields{
 				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
@@ -168,7 +168,7 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 			args: args{
 				source:      1,
 				dest:        2,
-				seqNumRange: cciptypes.NewSeqNumRange(1, 100),
+				seqNumRange: []cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(1, 100)},
 			},
 			fields: fields{
 				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
@@ -188,7 +188,7 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 			args: args{
 				source:      1,
 				dest:        2,
-				seqNumRange: cciptypes.NewSeqNumRange(1, 100),
+				seqNumRange: []cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(1, 100)},
 			},
 			fields: fields{
 				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
@@ -201,6 +201,56 @@ func TestInMemoryCCIPReader_ExecutedMessages(t *testing.T) {
 				Dest: 2,
 			},
 			want:    cciptypes.NewSeqNumRange(50, 52).ToSlice(),
+			wantErr: false,
+		},
+		{
+			name: "disjoint range",
+			args: args{
+				source: 1,
+				dest:   2,
+				seqNumRange: []cciptypes.SeqNumRange{
+					cciptypes.NewSeqNumRange(1, 50),
+					cciptypes.NewSeqNumRange(100, 150),
+				},
+			},
+			fields: fields{
+				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
+					1: {
+						makeMsg(25, 2, true),
+						makeMsg(26, 2, true),
+						makeMsg(75, 2, true),
+						makeMsg(125, 2, true),
+						makeMsg(126, 2, false),
+						makeMsg(127, 2, true),
+					},
+				},
+				Dest: 2,
+			},
+			want:    []cciptypes.SeqNum{25, 26, 125, 127},
+			wantErr: false,
+		},
+		{
+			name: "overlapping range",
+			args: args{
+				source: 1,
+				dest:   2,
+				seqNumRange: []cciptypes.SeqNumRange{
+					cciptypes.NewSeqNumRange(1, 50),
+					cciptypes.NewSeqNumRange(40, 100),
+				},
+			},
+			fields: fields{
+				MessagesWithExecuted: map[cciptypes.ChainSelector][]MessagesWithMetadata{
+					1: {
+						makeMsg(25, 2, true),
+						makeMsg(45, 2, true),
+						makeMsg(46, 2, true),
+						makeMsg(75, 2, true),
+					},
+				},
+				Dest: 2,
+			},
+			want:    []cciptypes.SeqNum{25, 45, 46, 75},
 			wantErr: false,
 		},
 	}
