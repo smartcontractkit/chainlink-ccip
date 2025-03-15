@@ -136,7 +136,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRange,
+								[]cciptypes.SeqNumRange{seqNrRange},
 								primitives.Unconfirmed,
 							).Return(
 							seqNrRange.ToSlice(),
@@ -148,7 +148,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRange,
+								[]cciptypes.SeqNumRange{seqNrRange},
 								primitives.Unconfirmed,
 							).Return(nil, nil). // not executed
 							Maybe()
@@ -179,7 +179,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRange,
+								[]cciptypes.SeqNumRange{seqNrRange},
 								primitives.Unconfirmed,
 							).Return(
 							fullRange[:len(fullRange)/2],
@@ -191,7 +191,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 							ExecutedMessages(
 								mock.Anything,
 								sourceSel,
-								seqNrRange,
+								[]cciptypes.SeqNumRange{seqNrRange},
 								primitives.Unconfirmed,
 							).Return(nil, nil).Maybe() // not executed
 					}
@@ -213,7 +213,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 						ExecutedMessages(
 							mock.Anything,
 							sourceSel,
-							seqNrRange,
+							[]cciptypes.SeqNumRange{seqNrRange},
 							primitives.Unconfirmed,
 						).Return(nil, nil).Maybe()
 				}
@@ -233,7 +233,7 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 						ExecutedMessages(
 							mock.Anything,
 							sourceSel,
-							seqNrRange,
+							[]cciptypes.SeqNumRange{seqNrRange},
 							primitives.Unconfirmed,
 						).Return(seqNrRange.ToSlice(), nil)
 				}
@@ -242,7 +242,6 @@ func Test_checkAlreadyExecuted(t *testing.T) {
 			shouldErr: true,
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			chainReports := genRandomChainReports(10, 15)
@@ -1130,7 +1129,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 			ExecutedMessages(
 				mock.Anything,
 				cciptypes.ChainSelector(sourceChain),
-				cciptypes.NewSeqNumRange(seqNum, seqNum),
+				[]cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(seqNum, seqNum)},
 				primitives.Unconfirmed,
 			).
 			Return(nil, nil)
@@ -1268,7 +1267,7 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 					ExecutedMessages(
 						mock.Anything,
 						cciptypes.ChainSelector(sourceChain),
-						cciptypes.NewSeqNumRange(seqNum, seqNum),
+						[]cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(seqNum, seqNum)},
 						primitives.Unconfirmed,
 					).Return(
 					[]cciptypes.SeqNum{seqNum},
@@ -1504,10 +1503,10 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 		ExecutedMessages(
 			mock.Anything,
 			reports[0].SourceChainSelector,
-			cciptypes.NewSeqNumRange(
+			[]cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(
 				reports[0].Messages[0].Header.SequenceNumber,
 				reports[0].Messages[0].Header.SequenceNumber,
-			),
+			)},
 			primitives.Unconfirmed,
 		).Return(nil, nil)
 
@@ -1568,10 +1567,11 @@ func TestPlugin_ShouldTransmitAcceptReport_Failure_AlreadyExecuted(t *testing.T)
 		ExecutedMessages(
 			mock.Anything,
 			reports[0].SourceChainSelector,
-			cciptypes.NewSeqNumRange(
-				reports[0].Messages[0].Header.SequenceNumber,
-				reports[0].Messages[0].Header.SequenceNumber,
-			),
+			[]cciptypes.SeqNumRange{
+				cciptypes.NewSeqNumRange(
+					reports[0].Messages[0].Header.SequenceNumber,
+					reports[0].Messages[0].Header.SequenceNumber,
+				)},
 			primitives.Unconfirmed, // Changed from Finalized to Unconfirmed
 		).Return([]cciptypes.SeqNum{
 		reports[0].Messages[0].Header.SequenceNumber,
