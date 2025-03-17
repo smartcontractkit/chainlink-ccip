@@ -671,25 +671,29 @@ pub struct TokenAccountsValidationContext<'info> {
     // billing: configured via CCIP fee quoter
     // chain config: configured via pool
     #[account(
-        seeds = [
-            fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
-            chain_selector.to_le_bytes().as_ref(),
-            mint.key().as_ref(),
-        ],
-        seeds::program = fee_quoter.key(),
-        bump
+        constraint = verify_pda(
+            token_billing_config.key(),
+            &[
+                fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
+                chain_selector.to_le_bytes().as_ref(),
+                mint.key().as_ref()
+            ],
+            &fee_quoter
+        ) @ CcipOfframpError::InvalidInputsConfigAccounts
     )]
     pub token_billing_config: AccountInfo<'info>,
 
     /// CHECK: Pool chain config
     #[account(
-        seeds = [
-            seed::TOKEN_POOL_CONFIG,
-            chain_selector.to_le_bytes().as_ref(),
-            mint.key().as_ref(),
-        ],
-        seeds::program = pool_program.key(),
-        bump
+        constraint = verify_pda(
+            pool_chain_config.key(),
+            &[
+                seed::TOKEN_POOL_CONFIG,
+                chain_selector.to_le_bytes().as_ref(),
+                mint.key().as_ref()
+            ],
+            &pool_program.key()
+        ) @ CcipOfframpError::InvalidInputsConfigAccounts
     )]
     pub pool_chain_config: AccountInfo<'info>,
 
@@ -698,9 +702,11 @@ pub struct TokenAccountsValidationContext<'info> {
 
     /// CHECK: Token admin registry
     #[account(
-        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
-        seeds::program = router.key(),
-        bump,
+        constraint = verify_pda(
+            token_admin_registry.key(),
+            &[seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+            &router
+        ) @ CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts,
         owner = router.key() @ CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts,
     )]
     pub token_admin_registry: AccountInfo<'info>,
@@ -708,12 +714,13 @@ pub struct TokenAccountsValidationContext<'info> {
     /// CHECK: Pool program
     pub pool_program: AccountInfo<'info>,
 
-    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsPoolAccounts
     /// CHECK: Pool config
     #[account(
-        seeds = [seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
-        seeds::program = pool_program.key(),
-        bump,
+        constraint = verify_pda(
+            pool_config.key(),
+            &[seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
+            &pool_program.key()
+        ) @ CcipOfframpError::InvalidInputsPoolAccounts,
         owner = pool_program.key() @ CcipOfframpError::InvalidInputsPoolAccounts
     )]
     pub pool_config: AccountInfo<'info>,
@@ -728,12 +735,13 @@ pub struct TokenAccountsValidationContext<'info> {
     )]
     pub pool_token_account: AccountInfo<'info>,
 
-    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsPoolAccounts
     /// CHECK: Pool signer
     #[account(
-        seeds = [seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
-        seeds::program = pool_program.key(),
-        bump
+        constraint = verify_pda(
+            pool_signer.key(),
+            &[seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
+            &pool_program.key()
+        ) @ CcipOfframpError::InvalidInputsPoolAccounts
     )]
     pub pool_signer: AccountInfo<'info>,
 
@@ -747,12 +755,20 @@ pub struct TokenAccountsValidationContext<'info> {
     // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsConfigAccounts
     /// CHECK: Fee token config
     #[account(
-        seeds = [
-            fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
-            mint.key().as_ref()
-        ],
-        seeds::program = fee_quoter.key(),
-        bump
+        constraint = verify_pda(
+            fee_token_config.key(),
+            &[
+                fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+                mint.key().as_ref()
+            ],
+            &fee_quoter
+        ) @ CcipOfframpError::InvalidInputsConfigAccounts
     )]
     pub fee_token_config: AccountInfo<'info>,
+}
+
+// Helper function to verify PDA addresses
+fn verify_pda(address: Pubkey, seeds: &[&[u8]], program_id: &Pubkey) -> bool {
+    let (expected_address, _) = Pubkey::find_program_address(seeds, program_id);
+    address == expected_address
 }
