@@ -131,6 +131,7 @@ type EventFeeQuoterConfigSet struct {
 	Discriminator      [8]byte
 	MaxFeeJuelsPerMsg  bin.Uint128
 	LinkTokenMint      solana.PublicKey
+	LinkTokenDecimals  uint8
 	Onramp             solana.PublicKey
 	DefaultCodeVersion fee_quoter.CodeVersion
 }

@@ -307,7 +307,7 @@ func (obj *TokenTransferAdditionalData) UnmarshalWithDecoder(decoder *ag_binary.
 type GetFeeResult struct {
 	Token                       ag_solanago.PublicKey
 	Amount                      uint64
-	Juels                       uint64
+	Juels                       ag_binary.Uint128
 	TokenTransferAdditionalData []TokenTransferAdditionalData
 	ProcessedExtraArgs          ProcessedExtraArgs
 }
