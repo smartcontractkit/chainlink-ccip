@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -60,12 +61,12 @@ func TestDevnet(t *testing.T) {
 		fmt.Printf("Router Config: %+v\n", routerConfig)
 	})
 
-	destinationChainSelector := uint64(devnetInfo.ChainSelectors.Sepolia)
+	chainSelector := uint64(devnetInfo.ChainSelectors.Sepolia)
 
-	destinationChainStatePDA, err := state.FindDestChainStatePDA(destinationChainSelector, referenceAddresses.Router)
+	destinationChainStatePDA, err := state.FindDestChainStatePDA(chainSelector, referenceAddresses.Router)
 	require.NoError(t, err)
 
-	nonceEvmPDA, err := state.FindNoncePDA(destinationChainSelector, user.PublicKey(), referenceAddresses.Router)
+	nonceEvmPDA, err := state.FindNoncePDA(chainSelector, user.PublicKey(), referenceAddresses.Router)
 	require.NoError(t, err)
 
 	billingSignerPDA, _, err := state.FindFeeBillingSignerPDA(referenceAddresses.Router)
@@ -77,7 +78,7 @@ func TestDevnet(t *testing.T) {
 	fqConfigPDA, _, err := state.FindFqConfigPDA(routerConfig.FeeQuoter)
 	require.NoError(t, err)
 
-	fqDestChainPDA, _, err := state.FindFqDestChainPDA(destinationChainSelector, routerConfig.FeeQuoter)
+	fqDestChainPDA, _, err := state.FindFqDestChainPDA(chainSelector, routerConfig.FeeQuoter)
 	require.NoError(t, err)
 
 	fqWsolBillingTokenConfigPDA, _, err := state.FindFqBillingTokenConfigPDA(solana.SolMint, routerConfig.FeeQuoter)
@@ -124,12 +125,10 @@ func TestDevnet(t *testing.T) {
 					{SourceToken: routerConfig.LinkTokenMint, UsdPerToken: common.To28BytesBE(4)},
 				},
 				GasPriceUpdates: []ccip_offramp.GasPriceUpdate{
-					{DestChainSelector: destinationChainSelector, UsdPerUnitGas: common.To28BytesBE(5)},
+					{DestChainSelector: chainSelector, UsdPerUnitGas: common.To28BytesBE(5)},
 				},
 			},
 		}
-
-		// signers, _, _ := testutils.GenerateSignersAndTransmitters(t, 16) // TODO
 
 		var initialConfig ccip_offramp.Config
 		require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.config, rpc.CommitmentConfirmed, &initialConfig))
@@ -219,10 +218,13 @@ func TestDevnet(t *testing.T) {
 			Receiver:  []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 12, 248, 134, 206, 65, 149, 35, 22, 68, 26, 228, 202, 195, 95, 0, 240, 232, 130, 166}, // just an example EVM address
 			Data:      []byte{4, 5, 6},
 			ExtraArgs: []byte{},
+			// TokenAmounts: []ccip_router.SVMTokenAmount{
+			// 	{Token: solana.SolMint, Amount: 7},
+			// },
 		}
 
 		raw := ccip_router.NewCcipSendInstruction(
-			destinationChainSelector,
+			chainSelector,
 			message,
 			[]byte{},
 			configPDA,
@@ -243,9 +245,108 @@ func TestDevnet(t *testing.T) {
 			externalTpSignerPDA,
 		)
 		// raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+
+		raw.AccountMetaSlice.Append(solana.Meta(user.PublicKey()).SIGNER())
+
 		instruction, err := raw.ValidateAndBuild()
 		require.NoError(t, err)
 		result := testutils.SendAndConfirm(ctx, t, client, []solana.Instruction{instruction}, user, rpc.CommitmentConfirmed)
 		require.NotNil(t, result)
+		tx, err := result.Transaction.GetTransaction()
+		require.NoError(t, err)
+		fmt.Printf("Result: %+v\n", tx.Signatures)
+	})
+
+	t.Run("Full offramp: commit (with message, no prices) & execute", func(t *testing.T) {
+		t.Skip("This test is not yet to be run")
+
+		t.Run("Commit", func(t *testing.T) {
+			sourceChainPDA, _, err := state.FindOfframpSourceChainPDA(chainSelector, offrampAddress)
+			require.NoError(t, err)
+
+			var sourceChain ccip_offramp.SourceChain
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, client, sourceChainPDA, rpc.CommitmentConfirmed, &sourceChain))
+			sequence := sourceChain.State.MinSeqNr + 1
+
+			msg := ccip.CreateDefaultMessageWith(chainSelector, sequence)
+			// msg.Header.MessageId = msg.Header.MessageId // TODO
+			msg.OnRampAddress = []byte(sourceChain.Config.OnRamp[0][:])
+			remainingAccounts := []solana.PublicKey{} // TODO
+			hash, err := ccip.HashAnyToSVMMessage(msg, config.OnRampAddress, remainingAccounts)
+			root := [32]byte(hash)
+
+			report := ccip_offramp.CommitInput{
+				MerkleRoot: &ccip_offramp.MerkleRoot{
+					SourceChainSelector: chainSelector,
+					OnRampAddress:       []byte(sourceChain.Config.OnRamp[0][:]),
+					MinSeqNr:            sequence,
+					MaxSeqNr:            sequence,
+					MerkleRoot:          root,
+				},
+				PriceUpdates: ccip_offramp.PriceUpdates{},
+			}
+
+			var initialConfig ccip_offramp.Config
+			require.NoError(t, common.GetAccountDataBorshInto(ctx, client, offrampPDAs.config, rpc.CommitmentConfirmed, &initialConfig))
+
+			index := uint8(testutils.OcrCommitPlugin)
+			commitConfig := initialConfig.Ocr3[index]
+
+			empty24byte := [24]byte{}
+			var reportContext [2][32]byte
+			reportContext[0] = commitConfig.ConfigInfo.ConfigDigest                              // match the onchain config digest
+			reportContext[1] = [32]byte(binary.BigEndian.AppendUint64(empty24byte[:], sequence)) // sequence number
+
+			signers := []eth.Signer{}
+			for _, signerPrivK := range devnetInfo.PrivateKeys.Signers {
+				signer, err := eth.GetSignerFromPk(string(signerPrivK))
+				require.NoError(t, err)
+				signers = append(signers, signer)
+			}
+			sigs, err := ccip.SignCommitReport(reportContext, report, signers)
+			require.NoError(t, err)
+
+			transmitter := solana.PrivateKey(devnetInfo.PrivateKeys.Transmitter)
+
+			fqAllowedPriceUpdater, _, err := state.FindFqAllowedPriceUpdaterPDA(offrampPDAs.billingSigner, referenceAddresses.FeeQuoter)
+			require.NoError(t, err)
+
+			fqConfigPDA, _, err := state.FindFqConfigPDA(referenceAddresses.FeeQuoter)
+			require.NoError(t, err)
+
+			commitReportPDA, err := state.FindOfframpCommitReportPDA(chainSelector, root, offrampAddress)
+			require.NoError(t, err)
+
+			ix, err := ccip_offramp.NewCommitInstruction(
+				reportContext,
+				testutils.MustMarshalBorsh(t, report),
+				sigs.Rs,
+				sigs.Ss,
+				sigs.RawVs,
+				offrampPDAs.config,
+				offrampPDAs.referenceAddresses,
+				sourceChainPDA,
+				commitReportPDA,
+				transmitter.PublicKey(),
+				solana.SystemProgramID,
+				solana.SysVarInstructionsPubkey,
+				offrampPDAs.billingSigner,
+				referenceAddresses.FeeQuoter,
+				fqAllowedPriceUpdater,
+				fqConfigPDA,
+			).ValidateAndBuild()
+
+			lookupTableEntries, err := common.GetAddressLookupTable(ctx, client, referenceAddresses.OfframpLookupTable)
+			require.NoError(t, err)
+			table := map[solana.PublicKey]solana.PublicKeySlice{
+				referenceAddresses.OfframpLookupTable: lookupTableEntries,
+			}
+
+			tx := testutils.SendAndConfirmWithLookupTables(ctx, t, client, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, table, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
+			commitEvent := ccip.EventCommitReportAccepted{}
+			require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &commitEvent, true))
+		})
+
+		t.Run("Execute", func(t *testing.T) {})
 	})
 }
