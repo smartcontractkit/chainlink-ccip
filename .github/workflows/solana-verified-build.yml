@@ -14,7 +14,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.inputs.sha }}
         fetch-depth: 0
     - name: Get full SHA
       id: get_sha
