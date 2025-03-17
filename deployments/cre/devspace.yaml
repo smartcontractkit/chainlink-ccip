@@ -120,6 +120,10 @@ pipelines:
       DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
       go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -jd -target-dir=${CRE_CONFIG_DIR}
 
+  beholder:
+    run: |-
+      run_dependency_pipelines beholder
+
 profiles:
   - name: chains
     patches:
@@ -171,6 +175,27 @@ profiles:
               JOB_DISTRIBUTOR_IMAGE_TAG: ${JOB_DISTRIBUTOR_IMAGE_TAG}
 
   - name: aws
+  - name: beholder
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          beholder:
+            path: ${DEPENDENCIES_DIR}/beholder
+            #            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+
+  - name: beholder-kind
+    parents:
+      - profile: beholder
+    patches:
+      - op: replace
+        path: dependencies.beholder.profiles
+        value:
+          - kind
+      - op: add
+        path: dependencies.beholder.pipeline
+        value: kind
 
   - name: kind
     patches:
@@ -202,4 +227,12 @@ commands:
   deploy-don:
     command: devspace run-pipeline don -p dons -p ${PROVIDER}
     description: Deploy a single DONs
+    appendArgs: true
+  beholder:
+    command: devspace run-pipeline beholder -p beholder
+    description: Run the Beholder pipeline.
+    appendArgs: true
+  beholder-kind:
+    command: devspace run-pipeline beholder -p beholder-kind
+    description: Run the Beholder pipeline for Kind.
     appendArgs: true
