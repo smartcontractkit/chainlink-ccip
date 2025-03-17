@@ -32,7 +32,7 @@ func TestTokenPool(t *testing.T) {
 	test_token_pool.SetProgramID(config.CcipTokenPoolProgram)
 
 	// acting as program wrapped by a token pool
-	test_ccip_receiver.SetProgramID(config.CcipLogicReceiver)
+	test_ccip_receiver.SetProgramID(config.CcipTestLogicReceiver)
 
 	// acting as "dumb" offramp that just proxies the pool,
 	// required for authnz in the pool but we don't want to test offramp internals here
@@ -756,7 +756,7 @@ func TestTokenPool(t *testing.T) {
 				config.RMNRemoteConfigPDA,
 				p.Chain[config.EvmChainSelector],
 			)
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipLogicReceiver, false, false))
+			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipTestLogicReceiver, false, false))
 			lbI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -790,7 +790,7 @@ func TestTokenPool(t *testing.T) {
 				p.User[admin.PublicKey()],
 			)
 
-			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(config.CcipLogicReceiver))
+			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.Meta(config.CcipTestLogicReceiver))
 			rmI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 

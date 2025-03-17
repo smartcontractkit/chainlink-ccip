@@ -16,7 +16,7 @@ var (
 
 	// program ids
 	CcipRouterProgram          = solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8")
-	CcipLogicReceiver          = solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH")
+	CcipTestLogicReceiver      = solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH")
 	CcipTokenReceiver          = solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
 	CcipInvalidReceiverProgram = solana.MustPublicKeyFromBase58("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8")
 	CcipTokenPoolProgram       = solana.MustPublicKeyFromBase58("GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH")
@@ -43,17 +43,11 @@ var (
 	// bytes4(keccak256("CCIP SVMExtraArgsV1"));
 	SvmChainFamilySelector, _ = hex.DecodeString("1e10bdc4")
 
-	// example programs
-	CcipBaseSender          = solana.MustPublicKeyFromBase58("CcipSender111111111111111111111111111111111")
-	CcipBaseReceiver        = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
-	CcipBasePoolBurnMint    = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111111BurnMint")
-	CcipBasePoolLockRelease = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111LockReLease")
-
 	// router/onramp PDAs
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
 	ExternalTokenPoolsSignerPDA, _, _        = state.FindExternalTokenPoolsSignerPDA(CcipRouterProgram)
-	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipLogicReceiver)
-	ReceiverExternalExecutionConfigPDA, _, _ = state.FindExternalExecutionConfigPDA(CcipLogicReceiver)
+	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipTestLogicReceiver)
+	ReceiverExternalExecutionConfigPDA, _, _ = state.FindExternalExecutionConfigPDA(CcipTestLogicReceiver)
 	BillingSignerPDA, _, _                   = state.FindFeeBillingSignerPDA(CcipRouterProgram)
 	SvmDestChainStatePDA, _                  = state.FindDestChainStatePDA(SvmChainSelector, CcipRouterProgram)
 	EvmDestChainStatePDA, _                  = state.FindDestChainStatePDA(EvmChainSelector, CcipRouterProgram)
@@ -79,4 +73,15 @@ var (
 	// RMN Remote PDAs
 	RMNRemoteConfigPDA, _, _ = state.FindRMNRemoteConfigPDA(RMNRemoteProgram)
 	RMNRemoteCursesPDA, _, _ = state.FindRMNRemoteCursesPDA(RMNRemoteProgram)
+
+	// example programs
+	CcipBaseSender                               = solana.MustPublicKeyFromBase58("CcipSender111111111111111111111111111111111")
+	CcipBaseReceiver                             = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
+	BaseReceiverStatePDA, _, _                   = solana.FindProgramAddress([][]byte{[]byte("state")}, CcipBaseReceiver)
+	BaseReceiverTokenAdminPDA, _, _              = solana.FindProgramAddress([][]byte{[]byte("receiver_token_admin")}, CcipBaseReceiver)
+	BaseReceiverExternalExecutionConfigPDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, CcipBaseReceiver)
+	BaseReceiverAllowedOfframpPDA, _, _          = solana.FindProgramAddress([][]byte{[]byte("allowed_offramp"), EvmChainLE, CcipOfframpProgram.Bytes()}, CcipBaseReceiver)
+
+	CcipBasePoolBurnMint    = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111111BurnMint")
+	CcipBasePoolLockRelease = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111LockReLease")
 )
