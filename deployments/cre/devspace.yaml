@@ -78,6 +78,7 @@ pipelines:
           run_dependency_pipelines kind-monitoring
         fi
       fi
+
   chain:
     run: |-
       run_pipelines maybe-kind
@@ -89,12 +90,14 @@ pipelines:
       DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
       DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
       go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -chain -chain-variant=geth -chain-type=evm -target-dir=${CRE_CONFIG_DIR}
+
   custom-chain:
     run: |-
       run_pipelines maybe-kind
 
       run_dependency_pipelines custom-geth-chain
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+
   don:
     run: |-
       run_pipelines maybe-kind
@@ -109,6 +112,7 @@ pipelines:
       DON_NODE_COUNT=${DON_NODE_COUNT} \
       DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
       go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -don -target-dir=${CRE_CONFIG_DIR}
+
   jd:
     run: |-
       run_pipelines maybe-kind
@@ -173,6 +177,7 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             vars:
               JOB_DISTRIBUTOR_IMAGE_TAG: ${JOB_DISTRIBUTOR_IMAGE_TAG}
+              ENABLE_JOB_DISTRIBUTOR: "true"
 
   - name: aws
   - name: beholder

@@ -70,6 +70,9 @@ vars:
   JOB_DISTRIBUTOR_IMAGE_TAG:
     source: env
     default: 0.9.0
+  ENABLE_JOB_DISTRIBUTOR:
+    source: env
+    default: "false"
 
 pipelines:
   maybe-kind:
@@ -319,8 +322,30 @@ profiles:
           path: ${DEPENDENCIES_DIR}/job-distributor
           overwriteVars: true
           namespace: ${DEVSPACE_NAMESPACE}
+  - name: job-distributor-enabled
+    activation:
+      - vars:
+          ENABLE_JOB_DISTRIBUTOR: "true"
+    merge:
+      dependencies:
+        job-distributor:
+          path: ${DEPENDENCIES_DIR}/job-distributor
+          overwriteVars: true
+          namespace: ${DEVSPACE_NAMESPACE}
           vars:
             JOB_DISTRIBUTOR_IMAGE_TAG: ${JOB_DISTRIBUTOR_IMAGE_TAG}
+
+  - name: job-distributor-aws-staging
+    activation:
+      - vars:
+          ENABLE_JOB_DISTRIBUTOR: "true"
+          PROVIDER: "aws"
+          CRIB_EKS_CLUSTER_NAME: "main-stage-cluster"
+    merge:
+      dependencies:
+        job-distributor:
+          profiles:
+          #  - size-medium
   - name: crib-staging
     activation:
       - vars:

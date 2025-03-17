@@ -169,6 +169,8 @@ profiles:
           ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
+            vars:
+              ENABLE_JOB_DISTRIBUTOR: "true"
             namespace: ${DEVSPACE_NAMESPACE}
             pipeline: deploy-ccip-v2
             profiles:

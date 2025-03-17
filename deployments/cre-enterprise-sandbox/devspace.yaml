@@ -234,11 +234,11 @@ profiles:
           DON_NODE_COUNT: 1
 
 commands:
-  besu:
+  blockchain:
     command: |-
       devspace run-pipeline chain-alpha -p chain-alpha
       devspace run-pipeline chain-beta -p chain-beta
-    description: Deploy both alpha and beta Besu chains
+    description: Deploy Besu blockchains
     appendArgs: true
   chain-alpha:
     command: devspace run-pipeline chain-alpha -p chain-alpha
@@ -250,15 +250,53 @@ commands:
     appendArgs: true
   ccip:
     command: devspace run-pipeline ccip -p ccip
-    description: Deploy CCIP v1.6 DON with full onchain configuration
+    description: Deploy CCIP v1.6 DON with full on-chain configuration
     appendArgs: true
   ccip-infra:
     command: devspace run-pipeline ccip-infra-only -p ccip
-    description: Deploy CCIP v1.6 DON infrastructure only (no onchain deployment)
+    description: Deploy CCIP v1.6 DON infrastructure only (no on-chain deployment)
     appendArgs: true
   cre:
     command: |-
       devspace run-pipeline cre-don -p cre
       devspace run-pipeline cre-don-gateway -p cre-gateway
-    description: Deploy the workflow/capability CRE DON infrastructure with a gateway node
+    description: Deploy the Chainlink workflow/capability CRE DON infrastructure with a gateway node
     appendArgs: true
+  uninstall:
+    command: |-
+      if [ -z "$1" ]; then
+        echo "Usage: devspace run-command uninstall <component>. Available components: chain-alpha, chain-beta, ccip, cre"
+        exit 1
+      fi
+      case "$1" in
+        chain-alpha)
+          namespace="chain-alpha"
+          ;;
+        chain-beta)
+          namespace="chain-beta"
+          ;;
+        ccip)
+          namespace="ccip"
+          ;;
+        cre)
+          namespace="chainlink"
+          ;;
+        *)
+          echo "Invalid component: $1. Available components: chain-alpha, chain-beta, ccip, cre"
+          exit 1
+          ;;
+      esac
+      releases=$(helm list -n $namespace -q)
+      if [ -z "$releases" ]; then
+        echo "No releases found in namespace $namespace."
+        exit 0
+      fi
+      echo "The following releases will be uninstalled from namespace $namespace:"
+      echo "$releases"
+      read -p "Are you sure you want to uninstall $1? (y/N): " confirm
+      if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+        echo "$releases" | xargs helm uninstall -n $namespace
+      else
+        echo "Uninstallation cancelled."
+      fi
+    description: Use Helm uninstall to remove a component, instead of devspace purge command that removes the namespace
