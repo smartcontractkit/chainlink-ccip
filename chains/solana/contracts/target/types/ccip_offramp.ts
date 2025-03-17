@@ -1685,6 +1685,10 @@ export type CcipOfframp = {
             "type": "bool"
           },
           {
+            "name": "isRmnVerificationDisabled",
+            "type": "bool"
+          },
+          {
             "name": "laneCodeVersion",
             "type": {
               "defined": "CodeVersion"
@@ -4006,6 +4010,10 @@ export const IDL: CcipOfframp = {
         "fields": [
           {
             "name": "isEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "isRmnVerificationDisabled",
             "type": "bool"
           },
           {
