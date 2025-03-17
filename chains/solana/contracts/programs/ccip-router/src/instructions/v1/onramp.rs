@@ -459,9 +459,9 @@ mod helpers {
             )
             .unwrap();
 
-            let expected_exec_data =
-                ethnum::U256::new(additional_token_transfer_data.dest_gas_overhead.into())
-                    .to_be_bytes();
+            let expected_exec_data = additional_token_transfer_data
+                .dest_gas_overhead
+                .to_be_bytes();
 
             assert!(transfer.extra_data.is_empty());
             assert_eq!(transfer.dest_exec_data, expected_exec_data);
