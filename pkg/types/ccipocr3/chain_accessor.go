@@ -7,6 +7,7 @@ import (
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	iplugintypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -41,6 +42,25 @@ type AllAccessors interface {
 	// Deprecated: use Metadata() instead.
 	GetContractAddress(contractName string) ([]byte, error)
 
+	// GetAllConfig looks up all configurations available to the accessor. This
+	// function replaces prepareBatchConfigRequests.
+	//
+	// This includes the following contracts:
+	// - Router
+	// - OffRamp
+	// - OnRamp
+	// - FeeQuoter
+	// - RMNProxy
+	// - RMNRemote
+	// - CurseInfo
+	//
+	// Access Type: Method(many, see code)
+	// Contract: Many
+	// Confidence: Unconfirmed
+	GetAllConfig(
+		ctx context.Context,
+	) (ChainConfig, error)
+
 	// GetChainFeeComponents Returns all fee components for given chains if corresponding
 	// chain writer is available.
 	//
@@ -63,6 +83,8 @@ type AllAccessors interface {
 	// contract and source chain selector.
 	// allChains is needed because there is no way to enumerate all chain selectors on Solana. We'll attempt to
 	// fetch the source config from the offramp for each of them.
+	//
+	// TODO: this should go away, it's a call to the ConfigPoller.
 	DiscoverContracts(ctx context.Context, allChains []ChainSelector) (ContractAddresses, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
@@ -197,7 +219,7 @@ type SourceAccessor interface {
 	// GetTokenPriceUSD looks up a token price in USD. The address value should
 	// be retrieved from a configuration cache (i.e. ConfigPoller).
 	//
-	// Access Type: Method(GetTokenPRice)
+	// Access Type: Method(GetTokenPrice)
 	// Contract: FeeQuoter
 	// Confidence: Unconfirmed
 	//
@@ -259,6 +281,8 @@ const (
 type ChainFeeComponents = types.ChainFeeComponents
 
 type TimestampedBig = iplugintypes.TimestampedBig
+
+type ChainConfig = reader.ChainConfigSnapshot
 
 // sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
