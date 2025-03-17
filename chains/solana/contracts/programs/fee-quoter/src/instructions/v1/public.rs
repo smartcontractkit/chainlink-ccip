@@ -9,7 +9,7 @@ use crate::messages::{
     GetFeeResult, ProcessedExtraArgs, SVM2AnyMessage, SVMTokenAmount, TokenTransferAdditionalData,
 };
 use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
-use crate::FeeQuoterError;
+use crate::{FeeQuoterError, LINK_JUEL_DECIMALS};
 
 use super::super::interfaces::Public;
 
@@ -34,8 +34,6 @@ pub const SVM_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 15);
 pub const SVM_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
 
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
-// 1e18 Juels = 1 LINK natively (in EVM.) In SVM, the LINK mint likely has different decimals.
-pub const LINK_JUEL_DECIMALS: u8 = 18;
 
 pub struct Impl;
 impl Public for Impl {
@@ -137,7 +135,7 @@ fn fee_juels(
     let fee_juels = (link_fee as u128)
         * 1u32.e(LINK_JUEL_DECIMALS
             .checked_sub(link_local_decimals)
-            .ok_or(FeeQuoterError::InvalidLinkDecimals)?);
+            .expect("Guaranteed at construction"));
     let fee_juels: u128 = fee_juels
         .try_into()
         .expect("Impossible to surpass the 128 bit space with a maximum of 18 decimals.");
@@ -961,5 +959,31 @@ mod tests {
             (50u128 * 1u32.e(9)).try_into().unwrap(),
         )
         .unwrap_err();
+
+        // Returns the same value when decimals are equal
+        let juels = fee_juels(
+            &fee,
+            &fee_billing_token_config,
+            &link_billing_config,
+            LINK_JUEL_DECIMALS,
+            link_mint,
+            (200u128 * 1u32.e(9)).try_into().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(juels, fee.amount as u128);
+
+        // 0 decimals edge case
+        let juels = fee_juels(
+            &fee,
+            &fee_billing_token_config,
+            &link_billing_config,
+            0,
+            link_mint,
+            (200u128 * 1u32.e(18)).try_into().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(juels, fee.amount as u128 * 1u32.e(18));
     }
 }

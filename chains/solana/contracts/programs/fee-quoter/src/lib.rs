@@ -20,6 +20,9 @@ pub mod extra_args;
 mod instructions;
 use instructions::router;
 
+// 1e18 Juels = 1 LINK natively (in EVM.) In SVM, the LINK mint likely has different decimals.
+pub const LINK_JUEL_DECIMALS: u8 = 18;
+
 #[program]
 pub mod fee_quoter {
     use super::*;
@@ -41,6 +44,11 @@ pub mod fee_quoter {
         max_fee_juels_per_msg: u128,
         onramp: Pubkey,
     ) -> Result<()> {
+        require!(
+            ctx.accounts.link_token_mint.decimals <= LINK_JUEL_DECIMALS,
+            FeeQuoterError::InvalidInputsMint
+        );
+
         ctx.accounts.config.set_inner(Config {
             version: 1,
             owner: ctx.accounts.authority.key(),
