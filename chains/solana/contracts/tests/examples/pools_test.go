@@ -111,9 +111,9 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 			for _, poolProgram := range []solana.PublicKey{config.CcipBasePoolBurnMint} {
 				mintPriv, err := solana.NewRandomPrivateKey()
 				require.NoError(t, err)
-				p, err := tokens.NewTokenPool(v.tokenProgram, poolProgram, mintPriv)
+				p, err := tokens.NewTokenPool(v.tokenProgram, poolProgram, mintPriv.PublicKey())
 				require.NoError(t, err)
-				mint := p.Mint.PublicKey()
+				mint := p.Mint
 
 				t.Run("setup:token", func(t *testing.T) {
 					// create token
@@ -130,7 +130,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					instructions = append(instructions, createI, mintToI)
-					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(p.Mint))
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 
 					// validate
 					outDec, outVal, err := tokens.TokenBalance(ctx, solanaGoClient, p.User[admin.PublicKey()], config.DefaultCommitment)
@@ -158,7 +158,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						// set pool config
 						ixConfigure, err := tokenpool.NewInitChainRemoteConfigInstruction(
 							config.EvmChainSelector,
-							p.Mint.PublicKey(),
+							p.Mint,
 							tokenpool.RemoteConfig{
 								TokenAddress: remoteToken,
 								Decimals:     9,
@@ -171,7 +171,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.NoError(t, err)
 
 						ixAppend, err := tokenpool.NewAppendRemotePoolAddressesInstruction(
-							config.EvmChainSelector, p.Mint.PublicKey(), []tokenpool.RemoteAddress{remotePool}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
+							config.EvmChainSelector, p.Mint, []tokenpool.RemoteAddress{remotePool}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID,
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
@@ -267,13 +267,13 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
 						require.Equal(t, "0", getBalance(poolTokenAccount))
 
-						approveIx, err := tokens.TokenApproveChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], p.Mint.PublicKey(), poolSigner, admin.PublicKey(), solana.PublicKeySlice{})
+						approveIx, err := tokens.TokenApproveChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], p.Mint, poolSigner, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
-						acceptIx, err := tokenpool.NewSetCanAcceptLiquidityInstruction(true, poolConfig, admin.PublicKey()).ValidateAndBuild()
+						acceptIx, err := tokenpool.NewSetCanAcceptLiquidityInstruction(true, poolConfig, mint, admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
-						provideIx, err := tokenpool.NewProvideLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint.PublicKey(), poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
+						provideIx, err := tokenpool.NewProvideLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint, poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{
@@ -290,7 +290,7 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						require.Equal(t, "0", getBalance(p.User[admin.PublicKey()]))
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(poolTokenAccount))
 
-						withdrawIx, err := tokenpool.NewWithdrawLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint.PublicKey(), poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
+						withdrawIx, err := tokenpool.NewWithdrawLiquidityInstruction(amount, poolConfig, v.tokenProgram, p.Mint, poolSigner, poolTokenAccount, p.User[admin.PublicKey()], admin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{
