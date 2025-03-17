@@ -58,12 +58,139 @@ pub(super) struct TokenAccounts<'a> {
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
+pub(super) fn validate_and_parse_token_accounts<'info>(
+    token_receiver: Pubkey,
+    chain_selector: u64,
+    router: Pubkey,
+    fee_quoter: Pubkey,
+    accounts: &'info [AccountInfo<'info>],
+) -> Result<TokenAccounts<'info>> {
+    let mut accounts_iter = accounts.iter();
+
+    // accounts based on user or chain
+    let user_token_account = next_account_info(&mut accounts_iter)?;
+    let token_billing_config = next_account_info(&mut accounts_iter)?;
+    let pool_chain_config = next_account_info(&mut accounts_iter)?;
+
+    // constant accounts for any pool interaction
+    let lookup_table = next_account_info(&mut accounts_iter)?;
+    let token_admin_registry = next_account_info(&mut accounts_iter)?;
+    let pool_program = next_account_info(&mut accounts_iter)?;
+    let pool_config = next_account_info(&mut accounts_iter)?;
+    let pool_token_account = next_account_info(&mut accounts_iter)?;
+    let pool_signer = next_account_info(&mut accounts_iter)?;
+    let token_program = next_account_info(&mut accounts_iter)?;
+    let mint = next_account_info(&mut accounts_iter)?;
+    let fee_token_config = next_account_info(&mut accounts_iter)?;
+
+    // collect remaining accounts
+    let remaining_accounts = accounts_iter.as_slice();
+
+    let program_id = crate::id();
+
+    let mut input_accounts = accounts;
+    let mut bumps = <Tokens as anchor_lang::Bumps>::Bumps::default();
+    let mut reallocs = std::collections::BTreeSet::new();
+
+    Tokens::try_accounts(
+        &program_id,
+        &mut input_accounts,
+        &[
+            token_receiver.as_ref(),
+            &chain_selector.to_le_bytes(),
+            router.as_ref(),
+            fee_quoter.as_ref(),
+        ]
+        .concat(),
+        &mut bumps,
+        &mut reallocs,
+    )?;
+
+    // Additional validations
+    {
+        // Check Lookup Table Address configured in TokenAdminRegistry(can't be deserialized in the account context)
+        // For that, deserialize the TokenAdminRegistry first. It has already been checked that it is
+        // the right PDA address and that its owner is the Router program, so it's safe to deserialize the data directly
+        let token_admin_registry_data = &mut &token_admin_registry.data.borrow()[..];
+        let token_admin_registry_account =
+            router_state::TokenAdminRegistry::try_deserialize(token_admin_registry_data)
+                .map_err(|_| CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts)?;
+        require_keys_eq!(
+            token_admin_registry_account.lookup_table,
+            lookup_table.key(),
+            CcipOfframpError::InvalidInputsLookupTableAccounts
+        );
+
+        // Check Lookup Table Entries
+        let lookup_table_data = &mut &lookup_table.data.borrow()[..];
+        let lookup_table_account = AddressLookupTable::deserialize(lookup_table_data)
+            .map_err(|_| CcipOfframpError::InvalidInputsLookupTableAccounts)?;
+
+        // reconstruct + validate expected values in token pool lookup table
+        // base set of constant accounts (9)
+        // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
+        let required_entries = [
+            lookup_table,
+            token_admin_registry,
+            pool_program,
+            pool_config,
+            pool_token_account,
+            pool_signer,
+            token_program,
+            mint,
+            fee_token_config,
+        ];
+        {
+            // validate pool addresses
+            let mut expected_keys: Vec<Pubkey> =
+                required_entries.iter().map(|acc| acc.key()).collect();
+            let mut remaining_keys: Vec<Pubkey> =
+                remaining_accounts.iter().map(|acc| acc.key()).collect();
+            expected_keys.append(&mut remaining_keys);
+            require!(
+                lookup_table_account.addresses.as_ref() == expected_keys,
+                CcipOfframpError::InvalidInputsLookupTableAccounts
+            );
+        }
+        {
+            // validate pool address writable
+            // token admin registry contains an array (binary) of indexes that are writable
+            // check that the writability of the passed accounts match the writable configuration (using indexes)
+            let mut expected_is_writable: Vec<bool> =
+                required_entries.iter().map(|acc| acc.is_writable).collect();
+            let mut remaining_is_writable: Vec<bool> = remaining_accounts
+                .iter()
+                .map(|acc| acc.is_writable)
+                .collect();
+            expected_is_writable.append(&mut remaining_is_writable);
+            for (i, is_writable) in expected_is_writable.iter().enumerate() {
+                require_eq!(
+                    token_admin_registry_writable::is(&token_admin_registry_account, i as u8),
+                    *is_writable,
+                    CcipOfframpError::InvalidInputsLookupTableAccountWritable
+                );
+            }
+        }
+    }
+
+    Ok(TokenAccounts {
+        user_token_account,
+        _token_billing_config: token_billing_config,
+        pool_chain_config,
+        pool_program,
+        pool_config,
+        pool_token_account,
+        pool_signer,
+        token_program,
+        mint,
+        _fee_token_config: fee_token_config,
+        remaining_accounts,
+    })
+}
+
 #[derive(Accounts)]
 #[instruction(token_receiver: Pubkey, chain_selector: u64, router: Pubkey, fee_quoter: Pubkey)]
-pub struct TokenPoolAccounts<'info> {
-    /**
-     * accounts based on user or chain
-     */
+pub struct Tokens<'info> {
     /// CHECK: User Token Account
     #[account(
         constraint = user_token_account.key() == get_associated_token_address_with_program_id(
@@ -101,9 +228,6 @@ pub struct TokenPoolAccounts<'info> {
     )]
     pub pool_chain_config: AccountInfo<'info>,
 
-    /**
-     * constant accounts for any pool interaction
-     */
     /// CHECK: Lookup table
     pub lookup_table: AccountInfo<'info>,
 
@@ -112,7 +236,7 @@ pub struct TokenPoolAccounts<'info> {
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         seeds::program = router.key(),
         bump,
-        constraint = *token_admin_registry.to_account_info().owner == router.key() @ CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts,
+        owner = router.key() @ CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts,
     )]
     pub token_admin_registry: AccountInfo<'info>,
 
@@ -166,136 +290,6 @@ pub struct TokenPoolAccounts<'info> {
         bump
     )]
     pub fee_token_config: AccountInfo<'info>,
-}
-
-pub(super) fn validate_and_parse_token_accounts<'info>(
-    token_receiver: Pubkey,
-    chain_selector: u64,
-    router: Pubkey,
-    fee_quoter: Pubkey,
-    accounts: &'info [AccountInfo<'info>],
-) -> Result<TokenAccounts<'info>> {
-    let mut accounts_iter = accounts.iter();
-
-    // accounts based on user or chain
-    let user_token_account = next_account_info(&mut accounts_iter)?;
-    let token_billing_config = next_account_info(&mut accounts_iter)?;
-    let pool_chain_config = next_account_info(&mut accounts_iter)?;
-
-    // constant accounts for any pool interaction
-    let lookup_table = next_account_info(&mut accounts_iter)?;
-    let token_admin_registry = next_account_info(&mut accounts_iter)?;
-    let pool_program = next_account_info(&mut accounts_iter)?;
-    let pool_config = next_account_info(&mut accounts_iter)?;
-    let pool_token_account = next_account_info(&mut accounts_iter)?;
-    let pool_signer = next_account_info(&mut accounts_iter)?;
-    let token_program = next_account_info(&mut accounts_iter)?;
-    let mint = next_account_info(&mut accounts_iter)?;
-    let fee_token_config = next_account_info(&mut accounts_iter)?;
-
-    // collect remaining accounts
-    let remaining_accounts = accounts_iter.as_slice();
-
-    let program_id = crate::id();
-
-    let mut input_accounts = accounts;
-    let mut bumps = <TokenPoolAccounts as anchor_lang::Bumps>::Bumps::default();
-    let mut reallocs = std::collections::BTreeSet::new();
-
-    TokenPoolAccounts::try_accounts(
-        &program_id,
-        &mut input_accounts,
-        &[
-            token_receiver.as_ref(),
-            &chain_selector.to_le_bytes(),
-            router.as_ref(),
-            fee_quoter.as_ref(),
-        ]
-        .concat(),
-        &mut bumps,
-        &mut reallocs,
-    )?;
-
-    // Additional validations
-    {
-        // Check Lookup Table Address configured in TokenAdminRegistry
-        // For that, deserialize the TokenAdminRegistry first. It has already been checked that it is(can't be deserialized in the account context)
-        // the right PDA address and that its owner is the Router program, so it's safe to deserialize the data directly
-        let token_admin_registry_data = &mut &token_admin_registry.data.borrow()[..];
-        let token_admin_registry_account =
-            router_state::TokenAdminRegistry::try_deserialize(token_admin_registry_data)
-                .map_err(|_| CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts)?;
-        require_keys_eq!(
-            token_admin_registry_account.lookup_table,
-            lookup_table.key(),
-            CcipOfframpError::InvalidInputsLookupTableAccounts
-        );
-
-        // Check Lookup Table Entries
-        let lookup_table_data = &mut &lookup_table.data.borrow()[..];
-        let lookup_table_account = AddressLookupTable::deserialize(lookup_table_data)
-            .map_err(|_| CcipOfframpError::InvalidInputsLookupTableAccounts)?;
-
-        // reconstruct + validate expected values in token pool lookup table
-        // base set of constant accounts (9)
-        // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
-        let required_entries = [
-            lookup_table.clone(),
-            token_admin_registry.clone(),
-            pool_program.clone(),
-            pool_config.clone(),
-            pool_token_account.clone(),
-            pool_signer.clone(),
-            token_program.clone(),
-            mint.clone(),
-            fee_token_config.clone(),
-        ];
-        {
-            // validate pool addresses
-            let mut expected_keys: Vec<Pubkey> =
-                required_entries.iter().map(|acc| acc.key()).collect();
-            let mut remaining_keys: Vec<Pubkey> =
-                remaining_accounts.iter().map(|acc| acc.key()).collect();
-            expected_keys.append(&mut remaining_keys);
-            require!(
-                lookup_table_account.addresses.as_ref() == expected_keys,
-                CcipOfframpError::InvalidInputsLookupTableAccounts
-            );
-        }
-        {
-            // validate pool address writable
-            // token admin registry contains an array (binary) of indexes that are writable
-            // check that the writability of the passed accounts match the writable configuration (using indexes)
-            let mut expected_is_writable: Vec<bool> =
-                required_entries.iter().map(|acc| acc.is_writable).collect();
-            let mut remaining_is_writable: Vec<bool> = remaining_accounts
-                .iter()
-                .map(|acc| acc.is_writable)
-                .collect();
-            expected_is_writable.append(&mut remaining_is_writable);
-            for (i, is_writable) in expected_is_writable.iter().enumerate() {
-                require_eq!(
-                    token_admin_registry_writable::is(&token_admin_registry_account, i as u8),
-                    *is_writable,
-                    CcipOfframpError::InvalidInputsLookupTableAccountWritable
-                );
-            }
-        }
-    }
-
-    Ok(TokenAccounts {
-        user_token_account,
-        _token_billing_config: token_billing_config,
-        pool_chain_config,
-        pool_program,
-        pool_config,
-        pool_token_account,
-        pool_signer,
-        token_program,
-        mint,
-        _fee_token_config: fee_token_config,
-        remaining_accounts,
-    })
 }
 
 pub(super) fn interact_with_pool(

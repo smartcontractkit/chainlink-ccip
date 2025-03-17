@@ -57,7 +57,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     router: Pubkey,
     fee_quoter: Pubkey,
     accounts: &'info [AccountInfo<'info>],
-) -> Result<TokenAccounts> {
+) -> Result<TokenAccounts<'info>> {
     let mut accounts_iter = accounts.iter();
 
     // accounts based on user or chain
@@ -79,112 +79,28 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     // collect remaining accounts
     let remaining_accounts = accounts_iter.as_slice();
 
-    // Account validations (using remaining_accounts does not facilitate built-in anchor checks)
+    let program_id = crate::id();
+
+    let mut input_accounts = accounts;
+    let mut bumps = <Tokens as anchor_lang::Bumps>::Bumps::default();
+    let mut reallocs = std::collections::BTreeSet::new();
+
+    Tokens::try_accounts(
+        &program_id,
+        &mut input_accounts,
+        &[
+            token_receiver.as_ref(),
+            &chain_selector.to_le_bytes(),
+            router.as_ref(),
+            fee_quoter.as_ref(),
+        ]
+        .concat(),
+        &mut bumps,
+        &mut reallocs,
+    )?;
+
+    // Additional validations
     {
-        // Check Token Admin Registry
-        let (expected_token_admin_registry, _) = Pubkey::find_program_address(
-            &[seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
-            &router,
-        );
-        require_eq!(
-            token_admin_registry.key(),
-            expected_token_admin_registry,
-            CcipRouterError::InvalidInputsTokenAdminRegistryAccounts
-        );
-
-        // check pool program + pool config + pool signer
-        let (expected_pool_config, _) = Pubkey::find_program_address(
-            &[seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
-            &pool_program.key(),
-        );
-        let (expected_pool_signer, _) = Pubkey::find_program_address(
-            &[seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
-            &pool_program.key(),
-        );
-        require_eq!(
-            *pool_config.owner,
-            pool_program.key(),
-            CcipRouterError::InvalidInputsPoolAccounts
-        );
-        require_eq!(
-            pool_config.key(),
-            expected_pool_config,
-            CcipRouterError::InvalidInputsPoolAccounts
-        );
-        require_eq!(
-            pool_signer.key(),
-            expected_pool_signer,
-            CcipRouterError::InvalidInputsPoolAccounts
-        );
-
-        let (expected_fee_token_config, _) = Pubkey::find_program_address(
-            &[
-                fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
-                mint.key.as_ref(),
-            ],
-            &fee_quoter,
-        );
-        require_eq!(
-            fee_token_config.key(),
-            expected_fee_token_config,
-            CcipRouterError::InvalidInputsConfigAccounts
-        );
-
-        // check token accounts
-        require_eq!(
-            *mint.owner,
-            token_program.key(),
-            CcipRouterError::InvalidInputsTokenAccounts
-        );
-        require_eq!(
-            user_token_account.key(),
-            get_associated_token_address_with_program_id(
-                &token_receiver,
-                &mint.key(),
-                &token_program.key()
-            ),
-            CcipRouterError::InvalidInputsTokenAccounts
-        );
-        require_eq!(
-            pool_token_account.key(),
-            get_associated_token_address_with_program_id(
-                &pool_signer.key(),
-                &mint.key(),
-                &token_program.key()
-            ),
-            CcipRouterError::InvalidInputsTokenAccounts
-        );
-
-        // check per token per chain configs
-        // billing: configured via CCIP fee quoter
-        // chain config: configured via pool
-        let (expected_billing_config, _) = Pubkey::find_program_address(
-            &[
-                fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
-                chain_selector.to_le_bytes().as_ref(),
-                mint.key().as_ref(),
-            ],
-            &fee_quoter,
-        );
-        let (expected_pool_chain_config, _) = Pubkey::find_program_address(
-            &[
-                seed::TOKEN_POOL_CONFIG,
-                chain_selector.to_le_bytes().as_ref(),
-                mint.key().as_ref(),
-            ],
-            &pool_program.key(),
-        );
-        require_eq!(
-            token_billing_config.key(),
-            expected_billing_config, // TODO: determine if this can be zero key for optional billing config?
-            CcipRouterError::InvalidInputsConfigAccounts
-        );
-        require_eq!(
-            pool_chain_config.key(),
-            expected_pool_chain_config,
-            CcipRouterError::InvalidInputsConfigAccounts
-        );
-
         // Check Lookup Table Address configured in TokenAdminRegistry
         let token_admin_registry_account: Account<TokenAdminRegistry> =
             Account::try_from(token_admin_registry)?;
@@ -257,6 +173,110 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         fee_token_config,
         remaining_accounts,
     })
+}
+
+#[derive(Accounts)]
+#[instruction(token_receiver: Pubkey, chain_selector: u64, router: Pubkey, fee_quoter: Pubkey)]
+pub struct Tokens<'info> {
+    /// CHECK: User Token Account
+    #[account(
+        constraint = user_token_account.key() == get_associated_token_address_with_program_id(
+            &token_receiver.key(),
+            &mint.key(),
+            &token_program.key()
+        ) @ CcipRouterError::InvalidInputsTokenAccounts
+    )]
+    pub user_token_account: AccountInfo<'info>,
+
+    // TODO: determine if this can be zero key for optional billing config?
+    /// CHECK: Per chain token billing config
+    // billing: configured via CCIP fee quoter
+    // chain config: configured via pool
+    #[account(
+        seeds = [
+            fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
+            chain_selector.to_le_bytes().as_ref(),
+            mint.key().as_ref(),
+        ],
+        seeds::program = fee_quoter.key(),
+        bump
+    )]
+    pub token_billing_config: AccountInfo<'info>,
+
+    /// CHECK: Pool chain config
+    #[account(
+        seeds = [
+            seed::TOKEN_POOL_CONFIG,
+            chain_selector.to_le_bytes().as_ref(),
+            mint.key().as_ref(),
+        ],
+        seeds::program = pool_program.key(),
+        bump
+    )]
+    pub pool_chain_config: AccountInfo<'info>,
+
+    /// CHECK: Lookup table
+    pub lookup_table: AccountInfo<'info>,
+
+    /// CHECK: Token admin registry
+    #[account(
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds::program = router.key(),
+        bump,
+        owner = router.key() @ CcipRouterError::InvalidInputsTokenAdminRegistryAccounts,
+    )]
+    pub token_admin_registry: AccountInfo<'info>,
+
+    /// CHECK: Pool program
+    pub pool_program: AccountInfo<'info>,
+
+    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsPoolAccounts
+    /// CHECK: Pool config
+    #[account(
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
+        seeds::program = pool_program.key(),
+        bump,
+        owner = pool_program.key() @ CcipRouterError::InvalidInputsPoolAccounts
+    )]
+    pub pool_config: AccountInfo<'info>,
+
+    /// CHECK: Pool token account
+    #[account(
+        address = get_associated_token_address_with_program_id(
+            &pool_signer.key(),
+            &mint.key(),
+            &token_program.key()
+        ) @ CcipRouterError::InvalidInputsTokenAccounts
+    )]
+    pub pool_token_account: AccountInfo<'info>,
+
+    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsPoolAccounts
+    /// CHECK: Pool signer
+    #[account(
+        seeds = [seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
+        seeds::program = pool_program.key(),
+        bump
+    )]
+    pub pool_signer: AccountInfo<'info>,
+
+    /// CHECK: Token program
+    pub token_program: AccountInfo<'info>,
+
+    /// CHECK: Mint
+    #[account(owner = token_program.key() @ CcipRouterError::InvalidInputsTokenAccounts)]
+    pub mint: AccountInfo<'info>,
+
+    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsConfigAccounts
+    /// CHECK: Fee token config
+    #[account(
+        seeds = [
+            fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+            mint.key().as_ref()
+        ],
+        seeds::program = fee_quoter.key(),
+        bump
+    )]
+    pub fee_token_config: AccountInfo<'info>,
 }
 
 pub fn transfer_token<'info>(
