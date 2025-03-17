@@ -175,28 +175,34 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     fee_quoter: Pubkey,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts<'info>> {
-    // todo: programs/ccip-offramp/src/instructions/v1/pools.rs
-    // todo: programs/ccip-router/src/instructions/v1/pools.rs
+    let mut accounts_iter = accounts.iter();
+
+    // accounts based on user or chain
+    let user_token_account = next_account_info(&mut accounts_iter)?;
+    let token_billing_config = next_account_info(&mut accounts_iter)?;
+    let pool_chain_config = next_account_info(&mut accounts_iter)?;
+
+    // constant accounts for any pool interaction
+    let lookup_table = next_account_info(&mut accounts_iter)?;
+    let token_admin_registry = next_account_info(&mut accounts_iter)?;
+    let pool_program = next_account_info(&mut accounts_iter)?;
+    let pool_config = next_account_info(&mut accounts_iter)?;
+    let pool_token_account = next_account_info(&mut accounts_iter)?;
+    let pool_signer = next_account_info(&mut accounts_iter)?;
+    let token_program = next_account_info(&mut accounts_iter)?;
+    let mint = next_account_info(&mut accounts_iter)?;
+    let fee_token_config = next_account_info(&mut accounts_iter)?;
+
+    // collect remaining accounts
+    let remaining_accounts = accounts_iter.as_slice();
+
     let program_id = crate::id();
 
     let mut input_accounts = accounts;
     let mut bumps = <TokenPoolAccounts as anchor_lang::Bumps>::Bumps::default();
     let mut reallocs = std::collections::BTreeSet::new();
 
-    let TokenPoolAccounts {
-        user_token_account: _,
-        token_billing_config: _,
-        pool_chain_config: _,
-        pool_program,
-        pool_config,
-        pool_token_account,
-        pool_signer,
-        token_program,
-        mint,
-        fee_token_config,
-        lookup_table,
-        token_admin_registry,
-    } = TokenPoolAccounts::try_accounts(
+    TokenPoolAccounts::try_accounts(
         &program_id,
         &mut input_accounts,
         &[
@@ -211,7 +217,6 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     )?;
 
     // Additional validations
-    let remaining_accounts = &accounts[12..];
     {
         // Check Lookup Table Address configured in TokenAdminRegistry
         // For that, deserialize the TokenAdminRegistry first. It has already been checked that it is(can't be deserialized in the account context)
@@ -237,13 +242,13 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         let required_entries = [
             lookup_table.clone(),
             token_admin_registry.clone(),
-            pool_program,
-            pool_config,
-            pool_token_account,
-            pool_signer,
-            token_program,
-            mint,
-            fee_token_config,
+            pool_program.clone(),
+            pool_config.clone(),
+            pool_token_account.clone(),
+            pool_signer.clone(),
+            token_program.clone(),
+            mint.clone(),
+            fee_token_config.clone(),
         ];
         {
             // validate pool addresses
@@ -278,19 +283,17 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         }
     }
 
-    // todo: check if we can return those from validated accounts(local variables)
     Ok(TokenAccounts {
-        user_token_account: &accounts[0],
-        _token_billing_config: &accounts[1],
-        pool_chain_config: &accounts[2],
-        // omit lookup_table and token_admin_registry at indexes 3 and 4
-        pool_program: &accounts[5],
-        pool_config: &accounts[6],
-        pool_token_account: &accounts[7],
-        pool_signer: &accounts[8],
-        token_program: &accounts[9],
-        mint: &accounts[10],
-        _fee_token_config: &accounts[11],
+        user_token_account,
+        _token_billing_config: token_billing_config,
+        pool_chain_config,
+        pool_program,
+        pool_config,
+        pool_token_account,
+        pool_signer,
+        token_program,
+        mint,
+        _fee_token_config: fee_token_config,
         remaining_accounts,
     })
 }
