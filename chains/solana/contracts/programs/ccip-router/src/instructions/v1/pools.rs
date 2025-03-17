@@ -80,6 +80,10 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
     // collect remaining accounts
     let remaining_accounts = accounts_iter.as_slice();
 
+    // leveraging Anchor's account context validation
+    // Instead of manually checking each account (ownership, PDA derivation, constraints),
+    // we're using Anchor's `try_accounts` to perform these validations based on the
+    // constraints defined in the `TokenAccountsValidationContext` account context struct
     let program_id = crate::id();
 
     let mut input_accounts = accounts;
@@ -100,7 +104,7 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         &mut reallocs,
     )?;
 
-    // Additional validations
+    // Additional validations that can't be expressed in the account context
     {
         // Check Lookup Table Address configured in TokenAdminRegistry
         let token_admin_registry_account: Account<TokenAdminRegistry> =
