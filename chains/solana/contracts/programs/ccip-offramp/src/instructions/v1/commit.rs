@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 
-use super::config::is_on_ramp_configured;
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
 
@@ -50,10 +49,8 @@ impl Commit for Impl {
             CcipOfframpError::UnsupportedSourceChainSelector
         );
         require!(
-            is_on_ramp_configured(
-                &source_chain.config,
-                &report.merkle_root.as_ref().unwrap().on_ramp_address
-            ),
+            &source_chain.config.on_ramp.bytes()
+                == &report.merkle_root.as_ref().unwrap().on_ramp_address,
             CcipOfframpError::OnrampNotConfigured
         );
 
