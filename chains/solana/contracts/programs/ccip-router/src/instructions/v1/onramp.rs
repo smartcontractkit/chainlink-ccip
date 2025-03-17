@@ -303,12 +303,7 @@ mod helpers {
             CcipRouterError::SourceTokenDataTooLarge
         );
 
-        // TODO: Revisit when/if non-EVM destinations from SVM become supported.
-        // for an EVM destination, exec data it consists of the amount of gas available for the releaseOrMint
-        // and transfer calls made by the offRamp
-        let dest_exec_data = ethnum::U256::new(dest_gas_amount.into()) // TODO remove dependency on ethnum
-            .to_be_bytes()
-            .to_vec();
+        let dest_exec_data = dest_gas_amount.to_be_bytes().to_vec();
 
         Ok(SVM2AnyTokenTransfer {
             source_pool_address,
@@ -464,9 +459,9 @@ mod helpers {
             )
             .unwrap();
 
-            let expected_exec_data =
-                ethnum::U256::new(additional_token_transfer_data.dest_gas_overhead.into())
-                    .to_be_bytes();
+            let expected_exec_data = additional_token_transfer_data
+                .dest_gas_overhead
+                .to_be_bytes();
 
             assert!(transfer.extra_data.is_empty());
             assert_eq!(transfer.dest_exec_data, expected_exec_data);
