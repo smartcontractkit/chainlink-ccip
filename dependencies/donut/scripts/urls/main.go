@@ -211,6 +211,12 @@ func generateChainUrls(namespace, ingressDomain string, chainType, chainID strin
 }
 
 func saveToFile(filename, targetDir string, data any, afterSaveHook func(string)) error {
+	if targetDir != "" {
+		err := os.MkdirAll(targetDir, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
 	filePath := filepath.Join(targetDir, filename)
 	f, err := os.Create(filePath)
 	if err != nil {
