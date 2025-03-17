@@ -108,7 +108,7 @@ impl Commit for Impl {
             root.max_seq_nr
                 .to_owned()
                 .checked_sub(root.min_seq_nr)
-                .map_or_else(|| false, |seq_size| seq_size <= 64),
+                .map_or_else(|| false, |seq_size| seq_size < 64),
             CcipOfframpError::InvalidSequenceInterval
         ); // As we have 64 slots to store the execution state
         require!(
@@ -148,7 +148,7 @@ impl Commit for Impl {
             &config.ocr3[OcrPluginType::Commit as usize],
             &ctx.accounts.sysvar_instructions,
             ctx.accounts.authority.key(),
-            OcrPluginType::Commit as u8,
+            OcrPluginType::Commit,
             report_context,
             &Ocr3ReportForCommit(&report),
             Signatures { rs, ss, raw_vs },
@@ -224,7 +224,7 @@ impl Commit for Impl {
             &config.ocr3[OcrPluginType::Commit as usize],
             &ctx.accounts.sysvar_instructions,
             ctx.accounts.authority.key(),
-            OcrPluginType::Commit as u8,
+            OcrPluginType::Commit,
             report_context,
             &Ocr3ReportForCommit(&report),
             Signatures { rs, ss, raw_vs },

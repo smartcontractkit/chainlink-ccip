@@ -927,7 +927,8 @@
         "",
         "* `ctx` - The context containing the accounts required for sending the message.",
         "* `dest_chain_selector` - The chain selector for the destination chain.",
-        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+        "* `message` - The message to be sent. The size limit of data is 256 bytes.",
+        "* `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins."
       ],
       "accounts": [
         {
@@ -1053,6 +1054,73 @@
           "u8",
           32
         ]
+      }
+    },
+    {
+      "name": "getFee",
+      "docs": [
+        "Queries the onramp for the fee required to send a message.",
+        "",
+        "This call is permissionless. Note it does not verify whether there's a curse active",
+        "in order to avoid the RMN CPI overhead.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for obtaining the message fee.",
+        "* `dest_chain_selector` - The chain selector for the destination chain.",
+        "* `message` - The message to be sent. The size limit of data is 256 bytes."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destChainState",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterDestChain",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterBillingTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeQuoterLinkTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "message",
+          "type": {
+            "defined": "SVM2AnyMessage"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "GetFeeResult"
       }
     }
   ],

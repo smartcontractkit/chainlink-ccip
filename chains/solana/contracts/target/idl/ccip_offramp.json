@@ -507,7 +507,9 @@
       "args": [
         {
           "name": "pluginType",
-          "type": "u8"
+          "type": {
+            "defined": "OcrPluginType"
+          }
         },
         {
           "name": "configInfo",
@@ -1391,6 +1393,22 @@
       }
     },
     {
+      "name": "ConfigOcrPluginType",
+      "docs": [
+        "It's not possible to store enums in zero_copy accounts, so we wrap the discriminant",
+        "in a struct to store in config."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discriminant",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "ExecutionReportSingleChain",
       "docs": [
         "Report that is submitted by the execution DON at the execution phase. (including chain selector data)"
@@ -1616,7 +1634,9 @@
         "fields": [
           {
             "name": "pluginType",
-            "type": "u8"
+            "type": {
+              "defined": "ConfigOcrPluginType"
+            }
           },
           {
             "name": "configInfo",
@@ -1662,6 +1682,10 @@
         "fields": [
           {
             "name": "isEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "isRmnVerificationDisabled",
             "type": "bool"
           },
           {
@@ -1954,7 +1978,9 @@
       "fields": [
         {
           "name": "ocrPluginType",
-          "type": "u8",
+          "type": {
+            "defined": "OcrPluginType"
+          },
           "index": false
         },
         {
@@ -1998,7 +2024,9 @@
       "fields": [
         {
           "name": "ocrPluginType",
-          "type": "u8",
+          "type": {
+            "defined": "OcrPluginType"
+          },
           "index": false
         },
         {

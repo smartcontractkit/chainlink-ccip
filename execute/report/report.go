@@ -594,6 +594,11 @@ func (b *execReportBuilder) buildSingleChainReport(
 			}
 		} else {
 			// this message didn't work, continue to the next one
+			b.lggr.Debugw("message did not fit in report, deleting from in-progress report built",
+				"sourceChain", commitData.Messages[i].Header.SourceChainSelector,
+				"messageID", commitData.Messages[i].Header.MessageID,
+				"seqNum", commitData.Messages[i].Header.SequenceNumber,
+			)
 			delete(msgs, i)
 		}
 	}

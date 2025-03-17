@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use bytemuck::{Pod, Zeroable};
 use solana_program::sysvar::instructions;
 
 use crate::messages::ExecutionReportSingleChain;
@@ -616,7 +617,37 @@ pub struct ExecuteReportContext<'info> {
     // ] x N tokens
 }
 
-#[derive(Copy, Clone, AnchorSerialize, AnchorDeserialize)]
+/// It's not possible to store enums in zero_copy accounts, so we wrap the discriminant
+/// in a struct to store in config.
+#[derive(
+    Copy, Clone, AnchorSerialize, AnchorDeserialize, PartialEq, Eq, InitSpace, Pod, Zeroable,
+)]
+#[repr(C)]
+pub struct ConfigOcrPluginType {
+    discriminant: u8,
+}
+
+impl From<OcrPluginType> for ConfigOcrPluginType {
+    fn from(value: OcrPluginType) -> Self {
+        Self {
+            discriminant: value as u8,
+        }
+    }
+}
+
+impl TryFrom<ConfigOcrPluginType> for OcrPluginType {
+    type Error = CcipOfframpError;
+
+    fn try_from(value: ConfigOcrPluginType) -> std::result::Result<Self, Self::Error> {
+        match value.discriminant {
+            0 => Ok(Self::Commit),
+            1 => Ok(Self::Execution),
+            _ => Err(CcipOfframpError::InvalidPluginType),
+        }
+    }
+}
+
+#[derive(Copy, Clone, AnchorSerialize, AnchorDeserialize, PartialEq, Eq)]
 pub enum OcrPluginType {
     Commit,
     Execution,

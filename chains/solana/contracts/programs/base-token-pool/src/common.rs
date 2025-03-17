@@ -6,7 +6,7 @@ use rmn_remote::state::CurseSubject;
 use spl_math::uint::U256;
 use std::ops::Deref;
 
-use crate::rate_limiter::{validate_token_bucket_config, RateLimitConfig, RateLimitTokenBucket};
+use crate::rate_limiter::{RateLimitConfig, RateLimitTokenBucket};
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
 pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed used by CCIP to provide correct chain config to pool
@@ -122,7 +122,7 @@ impl BaseConfig {
         let old_router = self.router;
         self.router = new_router;
         (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[POOL_SIGNER_SEED], &new_router);
+            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &new_router);
         emit!(RouterUpdated {
             old_router,
             new_router,
@@ -213,11 +213,10 @@ impl BaseChain {
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
-        validate_token_bucket_config(&inbound)?;
-        validate_token_bucket_config(&outbound)?;
-
-        self.inbound_rate_limit.cfg = inbound.clone();
-        self.outbound_rate_limit.cfg = outbound.clone();
+        self.inbound_rate_limit
+            .set_token_bucket_config(inbound.clone())?;
+        self.outbound_rate_limit
+            .set_token_bucket_config(outbound.clone())?;
 
         emit!(RateLimitConfigured {
             chain_selector: remote_chain_selector,
@@ -456,7 +455,7 @@ pub fn validate_lock_or_burn<'info>(
         lock_or_burn_in.remote_chain_selector,
     )?;
 
-    outbound_rate_limit.consume(lock_or_burn_in.amount)
+    outbound_rate_limit.consume::<Clock>(lock_or_burn_in.amount)
 }
 
 // validate_lock_or_burn checks for correctness on inputs
@@ -494,7 +493,7 @@ pub fn validate_release_or_mint<'info>(
         release_or_mint_in.remote_chain_selector,
     )?;
 
-    inbound_rate_limit.consume(parsed_amount)
+    inbound_rate_limit.consume::<Clock>(parsed_amount)
 }
 
 pub fn verify_uncursed_cpi<'info>(

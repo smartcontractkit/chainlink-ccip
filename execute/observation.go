@@ -118,7 +118,7 @@ func (p *Plugin) Observation(
 		"duration", time.Since(tStart),
 		"state", state,
 		"numCommitReports", len(observation.CommitReports),
-		"numMessages", len(observation.Messages))
+		"numMessages", observation.Messages.Count())
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
@@ -428,7 +428,7 @@ func (p *Plugin) getFilterObservation(
 	// Read args from chain.
 	nonceObservations := make(exectypes.NonceObservations)
 	for srcChain, addrSet := range nonceRequestArgs {
-		// TODO: check if srcSelector is supported.
+		// TODO: check if srcSelectors is supported.
 		addrs := maps.Keys(addrSet)
 		nonces, err := p.ccipReader.Nonces(ctx, srcChain, addrs)
 		if err != nil {

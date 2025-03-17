@@ -48,7 +48,7 @@ impl Execute for Impl {
                 &config.ocr3[OcrPluginType::Execution as usize],
                 &ctx.accounts.sysvar_instructions,
                 ctx.accounts.authority.key(),
-                OcrPluginType::Execution as u8,
+                OcrPluginType::Execution,
                 report_context,
                 &Ocr3ReportForExecutionReportSingleChain(&execution_report),
                 Signatures {
@@ -446,7 +446,7 @@ fn hash(
     use anchor_lang::solana_program::keccak;
 
     // Calculate vectors size to ensure that the hash is unique
-    let sender_size = [msg.sender.len() as u8];
+    let sender_size = msg.sender.len() as u16; // it should fit in a u8, but it's safer to use u16
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -473,7 +473,7 @@ fn hash(
         msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialized
         &header_nonce,
         // message
-        &sender_size,
+        &sender_size.to_be_bytes(),
         &msg.sender,
         &data_size.to_be_bytes(),
         &msg.data,
@@ -658,7 +658,7 @@ mod tests {
         let hash_result = hash(&message, remaining_account_keys);
 
         assert_eq!(
-            "7c1572c33e52696603008269d3dfb2936811891af29c263bfb83e38ae6b36321",
+            "c82035cdc1d1e58606afeaf137b71de280e1e2cafdfdc621944eecccb105d730",
             hex::encode(hash_result)
         );
     }

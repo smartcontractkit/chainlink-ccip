@@ -34,8 +34,8 @@ func TestPlugin(t *testing.T) {
 		makeMsgWithMetadata(105, srcSelector, dstSelector, false),
 	}
 
-	intTest := SetupSimpleTest(t, logger.Test(t), srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1)
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector}, dstSelector)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1, srcSelector)
 	runner := intTest.Start()
 	defer intTest.Close()
 
@@ -98,8 +98,8 @@ func TestExceedSizeObservation(t *testing.T) {
 		)
 	}
 
-	intTest := SetupSimpleTest(t, mocks.NullLogger, srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), nReports)
+	intTest := SetupSimpleTest(t, mocks.NullLogger, []cciptypes.ChainSelector{srcSelector}, dstSelector)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), nReports, srcSelector)
 	runner := intTest.Start()
 	defer intTest.Close()
 
@@ -162,13 +162,13 @@ func TestPlugin_FinalizedUnfinalizedCaching(t *testing.T) {
 		},
 	}
 
-	intTest := SetupSimpleTest(t, logger.Test(t), srcSelector, dstSelector)
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector}, dstSelector)
 
 	// Set up first report - should be executed and finalized
-	intTest.WithMessages(finalizedMessages, 1000, time.Now().Add(-4*time.Hour), 1)
+	intTest.WithMessages(finalizedMessages, 1000, time.Now().Add(-4*time.Hour), 1, srcSelector)
 
 	// Set up second report - should remain available
-	intTest.WithMessages(unexecutedMessages, 1001, time.Now().Add(-3*time.Hour), 1)
+	intTest.WithMessages(unexecutedMessages, 1001, time.Now().Add(-3*time.Hour), 1, srcSelector)
 
 	runner := intTest.Start()
 	defer intTest.Close()
@@ -187,4 +187,86 @@ func TestPlugin_FinalizedUnfinalizedCaching(t *testing.T) {
 	// Check that we see the second report
 	report := outcome.CommitReports[0]
 	require.Equal(t, cciptypes.NewSeqNumRange(200, 201), report.SequenceNumberRange)
+}
+
+func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcChainA := cciptypes.ChainSelector(1)
+	srcChainB := cciptypes.ChainSelector(3)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	// Create messages for multiple commit reports with different timestamps
+	baseTime := time.Now().Add(-4 * time.Hour)
+	msgSets := []struct {
+		messages  []inmem.MessagesWithMetadata
+		timestamp time.Time
+		blockNum  uint64
+		srcChain  cciptypes.ChainSelector
+	}{
+		{
+			// Latest messages
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(104, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(105, srcChainA, dstSelector, false),
+			},
+			timestamp: baseTime.Add(2 * time.Hour),
+			blockNum:  1002,
+			srcChain:  srcChainA,
+		},
+		{
+			// Earliest messages, From a chain that's chronologically after the other chain
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(100, srcChainB, dstSelector, false),
+				makeMsgWithMetadata(101, srcChainB, dstSelector, false),
+			},
+			timestamp: baseTime,
+			blockNum:  1000,
+			srcChain:  srcChainB,
+		},
+		{
+			// Middle messages
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(102, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(103, srcChainA, dstSelector, false),
+			},
+			timestamp: baseTime.Add(time.Hour),
+			blockNum:  1001,
+			srcChain:  srcChainA,
+		},
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcChainA, srcChainB}, dstSelector)
+
+	// Add messages in non-chronological order
+	for _, set := range msgSets {
+		intTest.WithMessages(set.messages, set.blockNum, set.timestamp, 1, set.srcChain)
+	}
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// GetCommitReports round - should return chronologically ordered reports
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	require.Len(t, outcome.CommitReports, 3)
+
+	// Verify timestamps are in ascending order
+	for i := 0; i < len(outcome.CommitReports)-1; i++ {
+		require.True(t, outcome.CommitReports[i].Timestamp.Before(
+			outcome.CommitReports[i+1].Timestamp),
+			"commit reports should be ordered by timestamp")
+	}
+
+	// Verify the specific order matches our expected chronological order
+	require.Equal(t, cciptypes.SeqNum(100),
+		outcome.CommitReports[0].SequenceNumberRange.Start(), "oldest report should be first")
+	require.Equal(t, cciptypes.SeqNum(102),
+		outcome.CommitReports[1].SequenceNumberRange.Start(), "middle report should be second")
+	require.Equal(t, cciptypes.SeqNum(104),
+		outcome.CommitReports[2].SequenceNumberRange.Start(), "newest report should be last")
 }
