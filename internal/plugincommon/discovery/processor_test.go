@@ -72,13 +72,13 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
 		dest,
 		fRoleDON,
-		nil, // oracleIDToP2PID, not needed for this test
+		nil, // oracleIDToP2PID, not needed for this test,
 	)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
@@ -109,7 +109,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
@@ -149,7 +149,7 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
@@ -188,7 +188,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
@@ -246,7 +246,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		Return(nil)
 	defer mockReader.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
@@ -329,7 +329,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		Return(nil)
 	defer mockReader.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
@@ -419,7 +419,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		Return(nil)
 	defer mockReader.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
@@ -505,7 +505,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		Return(syncErr)
 	defer mockReader.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		&mockReaderIface,
 		mockHomeChain,
@@ -558,7 +558,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_HappyPath(t *testing.T) 
 	mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(supportedChains, nil)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		nil, // reader, not needed for this test
 		mockHomeChain,
@@ -585,7 +585,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_NoPeerID(t *testing.T) {
 
 	oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{}
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		nil, // reader, not needed for this test
 		mockHomeChain,
@@ -620,7 +620,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedCha
 	mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(nil, expectedErr)
 	defer mockHomeChain.AssertExpectations(t)
 
-	cdp := NewContractDiscoveryProcessor(
+	cdp := internalNewContractDiscoveryProcessor(
 		lggr,
 		nil, // reader, not needed for this test
 		mockHomeChain,
@@ -738,7 +738,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 				nil).Maybe()
 			defer mockHomeChain.AssertExpectations(t)
 
-			cdp := NewContractDiscoveryProcessor(
+			cdp := internalNewContractDiscoveryProcessor(
 				lggr,
 				nil, // reader, not needed for this test
 				mockHomeChain,
@@ -777,4 +777,23 @@ var dummyObservation = discoverytypes.Observation{
 			1: cciptypes.UnknownAddress("someaddress"),
 		},
 	},
+}
+
+func internalNewContractDiscoveryProcessor(
+	lggr logger.Logger,
+	reader *reader.CCIPReader,
+	homechain reader.HomeChain,
+	dest cciptypes.ChainSelector,
+	fRoleDON int,
+	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
+) plugincommon.PluginProcessor[discoverytypes.Query, discoverytypes.Observation, discoverytypes.Outcome] {
+	return NewContractDiscoveryProcessor(
+		lggr,
+		reader,
+		homechain,
+		dest,
+		fRoleDON,
+		oracleIDToP2PID,
+		plugincommon.NoopReporter{},
+	)
 }

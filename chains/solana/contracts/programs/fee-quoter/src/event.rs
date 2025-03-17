@@ -6,6 +6,7 @@ use crate::state::{CodeVersion, DestChainConfig, TokenTransferFeeConfig};
 pub struct ConfigSet {
     pub max_fee_juels_per_msg: u128,
     pub link_token_mint: Pubkey,
+    pub link_token_local_decimals: u8,
     pub onramp: Pubkey,
     pub default_code_version: CodeVersion,
 }
@@ -67,6 +68,14 @@ pub struct UsdPerTokenUpdated {
     pub token: Pubkey,
     pub value: [u8; 28], // EVM uses u256 here
     pub timestamp: i64,  // EVM uses u256 here
+}
+
+/// Emitted when the price update corresponds to a token that isn't registered
+/// for price tracking.
+#[event]
+pub struct TokenPriceUpdateIgnored {
+    pub token: Pubkey,
+    pub value: [u8; 28], // EVM uses u256 here
 }
 
 #[event]

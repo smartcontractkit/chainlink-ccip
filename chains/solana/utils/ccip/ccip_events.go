@@ -65,6 +65,13 @@ type UsdPerTokenUpdated struct {
 }
 
 // FeeQuoter-specific event
+type TokenPriceUpdateIgnored struct {
+	Discriminator [8]byte
+	Token         solana.PublicKey
+	Value         [28]byte
+}
+
+// FeeQuoter-specific event
 type UsdPerUnitGasUpdated struct {
 	Discriminator [8]byte
 	DestChain     uint64
@@ -108,12 +115,14 @@ type EventOfframpReferenceAddressesSet struct {
 	Router             solana.PublicKey
 	FeeQuoter          solana.PublicKey
 	OfframpLookupTable solana.PublicKey
+	RMNRemote          solana.PublicKey
 }
 
 type EventRouterConfigSet struct {
 	Discriminator    [8]byte
 	SvmChainSelector uint64
 	FeeQuoter        solana.PublicKey
+	RMNRemote        solana.PublicKey
 	LinkTokenMint    solana.PublicKey
 	FeeAggregator    solana.PublicKey
 }
@@ -122,6 +131,7 @@ type EventFeeQuoterConfigSet struct {
 	Discriminator      [8]byte
 	MaxFeeJuelsPerMsg  bin.Uint128
 	LinkTokenMint      solana.PublicKey
+	LinkTokenDecimals  uint8
 	Onramp             solana.PublicKey
 	DefaultCodeVersion fee_quoter.CodeVersion
 }

@@ -65,6 +65,10 @@ export type BaseTokenPool = {
             "type": {
               "vec": "publicKey"
             }
+          },
+          {
+            "name": "rmnRemote",
+            "type": "publicKey"
           }
         ]
       }
@@ -547,66 +551,71 @@ export type BaseTokenPool = {
     },
     {
       "code": 6001,
+      "name": "InvalidRMNRemoteAddress",
+      "msg": "Invalid RMN Remote Address"
+    },
+    {
+      "code": 6002,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "InvalidInputs",
       "msg": "Invalid inputs"
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "InvalidPoolCaller",
       "msg": "Caller is not ramp on router"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidSender",
       "msg": "Sender not allowed"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "InvalidSourcePoolAddress",
       "msg": "Invalid source pool address"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "InvalidToken",
       "msg": "Invalid token"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "InvalidTokenAmountConversion",
       "msg": "Invalid token amount conversion"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     }
@@ -680,6 +689,10 @@ export const IDL: BaseTokenPool = {
             "type": {
               "vec": "publicKey"
             }
+          },
+          {
+            "name": "rmnRemote",
+            "type": "publicKey"
           }
         ]
       }
@@ -1162,66 +1175,71 @@ export const IDL: BaseTokenPool = {
     },
     {
       "code": 6001,
+      "name": "InvalidRMNRemoteAddress",
+      "msg": "Invalid RMN Remote Address"
+    },
+    {
+      "code": 6002,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "InvalidInputs",
       "msg": "Invalid inputs"
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "InvalidPoolCaller",
       "msg": "Caller is not ramp on router"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidSender",
       "msg": "Sender not allowed"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "InvalidSourcePoolAddress",
       "msg": "Invalid source pool address"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "InvalidToken",
       "msg": "Invalid token"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "InvalidTokenAmountConversion",
       "msg": "Invalid token amount conversion"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "RLBucketOverfilled",
       "msg": "RateLimit: bucket overfilled"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "RLMaxCapacityExceeded",
       "msg": "RateLimit: max capacity exceeded"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "RLRateLimitReached",
       "msg": "RateLimit: rate limit reached"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "RLInvalidRateLimitRate",
       "msg": "RateLimit: invalid rate limit rate"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "LiquidityNotAccepted",
       "msg": "Liquidity not accepted"
     }

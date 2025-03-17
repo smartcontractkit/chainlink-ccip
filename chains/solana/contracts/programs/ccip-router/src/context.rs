@@ -201,6 +201,29 @@ pub struct UpdateDestChainSelectorConfig<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(new_chain_selector: u64)]
+// Similar to `UpdateDestChainSelectorConfig` but with no realloc
+pub struct UpdateDestChainSelectorConfigNoRealloc<'info> {
+    #[account(
+        mut,
+        seeds = [seed::DEST_CHAIN_STATE, new_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub dest_chain_state: Account<'info, DestChain>,
+
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    #[account(mut, address = config.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct UpdateConfigCCIPRouter<'info> {
     #[account(
         mut,
@@ -393,6 +416,31 @@ pub struct CcipSend<'info> {
     )]
     pub fee_quoter_link_token_config: UncheckedAccount<'info>,
 
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = config.rmn_remote @ CcipRouterError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = config.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = config.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
+
     /// CPI signers, optional if no tokens are being transferred.
     /// CHECK: Using this to sign.
     #[account(mut, seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]
@@ -412,4 +460,76 @@ pub struct CcipSend<'info> {
     // token mint
     // ...additional accounts for pool config
     // ] x N tokens
+}
+
+#[derive(Accounts)]
+#[instruction(destination_chain_selector: u64, message: SVM2AnyMessage)]
+pub struct GetFee<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.version, MAX_CONFIG_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub config: Account<'info, Config>,
+
+    // Only used to retrieve the lane version to select the correct program version.
+    #[account(
+        seeds = [seed::DEST_CHAIN_STATE, destination_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidVersion,
+    )]
+    pub dest_chain_state: Account<'info, DestChain>,
+
+    ////////////////////
+    // fee quoter CPI //
+    ////////////////////
+    /// CHECK: This is the account for the Fee Quoter program
+    #[account(
+        address = config.fee_quoter @ CcipRouterError::InvalidVersion,
+    )]
+    pub fee_quoter: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [fee_quoter::context::seed::CONFIG],
+        bump,
+        seeds::program = config.fee_quoter,
+    )]
+    pub fee_quoter_config: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [fee_quoter::context::seed::DEST_CHAIN, destination_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        seeds::program = config.fee_quoter,
+    )]
+    pub fee_quoter_dest_chain: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+            if message.fee_token == Pubkey::default() {
+                native_mint::ID.as_ref() // pre-2022 WSOL
+            } else {
+                message.fee_token.as_ref()
+            },
+        ],
+        bump,
+        seeds::program = config.fee_quoter,
+    )]
+    pub fee_quoter_billing_token_config: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the Fee Quoter program
+    #[account(
+        seeds = [fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+            config.link_token_mint.key().as_ref(),
+        ],
+        bump,
+        seeds::program = config.fee_quoter,
+    )]
+    pub fee_quoter_link_token_config: UncheckedAccount<'info>,
+    //
+    // remaining_accounts:
+    // - First all BillingTokenConfigWrapper accounts (one per token transferred)
+    // - Then all PerChainPerTokenConfig accounts (one per token transferred)
 }

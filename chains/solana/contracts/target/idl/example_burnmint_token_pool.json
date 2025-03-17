@@ -30,6 +30,10 @@
         {
           "name": "router",
           "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
         }
       ]
     },
@@ -39,6 +43,11 @@
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -63,6 +72,11 @@
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -76,6 +90,11 @@
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -307,6 +326,11 @@
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -336,6 +360,11 @@
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -410,6 +439,21 @@
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "receiverTokenAccount",
           "isMut": true,
           "isSigner": false
@@ -458,6 +502,21 @@
         {
           "name": "poolTokenAccount",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
           "isSigner": false
         },
         {

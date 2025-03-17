@@ -29,6 +29,11 @@ jobs:
             name: "Messaging Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_batching_test.go -timeout 12m -test.parallel=2 -count=1 -json
             name: "Batching Test"
+          - cmd: cd integration-tests/smoke/ccip && go test ccip_gas_price_updates_test.go -timeout 12m -test.parallel=2 -count=1 -json
+            name: "Gas Price Updates Test"
+          # TODO: this can only run in docker for now, switch to in-memory and uncomment
+          # - cmd: cd integration-tests/smoke/ccip && go test ccip_token_price_updates_test.go -timeout 12m -test.parallel=2 -count=1 -json
+          #   name: "Token Price Updates Test"
           - cmd: cd integration-tests/smoke/ccip && go test ccip_reader_test.go -timeout 5m -test.parallel=1 -count=1 -json
             name: "CCIPReader Test"
     

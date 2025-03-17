@@ -213,6 +213,41 @@ func TestProcessor_Outcome(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:                   "deviation check disabled",
+			chainFeeWriteFrequency: *commonconfig.MustNewDuration(time.Hour),
+			feeInfo: map[cciptypes.ChainSelector]pluginconfig.FeeInfo{
+				1: {
+					ExecDeviationPPB:             cciptypes.NewBigInt(big.NewInt(1)),
+					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
+					ChainFeeDeviationDisabled:    true,
+				},
+			},
+			aos: sameObs(5, Observation{
+				FeeComponents: map[cciptypes.ChainSelector]types.ChainFeeComponents{
+					1: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
+				},
+				NativeTokenPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
+					1: cciptypes.NewBigInt(big.NewInt(2e18)), // <----------- token price increased deviation reached
+				},
+				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
+					1: {
+						Timestamp: oneMinuteAgo,
+						ChainFee: ComponentsUSDPrices{
+							ExecutionFeePriceUSD: big.NewInt(2), DataAvFeePriceUSD: big.NewInt(1),
+						},
+					},
+				},
+				FChain:       map[cciptypes.ChainSelector]int{1: 1},
+				TimestampNow: time.Now().UTC(),
+			}),
+			expectedError: false,
+			expectedOutcome: func() Outcome {
+				return Outcome{
+					GasPrices: nil,
+				}
+			},
+		},
 	}
 
 	for _, tt := range cases {

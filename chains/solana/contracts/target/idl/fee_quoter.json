@@ -24,6 +24,11 @@
           "isSigner": false
         },
         {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -45,10 +50,6 @@
         }
       ],
       "args": [
-        {
-          "name": "linkTokenMint",
-          "type": "publicKey"
-        },
         {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128"
@@ -674,6 +675,10 @@
             "type": "publicKey"
           },
           {
+            "name": "linkTokenLocalDecimals",
+            "type": "u8"
+          },
+          {
             "name": "onramp",
             "type": "publicKey"
           },
@@ -947,7 +952,7 @@
           },
           {
             "name": "juels",
-            "type": "u64"
+            "type": "u128"
           },
           {
             "name": "tokenTransferAdditionalData",
@@ -1204,6 +1209,11 @@
           "index": false
         },
         {
+          "name": "linkTokenLocalDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
           "name": "onramp",
           "type": "publicKey",
           "index": false
@@ -1372,6 +1382,26 @@
         {
           "name": "timestamp",
           "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenPriceUpdateIgnored",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
           "index": false
         }
       ]
@@ -1617,6 +1647,11 @@
     },
     {
       "code": 8036,
+      "name": "InvalidLinkDecimals",
+      "msg": "The LINK mint uses an unsupported number of decimals"
+    },
+    {
+      "code": 8037,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }

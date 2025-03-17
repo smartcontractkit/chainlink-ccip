@@ -41,6 +41,11 @@
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "offrampLookupTable",
           "isMut": false,
           "isSigner": false
@@ -236,7 +241,10 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for updating the reference addresses.",
-        "* `reference_addresses` - The new reference addresses to be set."
+        "* `router` - The router address to be set.",
+        "* `fee_quoter` - The fee_quoter address to be set.",
+        "* `offramp_lookup_table` - The offramp_lookup_table address to be set.",
+        "* `rmn_remote` - The rmn_remote address to be set."
       ],
       "accounts": [
         {
@@ -266,6 +274,10 @@
         },
         {
           "name": "offrampLookupTable",
+          "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
           "type": "publicKey"
         }
       ]
@@ -495,7 +507,9 @@
       "args": [
         {
           "name": "pluginType",
-          "type": "u8"
+          "type": {
+            "defined": "OcrPluginType"
+          }
         },
         {
           "name": "configInfo",
@@ -606,6 +620,21 @@
         },
         {
           "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
         }
@@ -730,6 +759,21 @@
         },
         {
           "name": "feeQuoterConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
         }
@@ -871,6 +915,21 @@
           "name": "tokenPoolsSigner",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -971,6 +1030,21 @@
         },
         {
           "name": "tokenPoolsSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
           "isMut": false,
           "isSigner": false
         }
@@ -1077,6 +1151,10 @@
           },
           {
             "name": "offrampLookupTable",
+            "type": "publicKey"
+          },
+          {
+            "name": "rmnRemote",
             "type": "publicKey"
           }
         ]
@@ -1315,6 +1393,22 @@
       }
     },
     {
+      "name": "ConfigOcrPluginType",
+      "docs": [
+        "It's not possible to store enums in zero_copy accounts, so we wrap the discriminant",
+        "in a struct to store in config."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "discriminant",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "ExecutionReportSingleChain",
       "docs": [
         "Report that is submitted by the execution DON at the execution phase. (including chain selector data)"
@@ -1336,15 +1430,6 @@
             "name": "offchainTokenData",
             "type": {
               "vec": "bytes"
-            }
-          },
-          {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
             }
           },
           {
@@ -1446,10 +1531,6 @@
             "type": {
               "defined": "Any2SVMRampExtraArgs"
             }
-          },
-          {
-            "name": "onRampAddress",
-            "type": "bytes"
           }
         ]
       }
@@ -1553,7 +1634,9 @@
         "fields": [
           {
             "name": "pluginType",
-            "type": "u8"
+            "type": {
+              "defined": "ConfigOcrPluginType"
+            }
           },
           {
             "name": "configInfo",
@@ -1599,6 +1682,10 @@
         "fields": [
           {
             "name": "isEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "isRmnVerificationDisabled",
             "type": "bool"
           },
           {
@@ -1800,6 +1887,11 @@
           "name": "offrampLookupTable",
           "type": "publicKey",
           "index": false
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey",
+          "index": false
         }
       ]
     },
@@ -1886,7 +1978,9 @@
       "fields": [
         {
           "name": "ocrPluginType",
-          "type": "u8",
+          "type": {
+            "defined": "OcrPluginType"
+          },
           "index": false
         },
         {
@@ -1930,7 +2024,9 @@
       "fields": [
         {
           "name": "ocrPluginType",
-          "type": "u8",
+          "type": {
+            "defined": "OcrPluginType"
+          },
           "index": false
         },
         {
@@ -1964,261 +2060,266 @@
     },
     {
       "code": 9002,
+      "name": "InvalidRMNRemoteAddress",
+      "msg": "Invalid RMN Remote Address"
+    },
+    {
+      "code": 9003,
       "name": "ExistingMerkleRoot",
       "msg": "The given Merkle Root is already committed"
     },
     {
-      "code": 9003,
+      "code": 9004,
       "name": "Unauthorized",
       "msg": "The signer is unauthorized"
     },
     {
-      "code": 9004,
+      "code": 9005,
       "name": "InvalidNonce",
       "msg": "Invalid Nonce"
     },
     {
-      "code": 9005,
+      "code": 9006,
       "name": "InvalidInputsMissingWritable",
       "msg": "Account should be writable"
     },
     {
-      "code": 9006,
+      "code": 9007,
       "name": "OnrampNotConfigured",
       "msg": "Onramp was not configured"
     },
     {
-      "code": 9007,
+      "code": 9008,
       "name": "FailedToDeserializeReport",
       "msg": "Failed to deserialize report"
     },
     {
-      "code": 9008,
+      "code": 9009,
       "name": "InvalidPluginType",
       "msg": "Invalid plugin type"
     },
     {
-      "code": 9009,
+      "code": 9010,
       "name": "InvalidVersion",
       "msg": "Invalid version of the onchain state"
     },
     {
-      "code": 9010,
+      "code": 9011,
       "name": "MissingExpectedPriceUpdates",
       "msg": "Commit report is missing expected price updates"
     },
     {
-      "code": 9011,
+      "code": 9012,
       "name": "MissingExpectedMerkleRoot",
       "msg": "Commit report is missing expected merkle root"
     },
     {
-      "code": 9012,
+      "code": 9013,
       "name": "UnexpectedMerkleRoot",
       "msg": "Commit report contains unexpected merkle root"
     },
     {
-      "code": 9013,
+      "code": 9014,
       "name": "RedundantOwnerProposal",
       "msg": "Proposed owner is the current owner"
     },
     {
-      "code": 9014,
+      "code": 9015,
       "name": "UnsupportedSourceChainSelector",
       "msg": "Source chain selector not supported"
     },
     {
-      "code": 9015,
+      "code": 9016,
       "name": "UnsupportedDestinationChainSelector",
       "msg": "Destination chain selector not supported"
     },
     {
-      "code": 9016,
+      "code": 9017,
       "name": "InvalidProof",
       "msg": "Invalid Proof for Merkle Root"
     },
     {
-      "code": 9017,
+      "code": 9018,
       "name": "InvalidMessage",
       "msg": "Invalid message format"
     },
     {
-      "code": 9018,
+      "code": 9019,
       "name": "ReachedMaxSequenceNumber",
       "msg": "Reached max sequence number"
     },
     {
-      "code": 9019,
+      "code": 9020,
       "name": "ManualExecutionNotAllowed",
       "msg": "Manual execution not allowed"
     },
     {
-      "code": 9020,
+      "code": 9021,
       "name": "InvalidInputsNumberOfAccounts",
       "msg": "Number of accounts is invalid"
     },
     {
-      "code": 9021,
+      "code": 9022,
       "name": "InvalidInputsGlobalStateAccount",
       "msg": "Invalid global state account address"
     },
     {
-      "code": 9022,
+      "code": 9023,
       "name": "InvalidInputsTokenIndices",
       "msg": "Invalid pool account account indices"
     },
     {
-      "code": 9023,
+      "code": 9024,
       "name": "InvalidInputsPoolAccounts",
       "msg": "Invalid pool accounts"
     },
     {
-      "code": 9024,
+      "code": 9025,
       "name": "InvalidInputsTokenAccounts",
       "msg": "Invalid token accounts"
     },
     {
-      "code": 9025,
+      "code": 9026,
       "name": "InvalidInputsSysvarAccount",
       "msg": "Invalid sysvar instructions account"
     },
     {
-      "code": 9026,
+      "code": 9027,
       "name": "InvalidInputsFeeQuoterAccount",
       "msg": "Invalid fee quoter account"
     },
     {
-      "code": 9027,
+      "code": 9028,
       "name": "InvalidInputsAllowedOfframpAccount",
       "msg": "Invalid offramp authorization account"
     },
     {
-      "code": 9028,
+      "code": 9029,
       "name": "InvalidInputsConfigAccounts",
       "msg": "Invalid config account"
     },
     {
-      "code": 9029,
+      "code": 9030,
       "name": "InvalidInputsTokenAdminRegistryAccounts",
       "msg": "Invalid Token Admin Registry account"
     },
     {
-      "code": 9030,
+      "code": 9031,
       "name": "InvalidInputsLookupTableAccounts",
       "msg": "Invalid LookupTable account"
     },
     {
-      "code": 9031,
+      "code": 9032,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
     },
     {
-      "code": 9032,
+      "code": 9033,
       "name": "OfframpReleaseMintBalanceMismatch",
       "msg": "Release or mint balance mismatch"
     },
     {
-      "code": 9033,
+      "code": 9034,
       "name": "OfframpInvalidDataLength",
       "msg": "Invalid data length"
     },
     {
-      "code": 9034,
+      "code": 9035,
       "name": "StaleCommitReport",
       "msg": "Stale commit report"
     },
     {
-      "code": 9035,
+      "code": 9036,
       "name": "InvalidWritabilityBitmap",
       "msg": "Invalid writability bitmap"
     },
     {
-      "code": 9036,
+      "code": 9037,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     },
     {
-      "code": 9037,
+      "code": 9038,
       "name": "Ocr3InvalidConfigFMustBePositive",
       "msg": "Invalid config: F must be positive"
     },
     {
-      "code": 9038,
+      "code": 9039,
       "name": "Ocr3InvalidConfigTooManyTransmitters",
       "msg": "Invalid config: Too many transmitters"
     },
     {
-      "code": 9039,
+      "code": 9040,
       "name": "Ocr3InvalidConfigTooManySigners",
       "msg": "Invalid config: Too many signers"
     },
     {
-      "code": 9040,
+      "code": 9041,
       "name": "Ocr3InvalidConfigFIsTooHigh",
       "msg": "Invalid config: F is too high"
     },
     {
-      "code": 9041,
+      "code": 9042,
       "name": "Ocr3InvalidConfigRepeatedOracle",
       "msg": "Invalid config: Repeated oracle address"
     },
     {
-      "code": 9042,
+      "code": 9043,
       "name": "Ocr3WrongMessageLength",
       "msg": "Wrong message length"
     },
     {
-      "code": 9043,
+      "code": 9044,
       "name": "Ocr3ConfigDigestMismatch",
       "msg": "Config digest mismatch"
     },
     {
-      "code": 9044,
+      "code": 9045,
       "name": "Ocr3WrongNumberOfSignatures",
       "msg": "Wrong number signatures"
     },
     {
-      "code": 9045,
+      "code": 9046,
       "name": "Ocr3UnauthorizedTransmitter",
       "msg": "Unauthorized transmitter"
     },
     {
-      "code": 9046,
+      "code": 9047,
       "name": "Ocr3UnauthorizedSigner",
       "msg": "Unauthorized signer"
     },
     {
-      "code": 9047,
+      "code": 9048,
       "name": "Ocr3NonUniqueSignatures",
       "msg": "Non unique signatures"
     },
     {
-      "code": 9048,
+      "code": 9049,
       "name": "Ocr3OracleCannotBeZeroAddress",
       "msg": "Oracle cannot be zero address"
     },
     {
-      "code": 9049,
+      "code": 9050,
       "name": "Ocr3StaticConfigCannotBeChanged",
       "msg": "Static config cannot be changed"
     },
     {
-      "code": 9050,
+      "code": 9051,
       "name": "Ocr3InvalidPluginType",
       "msg": "Incorrect plugin type"
     },
     {
-      "code": 9051,
+      "code": 9052,
       "name": "Ocr3InvalidSignature",
       "msg": "Invalid signature"
     },
     {
-      "code": 9052,
+      "code": 9053,
       "name": "Ocr3SignaturesOutOfRegistration",
       "msg": "Signatures out of registration"
     },
     {
-      "code": 9053,
+      "code": 9054,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
     }

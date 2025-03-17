@@ -97,6 +97,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 					op.lggr.Errorw("missing message", "seqNum", seqNum, "chain", chain)
 					continue
 				}
+				op.lggr.Debugw("truncating message", "seqNum", seqNum, "chain", chain)
 				obs.Messages[chain][seqNum] = cciptypes.Message{}
 				obs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 				// Subtract the removed message and token size
@@ -111,6 +112,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 				}
 			}
 
+			op.lggr.Debugw("truncating last commit report", "chain", chain)
 			var bytesTruncated int
 			// Reaching here means that all messages in the report are truncated, truncate the last commit
 			obs, bytesTruncated = op.truncateLastCommit(obs, chain)
@@ -118,6 +120,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 			encodedObsSize -= bytesTruncated
 
 			if len(obs.CommitReports[chain]) == 0 {
+				op.lggr.Debugw("truncating chain", "chain", chain)
 				// If the last commit report was truncated, truncate the chain
 				obs = op.truncateChain(obs, chain)
 			}

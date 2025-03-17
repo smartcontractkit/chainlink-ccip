@@ -48,6 +48,7 @@ type Plugin struct {
 	ccipReader        readerpkg.CCIPReader
 	tokenPricesReader readerpkg.PriceReader
 	reportCodec       cciptypes.CommitPluginCodec
+	reportBuilder     reportBuilderFunc
 	// Don't use this logger directly but rather through logutil\.WithContextValues where possible
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
@@ -81,6 +82,7 @@ func NewPlugin(
 	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	reporter metrics.Reporter,
+	addressCodec cciptypes.AddressCodec,
 ) *Plugin {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
@@ -124,6 +126,7 @@ func NewPlugin(
 		rmnCrypto,
 		rmnHomeReader,
 		reporter,
+		addressCodec,
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
@@ -145,6 +148,7 @@ func NewPlugin(
 		destChain,
 		reportingCfg.F,
 		oracleIDToP2pID,
+		reporter,
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(
@@ -158,6 +162,21 @@ func NewPlugin(
 		reportingCfg.F,
 		reporter,
 	)
+
+	var reportBuilder reportBuilderFunc
+
+	// These options were added to allow for more flexibility around report building. For example Solana
+	// only supports a single merkle root per report.
+	maxRoots := offchainCfg.MaxMerkleRootsPerReport
+	if !offchainCfg.RMNEnabled && maxRoots != 0 {
+		if offchainCfg.MultipleReportsEnabled {
+			reportBuilder = buildMultipleReports
+		} else {
+			reportBuilder = buildTruncatedReport
+		}
+	} else {
+		reportBuilder = buildStandardReport
+	}
 
 	return &Plugin{
 		donID:               donID,
@@ -178,6 +197,7 @@ func NewPlugin(
 		discoveryProcessor:  discoveryProcessor,
 		metricsReporter:     reporter,
 		ocrTypeCodec:        ocrtypecodec.DefaultCommitCodec,
+		reportBuilder:       reportBuilder,
 	}
 }
 

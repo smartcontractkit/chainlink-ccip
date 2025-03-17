@@ -8,7 +8,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
@@ -51,14 +50,14 @@ func TestMessageHashing(t *testing.T) {
 					Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokenAmount},
 				},
 			},
-		}, config.OnRampAddress,
+		},
 			[]solana.PublicKey{
 				solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
 				solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
 			})
 
 		require.NoError(t, err)
-		require.Equal(t, "8ceebcae8acd670231be9eb13203797bf6cb09e7a4851dd57600af3ed3945eb0", hex.EncodeToString(h))
+		require.Equal(t, "c82035cdc1d1e58606afeaf137b71de280e1e2cafdfdc621944eecccb105d730", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {

@@ -11,6 +11,8 @@ import (
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
@@ -266,7 +268,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
-	merkleOutcome := baseMerkleOutcome(params.rmnReportCfg)
+	merkleOutcome := reportEmptyMerkleRootOutcome()
 
 	testCases := []struct {
 		name                  string
@@ -321,6 +323,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					},
 					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
 					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
+					RMNSignatures:        make([]ccipocr3.RMNECDSASignature, 0),
 				},
 			},
 		},
@@ -422,6 +425,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					},
 					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
 					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
+					RMNSignatures:        make([]ccipocr3.RMNECDSASignature, 0),
 				},
 			},
 		},
@@ -465,7 +469,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 	params := defaultNodeParams(t)
-	merkleOutcome := baseMerkleOutcome(params.rmnReportCfg)
+	merkleOutcome := reportEmptyMerkleRootOutcome()
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
 	newFeeComponents, newNativePrice, packedGasPrice := newRandomFees()
@@ -572,7 +576,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
-				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
+				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
 				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
@@ -599,7 +603,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
-				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
+				MerkleRootOutcome: reportEmptyMerkleRootOutcome(),
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
@@ -633,7 +637,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
-				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
+				MerkleRootOutcome: reportEmptyMerkleRootOutcome(),
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
@@ -736,7 +740,7 @@ func prepareCcipReaderMock(
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
 	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).
-		Return(&reader2.CurseInfo{}, nil).Maybe()
+		Return(reader2.CurseInfo{}, nil).Maybe()
 	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
 		Return(sourceChainConfigs, nil).Maybe()
 
@@ -897,6 +901,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
+	mockAddrCodec := internal.NewMockAddressCodecHex(params.t)
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
@@ -913,6 +918,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		nil,
 		params.reportingCfg,
 		&metrics.Noop{},
+		mockAddrCodec,
 	)
 
 	if !params.enableDiscovery {
@@ -977,6 +983,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		InflightPriceCheckRetries:       10,
 		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
 		ChainFeeAsyncObserverDisabled:   true,
+		TokenPriceAsyncObserverDisabled: true,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}
@@ -1005,30 +1012,20 @@ var merkleRoot1 = ccipocr3.Bytes32{0x4a, 0x44, 0xdc, 0x15, 0x36, 0x42, 0x4, 0xa8
 	0x90, 0x39, 0x45, 0x5c, 0xc1, 0x60, 0x82, 0x81, 0x82, 0xf, 0xe2, 0xb2, 0x4f, 0x1e, 0x52,
 	0x33, 0xad, 0xe6, 0xaf, 0x1d, 0xd5}
 
-func baseMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
-	return merkleroot.Outcome{
-		OutcomeType:  merkleroot.ReportIntervalsSelected,
-		RMNRemoteCfg: r,
-	}
+func reportEmptyMerkleRootOutcome() merkleroot.Outcome {
+	return merkleroot.Outcome{OutcomeType: merkleroot.ReportEmpty}
 }
 
-func noReportMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
-	return merkleroot.Outcome{
-		OutcomeType:  merkleroot.ReportEmpty,
-		RMNRemoteCfg: r,
-	}
-}
-
-func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt) {
+func newRandomFees() (components types.ChainFeeComponents, nativePrice ccipocr3.BigInt, usdPrices ccipocr3.BigInt) {
 	execFee := big.NewInt(rand.RandomInt64())
 	dataAvFee := big.NewInt(rand.RandomInt64())
-	nativePrice := big.NewInt(rand.RandomInt64())
-	usdPrices := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
-		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePrice),
-		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePrice),
+	nativePriceI := big.NewInt(rand.RandomInt64())
+	usdPricesF := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
+		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePriceI),
+		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePriceI),
 	})
 
 	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee},
-		ccipocr3.NewBigInt(nativePrice),
-		ccipocr3.NewBigInt(usdPrices)
+		ccipocr3.NewBigInt(nativePriceI),
+		ccipocr3.NewBigInt(usdPricesF)
 }

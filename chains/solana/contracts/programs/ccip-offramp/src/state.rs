@@ -3,7 +3,7 @@ use std::fmt::Display;
 use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
 use anchor_lang::prelude::*;
 
-use crate::CcipOfframpError;
+use crate::{CcipOfframpError, ConfigOcrPluginType, OcrPluginType};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -23,13 +23,14 @@ pub struct Config {
     pub ocr3: [Ocr3Config; 2],
 }
 
-#[account]
+#[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct ReferenceAddresses {
     pub version: u8,
     pub router: Pubkey,
     pub fee_quoter: Pubkey,
     pub offramp_lookup_table: Pubkey,
+    pub rmn_remote: Pubkey,
 }
 
 #[zero_copy]
@@ -45,19 +46,30 @@ pub struct Ocr3ConfigInfo {
 // signers: pubkey is 20-byte address, secp256k1 curve ECDSA
 // transmitters: 32-byte pubkey, ed25519
 
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace)]
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
 pub struct Ocr3Config {
-    pub plugin_type: u8, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
+    pub plugin_type: ConfigOcrPluginType, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
     pub config_info: Ocr3ConfigInfo,
     pub signers: [[u8; 20]; 16], // v0.29.0 - anchor IDL does not build with MAX_SIGNERS
     pub transmitters: [[u8; 32]; 16], // v0.29.0 - anchor IDL does not build with MAX_TRANSMITTERS
 }
 
-impl Ocr3Config {
-    pub fn new(plugin_type: u8) -> Self {
+impl Default for Ocr3Config {
+    fn default() -> Self {
         Self {
-            plugin_type,
+            plugin_type: OcrPluginType::Commit.into(),
+            config_info: Default::default(),
+            signers: Default::default(),
+            transmitters: Default::default(),
+        }
+    }
+}
+
+impl Ocr3Config {
+    pub fn new(plugin_type: OcrPluginType) -> Self {
+        Self {
+            plugin_type: plugin_type.into(),
             ..Default::default()
         }
     }
@@ -78,6 +90,8 @@ pub struct ExternalExecutionConfig {}
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct SourceChainConfig {
     pub is_enabled: bool, // Flag whether the source chain is enabled or not
+
+    pub is_rmn_verification_disabled: bool, // Currently a placeholder.
 
     pub lane_code_version: CodeVersion, // The code version of the lane, which may override the global default code version
 
@@ -172,7 +186,7 @@ pub enum MessageExecutionState {
     Untouched = 0,
     InProgress = 1, // Not used in SVM, but used in EVM
     Success = 2,
-    Failure = 3,
+    Failure = 3, // Not used in SVM, but used in EVM
 }
 
 impl TryFrom<u128> for MessageExecutionState {

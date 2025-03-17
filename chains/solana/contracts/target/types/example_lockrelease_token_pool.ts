@@ -30,6 +30,10 @@ export type ExampleLockreleaseTokenPool = {
         {
           "name": "router",
           "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
         }
       ]
     },
@@ -39,6 +43,11 @@ export type ExampleLockreleaseTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -63,6 +72,11 @@ export type ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -76,6 +90,11 @@ export type ExampleLockreleaseTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -307,6 +326,11 @@ export type ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -336,6 +360,11 @@ export type ExampleLockreleaseTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -410,6 +439,21 @@ export type ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "receiverTokenAccount",
           "isMut": true,
           "isSigner": false
@@ -461,6 +505,21 @@ export type ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "chainConfig",
           "isMut": true,
           "isSigner": false
@@ -487,6 +546,11 @@ export type ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -505,6 +569,11 @@ export type ExampleLockreleaseTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -681,6 +750,10 @@ export const IDL: ExampleLockreleaseTokenPool = {
         {
           "name": "router",
           "type": "publicKey"
+        },
+        {
+          "name": "rmnRemote",
+          "type": "publicKey"
         }
       ]
     },
@@ -690,6 +763,11 @@ export const IDL: ExampleLockreleaseTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -714,6 +792,11 @@ export const IDL: ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -727,6 +810,11 @@ export const IDL: ExampleLockreleaseTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -958,6 +1046,11 @@ export const IDL: ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -987,6 +1080,11 @@ export const IDL: ExampleLockreleaseTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1061,6 +1159,21 @@ export const IDL: ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "receiverTokenAccount",
           "isMut": true,
           "isSigner": false
@@ -1112,6 +1225,21 @@ export const IDL: ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "rmnRemote",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteCurses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rmnRemoteConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "chainConfig",
           "isMut": true,
           "isSigner": false
@@ -1138,6 +1266,11 @@ export const IDL: ExampleLockreleaseTokenPool = {
           "isSigner": false
         },
         {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -1156,6 +1289,11 @@ export const IDL: ExampleLockreleaseTokenPool = {
         {
           "name": "state",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {

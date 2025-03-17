@@ -8,6 +8,15 @@ use solana_program::{
 
 declare_id!("CcipSender111111111111111111111111111111111");
 
+#[cfg(target_os = "solana")]
+#[global_allocator]
+static ALLOC: smalloc::Smalloc<
+    { solana_program::entrypoint::HEAP_START_ADDRESS as usize },
+    { solana_program::entrypoint::HEAP_LENGTH as usize },
+    16,
+    1024,
+> = smalloc::Smalloc::new();
+
 pub mod context;
 use context::*;
 
@@ -156,6 +165,9 @@ pub mod example_ccip_sender {
             ctx.accounts
                 .ccip_fee_quoter_link_token_config
                 .to_account_info(),
+            ctx.accounts.ccip_rmn_remote.to_account_info(),
+            ctx.accounts.ccip_rmn_remote_curses.to_account_info(),
+            ctx.accounts.ccip_rmn_remote_config.to_account_info(),
             ctx.accounts.ccip_token_pools_signer.to_account_info(),
         ]
         .to_vec();

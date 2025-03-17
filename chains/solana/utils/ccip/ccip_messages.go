@@ -75,7 +75,7 @@ func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, remainin
 	}
 	msg := CreateDefaultMessageWith(config.EvmChainSelector, nextSeq)
 
-	hash, err := HashAnyToSVMMessage(msg, config.OnRampAddress, remainingAccounts)
+	hash, err := HashAnyToSVMMessage(msg, remainingAccounts)
 	return msg, [32]byte(hash), err
 }
 
@@ -104,7 +104,6 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 			ComputeUnits:     1000,
 			IsWritableBitmap: GenerateBitMapForIndexes([]int{0, 1}),
 		},
-		OnRampAddress: config.OnRampAddress,
 	}
 	return message
 }
@@ -117,12 +116,12 @@ func MakeAnyToSVMMessage(tokenReceiver solana.PublicKey, chainSelector uint64, s
 	msg.TokenReceiver = tokenReceiver
 	msg.Data = data
 
-	hash, err := HashAnyToSVMMessage(msg, config.OnRampAddress, msgAccounts)
+	hash, err := HashAnyToSVMMessage(msg, msgAccounts)
 	msg.Header.MessageId = [32]byte(hash)
 	return msg, msg.Header.MessageId, err
 }
 
-func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, onRampAddress []byte, msgAccounts []solana.PublicKey) ([]byte, error) {
+func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, msgAccounts []solana.PublicKey) ([]byte, error) {
 	hash := sha3.NewLegacyKeccak256()
 
 	hash.Write(leafDomainSeparator[:])
@@ -132,13 +131,6 @@ func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, onRampAddress []by
 		return nil, err
 	}
 	if err := binary.Write(hash, binary.BigEndian, msg.Header.DestChainSelector); err != nil {
-		return nil, err
-	}
-	// Push OnRamp Size to ensure that the hash is unique
-	if _, err := hash.Write([]byte{uint8(len(onRampAddress))}); err != nil { //nolint:gosec
-		return nil, err
-	}
-	if _, err := hash.Write(onRampAddress); err != nil {
 		return nil, err
 	}
 	if _, err := hash.Write(msg.Header.MessageId[:]); err != nil {
@@ -161,7 +153,7 @@ func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, onRampAddress []by
 		return nil, err
 	}
 	// Push Sender Size to ensure that the hash is unique
-	if _, err := hash.Write([]byte{uint8(len(msg.Sender))}); err != nil { //nolint:gosec
+	if err := binary.Write(hash, binary.BigEndian, uint16(len(msg.Sender))); err != nil { //nolint:gosec
 		return nil, err
 	}
 	if _, err := hash.Write(msg.Sender); err != nil {

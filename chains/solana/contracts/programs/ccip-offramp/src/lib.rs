@@ -35,14 +35,14 @@ pub mod ccip_offramp {
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts
-            .reference_addresses
-            .set_inner(ReferenceAddresses {
-                version: 1,
-                router: ctx.accounts.router.key(),
-                fee_quoter: ctx.accounts.fee_quoter.key(),
-                offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
-            });
+        let mut reference_addresses = ctx.accounts.reference_addresses.load_init()?;
+        *reference_addresses = ReferenceAddresses {
+            version: 1,
+            router: ctx.accounts.router.key(),
+            fee_quoter: ctx.accounts.fee_quoter.key(),
+            rmn_remote: ctx.accounts.rmn_remote.key(),
+            offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
+        };
 
         ctx.accounts.state.latest_price_sequence_number = 0;
 
@@ -50,6 +50,7 @@ pub mod ccip_offramp {
             router: ctx.accounts.router.key(),
             fee_quoter: ctx.accounts.fee_quoter.key(),
             offramp_lookup_table: ctx.accounts.offramp_lookup_table.key(),
+            rmn_remote: ctx.accounts.rmn_remote.key(),
         });
 
         Ok(())
@@ -78,8 +79,8 @@ pub mod ccip_offramp {
         config.enable_manual_execution_after = enable_execution_after;
         config.owner = ctx.accounts.authority.key();
         config.ocr3 = [
-            Ocr3Config::new(OcrPluginType::Commit as u8),
-            Ocr3Config::new(OcrPluginType::Execution as u8),
+            Ocr3Config::new(OcrPluginType::Commit),
+            Ocr3Config::new(OcrPluginType::Execution),
         ];
 
         emit!(ConfigSet {
@@ -165,12 +166,16 @@ pub mod ccip_offramp {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for updating the reference addresses.
-    /// * `reference_addresses` - The new reference addresses to be set.
+    /// * `router` - The router address to be set.
+    /// * `fee_quoter` - The fee_quoter address to be set.
+    /// * `offramp_lookup_table` - The offramp_lookup_table address to be set.
+    /// * `rmn_remote` - The rmn_remote address to be set.
     pub fn update_reference_addresses(
         ctx: Context<UpdateReferenceAddresses>,
         router: Pubkey,
         fee_quoter: Pubkey,
         offramp_lookup_table: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         let default_code_version: CodeVersion = ctx
             .accounts
@@ -184,6 +189,7 @@ pub mod ccip_offramp {
             router,
             fee_quoter,
             offramp_lookup_table,
+            rmn_remote,
         )
     }
 
@@ -321,7 +327,7 @@ pub mod ccip_offramp {
     /// * `transmitters` - The list of transmitters.
     pub fn set_ocr_config(
         ctx: Context<SetOcrConfig>,
-        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
+        plugin_type: OcrPluginType,
         config_info: Ocr3ConfigInfo,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
@@ -525,6 +531,8 @@ pub enum CcipOfframpError {
     InvalidSequenceInterval = 3000,
     #[msg("The given Merkle Root is missing")]
     RootNotCommitted,
+    #[msg("Invalid RMN Remote Address")]
+    InvalidRMNRemoteAddress,
     #[msg("The given Merkle Root is already committed")]
     ExistingMerkleRoot,
     #[msg("The signer is unauthorized")]

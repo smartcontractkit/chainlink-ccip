@@ -31,7 +31,7 @@ pub struct TokenTransferAdditionalData {
 pub struct GetFeeResult {
     pub token: Pubkey,
     pub amount: u64,
-    pub juels: u64,
+    pub juels: u128,
     pub token_transfer_additional_data: Vec<TokenTransferAdditionalData>,
     pub processed_extra_args: ProcessedExtraArgs,
 }

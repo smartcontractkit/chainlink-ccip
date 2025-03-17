@@ -68,20 +68,21 @@ impl Admin for Impl {
         router: Pubkey,
         fee_quoter: Pubkey,
         offramp_lookup_table: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
-        ctx.accounts
-            .reference_addresses
-            .set_inner(ReferenceAddresses {
-                version: 1,
-                router,
-                fee_quoter,
-                offramp_lookup_table,
-            });
+        *ctx.accounts.reference_addresses.load_mut()? = ReferenceAddresses {
+            version: 1,
+            router,
+            fee_quoter,
+            offramp_lookup_table,
+            rmn_remote,
+        };
 
         emit!(ReferenceAddressesSet {
-            router: ctx.accounts.reference_addresses.router,
-            fee_quoter: ctx.accounts.reference_addresses.fee_quoter,
-            offramp_lookup_table: ctx.accounts.reference_addresses.offramp_lookup_table,
+            router,
+            fee_quoter,
+            offramp_lookup_table,
+            rmn_remote
         });
 
         Ok(())
@@ -182,15 +183,14 @@ impl Admin for Impl {
     fn set_ocr_config(
         &self,
         ctx: Context<SetOcrConfig>,
-        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
+        plugin_type: OcrPluginType,
         config_info: Ocr3ConfigInfo,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
-        require!(plugin_type < 2, CcipOfframpError::InvalidPluginType);
         let mut config = ctx.accounts.config.load_mut()?;
 
-        let is_commit = plugin_type == OcrPluginType::Commit as u8;
+        let is_commit = plugin_type == OcrPluginType::Commit;
 
         ocr3_set(
             &mut config.ocr3[plugin_type as usize],

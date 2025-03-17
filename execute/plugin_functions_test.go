@@ -79,9 +79,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 
 func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
-		name         string
-		observedData map[cciptypes.ChainSelector][]exectypes.CommitData
-		expErr       bool
+		name            string
+		observedData    map[cciptypes.ChainSelector][]exectypes.CommitData
+		supportedChains mapset.Set[cciptypes.ChainSelector]
+		expErr          bool
 	}{
 		{
 			name: "ValidData",
@@ -101,6 +102,28 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 					},
 				},
 			},
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+		},
+		{
+			name: "UnsupportedChain",
+			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
+				1: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.SeqNumRange{1, 3},
+						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
+					},
+				},
+				2: {
+					{
+						MerkleRoot:          cciptypes.Bytes32{2},
+						SequenceNumberRange: cciptypes.SeqNumRange{11, 15},
+						ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
+					},
+				},
+			},
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1)), // <-- 2 is missing
+			expErr:          true,
 		},
 		{
 			name: "DuplicateMerkleRoot",
@@ -118,7 +141,8 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 					},
 				},
 			},
-			expErr: true,
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+			expErr:          true,
 		},
 		{
 			name: "OverlappingSequenceNumberRange",
@@ -136,7 +160,8 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 					},
 				},
 			},
-			expErr: true,
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+			expErr:          true,
 		},
 		{
 			name: "ExecutedMessageOutsideObservedRange",
@@ -149,23 +174,26 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 					},
 				},
 			},
-			expErr: true,
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
+			expErr:          true,
 		},
 		{
 			name: "NoCommitData",
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
 				1: {},
 			},
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
 		},
 		{
-			name:         "EmptyObservedData",
-			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{},
+			name:            "EmptyObservedData",
+			observedData:    map[cciptypes.ChainSelector][]exectypes.CommitData{},
+			supportedChains: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedSequenceNumbers(tc.observedData)
+			err := validateObservedSequenceNumbers(tc.supportedChains, tc.observedData)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -187,6 +215,7 @@ func Test_validateMessagesConformToCommitReports(t *testing.T) {
 			observedData: map[cciptypes.ChainSelector][]exectypes.CommitData{
 				1: {},
 			},
+			expErr: true,
 		},
 		{
 			name:         "EmptyObservedData",
@@ -1457,7 +1486,7 @@ func Test_validateCommitReportsReadingEligibility(t *testing.T) {
 					{SourceChain: 2},
 				},
 			},
-			expErr: "observer not allowed to read from chain 2",
+			expErr: "invalid observed data, key=1 but data chain=2",
 		},
 	}
 

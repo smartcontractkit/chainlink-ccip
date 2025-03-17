@@ -186,7 +186,7 @@ impl TokenAdminRegistry for Impl {
                     fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
                     token_mint.as_ref(),
                 ],
-                &fee_quoter::ID,
+                &ctx.accounts.config.fee_quoter,
             );
 
             let min_accounts = [

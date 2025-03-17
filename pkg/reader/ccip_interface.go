@@ -34,6 +34,7 @@ type ChainConfigSnapshot struct {
 	FeeQuoter FeeQuoterConfig
 	OnRamp    OnRampConfig
 	Router    RouterConfig
+	CurseInfo CurseInfo
 }
 
 type OnRampConfig struct {
@@ -160,6 +161,7 @@ type CCIPReader interface {
 		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
+	// WARNING: This function will fail if the oracle does not support the requested chain.
 	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
 
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
@@ -196,7 +198,7 @@ type CCIPReader interface {
 
 	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
-	GetRmnCurseInfo(ctx context.Context) (*CurseInfo, error)
+	GetRmnCurseInfo(ctx context.Context) (CurseInfo, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

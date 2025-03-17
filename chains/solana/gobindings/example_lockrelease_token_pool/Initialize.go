@@ -12,7 +12,8 @@ import (
 
 // Initialize is the `initialize` instruction.
 type Initialize struct {
-	Router *ag_solanago.PublicKey
+	Router    *ag_solanago.PublicKey
+	RmnRemote *ag_solanago.PublicKey
 
 	// [0] = [WRITE] state
 	//
@@ -35,6 +36,12 @@ func NewInitializeInstructionBuilder() *Initialize {
 // SetRouter sets the "router" parameter.
 func (inst *Initialize) SetRouter(router ag_solanago.PublicKey) *Initialize {
 	inst.Router = &router
+	return inst
+}
+
+// SetRmnRemote sets the "rmnRemote" parameter.
+func (inst *Initialize) SetRmnRemote(rmnRemote ag_solanago.PublicKey) *Initialize {
+	inst.RmnRemote = &rmnRemote
 	return inst
 }
 
@@ -105,6 +112,9 @@ func (inst *Initialize) Validate() error {
 		if inst.Router == nil {
 			return errors.New("Router parameter is not set")
 		}
+		if inst.RmnRemote == nil {
+			return errors.New("RmnRemote parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -134,8 +144,9 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Router", *inst.Router))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("   Router", *inst.Router))
+						paramsBranch.Child(ag_format.Param("RmnRemote", *inst.RmnRemote))
 					})
 
 					// Accounts of the instruction:
@@ -155,11 +166,21 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Router`:
 	err = decoder.Decode(&obj.Router)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -170,6 +191,7 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 func NewInitializeInstruction(
 	// Parameters:
 	router ag_solanago.PublicKey,
+	rmnRemote ag_solanago.PublicKey,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	mint ag_solanago.PublicKey,
@@ -177,6 +199,7 @@ func NewInitializeInstruction(
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetRouter(router).
+		SetRmnRemote(rmnRemote).
 		SetStateAccount(state).
 		SetMintAccount(mint).
 		SetAuthorityAccount(authority).

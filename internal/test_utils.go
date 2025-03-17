@@ -2,11 +2,16 @@ package internal
 
 import (
 	"crypto/rand"
+	"encoding/hex"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -49,4 +54,22 @@ func CounterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.Histogr
 	require.NoError(t, err)
 
 	return int(pb.GetHistogram().GetSampleCount())
+}
+
+// NewMockAddressCodecHex returns a mock address codec that hex-encodes and decodes addresses.
+func NewMockAddressCodecHex(t *testing.T) *ccipocr3.MockAddressCodec {
+	mockAddrCodec := ccipocr3.NewMockAddressCodec(t)
+	mockAddrCodec.On("AddressBytesToString", mock.Anything, mock.Anything).
+		Return(func(addr cciptypes.UnknownAddress, _ cciptypes.ChainSelector) string {
+			return "0x" + hex.EncodeToString(addr)
+		}, nil).Maybe()
+	mockAddrCodec.On("AddressStringToBytes", mock.Anything, mock.Anything).
+		Return(func(addr string, _ cciptypes.ChainSelector) (cciptypes.UnknownAddress, error) {
+			addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
+			if err != nil {
+				return nil, err
+			}
+			return addrBytes, nil
+		}).Maybe()
+	return mockAddrCodec
 }

@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -116,16 +115,19 @@ func (p *Plugin) Observation(
 
 	p.observer.TrackObservation(observation, state)
 	lggr.Infow("execute plugin got observation", "observation", observation,
-		"duration", time.Since(tStart), "state", state)
+		"duration", time.Since(tStart),
+		"state", state,
+		"numCommitReports", len(observation.CommitReports),
+		"numMessages", observation.Messages.Count())
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
-func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.CurseInfo, error) {
+func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (reader.CurseInfo, error) {
 	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
 		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
-		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
 	}
 
 	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx)
@@ -134,7 +136,7 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 			"err", err,
 			"sourceChains", allSourceChains,
 		)
-		return nil, fmt.Errorf("nothing to observe: rmn read error: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("nothing to observe: rmn read error: %w", err)
 	}
 
 	return curseInfo, nil
@@ -165,9 +167,10 @@ func (p *Plugin) getCommitReportsObservation(
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// TODO: set fetchFrom to the oldest pending commit report.
-	// TODO: or, cache commit reports so that we don't need to fetch them again.
-	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
+	// Get the optimized timestamp using the cache
+	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
+
+	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 	//          a valid execution report.
@@ -195,7 +198,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingExecutedReports(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingReportsForExecution(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
@@ -231,10 +234,40 @@ func (p *Plugin) getCommitReportsObservation(
 		}
 	}
 
+	// Update the earliest unexecuted root based on remaining reports
+	p.commitRootsCache.UpdateEarliestUnexecutedRoot(buildCombinedReports(groupedCommits, fullyExecutedUnfinalized))
+
 	observation.CommitReports = groupedCommits
 
 	// TODO: truncate grouped to a maximum observation size?
 	return observation, nil
+}
+
+// buildCombinedReports creates a combined map for updating the earliest unexecuted root
+func buildCombinedReports(
+	groupedCommits map[cciptypes.ChainSelector][]exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
+) map[cciptypes.ChainSelector][]exectypes.CommitData {
+	combinedReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
+
+	// Add all unexecuted commits
+	for chain, commits := range groupedCommits {
+		combinedReports[chain] = append(combinedReports[chain], commits...)
+	}
+
+	// Add all unfinalized executions
+	for _, commit := range fullyExecutedUnfinalized {
+		combinedReports[commit.SourceChain] = append(
+			combinedReports[commit.SourceChain],
+			exectypes.CommitData{
+				Timestamp:   commit.Timestamp,
+				SourceChain: commit.SourceChain,
+				MerkleRoot:  commit.MerkleRoot,
+			},
+		)
+	}
+
+	return combinedReports
 }
 
 // regroup converts the previous outcome to the observation format.
@@ -382,7 +415,12 @@ func (p *Plugin) getFilterObservation(
 		}
 
 		for _, msg := range commitReport.Messages {
-			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(commitReport.SourceChain))
+			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], commitReport.SourceChain)
+			if err != nil {
+				lggr.Errorw("unable to convert sender address to string", "err", err, "sender address", msg.Sender)
+				continue
+			}
+
 			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
 		}
 	}
@@ -390,7 +428,7 @@ func (p *Plugin) getFilterObservation(
 	// Read args from chain.
 	nonceObservations := make(exectypes.NonceObservations)
 	for srcChain, addrSet := range nonceRequestArgs {
-		// TODO: check if srcSelector is supported.
+		// TODO: check if srcSelectors is supported.
 		addrs := maps.Keys(addrSet)
 		nonces, err := p.ccipReader.Nonces(ctx, srcChain, addrs)
 		if err != nil {

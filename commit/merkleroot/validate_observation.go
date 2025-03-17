@@ -76,7 +76,7 @@ func validateObservedMerkleRoots(
 			return fmt.Errorf("%s invalid: chain already appears in another observed root", root)
 		}
 
-		if len(root.OnRampAddress) == 0 {
+		if root.OnRampAddress.IsZeroOrEmpty() {
 			return fmt.Errorf("%s invalid: empty OnRampAddress", root)
 		}
 
@@ -121,10 +121,6 @@ func validateObservedOnRampMaxSeqNums(
 
 		if seenChains.Contains(seqNumChain.ChainSel) {
 			return fmt.Errorf("duplicate onRampMaxSeqNum for chain %d", seqNumChain.ChainSel)
-		}
-
-		if seqNumChain.ChainSel == 0 {
-			return fmt.Errorf("onRampMaxSeqNum for chain %d has chain selector 0", seqNumChain.ChainSel)
 		}
 
 		seenChains.Add(seqNumChain.ChainSel)
@@ -192,8 +188,8 @@ func validateRMNRemoteConfig(
 		return fmt.Errorf("not enough signers to cover F+1 threshold")
 	}
 
-	if len(rmnRemoteConfig.ContractAddress) == 0 {
-		return fmt.Errorf("empty ContractAddress")
+	if rmnRemoteConfig.ContractAddress.IsZeroOrEmpty() {
+		return fmt.Errorf("empty ContractAddress: %s", rmnRemoteConfig.ContractAddress)
 	}
 
 	seenNodeIndexes := mapset.NewSet[uint64]()

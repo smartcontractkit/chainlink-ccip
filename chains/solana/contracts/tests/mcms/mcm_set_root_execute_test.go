@@ -346,7 +346,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				},
 			)
 			require.NoError(t, rvErr)
-			signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil)
+			signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil, admin.PublicKey())
 
 			t.Run("preload signatures", func(t *testing.T) {
 				signers, getSignerErr := eth.GetEvmSigners(signerPrivateKeys)
@@ -370,7 +370,13 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, isErr)
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSigsIx}, admin, config.DefaultCommitment)
 
-				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				// append signature hijacking scenario
+				invalidAppendSigsIxs, iaserr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, user.PublicKey(), config.MaxAppendSignatureBatchSize)
+				require.NoError(t, iaserr)
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidAppendSigsIxs[0]}, user, config.DefaultCommitment, []string{"AnchorError caused by account: signatures. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized"})
+
+				// now try with valid authority
+				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, asErr)
 
 				// partially register signatures
@@ -392,7 +398,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				testutils.AssertClosedAccount(ctx, t, solanaGoClient, signaturesPDA, config.DefaultCommitment)
 
 				// preload again
-				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 
 				for _, ix := range preloadIxs {
@@ -411,6 +417,45 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					require.Equal(t, signatures[i], sig)
 				}
 			})
+
+			// legitimate root_signatures PDA but wrong authority
+			invalidIx1, ivsrerr := mcm.NewSetRootInstruction(
+				testMsigID,
+				rootValidationData.Root,
+				validUntil,
+				rootValidationData.Metadata,
+				rootValidationData.MetadataProof,
+				signaturesPDA, // legitimate root_signatures PDA address, but with wrong authority -> seed constraint violation
+				rootMetadataPDA,
+				mcms.GetSeenSignedHashesPDA(testMsigID, rootValidationData.Root, validUntil),
+				expiringRootAndOpCountPDA,
+				multisigConfigPDA,
+				user.PublicKey(), // invalid signer
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, ivsrerr)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidIx1}, user, config.DefaultCommitment, []string{"Error Code: ConstraintSeeds. Error Number: 2006. Error Message: A seeds constraint was violated."})
+
+			// root_signatures PDA with matching authority, but not the same authority with preloading instructions
+			// so in this case, the root_signatures PDA is not initialized
+			invalidIx2, ivsrerr := mcm.NewSetRootInstruction(
+				testMsigID,
+				rootValidationData.Root,
+				validUntil,
+				rootValidationData.Metadata,
+				rootValidationData.MetadataProof,
+				mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil, user.PublicKey()),
+				rootMetadataPDA,
+				mcms.GetSeenSignedHashesPDA(testMsigID, rootValidationData.Root, validUntil),
+				expiringRootAndOpCountPDA,
+				multisigConfigPDA,
+				user.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, ivsrerr)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidIx2}, user, config.DefaultCommitment, []string{"AnchorError caused by account: root_signatures. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized"})
 
 			newIx, setRootIxErr := mcm.NewSetRootInstruction(
 				testMsigID,
@@ -605,7 +650,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					},
 				)
 				require.NoError(t, rvErr)
-				signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil)
+				signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil, admin.PublicKey())
 
 				t.Run("preload signatures", func(t *testing.T) {
 					signers, getSignerErr := eth.GetEvmSigners(config.SignerPrivateKeys)
@@ -614,7 +659,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					signatures, sigsErr := mcms.BulkSignOnMsgHash(signers, rootValidationData.EthMsgHash)
 					require.NoError(t, sigsErr)
 
-					preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+					preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 					require.NoError(t, plerr)
 
 					for _, ix := range preloadIxs {
@@ -1045,7 +1090,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					},
 				)
 				require.NoError(t, rvErr)
-				signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil)
+				signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil, admin.PublicKey())
 
 				signers, getSignerErr := eth.GetEvmSigners(config.SignerPrivateKeys)
 				require.NoError(t, getSignerErr)
@@ -1069,7 +1114,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, err)
 				txs = append(txs, TxWithStage{Instructions: []solana.Instruction{initSigsIx}, Stage: InitSignatures})
 
-				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, asErr)
 
 				// one tx is enough since we only have 5 signers

@@ -249,6 +249,11 @@ func (p *processor) getGasPricesToUpdate(
 			continue
 		}
 
+		if ci.ChainFeeDeviationDisabled {
+			lggr.Debugw("chain fee deviation disabled", "chain", chain)
+			continue
+		}
+
 		executionFeeDeviates := mathslib.Deviates(
 			currentChainFee.ExecutionFeePriceUSD,
 			lastUpdate.ChainFee.ExecutionFeePriceUSD,

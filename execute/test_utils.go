@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -33,7 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	cciptypesmocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -48,8 +50,8 @@ type IntTest struct {
 	lggr  logger.Logger
 	donID uint32
 
-	srcSelector cciptypes.ChainSelector
-	dstSelector cciptypes.ChainSelector
+	srcSelectors []cciptypes.ChainSelector
+	dstSelector  cciptypes.ChainSelector
 
 	msgHasher           cciptypes.MessageHasher
 	ccipReader          *inmem.InMemoryCCIPReader
@@ -58,16 +60,24 @@ type IntTest struct {
 	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
 }
 
-func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
+func SetupSimpleTest(t *testing.T,
+	lggr logger.Logger,
+	srcSelectors []cciptypes.ChainSelector,
+	dstSelector cciptypes.ChainSelector,
+) *IntTest {
 	donID := uint32(1)
 
+	messagesMap := make(map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata)
+
+	for _, src := range srcSelectors {
+		messagesMap[src] = []inmem.MessagesWithMetadata{}
+
+	}
 	msgHasher := mocks.NewMessageHasher()
 	ccipReader := inmem.InMemoryCCIPReader{
-		Reports: []plugintypes2.CommitPluginReportWithMeta{},
-		Messages: map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata{
-			srcSelector: {},
-		},
-		Dest: dstSelector,
+		Reports:  []plugintypes2.CommitPluginReportWithMeta{},
+		Messages: messagesMap,
+		Dest:     dstSelector,
 	}
 
 	return &IntTest{
@@ -75,7 +85,7 @@ func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelector, dstSelector 
 		lggr:                lggr,
 		donID:               donID,
 		msgHasher:           msgHasher,
-		srcSelector:         srcSelector,
+		srcSelectors:        srcSelectors,
 		dstSelector:         dstSelector,
 		ccipReader:          &ccipReader,
 		tokenObserverConfig: []pluginconfig.TokenDataObserverConfig{},
@@ -87,7 +97,8 @@ func (it *IntTest) WithMessages(
 	messages []inmem.MessagesWithMetadata,
 	crBlockNumber uint64,
 	crTimestamp time.Time,
-	numReports int) {
+	numReports int,
+	srcSelector cciptypes.ChainSelector) {
 	mapped := slicelib.Map(messages,
 		func(m inmem.MessagesWithMetadata) cciptypes.Message {
 			return m.Message
@@ -111,7 +122,7 @@ func (it *IntTest) WithMessages(
 			hashes[i] = hash
 		}
 		reportData := exectypes.CommitData{
-			SourceChain: it.srcSelector,
+			SourceChain: srcSelector,
 			SequenceNumberRange: cciptypes.NewSeqNumRange(
 				mapped[startIndex].Header.SequenceNumber,
 				mapped[endIndex-1].Header.SequenceNumber,
@@ -119,6 +130,7 @@ func (it *IntTest) WithMessages(
 			Messages:         msgs,
 			Hashes:           hashes,
 			MessageTokenData: make([]exectypes.MessageTokenData, len(msgs)),
+			Timestamp:        crTimestamp,
 		}
 
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
@@ -139,8 +151,8 @@ func (it *IntTest) WithMessages(
 		})
 	}
 
-	it.ccipReader.Messages[it.srcSelector] = append(
-		it.ccipReader.Messages[it.srcSelector],
+	it.ccipReader.Messages[srcSelector] = append(
+		it.ccipReader.Messages[srcSelector],
 		messages...,
 	)
 }
@@ -149,6 +161,7 @@ func (it *IntTest) WithUSDC(
 	sourcePoolAddress string,
 	attestations map[string]string,
 	events []*readerpkg.MessageSentEvent,
+	srcSelector cciptypes.ChainSelector,
 ) {
 	it.server = newConfigurableAttestationServer(attestations)
 	it.tokenObserverConfig = []pluginconfig.TokenDataObserverConfig{
@@ -157,7 +170,7 @@ func (it *IntTest) WithUSDC(
 			Version: "1",
 			USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
 				Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-					it.srcSelector: {
+					srcSelector: {
 						SourcePoolAddress:            sourcePoolAddress,
 						SourceMessageTransmitterAddr: sourcePoolAddress,
 					},
@@ -185,7 +198,7 @@ func (it *IntTest) WithUSDC(
 	).Return(usdcEvents, nil).Maybe()
 
 	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-		it.srcSelector: r,
+		srcSelector:    r,
 		it.dstSelector: r,
 	}
 }
@@ -197,15 +210,6 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
-			ChainSelector: it.srcSelector,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
-			},
-		}, {
 			ChainSelector: it.dstSelector,
 			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
@@ -216,12 +220,25 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 			},
 		},
 	}
+	// Add config for all srcSelectors
+	for _, src := range it.srcSelectors {
+		chainConfigInfos = append(chainConfigInfos, reader.ChainConfigInfo{
+			ChainSelector: src,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
+			},
+		})
+	}
 
 	homeChain := setupHomeChainPoller(it.t, it.lggr, chainConfigInfos)
 	ctx := tests.Context(it.t)
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
-
+	mockAddrCodec := internal.NewMockAddressCodecHex(it.t)
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
 		it.lggr,
@@ -229,18 +246,19 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		it.tokenObserverConfig,
 		testhelpers.TokenDataEncoderInstance,
 		it.tokenChainReader,
+		mockAddrCodec,
 	)
 	require.NoError(it.t, err)
 
-	ep := gasmock.NewMockEstimateProvider(it.t)
+	ep := cciptypesmocks.NewMockEstimateProvider(it.t)
 	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -273,6 +291,7 @@ func (it *IntTest) newNode(
 	id int,
 	N int,
 	configDigest [32]byte,
+	mockCodec *cciptypesmocks.MockAddressCodec,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
 	rCfg := ocr3types.ReportingPluginConfig{
@@ -282,7 +301,6 @@ func (it *IntTest) newNode(
 	}
 
 	it.ccipReader.ConfigDigest = configDigest
-
 	node1 := NewPlugin(
 		it.donID,
 		rCfg,
@@ -297,6 +315,7 @@ func (it *IntTest) newNode(
 		ep,
 		it.lggr,
 		&metrics.Noop{},
+		mockCodec,
 	)
 
 	// FIXME: Test should not rely on the specific type of the plugin but rather than that on

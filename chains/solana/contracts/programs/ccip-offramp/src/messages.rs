@@ -10,7 +10,6 @@ pub struct ExecutionReportSingleChain {
     pub source_chain_selector: u64,
     pub message: Any2SVMRampMessage,
     pub offchain_token_data: Vec<Vec<u8>>, // https://github.com/smartcontractkit/chainlink/blob/885baff9479e935e0fc34d9f52214a32c158eac5/contracts/src/v0.8/ccip/libraries/Internal.sol#L72
-    pub root: [u8; 32],
     pub proofs: Vec<[u8; 32]>,
 }
 
@@ -60,7 +59,6 @@ pub struct Any2SVMRampMessage {
     pub token_receiver: Pubkey,
     pub token_amounts: Vec<Any2SVMTokenTransfer>,
     pub extra_args: Any2SVMRampExtraArgs,
-    pub on_ramp_address: Vec<u8>,
 }
 
 impl Any2SVMRampMessage {
@@ -73,7 +71,6 @@ impl Any2SVMRampMessage {
         + 32 // token receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
-        + 4 + self.on_ramp_address.len() // on_ramp_address
     }
 }
 

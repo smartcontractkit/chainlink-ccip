@@ -34,7 +34,8 @@ func validateCommitReportsReadingEligibility(
 		}
 		for _, data := range observedData[chainSel] {
 			if data.SourceChain != chainSel {
-				return fmt.Errorf("observer not allowed to read from chain %d", data.SourceChain)
+				return fmt.Errorf("invalid observed data, key=%d but data chain=%d",
+					chainSel, data.SourceChain)
 			}
 		}
 	}
@@ -101,14 +102,23 @@ func validateHashesExist(
 	}
 
 	for chain, msgs := range observedMsgs {
-		_, ok := hashes[chain]
+		hashesForChain, ok := hashes[chain]
 		if !ok {
 			return fmt.Errorf("hash not found for chain %d", chain)
 		}
 
+		if len(msgs) != len(hashesForChain) {
+			return fmt.Errorf("unexpected number of message hashes for chain %d: expected %d, got %d",
+				chain, len(msgs), len(hashesForChain))
+		}
+
 		for seq, msg := range msgs {
-			if _, ok := hashes[chain][seq]; !ok {
+			h, exists := hashes[chain][seq]
+			if !exists {
 				return fmt.Errorf("hash not found for message %s", msg)
+			}
+			if h.IsEmpty() {
+				return fmt.Errorf("hash is empty for message %s", msg)
 			}
 		}
 	}
@@ -123,6 +133,11 @@ func validateMessagesConformToCommitReports(
 	observedData exectypes.CommitObservations,
 	observedMsgs exectypes.MessageObservations,
 ) error {
+	if len(observedData) != len(observedMsgs) {
+		return fmt.Errorf("count of observed data=%d and observed msgs=%d do not match",
+			len(observedData), len(observedMsgs))
+	}
+
 	msgsCount := 0
 	for chain, report := range observedData {
 		for _, data := range report {
@@ -154,9 +169,14 @@ func validateMessagesConformToCommitReports(
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain
 // and that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(
+	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedData map[cciptypes.ChainSelector][]exectypes.CommitData,
 ) error {
-	for _, commitData := range observedData {
+	for chainSel, commitData := range observedData {
+		if !supportedChains.Contains(chainSel) {
+			return fmt.Errorf("observed a non-supported chain %d", chainSel)
+		}
+
 		// observed commitData must not contain duplicates
 
 		observedMerkleRoots := mapset.NewSet[string]()
@@ -270,16 +290,13 @@ func groupByChainSelector(
 // The provided reports must be sorted by sequence number range starting sequence number.
 func combineReportsAndMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNum,
-) ( /* pending */ []exectypes.CommitData /* executed */, []exectypes.CommitData) {
+) (pending []exectypes.CommitData, fullyExecuted []exectypes.CommitData) {
 	if len(executedMessages) == 0 {
 		return reports, nil
 	}
 
 	// filtered contains the reports with fully executed messages removed
 	// and the executed messages appended to the report sorted by sequence number.
-	var pending []exectypes.CommitData
-	var fullyExecuted []exectypes.CommitData
-
 	for i, report := range reports {
 		reportRange := report.SequenceNumberRange
 
@@ -521,7 +538,7 @@ func initResultsAndValidators(
 			messageTokenID := reader.NewMessageTokenID(seqNr, tokenIndex)
 			if _, ok := validators[selector][messageTokenID]; !ok {
 				validators[selector][messageTokenID] =
-					consensus.NewOracleMinObservation[exectypes.TokenData](consensus.TwoFPlus1(f), exectypes.TokenDataHash)
+					consensus.NewOracleMinObservation(consensus.TwoFPlus1(f), exectypes.TokenDataHash)
 			}
 			validators[selector][messageTokenID].Add(tokenData, oracleID)
 		}

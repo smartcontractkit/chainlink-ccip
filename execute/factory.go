@@ -156,6 +156,7 @@ func (p PluginFactory) NewReportingPlugin(
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
 		readers,
+		p.addrCodec,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
@@ -180,6 +181,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.estimateProvider,
 			lggr,
 			metricsReporter,
+			p.addrCodec,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{

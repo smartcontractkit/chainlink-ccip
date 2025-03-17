@@ -45,6 +45,7 @@ type Config struct {
 	Owner              ag_solanago.PublicKey
 	ProposedOwner      ag_solanago.PublicKey
 	FeeQuoter          ag_solanago.PublicKey
+	RmnRemote          ag_solanago.PublicKey
 	LinkTokenMint      ag_solanago.PublicKey
 	FeeAggregator      ag_solanago.PublicKey
 }
@@ -84,6 +85,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `FeeQuoter` param:
 	err = encoder.Encode(obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
 	if err != nil {
 		return err
 	}
@@ -141,6 +147,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `FeeQuoter`:
 	err = decoder.Decode(&obj.FeeQuoter)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
 	if err != nil {
 		return err
 	}

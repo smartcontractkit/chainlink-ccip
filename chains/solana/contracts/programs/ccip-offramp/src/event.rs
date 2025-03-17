@@ -64,5 +64,6 @@ pub mod admin {
         pub router: Pubkey,
         pub fee_quoter: Pubkey,
         pub offramp_lookup_table: Pubkey,
+        pub rmn_remote: Pubkey,
     }
 }

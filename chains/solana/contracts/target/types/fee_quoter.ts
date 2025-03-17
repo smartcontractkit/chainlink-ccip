@@ -24,6 +24,11 @@ export type FeeQuoter = {
           "isSigner": false
         },
         {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -45,10 +50,6 @@ export type FeeQuoter = {
         }
       ],
       "args": [
-        {
-          "name": "linkTokenMint",
-          "type": "publicKey"
-        },
         {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128"
@@ -674,6 +675,10 @@ export type FeeQuoter = {
             "type": "publicKey"
           },
           {
+            "name": "linkTokenLocalDecimals",
+            "type": "u8"
+          },
+          {
             "name": "onramp",
             "type": "publicKey"
           },
@@ -947,7 +952,7 @@ export type FeeQuoter = {
           },
           {
             "name": "juels",
-            "type": "u64"
+            "type": "u128"
           },
           {
             "name": "tokenTransferAdditionalData",
@@ -1204,6 +1209,11 @@ export type FeeQuoter = {
           "index": false
         },
         {
+          "name": "linkTokenLocalDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
           "name": "onramp",
           "type": "publicKey",
           "index": false
@@ -1372,6 +1382,26 @@ export type FeeQuoter = {
         {
           "name": "timestamp",
           "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenPriceUpdateIgnored",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
           "index": false
         }
       ]
@@ -1617,6 +1647,11 @@ export type FeeQuoter = {
     },
     {
       "code": 8036,
+      "name": "InvalidLinkDecimals",
+      "msg": "The LINK mint uses an unsupported number of decimals"
+    },
+    {
+      "code": 8037,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }
@@ -1649,6 +1684,11 @@ export const IDL: FeeQuoter = {
           "isSigner": false
         },
         {
+          "name": "linkTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1670,10 +1710,6 @@ export const IDL: FeeQuoter = {
         }
       ],
       "args": [
-        {
-          "name": "linkTokenMint",
-          "type": "publicKey"
-        },
         {
           "name": "maxFeeJuelsPerMsg",
           "type": "u128"
@@ -2299,6 +2335,10 @@ export const IDL: FeeQuoter = {
             "type": "publicKey"
           },
           {
+            "name": "linkTokenLocalDecimals",
+            "type": "u8"
+          },
+          {
             "name": "onramp",
             "type": "publicKey"
           },
@@ -2572,7 +2612,7 @@ export const IDL: FeeQuoter = {
           },
           {
             "name": "juels",
-            "type": "u64"
+            "type": "u128"
           },
           {
             "name": "tokenTransferAdditionalData",
@@ -2829,6 +2869,11 @@ export const IDL: FeeQuoter = {
           "index": false
         },
         {
+          "name": "linkTokenLocalDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
           "name": "onramp",
           "type": "publicKey",
           "index": false
@@ -2997,6 +3042,26 @@ export const IDL: FeeQuoter = {
         {
           "name": "timestamp",
           "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenPriceUpdateIgnored",
+      "fields": [
+        {
+          "name": "token",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              28
+            ]
+          },
           "index": false
         }
       ]
@@ -3242,6 +3307,11 @@ export const IDL: FeeQuoter = {
     },
     {
       "code": 8036,
+      "name": "InvalidLinkDecimals",
+      "msg": "The LINK mint uses an unsupported number of decimals"
+    },
+    {
+      "code": 8037,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     }

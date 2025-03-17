@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -303,6 +305,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
+		mockAddrCodec := internal.NewMockAddressCodecHex(t)
 		p := &PluginFactory{
 			baseLggr: lggr,
 			ocrConfig: reader.OCR3ConfigWithMeta{
@@ -315,6 +318,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 					ChainSelector: 12922642891491394802,
 				},
 			},
+			addrCodec: mockAddrCodec,
 		}
 
 		plugin, pluginInfo, err := p.NewReportingPlugin(ctx, ocr3types.ReportingPluginConfig{

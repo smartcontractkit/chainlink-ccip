@@ -27,10 +27,11 @@ pub struct InitializeTokenPool<'info> {
 pub struct SetConfig<'info> {
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -40,13 +41,14 @@ pub struct SetConfig<'info> {
 pub struct AddToAllowList<'info> {
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + State::INIT_SPACE + 32 * (state.config.allow_list.len() + add.len()),
         realloc::payer = authority,
         realloc::zero = false
     )]
     pub state: Account<'info, State>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(mut, address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -56,10 +58,11 @@ pub struct AddToAllowList<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
+    pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(address = state.config.proposed_owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
 }
@@ -97,7 +100,7 @@ pub struct TokenOfframp<'info> {
     // consistent set + token pool program
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -107,7 +110,7 @@ pub struct TokenOfframp<'info> {
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
-        seeds = [POOL_SIGNER_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
         bump,
         address = state.config.pool_signer,
     )]
@@ -121,6 +124,31 @@ pub struct TokenOfframp<'info> {
         bump,
     )]
     pub chain_config: Account<'info, ChainConfig>,
+
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = state.config.rmn_remote @ CcipTokenPoolError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = state.config.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = state.config.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
 
     // User specific accounts ---------------
     #[account(mut, address = get_associated_token_address_with_program_id(&release_or_mint.receiver, &mint.key(), &token_program.key()))]
@@ -138,7 +166,7 @@ pub struct TokenOnramp<'info> {
     // consistent set + token pool program
     #[account(
         mut,
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -148,7 +176,7 @@ pub struct TokenOnramp<'info> {
     #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
-        seeds = [POOL_SIGNER_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
         bump,
         address = state.config.pool_signer,
     )]
@@ -156,6 +184,31 @@ pub struct TokenOnramp<'info> {
     pub pool_signer: UncheckedAccount<'info>,
     #[account(mut, address = get_associated_token_address_with_program_id(&pool_signer.key(), &mint.key(), &token_program.key()))]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = state.config.rmn_remote @ CcipTokenPoolError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CURSES],
+        bump,
+        seeds::program = state.config.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [rmn_remote::context::seed::CONFIG],
+        bump,
+        seeds::program = state.config.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
+
     #[account(
         mut,
         seeds = [POOL_CHAINCONFIG_SEED, lock_or_burn.remote_chain_selector.to_le_bytes().as_ref(), mint.key().as_ref()],
@@ -168,7 +221,7 @@ pub struct TokenOnramp<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct InitializeChainConfig<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -189,7 +242,7 @@ pub struct InitializeChainConfig<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct SetChainRateLimit<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -208,7 +261,7 @@ pub struct SetChainRateLimit<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey, cfg: RemoteConfig)]
 pub struct EditChainConfigDynamicSize<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -230,7 +283,7 @@ pub struct EditChainConfigDynamicSize<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey, addresses: Vec<RemoteAddress>)]
 pub struct AppendRemotePoolAddresses<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,
@@ -254,7 +307,7 @@ pub struct AppendRemotePoolAddresses<'info> {
 #[instruction(remote_chain_selector: u64, mint: Pubkey)]
 pub struct DeleteChainConfig<'info> {
     #[account(
-        seeds = [POOL_STATE_SEED, state.config.mint.key().as_ref()],
+        seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
     pub state: Account<'info, State>,

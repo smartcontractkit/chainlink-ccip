@@ -22,6 +22,7 @@ anchor-spl = "0.29.0"
 bytemuck = "1.7"
 ethnum = "1.5"
 fee_quoter = {path = "../fee-quoter", features = ["cpi"]}
+rmn_remote = {path = "../rmn-remote", features = ["cpi"]}
 
 [dev-dependencies]
 hex = "0.4.3"

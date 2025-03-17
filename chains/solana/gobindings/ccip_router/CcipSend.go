@@ -24,6 +24,7 @@ import (
 // * `ctx` - The context containing the accounts required for sending the message.
 // * `dest_chain_selector` - The chain selector for the destination chain.
 // * `message` - The message to be sent. The size limit of data is 256 bytes.
+// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
 type CcipSend struct {
 	DestChainSelector *uint64
 	Message           *SVM2AnyMessage
@@ -60,7 +61,13 @@ type CcipSend struct {
 	//
 	// [14] = [] feeQuoterLinkTokenConfig
 	//
-	// [15] = [WRITE] tokenPoolsSigner
+	// [15] = [] rmnRemote
+	//
+	// [16] = [] rmnRemoteCurses
+	//
+	// [17] = [] rmnRemoteConfig
+	//
+	// [18] = [WRITE] tokenPoolsSigner
 	// ··········· CPI signers, optional if no tokens are being transferred.
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
@@ -68,7 +75,7 @@ type CcipSend struct {
 // NewCcipSendInstructionBuilder creates a new `CcipSend` instruction builder.
 func NewCcipSendInstructionBuilder() *CcipSend {
 	nd := &CcipSend{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 16),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 19),
 	}
 	return nd
 }
@@ -258,17 +265,50 @@ func (inst *CcipSend) GetFeeQuoterLinkTokenConfigAccount() *ag_solanago.AccountM
 	return inst.AccountMetaSlice[14]
 }
 
+// SetRmnRemoteAccount sets the "rmnRemote" account.
+func (inst *CcipSend) SetRmnRemoteAccount(rmnRemote ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[15] = ag_solanago.Meta(rmnRemote)
+	return inst
+}
+
+// GetRmnRemoteAccount gets the "rmnRemote" account.
+func (inst *CcipSend) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[15]
+}
+
+// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
+func (inst *CcipSend) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[16] = ag_solanago.Meta(rmnRemoteCurses)
+	return inst
+}
+
+// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
+func (inst *CcipSend) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[16]
+}
+
+// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
+func (inst *CcipSend) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[17] = ag_solanago.Meta(rmnRemoteConfig)
+	return inst
+}
+
+// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
+func (inst *CcipSend) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[17]
+}
+
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 // CPI signers, optional if no tokens are being transferred.
 func (inst *CcipSend) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[15] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
+	inst.AccountMetaSlice[18] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 // CPI signers, optional if no tokens are being transferred.
 func (inst *CcipSend) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[15]
+	return inst.AccountMetaSlice[18]
 }
 
 func (inst CcipSend) Build() *Instruction {
@@ -350,6 +390,15 @@ func (inst *CcipSend) Validate() error {
 			return errors.New("accounts.FeeQuoterLinkTokenConfig is not set")
 		}
 		if inst.AccountMetaSlice[15] == nil {
+			return errors.New("accounts.RmnRemote is not set")
+		}
+		if inst.AccountMetaSlice[16] == nil {
+			return errors.New("accounts.RmnRemoteCurses is not set")
+		}
+		if inst.AccountMetaSlice[17] == nil {
+			return errors.New("accounts.RmnRemoteConfig is not set")
+		}
+		if inst.AccountMetaSlice[18] == nil {
 			return errors.New("accounts.TokenPoolsSigner is not set")
 		}
 	}
@@ -372,7 +421,7 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=16]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=19]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                     config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("             destChainState", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("                      nonce", inst.AccountMetaSlice[2]))
@@ -388,7 +437,10 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("         feeQuoterDestChain", inst.AccountMetaSlice[12]))
 						accountsBranch.Child(ag_format.Meta("feeQuoterBillingTokenConfig", inst.AccountMetaSlice[13]))
 						accountsBranch.Child(ag_format.Meta("   feeQuoterLinkTokenConfig", inst.AccountMetaSlice[14]))
-						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[15]))
+						accountsBranch.Child(ag_format.Meta("                  rmnRemote", inst.AccountMetaSlice[15]))
+						accountsBranch.Child(ag_format.Meta("            rmnRemoteCurses", inst.AccountMetaSlice[16]))
+						accountsBranch.Child(ag_format.Meta("            rmnRemoteConfig", inst.AccountMetaSlice[17]))
+						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[18]))
 					})
 				})
 		})
@@ -453,6 +505,9 @@ func NewCcipSendInstruction(
 	feeQuoterDestChain ag_solanago.PublicKey,
 	feeQuoterBillingTokenConfig ag_solanago.PublicKey,
 	feeQuoterLinkTokenConfig ag_solanago.PublicKey,
+	rmnRemote ag_solanago.PublicKey,
+	rmnRemoteCurses ag_solanago.PublicKey,
+	rmnRemoteConfig ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey) *CcipSend {
 	return NewCcipSendInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
@@ -473,5 +528,8 @@ func NewCcipSendInstruction(
 		SetFeeQuoterDestChainAccount(feeQuoterDestChain).
 		SetFeeQuoterBillingTokenConfigAccount(feeQuoterBillingTokenConfig).
 		SetFeeQuoterLinkTokenConfigAccount(feeQuoterLinkTokenConfig).
+		SetRmnRemoteAccount(rmnRemote).
+		SetRmnRemoteCursesAccount(rmnRemoteCurses).
+		SetRmnRemoteConfigAccount(rmnRemoteConfig).
 		SetTokenPoolsSignerAccount(tokenPoolsSigner)
 }

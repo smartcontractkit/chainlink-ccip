@@ -40,7 +40,6 @@ func NewProcessor(
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	var obs observer
 	baseObs := newBaseObserver(
-		lggr,
 		ccipReader,
 		destChain,
 		oracleID,
