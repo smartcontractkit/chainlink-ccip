@@ -141,9 +141,8 @@ fn internal_execute<'info>(
     }
 
     let has_messaging = should_execute_messaging(ctx.remaining_accounts, token_indexes);
-    let hashed_leaf: [u8; 32];
 
-    if has_messaging {
+    let hashed_leaf: [u8; 32] = if has_messaging {
         let (msg_program, msg_accounts) = parse_messaging_accounts(
             token_indexes,
             &execution_report.message.extra_args.is_writable_bitmap,
@@ -155,18 +154,18 @@ fn internal_execute<'info>(
             .into_iter()
             .chain(msg_accounts.iter().map(|a| *a.key));
 
-        hashed_leaf = verify_merkle_root(
+        verify_merkle_root(
             &execution_report,
             commit_report.merkle_root,
             recv_and_msg_account_keys,
-        )?;
+        )?
     } else {
-        hashed_leaf = verify_merkle_root(
+        verify_merkle_root(
             &execution_report,
             commit_report.merkle_root,
             None.into_iter(),
-        )?;
-    }
+        )?
+    };
 
     // Mark as InProgress and emit ExecutionStateChanged event; the event will be used by offchain to recognize that
     // the message has been attempted in order to avoid more attempts.
