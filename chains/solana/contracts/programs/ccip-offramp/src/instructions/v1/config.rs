@@ -25,6 +25,7 @@ mod tests {
             is_enabled: true,
             on_ramp: [OnRampAddress::EMPTY, OnRampAddress::EMPTY],
             lane_code_version: CodeVersion::Default,
+            is_rmn_verification_disabled: true,
         };
 
         assert_eq!(get_on_ramps(&config).count(), 0);
