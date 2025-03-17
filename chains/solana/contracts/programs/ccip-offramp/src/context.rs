@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use solana_program::sysvar::instructions;
 
 use crate::messages::ExecutionReportSingleChain;
@@ -619,4 +620,108 @@ pub struct ExecuteReportContext<'info> {
 pub enum OcrPluginType {
     Commit,
     Execution,
+}
+
+#[derive(Accounts)]
+#[instruction(token_receiver: Pubkey, chain_selector: u64, router: Pubkey, fee_quoter: Pubkey)]
+pub struct TokenAccountsValidationContext<'info> {
+    /// CHECK: User Token Account
+    #[account(
+        constraint = user_token_account.key() == get_associated_token_address_with_program_id(
+            &token_receiver.key(),
+            &mint.key(),
+            &token_program.key()
+        ) @ CcipOfframpError::InvalidInputsTokenAccounts
+    )]
+    pub user_token_account: AccountInfo<'info>,
+
+    // TODO: determine if this can be zero key for optional billing config?
+    /// CHECK: Per chain token billing config
+    // billing: configured via CCIP fee quoter
+    // chain config: configured via pool
+    #[account(
+        seeds = [
+            fee_quoter::context::seed::PER_CHAIN_PER_TOKEN_CONFIG,
+            chain_selector.to_le_bytes().as_ref(),
+            mint.key().as_ref(),
+        ],
+        seeds::program = fee_quoter.key(),
+        bump
+    )]
+    pub token_billing_config: AccountInfo<'info>,
+
+    /// CHECK: Pool chain config
+    #[account(
+        seeds = [
+            seed::TOKEN_POOL_CONFIG,
+            chain_selector.to_le_bytes().as_ref(),
+            mint.key().as_ref(),
+        ],
+        seeds::program = pool_program.key(),
+        bump
+    )]
+    pub pool_chain_config: AccountInfo<'info>,
+
+    /// CHECK: Lookup table
+    pub lookup_table: AccountInfo<'info>,
+
+    /// CHECK: Token admin registry
+    #[account(
+        seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
+        seeds::program = router.key(),
+        bump,
+        owner = router.key() @ CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts,
+    )]
+    pub token_admin_registry: AccountInfo<'info>,
+
+    /// CHECK: Pool program
+    pub pool_program: AccountInfo<'info>,
+
+    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsPoolAccounts
+    /// CHECK: Pool config
+    #[account(
+        seeds = [seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
+        seeds::program = pool_program.key(),
+        bump,
+        owner = pool_program.key() @ CcipOfframpError::InvalidInputsPoolAccounts
+    )]
+    pub pool_config: AccountInfo<'info>,
+
+    /// CHECK: Pool token account
+    #[account(
+        address = get_associated_token_address_with_program_id(
+            &pool_signer.key(),
+            &mint.key(),
+            &token_program.key()
+        ) @ CcipOfframpError::InvalidInputsTokenAccounts
+    )]
+    pub pool_token_account: AccountInfo<'info>,
+
+    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsPoolAccounts
+    /// CHECK: Pool signer
+    #[account(
+        seeds = [seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
+        seeds::program = pool_program.key(),
+        bump
+    )]
+    pub pool_signer: AccountInfo<'info>,
+
+    /// CHECK: Token program
+    pub token_program: AccountInfo<'info>,
+
+    /// CHECK: Mint
+    #[account(owner = token_program.key() @ CcipOfframpError::InvalidInputsTokenAccounts)]
+    pub mint: AccountInfo<'info>,
+
+    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsConfigAccounts
+    /// CHECK: Fee token config
+    #[account(
+        seeds = [
+            fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
+            mint.key().as_ref()
+        ],
+        seeds::program = fee_quoter.key(),
+        bump
+    )]
+    pub fee_token_config: AccountInfo<'info>,
 }
