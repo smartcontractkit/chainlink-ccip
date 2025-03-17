@@ -580,9 +580,7 @@ pub struct TokenAccountsValidationContext<'info> {
     /// CHECK: Token admin registry
     #[account(
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
-        seeds::program = router.key(),
         bump,
-        owner = router.key() @ CcipRouterError::InvalidInputsTokenAdminRegistryAccounts,
     )]
     pub token_admin_registry: AccountInfo<'info>,
 
