@@ -140,7 +140,8 @@ func TestCCIPRouter(t *testing.T) {
 			Bytes: onRampAddress,
 			Len:   3,
 		}},
-		IsEnabled: true,
+		IsEnabled:                 true,
+		IsRmnVerificationDisabled: true,
 	}
 	validFqDestChainConfig := fee_quoter.DestChainConfig{
 		IsEnabled: true,

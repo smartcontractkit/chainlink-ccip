@@ -722,14 +722,20 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 }
 
 type SourceChainConfig struct {
-	IsEnabled       bool
-	LaneCodeVersion CodeVersion
-	OnRamp          [2]OnRampAddress
+	IsEnabled                 bool
+	IsRmnVerificationDisabled bool
+	LaneCodeVersion           CodeVersion
+	OnRamp                    [2]OnRampAddress
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `IsEnabled` param:
 	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsRmnVerificationDisabled` param:
+	err = encoder.Encode(obj.IsRmnVerificationDisabled)
 	if err != nil {
 		return err
 	}
@@ -749,6 +755,11 @@ func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `IsEnabled`:
 	err = decoder.Decode(&obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsRmnVerificationDisabled`:
+	err = decoder.Decode(&obj.IsRmnVerificationDisabled)
 	if err != nil {
 		return err
 	}
