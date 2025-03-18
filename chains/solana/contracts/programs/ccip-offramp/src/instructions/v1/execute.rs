@@ -650,7 +650,7 @@ mod tests {
             },
         };
         let remaining_account_keys = [
-            Pubkey::try_from("7gtMT88cNmZVmVUzkcC6MKZ4NY27ynwodKBVJFQdq8R2").unwrap(),
+            Pubkey::try_from("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C").unwrap(),
             Pubkey::try_from("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui").unwrap(),
         ]
         .into_iter();

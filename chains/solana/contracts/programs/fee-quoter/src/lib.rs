@@ -1,7 +1,7 @@
 use anchor_lang::error_code;
 use anchor_lang::prelude::*;
 
-declare_id!("CJaqnyk1hSrDcg8CM2CyWarkgSUDHueUeKKbD6gNM535");
+declare_id!("FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi");
 
 pub mod context;
 use context::*;
