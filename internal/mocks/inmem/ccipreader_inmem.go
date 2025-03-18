@@ -64,8 +64,7 @@ func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 
 func (r InMemoryCCIPReader) ExecutedMessages(
 	ctx context.Context,
-	source cciptypes.ChainSelector,
-	seqNumRanges []cciptypes.SeqNumRange,
+	rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 	_ primitives.ConfidenceLevel,
 ) ([]cciptypes.SeqNum, error) {
 	msgs, ok := r.Messages[source]

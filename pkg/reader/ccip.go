@@ -334,49 +334,53 @@ type ExecutionStateChangedEvent struct {
 
 func (r *ccipChainReader) ExecutedMessages(
 	ctx context.Context,
-	source cciptypes.ChainSelector,
-	seqNumRanges []cciptypes.SeqNumRange,
+	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 	confidence primitives.ConfidenceLevel,
-) ([]cciptypes.SeqNum, error) {
+) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
 	dataTyp := ExecutionStateChangedEvent{}
 
-	var seqRangeExpressions []query.Expression
+	var chainExpressions []query.Expression
 	var countSqNrs uint64
-	for _, seqNr := range seqNumRanges {
-		expr := query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
-			Value:    seqNr.Start(),
-			Operator: primitives.Gte,
-		}, primitives.ValueComparator{
-			Value:    seqNr.End(),
-			Operator: primitives.Lte,
-		})
-		seqRangeExpressions = append(seqRangeExpressions, expr)
-		countSqNrs += uint64(seqNr.End() - seqNr.Start() + 1)
+	for srcChain, seqNumRanges := range rangesPerChain {
+		var seqRangeExpressions []query.Expression
+		for _, seqNr := range seqNumRanges {
+			expr := query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
+				Value:    seqNr.Start(),
+				Operator: primitives.Gte,
+			}, primitives.ValueComparator{
+				Value:    seqNr.End(),
+				Operator: primitives.Lte,
+			})
+			seqRangeExpressions = append(seqRangeExpressions, expr)
+			countSqNrs += uint64(seqNr.End() - seqNr.Start() + 1)
+		}
+		combinedSeqNrs := query.Or(seqRangeExpressions...)
+		chainExpressions = append(chainExpressions, query.And(
+			combinedSeqNrs,
+			query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
+				Value:    srcChain,
+				Operator: primitives.Eq,
+			}),
+			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
+				Value:    0,
+				Operator: primitives.Gt,
+			}),
+			// We don't need to wait for an execute state changed event to be finalized
+			// before we optimistically mark a message as executed.
+			query.Confidence(confidence),
+		))
 	}
-	combinedSeqNrs := query.Or(seqRangeExpressions...)
+
 	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
 		query.KeyFilter{
-			Key: consts.EventNameExecutionStateChanged,
-			Expressions: []query.Expression{
-				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-					Value:    source,
-					Operator: primitives.Eq,
-				}),
-				query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
-					Value:    0,
-					Operator: primitives.Gt,
-				}),
-				combinedSeqNrs,
-				// We don't need to wait for an execute state changed event to be finalized
-				// before we optimistically mark a message as executed.
-				query.Confidence(confidence),
-			},
+			Key:         consts.EventNameExecutionStateChanged,
+			Expressions: chainExpressions,
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
@@ -390,20 +394,20 @@ func (r *ccipChainReader) ExecutedMessages(
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
 
-	executed := make([]cciptypes.SeqNum, 0)
+	executed := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 	for _, item := range iter {
 		stateChange, ok := item.Data.(*ExecutionStateChangedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to ExecutionStateChangedEvent", item.Data)
 		}
 
-		if err := validateExecutionStateChangedEvent(stateChange, seqNumRanges, source); err != nil {
+		if err := validateExecutionStateChangedEvent(stateChange, rangesPerChain); err != nil {
 			r.lggr.Errorw("validate execution state changed event",
 				"err", err, "stateChange", stateChange)
 			continue
 		}
 
-		executed = append(executed, stateChange.SequenceNumber)
+		executed[stateChange.SourceChainSelector] = append(executed[stateChange.SourceChainSelector], stateChange.SequenceNumber)
 	}
 
 	return executed, nil
@@ -1959,19 +1963,17 @@ func validateMerkleRoots(merkleRoots []MerkleRoot) error {
 }
 
 func validateExecutionStateChangedEvent(
-	ev *ExecutionStateChangedEvent, expRange []cciptypes.SeqNumRange, sourceChain cciptypes.ChainSelector) error {
+	ev *ExecutionStateChangedEvent, rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange) error {
 	if ev == nil {
 		return fmt.Errorf("execution state changed event is nil")
 	}
 
-	for _, r := range expRange {
-		if !r.Contains(ev.SequenceNumber) {
-			return fmt.Errorf("execution state changed event sequence number is not in the expected range")
-		}
+	if _, ok := rangesByChain[ev.SourceChainSelector]; !ok {
+		return fmt.Errorf("source chain of messages was not queries")
 	}
 
-	if ev.SourceChainSelector != sourceChain {
-		return fmt.Errorf("source chain is not the expected queried one")
+	if !ev.SequenceNumber.IsWithinRanges(rangesByChain[ev.SourceChainSelector]) {
+		return fmt.Errorf("execution state changed event sequence number is not in the expected range")
 	}
 
 	if ev.MessageHash.IsEmpty() {
