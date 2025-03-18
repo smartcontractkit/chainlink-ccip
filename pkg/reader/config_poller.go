@@ -350,7 +350,8 @@ func (c *configPoller) batchRefreshChainAndSourceConfigs(
 
 			// Update configs in the map
 			for chain, config := range sourceConfigs {
-				chainCache.sourceChainConfigs[chain] = config
+				cachedConfig := staticSourceChainConfigFromSourceChainConfig(config)
+				chainCache.staticSourceChainConfigs[chain] = cachedConfig
 			}
 
 			// Update the refresh timestamp
