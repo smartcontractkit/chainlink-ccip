@@ -1,0 +1,64 @@
+type = "gateway"
+schemaVersion = 1
+name = "my_gateway"
+externalJobID = "017293a9-eefb-4056-b225-d01c6832ba09"
+forwardingAllowed = false
+
+[gatewayConfig.ConnectionManagerConfig]
+AuthChallengeLen = 10
+AuthGatewayId = "my_gateway"
+AuthTimestampToleranceSec = 5
+HeartbeatIntervalSec = 20
+
+[[gatewayConfig.Dons]]
+DonId = "workflow_don_1"
+F = 1
+HandlerName = "web-api-capabilities"
+
+[gatewayConfig.Dons.HandlerConfig]
+MaxAllowedMessageAgeSec = 300
+
+[gatewayConfig.Dons.HandlerConfig.NodeRateLimiter]
+GlobalBurst = 10
+GlobalRPS = 5.1
+PerSenderBurst = 2
+PerSenderRPS = 0.5
+
+[[gatewayConfig.Dons.Members]]
+Address = "0xb54cd760462B0BC8C107778Cde2B2647E03F34a1"
+Name = "Workflow Node 0"
+
+[[gatewayConfig.Dons.Members]]
+Address = "0xe986C2F4d60BD34E96Cae02d0A2B91Dccac5Fb6A"
+Name = "Workflow Node 1"
+
+[[gatewayConfig.Dons.Members]]
+Address = "0xEC0163A477A772B492338749F5A50B34Ec830056"
+Name = "Workflow Node 2"
+
+[[gatewayConfig.Dons.Members]]
+Address = "0xf84ba72f546750EA4050FC883441E7412Ca18c4D"
+Name = "Workflow Node 3"
+
+[gatewayConfig.HTTPClientConfig]
+AllowedPorts = [ 8_080, 8_081, 443, 80 ]
+DefaultTimeout = 5_000_000_000
+MaxResponseBytes = 10_000
+
+[gatewayConfig.NodeServerConfig]
+HandshakeTimeoutMillis = 1_000
+MaxRequestBytes = 100_000
+Path = "/node"
+Port = 5_003
+ReadTimeoutMillis = 1_000
+RequestTimeoutMillis = 10_000
+WriteTimeoutMillis = 1_000
+
+[gatewayConfig.UserServerConfig]
+ContentTypeHeader = "application/jsonrpc"
+MaxRequestBytes = 100_000
+Path = "/"
+Port = 5_002
+ReadTimeoutMillis = 1_000
+RequestTimeoutMillis = 10_000
+WriteTimeoutMillis = 1_000

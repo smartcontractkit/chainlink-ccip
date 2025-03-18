@@ -1,0 +1,8 @@
+type = "workflow"
+schemaVersion = 1
+name = "batch_kv_write"
+externalJobID = "e4696005-545d-4786-a160-1b7f10506c60"
+forwardingAllowed = false
+workflowID = "4f6843f2610e852d589445f9b8b7588b1cdf90bc703c65e59b3eb648149e4c3c"
+workflow = "/home/capabilities/batchkvwrite"
+workflowOwner = "FE3B557E8Fb62b89F4916B721be55cEb828dBd73"

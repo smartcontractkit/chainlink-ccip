@@ -1,0 +1,12 @@
+---
+common:
+  chainlink:
+    v2Config:
+      01-network-anvil-chain.toml: |
+        [[EVM]]
+        ChainID = "31337"
+
+        [[EVM.Nodes]]
+        Name = '31337_primary_chainlink_local'
+        HTTPURL = "http://anvil:8545"
+        WSURL = "ws://anvil:8545"

@@ -1,0 +1,30 @@
+type = "offchainreporting2"
+schemaVersion = 1
+name = "Keystone OCR3 Consensus Capability"
+externalJobID = "41988efb-758b-4d08-a927-e6a75d5174fd"
+forwardingAllowed = false
+maxTaskDuration = "0s"
+contractID = "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+ocrKeyBundleID = "c2588c14da91794a4a3b3d80da15e13d2a856329d7eded505d788011e9d40447"
+p2pv2Bootstrappers = [
+  "12D3KooWF422NRRmBkBcNzGiq5UXG7S9iNDRKpLUnnnqjHupxRbR@node1:6690"
+]
+relay = "evm"
+pluginType = "plugin"
+transmitterID = "0xb54cd760462B0BC8C107778Cde2B2647E03F34a1"
+
+[relayConfig]
+chainID = "31337"
+
+[pluginConfig]
+command = "/usr/local/bin/chainlink-ocr3-capability"
+ocrVersion = 3
+pluginName = "ocr-capability"
+providerType = "ocr3-capability"
+telemetryType = "plugin"
+
+[onchainSigningStrategy]
+strategyName = "multi-chain"
+
+[onchainSigningStrategy.config]
+evm = "c2588c14da91794a4a3b3d80da15e13d2a856329d7eded505d788011e9d40447"

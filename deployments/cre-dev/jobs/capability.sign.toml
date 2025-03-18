@@ -1,0 +1,7 @@
+type = "standardcapabilities"
+schemaVersion = 1
+name = "sign-capability"
+externalJobID = "770fb6f2-9213-404e-bff3-a592cbf84f02"
+forwardingAllowed = false
+command = "/home/capabilities/sign"
+config = ""

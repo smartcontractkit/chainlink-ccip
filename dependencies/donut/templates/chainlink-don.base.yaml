@@ -17,6 +17,7 @@ in: |
           serviceAccount:
             enabled: false
             name: 'default'
+          {{- if eq (getenv "ENABLE_INSTANCE_OVERRIDES") "false" }}
           overrides:
           {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
           {{- range $i := seq 0 (math.Sub .Env.DON_BOOT_NODE_COUNT 1) }}
@@ -58,6 +59,7 @@ in: |
                     {{- printf "\n" }}
                     {{- file.Read (printf "%s/%s/secrets-override-%d.toml" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
               {{- end }}
+          {{- end }}
           {{- end }}
           {{- end }}
     {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}

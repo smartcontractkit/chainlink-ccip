@@ -1,0 +1,7 @@
+type = "standardcapabilities"
+schemaVersion = 1
+name = "log-event-trigger-capability-31337"
+externalJobID = "54fe1e1b-01dc-410c-b075-8d3d284d35c2"
+forwardingAllowed = false
+command = "/home/capabilities/log-event-trigger"
+config = '{"chainId":"31337","network":"evm","lookbackBlocks":1000,"pollPeriod":1000}'
