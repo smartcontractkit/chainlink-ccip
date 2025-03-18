@@ -8,7 +8,7 @@ use example_ccip_receiver::Any2SVMMessage;
 use program::TestCcipInvalidReceiver;
 use solana_program::pubkey;
 
-declare_id!("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8");
+declare_id!("FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j");
 
 #[program]
 pub mod test_ccip_invalid_receiver {
@@ -170,7 +170,7 @@ pub mod test_ccip_invalid_receiver {
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
-const TEST_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
+const TEST_ROUTER: Pubkey = pubkey!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]

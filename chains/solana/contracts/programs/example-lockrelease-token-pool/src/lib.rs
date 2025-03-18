@@ -6,7 +6,7 @@ use base_token_pool::{common::*, rate_limiter::*};
 mod context;
 use crate::context::*;
 
-declare_id!("TokenPooL11111111111111111111111LockReLease");
+declare_id!("8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC");
 
 #[program]
 pub mod example_lockrelease_token_pool {
@@ -189,7 +189,11 @@ pub mod example_lockrelease_token_pool {
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
-            dest_pool_data: RemoteAddress::ZERO,
+            dest_pool_data: {
+                let mut abi_encoded_decimals = vec![0u8; 32];
+                abi_encoded_decimals[31] = ctx.accounts.state.config.decimals;
+                abi_encoded_decimals
+            },
         })
     }
 
