@@ -404,7 +404,7 @@ mod helpers {
                     0, 0, 0, 0, 0, 0,
                 ]
                 .to_vec(),
-                extra_args: fee_quoter::extra_args::EVMExtraArgsV2 {
+                extra_args: fee_quoter::extra_args::GenericExtraArgsV2 {
                     gas_limit: 1,
                     allow_out_of_order_execution: true,
                 }
