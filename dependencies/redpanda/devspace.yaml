@@ -85,7 +85,6 @@ deployments:
         config:
           cluster:
             auto_create_topics_enabled: true
-            kafka_request_max_bytes: 524288000
         external:
           enabled: false
         tuning:

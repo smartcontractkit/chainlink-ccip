@@ -148,7 +148,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
-        version: 2.6.0-preview-1908-4659e19
+        version: 2.6.0
       valuesFiles: []
       values: {}
 
@@ -191,8 +191,9 @@ profiles:
           ENABLE_DON_BASE: "true"
     merge: |-
       $(
-        DON_NODE_COUNT=${DON_NODE_COUNT} \
+        CRIB_EKS_CLUSTER_NAME="${CRIB_EKS_CLUSTER_NAME}" \
         DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
+        DON_NODE_COUNT=${DON_NODE_COUNT} \
         DON_TYPE=${DON_TYPE} \
         ENV=${ENV} \
         LOCAL_VALUES_DIR="${LOCAL_VALUES_DIR}" \
@@ -266,8 +267,8 @@ profiles:
       $(
         pushd ./scripts/network_configs/ > /dev/null
         go run main.go \
-          -geth-chains-count="${GETH_CHAINS_COUNT}" \
           -besu-chains-count="${BESU_CHAINS_COUNT}" \
+          -geth-chains-count="${GETH_CHAINS_COUNT}" \
           -solana-chains-count="${SOLANA_CHAINS_COUNT}"
       )
   # versions
