@@ -608,11 +608,16 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
+// NextSeqNum returns the current sequence numbers for chains.
+// This always fetches fresh data directly from contracts to ensure accuracy.
+// Critical for proper message sequencing.
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
-	cfgs, err := r.getOffRampSourceChainsConfig(ctx, lggr, chains, false)
+
+	// Use our direct fetch method that doesn't affect the cache
+	cfgs, err := r.fetchFreshSourceChainConfigs(ctx, r.destChain, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
@@ -627,6 +632,16 @@ func (r *ccipChainReader) NextSeqNum(
 
 		if !cfg.IsEnabled {
 			lggr.Infof("source chain %d is disabled, chain is skipped.", chain)
+			continue
+		}
+
+		if len(cfg.OnRamp) == 0 {
+			lggr.Errorf("onRamp misconfigured for chain %d, chain is skipped: %x", chain, cfg.OnRamp)
+			continue
+		}
+
+		if len(cfg.Router) == 0 {
+			lggr.Errorf("router is empty for chain %d, chain is skipped: %v", chain, cfg.Router)
 			continue
 		}
 
@@ -1270,34 +1285,16 @@ type SourceChainConfig struct {
 	OnRamp                    cciptypes.UnknownAddress
 }
 
-func (scc SourceChainConfig) check() (bool /* enabled */, error) {
-	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
-	if !scc.IsEnabled {
-		return false, nil
-	}
-	// This may happen due to some sort of regression in the codec that unmarshals
-	// chain data -> go struct.
-	if len(scc.OnRamp) == 0 {
-		return false, fmt.Errorf(
-			"onRamp misconfigured/didn't unmarshal: %x",
-			scc.OnRamp,
-		)
-	}
-
-	if len(scc.Router) == 0 {
-		return false, fmt.Errorf("router is empty: %v", scc.Router)
-	}
-
-	return scc.IsEnabled, nil
-}
-
-// GetOffRampSourceChainsConfig returns all the source chains configs including disabled chains.
+// GetOffRampSourceChainsConfig returns the static source chain configs for all the provided source chains.
+// This method returns configurations without the MinSeqNr field, which should be fetched separately when needed.
 func (r *ccipChainReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	return r.getOffRampSourceChainsConfig(ctx, r.lggr, chains, true)
 }
 
-// getOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for dest chain
+// getOffRampSourceChainsConfig gets static source chain configs from the configPoller cache.
+// These configs deliberately exclude MinSeqNr to prevent usage of potentially stale sequence numbers.
+// For obtaining fresh sequence numbers, use ccipChainReader.GetLatestMinSeqNrs.
 //
 //nolint:revive
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
@@ -1305,7 +1302,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	lggr logger.Logger,
 	chains []cciptypes.ChainSelector,
 	includeDisabled bool,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
@@ -1330,6 +1327,93 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 					"enabled", enabled)
 				delete(configs, chain)
 			}
+		}
+	}
+
+	return configs, nil
+}
+
+// fetchFreshSourceChainConfigs always fetches fresh source chain configs directly from contracts
+// without using any cached values. Use this when up-to-date data is critical, especially
+// for sequence number accuracy.
+func (r *ccipChainReader) fetchFreshSourceChainConfigs(
+	ctx context.Context,
+	destChain cciptypes.ChainSelector,
+	sourceChains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+	lggr := logutil.WithContextValues(ctx, r.lggr)
+
+	reader, exists := r.contractReaders[destChain]
+	if !exists {
+		return nil, fmt.Errorf("no contract reader for chain %d", destChain)
+	}
+
+	// Filter out destination chain
+	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
+	if len(filteredSourceChains) == 0 {
+		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
+	}
+
+	// Prepare batch requests for the sourceChains to fetch the latest Unfinalized config values.
+	contractBatch := make([]types.BatchRead, 0, len(filteredSourceChains))
+	validSourceChains := make([]cciptypes.ChainSelector, 0, len(filteredSourceChains))
+
+	for _, chain := range filteredSourceChains {
+		validSourceChains = append(validSourceChains, chain)
+		contractBatch = append(contractBatch, types.BatchRead{
+			ReadName: consts.MethodNameGetSourceChainConfig,
+			Params: map[string]any{
+				"sourceChainSelector": chain,
+			},
+			ReturnVal: new(SourceChainConfig),
+		})
+	}
+
+	// Execute batch request
+	results, _, err := reader.ExtendedBatchGetLatestValues(
+		ctx,
+		contractreader.ExtendedBatchGetLatestValuesRequest{
+			consts.ContractNameOffRamp: contractBatch,
+		},
+		false,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
+	}
+
+	if len(results) != 1 {
+		return nil, fmt.Errorf("unexpected number of results: %d", len(results))
+	}
+
+	// Process results
+	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
+
+	for _, readResult := range results {
+		if len(readResult) != len(validSourceChains) {
+			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, results=%v",
+				validSourceChains, results)
+		}
+
+		for i, chain := range validSourceChains {
+			v, err := readResult[i].GetResult()
+			if err != nil {
+				lggr.Errorw("Failed to get source chain config",
+					"chain", chain,
+					"error", err)
+				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
+			}
+
+			cfg, ok := v.(*SourceChainConfig)
+			if !ok {
+				lggr.Errorw("Invalid result type from GetSourceChainConfig",
+					"chain", chain,
+					"type", fmt.Sprintf("%T", v))
+				return nil, fmt.Errorf(
+					"invalid result type (%T) from GetSourceChainConfig for chainSelector=%d, expected *SourceChainConfig", v, chain)
+			}
+
+			configs[chain] = *cfg
 		}
 	}
 
