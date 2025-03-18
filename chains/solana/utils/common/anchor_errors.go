@@ -19,6 +19,7 @@ const (
 	ConstraintHasOne_AnchorError
 	AccountOwnedByWrongProgram_AnchorError
 	ConstraintTokenOwner_AnchorError
+	InvalidProgramId_AnchorError
 )
 
 func (value AnchorError) String() string {
@@ -35,6 +36,8 @@ func (value AnchorError) String() string {
 		return "AccountOwnedByWrongProgram"
 	case ConstraintTokenOwner_AnchorError:
 		return "ConstraintTokenOwner"
+	case InvalidProgramId_AnchorError:
+		return "InvalidProgramId"
 	default:
 		return ""
 	}

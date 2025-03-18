@@ -4471,7 +4471,7 @@ func TestCCIPRouter(t *testing.T) {
 				{
 					name:     "incorrect user token account",
 					index:    0,
-					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError.String(),
+					errorStr: common.AccountOwnedByWrongProgram_AnchorError.String(),
 				},
 				{
 					name:     "invalid billing config",
@@ -4514,12 +4514,12 @@ func TestCCIPRouter(t *testing.T) {
 				{
 					name:     "invalid token program",
 					index:    9,
-					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError.String(),
+					errorStr: common.InvalidProgramId_AnchorError.String(),
 				},
 				{
 					name:     "incorrect pool token account",
 					index:    7,
-					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError.String(),
+					errorStr: common.AccountOwnedByWrongProgram_AnchorError.String(),
 				},
 				{
 					name:        "incorrect token pool lookup table",

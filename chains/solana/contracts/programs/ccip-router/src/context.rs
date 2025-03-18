@@ -538,7 +538,6 @@ pub struct GetFee<'info> {
 #[derive(Accounts)]
 #[instruction(token_receiver: Pubkey, chain_selector: u64, router: Pubkey, fee_quoter: Pubkey)]
 pub struct TokenAccountsValidationContext<'info> {
-    /// CHECK: User Token Account
     #[account(
         constraint = user_token_account.key() == get_associated_token_address_with_program_id(
             &token_receiver.key(),
@@ -546,10 +545,10 @@ pub struct TokenAccountsValidationContext<'info> {
             &token_program.key()
         ) @ CcipRouterError::InvalidInputsTokenAccounts
     )]
-    pub user_token_account: UncheckedAccount<'info>,
+    pub user_token_account: InterfaceAccount<'info, TokenAccount>,
 
     // TODO: determine if this can be zero key for optional billing config?
-    /// CHECK: Per chain token billing config
+    /// CHECK: Per chain token billing config PDA
     // billing: configured via CCIP fee quoter
     // chain config: configured via pool
     #[account(
@@ -563,7 +562,7 @@ pub struct TokenAccountsValidationContext<'info> {
     )]
     pub token_billing_config: UncheckedAccount<'info>,
 
-    /// CHECK: Pool chain config
+    /// CHECK: Pool chain config PDA
     #[account(
         seeds = [
             seed::TOKEN_POOL_CONFIG,
@@ -579,7 +578,7 @@ pub struct TokenAccountsValidationContext<'info> {
     #[account(owner = address_lookup_table::program::id() @ CcipRouterError::InvalidInputsLookupTableAccounts)]
     pub lookup_table: UncheckedAccount<'info>,
 
-    /// CHECK: Token admin registry
+    /// CHECK: Token admin registry PDA
     #[account(
         seeds = [seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
         bump,
@@ -590,7 +589,7 @@ pub struct TokenAccountsValidationContext<'info> {
     #[account(executable)]
     pub pool_program: UncheckedAccount<'info>,
 
-    /// CHECK: Pool config
+    /// CHECK: Pool config PDA
     #[account(
         seeds = [seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
         seeds::program = pool_program.key(),
@@ -599,7 +598,6 @@ pub struct TokenAccountsValidationContext<'info> {
     )]
     pub pool_config: UncheckedAccount<'info>,
 
-    /// CHECK: Pool token account
     #[account(
         address = get_associated_token_address_with_program_id(
             &pool_signer.key(),
@@ -607,9 +605,9 @@ pub struct TokenAccountsValidationContext<'info> {
             &token_program.key()
         ) @ CcipRouterError::InvalidInputsTokenAccounts
     )]
-    pub pool_token_account: UncheckedAccount<'info>,
+    pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
 
-    /// CHECK: Pool signer
+    /// CHECK: Pool signer PDA
     #[account(
         seeds = [seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
         seeds::program = pool_program.key(),
@@ -617,15 +615,12 @@ pub struct TokenAccountsValidationContext<'info> {
     )]
     pub pool_signer: UncheckedAccount<'info>,
 
-    /// CHECK: Token program
-    #[account(executable)]
-    pub token_program: UncheckedAccount<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
 
-    /// CHECK: Mint
     #[account(owner = token_program.key() @ CcipRouterError::InvalidInputsTokenAccounts)]
-    pub mint: UncheckedAccount<'info>,
+    pub mint: InterfaceAccount<'info, Mint>,
 
-    /// CHECK: Fee token config
+    /// CHECK: Fee token config PDA
     #[account(
         seeds = [
             fee_quoter::context::seed::FEE_BILLING_TOKEN_CONFIG,
