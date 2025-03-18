@@ -3,6 +3,7 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::Mint,
 };
 use rmn_remote::state::CurseSubject;
+use solana_program::log::sol_log;
 use spl_math::uint::U256;
 use std::ops::Deref;
 
@@ -66,6 +67,7 @@ impl BaseConfig {
         self.token_program = *token_info.owner;
         self.mint = mint.key();
         self.decimals = mint.decimals;
+        sol_log(&format!("decimals: {0}", self.decimals));
         (self.pool_signer, _) = Pubkey::find_program_address(
             &[POOL_SIGNER_SEED, self.mint.key().as_ref()],
             &pool_program,
@@ -284,7 +286,9 @@ pub struct LockOrBurnInV1 {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct LockOrBurnOutV1 {
     pub dest_token_address: RemoteAddress,
-    pub dest_pool_data: RemoteAddress,
+    // Data sent to the dest pool to process the Lock or Burn operation. Currently
+    // this encodes the local decimals when there's a chance they differ.
+    pub dest_pool_data: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]

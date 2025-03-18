@@ -290,9 +290,18 @@ pub mod test_token_pool {
             }
         };
 
+        // require!(
+        //     ctx.accounts.state.config.decimals > 0,
+        //     CcipTokenPoolError::InvalidInputs
+        // );
+
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
-            dest_pool_data: RemoteAddress::ZERO,
+            dest_pool_data: {
+                let mut abi_encoded_decimals = vec![0u8; 32];
+                abi_encoded_decimals[31] = ctx.accounts.state.config.decimals;
+                abi_encoded_decimals
+            },
         })
     }
 }
