@@ -31,6 +31,13 @@ vars:
   CHAINS_COUNT:
     source: env
     default: 2
+  ENABLE_CUSTOM_PROFILE:
+    source: env
+    default: false
+  # ChainID to use, when deploying a single chain, only used when ENABLE_CUSTOM_PROFILE is true
+  CHAIN_ID:
+    source: env
+    default: 1337
 
 pipelines:
   maybe-kind:
@@ -77,4 +84,17 @@ profiles:
         else
           echo "deployments:"
         fi
+      )
+  - name: custom
+    activation:
+      - vars:
+          ENABLE_CUSTOM_PROFILE: "true"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        DEVSPACE_INGRESS_CIDRS=${DEVSPACE_INGRESS_CIDRS} \
+        DEVSPACE_INGRESS_BASE_DOMAIN=${DEVSPACE_INGRESS_BASE_DOMAIN} \
+        CHAIN_ID=${CHAIN_ID} \
+        CHAINLINK_HELM_REGISTRY_URI=${CHAINLINK_HELM_REGISTRY_URI} \
+        gomplate -f ./templates/minimal.env.yaml.tmpl
       )

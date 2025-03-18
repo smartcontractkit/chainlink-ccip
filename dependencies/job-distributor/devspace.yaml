@@ -11,6 +11,9 @@ vars:
   DEVSPACE_INGRESS_BASE_DOMAIN:
     source: env
     default: "main.stage.cldev.sh"
+  JOB_DISTRIBUTOR_IMAGE_TAG:
+    source: env
+    default: 0.9.0
 
 dependencies:
   postgres:
@@ -38,7 +41,7 @@ deployments:
         version: "0.2.11"
       values:
         image:
-          tag: 0.6.1
+          tag: ${JOB_DISTRIBUTOR_IMAGE_TAG}
         envVars:
           ENVIRONMENT: development
           DATABASE_URL: postgresql://chainlink:JGVgp7M2Emcg7Av8KKVUgMZb@postgres:5432/chainlink?sslmode=disable

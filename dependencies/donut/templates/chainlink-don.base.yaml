@@ -26,6 +26,18 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-bt-{{ $i }}
+                  nodeName: ${DON_TYPE}-bt-{{ $i }}
+              {{ if and (ne (getenv "CONFIG_OVERRIDES_DIR") "") (file.Exists (printf "%s/%s" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE"))) }}
+              chainlink:
+                v2Config:
+                  99-config-override.toml: |
+                    {{- printf "\n" }}
+                    {{- file.Read (printf "%s/%s/config-override-bt-%d.toml" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
+                v2Secret:
+                  99-secrets-override.toml: |
+                    {{- printf "\n" }}
+                    {{- file.Read (printf "%s/%s/secrets-override-bt-%d.toml" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
+              {{- end }}
           {{- end }}
           {{- end }}
           {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
@@ -35,6 +47,18 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-{{ $i }}
+                  nodeName: ${DON_TYPE}-{{ $i }}
+              {{ if and (ne (getenv "CONFIG_OVERRIDES_DIR") "") (file.Exists (printf "%s/%s" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE"))) }}
+              chainlink:
+                v2Config:
+                  99-config-override.toml: |
+                    {{- printf "\n" }}
+                    {{- file.Read (printf "%s/%s/config-override-%d.toml" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
+                v2Secret:
+                  99-secrets-override.toml: |
+                    {{- printf "\n" }}
+                    {{- file.Read (printf "%s/%s/secrets-override-%d.toml" (getenv "CONFIG_OVERRIDES_DIR") (getenv "DON_TYPE") $i) | strings.Indent 18 }}
+              {{- end }}
           {{- end }}
           {{- end }}
           {{- end }}

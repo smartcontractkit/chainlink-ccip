@@ -40,6 +40,10 @@ vars:
   DON_TYPE:
     source: env
     default: dev
+  # Option to use template for custom don type, when enabled it will use type.${DON_TYPE}.yaml
+  ENABLE_CUSTOM_TYPE:
+    source: env
+    default: "false"
   DON_VERSION:
     source: env
     default: latest
@@ -65,6 +69,14 @@ vars:
   ENABLE_DON_BASE:
     source: env
     default: "true"
+  # Option to pass custom node config and secrets overrides. We expect the directory to contain
+  # a subfolder with ${DON_TYPE} name, which contains the overrides
+  CONFIG_OVERRIDES_DIR:
+    source: env
+    default: ""
+  JOB_DISTRIBUTOR_IMAGE_TAG:
+    source: env
+    default: 0.9.0
   ENABLE_JOB_DISTRIBUTOR:
     source: env
     default: "false"
@@ -142,7 +154,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
-        version: "2.4.4"
+        version: 2.6.0
       valuesFiles: []
       values: {}
 
@@ -193,16 +205,26 @@ profiles:
         LOCAL_VALUES_DIR="${LOCAL_VALUES_DIR}" \
         POSTGRES_CHART_VERSION="15.5.9" \
         PROVIDER=${PROVIDER} \
+        POSTGRES_CHART_VERSION="15.5.9" \
+        CONFIG_OVERRIDES_DIR="${CONFIG_OVERRIDES_DIR}" \
         ENABLE_INSTANCE_OVERRIDES=${ENABLE_INSTANCE_OVERRIDES} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.base.yaml
       )
   - name: don-base-type
-    activation: *enableDonBase
+    activation:
+      - vars:
+          ENABLE_CUSTOM_TYPE: "true"
     patches:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/type.${DON_TYPE}.yaml
+  - name: don-custom-type
+    activation: *enableDonBase
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
   - name: don-base-version
     activation: *enableDonBase
     patches:
@@ -278,6 +300,7 @@ profiles:
                   repository: ${DEVSPACE_IMAGE}
                   tag: ${DEVSPACE_IMAGE_TAG}
                   pullPolicy: Always
+
   # monitoring
   - name: monitoring-service-monitor
     patches:
@@ -326,6 +349,9 @@ profiles:
           path: ${DEPENDENCIES_DIR}/job-distributor
           overwriteVars: true
           namespace: ${DEVSPACE_NAMESPACE}
+          vars:
+            JOB_DISTRIBUTOR_IMAGE_TAG: ${JOB_DISTRIBUTOR_IMAGE_TAG}
+
   - name: job-distributor-aws-staging
     activation:
       - vars:

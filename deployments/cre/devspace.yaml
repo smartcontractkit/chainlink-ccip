@@ -1,0 +1,216 @@
+version: v2beta1
+name: chainlink
+
+vars:
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
+  SCRIPTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/scripts"
+  DEVSPACE_ENV_FILE: .env
+  DEVSPACE_INGRESS_DOMAIN:
+    source: env
+    default: "main.stage.cldev.sh"
+  DEPENDENCIES_DIR:
+    source: env
+    default: "${CRIB_DIR}/dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/imports"
+  TMP_DIR:
+    source: env
+    default: "${CRIB_DIR}/deployments/cre/.tmp"
+  # "The provider being used to deploy CRIB"
+  PROVIDER:
+    source: all
+    default: "aws"
+  CHAINLINK_CODE_DIR:
+    source: env
+    default: "../../.."
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  DON_TYPE:
+    source: env
+    default: base
+  DON_VERSION:
+    source: env
+    default: latest
+  DON_NODE_COUNT:
+    source: env
+    default: 4
+  DON_BOOT_NODE_COUNT:
+    source: env
+    default: 1
+  CHAINLINK_PRODUCT:
+    source: env
+    default: chainlink
+  CONFIG_OVERRIDES_DIR:
+    source: env
+    default: ""
+  JOB_DISTRIBUTOR_IMAGE_TAG:
+    source: env
+    default: 0.9.0
+  CHAIN_ID:
+    source: env
+    default: 1337
+  # TODO make it possible to pass it upstream to donut
+  DON_API_USERNAME:
+    source: env
+    default: "admin@chain.link"
+  DON_API_PASSWORD:
+    source: env
+    default: "hWDmgcub2gUhyrG6cxriqt7T"
+
+imports:
+  - path: ${IMPORTS_DIR}/lib-common
+  - path: ${IMPORTS_DIR}/lib-aws
+  - path: ${IMPORTS_DIR}/lib-kind
+
+pipelines:
+  maybe-kind:
+    run: |-
+      if [ "$PROVIDER" == "kind" ]; then
+        run_dependency_pipelines kind-core
+        if [ "$ENABLE_MONITORING" == "true" ]; then
+          run_dependency_pipelines kind-monitoring
+        fi
+      fi
+
+  custom-chain:
+    run: |-
+      run_pipelines maybe-kind
+
+      run_dependency_pipelines custom-geth-chain
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
+
+      CHAIN_ID=${CHAIN_ID} \
+      DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
+      DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+      go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -chain -chain-variant=geth -chain-type=evm -target-dir=${CONFIG_OVERRIDES_DIR}
+  don:
+    run: |-
+      run_pipelines maybe-kind
+
+      run_dependency_pipelines don
+      # add a check for the ingress
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
+
+      DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
+      DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+      DON_TYPE=${DON_TYPE} \
+      DON_NODE_COUNT=${DON_NODE_COUNT} \
+      DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
+      go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -don -target-dir=${CONFIG_OVERRIDES_DIR}
+
+  jd:
+    run: |-
+      run_pipelines maybe-kind
+
+      run_dependency_pipelines job-distributor
+       # add a check for the ingress
+       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+      DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
+      DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+      go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -jd -target-dir=${CONFIG_OVERRIDES_DIR}
+
+  beholder:
+    run: |-
+      run_dependency_pipelines beholder
+
+profiles:
+  - name: custom_geth
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          custom-geth-chain:
+            path: ${DEPENDENCIES_DIR}/geth-v2
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              ENABLE_DON_BASE: "false"
+              ENABLE_BASE_PROFILE: "false"
+              ENABLE_CUSTOM_PROFILE: "true"
+              CHAIN_ID: ${CHAIN_ID}
+
+  - name: dons
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          don:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles:
+              - version-from-env
+            vars:
+              DON_TYPE: ${DON_TYPE}
+              ENABLE_BASE_PROFILE: "false"
+          job-distributor:
+            path: ${DEPENDENCIES_DIR}/job-distributor
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              JOB_DISTRIBUTOR_IMAGE_TAG: ${JOB_DISTRIBUTOR_IMAGE_TAG}
+              ENABLE_JOB_DISTRIBUTOR: "true"
+
+  - name: aws
+  - name: beholder
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          beholder:
+            path: ${DEPENDENCIES_DIR}/beholder
+            #            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+
+  - name: beholder-kind
+    parents:
+      - profile: beholder
+    patches:
+      - op: replace
+        path: dependencies.beholder.profiles
+        value:
+          - kind
+      - op: add
+        path: dependencies.beholder.pipeline
+        value: kind
+
+  - name: kind
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          kind-core:
+            path: ${DEPENDENCIES_DIR}/kind-core
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          kind-monitoring:
+            path: ${DEPENDENCIES_DIR}/kind-monitoring
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+
+commands:
+  deploy-custom-geth-chain:
+    command: devspace run-pipeline custom-chain -p custom_geth -p ${PROVIDER}
+    description: Deploy a single Geth chain
+    appendArgs: true
+  deploy-jd:
+    command: devspace run-pipeline jd -p dons -p ${PROVIDER}
+    description: Deploy JD
+    appendArgs: true
+  deploy-don:
+    command: devspace run-pipeline don -p dons -p ${PROVIDER}
+    description: Deploy a single DONs
+    appendArgs: true
+  beholder:
+    command: devspace run-pipeline beholder -p beholder
+    description: Run the Beholder pipeline.
+    appendArgs: true
+  beholder-kind:
+    command: devspace run-pipeline beholder -p beholder-kind
+    description: Run the Beholder pipeline for Kind.
+    appendArgs: true
