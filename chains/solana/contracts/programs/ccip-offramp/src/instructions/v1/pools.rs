@@ -145,10 +145,9 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
         ];
         {
             // validate pool addresses
-            let mut expected_keys: Vec<Pubkey> =
-                required_entries.iter().map(|acc| acc.key()).collect();
+            let mut expected_keys: Vec<Pubkey> = required_entries.iter().map(|x| x.key()).collect();
             let mut remaining_keys: Vec<Pubkey> =
-                remaining_accounts.iter().map(|acc| acc.key()).collect();
+                remaining_accounts.iter().map(|x| x.key()).collect();
             expected_keys.append(&mut remaining_keys);
             require!(
                 lookup_table_account.addresses.as_ref() == expected_keys,
@@ -160,11 +159,9 @@ pub(super) fn validate_and_parse_token_accounts<'info>(
             // token admin registry contains an array (binary) of indexes that are writable
             // check that the writability of the passed accounts match the writable configuration (using indexes)
             let mut expected_is_writable: Vec<bool> =
-                required_entries.iter().map(|acc| acc.is_writable).collect();
-            let mut remaining_is_writable: Vec<bool> = remaining_accounts
-                .iter()
-                .map(|acc| acc.is_writable)
-                .collect();
+                required_entries.iter().map(|x| x.is_writable).collect();
+            let mut remaining_is_writable: Vec<bool> =
+                remaining_accounts.iter().map(|x| x.is_writable).collect();
             expected_is_writable.append(&mut remaining_is_writable);
             for (i, is_writable) in expected_is_writable.iter().enumerate() {
                 require_eq!(
