@@ -725,7 +725,7 @@ type SourceChainConfig struct {
 	IsEnabled                 bool
 	IsRmnVerificationDisabled bool
 	LaneCodeVersion           CodeVersion
-	OnRamp                    [2]OnRampAddress
+	OnRamp                    OnRampAddress
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {

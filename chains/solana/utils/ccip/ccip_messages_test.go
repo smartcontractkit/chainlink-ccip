@@ -8,6 +8,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
@@ -51,13 +52,14 @@ func TestMessageHashing(t *testing.T) {
 				},
 			},
 		},
+			config.OnRampAddress,
 			[]solana.PublicKey{
 				solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
 				solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
 			})
 
 		require.NoError(t, err)
-		require.Equal(t, "c82035cdc1d1e58606afeaf137b71de280e1e2cafdfdc621944eecccb105d730", hex.EncodeToString(h))
+		require.Equal(t, "bd8025f7b32386d93be284b6b4eb6f36c7b46ea157c0228f00ccba38fe7a448e", hex.EncodeToString(h))
 	})
 
 	t.Run("SVMToAny", func(t *testing.T) {
@@ -95,6 +97,6 @@ func TestMessageHashing(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "ab7f57fbf9979573a9fa1bcf1ad816449223c343ea8b938db9e917f2ca138a84", hex.EncodeToString(h))
+		require.Equal(t, "5ddb3c9fccb01abee926ec6112afa075dc81fdfe1e2902595d9c1d1d1de4f1d1", hex.EncodeToString(h))
 	})
 }
