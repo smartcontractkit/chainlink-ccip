@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use anchor_spl::token::Token;
 use bytemuck::{Pod, Zeroable};
+use solana_program::address_lookup_table;
 use solana_program::sysvar::instructions;
 
 use crate::messages::ExecutionReportSingleChain;
@@ -662,9 +664,9 @@ pub struct TokenAccountsValidationContext<'info> {
             &token_receiver.key(),
             &mint.key(),
             &token_program.key()
-        ) @ CcipOfframpError::InvalidInputsTokenAccounts
+        ) @ CcipOfframpError::InvalidInputsTokenAccounts,
     )]
-    pub user_token_account: AccountInfo<'info>,
+    pub user_token_account: UncheckedAccount<'info>,
 
     // TODO: determine if this can be zero key for optional billing config?
     /// CHECK: Per chain token billing config
@@ -679,7 +681,7 @@ pub struct TokenAccountsValidationContext<'info> {
         seeds::program = fee_quoter.key(),
         bump
     )]
-    pub token_billing_config: AccountInfo<'info>,
+    pub token_billing_config: UncheckedAccount<'info>,
 
     /// CHECK: Pool chain config
     #[account(
@@ -691,10 +693,11 @@ pub struct TokenAccountsValidationContext<'info> {
         seeds::program = pool_program.key(),
         bump
     )]
-    pub pool_chain_config: AccountInfo<'info>,
+    pub pool_chain_config: UncheckedAccount<'info>,
 
     /// CHECK: Lookup table
-    pub lookup_table: AccountInfo<'info>,
+    #[account(owner = address_lookup_table::program::id() @ CcipOfframpError::InvalidInputsLookupTableAccounts)]
+    pub lookup_table: UncheckedAccount<'info>,
 
     /// CHECK: Token admin registry
     #[account(
@@ -703,10 +706,11 @@ pub struct TokenAccountsValidationContext<'info> {
         bump,
         owner = router.key() @ CcipOfframpError::InvalidInputsTokenAdminRegistryAccounts,
     )]
-    pub token_admin_registry: AccountInfo<'info>,
+    pub token_admin_registry: UncheckedAccount<'info>,
 
     /// CHECK: Pool program
-    pub pool_program: AccountInfo<'info>,
+    #[account(executable)]
+    pub pool_program: UncheckedAccount<'info>,
 
     /// CHECK: Pool config
     #[account(
@@ -715,7 +719,7 @@ pub struct TokenAccountsValidationContext<'info> {
         bump,
         owner = pool_program.key() @ CcipOfframpError::InvalidInputsPoolAccounts
     )]
-    pub pool_config: AccountInfo<'info>,
+    pub pool_config: UncheckedAccount<'info>,
 
     /// CHECK: Pool token account
     #[account(
@@ -725,7 +729,7 @@ pub struct TokenAccountsValidationContext<'info> {
             &token_program.key()
         ) @ CcipOfframpError::InvalidInputsTokenAccounts
     )]
-    pub pool_token_account: AccountInfo<'info>,
+    pub pool_token_account: UncheckedAccount<'info>,
 
     /// CHECK: Pool signer
     #[account(
@@ -733,14 +737,14 @@ pub struct TokenAccountsValidationContext<'info> {
         seeds::program = pool_program.key(),
         bump
     )]
-    pub pool_signer: AccountInfo<'info>,
+    pub pool_signer: UncheckedAccount<'info>,
 
     /// CHECK: Token program
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Program<'info, Token>,
 
     /// CHECK: Mint
     #[account(owner = token_program.key() @ CcipOfframpError::InvalidInputsTokenAccounts)]
-    pub mint: AccountInfo<'info>,
+    pub mint: UncheckedAccount<'info>,
 
     /// CHECK: Fee token config
     #[account(
@@ -751,5 +755,5 @@ pub struct TokenAccountsValidationContext<'info> {
         seeds::program = fee_quoter.key(),
         bump
     )]
-    pub fee_token_config: AccountInfo<'info>,
+    pub fee_token_config: UncheckedAccount<'info>,
 }
