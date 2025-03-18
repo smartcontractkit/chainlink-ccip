@@ -140,7 +140,8 @@ func TestCCIPRouter(t *testing.T) {
 			Bytes: onRampAddress,
 			Len:   3,
 		}},
-		IsEnabled: true,
+		IsEnabled:                 true,
+		IsRmnVerificationDisabled: true,
 	}
 	validFqDestChainConfig := fee_quoter.DestChainConfig{
 		IsEnabled: true,
@@ -555,7 +556,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("FeeQuoter is initialized", func(t *testing.T) {
-			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
+			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000000000000, Hi: 0, Endianness: nil}
 
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.FeeQuoterProgram, &rpc.GetAccountInfoOpts{
@@ -568,11 +569,11 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 			ix, err := fee_quoter.NewInitializeInstruction(
-				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
+				link22.mint,
 				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
 				config.FeeQuoterProgram,
@@ -587,6 +588,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
 			require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, uint8(9), configSetEvent.LinkTokenDecimals)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
 			require.Equal(t, fee_quoter.V1_CodeVersion, configSetEvent.DefaultCodeVersion)
 
@@ -4235,16 +4237,19 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, wsol.mint, ccipMessageSentEvent.Message.FeeToken)
 				require.Equal(t, tokens.ToLittleEndianU256(36333028), ccipMessageSentEvent.Message.FeeTokenAmount.LeBytes)
 				// The difference is the ratio between the fee token value (wsol) and link token value (signified by link22 in these tests).
-				// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels
-				require.Equal(t, tokens.ToLittleEndianU256(3633302), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
+				// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels.
+				// Then, they differ again by 9 decimals due to the solana denomiation being 1e9 divisions = 1 LINK, compared to 1e18 juels = 1 LINK
+				// in EVM. Note how some precision is lost in the translation, because the price in solana is stored with respect to the native
+				// decimals.
+				require.Equal(t, tokens.ToLittleEndianU256(3633302000000000), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
 				require.Equal(t, token0.PoolConfig, ta.SourcePoolAddress)
 				require.Equal(t, []byte{1, 2, 3}, ta.DestTokenAddress)
 				require.Equal(t, 0, len(ta.ExtraData))
 				require.Equal(t, tokens.ToLittleEndianU256(1), ta.Amount.LeBytes)
-				require.Equal(t, 32, len(ta.DestExecData))
-				expectedDestExecData := make([]byte, 32)
+				require.Equal(t, 4, len(ta.DestExecData))
+				expectedDestExecData := make([]byte, 4)
 				// Token0 billing had DestGasOverhead set to 100 during setup
-				binary.BigEndian.PutUint64(expectedDestExecData[24:], 100)
+				binary.BigEndian.PutUint32(expectedDestExecData[:], 100)
 				require.Equal(t, expectedDestExecData, ta.DestExecData)
 
 				// check pool event

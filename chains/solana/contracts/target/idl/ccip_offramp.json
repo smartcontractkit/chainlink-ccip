@@ -1685,6 +1685,10 @@
             "type": "bool"
           },
           {
+            "name": "isRmnVerificationDisabled",
+            "type": "bool"
+          },
+          {
             "name": "laneCodeVersion",
             "type": {
               "defined": "CodeVersion"
