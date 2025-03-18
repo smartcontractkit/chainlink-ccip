@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/builder"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -216,6 +217,11 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
 	}
 
+	reportBuilder, err := builder.NewReportBuilder(offchainConfig)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create report builder: %w", err)
+	}
+
 	return NewPlugin(
 			p.donID,
 			oracleIDToP2PID,
@@ -233,6 +239,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			config,
 			metricsReporter,
 			p.addrCodec,
+			reportBuilder,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{
