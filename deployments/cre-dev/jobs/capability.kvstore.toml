@@ -1,0 +1,7 @@
+type = "standardcapabilities"
+schemaVersion = 1
+name = "kvstore-capability"
+externalJobID = "e06b7431-e97f-49c9-8170-f450277693a2"
+forwardingAllowed = false
+command = "/home/capabilities/kvstore"
+config = ""

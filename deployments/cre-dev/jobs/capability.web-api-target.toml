@@ -1,0 +1,12 @@
+type = "standardcapabilities"
+schemaVersion = 1
+name = "web-api-target-capability"
+externalJobID = "c86f46eb-9c4a-44b0-87ac-5853e95bb926"
+forwardingAllowed = false
+command = "__builtin_web-api-target"
+config = """
+[rateLimiter]
+GlobalRPS = 1000.0
+GlobalBurst = 1000
+PerSenderRPS = 1000.0
+PerSenderBurst = 1000"""

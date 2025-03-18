@@ -114,3 +114,14 @@ profiles:
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-sandbox.yaml
       )
+
+  - name: anvil
+    merge: |-
+      $(
+        CHAIN_ID=${CHAIN_ID} \
+        CHAIN_NAME=${CHAIN_NAME} \
+        DEVSPACE_INGRESS_BASE_DOMAIN=${DEVSPACE_INGRESS_BASE_DOMAIN} \
+        ETHEREUM_VARIANT=${ETHEREUM_VARIANT} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.anvil.yaml
+      )

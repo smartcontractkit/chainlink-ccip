@@ -17,6 +17,7 @@ in: |
           serviceAccount:
             enabled: false
             name: 'default'
+          {{- if eq (getenv "ENABLE_INSTANCE_OVERRIDES") "false" }}
           overrides:
           {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
           {{- range $i := seq 0 (math.Sub .Env.DON_BOOT_NODE_COUNT 1) }}
@@ -34,6 +35,7 @@ in: |
                   database:
                     config:
                       host: ${DON_TYPE}-db-{{ $i }}
+          {{- end }}
           {{- end }}
           {{- end }}
     {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}

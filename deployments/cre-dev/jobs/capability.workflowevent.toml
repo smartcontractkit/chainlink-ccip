@@ -1,0 +1,7 @@
+type = "standardcapabilities"
+schemaVersion = 1
+name = "workflowevent-capability"
+externalJobID = "3016102a-5e97-426d-9a6d-a7b997d28025"
+forwardingAllowed = false
+command = "/home/capabilities/workflowevent"
+config = ""

@@ -1,0 +1,12 @@
+type = "standardcapabilities"
+schemaVersion = 1
+name = "compute-capability"
+externalJobID = "e951cd81-68e6-4b6c-ae06-d1f265717d75"
+forwardingAllowed = false
+command = "__builtin_custom-compute-action"
+config = """
+[rateLimiter]
+GlobalRPS = 1000.0
+GlobalBurst = 1000
+PerSenderRPS = 1000.0
+PerSenderBurst = 1000"""

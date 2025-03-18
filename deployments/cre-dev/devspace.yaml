@@ -1,0 +1,167 @@
+---
+version: v2beta1
+name: cre-dev
+
+vars:
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  ## local directories
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
+  SCRIPTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/scripts"
+  DEPENDENCIES_DIR:
+    source: env
+    default: "${CRIB_DIR}/dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/imports"
+  CHARTS_DIR:
+    source: env
+    default: "${CRIB_DIR}/../infra-charts"
+  # switches
+  PROVIDER:
+    source: all
+    default: "aws"
+  # other
+  HOST_NAME:
+    source: env
+    default: main.stage.cldev.sh
+  TMP_DIR:
+    source: env
+    default: "${CRIB_DIR}/deployments/cre-dev/.tmp"
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  DON_NODE_COUNT:
+    source: env
+    default: 5
+  DON_BOOT_NODE_COUNT:
+    source: env
+    default: 1
+
+imports:
+  - path: ${IMPORTS_DIR}/lib-common
+  - path: ${IMPORTS_DIR}/lib-aws
+  - path: ${IMPORTS_DIR}/lib-kind
+
+pipelines:
+  blockchain:
+    run: |-
+      run_dependency_pipelines anvil
+      run_dependency_pipelines anvil-blockscout
+
+  chainlink:
+    run: |-
+      run_dependency_pipelines cre
+      run_dependency_pipelines jd
+
+  chainlink-config:
+    run: |-
+      echo "todo"
+
+  nuke:
+    run: |-
+      helm list -q | xargs -r helm uninstall
+      kubectl delete pvc data-blockscout-postgres-geth-chain-anvil-31337-0 --ignore-not-found
+
+profiles:
+  ## blockchains
+
+  - name: blockchain-anvil
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          anvil:
+            path: ${DEPENDENCIES_DIR}/daas/blockchain-anvil.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles: []
+
+  - name: blockchain-anvil-blockscout
+    patches:
+      - op: add
+        path: vars
+        value:
+          CHAIN_NAME: anvil
+          CHAIN_ID: 31337
+          ETHEREUM_VARIANT: geth
+          NAMESPACE: ${DEVSPACE_NAMESPACE}
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
+          INGRESS_CLASS_NAME: "alb"
+      - op: add
+        path: dependencies
+        value:
+          anvil-blockscout:
+            path: ${DEPENDENCIES_DIR}/blockscout/devspace.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles: [anvil]
+
+  - name: blockchain
+    parents:
+      - profile: blockchain-anvil
+      - profile: blockchain-anvil-blockscout
+
+  ## chainlink dons
+
+  - name: chainlink-don-cre
+    patches:
+      - op: replace
+        path: vars
+        value:
+          DON_TYPE: cre
+          DON_VERSION: latest
+          ENV: sandbox
+          DEPLOYMENT: cre-dev
+          CRIB_EKS_CLUSTER_NAME: main-fwog
+          ENABLE_INSTANCE_OVERRIDES: "true"
+      - op: add
+        path: dependencies
+        value:
+          cre:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            profiles:
+              - network-anvil-chain
+
+  - name: chainlink-jd
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          jd:
+            path: ${DEPENDENCIES_DIR}/job-distributor
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+
+  - name: chainlink
+    parents:
+      - profile: chainlink-don-cre
+      - profile: chainlink-jd
+
+  ## chainlink config
+
+  # - pre: onchain / contracts
+  # - post: jobs
+  # - cre-cli?
+
+commands:
+  blockchain:
+    command: devspace run-pipeline blockchain -p blockchain
+    description: Deploy the blockchains
+    appendArgs: true
+  chainlink:
+    command: devspace run-pipeline chainlink -p chainlink
+    description: Deploy the chainlink components (dons / jd)
+    appendArgs: true
+  nuke:
+    command: devspace run-pipeline nuke
+    description: Nuke
+    appendArgs: true

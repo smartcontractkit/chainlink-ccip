@@ -68,6 +68,12 @@ vars:
   ENABLE_JOB_DISTRIBUTOR:
     source: env
     default: "false"
+  ENABLE_INSTANCE_OVERRIDES:
+    source: env
+    default: "false"
+  DEPLOYMENT:
+    source: env
+    default: chainlink
 
 pipelines:
   maybe-kind:
@@ -187,6 +193,7 @@ profiles:
         LOCAL_VALUES_DIR="${LOCAL_VALUES_DIR}" \
         POSTGRES_CHART_VERSION="15.5.9" \
         PROVIDER=${PROVIDER} \
+        ENABLE_INSTANCE_OVERRIDES=${ENABLE_INSTANCE_OVERRIDES} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.base.yaml
       )
@@ -233,11 +240,11 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.besu-chain-beta.yaml
-  - name: network-ava-spruce-calm
+  - name: network-anvil-chain
     patches:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
-        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.ava-spruce-calm.yaml
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.anvil-chain.yaml
   # to support load testing scenarios, the profile generate variable number of chain configs
   # It relies on CHAINS_COUNT property to generate variable number of network configs
   - name: network-generated
@@ -401,3 +408,12 @@ profiles:
               git: https://github.com/smartcontractkit/infra-charts
               subPath: chainlink-cluster
               revision: a1928889c2b94f5e8e0849dee7727480d6b49cce
+  # instance overrides
+  - name: instance-overrides
+    activation:
+      - vars:
+          ENABLE_INSTANCE_OVERRIDES: "true"
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${CRIB_DIR}/deployments/cre-dev/values/chainlink-cluster/main-fwog.${DEVSPACE_NAMESPACE}.${DON_TYPE}.overrides.yaml

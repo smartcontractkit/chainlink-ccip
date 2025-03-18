@@ -1,0 +1,13 @@
+type = "bootstrap"
+schemaVersion = 1
+name = "Bootstrap Job"
+externalJobID = "07c693dd-289b-4d38-a6a8-76ea873aa5ea"
+forwardingAllowed = false
+contractID = "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+relay = "evm"
+contractConfigTrackerPollInterval = "1s"
+contractConfigConfirmations = 1
+
+[relayConfig]
+chainID = 31_337
+providerType = "ocr3-capability"

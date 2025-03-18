@@ -1,0 +1,138 @@
+---
+common:
+  image:
+    repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/chainlink-develop
+    tag: sha-528e34fdc8-bcm-swift-poc
+    pullPolicy: Always
+overrides:
+  - chainlinkNode: # bootstrap
+      spec:
+        database:
+          config:
+            host: cre-db-bt-0
+    chainlink:
+      v2Config:
+        99-overrides.toml: |
+          [Feature]
+          FeedsManager = true
+          LogPoller = true
+
+          [P2P.V2]
+          Enabled = true
+          ListenAddresses = ['0.0.0.0:5001']
+
+          [OCR2]
+          Enabled = true
+
+  - chainlinkNode: # gateway
+      spec:
+        database:
+          config:
+            host: cre-db-0
+    chainlink:
+      v2Config:
+        99-overrides.toml: |
+          [Feature]
+          FeedsManager = true
+          LogPoller = false
+
+          [P2P.V2]
+          Enabled = true
+          ListenAddresses = ['0.0.0.0:5001']
+
+  - chainlinkNode: # node
+      spec:
+        database:
+          config:
+            host: cre-db-1
+    chainlink:
+      v2Config:
+        98-node-common.toml: &tomlNodeCommon |
+          [Feature]
+          FeedsManager = true
+          LogPoller = true
+
+          [P2P.V2]
+          Enabled = true
+          ListenAddresses = ['0.0.0.0:5001']
+
+          [OCR2]
+          Enabled = true
+          DatabaseTimeout = '1s'
+        99-overrides.toml: |
+          [Log]
+          Level = 'info'
+
+          # [JobPipeline]
+          # [JobPipeline.HTTPRequest]
+          # DefaultTimeout = '30s'
+
+          # [Capabilities]
+          # [Capabilities.Peering]
+          # [Capabilities.Peering.V2]
+          # Enabled = true
+          # DefaultBootstrappers = ['12D3KooWCoXG82WfwcpbwdzWz6dgWZDWUU68yGPkysGna9GiwaUL@node2:7090']
+          # ListenAddresses = ['0.0.0.0:7090']
+
+          # [Capabilities.ExternalRegistry]
+          # Address = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512' # workflow registry
+          # NetworkID = 'evm'
+          # ChainID = '31337'
+
+          # [Capabilities.GatewayConnector]
+          # ChainIDForNodeKey = '31337'
+          # NodeAddress = '0xb54cd760462B0BC8C107778Cde2B2647E03F34a1'
+          # DonID = 'workflow_don_1'
+          # WSHandshakeTimeoutMillis = 100
+          # AuthMinChallengeLen = 10
+          # AuthTimestampToleranceSec = 10
+
+          # [[Capabilities.GatewayConnector.Gateways]]
+          # ID = 'my_gateway'
+          # URL = 'ws://node0:5003/node'
+
+          # [[EVM]]
+          # ChainID = '31337'
+          # FinalityDepth = 2
+          # FinalityTagEnabled = false
+
+          # [EVM.Workflow]
+          # FromAddress = '0xb54cd760462B0BC8C107778Cde2B2647E03F34a1'
+          # ForwarderAddress = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
+          # GasLimitDefault = 5000000
+
+  - chainlinkNode: # node
+      spec:
+        database:
+          config:
+            host: cre-db-2
+    chainlink:
+      v2Config:
+        98-node-common.toml: *tomlNodeCommon
+        99-overrides.toml: |
+          [Log]
+          Level = 'info'
+
+  - chainlinkNode: # node
+      spec:
+        database:
+          config:
+            host: cre-db-3
+    chainlink:
+      v2Config:
+        98-node-common.toml: *tomlNodeCommon
+        99-overrides.toml: |
+          [Log]
+          Level = 'info'
+
+  - chainlinkNode: # node
+      spec:
+        database:
+          config:
+            host: cre-db-4
+    chainlink:
+      v2Config:
+        98-node-common.toml: *tomlNodeCommon
+        99-overrides.toml: |
+          [Log]
+          Level = 'info'

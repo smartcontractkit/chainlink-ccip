@@ -52,7 +52,7 @@ deployments:
               - --chain-id
               - "31337"
               - --block-time
-              - "10"
+              - "1"
               - --dump-state
               - /data/anvil/anvil_state.json
         service:
@@ -146,7 +146,7 @@ profiles:
           - --chain-id
           - "31337"
           - --block-time
-          - "10"
+          - "1"
           - --dump-state
           - /data/anvil/anvil_state.json
           - --load-state

@@ -1,0 +1,7 @@
+type = "standardcapabilities"
+schemaVersion = 1
+name = "web-api-trigger-capability"
+externalJobID = "4fdd75ee-8fcf-422a-a08c-15f77beff72f"
+forwardingAllowed = false
+command = "__builtin_web-api-trigger"
+config = ""
