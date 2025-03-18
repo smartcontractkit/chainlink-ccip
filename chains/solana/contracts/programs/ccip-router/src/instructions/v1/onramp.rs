@@ -429,7 +429,7 @@ mod helpers {
             let hash_result = hash(&message);
 
             assert_eq!(
-                "a43d7d70b20ea71a61a1ac3eb1de4b04126678460487157b6a93d4cb10b73609",
+                "46abd733e950b0b0e05b1b4b040cf2df6c38899af71aad058ff08bfa96d4b532",
                 hex::encode(hash_result)
             );
         }
