@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token::spl_token::native_mint;
-use anchor_spl::token::Token;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use solana_program::address_lookup_table;
 
@@ -619,7 +618,8 @@ pub struct TokenAccountsValidationContext<'info> {
     pub pool_signer: UncheckedAccount<'info>,
 
     /// CHECK: Token program
-    pub token_program: Program<'info, Token>,
+    #[account(executable)]
+    pub token_program: UncheckedAccount<'info>,
 
     /// CHECK: Mint
     #[account(owner = token_program.key() @ CcipRouterError::InvalidInputsTokenAccounts)]

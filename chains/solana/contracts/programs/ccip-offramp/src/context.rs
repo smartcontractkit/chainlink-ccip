@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use anchor_spl::token::Token;
 use bytemuck::{Pod, Zeroable};
 use solana_program::address_lookup_table;
 use solana_program::sysvar::instructions;
@@ -740,7 +739,8 @@ pub struct TokenAccountsValidationContext<'info> {
     pub pool_signer: UncheckedAccount<'info>,
 
     /// CHECK: Token program
-    pub token_program: Program<'info, Token>,
+    #[account(executable)]
+    pub token_program: UncheckedAccount<'info>,
 
     /// CHECK: Mint
     #[account(owner = token_program.key() @ CcipOfframpError::InvalidInputsTokenAccounts)]
