@@ -48,6 +48,9 @@ pub struct Initialize<'info> {
     )]
     pub config: Account<'info, Config>,
 
+    #[account()]
+    pub link_token_mint: InterfaceAccount<'info, Mint>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
 

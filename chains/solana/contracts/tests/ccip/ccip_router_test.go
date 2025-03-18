@@ -87,6 +87,14 @@ func TestCCIPRouter(t *testing.T) {
 
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, legacyAdmin)
 
+	evmToken0Decimals := uint8(18)
+	evmToken1Decimals := uint8(18)
+	evmToken2Decimals := uint8(18)
+
+	token0Decimals := uint8(9)
+	token1Decimals := uint8(18)
+	token2Decimals := uint8(9)
+
 	// token addresses
 	token0Mint := solana.MustPrivateKeyFromBase58("42uJJqZk4gFz6Q6ghMiaYrFdDapXhbufQdTCGJDMeyv2wN6wNBbXkBBPibF7xQQZemzRaDH66ouJmjfvWhPJKtQC")
 	token0, gerr := tokens.NewTokenPool(config.Token2022Program, config.CcipTokenPoolProgram, token0Mint.PublicKey())
@@ -140,7 +148,8 @@ func TestCCIPRouter(t *testing.T) {
 			Bytes: onRampAddress,
 			Len:   3,
 		}},
-		IsEnabled: true,
+		IsEnabled:                 true,
+		IsRmnVerificationDisabled: true,
 	}
 	validFqDestChainConfig := fee_quoter.DestChainConfig{
 		IsEnabled: true,
@@ -197,13 +206,13 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("token", func(t *testing.T) {
-			ix0, ixErr0 := tokens.CreateToken(ctx, token0.Program, token0.Mint, token0PoolAdmin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
+			ix0, ixErr0 := tokens.CreateToken(ctx, token0.Program, token0.Mint, token0PoolAdmin.PublicKey(), token0Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr0)
 
-			ix1, ixErr1 := tokens.CreateToken(ctx, token1.Program, token1.Mint, token1PoolAdmin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
+			ix1, ixErr1 := tokens.CreateToken(ctx, token1.Program, token1.Mint, token1PoolAdmin.PublicKey(), token1Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr1)
 
-			ix2, ixErr2 := tokens.CreateToken(ctx, token2.Program, token2.Mint, token2PoolAdmin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
+			ix2, ixErr2 := tokens.CreateToken(ctx, token2.Program, token2.Mint, token2PoolAdmin.PublicKey(), token2Decimals, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, ixErr2)
 
 			// mint tokens to user
@@ -555,7 +564,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("FeeQuoter is initialized", func(t *testing.T) {
-			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
+			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000000000000, Hi: 0, Endianness: nil}
 
 			// get program data account
 			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.FeeQuoterProgram, &rpc.GetAccountInfoOpts{
@@ -568,11 +577,11 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 			ix, err := fee_quoter.NewInitializeInstruction(
-				link22.mint,
 				defaultMaxFeeJuelsPerMsg,
 				config.CcipRouterProgram,
 				// config solana.PublicKey, authority solana.PublicKey, systemProgram solana.PublicKey, program solana.PublicKey, programData solana.PublicKey
 				config.FqConfigPDA,
+				link22.mint,
 				legacyAdmin.PublicKey(),
 				solana.SystemProgramID,
 				config.FeeQuoterProgram,
@@ -587,6 +596,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "ConfigSet", &configSetEvent, config.PrintEvents))
 			require.Equal(t, defaultMaxFeeJuelsPerMsg, configSetEvent.MaxFeeJuelsPerMsg)
 			require.Equal(t, link22.mint, configSetEvent.LinkTokenMint)
+			require.Equal(t, uint8(9), configSetEvent.LinkTokenDecimals)
 			require.Equal(t, config.CcipRouterProgram, configSetEvent.Onramp)
 			require.Equal(t, fee_quoter.V1_CodeVersion, configSetEvent.DefaultCodeVersion)
 
@@ -2828,18 +2838,20 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("RemoteConfig", func(t *testing.T) {
 			for _, selector := range []uint64{config.EvmChainSelector, config.SvmChainSelector} {
 				ix0, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token0.Mint, base_token_pool.RemoteConfig{
-					// PoolAddresses: []test_token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
 					TokenAddress: base_token_pool.RemoteAddress{Address: []byte{1, 2, 3}},
+					Decimals:     evmToken0Decimals,
 				}, token0.PoolConfig, token0.Chain[selector], token0PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				ix1, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token1.Mint, base_token_pool.RemoteConfig{
 					PoolAddresses: []base_token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
 					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
+					Decimals:      evmToken1Decimals,
 				}, token1.PoolConfig, token1.Chain[selector], token1PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				ix2, err := test_token_pool.NewInitChainRemoteConfigInstruction(selector, token2.Mint, base_token_pool.RemoteConfig{
 					PoolAddresses: []base_token_pool.RemoteAddress{{Address: []byte{4, 5, 6}}},
 					TokenAddress:  base_token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
+					Decimals:      evmToken2Decimals,
 				}, token2.PoolConfig, token2.Chain[selector], token2PoolAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 				require.NoError(t, err)
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix0, ix1, ix2}, token0PoolAdmin, config.DefaultCommitment, common.AddSigners(token1PoolAdmin, token2PoolAdmin))
@@ -4220,7 +4232,7 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
 
-				ixApprove, err := tokens.TokenApproveChecked(1, 0, token0.Program, userTokenAccount, token0.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount, token0.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
@@ -4235,16 +4247,24 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, wsol.mint, ccipMessageSentEvent.Message.FeeToken)
 				require.Equal(t, tokens.ToLittleEndianU256(36333028), ccipMessageSentEvent.Message.FeeTokenAmount.LeBytes)
 				// The difference is the ratio between the fee token value (wsol) and link token value (signified by link22 in these tests).
-				// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels
-				require.Equal(t, tokens.ToLittleEndianU256(3633302), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
+				// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels.
+				// Then, they differ again by 9 decimals due to the solana denomiation being 1e9 divisions = 1 LINK, compared to 1e18 juels = 1 LINK
+				// in EVM. Note how some precision is lost in the translation, because the price in solana is stored with respect to the native
+				// decimals.
+				require.Equal(t, tokens.ToLittleEndianU256(3633302000000000), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
 				require.Equal(t, token0.PoolConfig, ta.SourcePoolAddress)
 				require.Equal(t, []byte{1, 2, 3}, ta.DestTokenAddress)
-				require.Equal(t, 0, len(ta.ExtraData))
+				// Local decimals are encoded in the extra data. By default, 9 decimals in Solana.
+				expectedExtraData := make([]byte, 32)
+				expectedExtraData[31] = token0Decimals
+				require.Equal(t, 32, len(ta.ExtraData))
+				require.Equal(t, expectedExtraData, ta.ExtraData)
+
 				require.Equal(t, tokens.ToLittleEndianU256(1), ta.Amount.LeBytes)
-				require.Equal(t, 32, len(ta.DestExecData))
-				expectedDestExecData := make([]byte, 32)
+				require.Equal(t, 4, len(ta.DestExecData))
+				expectedDestExecData := make([]byte, 4)
 				// Token0 billing had DestGasOverhead set to 100 during setup
-				binary.BigEndian.PutUint64(expectedDestExecData[24:], 100)
+				binary.BigEndian.PutUint32(expectedDestExecData[:], 100)
 				require.Equal(t, expectedDestExecData, ta.DestExecData)
 
 				// check pool event
@@ -4335,9 +4355,9 @@ func TestCCIPRouter(t *testing.T) {
 				ix, err := base.ValidateAndBuild()
 				require.NoError(t, err)
 
-				ixApprove0, err := tokens.TokenApproveChecked(1, 0, token0.Program, userTokenAccount0, token0.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, userTokenAccount0, token0.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
-				ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, userTokenAccount1, token1.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
+				ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, userTokenAccount1, token1.Mint, config.ExternalTokenPoolsSignerPDA, user.PublicKey(), nil)
 				require.NoError(t, err)
 
 				result := testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
@@ -5007,9 +5027,9 @@ func TestCCIPRouter(t *testing.T) {
 						ix, err := base.ValidateAndBuild()
 						require.NoError(t, err)
 
-						ixApprove0, err := tokens.TokenApproveChecked(1, 0, token0.Program, token0.User[user.PublicKey()], token0.Mint, senderPDA, user.PublicKey(), nil)
+						ixApprove0, err := tokens.TokenApproveChecked(1, token0Decimals, token0.Program, token0.User[user.PublicKey()], token0.Mint, senderPDA, user.PublicKey(), nil)
 						require.NoError(t, err)
-						ixApprove1, err := tokens.TokenApproveChecked(2, 0, token1.Program, token1.User[user.PublicKey()], token1.Mint, senderPDA, user.PublicKey(), nil)
+						ixApprove1, err := tokens.TokenApproveChecked(2, token1Decimals, token1.Program, token1.User[user.PublicKey()], token1.Mint, senderPDA, user.PublicKey(), nil)
 						require.NoError(t, err)
 
 						testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ixApprove0, ixApprove1, ix}, user, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(computebudget.MAX_COMPUTE_UNIT_LIMIT))
@@ -7574,7 +7594,8 @@ func TestCCIPRouter(t *testing.T) {
 					message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{{
 						SourcePoolAddress: []byte{1, 2, 3},
 						DestTokenAddress:  token0.Mint,
-						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
+						// 1 token * 1e9 due to decimal differences (18 in EVM, 9 in SVM). This will result in 1 unit in SVM.
+						Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1000000000)},
 					}}
 					rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 					require.NoError(t, err)
@@ -7697,11 +7718,13 @@ func TestCCIPRouter(t *testing.T) {
 					message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{{
 						SourcePoolAddress: []byte{1, 2, 3},
 						DestTokenAddress:  token0.Mint,
-						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
+						// 1 token * 1e9 due to decimal differences (18 in EVM, 9 in SVM). This will result in 1 unit in SVM.
+						Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1000000000)},
 					}, {
 						SourcePoolAddress: []byte{4, 5, 6},
 						DestTokenAddress:  token1.Mint,
-						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(2)},
+						// Token 2 has 18 decimals on both sides, no conversion will occur.
+						Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(2)},
 					}}
 					rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
 					require.NoError(t, err)
@@ -7787,7 +7810,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = raw.ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
+					testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
 
 					// validate amounts
 					_, finalBal0, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
@@ -8295,7 +8318,8 @@ func TestCCIPRouter(t *testing.T) {
 				message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{{
 					SourcePoolAddress: []byte{1, 2, 3},
 					DestTokenAddress:  token0.Mint,
-					Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
+					// 1 token * 1e9 due to decimal differences (18 in EVM, 9 in SVM). This will result in 1 unit in SVM.
+					Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1000000000)},
 				}}
 				message.TokenReceiver = receiver.PublicKey()
 				rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
@@ -8414,7 +8438,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 				maps.Copy(addressTables, offrampLookupTable) // commonly used ccip addresses - required otherwise tx is too large
 
-				testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, addressTables)
+				testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, legacyAdmin, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(400_000))
 
 				_, finalBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[receiver.PublicKey()], config.DefaultCommitment)
 				require.NoError(t, err)
