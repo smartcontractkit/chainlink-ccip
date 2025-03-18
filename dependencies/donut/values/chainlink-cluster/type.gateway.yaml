@@ -9,6 +9,8 @@ gatewayMode:
   public: false
   rdsCidr: 10.0.0.0/8
   serviceType: NodePort
+  # Disables restricitve egress network policy that blocks the node from connecting to Job Distributor
+  enableEgressNetworkPolicy: false
 
 networkPolicy:
   enabled: false
