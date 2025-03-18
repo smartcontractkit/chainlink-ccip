@@ -56,6 +56,9 @@ vars:
   # chains
   # Option to generate variable number of networks to be configured in Node config
   # It is required when network-generated profile is activated
+  BESU_CHAINS_COUNT:
+    source: env
+    default: 0
   GETH_CHAINS_COUNT:
     source: env
     default: 2
@@ -145,7 +148,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
-        version: 2.6.0-preview-1896-f6cd441
+        version: 2.6.0-preview-1908-4659e19
       valuesFiles: []
       values: {}
 
@@ -258,15 +261,15 @@ profiles:
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.ava-spruce-calm.yaml
   # to support load testing scenarios, the profile generate variable number of chain configs
   # It relies on CHAINS_COUNT property to generate variable number of network configs
-  # - name: network-generated
-  #   merge: |-
-  #     $(
-  #       pushd ./scripts/network_configs/ > /dev/null
-  #       go run main.go \
-  #         -geth-chains-count="${GETH_CHAINS_COUNT}" \
-  #         -besu-chains-count="${BESU_CHAINS_COUNT}" \
-  #         -solana-chains-count="${SOLANA_CHAINS_COUNT}"
-  #     )
+  - name: network-generated
+    merge: |-
+      $(
+        pushd ./scripts/network_configs/ > /dev/null
+        go run main.go \
+          -geth-chains-count="${GETH_CHAINS_COUNT}" \
+          -besu-chains-count="${BESU_CHAINS_COUNT}" \
+          -solana-chains-count="${SOLANA_CHAINS_COUNT}"
+      )
   # versions
   - name: version-latest
     patches:
