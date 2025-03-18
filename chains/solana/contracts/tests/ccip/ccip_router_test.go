@@ -141,13 +141,12 @@ func TestCCIPRouter(t *testing.T) {
 	}
 
 	onRampAddress := [64]byte{1, 2, 3}
-	emptyAddress := [64]byte{}
 
 	validSourceChainConfig := ccip_offramp.SourceChainConfig{
-		OnRamp: [2]ccip_offramp.OnRampAddress{{
+		OnRamp: ccip_offramp.OnRampAddress{
 			Bytes: onRampAddress,
 			Len:   3,
-		}},
+		},
 		IsEnabled:                 true,
 		IsRmnVerificationDisabled: true,
 	}
@@ -1013,7 +1012,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
 				onRampAddress := [64]byte{1, 2, 3}
 
-				require.Equal(t, [2]ccip_offramp.OnRampAddress{{Bytes: onRampAddress, Len: 3}, {Bytes: emptyAddress, Len: 0}}, sourceChainStateAccount.Config.OnRamp)
+				require.Equal(t, ccip_offramp.OnRampAddress{Bytes: onRampAddress, Len: 3}, sourceChainStateAccount.Config.OnRamp)
 			})
 		})
 
@@ -1022,14 +1021,9 @@ func TestCCIPRouter(t *testing.T) {
 
 			// the router is the SVM onramp
 			paddedCcipRouterProgram := common.ToPadded64Bytes(config.CcipRouterProgram.Bytes())
-			onRampConfig := [2]ccip_offramp.OnRampAddress{
-				{
-					Bytes: paddedCcipRouterProgram,
-					Len:   32,
-				}, {
-					Bytes: emptyAddress,
-					Len:   0,
-				},
+			onRampConfig := ccip_offramp.OnRampAddress{
+				Bytes: paddedCcipRouterProgram,
+				Len:   32,
 			}
 
 			t.Run("CCIP Router", func(t *testing.T) {
@@ -1100,7 +1094,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 				require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-				require.Equal(t, [2]ccip_offramp.OnRampAddress{{Bytes: paddedCcipRouterProgram, Len: 32}, {Bytes: emptyAddress, Len: 0}}, sourceChainStateAccount.Config.OnRamp)
+				require.Equal(t, ccip_offramp.OnRampAddress{Bytes: paddedCcipRouterProgram, Len: 32}, sourceChainStateAccount.Config.OnRamp)
 			})
 		})
 
@@ -7064,7 +7058,7 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message.Header.DestChainSelector = 89 // invalid dest chain selector
 				sequenceNumber := message.Header.SequenceNumber
-				hash, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 
 				require.NoError(t, err)
 				root := [32]byte(hash)
@@ -7197,7 +7191,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				message := ccip.CreateDefaultMessageWith(sourceChainSelector, executedSequenceNumber) // already executed seq number
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
-				hash, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -7254,7 +7248,7 @@ func TestCCIPRouter(t *testing.T) {
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 				message1, hash1 := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message2 := ccip.CreateDefaultMessageWith(config.EvmChainSelector, message1.Header.SequenceNumber+1)
-				hash2, err := ccip.HashAnyToSVMMessage(message2, msgAccounts)
+				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1[:], hash2[:]}))
@@ -7402,7 +7396,7 @@ func TestCCIPRouter(t *testing.T) {
 				message.TokenReceiver = stubAccountPDA
 				sequenceNumber := message.Header.SequenceNumber
 				message.ExtraArgs.IsWritableBitmap = 0
-				hash, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -7492,7 +7486,7 @@ func TestCCIPRouter(t *testing.T) {
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 				message.Data = []byte{} // empty message data
-				hash, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -7597,7 +7591,7 @@ func TestCCIPRouter(t *testing.T) {
 						// 1 token * 1e9 due to decimal differences (18 in EVM, 9 in SVM). This will result in 1 unit in SVM.
 						Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1000000000)},
 					}}
-					rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 					require.NoError(t, err)
 
 					root := [32]byte(rootBytes)
@@ -7726,7 +7720,7 @@ func TestCCIPRouter(t *testing.T) {
 						// Token 2 has 18 decimals on both sides, no conversion will occur.
 						Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(2)},
 					}}
-					rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 					require.NoError(t, err)
 
 					root := [32]byte(rootBytes)
@@ -7858,7 +7852,7 @@ func TestCCIPRouter(t *testing.T) {
 						DestTokenAddress:  token0.Mint,
 						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 					}}
-					rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
+					rootBytes, err := ccip.HashAnyToSVMMessage(message, args.onramp, msgAccounts)
 					require.NoError(t, err)
 
 					root := [32]byte(rootBytes)
@@ -7919,8 +7913,7 @@ func TestCCIPRouter(t *testing.T) {
 					var sourceChain ccip_offramp.SourceChain
 					require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.OfframpSvmSourceChainPDA, config.DefaultCommitment, &sourceChain))
 					t.Log(sourceChain.Config)
-					require.Equal(t, sourceChain.Config.OnRamp[0].Bytes[0:32], config.CcipRouterProgram[:])
-					require.Equal(t, sourceChain.Config.OnRamp[0].Len, uint32(32))
+					require.Equal(t, sourceChain.Config.OnRamp.Bytes[0:32], config.CcipRouterProgram[:])
 
 					// Check offramp program is not registered in router as valid offramp for SVM<>SVM lane
 					testutils.AssertClosedAccount(ctx, t, solanaGoClient, config.AllowedOfframpSvmPDA, config.DefaultCommitment)
@@ -8043,11 +8036,11 @@ func TestCCIPRouter(t *testing.T) {
 				msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 				message1, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 
-				hash1, err := ccip.HashAnyToSVMMessage(message1, msgAccounts)
+				hash1, err := ccip.HashAnyToSVMMessage(message1, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
 				message2 := ccip.CreateDefaultMessageWith(config.EvmChainSelector, message1.Header.SequenceNumber+1)
-				hash2, err := ccip.HashAnyToSVMMessage(message2, msgAccounts)
+				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1, hash2}))
@@ -8322,7 +8315,7 @@ func TestCCIPRouter(t *testing.T) {
 					Amount: ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1000000000)},
 				}}
 				message.TokenReceiver = receiver.PublicKey()
-				rootBytes, err := ccip.HashAnyToSVMMessage(message, msgAccounts)
+				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
 				require.NoError(t, err)
 
 				root := [32]byte(rootBytes)
