@@ -6,7 +6,7 @@ use anchor_spl::token_2022::spl_token_2022::{
 };
 use base_token_pool::{common::*, rate_limiter::*};
 
-declare_id!("TokenPooL11111111111111111111111111BurnMint");
+declare_id!("41FGToCmdaWa1dgZLKFAjvmx6e6AjVTX7SVRibvsMGVB");
 
 pub mod context;
 use crate::context::*;
@@ -197,7 +197,11 @@ pub mod example_burnmint_token_pool {
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
-            dest_pool_data: RemoteAddress::ZERO,
+            dest_pool_data: {
+                let mut abi_encoded_decimals = vec![0u8; 32];
+                abi_encoded_decimals[31] = ctx.accounts.state.config.decimals;
+                abi_encoded_decimals
+            },
         })
     }
 }
