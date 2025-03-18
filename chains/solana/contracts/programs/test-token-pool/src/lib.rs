@@ -9,8 +9,8 @@ use crate::context::*;
 #[program]
 pub mod test_token_pool {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
-    use example_burnmint_token_pool::{burn_tokens, mint_tokens};
-    use example_lockrelease_token_pool::{lock_tokens, release_tokens};
+    use burnmint_token_pool::{burn_tokens, mint_tokens};
+    use lockrelease_token_pool::{lock_tokens, release_tokens};
 
     use super::*;
 
