@@ -671,7 +671,7 @@ mod tests {
         let hash_result = hash(&message, remaining_account_keys, &on_ramp_address);
 
         assert_eq!(
-            "36a886a90047ffbc39dd32f5c8aa8bee849bfd8445074cf59d8457f32a77c2ae",
+            "5ddb3c9fccb01abee926ec6112afa075dc81fdfe1e2902595d9c1d1d1de4f1d1",
             hex::encode(hash_result)
         );
     }

@@ -49,8 +49,8 @@ impl Commit for Impl {
             CcipOfframpError::UnsupportedSourceChainSelector
         );
         require!(
-            &source_chain.config.on_ramp.bytes()
-                == &report.merkle_root.as_ref().unwrap().on_ramp_address,
+            source_chain.config.on_ramp.bytes()
+                == report.merkle_root.as_ref().unwrap().on_ramp_address,
             CcipOfframpError::OnrampNotConfigured
         );
 
