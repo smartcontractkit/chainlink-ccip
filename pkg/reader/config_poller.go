@@ -6,12 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 // ConfigPoller defines the interface for caching chain configuration data
@@ -20,16 +17,18 @@ type ConfigPoller interface {
 	GetChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error)
 	// RefreshChainConfig forces a refresh of the chain configuration
 	RefreshChainConfig(ctx context.Context, chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error)
-	// GetOfframpSourceChainConfigs retrieves cached source chain configurations
+	// GetOfframpSourceChainConfigs retrieves cached source chain configurations.
+	// This method returns StaticSourceChainConfig objects which deliberately exclude MinSeqNr.
+	// For obtaining sequence numbers, use ccipChainReader.GetLatestMinSeqNrs instead.
 	GetOfframpSourceChainConfigs(
 		ctx context.Context,
 		destChain cciptypes.ChainSelector,
-		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
 	// RefreshSourceChainConfigs forces a refresh of source chain configurations
 	RefreshSourceChainConfigs(
 		ctx context.Context,
 		destChain cciptypes.ChainSelector,
-		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
 }
 
 // configPoller handles caching of chain configuration data for multiple chains.
@@ -54,17 +53,10 @@ type chainCache struct {
 	chainConfigRefresh time.Time
 
 	// Source chain config specific lock and data
-	sourceChainMu      sync.RWMutex
-	sourceChainConfigs map[cciptypes.ChainSelector]SourceChainConfig
-	sourceChainRefresh time.Time // Single timestamp for all source chain configs
-
+	sourceChainMu            sync.RWMutex
+	staticSourceChainConfigs map[cciptypes.ChainSelector]StaticSourceChainConfig
+	sourceChainRefresh       time.Time // Single timestamp for all source chain configs
 }
-
-// // sourceChainCacheEntry holds cached data for a specific source chain
-// type sourceChainCacheEntry struct {
-// 	config      SourceChainConfig
-// 	lastRefresh time.Time
-// }
 
 // newConfigPoller creates a new config cache instance
 func newConfigPoller(
@@ -96,7 +88,7 @@ func (c *configPoller) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *
 	}
 
 	cache := &chainCache{
-		sourceChainConfigs: make(map[cciptypes.ChainSelector]SourceChainConfig),
+		staticSourceChainConfigs: make(map[cciptypes.ChainSelector]StaticSourceChainConfig),
 	}
 	c.chainCaches[chainSel] = cache
 	return cache
@@ -136,7 +128,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 	sourceChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	// Verify we have a reader for the destination chain
 	if _, exists := c.reader.contractReaders[destChain]; !exists {
 		c.lggr.Errorw("No contract reader for destination chain", "chain", destChain)
@@ -146,7 +138,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	// Filter out destination chain from source chains
 	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
 	if len(filteredSourceChains) == 0 {
-		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
+		return make(map[cciptypes.ChainSelector]StaticSourceChainConfig), nil
 	}
 
 	// Get or create cache for the destination chain
@@ -158,7 +150,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	chainCache.sourceChainMu.RLock()
 
 	// Initialize results map and track which chains need to be fetched
-	result := make(map[cciptypes.ChainSelector]SourceChainConfig)
+	cachedSourceConfigs := make(map[cciptypes.ChainSelector]StaticSourceChainConfig)
 	var chainsToFetch []cciptypes.ChainSelector
 
 	// Check if the global refresh time has expired
@@ -173,12 +165,12 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 
 	// Determine which chains need to be fetched
 	for _, chain := range filteredSourceChains {
-		config, exists := chainCache.sourceChainConfigs[chain]
+		config, exists := chainCache.staticSourceChainConfigs[chain]
 		if !exists || needsGlobalRefresh {
 			chainsToFetch = append(chainsToFetch, chain)
 		} else {
 			// Use cached version
-			result[chain] = config
+			cachedSourceConfigs[chain] = config
 		}
 	}
 
@@ -188,7 +180,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 		c.lggr.Debugw("All source chain configs found in cache",
 			"destChain", destChain,
 			"sourceChains", sourceChains)
-		return result, nil
+		return cachedSourceConfigs, nil
 	}
 
 	chainCache.sourceChainMu.RUnlock()
@@ -199,17 +191,17 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 		"chainsToFetch", chainsToFetch)
 
 	// Get the missing configs
-	newConfigs, err := c.RefreshSourceChainConfigs(ctx, destChain, chainsToFetch)
+	newCachedConfigs, err := c.RefreshSourceChainConfigs(ctx, destChain, chainsToFetch)
 	if err != nil {
 		return nil, err
 	}
 
 	// Merge the new configs with existing cached results
-	for chain, config := range newConfigs {
-		result[chain] = config
+	for chain, config := range newCachedConfigs {
+		cachedSourceConfigs[chain] = config
 	}
 
-	return result, nil
+	return cachedSourceConfigs, nil
 }
 
 // RefreshSourceChainConfigs forces a refresh of source chain configurations
@@ -217,9 +209,9 @@ func (c *configPoller) RefreshSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 	chainsToFetch []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
+) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	if len(chainsToFetch) == 0 {
-		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
+		return make(map[cciptypes.ChainSelector]StaticSourceChainConfig), nil
 	}
 
 	// Get the chain cache
@@ -230,7 +222,7 @@ func (c *configPoller) RefreshSourceChainConfigs(
 
 	// Fetch configs from the contract
 	startTime := time.Now()
-	newConfigs, err := c.fetchSourceChainConfigs(ctx, destChain, chainsToFetch)
+	sourceChainConfigs, err := c.reader.fetchFreshSourceChainConfigs(ctx, destChain, chainsToFetch)
 	fetchConfigLatency := time.Since(startTime)
 
 	if err != nil {
@@ -246,13 +238,14 @@ func (c *configPoller) RefreshSourceChainConfigs(
 	chainCache.sourceChainMu.Lock()
 
 	// Initialize the map if needed
-	if chainCache.sourceChainConfigs == nil {
-		chainCache.sourceChainConfigs = make(map[cciptypes.ChainSelector]SourceChainConfig)
+	if chainCache.staticSourceChainConfigs == nil {
+		chainCache.staticSourceChainConfigs = make(map[cciptypes.ChainSelector]StaticSourceChainConfig)
 	}
 
 	// Update configs in the map
-	for chain, config := range newConfigs {
-		chainCache.sourceChainConfigs[chain] = config
+	for chain, config := range sourceChainConfigs {
+		cachedConfig := staticSourceChainConfigFromSourceChainConfig(config)
+		chainCache.staticSourceChainConfigs[chain] = cachedConfig
 	}
 
 	// Update the refresh timestamp
@@ -262,10 +255,15 @@ func (c *configPoller) RefreshSourceChainConfigs(
 
 	c.lggr.Debugw("Successfully refreshed source chain configs",
 		"destChain", destChain,
-		"chainsCount", len(newConfigs),
+		"chainsCount", len(sourceChainConfigs),
 		"fetchConfigLatency", fetchConfigLatency)
 
-	return newConfigs, nil
+	result := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChainConfigs))
+	for chain, config := range sourceChainConfigs {
+		result[chain] = staticSourceChainConfigFromSourceChainConfig(config)
+	}
+
+	return result, nil
 }
 
 // RefreshChainConfig forces a refresh of the chain configuration
@@ -341,85 +339,6 @@ func (c *configPoller) fetchChainConfig(
 	return c.reader.processConfigResults(chainSel, batchResult)
 }
 
-// fetchSourceChainConfigs fetches source chain configs directly from contracts
-func (c *configPoller) fetchSourceChainConfigs(
-	ctx context.Context,
-	destChain cciptypes.ChainSelector,
-	sourceChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]SourceChainConfig, error) {
-	reader, exists := c.reader.contractReaders[destChain]
-	if !exists {
-		return nil, fmt.Errorf("no contract reader for chain %d", destChain)
-	}
-
-	// Filter out destination chain
-	filteredSourceChains := filterOutChainSelector(sourceChains, destChain)
-	if len(filteredSourceChains) == 0 {
-		return make(map[cciptypes.ChainSelector]SourceChainConfig), nil
-	}
-
-	// Prepare batch requests for the sourceChains
-	contractBatch := make([]types.BatchRead, 0, len(sourceChains))
-	validSourceChains := make([]cciptypes.ChainSelector, 0, len(sourceChains))
-
-	for _, chain := range filteredSourceChains {
-		validSourceChains = append(validSourceChains, chain)
-		contractBatch = append(contractBatch, types.BatchRead{
-			ReadName: consts.MethodNameGetSourceChainConfig,
-			Params: map[string]any{
-				"sourceChainSelector": chain,
-			},
-			ReturnVal: new(SourceChainConfig),
-		})
-	}
-
-	// Execute batch request
-	results, _, err := reader.ExtendedBatchGetLatestValues(
-		ctx,
-		contractreader.ExtendedBatchGetLatestValuesRequest{
-			consts.ContractNameOffRamp: contractBatch,
-		},
-		false,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
-	}
-
-	// Process results
-	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
-
-	for _, readResult := range results {
-		if len(readResult) != len(validSourceChains) {
-			return nil, fmt.Errorf("selectors and source chain configs length mismatch: sourceChains=%v, results=%v",
-				validSourceChains, results)
-		}
-
-		for i, chain := range validSourceChains {
-			v, err := readResult[i].GetResult()
-			if err != nil {
-				c.lggr.Errorw("Failed to get source chain config",
-					"chain", chain,
-					"error", err)
-				return nil, fmt.Errorf("GetSourceChainConfig for chainSelector=%d failed: %w", chain, err)
-			}
-
-			cfg, ok := v.(*SourceChainConfig)
-			if !ok {
-				c.lggr.Errorw("Invalid result type from GetSourceChainConfig",
-					"chain", chain,
-					"type", fmt.Sprintf("%T", v))
-				return nil, fmt.Errorf("invalid result type from GetSourceChainConfig for chainSelector=%d", chain)
-			}
-
-			// Store the config - we don't filter here as that's done at the reader level
-			configs[chain] = *cfg
-		}
-	}
-
-	return configs, nil
-}
-
 // filterOutChainSelector removes a specified chain selector from a slice of chain selectors
 func filterOutChainSelector(
 	chains []cciptypes.ChainSelector,
@@ -435,6 +354,17 @@ func filterOutChainSelector(
 		}
 	}
 	return filtered
+}
+
+// StaticSourceChainConfigFromSourceChainConfig creates a StaticSourceChainConfig from a SourceChainConfig,
+// omitting the MinSeqNr field.
+func staticSourceChainConfigFromSourceChainConfig(sc SourceChainConfig) StaticSourceChainConfig {
+	return StaticSourceChainConfig{
+		Router:                    sc.Router,
+		IsEnabled:                 sc.IsEnabled,
+		IsRMNVerificationDisabled: sc.IsRMNVerificationDisabled,
+		OnRamp:                    sc.OnRamp,
+	}
 }
 
 // resultProcessor defines a function type for processing individual results

@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -76,6 +77,48 @@ func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelecto
 	}
 	resp[contract][chain] = address
 	return resp
+}
+
+// StaticSourceChainConfig stores the static parts of SourceChainConfig
+// that don't change frequently and are safe to cache.
+type StaticSourceChainConfig struct {
+	Router                    []byte
+	IsEnabled                 bool
+	IsRMNVerificationDisabled bool
+	OnRamp                    cciptypes.UnknownAddress
+}
+
+// ToSourceChainConfig converts a CachedSourceChainConfig to a full SourceChainConfig
+// by adding the provided sequence number.
+func (s StaticSourceChainConfig) ToSourceChainConfig(minSeqNr uint64) SourceChainConfig {
+	return SourceChainConfig{
+		Router:                    s.Router,
+		IsEnabled:                 s.IsEnabled,
+		IsRMNVerificationDisabled: s.IsRMNVerificationDisabled,
+		OnRamp:                    s.OnRamp,
+		MinSeqNr:                  minSeqNr,
+	}
+}
+
+func (s StaticSourceChainConfig) check() (bool /* enabled */, error) {
+	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
+	if !s.IsEnabled {
+		return false, nil
+	}
+	// This may happen due to some sort of regression in the codec that unmarshals
+	// chain data -> go struct.
+	if len(s.OnRamp) == 0 {
+		return false, fmt.Errorf(
+			"onRamp misconfigured/didn't unmarshal: %x",
+			s.OnRamp,
+		)
+	}
+
+	if len(s.Router) == 0 {
+		return false, fmt.Errorf("router is empty: %v", s.Router)
+	}
+
+	return s.IsEnabled, nil
 }
 
 func NewCCIPChainReader(
@@ -226,8 +269,9 @@ type CCIPReader interface {
 	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
 	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
 
-	// GetOffRampSourceChainsConfig returns the sourceChains config for all the provided source chains.
+	// GetOffRampSourceChainsConfig returns the source chain static configs for all the provided source chains.
+	// This method returns StaticSourceChainConfig objects which deliberately exclude MinSeqNr.
 	// If a config was not found it will be missing from the returned map.
 	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
-	) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+	) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
 }
