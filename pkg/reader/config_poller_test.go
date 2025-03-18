@@ -1246,8 +1246,8 @@ func TestConfigCache_GetOrCreateChainCache_InitializesSourceChainConfig(t *testi
 	require.NotNil(t, chainCache)
 
 	// Verify the sourceChainConfigs map is initialized
-	require.NotNil(t, chainCache.sourceChainConfigs)
-	assert.Len(t, chainCache.sourceChainConfigs, 0)
+	require.NotNil(t, chainCache.staticSourceChainConfigs)
+	assert.Len(t, chainCache.staticSourceChainConfigs, 0)
 
 	// Verify the initial refresh time is zero
 	assert.True(t, chainCache.sourceChainRefresh.IsZero())
