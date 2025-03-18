@@ -178,9 +178,7 @@ export type BaseTokenPool = {
           },
           {
             "name": "destPoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           }
         ]
       }
@@ -802,9 +800,7 @@ export const IDL: BaseTokenPool = {
           },
           {
             "name": "destPoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           }
         ]
       }

@@ -97,6 +97,6 @@ func TestMessageHashing(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7", hex.EncodeToString(h))
+		require.Equal(t, "ab7f57fbf9979573a9fa1bcf1ad816449223c343ea8b938db9e917f2ca138a84", hex.EncodeToString(h))
 	})
 }

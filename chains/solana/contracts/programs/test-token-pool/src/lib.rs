@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use base_token_pool::{common::*, rate_limiter::RateLimitConfig};
 
-declare_id!("GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH");
+declare_id!("JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ");
 
 mod context;
 use crate::context::*;
@@ -292,7 +292,11 @@ pub mod test_token_pool {
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
-            dest_pool_data: RemoteAddress::ZERO,
+            dest_pool_data: {
+                let mut abi_encoded_decimals = vec![0u8; 32];
+                abi_encoded_decimals[31] = ctx.accounts.state.config.decimals;
+                abi_encoded_decimals
+            },
         })
     }
 }
