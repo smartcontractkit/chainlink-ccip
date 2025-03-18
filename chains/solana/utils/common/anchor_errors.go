@@ -8,8 +8,10 @@ import (
 // Note: This is not an exhaustive list of Anchor errors.
 // For a complete list, please refer to https://anchor.so/errors
 
+//nolint:all
 type AnchorError ag_binary.BorshEnum
 
+//nolint:all
 const (
 	ConstraintSeeds_AnchorError AnchorError = iota
 	AccountNotInitialized_AnchorError
