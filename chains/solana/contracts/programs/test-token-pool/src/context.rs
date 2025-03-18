@@ -17,6 +17,7 @@ pub struct InitializeTokenPool<'info> {
         space = ANCHOR_DISCRIMINATOR + State::INIT_SPACE,
     )]
     pub state: Account<'info, State>, // config PDA for token pool
+    #[account(constraint = mint.is_initialized)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(mut)]
     pub authority: Signer<'info>, // anyone can init token pool for a token, but ccip token admin registry controlls who can register pool for token
@@ -31,6 +32,7 @@ pub struct SetConfig<'info> {
         bump,
     )]
     pub state: Account<'info, State>,
+    #[account(constraint = mint.is_initialized)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(address = state.config.owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
@@ -44,6 +46,7 @@ pub struct AcceptOwnership<'info> {
         bump,
     )]
     pub state: Account<'info, State>,
+    #[account(constraint = mint.is_initialized)]
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
     #[account(address = state.config.proposed_owner @ CcipTokenPoolError::Unauthorized)]
     pub authority: Signer<'info>,
@@ -88,7 +91,7 @@ pub struct TokenOfframp<'info> {
     #[account(address = *mint.to_account_info().owner)]
     /// CHECK: CPI to token program
     pub token_program: AccountInfo<'info>,
-    #[account(mut)]
+    #[account(mut, constraint = mint.is_initialized)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
         seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],
@@ -158,7 +161,7 @@ pub struct TokenOnramp<'info> {
     #[account(address = *mint.to_account_info().owner)]
     /// CHECK: CPI to underlying token program
     pub token_program: AccountInfo<'info>,
-    #[account(mut)]
+    #[account(mut, constraint = mint.is_initialized)]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
         seeds = [POOL_SIGNER_SEED, mint.key().as_ref()],

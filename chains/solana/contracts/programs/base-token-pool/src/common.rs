@@ -284,7 +284,8 @@ pub struct LockOrBurnInV1 {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct LockOrBurnOutV1 {
     pub dest_token_address: RemoteAddress,
-    pub dest_pool_data: RemoteAddress,
+    // Currently encodes the local decimals as there's a chance they differ.
+    pub dest_pool_data: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
