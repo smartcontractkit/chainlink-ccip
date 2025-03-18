@@ -422,7 +422,7 @@ pub const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0
 pub fn build_receiver_discriminator_and_data(msg: &Any2SVMMessage) -> Result<Vec<u8>> {
     let message = msg.try_to_vec()?;
 
-    let mut data = Vec::with_capacity(8);
+    let mut data = Vec::with_capacity(8 + message.len());
     data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
     data.extend_from_slice(&message);
 

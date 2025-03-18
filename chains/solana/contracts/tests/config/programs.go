@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -20,7 +19,6 @@ func parseAnchorToml() Config {
 	var config Config
 	startDir, err := os.Getwd()
 	if err != nil {
-		fmt.Println("Error getting current working directory:", err)
 		return config
 	}
 
@@ -35,14 +33,12 @@ func parseAnchorToml() Config {
 		// Move up one level
 		parentDir := filepath.Dir(dir)
 		if parentDir == dir {
-			fmt.Println("Anchor.toml not found")
 			return config
 		}
 		dir = parentDir
 	}
 
 	if _, err := toml.DecodeFile(tomlPath, &config); err != nil {
-		fmt.Println("Error reading Anchor.toml:", err)
 		return config
 	}
 
@@ -53,7 +49,6 @@ func parseAnchorToml() Config {
 func GetProgramID(programName string) solana.PublicKey {
 	programID, exists := AnchorToml.Programs["localnet"][programName]
 	if !exists {
-		fmt.Printf("Program ID %s not found in Anchor.toml", programName)
 		return solana.PublicKey{}
 	}
 

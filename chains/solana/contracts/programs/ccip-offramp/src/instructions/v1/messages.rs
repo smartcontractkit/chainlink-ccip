@@ -53,7 +53,7 @@ impl Any2SVMMessage {
         require!(m.is_ok(), CcipOfframpError::InvalidMessage);
         let message = m.unwrap();
 
-        let mut data = Vec::with_capacity(8);
+        let mut data = Vec::with_capacity(8 + message.len());
         data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
         data.extend_from_slice(&message);
 
