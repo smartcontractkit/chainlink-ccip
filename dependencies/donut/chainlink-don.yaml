@@ -40,6 +40,10 @@ vars:
   DON_TYPE:
     source: env
     default: dev
+  # Option to use template for custom don type, when enabled it will use type.${DON_TYPE}.yaml
+  ENABLE_CUSTOM_TYPE:
+    source: env
+    default: "false"
   DON_VERSION:
     source: env
     default: latest
@@ -49,9 +53,6 @@ vars:
   DON_NODE_COUNT:
     source: env
     default: 1
-  DON_GATEWAY_NODE_COUNT:
-    source: env
-    default: 0
   # chains
   # Option to generate variable number of networks to be configured in Node config
   # It is required when network-generated profile is activated
@@ -65,8 +66,11 @@ vars:
   ENABLE_DON_BASE:
     source: env
     default: "true"
-  CRE_CONFIG_DIR:
+  # Option to pass custom node config and secrets overrides. We expect the directory to contain
+  # a subfolder with ${DON_TYPE} name, which contains the overrides
+  CONFIG_OVERRIDES_DIR:
     source: env
+    default: ""
   JOB_DISTRIBUTOR_IMAGE_TAG:
     source: env
     default: 0.9.0
@@ -162,10 +166,10 @@ hooks:
         "app.kubernetes.io/name": "chainlink-don"
     name: "wait-for-chainlink-don-pods"
     events: ["after:deploy:chainlink-don"]
-  # - name: Wait for ingress hosts
-  #   events: ["after:deploy:chainlink-don"]
-  #   command: crib
-  #   args: ["devspace", "ingress-check"]
+  - name: Wait for ingress hosts
+    events: ["after:deploy:chainlink-don"]
+    command: crib
+    args: ["devspace", "ingress-check"]
 profiles:
   # charts
   - name: local-charts
@@ -192,11 +196,19 @@ profiles:
         POSTGRES_CHART_VERSION="15.5.9" \
         PROVIDER=${PROVIDER} \
         POSTGRES_CHART_VERSION="15.5.9" \
-        CRE_CONFIG_DIR="${CRE_CONFIG_DIR}" \
+        CONFIG_OVERRIDES_DIR="${CONFIG_OVERRIDES_DIR}" \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.base.yaml
       )
   - name: don-base-type
+    activation:
+      - vars:
+          ENABLE_CUSTOM_TYPE: "true"
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/type.${DON_TYPE}.yaml
+  - name: don-custom-type
     activation: *enableDonBase
     patches:
       - op: add
@@ -246,14 +258,15 @@ profiles:
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.ava-spruce-calm.yaml
   # to support load testing scenarios, the profile generate variable number of chain configs
   # It relies on CHAINS_COUNT property to generate variable number of network configs
-  - name: network-generated
-    merge: |-
-      $(
-        pushd ./scripts/network_configs/ > /dev/null
-        go run main.go \
-          -geth-chains-count="${GETH_CHAINS_COUNT}" \
-          -solana-chains-count="${SOLANA_CHAINS_COUNT}"
-      )
+  # - name: network-generated
+  #   merge: |-
+  #     $(
+  #       pushd ./scripts/network_configs/ > /dev/null
+  #       go run main.go \
+  #         -geth-chains-count="${GETH_CHAINS_COUNT}" \
+  #         -besu-chains-count="${BESU_CHAINS_COUNT}" \
+  #         -solana-chains-count="${SOLANA_CHAINS_COUNT}"
+  #     )
   # versions
   - name: version-latest
     patches:
@@ -276,14 +289,7 @@ profiles:
                   repository: ${DEVSPACE_IMAGE}
                   tag: ${DEVSPACE_IMAGE_TAG}
                   pullPolicy: Always
-        chainlink-don-gateway:
-          helm:
-            values:
-              common:
-                image:
-                  repository: ${DEVSPACE_IMAGE}
-                  tag: ${DEVSPACE_IMAGE_TAG}
-                  pullPolicy: Always
+
   # monitoring
   - name: monitoring-service-monitor
     patches:
@@ -350,6 +356,7 @@ profiles:
     activation:
       - vars:
           PROVIDER: "aws"
+          CRIB_EKS_CLUSTER_NAME: "main-stage-cluster"
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \

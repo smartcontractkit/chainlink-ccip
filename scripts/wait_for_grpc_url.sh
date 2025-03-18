@@ -12,7 +12,6 @@ START=$(date +%s)
 echo "Waiting for gRPC server: $GRPC_SERVER, method: $GRPC_METHOD"
 while true; do
 	# Try calling the gRPC method
-	grpcurl "$GRPC_SERVER" "$GRPC_METHOD"
 	if grpcurl "$GRPC_SERVER" "$GRPC_METHOD" >/dev/null 2>&1; then
 		echo "gRPC server is ready: $GRPC_SERVER"
 		exit 0

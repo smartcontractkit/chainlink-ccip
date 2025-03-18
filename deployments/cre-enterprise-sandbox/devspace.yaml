@@ -63,12 +63,6 @@ vars:
   CHAINLINK_PRODUCT:
     source: env
     default: ccip
-  DON_GATEWAY_NODE_COUNT:
-    source: env
-    default: 0
-  DON_GATEWAY_NODE_COUNT_CRE:
-    source: env
-    default: 1
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
