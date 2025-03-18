@@ -119,6 +119,7 @@ pub struct Execute<'info> {
 
     /// CHECK: program signer PDA that can hold balance
     #[account(
+        mut,
         seeds = [SIGNER_SEED, multisig_id.as_ref()],
         bump
     )]

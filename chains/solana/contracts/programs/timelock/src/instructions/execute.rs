@@ -181,6 +181,7 @@ pub struct ExecuteBatch<'info> {
 
     /// CHECK: program signer PDA that can hold balance
     #[account(
+        mut,
         seeds = [TIMELOCK_SIGNER_SEED, timelock_id.as_ref()],
         bump
     )]
@@ -210,6 +211,7 @@ pub struct BypasserExecuteBatch<'info> {
 
     /// CHECK: program signer PDA that can hold balance
     #[account(
+        mut,
         seeds = [TIMELOCK_SIGNER_SEED, timelock_id.as_ref()],
         bump
     )]

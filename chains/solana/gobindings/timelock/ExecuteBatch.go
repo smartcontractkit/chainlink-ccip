@@ -40,7 +40,7 @@ type ExecuteBatch struct {
 	//
 	// [2] = [] config
 	//
-	// [3] = [] timelockSigner
+	// [3] = [WRITE] timelockSigner
 	//
 	// [4] = [] roleAccessController
 	//
@@ -103,7 +103,7 @@ func (inst *ExecuteBatch) GetConfigAccount() *ag_solanago.AccountMeta {
 
 // SetTimelockSignerAccount sets the "timelockSigner" account.
 func (inst *ExecuteBatch) SetTimelockSignerAccount(timelockSigner ag_solanago.PublicKey) *ExecuteBatch {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(timelockSigner)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(timelockSigner).WRITE()
 	return inst
 }
 

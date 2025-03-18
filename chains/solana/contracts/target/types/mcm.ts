@@ -441,7 +441,7 @@ export type Mcm = {
         },
         {
           "name": "multisigSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1812,7 +1812,7 @@ export const IDL: Mcm = {
         },
         {
           "name": "multisigSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {

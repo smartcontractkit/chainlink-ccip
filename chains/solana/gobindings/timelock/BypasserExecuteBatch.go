@@ -37,7 +37,7 @@ type BypasserExecuteBatch struct {
 	//
 	// [1] = [] config
 	//
-	// [2] = [] timelockSigner
+	// [2] = [WRITE] timelockSigner
 	//
 	// [3] = [] roleAccessController
 	//
@@ -89,7 +89,7 @@ func (inst *BypasserExecuteBatch) GetConfigAccount() *ag_solanago.AccountMeta {
 
 // SetTimelockSignerAccount sets the "timelockSigner" account.
 func (inst *BypasserExecuteBatch) SetTimelockSignerAccount(timelockSigner ag_solanago.PublicKey) *BypasserExecuteBatch {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(timelockSigner)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(timelockSigner).WRITE()
 	return inst
 }
 

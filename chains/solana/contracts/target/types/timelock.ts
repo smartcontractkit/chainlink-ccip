@@ -647,7 +647,7 @@ export type Timelock = {
         },
         {
           "name": "timelockSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1048,7 +1048,7 @@ export type Timelock = {
         },
         {
           "name": "timelockSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -2429,7 +2429,7 @@ export const IDL: Timelock = {
         },
         {
           "name": "timelockSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -2830,7 +2830,7 @@ export const IDL: Timelock = {
         },
         {
           "name": "timelockSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {

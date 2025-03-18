@@ -51,7 +51,7 @@ type Execute struct {
 	//
 	// [3] = [] to
 	//
-	// [4] = [] multisigSigner
+	// [4] = [WRITE] multisigSigner
 	//
 	// [5] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -141,7 +141,7 @@ func (inst *Execute) GetToAccount() *ag_solanago.AccountMeta {
 
 // SetMultisigSignerAccount sets the "multisigSigner" account.
 func (inst *Execute) SetMultisigSignerAccount(multisigSigner ag_solanago.PublicKey) *Execute {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(multisigSigner)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(multisigSigner).WRITE()
 	return inst
 }
 
