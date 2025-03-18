@@ -1697,12 +1697,7 @@
           {
             "name": "onRamp",
             "type": {
-              "array": [
-                {
-                  "defined": "OnRampAddress"
-                },
-                2
-              ]
+              "defined": "OnRampAddress"
             }
           }
         ]

@@ -1697,12 +1697,7 @@ export type CcipOfframp = {
           {
             "name": "onRamp",
             "type": {
-              "array": [
-                {
-                  "defined": "OnRampAddress"
-                },
-                2
-              ]
+              "defined": "OnRampAddress"
             }
           }
         ]
@@ -4020,12 +4015,7 @@ export const IDL: CcipOfframp = {
           {
             "name": "onRamp",
             "type": {
-              "array": [
-                {
-                  "defined": "OnRampAddress"
-                },
-                2
-              ]
+              "defined": "OnRampAddress"
             }
           }
         ]
