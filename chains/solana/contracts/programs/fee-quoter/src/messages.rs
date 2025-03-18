@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{extra_args::EVMExtraArgsV2, DestChainConfig};
+use crate::{extra_args::GenericExtraArgsV2, DestChainConfig};
 
 // https://github.com/smartcontractkit/chainlink/blob/ff8a597fd9df653f8967427498eaa5a04b19febb/contracts/src/v0.8/ccip/libraries/Internal.sol#L276
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
@@ -45,7 +45,7 @@ pub struct ProcessedExtraArgs {
 
 impl ProcessedExtraArgs {
     pub fn defaults(config: &DestChainConfig) -> Self {
-        let args = EVMExtraArgsV2::default_config(config);
+        let args = GenericExtraArgsV2::default_config(config);
 
         ProcessedExtraArgs {
             bytes: args.serialize_with_tag(),

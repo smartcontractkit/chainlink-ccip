@@ -818,7 +818,7 @@
       }
     },
     {
-      "name": "EVMExtraArgsV2",
+      "name": "GenericExtraArgsV2",
       "type": {
         "kind": "struct",
         "fields": [
