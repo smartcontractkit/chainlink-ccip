@@ -65,10 +65,10 @@ func TestMessageHashing(t *testing.T) {
 	t.Run("SVMToAny", func(t *testing.T) {
 		t.Parallel()
 
-		extraArgs, err := SerializeExtraArgs(fee_quoter.EVMExtraArgsV2{
+		extraArgs, err := SerializeExtraArgs(fee_quoter.GenericExtraArgsV2{
 			GasLimit:                 bin.Uint128{Lo: 1},
 			AllowOutOfOrderExecution: true,
-		}, EVMExtraArgsV2Tag)
+		}, GenericExtraArgsV2Tag)
 		require.NoError(t, err)
 
 		h, err := HashSVMToAnyMessage(ccip_router.SVM2AnyRampMessage{

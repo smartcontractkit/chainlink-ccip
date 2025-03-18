@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
-const EVMExtraArgsV2Tag = "181dcf10"
+const GenericExtraArgsV2Tag = "181dcf10"
 const SVMExtraArgsV1Tag = "1f3b3aba"
 
 var leafDomainSeparator = [32]byte{}
