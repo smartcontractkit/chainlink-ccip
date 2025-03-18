@@ -587,7 +587,6 @@ pub struct TokenAccountsValidationContext<'info> {
     /// CHECK: Pool program
     pub pool_program: AccountInfo<'info>,
 
-    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsPoolAccounts
     /// CHECK: Pool config
     #[account(
         seeds = [seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
@@ -607,7 +606,6 @@ pub struct TokenAccountsValidationContext<'info> {
     )]
     pub pool_token_account: AccountInfo<'info>,
 
-    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsPoolAccounts
     /// CHECK: Pool signer
     #[account(
         seeds = [seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
@@ -623,7 +621,6 @@ pub struct TokenAccountsValidationContext<'info> {
     #[account(owner = token_program.key() @ CcipRouterError::InvalidInputsTokenAccounts)]
     pub mint: AccountInfo<'info>,
 
-    // todo: PDA constraint violation will emit AccountConstraintViolation error instead of InvalidInputsConfigAccounts
     /// CHECK: Fee token config
     #[account(
         seeds = [
