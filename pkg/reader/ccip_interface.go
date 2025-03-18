@@ -79,7 +79,7 @@ func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelecto
 	return resp
 }
 
-// CachedSourceChainConfig stores the static parts of SourceChainConfig
+// StaticSourceChainConfig stores the static parts of SourceChainConfig
 // that don't change frequently and are safe to cache.
 type StaticSourceChainConfig struct {
 	Router                    []byte

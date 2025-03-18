@@ -621,6 +621,16 @@ func (r *ccipChainReader) NextSeqNum(
 			continue
 		}
 
+		if len(cfg.OnRamp) == 0 {
+			lggr.Errorf("onRamp misconfigured for chain %d, chain is skipped: %x", chain, cfg.OnRamp)
+			continue
+		}
+
+		if len(cfg.Router) == 0 {
+			lggr.Errorf("router is empty for chain %d, chain is skipped: %v", chain, cfg.Router)
+			continue
+		}
+
 		if cfg.MinSeqNr == 0 {
 			lggr.Errorf("minSeqNr not found for chain %d or is set to 0, chain is skipped.", chain)
 			continue
@@ -1358,6 +1368,10 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
 	}
 
+	if len(results) != 1 {
+		return nil, fmt.Errorf("unexpected number of results: %d", len(results))
+	}
+
 	// Process results
 	configs := make(map[cciptypes.ChainSelector]SourceChainConfig)
 
@@ -1381,10 +1395,10 @@ func (r *ccipChainReader) fetchFreshSourceChainConfigs(
 				lggr.Errorw("Invalid result type from GetSourceChainConfig",
 					"chain", chain,
 					"type", fmt.Sprintf("%T", v))
-				return nil, fmt.Errorf("invalid result type from GetSourceChainConfig for chainSelector=%d", chain)
+				return nil, fmt.Errorf(
+					"invalid result type (%T) from GetSourceChainConfig for chainSelector=%d, expected *SourceChainConfig", v, chain)
 			}
 
-			// Store the config - we don't filter here as that's done at the reader level
 			configs[chain] = *cfg
 		}
 	}

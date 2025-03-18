@@ -53,9 +53,9 @@ type chainCache struct {
 	chainConfigRefresh time.Time
 
 	// Source chain config specific lock and data
-	sourceChainMu      sync.RWMutex
-	sourceChainConfigs map[cciptypes.ChainSelector]StaticSourceChainConfig
-	sourceChainRefresh time.Time // Single timestamp for all source chain configs
+	sourceChainMu            sync.RWMutex
+	staticSourceChainConfigs map[cciptypes.ChainSelector]StaticSourceChainConfig
+	sourceChainRefresh       time.Time // Single timestamp for all source chain configs
 }
 
 // newConfigPoller creates a new config cache instance
@@ -88,7 +88,7 @@ func (c *configPoller) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *
 	}
 
 	cache := &chainCache{
-		sourceChainConfigs: make(map[cciptypes.ChainSelector]StaticSourceChainConfig),
+		staticSourceChainConfigs: make(map[cciptypes.ChainSelector]StaticSourceChainConfig),
 	}
 	c.chainCaches[chainSel] = cache
 	return cache
@@ -165,7 +165,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 
 	// Determine which chains need to be fetched
 	for _, chain := range filteredSourceChains {
-		config, exists := chainCache.sourceChainConfigs[chain]
+		config, exists := chainCache.staticSourceChainConfigs[chain]
 		if !exists || needsGlobalRefresh {
 			chainsToFetch = append(chainsToFetch, chain)
 		} else {
@@ -238,14 +238,14 @@ func (c *configPoller) RefreshSourceChainConfigs(
 	chainCache.sourceChainMu.Lock()
 
 	// Initialize the map if needed
-	if chainCache.sourceChainConfigs == nil {
-		chainCache.sourceChainConfigs = make(map[cciptypes.ChainSelector]StaticSourceChainConfig)
+	if chainCache.staticSourceChainConfigs == nil {
+		chainCache.staticSourceChainConfigs = make(map[cciptypes.ChainSelector]StaticSourceChainConfig)
 	}
 
 	// Update configs in the map
 	for chain, config := range sourceChainConfigs {
-		cachedConfig := StaticSourceChainConfigFromSourceChainConfig(config)
-		chainCache.sourceChainConfigs[chain] = cachedConfig
+		cachedConfig := staticSourceChainConfigFromSourceChainConfig(config)
+		chainCache.staticSourceChainConfigs[chain] = cachedConfig
 	}
 
 	// Update the refresh timestamp
@@ -260,7 +260,7 @@ func (c *configPoller) RefreshSourceChainConfigs(
 
 	result := make(map[cciptypes.ChainSelector]StaticSourceChainConfig, len(sourceChainConfigs))
 	for chain, config := range sourceChainConfigs {
-		result[chain] = StaticSourceChainConfigFromSourceChainConfig(config)
+		result[chain] = staticSourceChainConfigFromSourceChainConfig(config)
 	}
 
 	return result, nil
@@ -356,9 +356,9 @@ func filterOutChainSelector(
 	return filtered
 }
 
-// FromSourceChainConfig creates a StaticSourceChainConfig from a SourceChainConfig,
+// StaticSourceChainConfigFromSourceChainConfig creates a StaticSourceChainConfig from a SourceChainConfig,
 // omitting the MinSeqNr field.
-func StaticSourceChainConfigFromSourceChainConfig(sc SourceChainConfig) StaticSourceChainConfig {
+func staticSourceChainConfigFromSourceChainConfig(sc SourceChainConfig) StaticSourceChainConfig {
 	return StaticSourceChainConfig{
 		Router:                    sc.Router,
 		IsEnabled:                 sc.IsEnabled,
