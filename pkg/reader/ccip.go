@@ -373,7 +373,7 @@ func (r *ccipChainReader) ExecutedMessages(
 		query.LimitAndSort{
 			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
 			Limit: query.Limit{
-				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
+				Count: uint64(seqNumRange.Length()),
 			},
 		},
 		&dataTyp,
@@ -449,7 +449,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 				query.NewSortBySequence(query.Asc),
 			},
 			Limit: query.Limit{
-				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
+				Count: uint64(seqNumRange.Length()),
 			},
 		},
 		&SendRequestedEvent{},
