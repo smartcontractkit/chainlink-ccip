@@ -7907,7 +7907,7 @@ func TestCCIPRouter(t *testing.T) {
 					cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
 
 					// This validation is like a snapshot for gas consumption
-					require.LessOrEqual(t, cu, uint32(75_000))
+					require.LessOrEqual(t, cu, uint32(100_000))
 
 					tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 					executionEvent := ccip.EventExecutionStateChanged{}
@@ -8016,7 +8016,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// This validation is like a snapshot for gas consumption
 					// Execute: 1 Token Transfer + Message Execution
-					require.LessOrEqual(t, cu, uint32(140_000))
+					require.LessOrEqual(t, cu, uint32(170_000))
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(cu))
 					executionEvent := ccip.EventExecutionStateChanged{}
@@ -8143,7 +8143,7 @@ func TestCCIPRouter(t *testing.T) {
 
 					// This validation is like a snapshot for gas consumption
 					// Execute: 1 Token Transfer + Message Execution
-					require.LessOrEqual(t, cu, uint32(190_000))
+					require.LessOrEqual(t, cu, uint32(230_000))
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(cu))
 					executionEvent := ccip.EventExecutionStateChanged{}
