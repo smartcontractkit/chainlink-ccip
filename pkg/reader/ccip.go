@@ -1535,17 +1535,27 @@ func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
 	gasPerByteValues := make([]uint16, 0)
 	multiplierBpsValues := make([]uint16, 0)
 
+	var errs error
+	var foundValidConfig bool
 	// TODO: pay attention to performance here, as we are looping through all chains
 	for chain := range r.contractReaders {
 		config, err := r.getFeeQuoterDestChainConfig(ctx, chain)
 		if err != nil {
+			errors.Join(errs, err)
 			continue
+		}
+		if config.IsEnabled {
+			foundValidConfig = true
 		}
 		if config.IsEnabled && config.HasNonEmptyDAGasParams() {
 			overheadGasValues = append(overheadGasValues, config.DestDataAvailabilityOverheadGas)
 			gasPerByteValues = append(gasPerByteValues, config.DestGasPerDataAvailabilityByte)
 			multiplierBpsValues = append(multiplierBpsValues, config.DestDataAvailabilityMultiplierBps)
 		}
+	}
+	if !foundValidConfig {
+		// None of the readers found a valid config for the destination chain, so return error
+		return cciptypes.DataAvailabilityGasConfig{}, errors.Join(errors.New("no valid gas configs found for chain"), errs)
 	}
 
 	// Calculate medians

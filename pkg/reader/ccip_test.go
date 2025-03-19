@@ -1033,7 +1033,7 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 		},
 		{
 			name:        "all configs disabled",
-			expectError: false,
+			expectError: true,
 			expectedConfig: cciptypes.DataAvailabilityGasConfig{
 				DestDataAvailabilityOverheadGas:   0,
 				DestGasPerDataAvailabilityByte:    0,
