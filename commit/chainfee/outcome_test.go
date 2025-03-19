@@ -58,17 +58,29 @@ var obsNeedUpdate = Observation{
 		1: {
 			Timestamp: ts,
 			ChainFee: ComponentsUSDPrices{
-				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComponentsMap[1].ExecutionFee, nativeTokenPricesMap[1].Int),
-				DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComponentsMap[1].DataAvailabilityFee, nativeTokenPricesMap[1].Int),
+				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[1].ExecutionFee, nativeTokenPricesMap[1].Int,
+				),
+				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[1].DataAvailabilityFee,
+					nativeTokenPricesMap[1].Int,
+				),
 			},
 		},
 		2: {
+			// Need update because timestamp is older than batch write frequency
 			Timestamp: ts.Add(-chainFeePriceBatchWriteFrequency.Duration() * 2),
 			ChainFee: ComponentsUSDPrices{
-				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComponentsMap[2].ExecutionFee, nativeTokenPricesMap[2].Int),
-				DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComponentsMap[2].DataAvailabilityFee, nativeTokenPricesMap[2].Int),
+				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[2].ExecutionFee,
+					nativeTokenPricesMap[2].Int,
+				),
+				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[2].DataAvailabilityFee,
+					nativeTokenPricesMap[2].Int,
+				),
 			},
-		}, // Needs updating
+		},
 	},
 	TimestampNow: ts,
 }
@@ -80,15 +92,26 @@ var obsNoUpdate = Observation{
 	ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
 		1: {
 			ChainFee: ComponentsUSDPrices{
-				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComponentsMap[1].ExecutionFee, nativeTokenPricesMap[1].Int),
-				DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComponentsMap[1].DataAvailabilityFee, nativeTokenPricesMap[1].Int),
+				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[1].ExecutionFee, nativeTokenPricesMap[1].Int,
+				),
+				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[1].DataAvailabilityFee,
+					nativeTokenPricesMap[1].Int,
+				),
 			},
 			Timestamp: ts,
 		},
 		2: {
 			ChainFee: ComponentsUSDPrices{
-				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComponentsMap[2].ExecutionFee, nativeTokenPricesMap[2].Int),
-				DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComponentsMap[2].DataAvailabilityFee, nativeTokenPricesMap[2].Int),
+				ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[2].ExecutionFee,
+					nativeTokenPricesMap[2].Int,
+				),
+				DataAvFeePriceUSD: mathslib.CalculateUsdPerUnitGas(
+					feeComponentsMap[2].DataAvailabilityFee,
+					nativeTokenPricesMap[2].Int,
+				),
 			},
 			Timestamp: ts,
 		},
