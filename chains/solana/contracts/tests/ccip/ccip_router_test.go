@@ -6698,11 +6698,9 @@ func TestCCIPRouter(t *testing.T) {
 
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
 
-				executionEvents := []ccip.EventExecutionStateChanged{}
-				executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
 
-				require.NoError(t, err)
 				require.Equal(t, 2, len(executionEvents))
 				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
 				require.Equal(t, sequenceNumber, executionEvents[0].SequenceNumber)
@@ -7374,11 +7372,9 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-				executionEvents := []ccip.EventExecutionStateChanged{}
-				executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
 
-				require.NoError(t, err)
 				require.Equal(t, 2, len(executionEvents))
 				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
 				require.Equal(t, message1.Header.SequenceNumber, executionEvents[0].SequenceNumber)
@@ -7692,11 +7688,9 @@ func TestCCIPRouter(t *testing.T) {
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
 
-					executionEvents := []ccip.EventExecutionStateChanged{}
-					executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 					require.NoError(t, err)
 
-					require.NoError(t, err)
 					require.Equal(t, 2, len(executionEvents))
 					require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
 					require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
@@ -8239,11 +8233,9 @@ func TestCCIPRouter(t *testing.T) {
 
 						tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 
-						executionEvents := []ccip.EventExecutionStateChanged{}
-						executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+						executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 						require.NoError(t, err)
 
-						require.NoError(t, err)
 						require.Equal(t, 2, len(executionEvents))
 						require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
 						require.Equal(t, message1.Header.SequenceNumber, executionEvents[0].SequenceNumber)
@@ -8302,11 +8294,9 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 
 						tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-						executionEvents := []ccip.EventExecutionStateChanged{}
-						executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+						executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 						require.NoError(t, err)
 
-						require.NoError(t, err)
 						require.Equal(t, 2, len(executionEvents))
 						require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
 						require.Equal(t, message2.Header.SequenceNumber, executionEvents[0].SequenceNumber)

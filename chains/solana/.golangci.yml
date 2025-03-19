@@ -154,3 +154,5 @@ issues:
       text: "G115:" # ignore integer overflow in test conversions
       linters:
         - gosec
+    - text: 'shadow: declaration of "(err|ctx)" shadows declaration at'
+      linters: [ govet ]
