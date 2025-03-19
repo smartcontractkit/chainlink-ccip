@@ -6698,7 +6698,8 @@ func TestCCIPRouter(t *testing.T) {
 
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
 
-				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				executionEvents := []ccip.EventExecutionStateChanged{}
+				executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
 
 				require.NoError(t, err)
@@ -7373,7 +7374,8 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				executionEvents := []ccip.EventExecutionStateChanged{}
+				executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
 
 				require.NoError(t, err)
@@ -7690,7 +7692,8 @@ func TestCCIPRouter(t *testing.T) {
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
 
-					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+					executionEvents := []ccip.EventExecutionStateChanged{}
+					executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 					require.NoError(t, err)
 
 					require.NoError(t, err)
@@ -8299,7 +8302,8 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 
 						tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-						executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+						executionEvents := []ccip.EventExecutionStateChanged{}
+						executionEvents, err = common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 						require.NoError(t, err)
 
 						require.NoError(t, err)
