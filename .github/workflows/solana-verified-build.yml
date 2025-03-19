@@ -7,20 +7,20 @@ on:
         description: 'SHA to build (can be short)'
         required: true
         type: string
+  push:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest-8cores-32GB
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: Get full SHA
+    - name: Get Long and Short SHAs
       id: get_sha
       run: |
-        FULL_SHA=$(git rev-parse ${{ github.event.inputs.sha }})
-        echo "full_sha=$FULL_SHA" >> $GITHUB_OUTPUT
+        FULL_SHA=$(git rev-parse ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.sha || github.sha }})
         echo "short_sha=${FULL_SHA:0:12}" >> $GITHUB_OUTPUT
+        echo "full_sha=$FULL_SHA" >> $GITHUB_OUTPUT
     - uses: actions/checkout@v4
       with:
         ref: ${{ steps.get_sha.outputs.full_sha }}
