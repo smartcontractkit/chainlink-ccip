@@ -8,7 +8,7 @@ use example_ccip_receiver::Any2SVMMessage;
 use program::TestCcipInvalidReceiver;
 use solana_program::pubkey;
 
-declare_id!("FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j");
+declare_id!("58TiB4BArRDjxjqVevCqHyf7r8MENJimfbFW1vvccuzX");
 
 #[program]
 pub mod test_ccip_invalid_receiver {

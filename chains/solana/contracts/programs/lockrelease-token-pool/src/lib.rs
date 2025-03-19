@@ -6,7 +6,7 @@ use base_token_pool::{common::*, rate_limiter::*};
 mod context;
 use crate::context::*;
 
-declare_id!("8eqh8wppT9c5rw4ERqNCffvU6cNFJWff9WmkcYtmGiqC");
+declare_id!("GjUN731nhkZQrbm3xSJwEG618RkpRX9RW88mpBA9VeX");
 
 #[program]
 pub mod lockrelease_token_pool {

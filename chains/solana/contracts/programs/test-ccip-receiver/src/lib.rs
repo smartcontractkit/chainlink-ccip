@@ -4,7 +4,7 @@ use example_ccip_receiver::{
     Any2SVMMessage, BaseState, CcipReceiverError, ALLOWED_OFFRAMP, EXTERNAL_EXECUTION_CONFIG_SEED,
 };
 
-declare_id!("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui");
+declare_id!("Ezf5CDmg12Q6TxC5n53fuNK1ipuULNkw5SzFB4uqWA6N");
 
 /// This program an example of a CCIP Receiver Program.
 /// Used to test CCIP Router execute.
