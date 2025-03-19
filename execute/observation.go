@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -365,7 +366,12 @@ func readAllMessages(
 		}
 		availableReports[r.srcChain] = append(availableReports[r.srcChain], r.report)
 	}
-
+	// sort available reports for each selector by timestamp
+	for _, reports := range availableReports {
+		sort.Slice(reports, func(i, j int) bool {
+			return reports[i].Timestamp.Before(reports[j].Timestamp)
+		})
+	}
 	// Remove empty chains
 	for srcChain := range messageObs {
 		if len(messageObs[srcChain]) == 0 {
