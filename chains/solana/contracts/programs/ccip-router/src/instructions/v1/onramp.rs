@@ -404,7 +404,7 @@ mod helpers {
                     0, 0, 0, 0, 0, 0,
                 ]
                 .to_vec(),
-                extra_args: fee_quoter::extra_args::EVMExtraArgsV2 {
+                extra_args: fee_quoter::extra_args::GenericExtraArgsV2 {
                     gas_limit: 1,
                     allow_out_of_order_execution: true,
                 }
@@ -429,7 +429,7 @@ mod helpers {
             let hash_result = hash(&message);
 
             assert_eq!(
-                "2335e7898faa4e7e8816a6b1e0cf47ea2a18bb66bca205d0cb3ae4a8ce5c72f7",
+                "46abd733e950b0b0e05b1b4b040cf2df6c38899af71aad058ff08bfa96d4b532",
                 hex::encode(hash_result)
             );
         }
