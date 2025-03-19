@@ -32,9 +32,9 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 
 	// wait for confirmation so later transactions don't fail
 	remaining := len(sigs)
-	count := 0
+	initTime := time.Now()
 	for remaining > 0 {
-		count++
+		time.Sleep(500 * time.Millisecond)
 		statusRes, sigErr := solanaGoClient.GetSignatureStatuses(ctx, true, sigs...)
 		require.NoError(t, sigErr)
 		require.NotNil(t, statusRes)
@@ -48,9 +48,10 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 		}
 		remaining = unconfirmedTxCount
 
-		time.Sleep(500 * time.Millisecond)
-		if count > 120 {
-			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
+		elapsed := time.Now().Sub(initTime)
+		fmt.Printf("Waiting for airdrop confirmation, %d transactions remaining, elapsed time: %s\n", remaining, elapsed)
+		if elapsed > 5*time.Minute {
+			require.NoError(t, fmt.Errorf("unable to find transactions within timeout"))
 		}
 	}
 }
