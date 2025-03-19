@@ -250,7 +250,13 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 						).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
+						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
+
+						// This validation is like a snapshot for gas consumption
+						// Release or Mint CPI
+						require.LessOrEqual(t, cu, uint32(80_000))
+
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 						require.NotNil(t, res)
 
 						// validate balances
