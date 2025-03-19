@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 declare_id!("5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk");
 
-use program::Mcm;
+use program::ManyChainMultisig;
 
 mod constant;
 pub use constant::*;
@@ -41,7 +41,7 @@ use instructions::*;
 /// 3. Set a Merkle root with authenticated metadata and signatures
 /// 4. Execute operations by providing Merkle proofs
 #[program]
-pub mod mcm {
+pub mod many_chain_multisig {
     #![warn(missing_docs)]
     use super::*;
 
@@ -405,7 +405,7 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
-    pub program: Program<'info, Mcm>,
+    pub program: Program<'info, ManyChainMultisig>,
     // initialization only allowed by program upgrade authority(in common cases, the initial deployer)
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ AuthError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
