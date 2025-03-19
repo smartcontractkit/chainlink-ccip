@@ -7817,13 +7817,10 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("execute measure compute units", func(t *testing.T) {
-
 				transmitter := getTransmitter()
 
 				t.Run("Example Message Execution", func(t *testing.T) {
-
 					sourceChainSelector := config.EvmChainSelector
-					// TODO: Change the logic receiver to the example
 					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
@@ -7863,6 +7860,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -7872,7 +7872,6 @@ func TestCCIPRouter(t *testing.T) {
 					executionReport := ccip_offramp.ExecutionReportSingleChain{
 						SourceChainSelector: sourceChainSelector,
 						Message:             message,
-						Root:                root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -7890,6 +7889,9 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
 						config.OfframpTokenPoolsSignerPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					)
 					raw.AccountMetaSlice = append(
 						raw.AccountMetaSlice,
@@ -7914,8 +7916,7 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("1 Test Token Transfer", func(t *testing.T) {
-					// TODO: Change the Token Pool to the Burn/Mint Token Pool
-					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint.PublicKey(), config.DefaultCommitment)
+					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
 					require.NoError(t, err)
 					_, initBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
 					require.NoError(t, err)
@@ -7928,7 +7929,7 @@ func TestCCIPRouter(t *testing.T) {
 					message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
 					message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{{
 						SourcePoolAddress: []byte{1, 2, 3},
-						DestTokenAddress:  token0.Mint.PublicKey(),
+						DestTokenAddress:  token0.Mint,
 						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 					}}
 					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
@@ -7968,6 +7969,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -7978,7 +7982,6 @@ func TestCCIPRouter(t *testing.T) {
 						SourceChainSelector: sourceChainSelector,
 						Message:             message,
 						OffchainTokenData:   [][]byte{{}},
-						Root:                root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -7996,6 +7999,9 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
 						config.OfframpTokenPoolsSignerPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					)
 
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, token0.User[config.ReceiverExternalExecutionConfigPDA])
@@ -8023,7 +8029,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, token0.PoolSigner, mintEvent.Sender)
 					require.Equal(t, uint64(1), mintEvent.Amount)
 
-					_, finalSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint.PublicKey(), config.DefaultCommitment)
+					_, finalSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
 					require.NoError(t, err)
 					_, finalBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
 					require.NoError(t, err)
@@ -8032,20 +8038,18 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("1 Test Token Transfer + Example Message Execution", func(t *testing.T) {
-					// TODO: Change the Token Pool to the Burn/Mint Token Pool
-					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint.PublicKey(), config.DefaultCommitment)
+					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
 					require.NoError(t, err)
 					_, initBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
 					require.NoError(t, err)
 
 					sourceChainSelector := config.EvmChainSelector
-					// TODO: Change the logic receiver to the example
 					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
 					message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
 					message.TokenAmounts = []ccip_offramp.Any2SVMTokenTransfer{{
 						SourcePoolAddress: []byte{1, 2, 3},
-						DestTokenAddress:  token0.Mint.PublicKey(),
+						DestTokenAddress:  token0.Mint,
 						Amount:            ccip_offramp.CrossChainAmount{LeBytes: tokens.ToLittleEndianU256(1)},
 					}}
 					rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress, msgAccounts)
@@ -8085,6 +8089,9 @@ func TestCCIPRouter(t *testing.T) {
 						config.FeeQuoterProgram,
 						config.FqAllowedPriceUpdaterOfframpPDA,
 						config.FqConfigPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
 					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
@@ -8095,7 +8102,6 @@ func TestCCIPRouter(t *testing.T) {
 						SourceChainSelector: sourceChainSelector,
 						Message:             message,
 						OffchainTokenData:   [][]byte{{}},
-						Root:                root,
 						Proofs:              [][32]uint8{},
 					}
 					raw := ccip_offramp.NewExecuteInstruction(
@@ -8113,6 +8119,9 @@ func TestCCIPRouter(t *testing.T) {
 						solana.SystemProgramID,
 						solana.SysVarInstructionsPubkey,
 						config.OfframpTokenPoolsSignerPDA,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
 					)
 					raw.AccountMetaSlice = append(
 						raw.AccountMetaSlice,
@@ -8147,7 +8156,7 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, token0.PoolSigner, mintEvent.Sender)
 					require.Equal(t, uint64(1), mintEvent.Amount)
 
-					_, finalSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint.PublicKey(), config.DefaultCommitment)
+					_, finalSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
 					require.NoError(t, err)
 					_, finalBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
 					require.NoError(t, err)
