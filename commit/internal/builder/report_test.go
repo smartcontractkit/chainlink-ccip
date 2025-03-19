@@ -3,6 +3,7 @@ package builder
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -16,9 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-func TestMultiReportBuilders(t *testing.T) {
+func TestReportBuilders(t *testing.T) {
+	// This outcome is sliced in different ways depending on the config.
 	outcome := committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
 			OutcomeType: merkleroot.ReportGenerated,
@@ -54,11 +57,19 @@ func TestMultiReportBuilders(t *testing.T) {
 		TokenPriceOutcome: tokenprice.Outcome{
 			TokenPrices: ccipocr3.TokenPriceMap{
 				"a": ccipocr3.NewBigIntFromInt64(123),
+				"b": ccipocr3.NewBigIntFromInt64(123),
+				"c": ccipocr3.NewBigIntFromInt64(123),
+				"d": ccipocr3.NewBigIntFromInt64(123),
+				"e": ccipocr3.NewBigIntFromInt64(123),
 			},
 		},
 		ChainFeeOutcome: chainfee.Outcome{
 			GasPrices: []ccipocr3.GasPriceChain{
+				{GasPrice: ccipocr3.NewBigIntFromInt64(1), ChainSel: 123},
+				{GasPrice: ccipocr3.NewBigIntFromInt64(2), ChainSel: 123},
 				{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+				{GasPrice: ccipocr3.NewBigIntFromInt64(4), ChainSel: 123},
+				{GasPrice: ccipocr3.NewBigIntFromInt64(5), ChainSel: 123},
 			},
 		},
 	}
@@ -67,6 +78,7 @@ func TestMultiReportBuilders(t *testing.T) {
 		name            string
 		reportBuilder   ReportBuilderFunc
 		maxRoots        uint64
+		maxPrices       uint64
 		expectedReports int
 		checkReport     func(t *testing.T, i int, report ccipocr3.CommitPluginReport)
 	}{
@@ -88,24 +100,48 @@ func TestMultiReportBuilders(t *testing.T) {
 			},
 		},
 		{
-			name:            "multi report builder",
-			reportBuilder:   buildMultipleReports,
+			name:            "multi root report builder",
+			reportBuilder:   buildMultipleMerkleRootReports,
 			maxRoots:        1,
 			expectedReports: 4,
 			checkReport: func(t *testing.T, i int, report ccipocr3.CommitPluginReport) {
 				// only the first report contains price updates.
 				if i > 0 {
-					require.Equal(t, report.PriceUpdates, ccipocr3.PriceUpdates{})
+					assert.Equal(t, report.PriceUpdates, ccipocr3.PriceUpdates{})
 				} else {
+					// contains all price updates
 					priceUpdates := ccipocr3.PriceUpdates{
 						TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice(),
 						GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 					}
-					require.Equal(t, report.PriceUpdates, priceUpdates)
+					assert.Equal(t, report.PriceUpdates, priceUpdates)
 				}
 
 				roots := append(report.BlessedMerkleRoots, report.UnblessedMerkleRoots...)
-				require.Len(t, roots, 1)
+				assert.Len(t, roots, 1)
+			},
+		},
+		{
+			name:            "multi price report builder",
+			reportBuilder:   buildMultiplePriceAndMerkleRootReports,
+			maxPrices:       3, // chosen to have one report with both gas and token prices.
+			expectedReports: 5,
+			checkReport: func(t *testing.T, i int, report ccipocr3.CommitPluginReport) {
+				numRoots := len(report.BlessedMerkleRoots) + len(report.UnblessedMerkleRoots)
+				numPrices := len(report.PriceUpdates.TokenPriceUpdates) + len(report.PriceUpdates.GasPriceUpdates)
+
+				if i < 3 {
+					assert.Equalf(t, 3, numPrices,
+						"first 3 price reports should have maxPrices.")
+					assert.Equalf(t, 0, numRoots, "There should be no roots in a price report.")
+				} else if i < 4 {
+					assert.Equalf(t, 1, numPrices,
+						"final price report should have the remaining 1 gas price.")
+					assert.Equalf(t, 0, numRoots, "There should be no roots in a price report.")
+				} else {
+					require.Equalf(t, 4, numRoots, "All roots are in the final report.")
+					assert.Equalf(t, 0, numPrices, "There should be no prices in a root report.")
+				}
 			},
 		},
 	}
@@ -120,7 +156,12 @@ func TestMultiReportBuilders(t *testing.T) {
 				TransmissionDelays: nil,
 			}
 
-			reports, err := tc.reportBuilder(ctx, lggr, reportCodec, ts, outcome, tc.maxRoots)
+			cfg := pluginconfig.CommitOffchainConfig{}
+			require.NoError(t, cfg.ApplyDefaultsAndValidate())
+			cfg.MaxMerkleRootsPerReport = tc.maxRoots
+			cfg.MaxPricesPerReport = tc.maxPrices
+			cfg.MultipleReportsEnabled = true
+			reports, err := tc.reportBuilder(ctx, lggr, reportCodec, ts, outcome, cfg)
 			require.NoError(t, err)
 			require.Len(t, reports, tc.expectedReports)
 
