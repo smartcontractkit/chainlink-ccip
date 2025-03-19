@@ -51,8 +51,7 @@ func (p *Plugin) Reports(
 	lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2PID)
 
-	maxRoots := p.offchainCfg.MaxMerkleRootsPerReport
-	reports, err := p.reportBuilder(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, maxRoots)
+	reports, err := p.reportBuilder(ctx, lggr, p.reportCodec, transmissionSchedule, outcome, p.offchainCfg)
 
 	if err != nil {
 		return nil, fmt.Errorf("error while building reports: %w", err)
