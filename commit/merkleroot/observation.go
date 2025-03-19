@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/sync/errgroup"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -544,21 +543,22 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 		return nil
 	}
 
-	supportedChains, err := o.chainSupport.SupportedChains(o.oracleID)
+	sourceChainsConfig, err := o.ccipReader.GetOffRampSourceChainsConfig(ctx, allSourceChains)
 	if err != nil {
-		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		lggr.Errorw("get offRamp source chains config failed", "err", err)
 		return nil
 	}
 
-	sourceChains := mapset.NewSet(allSourceChains...).Intersect(supportedChains).ToSlice()
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
-
 	mu := &sync.Mutex{}
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChainsConfig))
 
 	wg := &sync.WaitGroup{}
-	wg.Add(len(sourceChains))
-	for _, sourceChain := range sourceChains {
+	for sourceChain, cfg := range sourceChainsConfig {
+		if !cfg.IsEnabled {
+			lggr.Debugw("ObserveLatestOnRampSeqNums source chain is disabled, skipping", "chain", sourceChain)
+			continue
+		}
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			latestOnRampSeqNum, err := o.ccipReader.LatestMsgSeqNum(ctx, sourceChain)
@@ -580,6 +580,7 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(ctx context.Context) []pluginty
 	sort.Slice(latestOnRampSeqNums, func(i, j int) bool {
 		return latestOnRampSeqNums[i].ChainSel < latestOnRampSeqNums[j].ChainSel
 	})
+	lggr.Debugw("fetched latestOnRampSeqNums", "seqNums", latestOnRampSeqNums)
 	return latestOnRampSeqNums
 }
 
