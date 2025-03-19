@@ -1685,6 +1685,10 @@ export type CcipOfframp = {
             "type": "bool"
           },
           {
+            "name": "isRmnVerificationDisabled",
+            "type": "bool"
+          },
+          {
             "name": "laneCodeVersion",
             "type": {
               "defined": "CodeVersion"
@@ -1693,12 +1697,7 @@ export type CcipOfframp = {
           {
             "name": "onRamp",
             "type": {
-              "array": [
-                {
-                  "defined": "OnRampAddress"
-                },
-                2
-              ]
+              "defined": "OnRampAddress"
             }
           }
         ]
@@ -4009,6 +4008,10 @@ export const IDL: CcipOfframp = {
             "type": "bool"
           },
           {
+            "name": "isRmnVerificationDisabled",
+            "type": "bool"
+          },
+          {
             "name": "laneCodeVersion",
             "type": {
               "defined": "CodeVersion"
@@ -4017,12 +4020,7 @@ export const IDL: CcipOfframp = {
           {
             "name": "onRamp",
             "type": {
-              "array": [
-                {
-                  "defined": "OnRampAddress"
-                },
-                2
-              ]
+              "defined": "OnRampAddress"
             }
           }
         ]

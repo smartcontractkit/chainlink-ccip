@@ -178,9 +178,7 @@
           },
           {
             "name": "destPoolData",
-            "type": {
-              "defined": "RemoteAddress"
-            }
+            "type": "bytes"
           }
         ]
       }

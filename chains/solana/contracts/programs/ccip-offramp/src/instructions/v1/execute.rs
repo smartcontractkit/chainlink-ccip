@@ -8,7 +8,7 @@ use crate::instructions::interfaces::Execute;
 use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
-use crate::state::{CommitReport, MessageExecutionState, SourceChain};
+use crate::state::{CommitReport, MessageExecutionState, OnRampAddress, SourceChain};
 use crate::CcipOfframpError;
 
 use super::merkle::{calculate_merkle_root, MerkleError, LEAF_DOMAIN_SEPARATOR};
@@ -158,12 +158,14 @@ fn internal_execute<'info>(
             &execution_report,
             commit_report.merkle_root,
             recv_and_msg_account_keys,
+            &source_chain.config.on_ramp,
         )?
     } else {
         verify_merkle_root(
             &execution_report,
             commit_report.merkle_root,
             None.into_iter(),
+            &source_chain.config.on_ramp,
         )?
     };
 
@@ -422,8 +424,13 @@ pub fn verify_merkle_root(
     // logic receiver followed by all other message account keys, when they were
     // provided (i.e. when the message isn't a token transfer exclusively)
     recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+    on_ramp_address: &OnRampAddress,
 ) -> Result<[u8; 32]> {
-    let hashed_leaf = hash(&execution_report.message, recv_and_msg_account_keys);
+    let hashed_leaf = hash(
+        &execution_report.message,
+        recv_and_msg_account_keys,
+        on_ramp_address,
+    );
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
         calculate_merkle_root(hashed_leaf, &execution_report.proofs);
     require!(
@@ -475,11 +482,13 @@ pub fn validate_execution_report<'info>(
 fn hash(
     msg: &Any2SVMRampMessage,
     recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+    on_ramp_address: &OnRampAddress,
 ) -> [u8; 32] {
     use anchor_lang::solana_program::keccak;
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = msg.sender.len() as u16; // it should fit in a u8, but it's safer to use u16
+    let on_ramp_address_size = on_ramp_address.bytes().len() as u16; // it should fit in a u8, but it's safer to use u16
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -499,6 +508,8 @@ fn hash(
         "Any2SVMMessageHashV1".as_bytes(),
         &header_source_chain_selector,
         &header_dest_chain_selector,
+        &on_ramp_address_size.to_be_bytes(),
+        &on_ramp_address.bytes(),
         // message header
         &msg.header.message_id,
         &msg.token_receiver.to_bytes(),
@@ -647,6 +658,8 @@ mod tests {
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
+        let on_ramp_address: OnRampAddress = [1, 2, 3].into();
+
         let message = Any2SVMRampMessage {
             sender: [
                 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -683,15 +696,15 @@ mod tests {
             },
         };
         let remaining_account_keys = [
-            Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8").unwrap(),
-            Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
+            Pubkey::try_from("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C").unwrap(),
+            Pubkey::try_from("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui").unwrap(),
         ]
         .into_iter();
 
-        let hash_result = hash(&message, remaining_account_keys);
+        let hash_result = hash(&message, remaining_account_keys, &on_ramp_address);
 
         assert_eq!(
-            "c82035cdc1d1e58606afeaf137b71de280e1e2cafdfdc621944eecccb105d730",
+            "5ddb3c9fccb01abee926ec6112afa075dc81fdfe1e2902595d9c1d1d1de4f1d1",
             hex::encode(hash_result)
         );
     }
