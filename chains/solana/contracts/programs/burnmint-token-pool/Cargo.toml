@@ -1,12 +1,12 @@
 [package]
-name = "test-token-pool"
+name = "burnmint-token-pool"
 version = "0.1.0-dev"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "test_token_pool"
+name = "burnmint_token_pool"
 
 [features]
 no-entrypoint = []
@@ -21,6 +21,4 @@ anchor-spl = "0.29.0"
 solana-program = "1.17.25" # pin solana to 1.17
 spl-math = { version = "0.2.0", features = [ "no-entrypoint" ] }
 base-token-pool = { version = "0.1.0-dev", path = "../base-token-pool/", features = ["no-entrypoint"] }
-burnmint-token-pool = { version = "0.1.0-dev", path = "../burnmint-token-pool", features = ["no-entrypoint"] }
-lockrelease-token-pool = { version = "0.1.0-dev", path = "../lockrelease-token-pool", features = ["no-entrypoint"] }
 rmn_remote = {path = "../rmn-remote", features = ["cpi"]}
