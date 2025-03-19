@@ -1541,7 +1541,7 @@ func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
 	for chain := range r.contractReaders {
 		config, err := r.getFeeQuoterDestChainConfig(ctx, chain)
 		if err != nil {
-			errors.Join(errs, err)
+			errs = errors.Join(errs, err)
 			continue
 		}
 		if config.IsEnabled {
