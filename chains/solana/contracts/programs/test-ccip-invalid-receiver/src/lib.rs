@@ -8,7 +8,7 @@ use example_ccip_receiver::Any2SVMMessage;
 use program::TestCcipInvalidReceiver;
 use solana_program::pubkey;
 
-declare_id!("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8");
+declare_id!("FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j");
 
 #[program]
 pub mod test_ccip_invalid_receiver {
@@ -170,7 +170,7 @@ pub mod test_ccip_invalid_receiver {
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
-const TEST_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
+const TEST_ROUTER: Pubkey = pubkey!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]
@@ -422,7 +422,7 @@ pub const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0
 pub fn build_receiver_discriminator_and_data(msg: &Any2SVMMessage) -> Result<Vec<u8>> {
     let message = msg.try_to_vec()?;
 
-    let mut data = Vec::with_capacity(8);
+    let mut data = Vec::with_capacity(8 + message.len());
     data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
     data.extend_from_slice(&message);
 
