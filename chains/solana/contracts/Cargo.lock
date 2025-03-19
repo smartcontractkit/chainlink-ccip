@@ -617,6 +617,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f30e7476521f6f8af1a1c4c0b8cc94f0bee37d91763d0ca2665f299b6cd8aec"
 
 [[package]]
+name = "burnmint-token-pool"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "base-token-pool",
+ "rmn_remote",
+ "solana-program",
+ "spl-math",
+]
+
+[[package]]
 name = "bv"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -962,30 +974,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 
 [[package]]
-name = "example-burnmint-token-pool"
-version = "0.1.0-dev"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "base-token-pool",
- "rmn_remote",
- "solana-program",
- "spl-math",
-]
-
-[[package]]
-name = "example-lockrelease-token-pool"
-version = "0.1.0-dev"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "base-token-pool",
- "rmn_remote",
- "solana-program",
- "spl-math",
-]
-
-[[package]]
 name = "example_ccip_receiver"
 version = "0.1.0-dev"
 dependencies = [
@@ -1311,6 +1299,18 @@ checksum = "3c168f8615b12bc01f9c17e2eb0cc07dcae1940121185446edc3744920e8ef45"
 dependencies = [
  "autocfg",
  "scopeguard",
+]
+
+[[package]]
+name = "lockrelease-token-pool"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "base-token-pool",
+ "rmn_remote",
+ "solana-program",
+ "spl-math",
 ]
 
 [[package]]
@@ -2464,8 +2464,8 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
- "example-burnmint-token-pool",
- "example-lockrelease-token-pool",
+ "burnmint-token-pool",
+ "lockrelease-token-pool",
  "rmn_remote",
  "solana-program",
  "spl-math",
