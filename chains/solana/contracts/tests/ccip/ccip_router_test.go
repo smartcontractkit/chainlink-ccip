@@ -6697,16 +6697,23 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-				executionEvent := ccip.EventExecutionStateChanged{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
+
+				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				require.NoError(t, err)
 
 				require.NoError(t, err)
-				require.NotNil(t, executionEvent)
-				require.Equal(t, config.EvmChainSelector, executionEvent.SourceChainSelector)
-				require.Equal(t, sequenceNumber, executionEvent.SequenceNumber)
-				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvent.MessageID[:]))
-				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(executionEvent.MessageHash[:]))
-				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, sequenceNumber, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, sequenceNumber, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
@@ -7366,17 +7373,22 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-				executionEvent = ccip.EventExecutionStateChanged{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
+				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+				require.NoError(t, err)
 
 				require.NoError(t, err)
-				require.NotNil(t, executionEvent)
-				require.Equal(t, config.EvmChainSelector, executionEvent.SourceChainSelector)
-				require.Equal(t, message1.Header.SequenceNumber, executionEvent.SequenceNumber)
-				require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvent.MessageID[:]))
-				require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvent.MessageHash[:]))
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, message1, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
 
-				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, message1, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
@@ -7677,9 +7689,14 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
-					executionEvent := ccip.EventExecutionStateChanged{}
-					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
-					require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+
+					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+					require.NoError(t, err)
+
+					require.NoError(t, err)
+					require.Equal(t, 2, len(executionEvents))
+					require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+					require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 					mintEvent := tokens.EventMintRelease{}
 					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "Minted", &mintEvent, config.PrintEvents))
@@ -8281,16 +8298,22 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 
 						tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-						executionEvent := ccip.EventExecutionStateChanged{}
-						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
+						executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+						require.NoError(t, err)
 
 						require.NoError(t, err)
-						require.NotNil(t, executionEvent)
-						require.Equal(t, config.EvmChainSelector, executionEvent.SourceChainSelector)
-						require.Equal(t, message2.Header.SequenceNumber, executionEvent.SequenceNumber)
-						require.Equal(t, hex.EncodeToString(message2.Header.MessageId[:]), hex.EncodeToString(executionEvent.MessageID[:]))
-						require.Equal(t, hex.EncodeToString(hash2[:]), hex.EncodeToString(executionEvent.MessageHash[:]))
-						require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+						require.Equal(t, 2, len(executionEvents))
+						require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+						require.Equal(t, message2.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+						require.Equal(t, hex.EncodeToString(message2.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+						require.Equal(t, hex.EncodeToString(hash2[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+						require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+						require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+						require.Equal(t, message2.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+						require.Equal(t, hex.EncodeToString(message2.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+						require.Equal(t, hex.EncodeToString(hash2[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+						require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 						var rootAccount ccip_offramp.CommitReport
 						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
