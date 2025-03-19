@@ -2142,10 +2142,14 @@ type ccipReaderInternal interface {
 	prepareBatchConfigRequests(chainSel cciptypes.ChainSelector) contractreader.ExtendedBatchGetLatestValuesRequest
 
 	// processConfigResults processes the batch results into a ChainConfigSnapshot
-	processConfigResults(chainSel cciptypes.ChainSelector, batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error)
+	processConfigResults(
+		chainSel cciptypes.ChainSelector,
+		batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error)
 
 	// fetchFreshSourceChainConfigs fetches source chain configurations from the specified destination chain
-	fetchFreshSourceChainConfigs(ctx context.Context, destChain cciptypes.ChainSelector, sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+	fetchFreshSourceChainConfigs(
+		ctx context.Context, destChain cciptypes.ChainSelector,
+		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error)
 }
 
 // getDestChain returns the destination chain selector
