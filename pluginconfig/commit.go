@@ -22,7 +22,6 @@ const (
 	defaultNewMsgScanBatchSize                = merklemulti.MaxNumberTreeLeaves
 	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
-	defaultRMNEnabled                         = false
 	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
 	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
