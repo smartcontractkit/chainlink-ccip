@@ -1,6 +1,6 @@
-export type Mcm = {
+export type ManyChainMultisig = {
   "version": "0.1.0-dev",
-  "name": "mcm",
+  "name": "many_chain_multisig",
   "docs": [
     "A multi-signature contract system that supports signing many transactions targeting",
     "multiple chains with a single set of signatures. This program manages multiple multisig",
@@ -1369,9 +1369,9 @@ export type Mcm = {
   ]
 };
 
-export const IDL: Mcm = {
+export const IDL: ManyChainMultisig = {
   "version": "0.1.0-dev",
-  "name": "mcm",
+  "name": "many_chain_multisig",
   "docs": [
     "A multi-signature contract system that supports signing many transactions targeting",
     "multiple chains with a single set of signatures. This program manages multiple multisig",
