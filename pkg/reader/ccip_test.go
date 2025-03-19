@@ -93,10 +93,11 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	// Add cleanup to ensure resources are released
 	t.Cleanup(func() {
 		if ccipReader.configPoller != nil {
-			ccipReader.configPoller.Stop()
+			err := ccipReader.configPoller.Close()
+			if err != nil {
+				t.Logf("Error closing config poller: %v", err)
+			}
 		}
-		// Allow some time for goroutines to stop
-		time.Sleep(50 * time.Millisecond)
 	})
 
 	addrStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, 111_111)
@@ -823,6 +824,13 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
 
+	// Add cleanup to properly shut down the background polling
+	t.Cleanup(func() {
+		if err := ccipReader.configPoller.Close(); err != nil {
+			t.Logf("Error closing config poller: %v", err)
+		}
+	})
+
 	feeQuoterAddressStr, err := mockAddrCodec.AddressBytesToString(feeQuoterAddress, 111_111)
 	require.NoError(t, err)
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -862,10 +870,8 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 	// Add cleanup to ensure resources are released
 	t.Cleanup(func() {
 		if ccipReader.configPoller != nil {
-			ccipReader.configPoller.Stop()
+			ccipReader.configPoller.Close()
 		}
-		// Allow some time for goroutines to stop
-		time.Sleep(50 * time.Millisecond)
 	})
 
 	ctx := context.Background()
@@ -900,10 +906,8 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 	// Add cleanup to ensure resources are released
 	t.Cleanup(func() {
 		if ccipReader.configPoller != nil {
-			ccipReader.configPoller.Stop()
+			ccipReader.configPoller.Close()
 		}
-		// Allow some time for goroutines to stop
-		time.Sleep(50 * time.Millisecond)
 	})
 
 	ctx := context.Background()
@@ -1723,10 +1727,10 @@ func (m *mockConfigCache) RefreshSourceChainConfigs(
 	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
 }
 
-func (m *mockConfigCache) Start() {
-	m.Called()
+func (m *mockConfigCache) Start() error {
+	return m.Called().Error(0)
 }
 
-func (m *mockConfigCache) Stop() {
-	m.Called()
+func (m *mockConfigCache) Close() error {
+	return m.Called().Error(0)
 }

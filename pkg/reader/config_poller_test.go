@@ -148,9 +148,18 @@ func setupInitialData(ctx context.Context, cache *configPoller, reader *reader_m
 
 // Helper to setup a second chain in the cache
 func setupSecondChain(ctx context.Context, t *testing.T, cache *configPoller) *reader_mocks.MockExtended {
-	// First add the reader for the second chain
+	// Create a new mock reader for the second chain
 	mockReader := reader_mocks.NewMockExtended(t)
-	cache.reader.contractReaders[chainB] = mockReader
+
+	// Type assertion to access the underlying ccipChainReader
+	// This is acceptable in test code since we know the concrete type
+	reader, ok := cache.reader.(*ccipChainReader)
+	if !ok {
+		t.Fatalf("Expected cache.reader to be *ccipChainReader, got %T", cache.reader)
+	}
+
+	// Now we can access contractReaders directly
+	reader.contractReaders[chainB] = mockReader
 
 	// Setup mock response for second chain
 	setupMockResponse(mockReader)
@@ -202,13 +211,15 @@ func TestConfigPoller_StartStop(t *testing.T) {
 	setupMockResponse(reader)
 
 	// Start the background poller
-	cache.Start()
+	err := cache.Start()
+	require.NoError(t, err, "Starting config poller should not error")
 
 	// Verify it's running by letting it execute at least once
 	time.Sleep(2 * cache.refreshPeriod)
 
 	// Stop the poller
-	cache.Stop()
+	err = cache.Close()
+	require.NoError(t, err, "Stopping config poller should not error")
 
 	// Reset the mock counts/expectations
 	reader.ExpectedCalls = nil
@@ -358,13 +369,15 @@ func TestConfigPoller_TrackSourceChain(t *testing.T) {
 	setupRefreshExpectations(reader)
 
 	// Start the background poller
-	cache.Start()
+	err = cache.Start()
+	require.NoError(t, err)
 
 	// Let it run for a refresh cycle (increased duration)
 	time.Sleep(3 * cache.refreshPeriod)
 
 	// Stop the poller
-	cache.Stop()
+	err = cache.Close()
+	require.NoError(t, err)
 
 	// Verify the mock was called
 	reader.AssertCalled(t, "ExtendedBatchGetLatestValues", mock.Anything, mock.Anything, true)
@@ -385,13 +398,15 @@ func TestConfigPoller_BackgroundErrorHandling(t *testing.T) {
 		Return(nil, nil, errors.New("simulated error"))
 
 	// Start the poller
-	cache.Start()
+	err := cache.Start()
+	require.NoError(t, err)
 
 	// Let it run and encounter the error
 	time.Sleep(2 * cache.refreshPeriod)
 
 	// Stop the poller
-	cache.Stop()
+	err = cache.Close()
+	require.NoError(t, err)
 
 	// Verify the service continues running despite errors
 	// This can be done by checking that initial data is still available
@@ -415,7 +430,8 @@ func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
 		}).Return(setupMockResponse(reader), []string{}, nil)
 
 	// Start the background poller
-	cache.Start()
+	err := cache.Start()
+	require.NoError(t, err)
 
 	// Sleep briefly to ensure background poller has started a refresh
 	time.Sleep(100 * time.Millisecond)
@@ -423,10 +439,12 @@ func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
 	// Now try to read concurrently while the refresh is in progress
 	start := time.Now()
 	config, err := cache.GetChainConfig(ctx, chainA)
+	require.NoError(t, err)
 	elapsed := time.Since(start)
 
 	// Stop the poller
-	cache.Stop()
+	err = cache.Close()
+	require.NoError(t, err)
 
 	// Verify the read was fast (non-blocking) despite ongoing refresh
 	require.NoError(t, err)
@@ -1064,13 +1082,15 @@ func TestConfigCache_BackgroundRefreshPeriod(t *testing.T) {
 			require.NoError(t, err)
 
 			// Start the background poller
-			cache.Start()
+			err = cache.Start()
+			require.NoError(t, err)
 
 			// Wait for the specified time to allow background polling
 			time.Sleep(tc.waitTime)
 
 			// Stop the background poller
-			cache.Stop()
+			err = cache.Close()
+			require.NoError(t, err)
 
 			// Verify the correct number of calls were made
 			mockReader.AssertNumberOfCalls(t, "ExtendedBatchGetLatestValues", tc.expectedCalls)
@@ -1530,4 +1550,62 @@ func TestConfigCache_RefreshSourceChainConfigs_SetsGlobalTimestamp(t *testing.T)
 	updatedRefreshTime := chainCache.sourceChainRefresh
 	assert.False(t, updatedRefreshTime.IsZero())
 	assert.True(t, updatedRefreshTime.After(initialRefreshTime))
+}
+
+func TestConfigPoller_GetChainsToRefresh(t *testing.T) {
+	// Setup test environment with destination chain A
+	cache, reader := setupBasicCache(t)
+	ctx := tests.Context(t)
+
+	// We need to first populate the cache for chain A by making a call to GetChainConfig
+	setupMockResponse(reader)
+	_, err := cache.GetChainConfig(ctx, chainA)
+	require.NoError(t, err, "Failed to populate cache for chain A")
+
+	// Add a second chain (chain B) to the cache
+	_ = setupSecondChain(ctx, t, cache)
+
+	// Track source chains B and C for destination chain A
+	sourceChains := []cciptypes.ChainSelector{chainB, chainC}
+	for _, chain := range sourceChains {
+		success := cache.trackSourceChain(chainA, chain)
+		require.True(t, success, "Failed to track source chain %d for dest chain %d", chain, chainA)
+	}
+
+	// Try to track a source chain D for chain B (which is not the destination chain)
+	// This should be ignored by getChainsToRefresh since B is not the destination
+	success := cache.trackSourceChain(chainB, chainD)
+	require.True(t, success, "Failed to track chain D as source for chain B")
+
+	// Call the method we want to test
+	chains, sourceChainsMap := cache.getChainsToRefresh()
+
+	// Verify all chains in cache are returned
+	require.Len(t, chains, 2, "Should return both chains in the cache")
+	assert.Contains(t, chains, chainA, "Chain A should be included")
+	assert.Contains(t, chains, chainB, "Chain B should be included")
+
+	// Verify only source chains for the destination chain are included
+	require.Len(t, sourceChainsMap, 1, "Should only have source chains for the destination chain")
+	assert.Contains(t, sourceChainsMap, chainA, "Destination chain should be in the map")
+
+	// Verify the source chains for destination chain are correct
+	destSourceChains := sourceChainsMap[chainA]
+	require.Len(t, destSourceChains, 2, "Should have 2 source chains for destination")
+	assert.Contains(t, destSourceChains, chainB, "Chain B should be in source chains")
+	assert.Contains(t, destSourceChains, chainC, "Chain C should be in source chains")
+
+	// Verify chain B's source chains are not included since it's not the destination chain
+	assert.NotContains(t, sourceChainsMap, chainB, "Non-destination chains should not have source chains in the map")
+
+	// Test edge case: Clear the source chains map and verify empty result
+	cache.Lock()
+	cache.knownSourceChains = make(map[cciptypes.ChainSelector]map[cciptypes.ChainSelector]bool)
+	cache.Unlock()
+
+	chains2, sourceChainsMap2 := cache.getChainsToRefresh()
+	require.Len(t, chains2, 2, "Should still return all chains in cache")
+	assert.Contains(t, chains2, chainA, "Chain A should still be included")
+	assert.Contains(t, chains2, chainB, "Chain B should still be included")
+	assert.Empty(t, sourceChainsMap2, "Source chains map should be empty when none tracked")
 }

@@ -11,8 +11,13 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
+
+// refreshAllKnownChains refreshes all known chains in background using batched requests where possible
+// bgRefreshTimeout defines the timeout for background refresh operations
+const bgRefreshTimeout = 30 * time.Second
 
 // ConfigPoller defines the interface for caching chain configuration data
 type ConfigPoller interface {
@@ -24,17 +29,19 @@ type ConfigPoller interface {
 		destChain cciptypes.ChainSelector,
 		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
 	// Start starts the background polling
-	Start()
-	// Stop stops the background polling
-	Stop()
+	Start() error
+	// Close stops the background polling
+	Close() error
 }
 
 // configPoller handles caching of chain configuration data for multiple chains
 type configPoller struct {
+	services.StateMachine // Embeds the StateMachine for lifecycle management
+
 	sync.RWMutex
 	chainCaches   map[cciptypes.ChainSelector]*chainCache
 	refreshPeriod time.Duration
-	reader        *ccipChainReader // Reference to the reader for fetching configs
+	reader        ccipReaderInternal
 	lggr          logger.Logger
 
 	// Track known source chains for each destination chain
@@ -63,7 +70,7 @@ type chainCache struct {
 // newConfigPoller creates a new config cache instance
 func newConfigPoller(
 	lggr logger.Logger,
-	reader *ccipChainReader,
+	reader ccipReaderInternal,
 	refreshPeriod time.Duration,
 ) *configPoller {
 	return &configPoller{
@@ -96,73 +103,95 @@ func (c *configPoller) startBackgroundPolling() {
 }
 
 // Add Start method to configPoller
-func (c *configPoller) Start() {
-	c.startBackgroundPolling()
-
-	c.lggr.Info("Background poller started")
+func (c *configPoller) Start() error {
+	return c.StartOnce("ConfigPoller", func() error {
+		c.startBackgroundPolling()
+		c.lggr.Info("Background poller started")
+		return nil
+	})
 }
 
 // Stop stops the background polling
-func (c *configPoller) Stop() {
-	close(c.stopChan)
-	c.wg.Wait()
+func (c *configPoller) Close() error {
+	return c.StopOnce("ConfigPoller", func() error {
+		close(c.stopChan)
+		c.wg.Wait()
+		return nil
+	})
 }
 
-// refreshAllKnownChains refreshes all known chains in background using batched requests where possible
-func (c *configPoller) refreshAllKnownChains() {
+// getChainsToRefresh returns all chains in the cache and their associated source chains
+// This method acquires a read lock for the duration of its execution
+func (c *configPoller) getChainsToRefresh() (
+	[]cciptypes.ChainSelector,
+	map[cciptypes.ChainSelector][]cciptypes.ChainSelector) {
 	c.RLock()
-	// Gather all chain configs and source chain configs to refresh
+	defer c.RUnlock()
+
+	// Get all chains to refresh
 	chainSelectors := make([]cciptypes.ChainSelector, 0, len(c.chainCaches))
 	sourceChainsMap := make(map[cciptypes.ChainSelector][]cciptypes.ChainSelector)
 
 	for chainSel := range c.chainCaches {
 		chainSelectors = append(chainSelectors, chainSel)
 
-		// If this chain has source chains, gather them
-		if sourceChains, exists := c.knownSourceChains[chainSel]; exists && len(sourceChains) > 0 {
-			sourceList := make([]cciptypes.ChainSelector, 0, len(sourceChains))
-			for sourceChain := range sourceChains {
-				sourceList = append(sourceList, sourceChain)
+		// If this chain is the destination chain and has source chains, gather them
+		if chainSel == c.reader.getDestChain() {
+			if sourceChains, exists := c.knownSourceChains[chainSel]; exists && len(sourceChains) > 0 {
+				sourceList := make([]cciptypes.ChainSelector, 0, len(sourceChains))
+				for sourceChain := range sourceChains {
+					sourceList = append(sourceList, sourceChain)
+				}
+				sourceChainsMap[chainSel] = sourceList
 			}
-			sourceChainsMap[chainSel] = sourceList
 		}
 	}
-	c.RUnlock()
+
+	return chainSelectors, sourceChainsMap
+}
+
+// refreshAllKnownChains refreshes all known chains in background using batched requests where possible
+func (c *configPoller) refreshAllKnownChains() {
+	// Get all chains to refresh using the helper method
+	chainSelectors, sourceChainsMap := c.getChainsToRefresh()
+
+	// Log the starting of refresh cycle
+	c.lggr.Debugw("Starting refresh cycle for known chains",
+		"chainsCount", len(chainSelectors),
+		"refreshPeriod", c.refreshPeriod)
 
 	// Refresh each chain (and its source chains if applicable)
-	for _, destChain := range chainSelectors {
-		// Skip chains we don't know as dest chains
-		sourceChains, hasSourceChains := sourceChainsMap[destChain]
+	for _, chainSel := range chainSelectors {
+		ctx, cancel := context.WithTimeout(context.Background(), bgRefreshTimeout)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-
-		// If this is a destination chain with source chains, batch refresh both
-		if hasSourceChains && len(sourceChains) > 0 {
-			err := c.batchRefreshChainAndSourceConfigs(ctx, destChain, sourceChains)
+		// If this is the destination chain and has source chains, use batch refresh
+		if chainSel == c.reader.getDestChain() && len(sourceChainsMap[chainSel]) > 0 {
+			sourceChains := sourceChainsMap[chainSel]
+			err := c.batchRefreshChainAndSourceConfigs(ctx, chainSel, sourceChains)
 			if err != nil {
 				c.lggr.Warnw("Failed to batch refresh chain and source configs",
-					"destChain", destChain,
+					"destChain", chainSel,
 					"sourceChains", sourceChains,
 					"error", err)
 				// Fall back to individual refreshes if batch fails
-				_, err := c.refreshChainConfig(ctx, destChain)
+				_, err := c.refreshChainConfig(ctx, chainSel)
 				if err != nil {
 					c.lggr.Warnw("Failed to refresh chain config in background",
-						"chain", destChain, "error", err)
+						"chain", chainSel, "error", err)
 				}
 
-				_, err = c.refreshSourceChainConfigs(ctx, destChain, sourceChains)
+				_, err = c.refreshSourceChainConfigs(ctx, chainSel, sourceChains)
 				if err != nil {
 					c.lggr.Warnw("Failed to refresh source chain configs in background",
-						"destChain", destChain, "sourceChains", sourceChains, "error", err)
+						"destChain", chainSel, "sourceChains", sourceChains, "error", err)
 				}
 			}
 		} else {
-			// Just refresh chain config for chains without source chains
-			_, err := c.refreshChainConfig(ctx, destChain)
+			// This is a source chain or a chain without source chains, just refresh its config
+			_, err := c.refreshChainConfig(ctx, chainSel)
 			if err != nil {
 				c.lggr.Warnw("Failed to refresh chain config in background",
-					"chain", destChain, "error", err)
+					"chain", chainSel, "error", err)
 			}
 		}
 
@@ -303,7 +332,7 @@ func (c *configPoller) batchRefreshChainAndSourceConfigs(
 	standardOffRampRequestCount, _ := c.appendSourceQueriesToRequests(chainConfigRequests, sourceQueries)
 
 	// 4. Get the contract reader for this chain
-	reader, exists := c.reader.contractReaders[destChain]
+	reader, exists := c.reader.getContractReader(destChain)
 	if !exists {
 		return fmt.Errorf("no contract reader for chain %d", destChain)
 	}
@@ -378,7 +407,7 @@ func (c *configPoller) trackSourceChain(destChain, sourceChain cciptypes.ChainSe
 	}
 
 	// First check if we have a contract reader for this destination chain
-	if _, exists := c.reader.contractReaders[destChain]; !exists {
+	if _, exists := c.reader.getContractReader(destChain); !exists {
 		c.lggr.Debugw("Cannot track source chain - no contract reader for dest chain",
 			"destChain", destChain,
 			"sourceChain", sourceChain)
@@ -406,7 +435,7 @@ func (c *configPoller) getOrCreateChainCache(chainSel cciptypes.ChainSelector) *
 	}
 
 	// verify we have the reader for this chain
-	if _, exists := c.reader.contractReaders[chainSel]; !exists {
+	if _, exists := c.reader.getContractReader(chainSel); !exists {
 		c.lggr.Errorw("No contract reader for chain", "chain", chainSel)
 		return nil
 	}
@@ -424,7 +453,7 @@ func (c *configPoller) GetChainConfig(
 	chainSel cciptypes.ChainSelector,
 ) (ChainConfigSnapshot, error) {
 	// Check if we have a reader for this chain
-	reader, exists := c.reader.contractReaders[chainSel]
+	reader, exists := c.reader.getContractReader(chainSel)
 	if !exists || reader == nil {
 		c.lggr.Errorw("No contract reader for chain", "chain", chainSel)
 		return ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
@@ -456,7 +485,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 	sourceChains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	// Verify we have a reader for the destination chain
-	if _, exists := c.reader.contractReaders[destChain]; !exists {
+	if _, exists := c.reader.getContractReader(destChain); !exists {
 		c.lggr.Errorw("No contract reader for destination chain", "chain", destChain)
 		return nil, fmt.Errorf("no contract reader for destination chain %d", destChain)
 	}
@@ -643,7 +672,7 @@ func (c *configPoller) fetchChainConfig(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
 
-	reader, exists := c.reader.contractReaders[chainSel]
+	reader, exists := c.reader.getContractReader(chainSel)
 	if !exists {
 		return ChainConfigSnapshot{}, fmt.Errorf("no contract reader for chain %d", chainSel)
 	}

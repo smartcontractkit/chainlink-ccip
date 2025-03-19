@@ -89,8 +89,12 @@ func newCCIPChainReaderInternal(
 	}
 
 	// After contracts are synced, start the background polling
-	reader.configPoller.Start()
-	lggr.Info("Started config background polling")
+	lggr.Info("Starting config background polling")
+	if err := reader.configPoller.Start(); err != nil {
+		// Log the error but don't fail - we can still function without background polling
+		// by fetching configs on demand
+		lggr.Errorw("failed to start config background polling", "err", err)
+	}
 
 	return reader
 }
@@ -103,12 +107,11 @@ func (r *ccipChainReader) WithExtendedContractReader(
 }
 
 func (r *ccipChainReader) Close() error {
-	// Stop the background poller
-	r.configPoller.Stop()
-	r.lggr.Info("Stopped config background polling")
-
-	// Add any other cleanup here
-
+	if err := r.configPoller.Close(); err != nil {
+		r.lggr.Warnw("Error closing config poller", "err", err)
+		// Continue with shutdown even if there's an error
+	}
+	r.lggr.Info("Stopped CCIP chain reader")
 	return nil
 }
 
@@ -2124,6 +2127,36 @@ func validateSendRequestedEvent(
 	}
 
 	return nil
+}
+
+// ccipReaderInternal defines the interface that ConfigPoller needs from the ccipChainReader
+// This allows for better encapsulation and easier testing through mocking
+type ccipReaderInternal interface {
+	// getDestChain returns the destination chain selector
+	getDestChain() cciptypes.ChainSelector
+
+	// getContractReader returns the contract reader for the specified chain
+	getContractReader(chain cciptypes.ChainSelector) (contractreader.Extended, bool)
+
+	// prepareBatchConfigRequests prepares the batch requests for fetching chain configuration
+	prepareBatchConfigRequests(chainSel cciptypes.ChainSelector) contractreader.ExtendedBatchGetLatestValuesRequest
+
+	// processConfigResults processes the batch results into a ChainConfigSnapshot
+	processConfigResults(chainSel cciptypes.ChainSelector, batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error)
+
+	// fetchFreshSourceChainConfigs fetches source chain configurations from the specified destination chain
+	fetchFreshSourceChainConfigs(ctx context.Context, destChain cciptypes.ChainSelector, sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+}
+
+// getDestChain returns the destination chain selector
+func (r *ccipChainReader) getDestChain() cciptypes.ChainSelector {
+	return r.destChain
+}
+
+// getContractReader returns the contract reader for the specified chain
+func (r *ccipChainReader) getContractReader(chain cciptypes.ChainSelector) (contractreader.Extended, bool) {
+	reader, exists := r.contractReaders[chain]
+	return reader, exists
 }
 
 // Interface compliance check
