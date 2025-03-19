@@ -46,8 +46,8 @@ var (
 	// example programs
 	CcipBaseSender          = GetProgramID("example_ccip_sender")
 	CcipBaseReceiver        = GetProgramID("example_ccip_receiver")
-	CcipBasePoolBurnMint    = GetProgramID("example_burnmint_token_pool")
-	CcipBasePoolLockRelease = GetProgramID("example_lockrelease_token_pool")
+	CcipBasePoolBurnMint    = GetProgramID("burnmint_token_pool")
+	CcipBasePoolLockRelease = GetProgramID("lockrelease_token_pool")
 
 	// router/onramp PDAs
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
