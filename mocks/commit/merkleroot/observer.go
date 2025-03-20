@@ -9,7 +9,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	plugintypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	plugintypes "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	types "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )

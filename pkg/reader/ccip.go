@@ -23,7 +23,6 @@ import (
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
@@ -807,7 +806,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		var update plugintypes.TimestampedUnixBig
+		var update plugintypes2.TimestampedUnixBig
 		err = reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameFeeQuoter,
@@ -841,16 +840,16 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 // https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
 //
 //nolint:lll
-func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
+func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes2.TimestampedBig {
 	lggr := logutil.WithContextValues(ctx, r.lggr)
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		lggr.Errorw("GetChainFeePriceUpdate dest chain extended reader not exist", "err", err)
 		return nil
 	}
 
-	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
+	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes2.TimestampedBig, len(selectors))
 	for _, chain := range selectors {
-		update := plugintypes.TimestampedUnixBig{}
+		update := plugintypes2.TimestampedUnixBig{}
 		// Read from dest chain
 		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 			ctx,
@@ -871,7 +870,7 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 			lggr.Debugw("chain fee price update is empty", "chain", chain)
 			continue
 		}
-		feeUpdates[chain] = plugintypes.TimeStampedBigFromUnix(update)
+		feeUpdates[chain] = plugintypes2.TimeStampedBigFromUnix(update)
 	}
 
 	return feeUpdates
@@ -1230,7 +1229,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
 	}
 
-	var timestampedPrice plugintypes.TimestampedUnixBig
+	var timestampedPrice plugintypes2.TimestampedUnixBig
 	err := reader.ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameFeeQuoter,

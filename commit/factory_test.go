@@ -8,16 +8,19 @@ import (
 	"testing"
 	"time"
 
-	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -27,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -85,8 +87,8 @@ func Test_maxObservationLength(t *testing.T) {
 
 	merkleRootObs := merkleroot.Observation{
 		MerkleRoots:        make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
-		OnRampMaxSeqNums:   make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
-		OffRampNextSeqNums: make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
+		OnRampMaxSeqNums:   make([]plugintypes2.SeqNumChain, estimatedMaxNumberOfSourceChains),
+		OffRampNextSeqNums: make([]plugintypes2.SeqNumChain, estimatedMaxNumberOfSourceChains),
 		RMNRemoteConfig: rmntypes.RemoteConfig{
 			ContractAddress:  make([]byte, 20),
 			ConfigDigest:     [32]byte{},
@@ -108,14 +110,14 @@ func Test_maxObservationLength(t *testing.T) {
 	}
 
 	for i := range merkleRootObs.OnRampMaxSeqNums {
-		merkleRootObs.OnRampMaxSeqNums[i] = plugintypes.SeqNumChain{
+		merkleRootObs.OnRampMaxSeqNums[i] = plugintypes2.SeqNumChain{
 			ChainSel: math.MaxUint64,
 			SeqNum:   math.MaxUint64,
 		}
 	}
 
 	for i := range merkleRootObs.OffRampNextSeqNums {
-		merkleRootObs.OffRampNextSeqNums[i] = plugintypes.SeqNumChain{
+		merkleRootObs.OffRampNextSeqNums[i] = plugintypes2.SeqNumChain{
 			ChainSel: math.MaxUint64,
 			SeqNum:   math.MaxUint64,
 		}
@@ -132,7 +134,7 @@ func Test_maxObservationLength(t *testing.T) {
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenprice.Observation{
 			FeedTokenPrices: make(ccipocr3.TokenPriceMap),
-			FeeQuoterTokenUpdates: make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig,
+			FeeQuoterTokenUpdates: make(map[ccipocr3.UnknownEncodedAddress]plugintypes2.TimestampedBig,
 				estimatedMaxNumberOfPricedTokens),
 			FChain:    make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
 			Timestamp: time.Now(),
@@ -179,9 +181,9 @@ func Test_maxOutcomeLength(t *testing.T) {
 	maxOutc := committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
 			OutcomeType:                     merkleroot.OutcomeType(math.MaxInt),
-			RangesSelectedForReport:         make([]plugintypes.ChainRange, estimatedMaxNumberOfSourceChains),
+			RangesSelectedForReport:         make([]plugintypes2.ChainRange, estimatedMaxNumberOfSourceChains),
 			RootsToReport:                   make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
-			OffRampNextSeqNums:              make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
+			OffRampNextSeqNums:              make([]plugintypes2.SeqNumChain, estimatedMaxNumberOfSourceChains),
 			ReportTransmissionCheckAttempts: math.MaxUint64,
 			RMNReportSignatures:             make([]ccipocr3.RMNECDSASignature, estimatedMaxRmnNodesCount),
 			RMNRemoteCfg: rmntypes.RemoteConfig{
@@ -202,7 +204,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 	}
 
 	for i := range maxOutc.MerkleRootOutcome.RangesSelectedForReport {
-		maxOutc.MerkleRootOutcome.RangesSelectedForReport[i] = plugintypes.ChainRange{
+		maxOutc.MerkleRootOutcome.RangesSelectedForReport[i] = plugintypes2.ChainRange{
 			ChainSel:    math.MaxUint64,
 			SeqNumRange: ccipocr3.NewSeqNumRange(math.MaxUint64, math.MaxUint64),
 		}
@@ -218,7 +220,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 	}
 
 	for i := range maxOutc.MerkleRootOutcome.OffRampNextSeqNums {
-		maxOutc.MerkleRootOutcome.OffRampNextSeqNums[i] = plugintypes.SeqNumChain{
+		maxOutc.MerkleRootOutcome.OffRampNextSeqNums[i] = plugintypes2.SeqNumChain{
 			ChainSel: math.MaxUint64,
 			SeqNum:   math.MaxUint64,
 		}
