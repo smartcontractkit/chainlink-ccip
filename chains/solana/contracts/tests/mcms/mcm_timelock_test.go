@@ -1732,7 +1732,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					memoIx := solana.NewInstruction(
 						solana.MemoProgramID,
 						[]*solana.AccountMeta{
-							solana.Meta(executorMsig.SignerPDA).SIGNER(),
+							solana.Meta(executorMsig.SignerPDA).SIGNER().WRITE(),
 						},
 						[]byte(memoText),
 					)
