@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -129,6 +130,7 @@ func NewCCIPChainReader(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
+	configPollerSyncFreq commonconfig.Duration,
 ) CCIPReader {
 	return NewObservedCCIPReader(
 		newCCIPChainReaderInternal(
@@ -139,6 +141,7 @@ func NewCCIPChainReader(
 			destChain,
 			offrampAddress,
 			addrCodec,
+			configPollerSyncFreq,
 		),
 		lggr,
 		destChain,
@@ -154,8 +157,9 @@ func NewCCIPReaderWithExtendedContractReaders(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
+	configPollerSyncFreq commonconfig.Duration,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec)
+	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec, configPollerSyncFreq)
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}

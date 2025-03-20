@@ -171,6 +171,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 			BatchingStrategyID:        0,
 			TokenDataObservers:        configs,
+			ConfigPollerSyncFreq:      *commonconfig.MustNewDuration(1),
 		}
 	}
 

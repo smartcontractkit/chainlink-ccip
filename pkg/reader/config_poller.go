@@ -7,6 +7,7 @@ import (
 	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -38,7 +39,7 @@ type ConfigPoller interface {
 type configPoller struct {
 	sync.RWMutex
 	chainCaches   map[cciptypes.ChainSelector]*chainCache
-	refreshPeriod time.Duration
+	refreshPeriod commonconfig.Duration
 	reader        *ccipChainReader // Reference to the reader for fetching configs
 	lggr          logger.Logger
 }
@@ -62,7 +63,7 @@ type chainCache struct {
 func newConfigPoller(
 	lggr logger.Logger,
 	reader *ccipChainReader,
-	refreshPeriod time.Duration,
+	refreshPeriod commonconfig.Duration,
 ) *configPoller {
 	return &configPoller{
 		chainCaches:   make(map[cciptypes.ChainSelector]*chainCache),
@@ -110,7 +111,7 @@ func (c *configPoller) GetChainConfig(
 
 	chainCache.chainConfigMu.RLock()
 	timeSinceLastRefresh := time.Since(chainCache.chainConfigRefresh)
-	if timeSinceLastRefresh < c.refreshPeriod {
+	if timeSinceLastRefresh < c.refreshPeriod.Duration() {
 		defer chainCache.chainConfigMu.RUnlock()
 		c.lggr.Debugw("Cache hit",
 			"chain", chainSel,
@@ -155,7 +156,7 @@ func (c *configPoller) GetOfframpSourceChainConfigs(
 
 	// Check if the global refresh time has expired
 	needsGlobalRefresh := chainCache.sourceChainRefresh.IsZero() ||
-		time.Since(chainCache.sourceChainRefresh) >= c.refreshPeriod
+		time.Since(chainCache.sourceChainRefresh) >= c.refreshPeriod.Duration()
 
 	c.lggr.Debugw("Checking if refresh needed",
 		"sourceChainRefresh", chainCache.sourceChainRefresh,
@@ -278,7 +279,7 @@ func (c *configPoller) RefreshChainConfig(
 
 	// Double check if another goroutine has already refreshed
 	timeSinceLastRefresh := time.Since(chainCache.chainConfigRefresh)
-	if timeSinceLastRefresh < c.refreshPeriod {
+	if timeSinceLastRefresh < c.refreshPeriod.Duration() {
 		c.lggr.Debugw("Cache was refreshed by another goroutine",
 			"chain", chainSel,
 			"timeSinceLastRefresh", timeSinceLastRefresh)

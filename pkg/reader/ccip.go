@@ -16,6 +16,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -32,9 +33,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
-
-// Default refresh period for cache if not specified
-const defaultRefreshPeriod = 30 * time.Second
 
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
 // can be generated.
@@ -56,6 +54,8 @@ func newCCIPChainReaderInternal(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 	addrCodec cciptypes.AddressCodec,
+	configPollerSyncFreq commonconfig.Duration,
+
 ) *ccipChainReader {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
@@ -77,7 +77,7 @@ func newCCIPChainReaderInternal(
 	}
 
 	// Initialize cache with readers
-	reader.configPoller = newConfigPoller(lggr, reader, defaultRefreshPeriod)
+	reader.configPoller = newConfigPoller(lggr, reader, configPollerSyncFreq)
 
 	contracts := ContractAddresses{
 		consts.ContractNameOffRamp: {
