@@ -2,6 +2,9 @@ package solana
 
 import "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
+// These types are needed as special call args for the CCIP contract transmitter on
+// Solana. These call args are passed to the ChainWriter and are used to derive additional
+// fields to send txs on chain.
 type ExtraDataDecoded struct {
 	// ExtraArgsDecoded contain message specific extra args.
 	ExtraArgsDecoded map[string]any
