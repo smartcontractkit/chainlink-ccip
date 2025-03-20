@@ -24,9 +24,10 @@ func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.Pri
 
 func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T) {
 	sigs := []solana.Signature{}
-	for _, v := range accounts {
+	for i, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
 		require.NoError(t, err)
+		fmt.Printf("Sig %d: %s\n", i, sig)
 		sigs = append(sigs, sig)
 	}
 
