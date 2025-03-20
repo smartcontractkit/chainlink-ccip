@@ -51,7 +51,7 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 
 		elapsed := time.Since(initTime)
 		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\n", t.Name(), remaining, len(accounts), elapsed)
-		if elapsed > 5*time.Minute {
+		if elapsed > 1*time.Minute {
 			require.NoError(t, fmt.Errorf("[%s]: unable to find transactions within timeout", t.Name()))
 		}
 	}
