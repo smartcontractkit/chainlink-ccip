@@ -46,10 +46,6 @@ func (o waitAndRetryOpts) WithDecreasedAttempts() waitAndRetryOpts {
 }
 
 func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T, opts waitAndRetryOpts) {
-	if opts.RemainingAttempts == 0 {
-		require.NoError(t, fmt.Errorf("[%s]: unable to find transactions after all attempts", t.Name()))
-	}
-
 	sigs := []solana.Signature{}
 	fmt.Printf("[%s]: Requesting airdrop for %d accounts and remaining attempts %d\n", t.Name(), len(accounts), opts.RemainingAttempts)
 	for i, v := range accounts {
@@ -87,7 +83,13 @@ func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 	}
 
 	fmt.Printf("[%s]: unable to find %d transactions out of %d within timeout when remaining attempts is %d\n", t.Name(), len(remaining), len(accounts), opts.RemainingAttempts)
-	fundAccounts(ctx, remaining, solanaGoClient, t, opts.WithDecreasedAttempts()) // recursive call with only remaining & with fewer attempts
+
+	decreasedOpts := opts.WithDecreasedAttempts()
+	if decreasedOpts.RemainingAttempts == 0 {
+		require.NoError(t, fmt.Errorf("[%s]: unable to find transactions after all attempts", t.Name()))
+	} else {
+		fundAccounts(ctx, remaining, solanaGoClient, t, decreasedOpts) // recursive call with only remaining & with fewer attempts
+	}
 }
 
 func SetupTestValidatorWithAnchorPrograms(t *testing.T, pathToAnchorConfig string, upgradeAuthority string) string {
