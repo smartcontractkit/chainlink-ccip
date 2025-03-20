@@ -24,16 +24,34 @@ func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.Pri
 }
 
 func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T) {
-	fundAccounts(ctx, accounts, solanaGoClient, t, 3)
+	fundAccounts(ctx, accounts, solanaGoClient, t, waitAndRetryOpts{
+		RemainingAttempts: 3,
+		Timeout:           30 * time.Second,
+		Timestep:          500 * time.Millisecond,
+	})
 }
 
-func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T, remainingAttempts uint) {
-	if remainingAttempts == 0 {
+type waitAndRetryOpts struct {
+	RemainingAttempts uint
+	Timeout           time.Duration
+	Timestep          time.Duration
+}
+
+func (o waitAndRetryOpts) WithDecreasedAttempts() waitAndRetryOpts {
+	return waitAndRetryOpts{
+		RemainingAttempts: o.RemainingAttempts - 1,
+		Timeout:           o.Timeout,
+		Timestep:          o.Timestep,
+	}
+}
+
+func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T, opts waitAndRetryOpts) {
+	if opts.RemainingAttempts == 0 {
 		require.NoError(t, fmt.Errorf("[%s]: unable to find transactions after all attempts", t.Name()))
 	}
 
 	sigs := []solana.Signature{}
-	fmt.Printf("[%s]: Requesting airdrop for %d accounts and remaining attempts %d\n", t.Name(), len(accounts), remainingAttempts)
+	fmt.Printf("[%s]: Requesting airdrop for %d accounts and remaining attempts %d\n", t.Name(), len(accounts), opts.RemainingAttempts)
 	for i, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
 		require.NoError(t, err)
@@ -44,8 +62,8 @@ func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 	// wait for confirmation so later transactions don't fail
 	remaining := accounts
 	initTime := time.Now()
-	for elapsed := time.Since(initTime); elapsed < 1*time.Minute; elapsed = time.Since(initTime) {
-		time.Sleep(500 * time.Millisecond)
+	for elapsed := time.Since(initTime); elapsed < opts.Timeout; elapsed = time.Since(initTime) {
+		time.Sleep(opts.Timestep)
 
 		statusRes, sigErr := solanaGoClient.GetSignatureStatuses(ctx, true, sigs...)
 		require.NoError(t, sigErr)
@@ -60,7 +78,7 @@ func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 		}
 		remaining = accountsWithNonFinalizedFunding
 		if len(remaining) == 0 {
-			break
+			return // all done!
 		}
 
 		printableStatuses, err := json.Marshal(statusRes)
@@ -68,10 +86,8 @@ func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\nSignatureStatuses: %s\n\n", t.Name(), len(remaining), len(accounts), elapsed, printableStatuses)
 	}
 
-	if len(remaining) > 0 {
-		fmt.Printf("[%s]: unable to find %d transactions out of %d within timeout when remaining attempts is %d", t.Name(), len(remaining), len(accounts), remainingAttempts)
-		fundAccounts(ctx, remaining, solanaGoClient, t, remainingAttempts-1) // recursive call with only remaining & with fewer attempts
-	}
+	fmt.Printf("[%s]: unable to find %d transactions out of %d within timeout when remaining attempts is %d\n", t.Name(), len(remaining), len(accounts), opts.RemainingAttempts)
+	fundAccounts(ctx, remaining, solanaGoClient, t, opts.WithDecreasedAttempts()) // recursive call with only remaining & with fewer attempts
 }
 
 func SetupTestValidatorWithAnchorPrograms(t *testing.T, pathToAnchorConfig string, upgradeAuthority string) string {
