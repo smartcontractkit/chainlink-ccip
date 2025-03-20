@@ -620,27 +620,31 @@ func (p *Plugin) checkAlreadyExecuted(
 ) error {
 	seqNrRangesBySource := getSeqNrRangesBySource(reports)
 
-	// TODO: batch these queries? these are all DB reads.
-	// maybe some alternative queries exist.
-	for sourceChainSelector, seqNrRange := range seqNrRangesBySource {
-		executed, err := p.ccipReader.ExecutedMessages(
-			ctx,
-			sourceChainSelector,
-			[]cciptypes.SeqNumRange{seqNrRange},
-			primitives.Unconfirmed)
-		if err != nil {
-			return fmt.Errorf("couldn't check if messages already executed: %w", err)
+	executed, err := p.ccipReader.ExecutedMessages(
+		ctx,
+		seqNrRangesBySource,
+		primitives.Unconfirmed)
+	if err != nil {
+		return fmt.Errorf("couldn't check if messages already executed: %w", err)
+	}
+
+	for sourceChainSelector, executedSqNrs := range executed {
+		snRangeSet := mapset.NewSet[cciptypes.SeqNum]()
+		totalSeqNums := 0
+		for _, snRange := range seqNrRangesBySource[sourceChainSelector] {
+			snRangeSet.Append(snRange.ToSlice()...)
+			totalSeqNums += snRange.Length()
 		}
 
-		executedSet := mapset.NewSet(executed...)
-		snRangeSet := mapset.NewSet(seqNrRange.ToSlice()...)
+		executedSet := mapset.NewSet(executedSqNrs...)
 		intersection := executedSet.Intersect(snRangeSet)
-		if intersection.Cardinality() != seqNrRange.Length() {
+
+		if intersection.Cardinality() != totalSeqNums {
 			// Some messages have not been executed, return early to accept/transmit the report.
 			notYetExecuted := snRangeSet.Difference(executedSet)
 			lggr.Debugw("some messages from source not yet executed",
 				"sourceChain", sourceChainSelector,
-				"seqNrRange", seqNrRange,
+				"seqNrRange", seqNrRangesBySource[sourceChainSelector],
 				"executed", executed,
 				"notYetExecuted", notYetExecuted,
 			)
@@ -650,7 +654,7 @@ func (p *Plugin) checkAlreadyExecuted(
 		// All messages from this source have been executed, check the next source chain.
 		lggr.Debugw("all messages from source already executed, checking next source",
 			"sourceChain", sourceChainSelector,
-			"seqNrRange", seqNrRange,
+			"seqNrRange", seqNrRangesBySource[sourceChainSelector],
 			"executed", executed,
 		)
 	}
@@ -664,13 +668,16 @@ func (p *Plugin) checkAlreadyExecuted(
 // the sequence number range of the messages in the report.
 func getSeqNrRangesBySource(
 	chainReports []cciptypes.ExecutePluginReportSingleChain,
-) map[cciptypes.ChainSelector]cciptypes.SeqNumRange {
-	seqNrRangesBySource := make(map[cciptypes.ChainSelector]cciptypes.SeqNumRange)
+) map[cciptypes.ChainSelector][]cciptypes.SeqNumRange {
+	seqNrRangesBySource := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
 	for _, chainReport := range chainReports {
 		// This should never happen, indicates a bug in the report building and accepting process.
 		// But we sanity check since slices.Min/Max will panic on empty slices.
 		if len(chainReport.Messages) == 0 {
 			continue
+		}
+		if _, exists := seqNrRangesBySource[chainReport.SourceChainSelector]; !exists {
+			seqNrRangesBySource[chainReport.SourceChainSelector] = []cciptypes.SeqNumRange{}
 		}
 
 		cmpr := func(a, b cciptypes.Message) int {
@@ -678,9 +685,10 @@ func getSeqNrRangesBySource(
 		}
 		minMsg := slices.MinFunc(chainReport.Messages, cmpr)
 		maxMsg := slices.MaxFunc(chainReport.Messages, cmpr)
-		seqNrRangesBySource[chainReport.SourceChainSelector] = cciptypes.NewSeqNumRange(
+		seqNrRangesBySource[chainReport.SourceChainSelector] = []cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(
 			minMsg.Header.SequenceNumber,
-			maxMsg.Header.SequenceNumber)
+			maxMsg.Header.SequenceNumber,
+		)}
 	}
 	return seqNrRangesBySource
 }

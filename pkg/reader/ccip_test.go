@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -36,6 +37,72 @@ var (
 	chainC = cciptypes.ChainSelector(3)
 	chainD = cciptypes.ChainSelector(4)
 )
+
+func TestCCIPChainReader_ExecutedMessages(t *testing.T) {
+	var (
+		range1 = cciptypes.NewSeqNumRange(1, 2)
+	)
+	testCases := []struct {
+		name               string
+		seqNrRangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
+		confidence         primitives.ConfidenceLevel
+		expectedCount      uint64
+		expected           query.KeyFilter
+	}{
+		{
+			name: "happy path",
+			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				chainA: {range1},
+			},
+			confidence:    primitives.Finalized,
+			expectedCount: 2,
+			expected: query.KeyFilter{
+				Key: consts.EventNameExecutionStateChanged,
+				Expressions: []query.Expression{
+					{
+						BoolExpression: query.BoolExpression{
+							BoolOperator: query.AND,
+							Expressions: []query.Expression{
+								{
+									Primitive: &primitives.Comparator{
+										Name: consts.EventAttributeSequenceNumber,
+										ValueComparators: []primitives.ValueComparator{
+											{Value: range1.Start(), Operator: primitives.Gte},
+											{Value: range1.End(), Operator: primitives.Lte},
+										},
+									},
+								},
+								{
+									Primitive: &primitives.Comparator{
+										Name: consts.EventAttributeSourceChain,
+										ValueComparators: []primitives.ValueComparator{
+											{Value: chainA, Operator: primitives.Eq},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Primitive: &primitives.Comparator{
+							Name:             consts.EventAttributeState,
+							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
+						},
+					},
+					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			output, count := createExecutedMessagesKeyFilter(tt.seqNrRangesByChain, tt.confidence)
+			assert.Equal(t, tt.expected, output)
+			assert.Equal(t, tt.expectedCount, count)
+		})
+	}
+}
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)

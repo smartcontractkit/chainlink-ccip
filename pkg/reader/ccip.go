@@ -342,46 +342,12 @@ func (r *ccipChainReader) ExecutedMessages(
 	}
 
 	dataTyp := ExecutionStateChangedEvent{}
-
-	var chainExpressions []query.Expression
-	var countSqNrs uint64
-	for srcChain, seqNumRanges := range rangesPerChain {
-		var seqRangeExpressions []query.Expression
-		for _, seqNr := range seqNumRanges {
-			expr := query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
-				Value:    seqNr.Start(),
-				Operator: primitives.Gte,
-			}, primitives.ValueComparator{
-				Value:    seqNr.End(),
-				Operator: primitives.Lte,
-			})
-			seqRangeExpressions = append(seqRangeExpressions, expr)
-			countSqNrs += uint64(seqNr.End() - seqNr.Start() + 1)
-		}
-		combinedSeqNrs := query.Or(seqRangeExpressions...)
-		chainExpressions = append(chainExpressions, query.And(
-			combinedSeqNrs,
-			query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-				Value:    srcChain,
-				Operator: primitives.Eq,
-			}),
-			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
-				Value:    0,
-				Operator: primitives.Gt,
-			}),
-			// We don't need to wait for an execute state changed event to be finalized
-			// before we optimistically mark a message as executed.
-			query.Confidence(confidence),
-		))
-	}
+	keyFilter, countSqNrs := createExecutedMessagesKeyFilter(rangesPerChain, confidence)
 
 	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
-		query.KeyFilter{
-			Key:         consts.EventNameExecutionStateChanged,
-			Expressions: chainExpressions,
-		},
+		keyFilter,
 		query.LimitAndSort{
 			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
 			Limit: query.Limit{
@@ -411,6 +377,56 @@ func (r *ccipChainReader) ExecutedMessages(
 	}
 
 	return executed, nil
+}
+
+func createExecutedMessagesKeyFilter(rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
+	confidence primitives.ConfidenceLevel) (query.KeyFilter, uint64) {
+
+	var chainExpressions []query.Expression
+	var countSqNrs uint64
+	// final query should look like
+	// (chainA && (sqRange1 || sqRange2 || ...)) || (chainB && (sqRange1 || sqRange2 || ...))
+	for srcChain, seqNumRanges := range rangesPerChain {
+		var seqRangeExpressions []query.Expression
+		for _, seqNr := range seqNumRanges {
+			expr := query.Comparator(consts.EventAttributeSequenceNumber,
+				primitives.ValueComparator{
+					Value:    seqNr.Start(),
+					Operator: primitives.Gte,
+				},
+				primitives.ValueComparator{
+					Value:    seqNr.End(),
+					Operator: primitives.Lte,
+				})
+			seqRangeExpressions = append(seqRangeExpressions, expr)
+			countSqNrs += uint64(seqNr.End() - seqNr.Start() + 1)
+		}
+		combinedSeqNrs := query.Or(seqRangeExpressions...)
+
+		chainExpressions = append(chainExpressions, query.And(
+			combinedSeqNrs,
+			query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
+				Value:    srcChain,
+				Operator: primitives.Eq,
+			}),
+		))
+	}
+	extendedQuery := query.Or(chainExpressions...)
+
+	keyFilter := query.KeyFilter{
+		Key: consts.EventNameExecutionStateChanged,
+		Expressions: []query.Expression{
+			extendedQuery,
+			// We don't need to wait for an execute state changed event to be finalized
+			// before we optimistically mark a message as executed.
+			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
+				Value:    0,
+				Operator: primitives.Gt,
+			}),
+			query.Confidence(confidence),
+		},
+	}
+	return keyFilter, countSqNrs
 }
 
 type SendRequestedEvent struct {
