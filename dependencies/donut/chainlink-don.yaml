@@ -43,7 +43,7 @@ vars:
   # Option to use template for custom don type, when enabled it will use type.${DON_TYPE}.yaml
   ENABLE_CUSTOM_TYPE:
     source: env
-    default: "false"
+    default: "true"
   DON_VERSION:
     source: env
     default: latest
