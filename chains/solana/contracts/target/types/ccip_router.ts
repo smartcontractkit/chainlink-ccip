@@ -700,7 +700,7 @@ export type CcipRouter = {
         },
         {
           "name": "tokenAdminRegistry",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -2657,7 +2657,7 @@ export const IDL: CcipRouter = {
         },
         {
           "name": "tokenAdminRegistry",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
