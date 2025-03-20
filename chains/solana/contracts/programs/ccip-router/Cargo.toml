@@ -23,6 +23,7 @@ bytemuck = "1.7"
 ethnum = "1.5"
 fee_quoter = {path = "../fee-quoter", features = ["cpi"]}
 rmn_remote = {path = "../rmn-remote", features = ["cpi"]}
+common = {path = "../../crates/common"}
 
 [dev-dependencies]
 hex = "0.4.3"

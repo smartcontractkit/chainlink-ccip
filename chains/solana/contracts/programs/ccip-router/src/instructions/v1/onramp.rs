@@ -1,6 +1,8 @@
 use crate::events::on_ramp as events;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
+use common::seed;
+use common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use fee_quoter::messages::{GetFeeResult, TokenTransferAdditionalData};
 
 use super::super::interfaces::OnRamp;
@@ -8,10 +10,10 @@ use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token,
-    validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+    CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
 
-use crate::{seed, GetFee};
+use crate::GetFee;
 use crate::{
     CcipRouterError, CcipSend, Nonce, RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage,
     SVM2AnyTokenTransfer, SVMTokenAmount,

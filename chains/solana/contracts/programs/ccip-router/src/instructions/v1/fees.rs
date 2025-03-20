@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
+use common::seed;
 use solana_program::{program::invoke, system_instruction};
 
 use crate::messages::SVM2AnyMessage;
-use crate::seed::FEE_BILLING_SIGNER;
 use crate::{CcipRouterError, SVMTokenAmount};
 
 /// Invokes Fee Quoter to:
@@ -72,7 +72,7 @@ pub fn transfer_and_wrap_native_sol<'info>(
         &[from.to_account_info(), to.to_account_info()],
     )?;
 
-    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
+    let seeds = &[seed::FEE_BILLING_SIGNER, &[signer_bump]];
     let signer_seeds = &[&seeds[..]];
     let account = to.to_account_info();
     let sync: anchor_spl::token_2022::SyncNative = anchor_spl::token_2022::SyncNative { account };
@@ -103,7 +103,7 @@ pub fn do_billing_transfer<'info>(
     decimals: u8,
     signer_bump: u8,
 ) -> Result<()> {
-    let seeds = &[FEE_BILLING_SIGNER, &[signer_bump]];
+    let seeds = &[seed::FEE_BILLING_SIGNER, &[signer_bump]];
     let signer_seeds = &[&seeds[..]];
     let cpi_ctx = CpiContext::new_with_signer(token_program, transfer, signer_seeds);
     token_interface::transfer_checked(cpi_ctx, amount, decimals)

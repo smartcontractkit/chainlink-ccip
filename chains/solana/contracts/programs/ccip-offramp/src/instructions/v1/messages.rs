@@ -64,22 +64,3 @@ impl Any2SVMMessage {
 pub fn is_writable(bitmap: &u64, index: u8) -> bool {
     index < 64 && (bitmap & 1 << index != 0) // check valid index and that bit at index is 1
 }
-
-pub mod router_state {
-    /// This mod holds structs that represent accounts owned by the CCIP Router program, not by this Offramp,
-    /// but are used here just to deserialize data from them.
-    use super::*;
-
-    #[account]
-    #[derive(InitSpace)]
-    pub(in super::super) struct TokenAdminRegistry {
-        pub version: u8,
-        pub administrator: Pubkey,
-        pub pending_administrator: Pubkey,
-        pub lookup_table: Pubkey,
-        // binary representation of indexes that are writable in token pool lookup table
-        // lookup table can store 256 addresses
-        pub writable_indexes: [u128; 2],
-        pub mint: Pubkey,
-    }
-}

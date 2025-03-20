@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
+use common::seed;
 
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
 
-use crate::context::{seed, CommitInput, CommitReportContext, OcrPluginType};
+use crate::context::{CommitInput, CommitReportContext, OcrPluginType};
 use crate::event::CommitReportAccepted;
 use crate::instructions::interfaces::Commit;
 use crate::instructions::v1::rmn::verify_uncursed_cpi;
