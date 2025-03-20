@@ -3,11 +3,8 @@ package config
 import (
 	"crypto/tls"
 	"fmt"
-<<<<<<< HEAD
 	"math/big"
-=======
 	"strconv"
->>>>>>> e2c937e (Solana CRIB fixes)
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
@@ -29,15 +26,6 @@ const (
 )
 
 type ChainConfigurer struct {
-<<<<<<< HEAD
-	chainID      uint64
-	deployerKey  string
-	env          DevspaceEnv
-	chainVariant string
-	chainName    string
-	chainType    ChainType
-	GasPrice     *big.Int
-=======
 	chainID        string
 	deployerKey    string
 	solDeployerKey solana.PrivateKey
@@ -45,8 +33,8 @@ type ChainConfigurer struct {
 	chainVariant   string
 	chainName      string
 	chainType      ChainType
+	GasPrice       *big.Int
 	podID          int
->>>>>>> e2c937e (Solana CRIB fixes)
 }
 
 type EVMChain struct {
@@ -267,31 +255,21 @@ func (c ChainlinkNodeConfigurer) getNodeInfo(nodeName string, isBootstrap bool) 
 func NewChainConfigurer(env DevspaceEnv, chainID string, chainType ChainType, chainVariant, name string, podId int) ChainConfigurer {
 	// These are generally known private keys used for testing
 	testKey := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-<<<<<<< HEAD
 	var gasPrice *big.Int
 
 	if chainVariant == "besu" {
 		// the same key as used in the FWOG env alpha chain
 		testKey = "8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
 		gasPrice = big.NewInt(2000000)
-=======
+	}
+	// Generate sol key for the deployment
 	solTestKey, err := solana.PrivateKeyFromBase58("57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC")
 
 	if err != nil {
-		panic("Could not decode private localnet private key")
->>>>>>> 502b344 (rebase)
+		panic("Could not create private localnet private key")
 	}
 
 	return ChainConfigurer{
-<<<<<<< HEAD
-		env:          env,
-		chainID:      chainID,
-		chainName:    name,
-		chainVariant: chainVariant,
-		deployerKey:  testKey,
-		chainType:    chainType,
-		GasPrice:     gasPrice,
-=======
 		env:            env,
 		chainID:        chainID,
 		chainName:      name,
@@ -299,8 +277,8 @@ func NewChainConfigurer(env DevspaceEnv, chainID string, chainType ChainType, ch
 		deployerKey:    testKey,
 		solDeployerKey: solTestKey,
 		chainType:      chainType,
+		GasPrice:       gasPrice,
 		podID:          podId,
->>>>>>> e2c937e (Solana CRIB fixes)
 	}
 }
 
@@ -342,10 +320,7 @@ func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {
 	}
 
 	err := chainConfig.SetDeployerKey(&c.deployerKey)
-<<<<<<< HEAD
 	chainConfig.DeployerKey.GasPrice = c.GasPrice
-=======
->>>>>>> 502b344 (rebase)
 
 	if err != nil {
 		return nil, fmt.Errorf("unable to set deployer key, err: %s", err)

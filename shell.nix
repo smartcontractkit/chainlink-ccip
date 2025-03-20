@@ -71,7 +71,7 @@ mkShell' {
     export GOBIN=$(go env GOPATH)/bin
     export PATH=$PATH:$repo_root/scripts:$GOBIN
 
-      # If the solana binary isn't found, install it
+    # If the solana binary isn't found, install it
     if ! command -v solana &>/dev/null; then
       echo "Installing solana-cli..."
       sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.0/install)"
