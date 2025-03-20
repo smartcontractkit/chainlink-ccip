@@ -2,3 +2,4 @@
 
 deployments/ccip-v2 @smartcontractkit/cl-orchestration @smartcontractkit/ccip
 dependencies/ccip-v2-scripts @smartcontractkit/cl-orchestration @smartcontractkit/ccip
+dependencies/beholder @smartcontractkit/data-tooling
