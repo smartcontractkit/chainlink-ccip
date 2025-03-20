@@ -24,8 +24,16 @@ func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.Pri
 }
 
 func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T) {
+	fundAccounts(ctx, accounts, solanaGoClient, t, 3)
+}
+
+func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T, remainingAttempts uint) {
+	if remainingAttempts == 0 {
+		require.NoError(t, fmt.Errorf("[%s]: unable to find transactions after all attempts", t.Name()))
+	}
+
 	sigs := []solana.Signature{}
-	fmt.Printf("[%s]: Requesting airdrop for %d accounts\n", t.Name(), len(accounts))
+	fmt.Printf("[%s]: Requesting airdrop for %d accounts and remaining attempts %d\n", t.Name(), len(accounts), remainingAttempts)
 	for i, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
 		require.NoError(t, err)
@@ -34,30 +42,35 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 	}
 
 	// wait for confirmation so later transactions don't fail
-	remaining := len(sigs)
+	remaining := accounts
 	initTime := time.Now()
-	for remaining > 0 {
+	for elapsed := time.Since(initTime); elapsed < 1*time.Minute; elapsed = time.Since(initTime) {
 		time.Sleep(500 * time.Millisecond)
+
 		statusRes, sigErr := solanaGoClient.GetSignatureStatuses(ctx, true, sigs...)
 		require.NoError(t, sigErr)
 		require.NotNil(t, statusRes)
 		require.NotNil(t, statusRes.Value)
 
-		nonFinalizedCount := 0
-		for _, res := range statusRes.Value {
+		accountsWithNonFinalizedFunding := []solana.PrivateKey{}
+		for i, res := range statusRes.Value {
 			if res == nil || res.ConfirmationStatus == rpc.ConfirmationStatusProcessed || res.ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
-				nonFinalizedCount++
+				accountsWithNonFinalizedFunding = append(accountsWithNonFinalizedFunding, accounts[i])
 			}
 		}
-		remaining = nonFinalizedCount
+		remaining = accountsWithNonFinalizedFunding
+		if len(remaining) == 0 {
+			break
+		}
 
-		elapsed := time.Since(initTime)
 		printableStatuses, err := json.Marshal(statusRes)
 		require.NoError(t, err)
 		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\nSignatureStatuses: %s\n\n", t.Name(), remaining, len(accounts), elapsed, printableStatuses)
-		if elapsed > 1*time.Minute {
-			require.NoError(t, fmt.Errorf("[%s]: unable to find transactions within timeout", t.Name()))
-		}
+	}
+
+	if len(remaining) > 0 {
+		fmt.Printf("[%s]: unable to find %d transactions out of %d within timeout when remaining attempts is %d", t.Name(), len(remaining), len(accounts), remainingAttempts)
+		fundAccounts(ctx, remaining, solanaGoClient, t, remainingAttempts-1) // recursive call with only remaining & with fewer attempts
 	}
 }
 
