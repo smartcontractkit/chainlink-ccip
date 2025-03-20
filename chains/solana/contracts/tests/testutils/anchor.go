@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,9 +26,10 @@ func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.Pri
 func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T) {
 	sigs := []solana.Signature{}
 	fmt.Printf("[%s]: Requesting airdrop for %d accounts\n", t.Name(), len(accounts))
-	for _, v := range accounts {
+	for i, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
 		require.NoError(t, err)
+		fmt.Printf("[%s]: Requested airdrop for account #%d out of %d: %s\n", t.Name(), i, len(accounts), sig)
 		sigs = append(sigs, sig)
 	}
 
@@ -41,16 +43,18 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 		require.NotNil(t, statusRes)
 		require.NotNil(t, statusRes.Value)
 
-		unconfirmedTxCount := 0
+		nonFinalizedCount := 0
 		for _, res := range statusRes.Value {
 			if res == nil || res.ConfirmationStatus == rpc.ConfirmationStatusProcessed || res.ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
-				unconfirmedTxCount++
+				nonFinalizedCount++
 			}
 		}
-		remaining = unconfirmedTxCount
+		remaining = nonFinalizedCount
 
 		elapsed := time.Since(initTime)
-		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\n", t.Name(), remaining, len(accounts), elapsed)
+		printableStatuses, err := json.Marshal(statusRes)
+		require.NoError(t, err)
+		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\nSignatureStatuses: %s\n\n", t.Name(), remaining, len(accounts), elapsed, printableStatuses)
 		if elapsed > 1*time.Minute {
 			require.NoError(t, fmt.Errorf("[%s]: unable to find transactions within timeout", t.Name()))
 		}
