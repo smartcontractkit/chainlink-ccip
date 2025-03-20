@@ -102,6 +102,11 @@ pipelines:
       DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
       go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -don -target-dir=${CONFIG_OVERRIDES_DIR}
 
+  mockserver:
+    run: |-
+      run_pipelines maybe-kind
+      run_dependency_pipelines mockserver
+
   jd:
     run: |-
       run_pipelines maybe-kind
@@ -118,6 +123,16 @@ pipelines:
       run_dependency_pipelines beholder
 
 profiles:
+  - name: mockserver
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          mockserver:
+            path: ${DEPENDENCIES_DIR}/mockserver
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+
   - name: custom_geth
     patches:
       - op: add
@@ -192,6 +207,10 @@ profiles:
             path: ${DEPENDENCIES_DIR}/kind-monitoring
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+      - op: replace
+        path: dependencies.mockserver.profiles
+        value:
+          - kind
 
 commands:
   deploy-custom-geth-chain:
@@ -205,6 +224,10 @@ commands:
   deploy-don:
     command: devspace run-pipeline don -p dons -p ${PROVIDER}
     description: Deploy a single DONs
+    appendArgs: true
+  deploy-mockserver:
+    command: devspace run-pipeline mockserver -p mockserver -p ${PROVIDER}
+    description: Deploy mockserver
     appendArgs: true
   beholder:
     command: devspace run-pipeline beholder -p beholder
