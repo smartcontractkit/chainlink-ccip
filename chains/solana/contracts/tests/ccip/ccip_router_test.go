@@ -8233,8 +8233,8 @@ func TestCCIPRouter(t *testing.T) {
 
 						tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 
-						executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
-						require.NoError(t, err)
+						executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+						require.NoError(t, err2)
 
 						require.Equal(t, 2, len(executionEvents))
 						require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
