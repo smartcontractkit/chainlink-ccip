@@ -97,7 +97,10 @@ pub mod mcm {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
-        require!(proposed_owner != config.owner, McmError::InvalidInputs);
+        require!(
+            proposed_owner != config.owner && proposed_owner != Pubkey::default(),
+            McmError::InvalidInputs
+        );
         config.proposed_owner = proposed_owner;
         Ok(())
     }
