@@ -545,10 +545,6 @@ export type BurnmintTokenPool = {
         "kind": "struct",
         "fields": [
           {
-            "name": "version",
-            "type": "u8"
-          },
-          {
             "name": "config",
             "type": {
               "defined": "BaseConfig"
@@ -1120,10 +1116,6 @@ export const IDL: BurnmintTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
           {
             "name": "config",
             "type": {

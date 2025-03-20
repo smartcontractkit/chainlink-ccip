@@ -8,8 +8,7 @@ import (
 )
 
 type State struct {
-	Version uint8
-	Config  BaseConfig
+	Config BaseConfig
 }
 
 var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
@@ -17,11 +16,6 @@ var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
 func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
 	err = encoder.WriteBytes(StateDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Version` param:
-	err = encoder.Encode(obj.Version)
 	if err != nil {
 		return err
 	}
@@ -46,11 +40,6 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 				"[216 146 107 94 104 75 182 177]",
 				fmt.Sprint(discriminator[:]))
 		}
-	}
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
 	}
 	// Deserialize `Config`:
 	err = decoder.Decode(&obj.Config)

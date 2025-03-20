@@ -689,10 +689,6 @@ export type LockreleaseTokenPool = {
         "kind": "struct",
         "fields": [
           {
-            "name": "version",
-            "type": "u8"
-          },
-          {
             "name": "config",
             "type": {
               "defined": "BaseConfig"
@@ -1408,10 +1404,6 @@ export const IDL: LockreleaseTokenPool = {
       "type": {
         "kind": "struct",
         "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
           {
             "name": "config",
             "type": {

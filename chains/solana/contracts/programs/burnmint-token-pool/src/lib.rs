@@ -211,7 +211,6 @@ pub mod burnmint_token_pool {
 #[account]
 #[derive(InitSpace)]
 pub struct State {
-    pub version: u8,
     pub config: BaseConfig,
 }
 
