@@ -379,7 +379,8 @@ func (r *ccipChainReader) ExecutedMessages(
 	return executed, nil
 }
 
-func createExecutedMessagesKeyFilter(rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
+func createExecutedMessagesKeyFilter(
+	rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 	confidence primitives.ConfidenceLevel) (query.KeyFilter, uint64) {
 
 	var chainExpressions []query.Expression

@@ -41,6 +41,7 @@ var (
 func TestCCIPChainReader_ExecutedMessages(t *testing.T) {
 	var (
 		range1 = cciptypes.NewSeqNumRange(1, 2)
+		range2 = cciptypes.NewSeqNumRange(5, 7)
 	)
 	testCases := []struct {
 		name               string
@@ -50,7 +51,7 @@ func TestCCIPChainReader_ExecutedMessages(t *testing.T) {
 		expected           query.KeyFilter
 	}{
 		{
-			name: "happy path",
+			name: "simple example",
 			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
 				chainA: {range1},
 			},
@@ -77,6 +78,82 @@ func TestCCIPChainReader_ExecutedMessages(t *testing.T) {
 										Name: consts.EventAttributeSourceChain,
 										ValueComparators: []primitives.ValueComparator{
 											{Value: chainA, Operator: primitives.Eq},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Primitive: &primitives.Comparator{
+							Name:             consts.EventAttributeState,
+							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
+						},
+					},
+					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
+				},
+			},
+		},
+		{
+			name: "multiChain simple example",
+			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				chainA: {range1},
+				chainB: {range2},
+			},
+			confidence:    primitives.Finalized,
+			expectedCount: 5,
+			expected: query.KeyFilter{
+				Key: consts.EventNameExecutionStateChanged,
+				Expressions: []query.Expression{
+					{
+						BoolExpression: query.BoolExpression{
+							BoolOperator: query.OR,
+							Expressions: []query.Expression{
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSequenceNumber,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: range1.Start(), Operator: primitives.Gte},
+														{Value: range1.End(), Operator: primitives.Lte},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainA, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSequenceNumber,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: range2.Start(), Operator: primitives.Gte},
+														{Value: range2.End(), Operator: primitives.Lte},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainB, Operator: primitives.Eq},
+													},
+												},
+											},
 										},
 									},
 								},
