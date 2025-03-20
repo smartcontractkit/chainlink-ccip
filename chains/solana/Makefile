@@ -53,7 +53,7 @@ go-tests:
 
 .PHONY: ccip-router-contracts-go-tests
 ccip-router-contracts-go-tests:
-	go test -run TestCCIPRouter -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log |  -json=true -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+	go test -run TestCCIPRouter -v -failfast ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
 .PHONY: build-contracts
 build-contracts:
