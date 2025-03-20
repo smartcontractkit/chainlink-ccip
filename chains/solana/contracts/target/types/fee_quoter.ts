@@ -818,7 +818,7 @@ export type FeeQuoter = {
       }
     },
     {
-      "name": "EVMExtraArgsV2",
+      "name": "GenericExtraArgsV2",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2478,7 +2478,7 @@ export const IDL: FeeQuoter = {
       }
     },
     {
-      "name": "EVMExtraArgsV2",
+      "name": "GenericExtraArgsV2",
       "type": {
         "kind": "struct",
         "fields": [
