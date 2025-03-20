@@ -24,10 +24,11 @@ func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.Pri
 
 func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T) {
 	sigs := []solana.Signature{}
+	fmt.Printf("[%s]: Requesting airdrop for %d accounts\n", t.Name(), len(accounts))
 	for i, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
 		require.NoError(t, err)
-		fmt.Printf("Sig %d: %s\n", i, sig)
+		fmt.Printf("[%s]: Sig %d for account %s: %s\n", t.Name(), i, v.PublicKey(), sig)
 		sigs = append(sigs, sig)
 	}
 
@@ -50,9 +51,9 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 		remaining = unconfirmedTxCount
 
 		elapsed := time.Since(initTime)
-		fmt.Printf("Waiting for airdrop confirmation, %d transactions remaining, elapsed time: %s\n", remaining, elapsed)
+		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\n", t.Name(), remaining, len(accounts), elapsed)
 		if elapsed > 5*time.Minute {
-			require.NoError(t, fmt.Errorf("unable to find transactions within timeout"))
+			require.NoError(t, fmt.Errorf("[%s]: unable to find transactions within timeout", t.Name()))
 		}
 	}
 }
