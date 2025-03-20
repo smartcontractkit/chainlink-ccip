@@ -65,7 +65,7 @@ func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 
 		printableStatuses, err := json.Marshal(statusRes)
 		require.NoError(t, err)
-		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\nSignatureStatuses: %s\n\n", t.Name(), remaining, len(accounts), elapsed, printableStatuses)
+		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\nSignatureStatuses: %s\n\n", t.Name(), len(remaining), len(accounts), elapsed, printableStatuses)
 	}
 
 	if len(remaining) > 0 {
