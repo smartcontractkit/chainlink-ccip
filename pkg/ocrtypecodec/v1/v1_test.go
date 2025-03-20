@@ -11,9 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -23,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -372,12 +373,12 @@ func (d *dataGenerator) commitObservation() committypes.Observation {
 	}
 
 	feedTokenPrices := make(map[cciptypes.UnknownEncodedAddress]cciptypes.BigInt, d.numPricedTokens)
-	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, d.numPricedTokens)
+	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes2.TimestampedBig, d.numPricedTokens)
 
 	for i := 0; i < d.numPricedTokens; i++ {
 		feedTokenPrices[cciptypes.UnknownEncodedAddress(genRandomString(40))] = randBigInt()
 
-		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(genRandomString(40))] = plugintypes.TimestampedBig{
+		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(genRandomString(40))] = plugintypes2.TimestampedBig{
 			Timestamp: time.Now().UTC(),
 			Value:     randBigInt(),
 		}
@@ -677,10 +678,10 @@ func genRmnEnabledChains(n int) map[cciptypes.ChainSelector]bool {
 	return m
 }
 
-func genSeqNumChain(n int) []plugintypes.SeqNumChain {
-	chains := make([]plugintypes.SeqNumChain, n)
+func genSeqNumChain(n int) []plugintypes2.SeqNumChain {
+	chains := make([]plugintypes2.SeqNumChain, n)
 	for i := 0; i < n; i++ {
-		chains[i] = plugintypes.SeqNumChain{
+		chains[i] = plugintypes2.SeqNumChain{
 			ChainSel: cciptypes.ChainSelector(rand.Uint64()),
 			SeqNum:   cciptypes.SeqNum(rand.Uint64()),
 		}
@@ -711,10 +712,10 @@ func randBigInt() cciptypes.BigInt {
 	return cciptypes.NewBigInt(big.NewInt(rand.Int63()))
 }
 
-func genChainRanges(n int) []plugintypes.ChainRange {
-	ranges := make([]plugintypes.ChainRange, n)
+func genChainRanges(n int) []plugintypes2.ChainRange {
+	ranges := make([]plugintypes2.ChainRange, n)
 	for i := 0; i < n; i++ {
-		ranges[i] = plugintypes.ChainRange{
+		ranges[i] = plugintypes2.ChainRange{
 			ChainSel: cciptypes.ChainSelector(rand.Uint64()),
 			SeqNumRange: cciptypes.NewSeqNumRange(
 				cciptypes.SeqNum(rand.Uint64()),

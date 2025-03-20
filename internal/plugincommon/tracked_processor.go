@@ -4,9 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 type MethodType = string

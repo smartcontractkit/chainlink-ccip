@@ -11,8 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -235,7 +233,7 @@ type CCIPReader interface {
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
-	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
+	) map[cciptypes.ChainSelector]plugintypes2.TimestampedBig
 
 	GetRMNRemoteConfig(ctx context.Context) (rmntypes.RemoteConfig, error)
 

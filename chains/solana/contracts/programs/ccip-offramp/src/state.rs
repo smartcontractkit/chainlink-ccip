@@ -188,7 +188,7 @@ pub enum MessageExecutionState {
 }
 
 impl TryFrom<u128> for MessageExecutionState {
-    type Error = &'static str;
+    type Error = &'static str;RMN
 
     fn try_from(value: u128) -> std::result::Result<MessageExecutionState, &'static str> {
         match value {

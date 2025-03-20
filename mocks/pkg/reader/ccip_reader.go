@@ -7,8 +7,6 @@ import (
 
 	ccipocr3 "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
-	internalplugintypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-
 	mock "github.com/stretchr/testify/mock"
 
 	plugintypes "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -218,19 +216,19 @@ func (_c *MockCCIPReader_ExecutedMessages_Call) RunAndReturn(run func(context.Co
 }
 
 // GetChainFeePriceUpdate provides a mock function with given fields: ctx, selectors
-func (_m *MockCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig {
+func (_m *MockCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]plugintypes.TimestampedBig {
 	ret := _m.Called(ctx, selectors)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetChainFeePriceUpdate")
 	}
 
-	var r0 map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig); ok {
+	var r0 map[ccipocr3.ChainSelector]plugintypes.TimestampedBig
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]plugintypes.TimestampedBig); ok {
 		r0 = rf(ctx, selectors)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig)
 		}
 	}
 
@@ -256,12 +254,12 @@ func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Run(run func(ctx context.C
 	return _c
 }
 
-func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Return(_a0 map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
+func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Return(_a0 map[ccipocr3.ChainSelector]plugintypes.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
+func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]plugintypes.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }
