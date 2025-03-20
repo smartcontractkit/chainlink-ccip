@@ -49,7 +49,7 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 		}
 		remaining = unconfirmedTxCount
 
-		elapsed := time.Now().Sub(initTime)
+		elapsed := time.Since(initTime)
 		fmt.Printf("Waiting for airdrop confirmation, %d transactions remaining, elapsed time: %s\n", remaining, elapsed)
 		if elapsed > 5*time.Minute {
 			require.NoError(t, fmt.Errorf("unable to find transactions within timeout"))
