@@ -342,8 +342,6 @@ deployments:
               fieldRef:
                 apiVersion: v1
                 fieldPath: spec.nodeName
-          - name: KAFKA_SASL_MECHANISM
-            value: PLAINTEXT
         config:
           exporters:
             debug:
