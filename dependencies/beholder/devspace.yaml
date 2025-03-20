@@ -342,6 +342,8 @@ deployments:
               fieldRef:
                 apiVersion: v1
                 fieldPath: spec.nodeName
+          - name: KAFKA_SASL_MECHANISM
+            value: PLAIN
         config:
           exporters:
             debug:
@@ -353,7 +355,11 @@ deployments:
             beholder_kafka:
               brokers:
                 - redpanda:9093
+              kafka_sasl_username: ""
+              kafka_sasl_password: ""
               schema_registry_url: http://redpanda:8081
+              schema_registry_username: ""
+              schema_registry_password: ""
           extensions:
             # The health_check extension is mandatory for this chart.
             # Without the health_check extension the collector will fail the readiness and liveliness probes.
