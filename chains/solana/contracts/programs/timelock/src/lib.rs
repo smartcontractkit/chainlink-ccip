@@ -468,7 +468,10 @@ pub mod timelock {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_mut()?;
-        require!(proposed_owner != config.owner, TimelockError::InvalidInput);
+        require!(
+            proposed_owner != config.owner && proposed_owner != Pubkey::default(),
+            TimelockError::InvalidInput
+        );
         config.proposed_owner = proposed_owner;
         Ok(())
     }

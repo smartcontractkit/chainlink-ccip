@@ -22,6 +22,10 @@ impl BaseState {
     }
 
     pub fn transfer_ownership(&mut self, owner: Pubkey, proposed_owner: Pubkey) -> Result<()> {
+        require!(
+            proposed_owner != self.owner && proposed_owner != Pubkey::default(),
+            CcipSenderError::InvalidProposedOwner
+        );
         require_eq!(self.owner, owner, CcipSenderError::OnlyOwner);
         self.proposed_owner = proposed_owner;
         Ok(())
@@ -106,6 +110,8 @@ pub enum CcipSenderError {
     OnlyOwner,
     #[msg("Address is not proposed_owner")]
     OnlyProposedOwner,
+    #[msg("Proposed owner is invalid")]
+    InvalidProposedOwner,
 }
 
 #[cfg(test)]

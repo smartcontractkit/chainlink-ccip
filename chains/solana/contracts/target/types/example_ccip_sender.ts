@@ -471,6 +471,11 @@ export type ExampleCcipSender = {
       "code": 6002,
       "name": "OnlyProposedOwner",
       "msg": "Address is not proposed_owner"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidProposedOwner",
+      "msg": "Proposed owner is invalid"
     }
   ]
 };
@@ -948,6 +953,11 @@ export const IDL: ExampleCcipSender = {
       "code": 6002,
       "name": "OnlyProposedOwner",
       "msg": "Address is not proposed_owner"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidProposedOwner",
+      "msg": "Proposed owner is invalid"
     }
   ]
 };

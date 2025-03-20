@@ -325,6 +325,10 @@ impl BaseState {
     }
 
     pub fn transfer_ownership(&mut self, owner: Pubkey, proposed_owner: Pubkey) -> Result<()> {
+        require!(
+            proposed_owner != self.owner && proposed_owner != Pubkey::default(),
+            CcipReceiverError::InvalidProposedOwner
+        );
         require_eq!(self.owner, owner, CcipReceiverError::OnlyOwner);
         self.proposed_owner = proposed_owner;
         Ok(())
@@ -386,6 +390,8 @@ pub enum CcipReceiverError {
     OnlyProposedOwner,
     #[msg("Caller is not allowed")]
     InvalidCaller,
+    #[msg("Proposed owner is invalid")]
+    InvalidProposedOwner,
 }
 
 #[event]
