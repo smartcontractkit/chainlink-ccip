@@ -252,11 +252,6 @@ export type LockreleaseTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -299,11 +294,6 @@ export type LockreleaseTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -410,7 +400,7 @@ export type LockreleaseTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -481,7 +471,7 @@ export type LockreleaseTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -594,7 +584,7 @@ export type LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -640,7 +630,7 @@ export type LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -972,11 +962,6 @@ export const IDL: LockreleaseTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -1019,11 +1004,6 @@ export const IDL: LockreleaseTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -1130,7 +1110,7 @@ export const IDL: LockreleaseTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1201,7 +1181,7 @@ export const IDL: LockreleaseTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1314,7 +1294,7 @@ export const IDL: LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1360,7 +1340,7 @@ export const IDL: LockreleaseTokenPool = {
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
