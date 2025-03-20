@@ -403,6 +403,11 @@
       "code": 6005,
       "name": "InvalidCaller",
       "msg": "Caller is not allowed"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidProposedOwner",
+      "msg": "Proposed owner is invalid"
     }
   ]
 }
