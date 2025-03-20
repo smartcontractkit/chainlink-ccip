@@ -7916,10 +7916,6 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("1 Test Token Transfer", func(t *testing.T) {
-					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
-					require.NoError(t, err)
-					_, initBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
-					require.NoError(t, err)
 
 					sourceChainSelector := config.EvmChainSelector
 					msgAccounts := []solana.PublicKey{}
@@ -8029,10 +8025,6 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("1 Test Token Transfer + Example Message Execution", func(t *testing.T) {
-					_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint, config.DefaultCommitment)
-					require.NoError(t, err)
-					_, initBal, err := tokens.TokenBalance(ctx, solanaGoClient, token0.User[config.ReceiverExternalExecutionConfigPDA], config.DefaultCommitment)
-					require.NoError(t, err)
 
 					sourceChainSelector := config.EvmChainSelector
 					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
