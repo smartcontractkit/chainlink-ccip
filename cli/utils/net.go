@@ -17,9 +17,9 @@ type LookupFunc func(string) ([]string, error)
 // Does not use net.LookupHost because of https://github.com/golang/go/issues/67925 (dial udp 127.0.0.53:53: i/o timeout")
 // It retries the resolution until the timeout (specified in the context) is reached.
 func CheckHostnameResolution(hostname string, nsTimeout, interval time.Duration, lookup LookupFunc) (time.Duration, error) {
-	// every attempt has a timeout of 2 seconds
+	// every attempt has a timeout of 5 seconds
 	// TODO: make this timeout configurable
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if lookup == nil {

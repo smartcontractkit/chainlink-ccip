@@ -40,8 +40,8 @@ vars:
   DON_TYPE:
     source: env
     default: dev
-  # Option to use template for custom don type, when enabled it will use type.${DON_TYPE}.yaml
-  ENABLE_CUSTOM_TYPE:
+  # Option to use default overrides for a don type, when enabled it will use type.${DON_TYPE}.yaml
+  ENABLE_DON_TYPE_OVERRIDES:
     source: env
     default: "true"
   DON_VERSION:
@@ -117,17 +117,17 @@ pipelines:
         echo "Deploying app dependencies for CCIP v2"
         run_dependency_pipelines job-distributor
 
+        # CCIP On Chain Deployment Orchestration below
         if [ $(get_flag "infraOnly") == "false" ]; then
-          task ccip-v2-scripts:build
-
           # deploy-home-chain-contracts pipeline writes 2 files to temp dir
           #   - ccip-v2-scripts-node-overrides.toml
           #   - ccip-v2-scripts-address-book.json
-          run_dependency_pipelines ccip-v2-scripts-deploy-home-chain
+          ccip-v2-scripts deploy-home-chain
+          echo "Home Chain deployed"
           run_pipelines deploy-ccip-v2-don-with-overrides
 
           # deploy on chain contracts (tokens, lanes, token pools, price registry, router)
-          run_dependency_pipelines ccip-v2-scripts-deploy-ccip
+          ccip-v2-scripts deploy-ccip
         else
           echo "infraOnly=true, skipping on chain deployments and node orchestration"
         fi
@@ -142,9 +142,9 @@ pipelines:
   deploy-ccip-v2-don-with-overrides:
     run: |-
       echo "Redeploying DON with overrides"
-      NODE_TOML_OVERRIDES=$(cat ${TMP_DIR}/ccip-v2-scripts-node-overrides.toml) \
-        gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${TMP_DIR}/ccip-v2-node-overrides.yaml
-      create_deployments chainlink-don --from-file="${TMP_DIR}/ccip-v2-node-overrides.yaml"
+      NODE_TOML_OVERRIDES=$(cat ${TMP_DIR}/ccip/node-capability-registry-overrides.toml) \
+        gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${TMP_DIR}/ccip/common-overrides.yaml
+      create_deployments chainlink-don --from-file="${TMP_DIR}/ccip/common-overrides.yaml"
 
 deployments:
   chainlink-don:
@@ -214,7 +214,7 @@ profiles:
   - name: don-base-type
     activation:
       - vars:
-          ENABLE_CUSTOM_TYPE: "true"
+          ENABLE_DON_TYPE_OVERRIDES: "true"
     patches:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles

@@ -39,6 +39,16 @@ type ChainlinkNodeConfigurer struct {
 	env DevspaceEnv
 }
 
+func ChainTypeFromString(s string) ChainType {
+	switch strings.ToLower(s) {
+	case "evm":
+		return EVM
+	case "solana":
+		return SOLANA
+	}
+	return EVM
+}
+
 // String method to convert enum values to readable strings
 func (s ChainType) String() string {
 	return [...]string{"EVM", "SOLANA"}[s]
@@ -80,6 +90,19 @@ func GetEnvConfig(env DevspaceEnv) (*devenv.EnvironmentConfig, error) {
 		Chains:   chainConfigs,
 		JDConfig: jdConfig,
 	}, nil
+}
+
+func GetChainConfigBySelector(configs []devenv.ChainConfig, chainSelector uint64) *devenv.ChainConfig {
+	chain, ok := chainsel.ChainBySelector(chainSelector)
+	if !ok {
+		panic("invalid chain selector")
+	}
+	for _, chainConfig := range configs {
+		if chainConfig.ChainID == chain.EvmChainID {
+			return &chainConfig
+		}
+	}
+	return nil
 }
 
 func getChainConfigurers(env DevspaceEnv) []ChainConfigurer {
@@ -165,16 +188,28 @@ func NewCLNodeConfigurer(env DevspaceEnv) ChainlinkNodeConfigurer {
 
 func (c ChainlinkNodeConfigurer) GetNodeInfos() []devenv.NodeInfo {
 	var nodes []devenv.NodeInfo
-	for i := 0; i < c.env.DonBootNodeCount; i++ {
-		bootNode := c.getNodeInfo(fmt.Sprintf("ccip-bt-%d", i), true)
-		nodes = append(nodes, bootNode)
-	}
+	nodes = append(nodes, c.GetBootNodeInfos()...)
+	nodes = append(nodes, c.GetWorkerNodeInfos()...)
 
+	return nodes
+}
+
+func (c ChainlinkNodeConfigurer) GetWorkerNodeInfos() []devenv.NodeInfo {
+	var nodes []devenv.NodeInfo
 	for i := 0; i < c.env.DonNodeCount; i++ {
 		bootNode := c.getNodeInfo(fmt.Sprintf("ccip-%d", i), false)
 		nodes = append(nodes, bootNode)
 	}
 
+	return nodes
+}
+
+func (c ChainlinkNodeConfigurer) GetBootNodeInfos() []devenv.NodeInfo {
+	var nodes []devenv.NodeInfo
+	for i := 0; i < c.env.DonBootNodeCount; i++ {
+		bootNode := c.getNodeInfo(fmt.Sprintf("ccip-bt-%d", i), true)
+		nodes = append(nodes, bootNode)
+	}
 	return nodes
 }
 
@@ -219,20 +254,24 @@ func NewChainConfigurer(env DevspaceEnv, chainID uint64, chainType ChainType, ch
 	}
 }
 
+func NewChainConfigurerFromChainConfig(env DevspaceEnv, chainConfig devenv.ChainConfig, chainVariant string) ChainConfigurer {
+	return NewChainConfigurer(env, chainConfig.ChainID, ChainTypeFromString(chainConfig.ChainType), chainVariant, chainConfig.ChainName)
+}
+
 func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {
-	wsExternalRPC := c.externalWSRPC()
+	wsExternalRPC := c.ExternalWSRPC()
 	if wsExternalRPC == nil {
 		return nil, fmt.Errorf("wsRPC external url not available")
 	}
-	wsInternalRPC := c.internalWSRPC()
+	wsInternalRPC := c.InternalWSRPC()
 	if wsInternalRPC == nil {
 		return nil, fmt.Errorf("wsRPC internal url not available")
 	}
-	httpExternalRPC := c.externalHTTPRPC()
+	httpExternalRPC := c.ExternalHTTPRPC()
 	if httpExternalRPC == nil {
 		return nil, fmt.Errorf("httpRPC external url not available")
 	}
-	httpInternalRPC := c.internalWSRPC()
+	httpInternalRPC := c.InternalWSRPC()
 	if httpInternalRPC == nil {
 		return nil, fmt.Errorf("httpRPC internal url not available")
 	}
@@ -262,18 +301,18 @@ func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {
 func (c ChainConfigurer) GetTransmittedChainConfigs() crib.ChainConfig {
 	chainConfig := crib.ChainConfig{
 		ChainID:   c.chainID,
-		ChainName: c.getChainName(),
+		ChainName: c.GetChainName(),
 		ChainType: c.chainType.String(),
 		WSRPCs: []crib.RPC{
 			{
-				Internal: c.internalWSRPC(),
-				External: c.externalWSRPC(),
+				Internal: c.InternalWSRPC(),
+				External: c.ExternalWSRPC(),
 			},
 		},
 		HTTPRPCs: []crib.RPC{
 			{
-				External: c.externalHTTPRPC(),
-				Internal: c.internalHTTPRPC(),
+				External: c.ExternalHTTPRPC(),
+				Internal: c.InternalHTTPRPC(),
 			},
 		},
 	}
@@ -292,7 +331,7 @@ func ChainSelector(chainID uint64) uint64 {
 	return homeChainSelector
 }
 
-func (c ChainConfigurer) externalWSRPC() *string {
+func (c ChainConfigurer) ExternalWSRPC() *string {
 	var u string
 	if c.env.CIEnv {
 		hostName := gapV2HostName(c.env, fmt.Sprintf("%s-%d-ws", strings.ToLower(c.chainName), c.chainID))
@@ -305,7 +344,7 @@ func (c ChainConfigurer) externalWSRPC() *string {
 	return &u
 }
 
-func (c ChainConfigurer) externalHTTPRPC() *string {
+func (c ChainConfigurer) ExternalHTTPRPC() *string {
 	var u string
 	if c.env.CIEnv {
 		hostName := gapV2HostName(c.env, fmt.Sprintf("%s-%d", strings.ToLower(c.chainVariant), c.chainID))
@@ -330,7 +369,7 @@ func (c ChainConfigurer) chainTypeHostNamePart() string {
 	return chainType
 }
 
-func (c ChainConfigurer) internalWSRPC() *string {
+func (c ChainConfigurer) InternalWSRPC() *string {
 	var u string
 
 	switch {
@@ -346,7 +385,7 @@ func (c ChainConfigurer) internalWSRPC() *string {
 	return &u
 }
 
-func (c ChainConfigurer) internalHTTPRPC() *string {
+func (c ChainConfigurer) InternalHTTPRPC() *string {
 	var u string
 	switch {
 	case c.chainType == EVM && c.chainVariant == "besu":
@@ -361,7 +400,7 @@ func (c ChainConfigurer) internalHTTPRPC() *string {
 	return &u
 }
 
-func (c ChainConfigurer) getChainName() string {
+func (c ChainConfigurer) GetChainName() string {
 	return fmt.Sprintf("%s-simulated-%d", strings.ToLower(c.chainType.String()), c.chainID)
 }
 

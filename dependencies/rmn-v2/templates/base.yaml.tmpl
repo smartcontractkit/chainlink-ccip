@@ -1,0 +1,51 @@
+deployments:
+  {{- range .RMNNodes }}
+  rmn-{{ .NodeID }}:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      upgradeArgs: ["--timeout", "10m"]
+      displayOutput: true
+      chart:
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/ccip-rmn-v2
+        version: "0.4.0"
+      values:
+        enable_local: false
+        podSecurityContext:
+          fsGroup: 999
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+        rageproxy:
+          healthcheck:
+            enabled: false
+          listenAddress: 0.0.0.0:12345
+          keystore:
+            local:
+              enabled: true
+              content: '{{- .RageproxyKeystore }}'
+              passphrase: '{{- .Passphrase }}'
+          image:
+            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/rageproxy
+            tag: master-amd64${RAGE_PROXY_IMAGE_SHA}
+        rmn:
+          healthcheck:
+            enabled: false
+          keystore:
+            local:
+              enabled: true
+              content: '{{- .RMNKeystore }}'
+              passphrase: '{{- .Passphrase }}'
+          image:
+            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/afn2proxy
+            tag: master-amd64-${RMN_IMAGE_SHA}
+          config:
+            shared-config.toml: |
+              {{- printf "\n%s" ($.SharedConfigToml | indent 14) }}
+            local-config.toml: |
+              {{- printf "\n%s" ($.LocalConfigToml | indent 14) }}
+  {{- end }}

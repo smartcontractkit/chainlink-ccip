@@ -1,6 +1,31 @@
 ---
 version: v2beta1
 
+vars:
+  CCIP_ENV_STATE_DIR:
+    source: env
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  LOCAL_VALUES_DIR:
+    source: env
+    default: ./values
+  NODES_COUNT:
+    source: env
+    default: 3
+  # This is just a hack to always enable the profile
+  ENABLE_BASE_PROFILE:
+    source: env
+    default: true
+  ENABLE_RMN:
+    source: env
+    default: true
+  RAGE_PROXY_IMAGE_SHA:
+    source: env
+    default: "16f5d86"
+  RMN_IMAGE_SHA:
+    source: env
+    default: "10b42b2"
 pipelines:
   deploy:
     run: |-
@@ -8,82 +33,53 @@ pipelines:
         ensure_pull_secrets --all
       fi
 
-      create_deployments rmn-v2
+      if [ "${NODES_COUNT}" -gt 0 ]; then
+        create_deployments --all
+      fi
 
-deployments:
-  rmn-v2:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      upgradeArgs: ["--timeout", "10m"]
-      displayOutput: true
-      chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/ccip-rmn-v2
-        version: "0.1.0"
-      values:
-        enable_local: false
-        podSecurityContext:
-          fsGroup: 999
-        securityContext:
-          capabilities:
-            drop:
-              - ALL
-          readOnlyRootFilesystem: false
-          runAsNonRoot: true
-          runAsUser: 999
-          runAsGroup: 999
-        rageproxy:
-          image:
-            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/rageproxy
-            tag: "master-f461a9e"
-        rmn:
-          image:
-            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/afn2proxy
-            tag: "master-f461a9e"
 profiles:
-  - name: local-charts-and-image-kind
-    merge:
-      deployments:
-        rmn-v2:
-          helm:
-            chart:
-              name: rmn-v2
-              path: ${CHAINLINK_CODE_DIR}/ccip-rmn-v2
-              version: null
-            values:
-              enable_local: true
-              rageproxy:
-                imagePullPolicy: Never
-                image:
-                  repository: rageproxy
-                  tag: "latest"
-              rmn:
-                imagePullPolicy: Never
-                image:
-                  repository: afn2proxy
-                  tag: "latest"
+  - name: base
+    activation:
+      - vars:
+          ENABLE_RMN: "true"
+    merge: |-
+      $(
+        if [ "${NODES_COUNT}" -gt 0 ]; then
+          pushd ./scripts/render_template > /dev/null
+          go run main.go \
+            -nodes-count="${NODES_COUNT}" -provider="${PROVIDER}" \
+            -ccip-env-state-dir="${CCIP_ENV_STATE_DIR}"
+        else
+          echo "deployments:"
+        fi
+      )
   - name: local-charts
-    merge:
-      deployments:
-        rmn-v2:
-          helm:
-            chart:
-              name: rmn-v2
-              path: ${CHAINLINK_CODE_DIR}/ccip-rmn-v2
-              version: null
+    merge: |-
+      $(
+        if [ "${NODES_COUNT}" -gt 0 ]; then
+          pushd ./scripts/render_template > /dev/null
+          go run main.go -provider="${PROVIDER}" \
+            -nodes-count="${NODES_COUNT}" \
+            -ccip-env-state-dir="${CCIP_ENV_STATE_DIR}" \
+            -template="local-charts.yaml.tmpl"
+        else
+          echo "deployments:"
+        fi
+      )
   - name: kind
     activation:
       - vars:
+          ENABLE_RMN: "true"
           PROVIDER: "kind"
-    merge:
-      pullSecrets:
-        regcred-prod-ecr:
-          registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
-          secret: regcred-prod-ecr
-      deployments:
-        rmn-v2:
-          helm:
-            values:
-              enable_local: true
-              imagePullSecrets:
-                - name: regcred-prod-ecr
+    merge: |-
+      $(
+        if [ "${NODES_COUNT}" -gt 0 ]; then
+          pushd ./scripts/render_template > /dev/null
+          go run main.go -provider="${PROVIDER}" \
+            -nodes-count="${NODES_COUNT}" \
+            -ccip-env-state-dir="${CCIP_ENV_STATE_DIR}" \
+            -template="env.kind.yaml.tmpl"
+        else
+          echo "deployments:"
+        fi
+      )

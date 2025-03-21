@@ -9,60 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type TestData struct {
-	DevspaceEnv                        DevspaceEnv
-	DevspaceEnvWithAdditionalChains    DevspaceEnv
-	DevspaceEnvWithGethAndSolanaChains DevspaceEnv
-	DevspaceEnvWithBesuAndSolanaChains DevspaceEnv
-}
-
-func testData() TestData {
-	return TestData{
-		DevspaceEnv: DevspaceEnv{
-			Namespace:         "crib-test",
-			Provider:          "aws",
-			DonBootNodeCount:  1,
-			DonNodeCount:      4,
-			IngressBaseDomain: "test.cl",
-			TmpDir:            "./tmp",
-			GethChainsCount:   2,
-		},
-		DevspaceEnvWithAdditionalChains: DevspaceEnv{
-			Namespace:         "crib-test",
-			Provider:          "aws",
-			DonBootNodeCount:  1,
-			DonNodeCount:      4,
-			IngressBaseDomain: "test.cl",
-			TmpDir:            "./tmp",
-			GethChainsCount:   4,
-		},
-		DevspaceEnvWithGethAndSolanaChains: DevspaceEnv{
-			Namespace:         "crib-test",
-			Provider:          "aws",
-			DonBootNodeCount:  1,
-			DonNodeCount:      4,
-			IngressBaseDomain: "main.stage.cldev.sh",
-			TmpDir:            "./tmp",
-			GethChainsCount:   2,
-			SolanaChainsCount: 1,
-		},
-		DevspaceEnvWithBesuAndSolanaChains: DevspaceEnv{
-			Namespace:         "crib-test",
-			Provider:          "aws",
-			DonBootNodeCount:  1,
-			DonNodeCount:      4,
-			IngressBaseDomain: "main.stage.cldev.sh",
-			TmpDir:            "./tmp",
-			BesuChainsCount:   2,
-			GethChainsCount:   0,
-			SolanaChainsCount: 1,
-		},
-	}
-}
-
 func TestGetEnvConfig(t *testing.T) {
 	t.Parallel()
-	env := testData().DevspaceEnv
+	env := GetDevspaceEnvTestData().DevspaceEnv
 	config, err := GetEnvConfig(env)
 	require.NoError(t, err)
 	assert.NotNil(t, config)
@@ -90,7 +39,7 @@ func TestGetEnvConfig_AdditionalChains(t *testing.T) {
 
 func TestGetTransmittedChainConfigs(t *testing.T) {
 	t.Parallel()
-	env := testData().DevspaceEnv
+	env := GetDevspaceEnvTestData().DevspaceEnv
 	configs := GetTransmittedChainConfigs(env)
 	assert.NotNil(t, configs)
 	assert.Len(t, configs, 2)
@@ -98,7 +47,7 @@ func TestGetTransmittedChainConfigs(t *testing.T) {
 
 func TestGetTransmittedChainConfigs_AdditionalChains(t *testing.T) {
 	t.Parallel()
-	env := testData().DevspaceEnvWithAdditionalChains
+	env := GetDevspaceEnvTestData().DevspaceEnvWithAdditionalChains
 	configs := GetTransmittedChainConfigs(env)
 	assert.NotNil(t, configs)
 	assert.Len(t, configs, 4)
@@ -129,7 +78,7 @@ func strPtr(s string) *string {
 
 func TestGetTransmittedChainConfigs_GethAndSolanaChain(t *testing.T) {
 	t.Parallel()
-	env := testData().DevspaceEnvWithGethAndSolanaChains
+	env := GetDevspaceEnvTestData().DevspaceEnvWithGethAndSolanaChains
 	configs := GetTransmittedChainConfigs(env)
 
 	expected := []crib.ChainConfig{
@@ -275,7 +224,7 @@ func TestGetChainName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := tt.chainConfigurer.getChainName()
+			result := tt.chainConfigurer.GetChainName()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -322,7 +271,7 @@ func TestChainConfigurer_internalHTTPRPC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := tt.chainConfigurer.internalHTTPRPC()
+			result := tt.chainConfigurer.InternalHTTPRPC()
 			assert.NotNil(t, result)
 			assert.Equal(t, tt.expected, *result)
 		})
@@ -370,7 +319,7 @@ func TestChainConfigurer_internalWSRPC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := tt.chainConfigurer.internalWSRPC()
+			result := tt.chainConfigurer.InternalWSRPC()
 			assert.NotNil(t, result)
 			assert.Equal(t, tt.expected, *result)
 		})
@@ -489,7 +438,7 @@ func TestChainConfigurer_externalHTTPRPC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := tt.chainConfigurer.externalHTTPRPC()
+			result := tt.chainConfigurer.ExternalHTTPRPC()
 			assert.NotNil(t, result)
 			assert.Equal(t, tt.expected, *result)
 		})
@@ -567,7 +516,7 @@ func TestChainConfigurer_externalWSRPC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := tt.chainConfigurer.externalWSRPC()
+			result := tt.chainConfigurer.ExternalWSRPC()
 			assert.NotNil(t, result)
 			assert.Equal(t, tt.expected, *result)
 		})

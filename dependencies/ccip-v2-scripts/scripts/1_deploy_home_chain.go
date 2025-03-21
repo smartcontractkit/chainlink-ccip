@@ -79,7 +79,7 @@ func (h HomeChainDeployer) Deploy() {
 		os.Exit(1)
 	}
 
-	h.envState.SaveNodesTomlOverride(capRegConfig, homeChainID)
+	h.envState.SaveCapRegistryNodeOverride(capRegConfig, homeChainID)
 
 	addresses, err := addressBook.Addresses()
 	if err != nil {

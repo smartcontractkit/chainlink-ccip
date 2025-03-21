@@ -5,7 +5,6 @@ name: k8s-tester
 vars:
   ENV_STATE_DIR:
     source: env
-    default: "../../deployments/ccip-v2/.tmp"
   IMAGE_TAG:
     source: env
     default: develop

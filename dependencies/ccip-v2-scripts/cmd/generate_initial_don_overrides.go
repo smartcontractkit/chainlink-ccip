@@ -6,18 +6,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var configureOCR = &cobra.Command{
-	Use:   "configure-ocr",
-	Short: "Configure CCIP OCR",
-	Long:  `TBD`,
+var generateInitialDONOverrides = &cobra.Command{
+	Use:   "generate-initial-don-overrides",
+	Short: "Generate initial don-overrides",
+	Long:  `Generate initial don-overrides are supplied to DON during the first DON deployment`,
 	Run: func(cmd *cobra.Command, args []string) {
 		config.BindEnvVars()
 		devspaceEnv := config.NewDevspaceEnvFromEnv()
-		scripts.ConfigureOCR(logger, devspaceEnv)
+		scripts.GenerateInitialNodeOverrides(devspaceEnv)
 	},
 }
 
 //nolint:gochecknoinits
 func init() {
-	rootCmd.AddCommand(configureOCR)
+	rootCmd.AddCommand(generateInitialDONOverrides)
 }

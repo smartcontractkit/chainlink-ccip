@@ -53,7 +53,14 @@ func CallDeployerFn(logger *zap.SugaredLogger, env config.DevspaceEnv, stateDirP
 		os.Exit(1)
 	}
 	envState.SaveAddressBook(addresses)
-	envState.SaveNodeDetails(crib.NodesDetails{
-		NodeIDs: output.NodeIDs,
-	})
+
+	updateNodeDetails(reader, output.NodeIDs, envState)
+}
+
+func updateNodeDetails(reader *crib.OutputReader, nodeIDs []string, envState model.CCIPEnvState) {
+	// assuming that node details file already exist, as it was generated in generate_initial_node_overrides.go
+	nodesDetails := reader.ReadNodesDetails()
+	nodesDetails.NodeIDs = nodeIDs
+
+	envState.SaveNodeDetails(nodesDetails)
 }

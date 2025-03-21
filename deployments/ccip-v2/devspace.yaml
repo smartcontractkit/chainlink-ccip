@@ -47,12 +47,18 @@ vars:
   SOLANA_CHAINS_COUNT:
     source: env
     default: 0
+  ENABLE_RMN:
+    source: env
+    default: "false"
   ENABLE_MONITORING:
     source: env
     default: false
   CHAINLINK_PRODUCT:
     source: env
     default: ccip
+  K8S_TESTER_IMAGE_TAG:
+    source: env
+    default: develop
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -68,9 +74,21 @@ pipelines:
           run_dependency_pipelines kind-monitoring
         fi
       fi
+  # rely on the DEVSPACE_TMPDIR to avoid addition ccip-v2-scripts builds
+  maybe-build-ccip-v2-scripts:
+    run: |-
+      is_built_file=${DEVSPACE_TMPDIR}/ccip-v2-scripts-built
+      # Check if the file exists
+      if [ -f "$is_built_file" ]; then
+        echo "ccip-v2-scripts already built in this devspace run $is_built_file"
+      else
+        task ccip-v2-scripts:build
+        touch $is_built_file
+      fi
   ccip-v2:
     run: |-
       run_pipelines maybe-kind
+      run_pipelines maybe-build-ccip-v2-scripts
 
       run_dependency_pipelines geth-chains
       run_dependency_pipelines solana-chains
@@ -79,6 +97,18 @@ pipelines:
       # Deploy CCIP enabled fully configured DON
       run_dependency_pipelines ccip-don
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+  rmn:
+    run: |-
+      run_pipelines maybe-build-ccip-v2-scripts
+
+      if [[ "$ENABLE_RMN" == "true" ]]; then
+        echo "Deploying RMN"
+        ccip-v2-scripts rmn setup-rmn-onchain
+        run_dependency_pipelines rmn
+      else
+        echo "ENABLE_RMN is set to false, skipping RMN deployment"
+      fi
+
   ccip-v2-redeploy-don:
     run: |-
       # Deploy CCIP enabled fully configured DON
@@ -96,7 +126,7 @@ pipelines:
       kubectl delete pod -l app.kubernetes.io/name=geth
 
       # Uninstall chainlink-don app
-      helm uninstall chainlink-don
+      helm uninstall ccip
 
   # Resume pods stopped by ccip-v2-pause-pods pipeline
   # Make sure to run that pipeline with --force-deploy flag
@@ -113,6 +143,8 @@ pipelines:
   ccip-v2-infra-only:
     run: |-
       run_pipelines maybe-kind
+      run_pipelines maybe-build-ccip-v2-scripts
+      ccip-v2-scripts generate-initial-don-overrides
 
       run_dependency_pipelines geth-chains
       run_dependency_pipelines solana-chains
@@ -124,9 +156,12 @@ pipelines:
   # Pipeline without any steps that would break --render flag
   ccip-v2-infra-only-render:
     run: |-
-      run_pipelines maybe-kind
-      run_dependency_pipelines geth-chains
-      run_dependency_pipelines solana-chains
+      # run_pipelines maybe-kind
+      # run_dependency_pipelines geth-chains
+      # run_dependency_pipelines solana-chains
+
+      run_pipelines maybe-build-ccip-v2-scripts
+      ccip-v2-scripts generate-initial-don-overrides
       run_dependency_pipelines ccip-don --set-flag infraOnly="true"
   k8s-remote-tester:
     run: |-
@@ -143,7 +178,7 @@ pipelines:
     run: |-
       run_dependency_pipelines geth-chains
       run_dependency_pipelines solana-chains
-      task ccip-v2-scripts:build
+      run_pipelines maybe-build-ccip-v2-scripts
       run_dependency_pipelines ccip-v2-scripts --pipeline deploy-home-chain-contracts
   job-distributor:
     run: |-
@@ -171,6 +206,8 @@ profiles:
             overwriteVars: true
             vars:
               ENABLE_JOB_DISTRIBUTOR: "true"
+              CONFIG_OVERRIDES_DIR: "${TMP_DIR}"
+              ENABLE_DON_TYPE_OVERRIDES: "true"
             namespace: ${DEVSPACE_NAMESPACE}
             pipeline: deploy-ccip-v2
             profiles:
@@ -209,6 +246,18 @@ profiles:
         path: dependencies.ccip-don.profiles
         value: ccip-load-testing-aws-staging
 
+  # RMN dependency requires static configuration like shared toml config to be available
+  # before it can be activated
+  - name: rmn
+    merge:
+      dependencies:
+        rmn:
+          path: ${DEPENDENCIES_DIR}/rmn-v2
+          overwriteVars: true
+          namespace: ${DEVSPACE_NAMESPACE}
+          vars:
+            CCIP_ENV_STATE_DIR: "${TMP_DIR}"
+
   ### Misc profiles for testing individual dependencies in isolation
   - name: k8s-remote-tester
     patches:
@@ -218,6 +267,9 @@ profiles:
           k8s-remote-tester:
             path: ${DEPENDENCIES_DIR}/k8s-remote-tester
             namespace: ${DEVSPACE_NAMESPACE}
+            vars:
+              ENV_STATE_DIR: "${TMP_DIR}"
+              IMAGE_TAG: "${K8S_TESTER_IMAGE_TAG}"
   - name: ccip-v2-scripts
     patches:
       - op: add
@@ -254,7 +306,9 @@ profiles:
 
 commands:
   ccip-v2:
-    command: devspace run-pipeline ccip-v2 -p ${PROVIDER}
+    command: |
+      devspace run ccip-v2-scripts generate-initial-don-overrides
+      devspace run-pipeline ccip-v2 -p ${PROVIDER}
     description: Deploy full ccip-v2 setup
     appendArgs: true
   purge:
@@ -262,8 +316,15 @@ commands:
       rm -rf ${TMP_DIR}/*
       devspace purge
     description: Cleanup temp files and purge devspace env
+  rmn:
+    command: |
+      ccip-v2-scripts rmn generate-infra-config
+      devspace run-pipeline rmn -p ${PROVIDER} -p rmn
+    description: Generate config and Deploy RMN on top fully deployed CCIP DON
+    appendArgs: true
   ccip-v2-redeploy-don:
-    command: devspace run-pipeline ccip-v2-redeploy-don -p ${PROVIDER}
+    command: |
+      devspace run-pipeline ccip-v2-redeploy-don -p ${PROVIDER}
     description: Redeploy DON without updating contracts
     appendArgs: true
   ccip-v2-pause-pods:
@@ -279,11 +340,15 @@ commands:
     description: Deploy full ccip-v2 setup to AWS with heavy load test profile. (aws only)
     appendArgs: true
   ccip-v2-infra:
-    command: devspace run-pipeline ccip-v2-infra-only -p ${PROVIDER}
+    command: |
+      devspace run ccip-v2-scripts generate-initial-don-overrides
+      devspace run-pipeline ccip-v2-infra-only -p ${PROVIDER}
     description: Run the ccip v2 pipeline without onchain deployment, just infra.
     appendArgs: true
   ccip-v2-infra-render:
-    command: devspace run-pipeline ccip-v2-infra-only-render --render
+    command: |
+      devspace run ccip-v2-scripts generate-initial-don-overrides
+      devspace run-pipeline ccip-v2-infra-only-render --render
     description: Render infra components, pass desired profile via -p flag
     appendArgs: true
   start-remote-tests:

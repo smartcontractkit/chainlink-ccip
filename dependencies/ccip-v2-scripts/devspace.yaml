@@ -11,17 +11,3 @@ vars:
   CHAINS_COUNT:
     source: env
     default: 2
-
-pipelines:
-  # deploy home chain contracts and return capability registry address
-  deploy-home-chain-contracts: |-
-    echo "running deploy scripts"
-
-    tmp_dir="${TMP_DIR}"
-    mkdir -p "$tmp_dir"
-    task ccip-v2-scripts:build
-    ccip-v2-scripts deploy-home-chain
-
-  deploy-ccip: |-
-    echo "deploy on chain contracts (tokens, lanes, token pools, price registry, router)"
-    ccip-v2-scripts deploy-ccip

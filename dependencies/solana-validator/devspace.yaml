@@ -33,12 +33,12 @@ vars:
     default: 1
 
 pipelines:
-  kind:
-    run: |-
-      ensure_pull_secrets --all
-      run_pipelines deploy
   deploy:
     run: |-
+      if [ "$PROVIDER" == "kind" ]; then
+        ensure_pull_secrets --all
+      fi
+
       if [ "${CHAINS_COUNT}" -gt 0 ]; then
         create_deployments --all
       fi

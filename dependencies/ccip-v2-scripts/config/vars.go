@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func InitViper() {
+func BindEnvVars() {
 	MustHaveEnv("DEVSPACE_NAMESPACE")
 	MustHaveEnv("PROVIDER")
 	MustHaveEnv("DON_BOOT_NODE_COUNT")

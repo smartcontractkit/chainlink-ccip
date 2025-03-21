@@ -20,7 +20,7 @@ func TestSaveJSONOutputFile(t *testing.T) {
 	}
 	state := NewEnvState(nil, env)
 
-	savedFile := state.SaveJSONOutputFile("test_file.json", env)
+	savedFile := state.SaveJSONOutputFile("test_file.json", env, DataFile)
 	file, err := os.ReadFile(savedFile)
 	require.NoError(t, err)
 

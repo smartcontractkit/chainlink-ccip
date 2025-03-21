@@ -1,0 +1,9 @@
+deployments:
+  {{- range .RMNNodes }}
+  rmn-{{ .NodeID }}:
+    helm:
+      chart:
+        name: rmn-v2
+        path: ${CHAINLINK_CODE_DIR}/infra-charts/ccip-rmn-v2
+        version: null
+  {{- end }}
