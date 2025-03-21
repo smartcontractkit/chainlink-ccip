@@ -141,6 +141,55 @@ fn internal_execute<'info>(
         return Ok(());
     }
 
+    let has_messaging = should_execute_messaging(ctx.remaining_accounts, token_indexes);
+
+    let hashed_leaf: [u8; 32] = if has_messaging {
+        let (msg_program, msg_accounts) = parse_messaging_accounts(
+            token_indexes,
+            &execution_report.message.extra_args.is_writable_bitmap,
+            ctx.remaining_accounts,
+        )?;
+
+        // Verify merkle root before doing any token operations or CPI calls
+        let recv_and_msg_account_keys = Some(*msg_program.key)
+            .into_iter()
+            .chain(msg_accounts.iter().map(|a| *a.key));
+
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            recv_and_msg_account_keys,
+            &source_chain.config.on_ramp,
+        )?
+    } else {
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            None.into_iter(),
+            &source_chain.config.on_ramp,
+        )?
+    };
+
+    // Mark as InProgress and emit ExecutionStateChanged event; the event will be used by offchain to recognize that
+    // the message has been attempted in order to avoid more attempts.
+    // An attempt is considered valid only if it passes necessary validation, such as merkle proof check.
+    // Since Solana keeps logs even if the transaction errors, this approach works regardless of attempt outcome.
+    // This event should be emitted before any operations that calls 3rd party programs.
+    let in_progress_state = MessageExecutionState::InProgress;
+    execution_state::set(
+        commit_report,
+        message_header.sequence_number,
+        in_progress_state.to_owned(),
+    );
+
+    emit!(ExecutionStateChanged {
+        source_chain_selector: message_header.source_chain_selector,
+        sequence_number: message_header.sequence_number,
+        message_id: message_header.message_id,
+        message_hash: hashed_leaf,
+        state: in_progress_state,
+    });
+
     // send tokens any -> SOL
     require!(
         token_indexes.len() == execution_report.message.token_amounts.len()
@@ -232,7 +281,7 @@ fn internal_execute<'info>(
     // handle CPI call if there are message accounts in the remaining_accounts
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
-    let hashed_leaf = if should_execute_messaging(ctx.remaining_accounts, token_indexes) {
+    if has_messaging {
         let (msg_program, msg_accounts) = parse_messaging_accounts(
             token_indexes,
             &execution_report.message.extra_args.is_writable_bitmap,
@@ -277,23 +326,7 @@ fn internal_execute<'info>(
         let signer = &[&seeds[..]];
 
         invoke_signed(&instruction, &acc_infos, signer)?;
-        let recv_and_msg_account_keys = Some(*msg_program.key)
-            .into_iter()
-            .chain(msg_accounts.iter().map(|a| *a.key));
-        verify_merkle_root(
-            &execution_report,
-            commit_report.merkle_root,
-            recv_and_msg_account_keys,
-            &source_chain.config.on_ramp,
-        )?
-    } else {
-        verify_merkle_root(
-            &execution_report,
-            commit_report.merkle_root,
-            None.into_iter(),
-            &source_chain.config.on_ramp,
-        )?
-    };
+    }
 
     let new_state = MessageExecutionState::Success;
     execution_state::set(
