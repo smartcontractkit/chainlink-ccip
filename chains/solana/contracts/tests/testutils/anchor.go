@@ -2,7 +2,6 @@ package testutils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,11 +46,9 @@ func (o waitAndRetryOpts) WithDecreasedAttempts() waitAndRetryOpts {
 
 func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T, opts waitAndRetryOpts) {
 	sigs := []solana.Signature{}
-	fmt.Printf("[%s]: Requesting airdrop for %d accounts and remaining attempts %d\n", t.Name(), len(accounts), opts.RemainingAttempts)
-	for i, v := range accounts {
+	for _, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
 		require.NoError(t, err)
-		fmt.Printf("[%s]: Requested airdrop for account #%d out of %d: %s\n", t.Name(), i, len(accounts), sig)
 		sigs = append(sigs, sig)
 	}
 
@@ -73,16 +70,11 @@ func fundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 			}
 		}
 		remaining = accountsWithNonFinalizedFunding
+
 		if len(remaining) == 0 {
 			return // all done!
 		}
-
-		printableStatuses, err := json.Marshal(statusRes)
-		require.NoError(t, err)
-		fmt.Printf("[%s]: Waiting for airdrop confirmation, %d transactions remaining out of %d, elapsed time: %s\nSignatureStatuses: %s\n\n", t.Name(), len(remaining), len(accounts), elapsed, printableStatuses)
 	}
-
-	fmt.Printf("[%s]: unable to find %d transactions out of %d within timeout when remaining attempts is %d\n", t.Name(), len(remaining), len(accounts), opts.RemainingAttempts)
 
 	decreasedOpts := opts.WithDecreasedAttempts()
 	if decreasedOpts.RemainingAttempts == 0 {
