@@ -376,7 +376,8 @@ func (r *ccipChainReader) ExecutedMessages(
 			continue
 		}
 
-		executed[stateChange.SourceChainSelector] = append(executed[stateChange.SourceChainSelector], stateChange.SequenceNumber)
+		executed[stateChange.SourceChainSelector] =
+			append(executed[stateChange.SourceChainSelector], stateChange.SequenceNumber)
 	}
 
 	return executed, nil

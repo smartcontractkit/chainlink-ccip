@@ -217,7 +217,8 @@ func getPendingReportsForExecution(
 			"reports", filteredReports[selector],
 			"count", len(filteredReports[selector]))
 		sort.Slice(filteredReports[selector], func(i, j int) bool {
-			return filteredReports[selector][i].SequenceNumberRange.Start() < filteredReports[selector][j].SequenceNumberRange.Start()
+			return filteredReports[selector][i].SequenceNumberRange.Start() <
+				filteredReports[selector][j].SequenceNumberRange.Start()
 		})
 		// todo: remove this logs after investigating whether the sorting above can be safely removed
 		lggr.Debugw("sorted reports",
