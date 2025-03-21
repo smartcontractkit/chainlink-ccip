@@ -10,6 +10,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/filter"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/stream"
@@ -20,7 +21,7 @@ type arguments struct {
 	logType      string
 	rendererName string
 
-	parse.FilterFields
+	filter.CompiledFilterFields
 }
 
 func run(args arguments) error {
@@ -41,11 +42,6 @@ func run(args arguments) error {
 		return fmt.Errorf("failed to initialize input stream: %w", err)
 	}
 
-	compiledFilters, err := args.FilterFields.Compile()
-	if err != nil {
-		return fmt.Errorf("failed to compile filters: %w", err)
-	}
-
 	scanner := bufio.NewScanner(inputStream)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -54,7 +50,7 @@ func run(args arguments) error {
 			return fmt.Errorf("ParseLine: %w", err)
 		}
 
-		include, err := parse.Filter(data, compiledFilters)
+		include, err := filter.Filter(data, args.CompiledFilterFields)
 		if err != nil {
 			msg := fmt.Sprintf("Unable to get data: %s\n", err)
 			_, err2 := fmt.Fprintf(os.Stderr, msg)
@@ -116,16 +112,18 @@ func makeCommand() *cli.Command {
 				},
 			},
 			&cli.StringSliceFlag{
-				Name:        "filter",
-				Usage:       "Provide one or more filters to apply to the logs. Format: field=matcher",
-				Destination: &args.FilterFields.Filters,
-				Category:    "filters",
-			},
-			&cli.StringSliceFlag{
-				Name:        "componentFilter",
-				Usage:       "Provide one or more component filters to apply to the logs.",
-				Destination: &args.FilterFields.ComponentFilters,
-				Category:    "filters",
+				Name:  "filter",
+				Usage: fmt.Sprintf("Provide one or more filters to apply to the logs. Format as 'FieldName:Regexp', valid fields: [%s]", strings.Join(filter.FieldNames(), ", ")),
+				//Destination: &args.FilterFields.Filters,
+				Category: "filters",
+				Action: func(ctx context.Context, command *cli.Command, fields []string) error {
+					var err error
+					args.CompiledFilterFields, err = filter.NewFilterFields(fields)
+					if err != nil {
+						return fmt.Errorf("invalid filter fields: %w", err)
+					}
+					return nil
+				},
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {

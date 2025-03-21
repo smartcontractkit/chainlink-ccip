@@ -14,3 +14,11 @@ lint-fix:
 	golangci-lint run -c ../../.golangci.yml --fix
 
 checks: test lint
+
+$(GOPATH)/bin/go-enum:
+	go get -u github.com/abice/go-enum
+	go install github.com/abice/go-enum
+
+.PHONY: generate
+generate: $(GOPATH)/bin/go-enum
+	go generate ./...

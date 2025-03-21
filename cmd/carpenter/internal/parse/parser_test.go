@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/filter"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
 )
 
@@ -80,7 +81,7 @@ func TestParse(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := parse.Filter(tc.line, parse.LogTypeJSON, false)
+			result, err := filter.Filter(tc.line, parse.LogTypeJSON, false)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			require.Equal(t, tc.expected, *result)
