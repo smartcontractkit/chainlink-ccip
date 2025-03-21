@@ -1,7 +1,7 @@
 /// Methods in this module are used to deserialize AccountInfo into the state structs
 use anchor_lang::prelude::*;
+use ccip_common::seed;
 
-use crate::context::seed::{FEE_BILLING_TOKEN_CONFIG, PER_CHAIN_PER_TOKEN_CONFIG};
 use crate::state::{BillingTokenConfig, BillingTokenConfigWrapper, PerChainPerTokenConfig};
 use crate::FeeQuoterError;
 
@@ -14,7 +14,7 @@ pub fn per_chain_per_token_config<'info>(
 ) -> Result<Option<PerChainPerTokenConfig>> {
     let (expected, _) = Pubkey::find_program_address(
         &[
-            PER_CHAIN_PER_TOKEN_CONFIG,
+            seed::PER_CHAIN_PER_TOKEN_CONFIG,
             dest_chain_selector.to_le_bytes().as_ref(),
             token.key().as_ref(),
         ],
@@ -47,8 +47,10 @@ pub fn billing_token_config<'info>(
     account: &'info AccountInfo<'info>,
     token: Pubkey,
 ) -> Result<Option<BillingTokenConfig>> {
-    let (expected, _) =
-        Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
+    let (expected, _) = Pubkey::find_program_address(
+        &[seed::FEE_BILLING_TOKEN_CONFIG, token.as_ref()],
+        &crate::ID,
+    );
     require_keys_eq!(
         account.key(),
         expected,
