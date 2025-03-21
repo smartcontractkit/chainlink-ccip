@@ -12,6 +12,9 @@ vars:
   DEVSPACE_ENV_FILE:
     source: env
     default: .env
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
   # switches / activation
   ENV: # options=[local|stage|prod]
     source: env
@@ -37,6 +40,7 @@ pipelines:
 
 deployments:
   minio-tenant:
+    namespace: ${NAMESPACE}
     helm:
       chart:
         name: tenant
@@ -116,7 +120,7 @@ profiles:
           PROVIDER: aws
     patches:
       - op: add
-        path: deployments.minio-tenant.helm.values.exposeServices
+        path: deployments.minio-tenant.helm.values.tenant.exposeServices
         value:
           console: true
           minio: true

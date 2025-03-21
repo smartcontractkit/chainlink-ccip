@@ -47,6 +47,10 @@ imports:
   - path: ${IMPORTS_DIR}/lib-kind
 
 pipelines:
+  cluster-services:
+    run: |-
+      run_dependency_pipelines otel-gateway
+
   blockchain:
     run: |-
       run_dependency_pipelines anvil
@@ -67,6 +71,26 @@ pipelines:
       kubectl delete pvc data-blockscout-postgres-geth-chain-anvil-31337-0 --ignore-not-found
 
 profiles:
+  ## cluster-services
+
+  - name: cluster-services-otel-gateway
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          otel-gateway:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-otel-collector.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            pipeline: deploy
+            vars:
+              OTEL_COLLECTOR_NAME: otel-gateway
+            profiles: []
+
+  - name: cluster-services
+    parents:
+      - profile: cluster-services-otel-gateway
+
   ## blockchains
 
   - name: blockchain-anvil
@@ -79,7 +103,13 @@ profiles:
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             pipeline: deploy
-            profiles: []
+            profiles: [anvil-stateful]
+
+  - name: blockchain-anvil-reload
+    patches:
+      - op: add
+        path: dependencies.anvil.profiles
+        value: anvil-load-state
 
   - name: blockchain-anvil-blockscout
     patches:
@@ -87,7 +117,7 @@ profiles:
         path: vars
         value:
           CHAIN_NAME: anvil
-          CHAIN_ID: 31337
+          CHAIN_ID: 1337
           ETHEREUM_VARIANT: geth
           NAMESPACE: ${DEVSPACE_NAMESPACE}
           CRIB_EKS_CLUSTER_NAME: "main-fwog"
@@ -105,6 +135,12 @@ profiles:
   - name: blockchain
     parents:
       - profile: blockchain-anvil
+      - profile: blockchain-anvil-blockscout
+
+  - name: blockchain-reload
+    parents:
+      - profile: blockchain-anvil
+      - profile: blockchain-anvil-reload
       - profile: blockchain-anvil-blockscout
 
   ## chainlink dons
@@ -153,9 +189,17 @@ profiles:
   # - cre-cli?
 
 commands:
+  cluster-services:
+    command: devspace run-pipeline cluster-services -p cluster-services
+    description: Deploy the cluster-services
+    appendArgs: true
   blockchain:
     command: devspace run-pipeline blockchain -p blockchain
     description: Deploy the blockchains
+    appendArgs: true
+  blockchain-reload:
+    command: devspace run-pipeline blockchain -p blockchain-reload
+    description: Redeploy the blockchains
     appendArgs: true
   chainlink:
     command: devspace run-pipeline chainlink -p chainlink

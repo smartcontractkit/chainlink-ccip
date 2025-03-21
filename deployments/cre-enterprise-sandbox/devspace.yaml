@@ -63,6 +63,12 @@ vars:
   CHAINLINK_PRODUCT:
     source: env
     default: ccip
+  HOST_NAME:
+    source: env
+    default: main.stage.cldev.sh
+  AWS_ACM_CERT_ARN:
+    source: env
+    default: ""
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -70,36 +76,127 @@ imports:
   - path: ${IMPORTS_DIR}/lib-kind
 
 pipelines:
-  chain-alpha:
+
+  cluster-services:
+    run: |-
+      run_dependency_pipelines tempo
+      run_dependency_pipelines beholder-gateway
+      run_dependency_pipelines minio-operator
+      run_dependency_pipelines minio-tenant
+
+  blockchain:
     run: |-
       run_dependency_pipelines chain-alpha
-      run_dependency_pipelines blockscout
-      run_pipelines ingress-check
+      run_dependency_pipelines chain-alpha-blockscout
+      run_dependency_pipelines chain-beta
+      run_dependency_pipelines chain-beta-blockscout
+      # run_pipelines ingress-check
 
-  chain-beta:
+  blockchain-alpha:
+    run: |-
+      run_dependency_pipelines chain-alpha
+      run_dependency_pipelines chain-alpha-blockscout
+      # run_pipelines ingress-check
+
+  blockchain-beta:
     run: |-
       run_dependency_pipelines chain-beta
-      run_dependency_pipelines blockscout
-      run_pipelines ingress-check
+      run_dependency_pipelines chain-beta-blockscout
+      # run_pipelines ingress-check
 
-  ccip:
+  chainlink:
     run: |-
-      run_dependency_pipelines ccip-don
-      crib devspace ingress-check --nsTimeout=2m --timeout=4m
+      run_dependency_pipelines ccip
+      run_dependency_pipelines cre
 
-  ccip-infra-only:
+  chainlink-ccip:
     run: |-
-      run_dependency_pipelines ccip-don --set-flag infraOnly="true"
-      crib devspace ingress-check --nsTimeout=2m --timeout=4m
-  cre-don:
+      run_dependency_pipelines ccip
+      # crib devspace ingress-check --nsTimeout=2m --timeout=4m
+
+  chainlink-ccip-infra:
     run: |-
-      run_dependency_pipelines cre-don
-  cre-don-gateway:
+      run_dependency_pipelines ccip --set-flag infraOnly="true"
+      # crib devspace ingress-check --nsTimeout=2m --timeout=4m
+
+  chainlink-cre:
     run: |-
-      run_dependency_pipelines cre-don-gateway
+      run_dependency_pipelines cre
 
 profiles:
-  - name: chain-alpha
+  ## cluster-services
+
+  - name: cluster-services-tempo
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          tempo:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-tempo.yaml
+            overwriteVars: true
+            namespace: prometheus
+            pipeline: deploy
+            vars:
+              NAMESPACE: prometheus
+              TEMPO_NAME: tempo
+            profiles: []
+
+  - name: cluster-services-beholder-gateway
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          beholder-gateway:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-otel-collector.yaml
+            overwriteVars: true
+            namespace: prometheus
+            pipeline: deploy
+            vars:
+              NAMESPACE: prometheus
+              OTEL_COLLECTOR_NAME: beholder-gateway
+            profiles: [use-beholder-image]
+
+  - name: cluster-services-minio-operator
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          minio-operator:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-minio-operator.yaml
+            overwriteVars: true
+            namespace: minio
+            pipeline: deploy
+            vars:
+              NAMESPACE: minio
+            profiles: []
+
+  - name: cluster-services-minio-tenant
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          minio-tenant:
+            path: ${DEPENDENCIES_DIR}/daas/cluster-services-minio-tenant.yaml
+            overwriteVars: true
+            namespace: minio
+            pipeline: deploy
+            vars:
+              NAMESPACE: minio
+              HOST_NAME: ${HOST_NAME}
+              AWS_ACM_CERT_ARN: ${AWS_ACM_CERT_ARN}
+              PROVIDER: ${PROVIDER}
+            profiles: []
+
+  - name: cluster-services
+    parents:
+      - profile: cluster-services-tempo
+      - profile: cluster-services-beholder-gateway
+      - profile: cluster-services-minio-operator
+      - profile: cluster-services-minio-tenant
+
+  ## blockchains
+
+  - name: blockchain-alpha
     patches:
       - op: add
         path: dependencies
@@ -107,29 +204,27 @@ profiles:
           chain-alpha:
             path: ${DEPENDENCIES_DIR}/besu/devspace.yaml
             overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-      - op: add
-        path: vars
-        value:
-          CHAIN_NAME:
-            source: env
-            default: "alpha"
-          CHAIN_ID:
-            source: env
-            default: 1337
-          NAMESPACE:
-            source: env
-            default: "chain-alpha"
-          CRIB_EKS_CLUSTER_NAME: "main-fwog"
+            namespace: chain-alpha
+            vars:
+              CHAIN_NAME: alpha
+              CHAIN_ID: 1337
+              NAMESPACE: chain-alpha
+              INGRESS_CLASS_NAME: alb
       - op: add
         path: dependencies
         value:
-          blockscout:
+          chain-alpha-blockscout:
             path: ${DEPENDENCIES_DIR}/blockscout/devspace.yaml
             overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
+            namespace: chain-alpha
+            vars:
+              CHAIN_NAME: alpha
+              CHAIN_ID: 1337
+              NAMESPACE: chain-alpha
+              INGRESS_CLASS_NAME: alb
+              CRIB_EKS_CLUSTER_NAME: "main-fwog"
 
-  - name: chain-beta
+  - name: blockchain-beta
     patches:
       - op: add
         path: dependencies
@@ -137,123 +232,107 @@ profiles:
           chain-beta:
             path: ${DEPENDENCIES_DIR}/besu/devspace.yaml
             overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-      - op: add
-        path: vars
-        value:
-          CHAIN_NAME:
-            source: env
-            default: "beta"
-          CHAIN_ID:
-            source: env
-            default: 2337
-          NAMESPACE:
-            source: env
-            default: "chain-beta"
-          CRIB_EKS_CLUSTER_NAME: "main-fwog"
-          INGRESS_CLASS_NAME: "alb"
+            namespace: chain-beta
+            vars:
+              CHAIN_NAME: beta
+              CHAIN_ID: 2337
+              NAMESPACE: chain-beta
+              INGRESS_CLASS_NAME: alb
       - op: add
         path: dependencies
         value:
-          blockscout:
+          chain-beta-blockscout:
             path: ${DEPENDENCIES_DIR}/blockscout/devspace.yaml
             overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
+            namespace: chain-beta
+            vars:
+              CHAIN_NAME: beta
+              CHAIN_ID: 2337
+              NAMESPACE: chain-beta
+              INGRESS_CLASS_NAME: alb
+              CRIB_EKS_CLUSTER_NAME: "main-fwog"
 
-  - name: ccip
+  - name: blockchain
+    parents:
+      - profile: blockchain-alpha
+      - profile: blockchain-beta
+
+  ## chainlink dons
+
+  - name: chainlink-don-ccip
     patches:
       - op: add
         path: dependencies
         value:
-          ccip-don:
+          ccip:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
+            namespace: ccip
             pipeline: deploy-ccip-v2
             profiles:
               - network-besu-chain-alpha
               - network-besu-chain-beta
               - version-from-env
-      - op: add
-        path: vars
-        value:
-          ENV: sandbox
+            vars:
+              DON_TYPE: ${DON_TYPE}
+              DON_VERSION: ${DON_VERSION}
+              ENV: sandbox
 
-  - name: cre
+  - name: chainlink-don-cre
     patches:
       - op: add
         path: dependencies
         value:
-          cre-don:
+          cre:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
+            namespace: cre
             pipeline: deploy
             profiles:
               - network-besu-chain-alpha
               - network-besu-chain-beta
               - version-from-env
-      - op: replace
-        path: vars
-        value:
-          DON_TYPE: ${DON_TYPE_CRE}
-          DON_VERSION: ${DON_VERSION_CRE}
-      - op: add
-        path: vars
-        value:
-          ENV: sandbox
+            vars:
+              DON_TYPE: ${DON_TYPE_CRE}
+              DON_VERSION: ${DON_VERSION_CRE}
+              ENV: sandbox
 
-  - name: cre-gateway
-    patches:
-      - op: add
-        path: dependencies
-        value:
-          cre-don-gateway:
-            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-            pipeline: deploy
-            profiles:
-              - version-from-env
-      - op: replace
-        path: vars
-        value:
-          DON_TYPE: gateway
-          DON_VERSION: ${DON_VERSION_CRE}
-          DON_BOOT_NODE_COUNT: 0
-      - op: add
-        path: vars
-        value:
-          ENV: sandbox
-          DON_NODE_COUNT: 1
+  - name: chainlink
+    parents:
+      - profile: chainlink-don-ccip
+      - profile: chainlink-don-cre
 
 commands:
+  cluster-services:
+    command: devspace run-pipeline cluster-services -p cluster-services
+    description: Deploy cluster services
+    appendArgs: true
   blockchain:
-    command: |-
-      devspace run-pipeline chain-alpha -p chain-alpha
-      devspace run-pipeline chain-beta -p chain-beta
+    command: devspace run-pipeline blockchain -p blockchain
     description: Deploy Besu blockchains
     appendArgs: true
-  chain-alpha:
-    command: devspace run-pipeline chain-alpha -p chain-alpha
+  blockchain-alpha:
+    command: devspace run-pipeline blockchain-alpha -p blockchain
     description: Deploy alpha Besu chain
     appendArgs: true
-  chain-beta:
-    command: devspace run-pipeline chain-beta -p chain-beta
+  blockchain-beta:
+    command: devspace run-pipeline blockchain-beta -p blockchain
     description: Deploy beta Besu chain
     appendArgs: true
-  ccip:
-    command: devspace run-pipeline ccip -p ccip
+  chainlink:
+    command: devspace run-pipeline chainlink -p chainlink
+    description: Deploy ccip / cre
+    appendArgs: true
+  chainlink-ccip:
+    command: devspace run-pipeline chainlink-ccip -p chainlink
     description: Deploy CCIP v1.6 DON with full on-chain configuration
     appendArgs: true
-  ccip-infra:
-    command: devspace run-pipeline ccip-infra-only -p ccip
+  chainlink-ccip-infra:
+    command: devspace run-pipeline chainlink-ccip-infra -p chainlink
     description: Deploy CCIP v1.6 DON infrastructure only (no on-chain deployment)
     appendArgs: true
-  cre:
-    command: |-
-      devspace run-pipeline cre-don -p cre
-      devspace run-pipeline cre-don-gateway -p cre-gateway
+  chainlink-cre:
+    command: devspace run-pipeline cre -p chainlink
     description: Deploy the Chainlink workflow/capability CRE DON infrastructure with a gateway node
     appendArgs: true
   uninstall:

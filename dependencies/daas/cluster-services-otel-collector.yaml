@@ -1,0 +1,197 @@
+---
+# charts: https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector
+version: v2beta1
+name: cluster-services-otel-collector
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  # default
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
+  # specific
+  OTEL_COLLECTOR_NAME:
+    source: env
+    default: otel-collector
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments otel-collector
+  purge:
+    run: |-
+      purge_deployments otel-collector
+
+deployments:
+  otel-collector:
+    updateImageTags: false
+    namespace: ${NAMESPACE}
+    helm:
+      displayOutput: true
+      chart:
+        name: opentelemetry-collector
+        repo: https://open-telemetry.github.io/opentelemetry-helm-charts
+        version: 0.116.0
+      values:
+        fullnameOverride: ${OTEL_COLLECTOR_NAME}
+        mode: deployment
+        image:
+          repository: otel/opentelemetry-collector
+          tag: 0.119.0
+        podSecurityContext:
+          fsGroup: 2000
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+        ports:
+          otlp:
+            enabled: true
+          otlp-http:
+            enabled: true
+          jaeger-compact:
+            enabled: false
+          jaeger-thrift:
+            enabled: false
+          jaeger-grpc:
+            enabled: false
+          zipkin:
+            enabled: false
+          metrics:
+            enabled: true
+        serviceMonitor:
+          enabled: true
+          metricsEndpoints:
+            - port: metrics
+        # When enabled, the chart will set the GOMEMLIMIT env var to 80% of the configured resources.limits.memory.
+        # If no resources.limits.memory are defined then enabling does nothing.
+        # It is HIGHLY recommend to enable this setting and set a value for resources.limits.memory.
+        useGOMEMLIMIT: true
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 256Mi
+        ingress:
+          enabled: false
+        podDisruptionBudget:
+          minAvailable: 2
+          maxUnavailable: 1
+        autoscaling:
+          enabled: false
+          minReplicas: 3
+          maxReplicas: 6
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 60
+        extraEnvs:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: KAFKA_SASL_MECHANISM
+            value: PLAINTEXT
+        config:
+          exporters:
+            debug:
+              verbosity: detailed
+            debug/noop:
+              verbosity: normal
+              sampling_initial: 0
+              sampling_thereafter: 0
+            otlphttp/logs:
+              endpoint: http://loki.prometheus.svc.cluster.local:3100/otlp
+              tls:
+                insecure: true
+            otlp/tempo:
+              endpoint: tempo.prometheus.svc.cluster.local:4317
+              tls:
+                insecure: true
+          extensions:
+            # The health_check extension is mandatory for this chart.
+            # Without the health_check extension the collector will fail the readiness and liveliness probes.
+            # The health_check extension can be modified, but should never be removed.
+            health_check:
+              endpoint: ${env:MY_POD_IP}:13133
+          processors:
+            batch:
+              send_batch_size: 5000
+              timeout: 10s
+            # Default memory limiter configuration for the collector based on k8s resource limits.
+            memory_limiter:
+              # check_interval is the time between measurements of memory usage.
+              check_interval: 5s
+              # By default limit_mib is set to 80% of ".Values.resources.limits.memory"
+              limit_percentage: 80
+              # By default spike_limit_mib is set to 25% of ".Values.resources.limits.memory"
+              spike_limit_percentage: 25
+          receivers:
+            jaeger: null
+            prometheus: null
+            zipkin: null
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: ${env:MY_POD_IP}:4317
+                http:
+                  endpoint: ${env:MY_POD_IP}:4318
+          service:
+            telemetry:
+              metrics:
+                address: ${env:MY_POD_IP}:8888
+                level: detailed
+            extensions:
+              - health_check
+            pipelines:
+              logs:
+                exporters:
+                  - debug
+                  - otlphttp/logs
+                processors:
+                  - memory_limiter
+                  - batch
+                receivers:
+                  - otlp
+              metrics:
+                exporters:
+                  - debug
+                processors:
+                  - memory_limiter
+                  - batch
+                receivers:
+                  - otlp
+              traces:
+                exporters:
+                  - debug/noop
+                  - otlp/tempo
+                processors:
+                  - memory_limiter
+                  - batch
+                receivers:
+                  - otlp
+
+profiles:
+  - name: use-beholder-image
+    patches:
+      - op: replace
+        path: deployments.otel-collector.helm.values.image
+        value:
+          repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-gateway-otel-collector
+          tag: 1971fd13ff415a225dc3db0d1be653aec22200d9
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/instance: otel-collector
+        app.kubernetes.io/name: opentelemetry-collector
+    events: ["after:deploy:otel-collector"]

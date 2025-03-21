@@ -10,6 +10,9 @@ vars:
   DEVSPACE_ENV_FILE:
     source: env
     default: .env
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
 
 pipelines:
   deploy:
@@ -21,6 +24,7 @@ pipelines:
 
 deployments:
   minio-operator:
+    namespace: ${NAMESPACE}
     helm:
       chart:
         name: operator
@@ -31,3 +35,14 @@ deployments:
           enabled: true
 
 profiles: []
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/instance: minio-operator
+        app.kubernetes.io/name: operator
+    events: ["after:deploy:minio-operator"]

@@ -1,7 +1,7 @@
 # cre-dev deployment
 
 - cluster-services
-  - otel-operator
+  - [x] otel-gateway
   - minio-operator
   - minio-tenant
 - blockchain
@@ -41,16 +41,18 @@ cd deployments/cre-dev
 cp .env.example .env
 
 # cluster-services
-# -> todo
+devspace run cluster-services
 
 # blockchain: anvil / anvil-blockscout
 devspace run blockchain
+devspace run blockchain-reload
 
 # chainlink: cre don / jd
 devspace run chainlink
 
 # nuke
 helm list -q | xargs -r helm uninstall
+kg pvc --no-headers | awk '{print $1}' | xargs -r kubectl delete pvc
 ```
 
 ### capabilities

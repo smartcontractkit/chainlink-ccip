@@ -1,0 +1,58 @@
+---
+# charts: https://github.com/grafana/helm-charts/tree/main/charts/tempo
+version: v2beta1
+name: cluster-services-tempo
+
+require:
+  devspace: ">= 6.0"
+
+vars:
+  # default
+  DEVSPACE_ENV_FILE:
+    source: env
+    default: .env
+  NAMESPACE:
+    source: env
+    default: ${DEVSPACE_NAMESPACE}
+  # specific
+  TEMPO_NAME:
+    source: env
+    default: tempo
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments tempo
+  purge:
+    run: |-
+      purge_deployments tempo
+
+deployments:
+  tempo:
+    updateImageTags: false
+    namespace: ${NAMESPACE}
+    helm:
+      displayOutput: true
+      chart:
+        name: tempo
+        repo: https://grafana.github.io/helm-charts
+        version: 1.16.0
+      values:
+        fullnameOverride: ${TEMPO_NAME}
+        tempo:
+          repository: grafana/tempo
+          tag: "2.6.1"
+          pullPolicy: IfNotPresent
+          updateStrategy: RollingUpdate
+          resources: {}
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/instance: ${TEMPO_NAME}
+        app.kubernetes.io/name: ${TEMPO_NAME}
+    events: ["after:deploy:tempo"]

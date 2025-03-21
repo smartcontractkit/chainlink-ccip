@@ -50,7 +50,7 @@ deployments:
               - --port
               - "8545"
               - --chain-id
-              - "31337"
+              - "1337"
               - --block-time
               - "1"
               - --dump-state
@@ -144,7 +144,7 @@ profiles:
           - --port
           - "8545"
           - --chain-id
-          - "31337"
+          - "1337"
           - --block-time
           - "1"
           - --dump-state
