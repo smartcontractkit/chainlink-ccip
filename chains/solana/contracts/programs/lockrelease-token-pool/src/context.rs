@@ -8,6 +8,7 @@ use base_token_pool::common::{
     ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR, EXTERNAL_TOKENPOOL_SIGNER, POOL_CHAINCONFIG_SEED,
     POOL_SIGNER_SEED, POOL_STATE_SEED,
 };
+use ccip_common::seed;
 
 use crate::{ChainConfig, State};
 
@@ -139,7 +140,7 @@ pub struct TokenOfframp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [seed::CURSES],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
@@ -147,7 +148,7 @@ pub struct TokenOfframp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
@@ -199,7 +200,7 @@ pub struct TokenOnramp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [seed::CURSES],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
@@ -207,7 +208,7 @@ pub struct TokenOnramp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = state.config.rmn_remote,
     )]

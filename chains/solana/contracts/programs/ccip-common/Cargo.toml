@@ -1,27 +1,22 @@
 [package]
-name = "fee_quoter"
+name = "ccip_common"
 version = "0.1.0-dev"
-description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "fee_quoter"
+name = "ccip_common"
 
 [features]
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
-default = []
+# ccip-common is not to be deployed, so using the no-entrypoint feature
+# prevents global allocator conflicts with its dependees.
+default = ["no-entrypoint"]
 
 [dependencies]
 solana-program = "1.17.25" # pin solana to 1.17
 anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 anchor-spl = "0.29.0"
-bytemuck = "1.7"
-ethnum = "1.5"
-ccip_common = {path = "../ccip-common"}
-
-[dev-dependencies]
-hex = "0.4.3"
