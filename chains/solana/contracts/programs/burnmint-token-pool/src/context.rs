@@ -4,7 +4,7 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount},
 };
 use base_token_pool::common::*;
-use common::seed;
+use ccip_common::seed;
 
 use crate::{ChainConfig, State};
 

@@ -24,4 +24,4 @@ base-token-pool = { version = "0.1.0-dev", path = "../base-token-pool/", feature
 burnmint-token-pool = { version = "0.1.0-dev", path = "../burnmint-token-pool", features = ["no-entrypoint"] }
 lockrelease-token-pool = { version = "0.1.0-dev", path = "../lockrelease-token-pool", features = ["no-entrypoint"] }
 rmn_remote = {path = "../rmn-remote", features = ["cpi"]}
-common = {path = "../../crates/common"}
+ccip_common = {path = "../../crates/ccip_common"}

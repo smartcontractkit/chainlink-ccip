@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-use common::seed;
+use ccip_common::seed;
 
 use crate::program::CcipRouter;
 use crate::state::{Config, Nonce};

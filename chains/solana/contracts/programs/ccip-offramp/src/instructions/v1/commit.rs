@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use common::seed;
+use ccip_common::seed;
 
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;

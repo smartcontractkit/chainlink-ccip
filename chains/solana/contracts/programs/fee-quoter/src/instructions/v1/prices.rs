@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use common::seed;
+use ccip_common::seed;
 
 use crate::context::{GasPriceUpdate, TokenPriceUpdate, UpdatePrices};
 use crate::event::{UsdPerTokenUpdated, UsdPerUnitGasUpdated};

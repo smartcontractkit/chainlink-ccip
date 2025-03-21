@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use bytemuck::{Pod, Zeroable};
-use common::seed;
+use ccip_common::seed;
 use solana_program::sysvar::instructions;
 
 use crate::messages::ExecutionReportSingleChain;

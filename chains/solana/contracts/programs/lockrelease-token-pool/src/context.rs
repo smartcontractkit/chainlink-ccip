@@ -8,7 +8,7 @@ use base_token_pool::common::{
     ALLOWED_OFFRAMP, ANCHOR_DISCRIMINATOR, EXTERNAL_TOKENPOOL_SIGNER, POOL_CHAINCONFIG_SEED,
     POOL_SIGNER_SEED, POOL_STATE_SEED,
 };
-use common::seed;
+use ccip_common::seed;
 
 use crate::{ChainConfig, State};
 

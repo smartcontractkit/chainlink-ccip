@@ -1,6 +1,6 @@
 /// Methods in this module are used to deserialize AccountInfo into the state structs
 use anchor_lang::prelude::*;
-use common::seed;
+use ccip_common::seed;
 
 use crate::state::{BillingTokenConfig, BillingTokenConfigWrapper, PerChainPerTokenConfig};
 use crate::FeeQuoterError;

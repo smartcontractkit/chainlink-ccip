@@ -1,11 +1,11 @@
 [package]
-name = "common"
+name = "ccip_common"
 version = "0.1.0-dev"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "common"
+name = "ccip_common"
 
 [features]
 no-entrypoint = []

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use common::seed;
-use common::v1::{validate_and_parse_token_accounts, TokenAccounts};
+use ccip_common::seed;
+use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 

@@ -1,8 +1,8 @@
 use crate::events::on_ramp as events;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
-use common::seed;
-use common::v1::{validate_and_parse_token_accounts, TokenAccounts};
+use ccip_common::seed;
+use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use fee_quoter::messages::{GetFeeResult, TokenTransferAdditionalData};
 
 use super::super::interfaces::OnRamp;

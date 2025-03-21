@@ -623,7 +623,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
- "common",
+ "ccip_common",
  "rmn_remote",
  "solana-program",
  "spl-math",
@@ -676,13 +676,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ccip_common"
+version = "0.1.0-dev"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-program",
+]
+
+[[package]]
 name = "ccip_offramp"
 version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
- "common",
+ "ccip_common",
  "ethnum",
  "fee_quoter",
  "hex",
@@ -697,7 +706,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
- "common",
+ "ccip_common",
  "ethnum",
  "fee_quoter",
  "hex",
@@ -727,15 +736,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ee52072ec15386f770805afd189a01c8841be8696bed250fa2f13c4c0d6dfb7"
 dependencies = [
  "generic-array",
-]
-
-[[package]]
-name = "common"
-version = "0.1.0-dev"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "solana-program",
 ]
 
 [[package]]
@@ -1025,7 +1025,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
- "common",
+ "ccip_common",
  "ethnum",
  "hex",
  "solana-program",
@@ -1321,7 +1321,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base-token-pool",
- "common",
+ "ccip_common",
  "rmn_remote",
  "solana-program",
  "spl-math",
@@ -1763,7 +1763,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "bytemuck",
- "common",
+ "ccip_common",
 ]
 
 [[package]]
@@ -2480,7 +2480,7 @@ dependencies = [
  "anchor-spl",
  "base-token-pool",
  "burnmint-token-pool",
- "common",
+ "ccip_common",
  "lockrelease-token-pool",
  "rmn_remote",
  "solana-program",

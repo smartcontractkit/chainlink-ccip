@@ -8,7 +8,7 @@ use crate::{
 };
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use common::seed;
+use ccip_common::seed;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
 use crate::{

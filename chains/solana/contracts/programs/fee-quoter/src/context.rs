@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-use common::seed;
+use ccip_common::seed;
 
 use crate::messages::SVM2AnyMessage;
 use crate::program::FeeQuoter;
