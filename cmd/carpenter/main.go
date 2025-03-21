@@ -6,6 +6,10 @@ import (
 	"os"
 
 	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/filter"
+
+	// Register the renderers
+	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render/basic"
+	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render/fancy"
 )
 
 func main() {
