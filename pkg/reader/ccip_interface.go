@@ -159,7 +159,15 @@ func NewCCIPReaderWithExtendedContractReaders(
 	addrCodec cciptypes.AddressCodec,
 	configPollerSyncFreq commonconfig.Duration,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress, addrCodec, configPollerSyncFreq)
+	cr := newCCIPChainReaderInternal(
+		ctx,
+		lggr,
+		nil,
+		contractWriters,
+		destChain,
+		offrampAddress,
+		addrCodec,
+		configPollerSyncFreq)
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}
