@@ -2,6 +2,7 @@
 //! v1 of the common logic may not necessarily be used by v1 of each particular program.
 use anchor_lang::prelude::*;
 
+pub mod context;
 pub mod seed;
 pub mod v1;
 
