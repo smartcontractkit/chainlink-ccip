@@ -1,8 +1,11 @@
 package commit
 
 import (
+	"context"
+	"encoding/json"
 	rand2 "math/rand"
 	"testing"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -11,7 +14,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -448,5 +453,105 @@ func TestMultiReportBuilders(t *testing.T) {
 				tc.checkReport(t, i, r)
 			}
 		})
+	}
+}
+
+func BenchmarkReports(b *testing.B) {
+	oracleID := commontypes.OracleID(1)
+	mockChainSupport := plugincommon.NewMockChainSupport(b)
+	mockChainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
+	oracleIDToP2PID := map[commontypes.OracleID]libocrtypes.PeerID{0: {0}, oracleID: {1}, 2: {2}, 3: {3}}
+
+	plugin := &Plugin{
+		oracleID:        oracleID,
+		lggr:            logger.Test(b),
+		ocrTypeCodec:    ocrtypecodec.DefaultCommitCodec,
+		chainSupport:    mockChainSupport,
+		oracleIDToP2PID: oracleIDToP2PID,
+		offchainCfg: pluginconfig.CommitOffchainConfig{
+			TransmissionDelayMultiplier: 30 * time.Second,
+			MaxMerkleRootsPerReport:     0,
+		},
+		reportBuilder: buildStandardReport,
+		reportCodec:   mocks.NewCommitPluginJSONReportCodec(),
+	}
+
+	// Mock input data
+	ctx := context.Background()
+	seqNr := uint64(1)
+	outcomeJSON := `{
+    "merkleRootOutcome": {
+      "outcomeType": 2,
+      "rangesSelectedForReport": null,
+      "rootsToReport": [
+        {
+          "chain": 909606746561742100,
+          "onRampAddress": "0x00000000000000000000000078c2e4a7ef593bf4759f5401ee22556e42a1b334",
+          "seqNumsRange": [
+            1,
+            256
+          ],
+          "merkleRoot": "0x1da9da57091881823f3a3791b5ba351bcd3012b670e499d46ef4b069754ff808"
+        }
+      ],
+      "rmnEnabledChains": {},
+      "offRampNextSeqNums": [
+        {
+          "chainSel": 909606746561742100,
+          "seqNum": 1
+        },
+        {
+          "chainSel": 5548718428018410000,
+          "seqNum": 1
+        }
+      ],
+      "reportTransmissionCheckAttempts": 0,
+      "rmnReportSignatures": [],
+      "rmnRemoteCfg": {
+        "contractAddress": "0xd59800ca659eca2b8d4dc0d2a9f4c929951e6e89",
+        "configDigest": "0x000b6accb0239044979ae0df2c58e36ab26d31da43997dcb10c38f47215437e8",
+        "signers": [
+          {
+            "onchainPublicKey": "0x0100000000000000000000000000000000000000",
+            "nodeIndex": 0
+          }
+        ],
+        "fSign": 0,
+        "configVersion": 1,
+        "rmnReportVersion": "0x9651943783dbf81935a60e98f218a9d9b5b28823fb2228bbd91320d632facf53"
+      }
+    },
+    "tokenPriceOutcome": {
+      "tokenPrices": {
+        "0x5050E3E132aE4c03cAD5fF0747fd210544366caF": "9000000000000000000",
+        "0x72867881ee6AA5b4fc57adD6AE02CA9dB24Afc07": "500000000000000000000"
+      }
+    },
+    "chainFeeOutcome": {
+      "gasPrices": [
+        {
+          "chainSel": 909606746561742100,
+          "gasPrice": "80000000000000"
+        }
+      ]
+    },
+    "mainOutcome": {
+      "inflightPriceOcrSequenceNumber": 3,
+      "remainingPriceChecks": 5
+    }
+  }`
+	var outcome committypes.Outcome
+	err := json.Unmarshal([]byte(outcomeJSON), &outcome)
+	require.NoError(b, err)
+	outcomeBytes, err := plugin.ocrTypeCodec.EncodeOutcome(outcome)
+	require.NoError(b, err)
+
+	// Reset the timer to exclude setup time
+
+	for b.Loop() {
+		_, err := plugin.Reports(ctx, seqNr, outcomeBytes)
+		if err != nil {
+			b.Fatalf("Reports function failed: %v", err)
+		}
 	}
 }
