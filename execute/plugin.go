@@ -186,7 +186,8 @@ func getPendingReportsForExecution(
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
-	// Remove fully executed reports.
+	rangesBySelector := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
+	filteredReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for selector, reports := range groupedCommits {
 		if len(reports) == 0 {
 			continue
@@ -209,50 +210,55 @@ func getPendingReportsForExecution(
 				"skippedCommitRoots", skippedCommitRoots,
 			)
 		}
-		reports = filtered
+		filteredReports[selector] = filtered
 
-		lggr.Debugw("grouped reports", "selector", selector, "reports", reports, "count", len(reports))
-		sort.Slice(reports, func(i, j int) bool {
-			return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
+		lggr.Debugw("grouped reports",
+			"selector", selector,
+			"reports", filteredReports[selector],
+			"count", len(filteredReports[selector]))
+		sort.Slice(filteredReports[selector], func(i, j int) bool {
+			return filteredReports[selector][i].SequenceNumberRange.Start() <
+				filteredReports[selector][j].SequenceNumberRange.Start()
 		})
 		// todo: remove this logs after investigating whether the sorting above can be safely removed
-		lggr.Debugw("sorted reports", "selector", selector, "reports", reports, "count", len(reports))
+		lggr.Debugw("sorted reports",
+			"selector", selector,
+			"reports", filteredReports[selector],
+			"count", len(filteredReports[selector]))
 
-		ranges, err := computeRanges(reports)
+		ranges, err := computeRanges(filteredReports[selector])
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("compute report ranges: %w", err)
+			return nil, nil, nil,
+				fmt.Errorf("compute report ranges: %w", err)
 		}
+		rangesBySelector[selector] = ranges
+	}
+	// Get all executed messages
+	allMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Unconfirmed)
+	if err != nil {
+		return nil, nil, nil,
+			fmt.Errorf("get executed messages in range %v: %w", rangesBySelector, err)
+	}
+	// Get finalized messages
+	finalizedMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Finalized)
+	if err != nil {
+		return nil, nil, nil,
+			fmt.Errorf("get finalized executed messages in range %v: %w", rangesBySelector, err)
+	}
 
-		// Get both finalized and unfinalized executed messages
-		finalizedMsgSet := mapset.NewSet[cciptypes.SeqNum]()
-		allExecutedMsgSet := mapset.NewSet[cciptypes.SeqNum]()
-
-		for _, seqRange := range ranges {
-			// Get all executed messages
-			allMessages, err := ccipReader.ExecutedMessages(ctx, selector, seqRange, primitives.Unconfirmed)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("get %d executed messages in range %v: %w", selector, seqRange, err)
-			}
-			allExecutedMsgSet = allExecutedMsgSet.Union(mapset.NewSet(allMessages...))
-
-			// Get finalized messages
-			finalizedMessages, err := ccipReader.ExecutedMessages(ctx, selector, seqRange, primitives.Finalized)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("get finalized %d executed messages in range %v: %w", selector, seqRange, err)
-			}
-			finalizedMsgSet = finalizedMsgSet.Union(mapset.NewSet(finalizedMessages...))
-		}
-
+	for selector, reports := range filteredReports {
+		allExecutedMsgSet := mapset.NewSet(allMessages[selector]...)
+		finalizedMsgSet := mapset.NewSet(finalizedMessages[selector]...)
 		// Get unfinalized messages by taking the difference
 		unfinalizedMsgSet := allExecutedMsgSet.Difference(finalizedMsgSet)
 
-		finalizedMessages := slicelib.ToSortedSlice(finalizedMsgSet)
+		sortedFinalizedMessages := slicelib.ToSortedSlice(finalizedMsgSet)
 
 		unfinalizedMessages := slicelib.ToSortedSlice(unfinalizedMsgSet)
 
 		// Fully finalized roots are removed from the reports and set in groupedCommits
 		var executedCommitsFinalized []exectypes.CommitData
-		remainingReports, executedCommitsFinalized := combineReportsAndMessages(reports, finalizedMessages)
+		remainingReports, executedCommitsFinalized := combineReportsAndMessages(reports, sortedFinalizedMessages)
 		fullyExecutedFinalized = append(fullyExecutedFinalized, executedCommitsFinalized...)
 
 		// Process unfinalized messages
@@ -602,7 +608,7 @@ func (p *Plugin) validateReport(
 	return decodedReport, nil
 }
 
-// checkAlreadyExecuted checks if all the messages from all source chains in the report have already been executed
+// checkAlreadyExecuted checks if all the messages from all source chains in a single report have already been executed
 // on the destination chain. It queries the DB for executed messages in the given sequence
 // number range for each source chain in the report.
 //
@@ -620,23 +626,36 @@ func (p *Plugin) checkAlreadyExecuted(
 ) error {
 	seqNrRangesBySource := getSeqNrRangesBySource(reports)
 
-	// TODO: batch these queries? these are all DB reads.
-	// maybe some alternative queries exist.
-	for sourceChainSelector, seqNrRange := range seqNrRangesBySource {
-		executed, err := p.ccipReader.ExecutedMessages(ctx, sourceChainSelector, seqNrRange, primitives.Unconfirmed)
-		if err != nil {
-			return fmt.Errorf("couldn't check if messages already executed: %w", err)
+	executed, err := p.ccipReader.ExecutedMessages(
+		ctx,
+		seqNrRangesBySource,
+		primitives.Unconfirmed)
+	if err != nil {
+		return fmt.Errorf("couldn't check if messages already executed: %w", err)
+	}
+
+	for sourceChainSelector, expectedSqNrRanges := range seqNrRangesBySource {
+		snRangeSet := mapset.NewSet[cciptypes.SeqNum]()
+		totalSeqNums := 0
+		for _, snRange := range expectedSqNrRanges {
+			snRangeSet.Append(snRange.ToSlice()...)
+			totalSeqNums += snRange.Length()
 		}
 
-		executedSet := mapset.NewSet(executed...)
-		snRangeSet := mapset.NewSet(seqNrRange.ToSlice()...)
+		if _, exists := executed[sourceChainSelector]; !exists {
+			lggr.Debugw("no messages from source chain executed yet",
+				"sourceChain", sourceChainSelector)
+			return nil
+		}
+
+		executedSet := mapset.NewSet(executed[sourceChainSelector]...)
 		intersection := executedSet.Intersect(snRangeSet)
-		if intersection.Cardinality() != seqNrRange.Length() {
+		if intersection.Cardinality() != totalSeqNums {
 			// Some messages have not been executed, return early to accept/transmit the report.
 			notYetExecuted := snRangeSet.Difference(executedSet)
 			lggr.Debugw("some messages from source not yet executed",
 				"sourceChain", sourceChainSelector,
-				"seqNrRange", seqNrRange,
+				"seqNrRange", seqNrRangesBySource[sourceChainSelector],
 				"executed", executed,
 				"notYetExecuted", notYetExecuted,
 			)
@@ -646,7 +665,7 @@ func (p *Plugin) checkAlreadyExecuted(
 		// All messages from this source have been executed, check the next source chain.
 		lggr.Debugw("all messages from source already executed, checking next source",
 			"sourceChain", sourceChainSelector,
-			"seqNrRange", seqNrRange,
+			"seqNrRange", seqNrRangesBySource[sourceChainSelector],
 			"executed", executed,
 		)
 	}
@@ -660,13 +679,16 @@ func (p *Plugin) checkAlreadyExecuted(
 // the sequence number range of the messages in the report.
 func getSeqNrRangesBySource(
 	chainReports []cciptypes.ExecutePluginReportSingleChain,
-) map[cciptypes.ChainSelector]cciptypes.SeqNumRange {
-	seqNrRangesBySource := make(map[cciptypes.ChainSelector]cciptypes.SeqNumRange)
+) map[cciptypes.ChainSelector][]cciptypes.SeqNumRange {
+	seqNrRangesBySource := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
 	for _, chainReport := range chainReports {
 		// This should never happen, indicates a bug in the report building and accepting process.
 		// But we sanity check since slices.Min/Max will panic on empty slices.
 		if len(chainReport.Messages) == 0 {
 			continue
+		}
+		if _, exists := seqNrRangesBySource[chainReport.SourceChainSelector]; !exists {
+			seqNrRangesBySource[chainReport.SourceChainSelector] = []cciptypes.SeqNumRange{}
 		}
 
 		cmpr := func(a, b cciptypes.Message) int {
@@ -674,9 +696,10 @@ func getSeqNrRangesBySource(
 		}
 		minMsg := slices.MinFunc(chainReport.Messages, cmpr)
 		maxMsg := slices.MaxFunc(chainReport.Messages, cmpr)
-		seqNrRangesBySource[chainReport.SourceChainSelector] = cciptypes.NewSeqNumRange(
+		seqNrRangesBySource[chainReport.SourceChainSelector] = []cciptypes.SeqNumRange{cciptypes.NewSeqNumRange(
 			minMsg.Header.SequenceNumber,
-			maxMsg.Header.SequenceNumber)
+			maxMsg.Header.SequenceNumber,
+		)}
 	}
 	return seqNrRangesBySource
 }
