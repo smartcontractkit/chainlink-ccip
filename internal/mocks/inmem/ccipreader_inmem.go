@@ -197,12 +197,6 @@ func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) 
 	return nil
 }
 
-func (r InMemoryCCIPReader) GetMedianDataAvailabilityGasConfig(
-	ctx context.Context,
-) (cciptypes.DataAvailabilityGasConfig, error) {
-	return cciptypes.DataAvailabilityGasConfig{}, nil
-}
-
 func (r InMemoryCCIPReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
 	return 0, nil
 }
