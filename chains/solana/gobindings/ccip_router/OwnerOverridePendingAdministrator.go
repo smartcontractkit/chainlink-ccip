@@ -21,7 +21,7 @@ type OwnerOverridePendingAdministrator struct {
 
 	// [0] = [] config
 	//
-	// [1] = [] tokenAdminRegistry
+	// [1] = [WRITE] tokenAdminRegistry
 	//
 	// [2] = [] mint
 	//
@@ -58,7 +58,7 @@ func (inst *OwnerOverridePendingAdministrator) GetConfigAccount() *ag_solanago.A
 
 // SetTokenAdminRegistryAccount sets the "tokenAdminRegistry" account.
 func (inst *OwnerOverridePendingAdministrator) SetTokenAdminRegistryAccount(tokenAdminRegistry ag_solanago.PublicKey) *OwnerOverridePendingAdministrator {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry)
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(tokenAdminRegistry).WRITE()
 	return inst
 }
 
