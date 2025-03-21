@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -95,7 +96,7 @@ func makeCommand() *cli.Command {
 			&cli.StringFlag{
 				OnlyOnce:    true,
 				Name:        "renderer",
-				Usage:       fmt.Sprintf("Select which rendering algorithm to use: %s", render.GetRenderers()),
+				Usage:       fmt.Sprintf("Select which rendering algorithm to use: [%s]", strings.Join(render.GetRenderers(), ", ")),
 				Value:       "basic",
 				Destination: &args.rendererName,
 				Validator: func(s string) error {
