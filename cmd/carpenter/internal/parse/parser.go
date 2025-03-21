@@ -152,7 +152,7 @@ func ParseLine(line, logType string) (*Data, error) {
 		}
 
 		var data Data
-		if err := json.Unmarshal([]byte(line), &data); err != nil {
+		if err = json.Unmarshal([]byte(line), &data); err != nil {
 			return nil, fmt.Errorf("unparsable line: %w", err)
 		}
 
@@ -193,11 +193,11 @@ func ParseLine(line, logType string) (*Data, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not parse timestamp: %w", err)
 		}
-		data.Timestamp = parsedTs
-		data.Level = obj["level"]
-		data.LoggerName = obj["logger"]
-		data.Caller = obj["caller"]
-		data.Message = obj["message"]
+		data.ProdTimestamp = parsedTs.String()
+		data.ProdLevel = obj["level"]
+		data.ProdLoggerName = obj["logger"]
+		data.ProdCaller = obj["caller"]
+		data.ProdMessage = obj["message"]
 
 		// parse the json fields into the data object to get the remaining fields.
 		if err := json.Unmarshal([]byte(obj["jsonFields"]), &data); err != nil {
@@ -252,11 +252,11 @@ func ParseLine(line, logType string) (*Data, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not parse timestamp: %w, output: %s, matches: %+v", err, obj.Output, namedMatches)
 		}
-		data.Timestamp = parsedTs
-		data.Level = namedMatches["level"]
-		data.LoggerName = namedMatches["logger"]
-		data.Caller = namedMatches["caller"]
-		data.Message = namedMatches["message"]
+		data.ProdTimestamp = parsedTs.String()
+		data.ProdLevel = namedMatches["level"]
+		data.ProdLoggerName = namedMatches["logger"]
+		data.ProdCaller = namedMatches["caller"]
+		data.ProdMessage = namedMatches["message"]
 
 		// parse the json fields into the data object to get the remaining fields.
 		// its possible that this fails and we don't have all the fields.
@@ -316,25 +316,85 @@ type Data struct {
 	// level, ts, logger, caller, msg, version, donID, oracleID
 	// Data that we expect from most logs.
 	// This is all part of the primary display.
-	LoggerName     string    `json:"logger"`
-	Timestamp      time.Time `json:"ts"`
-	Level          string    `json:"level"`
-	Caller         string    `json:"caller"`
-	SequenceNumber int       `json:"ocrSeqNr"`
-	OCRPhase       string    `json:"ocrPhase"`
-	Plugin         string    `json:"plugin"`
-	Component      string    `json:"component"`
-	OracleID       int       `json:"oracleID"`
-	DONID          int       `json:"donID"`
-	Message        string    `json:"msg"`
-	Version        string    `json:"version"`
-	ConfigDigest   string    `json:"configDigest"`
+
+	// Prod fields
+	ProdLoggerName string `json:"logger"`
+	ProdTimestamp  string `json:"ts"` // this is also overloaded with the other format...
+	ProdLevel      string `json:"level"`
+	ProdCaller     string `json:"caller"`
+	ProdMessage    string `json:"msg"`
+
+	// Test fields - why in the actual heck are the test fields different?
+	TestLoggerName string `json:"N"`
+	TestTimestamp  string `json:"T"`
+	TestLevel      string `json:"L"`
+	TestCaller     string `json:"C"`
+	TestMessage    string `json:"M"`
+	TestBullshit1  int    `json:"n"` // random field that was colliding with the test fields.
+	TestBullshit2  int    `json:"l"` // random field that was colliding with the test fields.
+
+	SequenceNumber int    `json:"ocrSeqNr"`
+	OCRPhase       string `json:"ocrPhase"`
+	Plugin         string `json:"plugin"`
+	Component      string `json:"component"`
+	OracleID       int    `json:"oracleID"`
+	DONID          int    `json:"donID"`
+	Version        string `json:"version"`
+	ConfigDigest   string `json:"configDigest"`
 
 	RawLoggerFields map[string]any `json:"-"`
 
 	// Additional detail space, can be unique to each filter.
 	// i.e. an error message, observer details, number of messages, etc
 	Details string
+}
+
+func (data Data) GetTimestamp() time.Time {
+	str := data.TestTimestamp
+	if data.ProdTimestamp != "" {
+		str = data.ProdTimestamp
+	}
+	parsedTs, err1 := time.Parse(time.RFC3339, str)
+
+	if err1 != nil {
+		var err2 error
+		parsedTs, err2 = time.Parse(time.TimeOnly, str)
+		if err2 != nil {
+			panic("could not parse timestamp: " + err1.Error())
+			return time.Time{}
+		}
+	}
+
+	return parsedTs
+	return parsedTs
+}
+
+func (data Data) GetLevel() string {
+	if data.ProdLevel != "" {
+		return data.ProdLevel
+	}
+	return data.TestLevel
+}
+
+func (data Data) GetLoggerName() string {
+	if data.ProdLoggerName != "" {
+		return data.ProdLoggerName
+	}
+	return data.TestLoggerName
+}
+
+func (data Data) GetCaller() string {
+	if data.ProdCaller != "" {
+		return data.ProdCaller
+	}
+	return data.TestCaller
+}
+
+func (data Data) GetMessage() string {
+	if data.ProdMessage != "" {
+		return data.ProdMessage
+	}
+	return data.TestMessage
 }
 
 func (d Data) IsEmpty() bool {

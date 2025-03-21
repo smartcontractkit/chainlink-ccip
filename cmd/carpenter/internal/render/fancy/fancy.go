@@ -59,10 +59,10 @@ func basicRenderer(data *parse.Data) {
 	)
 
 	fmt.Printf("%s|%s|%s|%s|%s\n",
-		timeStyle.Render(data.Timestamp.Format(time.TimeOnly)),
+		timeStyle.Render(data.GetTimestamp().Format(time.TimeOnly)),
 		uidStyle.Render(uid),
-		levelStyle.Render(truncateLevel(data.Level)),
-		messageStyle.Render(data.Message),
+		levelStyle.Render(truncateLevel(data.GetLevel())),
+		messageStyle.Render(data.GetMessage()),
 		fieldsStyle.Render(getRelevantFieldsForMessage(data)),
 	)
 }
@@ -106,28 +106,28 @@ func truncateLevel(level string) string {
 func getRelevantFieldsForMessage(data *parse.Data) string {
 	var fields string
 
-	if strings.ToLower(data.Level) == "error" {
+	if strings.ToLower(data.GetLevel()) == "error" {
 		fields = fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
 	}
 
-	if strings.HasPrefix(data.Message, "failed to get token prices outcome") {
+	if strings.HasPrefix(data.GetMessage(), "failed to get token prices outcome") {
 		return fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
 	}
 
-	if strings.HasPrefix(data.Message, "Get consensus observation failed, empty outcome") {
+	if strings.HasPrefix(data.GetMessage(), "Get consensus observation failed, empty outcome") {
 		return fmt.Sprintf("err=%v", data.RawLoggerFields["err"])
 	}
 
-	if strings.HasPrefix(data.Message, "Sending Outcome") {
+	if strings.HasPrefix(data.GetMessage(), "Sending Outcome") {
 		return fmt.Sprintf("nextState=%v outcome=%v",
 			data.RawLoggerFields["nextState"], data.RawLoggerFields["outcome"])
 	}
 
-	if strings.HasPrefix(data.Message, "sending merkle root processor observation") {
+	if strings.HasPrefix(data.GetMessage(), "sending merkle root processor observation") {
 		return fmt.Sprintf("observation=%v", data.RawLoggerFields["observation"])
 	}
 
-	if strings.HasPrefix(data.Message, "call to MsgsBetweenSeqNums returned unexpected") {
+	if strings.HasPrefix(data.GetMessage(), "call to MsgsBetweenSeqNums returned unexpected") {
 		return fmt.Sprintf(
 			"%s expected=%v actual=%v chain=%v",
 			fields,
@@ -136,7 +136,7 @@ func getRelevantFieldsForMessage(data *parse.Data) string {
 			data.RawLoggerFields["chain"],
 		)
 	}
-	if strings.HasPrefix(data.Message, "queried messages between sequence numbers") {
+	if strings.HasPrefix(data.GetMessage(), "queried messages between sequence numbers") {
 		return fmt.Sprintf("%s numMsgs=%v sourceChain=%v seqNumRange=%v",
 			fields,
 			data.RawLoggerFields["numMsgs"],
@@ -144,7 +144,7 @@ func getRelevantFieldsForMessage(data *parse.Data) string {
 			data.RawLoggerFields["seqNumRange"],
 		)
 	}
-	if strings.HasPrefix(data.Message, "decoded messages between sequence numbers") {
+	if strings.HasPrefix(data.GetMessage(), "decoded messages between sequence numbers") {
 		return fmt.Sprintf("%s sourceChain=%v seqNumRange=%v",
 			fields, data.RawLoggerFields["sourceChainSelector"], data.RawLoggerFields["seqNumRange"])
 	}

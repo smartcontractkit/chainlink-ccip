@@ -29,7 +29,7 @@ func CommitFilter(data parse.Data) *parse.Data {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to parse timestamp: %s", err)
 	} else {
-		result.Timestamp = time
+		result.ProdTimestamp = time.String()
 	}
 
 	return result

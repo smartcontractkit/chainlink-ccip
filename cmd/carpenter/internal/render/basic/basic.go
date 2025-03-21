@@ -1,3 +1,5 @@
+// Package basic is a simple renderer that prints the data message to the
+// console. Long lines are truncated when printing to a terminal.
 package basic
 
 import (
@@ -37,8 +39,14 @@ func basicRendererFactory(options render.Options) render.Renderer {
 func basicRenderer(data *parse.Data) {
 	tryUpdateTermWidth()
 
+	var line string
+	if len(data.GetMessage()) > 0 {
+		line = data.GetMessage()
+	} else {
+		line = fmt.Sprintf("%v", data)
+	}
+
 	// Truncate line if it's too long.
-	line := fmt.Sprintf("%v", data)
 	if termWidth != 0 && len(line) > termWidth {
 		line = line[:termWidth]
 	}
