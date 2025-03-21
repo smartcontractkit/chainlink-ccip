@@ -227,7 +227,7 @@ impl TokenAdminRegistry for Impl {
 }
 
 fn init_with_pending_administrator(
-    token_admin_registry: &mut Account<'_, crate::TokenAdminRegistry>,
+    token_admin_registry: &mut Account<'_, ccip_common::router_accounts::TokenAdminRegistry>,
     token_mint: Pubkey,
     new_admin: Pubkey,
 ) -> Result<()> {

@@ -25,16 +25,17 @@ pub enum CommonCcipError {
     InvalidInputsLookupTableAccountWritable,
 }
 
-// Used only to enable the `account` attribute to enable account deserialization, for accounts
-// owned by the router (see TokenAdminRegistry below)
+// Duplicates the router ID to declare router accounts that must be visible from the common crate,
+// avoiding a circular dependency. This means this crate may only declare accounts that belong
+// to the router, and no other program.
 declare_id!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
-pub mod accounts_for_deserialization {
-    /// This mod holds structs that represent accounts owned by other programs,
-    /// but are used here just to deserialize data from them. Must be kept in sync
-    /// with their originals.
+// null contract required for IDL + gobinding generation
+#[program]
+pub mod ccip_common {}
+
+pub mod router_accounts {
     use super::*;
 
-    // From ccip_router
     #[account]
     #[derive(InitSpace)]
     pub struct TokenAdminRegistry {

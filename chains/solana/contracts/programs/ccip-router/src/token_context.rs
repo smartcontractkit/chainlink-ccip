@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use ccip_common::router_accounts::TokenAdminRegistry;
 use ccip_common::seed;
 
 use crate::context::*;
@@ -9,19 +10,6 @@ use anchor_spl::token_interface::Mint;
 
 // track state versions
 const MAX_TOKEN_REGISTRY_V: u8 = 1;
-
-#[account]
-#[derive(InitSpace)]
-pub struct TokenAdminRegistry {
-    pub version: u8,
-    pub administrator: Pubkey,
-    pub pending_administrator: Pubkey,
-    pub lookup_table: Pubkey,
-    // binary representation of indexes that are writable in token pool lookup table
-    // lookup table can store 256 addresses
-    pub writable_indexes: [u128; 2],
-    pub mint: Pubkey,
-}
 
 #[derive(Accounts)]
 pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {

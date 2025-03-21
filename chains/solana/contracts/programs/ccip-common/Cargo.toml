@@ -12,7 +12,9 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
-default = []
+# ccip-common is not to be deployed, so using the no-entrypoint feature
+# prevents global allocator conflicts with its dependees.
+default = ["no-entrypoint"]
 
 [dependencies]
 solana-program = "1.17.25" # pin solana to 1.17

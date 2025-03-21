@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use solana_program::address_lookup_table::state::AddressLookupTable;
 
-use crate::{accounts_for_deserialization::TokenAdminRegistry, seed, CommonCcipError};
+use crate::{router_accounts::TokenAdminRegistry, seed, CommonCcipError};
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
@@ -219,7 +219,7 @@ pub fn validate_and_parse_token_accounts<'info>(
 }
 
 pub mod token_admin_registry_writable {
-    use crate::accounts_for_deserialization::TokenAdminRegistry;
+    use crate::router_accounts::TokenAdminRegistry;
 
     // set writable inserts bits from left to right
     // index 0 is left-most bit
