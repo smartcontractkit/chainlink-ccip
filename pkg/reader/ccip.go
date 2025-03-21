@@ -343,7 +343,10 @@ func (r *ccipChainReader) ExecutedMessages(
 
 	dataTyp := ExecutionStateChangedEvent{}
 	keyFilter, countSqNrs := createExecutedMessagesKeyFilter(rangesPerChain, confidence)
-
+	if countSqNrs == 0 {
+		r.lggr.Debugw("no sequence numbers to query", "rangesPerChain", rangesPerChain)
+		return nil, nil
+	}
 	iter, err := r.contractReaders[r.destChain].ExtendedQueryKey(
 		ctx,
 		consts.ContractNameOffRamp,

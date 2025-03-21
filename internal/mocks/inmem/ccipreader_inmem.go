@@ -66,52 +66,56 @@ func (r InMemoryCCIPReader) ExecutedMessages(
 	ctx context.Context,
 	rangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 	_ primitives.ConfidenceLevel,
-) ([]cciptypes.SeqNum, error) {
-	msgs, ok := r.Messages[source]
-	// no messages for chain
-	if !ok {
-		return nil, nil
-	}
-	filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
-		if msg.Destination != r.Dest || !msg.Executed {
+) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error) {
+	var ret = make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
+	for source, seqNumRanges := range rangesByChain {
+		msgs, ok := r.Messages[source]
+		// no messages for chain
+		if !ok {
+			return nil, nil
+		}
+		filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
+			if msg.Destination != r.Dest || !msg.Executed {
+				return false
+			}
+			for _, r := range seqNumRanges {
+				if r.Contains(msg.Header.SequenceNumber) {
+					return true
+				}
+			}
 			return false
-		}
-		for _, r := range seqNumRanges {
-			if r.Contains(msg.Header.SequenceNumber) {
-				return true
+		})
+
+		// Build executed ranges
+		var ranges []cciptypes.SeqNumRange
+		var currentRange *cciptypes.SeqNumRange
+		for _, msg := range filtered {
+			if currentRange != nil && currentRange.End()+1 == msg.Header.SequenceNumber {
+				// expand current range
+				currentRange.SetEnd(msg.Header.SequenceNumber)
+			} else {
+				if currentRange != nil {
+					ranges = append(ranges, *currentRange)
+				}
+				// initialize new range and add it to the list
+				newRange := cciptypes.NewSeqNumRange(msg.Header.SequenceNumber, msg.Header.SequenceNumber)
+				currentRange = &newRange
 			}
 		}
-		return false
-	})
-
-	// Build executed ranges
-	var ranges []cciptypes.SeqNumRange
-	var currentRange *cciptypes.SeqNumRange
-	for _, msg := range filtered {
-		if currentRange != nil && currentRange.End()+1 == msg.Header.SequenceNumber {
-			// expand current range
-			currentRange.SetEnd(msg.Header.SequenceNumber)
-		} else {
-			if currentRange != nil {
-				ranges = append(ranges, *currentRange)
-			}
-			// initialize new range and add it to the list
-			newRange := cciptypes.NewSeqNumRange(msg.Header.SequenceNumber, msg.Header.SequenceNumber)
-			currentRange = &newRange
+		if currentRange != nil {
+			ranges = append(ranges, *currentRange)
 		}
-	}
-	if currentRange != nil {
-		ranges = append(ranges, *currentRange)
-	}
 
-	seqNums := make([]cciptypes.SeqNum, 0, len(ranges))
-	for _, r := range ranges {
-		seqNums = append(seqNums, r.ToSlice()...)
-	}
+		seqNums := make([]cciptypes.SeqNum, 0, len(ranges))
+		for _, r := range ranges {
+			seqNums = append(seqNums, r.ToSlice()...)
+		}
 
-	unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
-	sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
-	return unqSeqNums, nil
+		unqSeqNums := mapset.NewSet(seqNums...).ToSlice()
+		sort.Slice(unqSeqNums, func(i, j int) bool { return unqSeqNums[i] < unqSeqNums[j] })
+		ret[source] = unqSeqNums
+	}
+	return ret, nil
 }
 
 func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
