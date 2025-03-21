@@ -2190,131 +2190,126 @@ export type CcipOfframp = {
     },
     {
       "code": 9029,
-      "name": "InvalidInputsConfigAccounts",
-      "msg": "Invalid config account"
-    },
-    {
-      "code": 9030,
       "name": "InvalidInputsTokenAdminRegistryAccounts",
       "msg": "Invalid Token Admin Registry account"
     },
     {
-      "code": 9031,
+      "code": 9030,
       "name": "InvalidInputsLookupTableAccounts",
       "msg": "Invalid LookupTable account"
     },
     {
-      "code": 9032,
+      "code": 9031,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
     },
     {
-      "code": 9033,
+      "code": 9032,
       "name": "OfframpReleaseMintBalanceMismatch",
       "msg": "Release or mint balance mismatch"
     },
     {
-      "code": 9034,
+      "code": 9033,
       "name": "OfframpInvalidDataLength",
       "msg": "Invalid data length"
     },
     {
-      "code": 9035,
+      "code": 9034,
       "name": "StaleCommitReport",
       "msg": "Stale commit report"
     },
     {
-      "code": 9036,
+      "code": 9035,
       "name": "InvalidWritabilityBitmap",
       "msg": "Invalid writability bitmap"
     },
     {
-      "code": 9037,
+      "code": 9036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     },
     {
-      "code": 9038,
+      "code": 9037,
       "name": "Ocr3InvalidConfigFMustBePositive",
       "msg": "Invalid config: F must be positive"
     },
     {
-      "code": 9039,
+      "code": 9038,
       "name": "Ocr3InvalidConfigTooManyTransmitters",
       "msg": "Invalid config: Too many transmitters"
     },
     {
-      "code": 9040,
+      "code": 9039,
       "name": "Ocr3InvalidConfigTooManySigners",
       "msg": "Invalid config: Too many signers"
     },
     {
-      "code": 9041,
+      "code": 9040,
       "name": "Ocr3InvalidConfigFIsTooHigh",
       "msg": "Invalid config: F is too high"
     },
     {
-      "code": 9042,
+      "code": 9041,
       "name": "Ocr3InvalidConfigRepeatedOracle",
       "msg": "Invalid config: Repeated oracle address"
     },
     {
-      "code": 9043,
+      "code": 9042,
       "name": "Ocr3WrongMessageLength",
       "msg": "Wrong message length"
     },
     {
-      "code": 9044,
+      "code": 9043,
       "name": "Ocr3ConfigDigestMismatch",
       "msg": "Config digest mismatch"
     },
     {
-      "code": 9045,
+      "code": 9044,
       "name": "Ocr3WrongNumberOfSignatures",
       "msg": "Wrong number signatures"
     },
     {
-      "code": 9046,
+      "code": 9045,
       "name": "Ocr3UnauthorizedTransmitter",
       "msg": "Unauthorized transmitter"
     },
     {
-      "code": 9047,
+      "code": 9046,
       "name": "Ocr3UnauthorizedSigner",
       "msg": "Unauthorized signer"
     },
     {
-      "code": 9048,
+      "code": 9047,
       "name": "Ocr3NonUniqueSignatures",
       "msg": "Non unique signatures"
     },
     {
-      "code": 9049,
+      "code": 9048,
       "name": "Ocr3OracleCannotBeZeroAddress",
       "msg": "Oracle cannot be zero address"
     },
     {
-      "code": 9050,
+      "code": 9049,
       "name": "Ocr3StaticConfigCannotBeChanged",
       "msg": "Static config cannot be changed"
     },
     {
-      "code": 9051,
+      "code": 9050,
       "name": "Ocr3InvalidPluginType",
       "msg": "Incorrect plugin type"
     },
     {
-      "code": 9052,
+      "code": 9051,
       "name": "Ocr3InvalidSignature",
       "msg": "Invalid signature"
     },
     {
-      "code": 9053,
+      "code": 9052,
       "name": "Ocr3SignaturesOutOfRegistration",
       "msg": "Signatures out of registration"
     },
     {
-      "code": 9054,
+      "code": 9053,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
     }
@@ -4513,131 +4508,126 @@ export const IDL: CcipOfframp = {
     },
     {
       "code": 9029,
-      "name": "InvalidInputsConfigAccounts",
-      "msg": "Invalid config account"
-    },
-    {
-      "code": 9030,
       "name": "InvalidInputsTokenAdminRegistryAccounts",
       "msg": "Invalid Token Admin Registry account"
     },
     {
-      "code": 9031,
+      "code": 9030,
       "name": "InvalidInputsLookupTableAccounts",
       "msg": "Invalid LookupTable account"
     },
     {
-      "code": 9032,
+      "code": 9031,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
     },
     {
-      "code": 9033,
+      "code": 9032,
       "name": "OfframpReleaseMintBalanceMismatch",
       "msg": "Release or mint balance mismatch"
     },
     {
-      "code": 9034,
+      "code": 9033,
       "name": "OfframpInvalidDataLength",
       "msg": "Invalid data length"
     },
     {
-      "code": 9035,
+      "code": 9034,
       "name": "StaleCommitReport",
       "msg": "Stale commit report"
     },
     {
-      "code": 9036,
+      "code": 9035,
       "name": "InvalidWritabilityBitmap",
       "msg": "Invalid writability bitmap"
     },
     {
-      "code": 9037,
+      "code": 9036,
       "name": "InvalidCodeVersion",
       "msg": "Invalid code version"
     },
     {
-      "code": 9038,
+      "code": 9037,
       "name": "Ocr3InvalidConfigFMustBePositive",
       "msg": "Invalid config: F must be positive"
     },
     {
-      "code": 9039,
+      "code": 9038,
       "name": "Ocr3InvalidConfigTooManyTransmitters",
       "msg": "Invalid config: Too many transmitters"
     },
     {
-      "code": 9040,
+      "code": 9039,
       "name": "Ocr3InvalidConfigTooManySigners",
       "msg": "Invalid config: Too many signers"
     },
     {
-      "code": 9041,
+      "code": 9040,
       "name": "Ocr3InvalidConfigFIsTooHigh",
       "msg": "Invalid config: F is too high"
     },
     {
-      "code": 9042,
+      "code": 9041,
       "name": "Ocr3InvalidConfigRepeatedOracle",
       "msg": "Invalid config: Repeated oracle address"
     },
     {
-      "code": 9043,
+      "code": 9042,
       "name": "Ocr3WrongMessageLength",
       "msg": "Wrong message length"
     },
     {
-      "code": 9044,
+      "code": 9043,
       "name": "Ocr3ConfigDigestMismatch",
       "msg": "Config digest mismatch"
     },
     {
-      "code": 9045,
+      "code": 9044,
       "name": "Ocr3WrongNumberOfSignatures",
       "msg": "Wrong number signatures"
     },
     {
-      "code": 9046,
+      "code": 9045,
       "name": "Ocr3UnauthorizedTransmitter",
       "msg": "Unauthorized transmitter"
     },
     {
-      "code": 9047,
+      "code": 9046,
       "name": "Ocr3UnauthorizedSigner",
       "msg": "Unauthorized signer"
     },
     {
-      "code": 9048,
+      "code": 9047,
       "name": "Ocr3NonUniqueSignatures",
       "msg": "Non unique signatures"
     },
     {
-      "code": 9049,
+      "code": 9048,
       "name": "Ocr3OracleCannotBeZeroAddress",
       "msg": "Oracle cannot be zero address"
     },
     {
-      "code": 9050,
+      "code": 9049,
       "name": "Ocr3StaticConfigCannotBeChanged",
       "msg": "Static config cannot be changed"
     },
     {
-      "code": 9051,
+      "code": 9050,
       "name": "Ocr3InvalidPluginType",
       "msg": "Incorrect plugin type"
     },
     {
-      "code": 9052,
+      "code": 9051,
       "name": "Ocr3InvalidSignature",
       "msg": "Invalid signature"
     },
     {
-      "code": 9053,
+      "code": 9052,
       "name": "Ocr3SignaturesOutOfRegistration",
       "msg": "Signatures out of registration"
     },
     {
-      "code": 9054,
+      "code": 9053,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
     }

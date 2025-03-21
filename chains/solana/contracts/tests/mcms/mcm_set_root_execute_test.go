@@ -373,7 +373,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				// append signature hijacking scenario
 				invalidAppendSigsIxs, iaserr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, user.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, iaserr)
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidAppendSigsIxs[0]}, user, config.DefaultCommitment, []string{"AnchorError caused by account: signatures. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized"})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidAppendSigsIxs[0]}, user, config.DefaultCommitment, []string{"AnchorError caused by account: signatures. Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 
 				// now try with valid authority
 				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
@@ -435,7 +435,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, ivsrerr)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidIx1}, user, config.DefaultCommitment, []string{"Error Code: ConstraintSeeds. Error Number: 2006. Error Message: A seeds constraint was violated."})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidIx1}, user, config.DefaultCommitment, []string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()})
 
 			// root_signatures PDA with matching authority, but not the same authority with preloading instructions
 			// so in this case, the root_signatures PDA is not initialized
@@ -455,7 +455,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, ivsrerr)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidIx2}, user, config.DefaultCommitment, []string{"AnchorError caused by account: root_signatures. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized"})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{invalidIx2}, user, config.DefaultCommitment, []string{"AnchorError caused by account: root_signatures. Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 
 			newIx, setRootIxErr := mcm.NewSetRootInstruction(
 				testMsigID,

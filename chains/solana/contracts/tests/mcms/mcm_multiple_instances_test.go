@@ -274,7 +274,7 @@ func TestMcmMultipleInstances(t *testing.T) {
 
 				require.NoError(t, err)
 
-				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Error Code: " + "ConstraintSeeds"})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()})
 				require.NotNil(t, result)
 			})
 

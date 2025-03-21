@@ -341,7 +341,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					[]solana.Instruction{ix},
 					timelockInstances[0].Admin, // signing with instance1's admin
 					config.DefaultCommitment,
-					[]string{"Error Code: ConstraintHasOne"},
+					[]string{"Error Code: " + common.ConstraintHasOne_AnchorError.String()},
 				)
 				require.NotNil(t, result)
 			})
@@ -448,7 +448,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					[]solana.Instruction{vIx},
 					executor2,
 					config.DefaultCommitment,
-					[]string{"Error Code: ConstraintSeeds."},
+					[]string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()},
 				)
 			})
 			t.Run("cannot cancel operation from another instance", func(t *testing.T) {
@@ -515,7 +515,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					[]solana.Instruction{cancelIx},
 					canceller2,
 					config.DefaultCommitment,
-					[]string{"Error Code: ConstraintSeeds"},
+					[]string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()},
 				)
 			})
 		})
@@ -610,7 +610,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					[]solana.Instruction{vIx},
 					executor1,
 					config.DefaultCommitment,
-					[]string{"Error Code: ConstraintSeeds"},
+					[]string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()},
 				)
 			})
 
@@ -641,7 +641,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					[]solana.Instruction{cancelIx},
 					canceller1,
 					config.DefaultCommitment,
-					[]string{"Error Code: ConstraintSeeds"},
+					[]string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()},
 				)
 			})
 
@@ -677,7 +677,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 					[]solana.Instruction{vIx},
 					bypasser1,
 					config.DefaultCommitment,
-					[]string{"Error Code: ConstraintSeeds"},
+					[]string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()},
 				)
 			})
 		})
@@ -707,7 +707,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 				[]solana.Instruction{ix},
 				inst.Admin, // signing with the instance's admin
 				config.DefaultCommitment,
-				[]string{"Error Code: AccountOwnedByWrongProgram."},
+				[]string{"Error Code: " + common.AccountOwnedByWrongProgram_AnchorError.String()},
 			)
 		})
 
@@ -733,7 +733,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 				[]solana.Instruction{finalizeIx},
 				timelockInstances[1].Admin,
 				config.DefaultCommitment,
-				[]string{"Error Code: ConstraintSeeds"},
+				[]string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()},
 			)
 		})
 	})
