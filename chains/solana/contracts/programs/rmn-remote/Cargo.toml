@@ -18,3 +18,4 @@ default = []
 [dependencies]
 anchor-lang = "0.29.0"
 bytemuck = "1.7"
+ccip_common = {path = "../ccip-common"}

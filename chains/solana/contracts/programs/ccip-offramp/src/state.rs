@@ -91,11 +91,11 @@ pub struct ExternalExecutionConfig {}
 pub struct SourceChainConfig {
     pub is_enabled: bool, // Flag whether the source chain is enabled or not
 
+    pub is_rmn_verification_disabled: bool, // Currently a placeholder.
+
     pub lane_code_version: CodeVersion, // The code version of the lane, which may override the global default code version
 
-    // OnRamp addresses supported from the source chain, each of them has a 64 byte address. So this can hold 2 addresses.
-    // If only one address is configured, then the space for the second address must be zeroed.
-    pub on_ramp: [OnRampAddress; 2],
+    pub on_ramp: OnRampAddress, // OnRamp addresses supported from the source chain
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]

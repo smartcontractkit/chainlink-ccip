@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX");
+declare_id!("5vNJx78mz7KVMjhuipyr9jKBKcMrKYGdjGkgE4LUmjKk");
 
 use program::Mcm;
 
@@ -97,7 +97,10 @@ pub mod mcm {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
-        require!(proposed_owner != config.owner, McmError::InvalidInputs);
+        require!(
+            proposed_owner != config.owner && proposed_owner != Pubkey::default(),
+            McmError::InvalidInputs
+        );
         config.proposed_owner = proposed_owner;
         Ok(())
     }

@@ -60,6 +60,7 @@ impl Admin for Impl {
         emit!(ConfigSet {
             max_fee_juels_per_msg: config.max_fee_juels_per_msg,
             link_token_mint: config.link_token_mint,
+            link_token_local_decimals: config.link_token_local_decimals,
             onramp: config.onramp,
             default_code_version: config.default_code_version
         });

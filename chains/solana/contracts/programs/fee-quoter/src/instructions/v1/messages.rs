@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use ethnum::U256;
 
 use crate::extra_args::{
-    EVMExtraArgsV2, SVMExtraArgsV1, EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
+    GenericExtraArgsV2, SVMExtraArgsV1, GENERIC_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG,
 };
 use crate::messages::{
     ProcessedExtraArgs, SVM2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM, CHAIN_FAMILY_SELECTOR_SVM,
@@ -107,17 +107,6 @@ pub fn process_extra_args(
     message_contains_tokens: bool,
 ) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(dest_config.chain_family_selector) {
-        CHAIN_FAMILY_SELECTOR_EVM => {
-            // Extra args are optional for EVM destination. In case there
-            // are extra args, they must be prefixed by a four byte tag
-            // -> bytes4(keccak256("CCIP EVMExtraArgsV2"));
-            let Some(tag) = extra_args.get(..4) else {
-                return Ok(ProcessedExtraArgs::defaults(dest_config));
-            };
-
-            let mut data = &extra_args[4..];
-            parse_and_validate_evm_extra_args(tag.try_into().unwrap(), &mut data)
-        }
         CHAIN_FAMILY_SELECTOR_SVM => {
             // Extra args are mandatory for a SVM destination, so the tag must exist.
             require_gte!(
@@ -134,18 +123,30 @@ pub fn process_extra_args(
                 message_contains_tokens,
             )?)
         }
+        _ => {
+            // Extra args are optional for non-SVM destinations. In case there
+            // are extra args, they must be prefixed by a four byte tag
+            // -> bytes4(keccak256("CCIP EVMExtraArgsV2"));
+            let Some(tag) = extra_args.get(..4) else {
+                return Ok(ProcessedExtraArgs::defaults(dest_config));
+            };
 
-        _ => Err(FeeQuoterError::InvalidChainFamilySelector.into()),
+            let mut data = &extra_args[4..];
+            parse_and_validate_generic_extra_args(tag.try_into().unwrap(), &mut data)
+        }
     }
 }
 
-fn parse_and_validate_evm_extra_args(tag: [u8; 4], data: &mut &[u8]) -> Result<ProcessedExtraArgs> {
+fn parse_and_validate_generic_extra_args(
+    tag: [u8; 4],
+    data: &mut &[u8],
+) -> Result<ProcessedExtraArgs> {
     match u32::from_be_bytes(tag) {
-        EVM_EXTRA_ARGS_V2_TAG => {
+        GENERIC_EXTRA_ARGS_V2_TAG => {
             if data.is_empty() {
                 Err(FeeQuoterError::InvalidInputsMissingDataAfterExtraArgs.into())
             } else {
-                let args = EVMExtraArgsV2::deserialize(data)?;
+                let args = GenericExtraArgsV2::deserialize(data)?;
                 Ok(ProcessedExtraArgs {
                     bytes: args.serialize_with_tag(),
                     gas_limit: args.gas_limit,
@@ -192,7 +193,7 @@ fn parse_and_validate_svm_extra_args(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::extra_args::{EVMExtraArgsV2, EVM_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG};
+    use crate::extra_args::{GenericExtraArgsV2, GENERIC_EXTRA_ARGS_V2_TAG, SVM_EXTRA_ARGS_V1_TAG};
     use crate::{SVMTokenAmount, TimestampedPackedU224};
     use anchor_lang::solana_program::pubkey::Pubkey;
     use anchor_spl::token::spl_token::native_mint;
@@ -275,7 +276,7 @@ pub mod tests {
     #[test]
     fn message_exceeds_gas_limit_fails_to_validate() {
         let mut message = sample_message();
-        message.extra_args = EVMExtraArgsV2 {
+        message.extra_args = GenericExtraArgsV2 {
             gas_limit: 1_000_000_000,
             allow_out_of_order_execution: false,
         }
@@ -294,13 +295,13 @@ pub mod tests {
         dest_chain_not_enforce.config.enforce_out_of_order = false;
 
         let mut message_ooo = sample_message();
-        message_ooo.extra_args = EVMExtraArgsV2 {
+        message_ooo.extra_args = GenericExtraArgsV2 {
             gas_limit: 1_000,
             allow_out_of_order_execution: true,
         }
         .serialize_with_tag();
         let mut message_not_ooo = sample_message();
-        message_not_ooo.extra_args = EVMExtraArgsV2 {
+        message_not_ooo.extra_args = GenericExtraArgsV2 {
             gas_limit: 1_000,
             allow_out_of_order_execution: false,
         }
@@ -338,20 +339,10 @@ pub mod tests {
         let evm_dest_chain = sample_dest_chain();
         let mut svm_dest_chain = sample_dest_chain();
         svm_dest_chain.config.chain_family_selector = CHAIN_FAMILY_SELECTOR_SVM.to_be_bytes();
-        let evm_tag_bytes = EVM_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
+        let evm_tag_bytes = GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes().to_vec();
         let svm_tag_bytes = SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec();
         let mut none_dest_chain = sample_dest_chain();
         none_dest_chain.config.chain_family_selector = [0; 4];
-
-        // mismatched family fails
-        assert_eq!(
-            process_extra_args(&none_dest_chain.config, &evm_tag_bytes, false).unwrap_err(),
-            FeeQuoterError::InvalidChainFamilySelector.into()
-        );
-        assert_eq!(
-            process_extra_args(&none_dest_chain.config, &[0; 0], false).unwrap_err(),
-            FeeQuoterError::InvalidChainFamilySelector.into()
-        );
 
         // evm - tag but no data fails
         assert_eq!(
@@ -361,7 +352,10 @@ pub mod tests {
 
         // evm - default case: (no data or tag)
         let extra_args = process_extra_args(&evm_dest_chain.config, &[], false).unwrap();
-        assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(
+            extra_args.bytes[..4],
+            GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes()
+        );
         assert_eq!(
             extra_args.gas_limit,
             evm_dest_chain.config.default_tx_gas_limit as u128
@@ -371,7 +365,7 @@ pub mod tests {
         // evm - passed in data
         let extra_args = process_extra_args(
             &evm_dest_chain.config,
-            &EVMExtraArgsV2 {
+            &GenericExtraArgsV2 {
                 gas_limit: 100,
                 allow_out_of_order_execution: true,
             }
@@ -379,7 +373,28 @@ pub mod tests {
             false,
         )
         .unwrap();
-        assert_eq!(extra_args.bytes[..4], EVM_EXTRA_ARGS_V2_TAG.to_be_bytes());
+        assert_eq!(
+            extra_args.bytes[..4],
+            GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes()
+        );
+        assert_eq!(extra_args.gas_limit, 100);
+        assert!(extra_args.allow_out_of_order_execution);
+
+        // unknown family - uses generic (same as evm) tag
+        let extra_args = process_extra_args(
+            &none_dest_chain.config,
+            &GenericExtraArgsV2 {
+                gas_limit: 100,
+                allow_out_of_order_execution: true,
+            }
+            .serialize_with_tag(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            extra_args.bytes[..4],
+            GENERIC_EXTRA_ARGS_V2_TAG.to_be_bytes()
+        );
         assert_eq!(extra_args.gas_limit, 100);
         assert!(extra_args.allow_out_of_order_execution);
 

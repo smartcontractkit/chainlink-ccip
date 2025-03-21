@@ -1685,6 +1685,10 @@
             "type": "bool"
           },
           {
+            "name": "isRmnVerificationDisabled",
+            "type": "bool"
+          },
+          {
             "name": "laneCodeVersion",
             "type": {
               "defined": "CodeVersion"
@@ -1693,12 +1697,7 @@
           {
             "name": "onRamp",
             "type": {
-              "array": [
-                {
-                  "defined": "OnRampAddress"
-                },
-                2
-              ]
+              "defined": "OnRampAddress"
             }
           }
         ]

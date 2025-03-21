@@ -12,7 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_lockrelease_token_pool"
+	tokenpool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"

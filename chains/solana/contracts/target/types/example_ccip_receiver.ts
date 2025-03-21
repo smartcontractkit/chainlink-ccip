@@ -403,6 +403,11 @@ export type ExampleCcipReceiver = {
       "code": 6005,
       "name": "InvalidCaller",
       "msg": "Caller is not allowed"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidProposedOwner",
+      "msg": "Proposed owner is invalid"
     }
   ]
 };
@@ -812,6 +817,11 @@ export const IDL: ExampleCcipReceiver = {
       "code": 6005,
       "name": "InvalidCaller",
       "msg": "Caller is not allowed"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidProposedOwner",
+      "msg": "Proposed owner is invalid"
     }
   ]
 };

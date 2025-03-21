@@ -361,7 +361,7 @@ func (obj *LockOrBurnInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 
 type LockOrBurnOutV1 struct {
 	DestTokenAddress RemoteAddress
-	DestPoolData     RemoteAddress
+	DestPoolData     []byte
 }
 
 func (obj LockOrBurnOutV1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
