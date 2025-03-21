@@ -27,6 +27,10 @@ type ChainConfig struct {
 	// OptimisticConfirmations is the number of confirmations of a chain event before
 	// it is considered optimistically confirmed (i.e not necessarily finalized).
 	OptimisticConfirmations uint32 `json:"optimisticConfirmations"`
+
+	// ChainFeeDeviationDisabled is a flag to disable deviation-based reporting. If true, we will only report
+	// prices based on the heartbeat.
+	ChainFeeDeviationDisabled bool `json:"chainFeeDeviationDisabled"`
 }
 
 func (cc ChainConfig) Validate() error {
