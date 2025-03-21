@@ -17,6 +17,11 @@ pub fn calculate_token_pool_account_indices(
     start_indices: &[u8],
     remaining_accounts_count: usize,
 ) -> Result<(usize, usize)> {
+    require!(
+        i < start_indices.len(),
+        CcipRouterError::InvalidInputsTokenIndices
+    );
+
     // account set = [start...end)
     let start: usize = start_indices[i] as usize;
     let end: usize = if i == start_indices.len() - 1 {
@@ -355,6 +360,10 @@ pub mod token_admin_registry_writable {
 
     #[cfg(test)]
     mod tests {
+        use crate::{
+            instructions::v1::pools::calculate_token_pool_account_indices, CcipRouterError,
+        };
+
         use super::*;
         use solana_program::pubkey::Pubkey;
 
@@ -421,6 +430,31 @@ pub mod token_admin_registry_writable {
             assert!(is(state, 128 + 8));
             assert!(is(state, 128 + 56));
             assert!(is(state, 128 + 100));
+        }
+
+        #[test]
+        fn token_pool_indices_underflow_overflow() {
+            let empty_start_indices: [u8; 0] = [];
+            let full_start_indices = [1u8, 2, 3];
+            let arbitrary_account_count = 5;
+
+            assert_eq!(
+                calculate_token_pool_account_indices(
+                    0,
+                    &empty_start_indices,
+                    arbitrary_account_count
+                ),
+                Err(CcipRouterError::InvalidInputsTokenIndices.into())
+            );
+
+            assert_eq!(
+                calculate_token_pool_account_indices(
+                    full_start_indices.len(),
+                    &full_start_indices,
+                    arbitrary_account_count
+                ),
+                Err(CcipRouterError::InvalidInputsTokenIndices.into())
+            );
         }
     }
 }
