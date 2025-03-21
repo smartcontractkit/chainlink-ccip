@@ -102,8 +102,8 @@ func (e *ExecuteOffchainConfig) IsUSDCEnabled() bool {
 			return true
 		}
 	}
-	return false
 
+	return false
 }
 
 // EncodeExecuteOffchainConfig encodes a ExecuteOffchainConfig into bytes using JSON.

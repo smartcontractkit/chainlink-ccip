@@ -56,6 +56,18 @@ func CounterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.Histogr
 	return int(pb.GetHistogram().GetSampleCount())
 }
 
+func MustDecode(s string) cciptypes.Bytes {
+	b, err := cciptypes.NewBytesFromString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func MustDecodeRaw(s string) []byte {
+	return MustDecode(s)
+}
+
 // NewMockAddressCodecHex returns a mock address codec that hex-encodes and decodes addresses.
 func NewMockAddressCodecHex(t *testing.T) *ccipocr3.MockAddressCodec {
 	mockAddrCodec := ccipocr3.NewMockAddressCodec(t)

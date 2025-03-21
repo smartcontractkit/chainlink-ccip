@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
-	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/observer"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -149,7 +149,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.addrCodec,
 	)
 
-	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
+	tokenDataObserver, err := observer.NewConfigBasedCompositeObservers(
 		ctx,
 		logutil.WithComponent(lggr, "TokenDataObserver"),
 		p.ocrConfig.Config.ChainSelector,
