@@ -264,9 +264,8 @@ func NewChainConfigurer(env DevspaceEnv, chainID string, chainType ChainType, ch
 	}
 	// Generate sol key for the deployment
 	solTestKey, err := solana.PrivateKeyFromBase58("57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC")
-
 	if err != nil {
-		panic("Could not create private localnet private key")
+		panic("Could not create localnet private key")
 	}
 
 	return ChainConfigurer{
