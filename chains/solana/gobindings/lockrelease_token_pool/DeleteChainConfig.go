@@ -20,15 +20,13 @@ type DeleteChainConfig struct {
 	// [1] = [WRITE] chainConfig
 	//
 	// [2] = [WRITE, SIGNER] authority
-	//
-	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewDeleteChainConfigInstructionBuilder creates a new `DeleteChainConfig` instruction builder.
 func NewDeleteChainConfigInstructionBuilder() *DeleteChainConfig {
 	nd := &DeleteChainConfig{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -78,17 +76,6 @@ func (inst *DeleteChainConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *DeleteChainConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *DeleteChainConfig {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
-	return inst
-}
-
-// GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *DeleteChainConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
-}
-
 func (inst DeleteChainConfig) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -128,9 +115,6 @@ func (inst *DeleteChainConfig) Validate() error {
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
-		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.SystemProgram is not set")
-		}
 	}
 	return nil
 }
@@ -150,11 +134,10 @@ func (inst *DeleteChainConfig) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("      state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("chainConfig", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("  authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -195,13 +178,11 @@ func NewDeleteChainConfigInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *DeleteChainConfig {
+	authority ag_solanago.PublicKey) *DeleteChainConfig {
 	return NewDeleteChainConfigInstructionBuilder().
 		SetRemoteChainSelector(remoteChainSelector).
 		SetMint(mint).
 		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
-		SetAuthorityAccount(authority).
-		SetSystemProgramAccount(systemProgram)
+		SetAuthorityAccount(authority)
 }

@@ -14,7 +14,7 @@ import (
 type ProvideLiquidity struct {
 	Amount *uint64
 
-	// [0] = [WRITE] state
+	// [0] = [] state
 	//
 	// [1] = [] tokenProgram
 	//
@@ -46,7 +46,7 @@ func (inst *ProvideLiquidity) SetAmount(amount uint64) *ProvideLiquidity {
 
 // SetStateAccount sets the "state" account.
 func (inst *ProvideLiquidity) SetStateAccount(state ag_solanago.PublicKey) *ProvideLiquidity {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(state)
 	return inst
 }
 

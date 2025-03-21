@@ -476,7 +476,7 @@ fn hash(
         &header_source_chain_selector,
         &header_dest_chain_selector,
         &on_ramp_address_size.to_be_bytes(),
-        &on_ramp_address.bytes(),
+        on_ramp_address.bytes(),
         // message header
         &msg.header.message_id,
         &msg.token_receiver.to_bytes(),

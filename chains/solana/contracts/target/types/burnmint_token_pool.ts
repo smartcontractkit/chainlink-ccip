@@ -252,11 +252,6 @@ export type BurnmintTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -299,11 +294,6 @@ export type BurnmintTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -410,7 +400,7 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -481,7 +471,7 @@ export type BurnmintTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -828,11 +818,6 @@ export const IDL: BurnmintTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -875,11 +860,6 @@ export const IDL: BurnmintTokenPool = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -986,7 +966,7 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1057,7 +1037,7 @@ export const IDL: BurnmintTokenPool = {
         },
         {
           "name": "state",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
