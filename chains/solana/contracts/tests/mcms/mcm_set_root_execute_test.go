@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/external_program_cpi_stub"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
+	mcm "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/many_chain_multisig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"

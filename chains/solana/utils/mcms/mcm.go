@@ -8,7 +8,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
+	mcm "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/many_chain_multisig"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 )
 

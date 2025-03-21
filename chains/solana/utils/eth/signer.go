@@ -12,7 +12,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
+	mcm "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/many_chain_multisig"
 )
 
 type Signer struct {

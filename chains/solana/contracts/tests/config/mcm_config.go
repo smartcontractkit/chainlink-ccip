@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	McmProgram = GetProgramID("mcm")
+	McmProgram = GetProgramID("many_chain_multisig")
 	// For testing CPIs made by other programs (with actual business logic).
 	ExternalCpiStubProgram = GetProgramID("external_program_cpi_stub")
 	StubAccountPDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("u8_value")}, ExternalCpiStubProgram)
