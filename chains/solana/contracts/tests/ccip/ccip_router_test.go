@@ -2638,7 +2638,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
-				tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+				tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 				require.NoError(t, err)
 				require.Equal(t, uint8(1), tokenAdminRegistry.Version)
@@ -2659,7 +2659,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
-				tokenAdminRegistry = ccip_router.TokenAdminRegistry{}
+				tokenAdminRegistry = ccip_common.TokenAdminRegistry{}
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 				require.NoError(t, err)
 				require.Equal(t, uint8(1), tokenAdminRegistry.Version)
