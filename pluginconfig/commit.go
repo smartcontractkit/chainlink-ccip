@@ -157,6 +157,12 @@ type CommitOffchainConfig struct {
 	// NOTE: this can only be used if RMNEnabled == false.
 	MaxMerkleRootsPerReport uint64 `json:"maxRootsPerReport"`
 
+	// MaxPricesPerReport is the maximum number of prices to include in a single report. When this option is set,
+	// the commit plugin will split the prices across multiple reports if there are more than this number of prices.
+	// It will also split prices and merkle roots into separate reports.
+	// NOTE: this can only be used if RMNEnabled == false.
+	MaxPricesPerReport uint64 `json:"maxPricesPerReport"`
+
 	// MultipleReportsEnabled is a flag to enable/disable multiple reports per round.
 	// This is typically set to true on chains that use 'MaxMerkleRootsPerReport'
 	// in order to avoid delays when there are reports from multiple sources.
@@ -287,14 +293,21 @@ func (c *CommitOffchainConfig) Validate() error {
 	var errs []error
 	if c.RMNEnabled {
 		if c.MultipleReportsEnabled {
-			errs = append(errs, fmt.Errorf("multipleReports is set with RMN enabled"))
+			errs = append(errs, fmt.Errorf("multipleReports do not support RMN, RMNEnabled cannot be true"))
 		}
 		if c.MaxMerkleRootsPerReport != 0 {
-			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport is set with RMN enabled"))
+			errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport does not support RMN, RMNEnabled cannot be true"))
 		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+	}
+	if c.MaxMerkleRootsPerReport != 0 && !c.MultipleReportsEnabled {
+		errs = append(errs, fmt.Errorf("maxMerkleRootsPerReport cannot be used without MultipleReportsEnabled"))
+	}
+	if c.MaxPricesPerReport != 0 && !c.MultipleReportsEnabled {
+		errs = append(errs, fmt.Errorf("maxPricesPerReport cannot be used without MultipleReportsEnabled"))
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil
