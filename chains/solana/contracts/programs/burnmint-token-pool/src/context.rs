@@ -100,7 +100,6 @@ pub struct TokenOfframp<'info> {
     // Token pool accounts ------------------
     // consistent set + token pool program
     #[account(
-        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
@@ -166,7 +165,6 @@ pub struct TokenOnramp<'info> {
     // Token pool accounts ------------------
     // consistent set + token pool program
     #[account(
-        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
@@ -255,7 +253,6 @@ pub struct SetChainRateLimit<'info> {
     pub chain_config: Account<'info, ChainConfig>,
     #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin)]
     pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -321,5 +318,4 @@ pub struct DeleteChainConfig<'info> {
     pub chain_config: Account<'info, ChainConfig>,
     #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
 }
