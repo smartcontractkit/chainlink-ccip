@@ -7,7 +7,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -20,15 +19,14 @@ func IsReportCursed(
 	ctx context.Context,
 	lggr logger.Logger,
 	ccipReader reader.CCIPReader,
-	destChain ccipocr3.ChainSelector,
-	reportSourceChains []ccipocr3.ChainSelector,
+	reportSourceChains []cciptypes.ChainSelector,
 ) (bool, error) {
 	// No error is returned in case there are other things for the report.
 	if len(reportSourceChains) == 0 {
 		return false, nil
 	}
 
-	curseInfo, err := ccipReader.GetRmnCurseInfo(ctx, reportSourceChains)
+	curseInfo, err := ccipReader.GetRmnCurseInfo(ctx)
 	if err != nil {
 		return false, fmt.Errorf("error while fetching curse info: %w", err)
 	}

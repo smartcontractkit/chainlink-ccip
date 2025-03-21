@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -68,6 +67,7 @@ type PluginFactory struct {
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
 	msgHasher        cciptypes.MessageHasher
+	addrCodec        cciptypes.AddressCodec
 	homeChainReader  reader.HomeChain
 	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
@@ -81,7 +81,7 @@ type PluginFactoryParams struct {
 	OcrConfig        reader.OCR3ConfigWithMeta
 	ExecCodec        cciptypes.ExecutePluginCodec
 	MsgHasher        cciptypes.MessageHasher
-	ExtraDataCodec   cciptypes.ExtraDataCodec
+	AddrCodec        cciptypes.AddressCodec
 	HomeChainReader  reader.HomeChain
 	TokenDataEncoder cciptypes.TokenDataEncoder
 	EstimateProvider cciptypes.EstimateProvider
@@ -98,6 +98,7 @@ func NewExecutePluginFactory(params PluginFactoryParams) *PluginFactory {
 		ocrConfig:        params.OcrConfig,
 		execCodec:        params.ExecCodec,
 		msgHasher:        params.MsgHasher,
+		addrCodec:        params.AddrCodec,
 		homeChainReader:  params.HomeChainReader,
 		estimateProvider: params.EstimateProvider,
 		tokenDataEncoder: params.TokenDataEncoder,
@@ -145,6 +146,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
+		p.addrCodec,
 	)
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
@@ -154,18 +156,11 @@ func (p PluginFactory) NewReportingPlugin(
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
 		readers,
+		p.addrCodec,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
-
-	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
-		logutil.WithComponent(lggr, "CostlyMessages"),
-		false,
-		ccipReader,
-		offchainConfig.RelativeBoostPerWaitHour,
-		p.estimateProvider,
-	)
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
 	if err != nil {
@@ -185,8 +180,8 @@ func (p PluginFactory) NewReportingPlugin(
 			tokenDataObserver,
 			p.estimateProvider,
 			lggr,
-			costlyMessageObserver,
 			metricsReporter,
+			p.addrCodec,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{

@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -116,25 +115,28 @@ func (p *Plugin) Observation(
 
 	p.observer.TrackObservation(observation, state)
 	lggr.Infow("execute plugin got observation", "observation", observation,
-		"duration", time.Since(tStart), "state", state)
+		"duration", time.Since(tStart),
+		"state", state,
+		"numCommitReports", len(observation.CommitReports),
+		"numMessages", observation.Messages.Count())
 
 	return p.ocrTypeCodec.EncodeObservation(observation)
 }
 
-func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.CurseInfo, error) {
+func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (reader.CurseInfo, error) {
 	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
 		lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
-		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
 	}
 
-	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx)
 	if err != nil {
 		lggr.Errorw("nothing to observe: rmn read error",
 			"err", err,
 			"sourceChains", allSourceChains,
 		)
-		return nil, fmt.Errorf("nothing to observe: rmn read error: %w", err)
+		return reader.CurseInfo{}, fmt.Errorf("nothing to observe: rmn read error: %w", err)
 	}
 
 	return curseInfo, nil
@@ -143,14 +145,32 @@ func (p *Plugin) getCurseInfo(ctx context.Context, lggr logger.Logger) (*reader.
 // getCommitReportsObservations implements phase1 of the execute plugin state machine. It fetches commit reports from
 // the destination chain and determines which messages are ready to be executed. These are added to the provided
 // observation object.
+//
+// Execution and Snoozing Logic:
+// 1. For finalized executions:
+//   - When messages are executed with finality (on destChain), they are permanently marked as executed
+//   - MarkAsExecuted removes the commit root from the cache entirely to prevent reprocessing
+//   - These messages will never be considered for execution again
+//
+// 2. For unfinalized executions:
+//   - When messages are executed but not yet finalized, they are temporarily snoozed
+//   - Snoozing adds the commit root to a snooze cache with a TTL
+//   - If a reorg occurs and invalidates the execution, the messages become available again after the snooze period
+//   - This prevents duplicate executions while allowing recovery from reorgs
+//
+// 3. For cursed chains:
+//   - All commit reports from cursed source chains are snoozed
+//   - This temporarily prevents execution until the curse is lifted
+//   - Messages become available again after the snooze period if the chain is no longer cursed
 func (p *Plugin) getCommitReportsObservation(
 	ctx context.Context,
 	lggr logger.Logger,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// TODO: set fetchFrom to the oldest pending commit report.
-	// TODO: or, cache commit reports so that we don't need to fetch them again.
-	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
+	// Get the optimized timestamp using the cache
+	fetchFrom := p.commitRootsCache.GetTimestampToQueryFrom()
+
+	lggr.Infow("Querying commit reports", "fetchFrom", fetchFrom)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 	//          a valid execution report.
@@ -178,7 +198,7 @@ func (p *Plugin) getCommitReportsObservation(
 	}
 
 	// Get pending exec reports.
-	groupedCommits, fullyExecutedCommits, err := getPendingExecutedReports(
+	groupedCommits, fullyExecutedFinalized, fullyExecutedUnfinalized, err := getPendingReportsForExecution(
 		ctx,
 		p.ccipReader,
 		p.commitRootsCache.CanExecute,
@@ -193,8 +213,14 @@ func (p *Plugin) getCommitReportsObservation(
 
 	// If fully executed reports are detected, mark them in the cache.
 	// This cache will be re-initialized on each plugin restart.
-	for _, fullyExecutedCommit := range fullyExecutedCommits {
+	for _, fullyExecutedCommit := range fullyExecutedFinalized {
 		p.commitRootsCache.MarkAsExecuted(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
+	}
+
+	// If fully executed reports are detected, snooze them in the cache.
+	// This cache will be re-initialized on each plugin restart.
+	for _, fullyExecutedCommit := range fullyExecutedUnfinalized {
+		p.commitRootsCache.Snooze(fullyExecutedCommit.SourceChain, fullyExecutedCommit.MerkleRoot)
 	}
 
 	// Remove and snooze commit reports from cursed chains.
@@ -208,10 +234,40 @@ func (p *Plugin) getCommitReportsObservation(
 		}
 	}
 
+	// Update the earliest unexecuted root based on remaining reports
+	p.commitRootsCache.UpdateEarliestUnexecutedRoot(buildCombinedReports(groupedCommits, fullyExecutedUnfinalized))
+
 	observation.CommitReports = groupedCommits
 
 	// TODO: truncate grouped to a maximum observation size?
 	return observation, nil
+}
+
+// buildCombinedReports creates a combined map for updating the earliest unexecuted root
+func buildCombinedReports(
+	groupedCommits map[cciptypes.ChainSelector][]exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
+) map[cciptypes.ChainSelector][]exectypes.CommitData {
+	combinedReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
+
+	// Add all unexecuted commits
+	for chain, commits := range groupedCommits {
+		combinedReports[chain] = append(combinedReports[chain], commits...)
+	}
+
+	// Add all unfinalized executions
+	for _, commit := range fullyExecutedUnfinalized {
+		combinedReports[commit.SourceChain] = append(
+			combinedReports[commit.SourceChain],
+			exectypes.CommitData{
+				Timestamp:   commit.Timestamp,
+				SourceChain: commit.SourceChain,
+				MerkleRoot:  commit.MerkleRoot,
+			},
+		)
+	}
+
+	return combinedReports
 }
 
 // regroup converts the previous outcome to the observation format.
@@ -284,9 +340,9 @@ func (p *Plugin) getMessagesObservation(
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// Phase 2: Get messages and determine which messages are too costly to execute.
+	// Phase 2: Get messages.
 	//          These messages will not be executed in the current round, but may be executed in future rounds
-	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
+	//          (e.g. if gas prices decrease).
 	if len(previousOutcome.CommitReports) == 0 {
 		lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
@@ -294,7 +350,7 @@ func (p *Plugin) getMessagesObservation(
 		return observation, nil
 	}
 
-	messageObs, commitReportCache, messageTimestamps := readAllMessages(
+	messageObs, commitReportCache, _ := readAllMessages(
 		ctx,
 		lggr,
 		p.ccipReader,
@@ -306,15 +362,10 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
 
-	// validating before continuing with heavy operations afterwards like truncation and costly messages
+	// validating before continuing with heavy operations afterwards like truncation
 	// all messages should have a token data observation even if it's empty
 	if validateTokenDataObservations(messageObs, tkData) != nil {
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
-	}
-
-	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages: %w", err)
 	}
 
 	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
@@ -325,7 +376,6 @@ func (p *Plugin) getMessagesObservation(
 	observation.CommitReports = commitReportCache
 	observation.Messages = messageObs
 	observation.Hashes = hashes
-	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
 
 	// Make sure encoded observation fits within the maximum observation size.
@@ -365,7 +415,12 @@ func (p *Plugin) getFilterObservation(
 		}
 
 		for _, msg := range commitReport.Messages {
-			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.destChain))
+			sender, err := p.addrCodec.AddressBytesToString(msg.Sender[:], commitReport.SourceChain)
+			if err != nil {
+				lggr.Errorw("unable to convert sender address to string", "err", err, "sender address", msg.Sender)
+				continue
+			}
+
 			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
 		}
 	}
@@ -373,7 +428,7 @@ func (p *Plugin) getFilterObservation(
 	// Read args from chain.
 	nonceObservations := make(exectypes.NonceObservations)
 	for srcChain, addrSet := range nonceRequestArgs {
-		// TODO: check if srcSelector is supported.
+		// TODO: check if srcSelectors is supported.
 		addrs := maps.Keys(addrSet)
 		nonces, err := p.ccipReader.Nonces(ctx, srcChain, addrs)
 		if err != nil {

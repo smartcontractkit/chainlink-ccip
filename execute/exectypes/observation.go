@@ -17,7 +17,6 @@ const (
 	tokenDataLabel     = "tokenData"
 	commitReportsLabel = "commitReports"
 	noncesLabel        = "nonces"
-	costlyMessages     = "costlyMessages"
 	tokenStateReady    = "tokenReady"
 	tokenStateWaiting  = "tokenWaiting"
 )
@@ -42,6 +41,15 @@ func (mo MessageObservations) Flatten() []cciptypes.Message {
 		}
 	}
 	return results
+}
+
+// Count the number of messages in the observation.
+func (mo MessageObservations) Count() int {
+	count := 0
+	for _, msgs := range mo {
+		count += len(msgs)
+	}
+	return count
 }
 
 func (mo MessageObservations) Stats() map[string]int {
@@ -118,12 +126,6 @@ type Observation struct {
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`
 
-	// CostlyMessages are determined during the GetMessages state of execute.
-	// It contains the message IDs of messages that cost more to execute than their source fees. These messages will not
-	// be executed in the current round, but may be executed in future rounds (e.g. if gas prices decrease or if
-	// these messages' fees are boosted high enough).
-	CostlyMessages []cciptypes.Bytes32 `json:"costlyMessages"`
-
 	// Nonces are determined during the third phase of execute.
 	// It contains the nonces of senders who are being considered for the final report.
 	Nonces NonceObservations `json:"nonces"`
@@ -157,20 +159,18 @@ func (co CommitObservations) Stats() map[string]int {
 func NewObservation(
 	commitReports CommitObservations,
 	messages MessageObservations,
-	costlyMessages []cciptypes.Bytes32,
 	tokenData TokenDataObservations,
 	nonces NonceObservations,
 	contracts dt.Observation,
 	hashes MessageHashes,
 ) Observation {
 	return Observation{
-		CommitReports:  commitReports,
-		Messages:       messages,
-		CostlyMessages: costlyMessages,
-		TokenData:      tokenData,
-		Nonces:         nonces,
-		Contracts:      contracts,
-		Hashes:         hashes,
+		CommitReports: commitReports,
+		Messages:      messages,
+		TokenData:     tokenData,
+		Nonces:        nonces,
+		Contracts:     contracts,
+		Hashes:        hashes,
 	}
 }
 
@@ -180,7 +180,6 @@ func (o Observation) Stats() map[string]int {
 	mergeStats(&stats, o.CommitReports)
 	mergeStats(&stats, o.Messages)
 	mergeStats(&stats, o.TokenData)
-	maps.Copy(stats, o.trackCostlyMessages())
 	return stats
 }
 
@@ -221,10 +220,4 @@ func (o TokenDataObservations) Stats() map[string]int {
 	}
 
 	return tokenCounters
-}
-
-func (o Observation) trackCostlyMessages() map[string]int {
-	return map[string]int{
-		costlyMessages: len(o.CostlyMessages),
-	}
 }

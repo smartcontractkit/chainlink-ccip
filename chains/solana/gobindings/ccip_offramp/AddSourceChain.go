@@ -10,7 +10,6 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Config //
 // Adds a new source chain selector with its config to the offramp.
 //
 // The Admin needs to add any new chain supported.

@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
-const EVMExtraArgsV2Tag = "181dcf10"
+const GenericExtraArgsV2Tag = "181dcf10"
 const SVMExtraArgsV1Tag = "1f3b3aba"
 
 var leafDomainSeparator = [32]byte{}
@@ -104,7 +104,6 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 			ComputeUnits:     1000,
 			IsWritableBitmap: GenerateBitMapForIndexes([]int{0, 1}),
 		},
-		OnRampAddress: config.OnRampAddress,
 	}
 	return message
 }
@@ -135,7 +134,7 @@ func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, onRampAddress []by
 		return nil, err
 	}
 	// Push OnRamp Size to ensure that the hash is unique
-	if _, err := hash.Write([]byte{uint8(len(onRampAddress))}); err != nil { //nolint:gosec
+	if err := binary.Write(hash, binary.BigEndian, uint16(len(onRampAddress))); err != nil { //nolint:gosec
 		return nil, err
 	}
 	if _, err := hash.Write(onRampAddress); err != nil {
@@ -161,7 +160,7 @@ func HashAnyToSVMMessage(msg ccip_offramp.Any2SVMRampMessage, onRampAddress []by
 		return nil, err
 	}
 	// Push Sender Size to ensure that the hash is unique
-	if _, err := hash.Write([]byte{uint8(len(msg.Sender))}); err != nil { //nolint:gosec
+	if err := binary.Write(hash, binary.BigEndian, uint16(len(msg.Sender))); err != nil { //nolint:gosec
 		return nil, err
 	}
 	if _, err := hash.Write(msg.Sender); err != nil {

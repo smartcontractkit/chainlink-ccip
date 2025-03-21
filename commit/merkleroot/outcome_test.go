@@ -3,10 +3,11 @@ package merkleroot
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -48,6 +50,7 @@ func Test_Processor_Outcome(t *testing.T) {
 		destChainSel                       cciptypes.ChainSelector
 		maxMerkleTreeSize                  uint64
 		rmnEnabled                         bool
+		multipleReports                    bool
 		maxReportTransmissionCheckAttempts int
 		expOutcome                         Outcome
 		expErr                             bool
@@ -444,6 +447,10 @@ func Test_Processor_Outcome(t *testing.T) {
 			name: "waiting for merkleRoots report transmission",
 			prevOutcome: Outcome{
 				OutcomeType: ReportGenerated,
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: chainA},
+					{ChainSel: chainB},
+				},
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
@@ -484,9 +491,13 @@ func Test_Processor_Outcome(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "waiting for merkleRoots report transmission",
+			name: "waiting for merkleRoots report transmission 2",
 			prevOutcome: Outcome{
 				OutcomeType: ReportGenerated,
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: chainA},
+					{ChainSel: chainB},
+				},
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
@@ -522,9 +533,63 @@ func Test_Processor_Outcome(t *testing.T) {
 			expErr: false,
 		},
 		{
+			// Same as the previous test but with multiple reports, this time it remains
+			// inflight because only one of the seqNums was updated.
+			name: "waiting for merkleRoots report transmission 3: multiple reports",
+			prevOutcome: Outcome{
+				OutcomeType: ReportGenerated,
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: chainA},
+					{ChainSel: chainB},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+			},
+			q: Query{},
+			observations: []func(testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 21}, // <--- indicates report transmission (also for chainA)
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1,
+							chainB: 1,
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers:                          []commontypes.OracleID{1, 2, 3},
+			bigF:                               1,
+			destChainSel:                       chainD,
+			maxMerkleTreeSize:                  20,
+			rmnEnabled:                         true,
+			multipleReports:                    true,
+			maxReportTransmissionCheckAttempts: 5,
+			expOutcome: Outcome{
+				OutcomeType: ReportInFlight,
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+				ReportTransmissionCheckAttempts: 0x1,
+			},
+			expErr: false,
+		},
+		{
 			name: "reached all report transmission check attempts",
 			prevOutcome: Outcome{
 				OutcomeType: ReportGenerated,
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{ChainSel: chainA},
+					{ChainSel: chainB},
+				},
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
@@ -578,8 +643,10 @@ func Test_Processor_Outcome(t *testing.T) {
 					MaxMerkleTreeSize:                  tc.maxMerkleTreeSize,
 					RMNEnabled:                         tc.rmnEnabled,
 					MaxReportTransmissionCheckAttempts: uint(tc.maxReportTransmissionCheckAttempts),
+					MultipleReportsEnabled:             tc.multipleReports,
 				},
 				metricsReporter: NoopMetrics{},
+				addressCodec:    internal.NewMockAddressCodecHex(t),
 			}
 
 			aos := make([]plugincommon.AttributedObservation[Observation], 0, len(tc.observations))
@@ -602,6 +669,7 @@ func Test_Processor_Outcome(t *testing.T) {
 }
 
 func Test_buildMerkleRootsOutcome(t *testing.T) {
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
 
@@ -624,11 +692,10 @@ func Test_buildMerkleRootsOutcome(t *testing.T) {
 		}
 
 		lggr := logger.Test(t)
-
 		for i := 0; i < rounds; i++ {
-			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{})
+			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
-			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{})
+			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{}, mockAddrCodec)
 			require.NoError(t, err)
 			require.Equal(t, report1, report2)
 		}
@@ -647,13 +714,8 @@ func Test_reportRangesOutcome(t *testing.T) {
 		expectedOutcome      Outcome
 	}{
 		{
-			name: "base empty outcome",
-			expectedOutcome: Outcome{
-				OutcomeType:             ReportIntervalsSelected,
-				RangesSelectedForReport: []plugintypes.ChainRange{},
-				OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
-				RMNRemoteCfg:            rmntypes.RemoteConfig{},
-			},
+			name:            "base empty outcome",
+			expectedOutcome: Outcome{OutcomeType: ReportEmpty},
 		},
 		{
 			name: "simple scenario with one chain",

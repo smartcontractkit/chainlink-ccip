@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
@@ -59,6 +60,7 @@ func TestObservation(t *testing.T) {
 		metricsReporter: NoopMetrics{},
 	}
 
+	thirtyTwoBytes := [32]byte{1, 2, 3}
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -100,7 +102,9 @@ func TestObservation(t *testing.T) {
 				RMNRemoteCfg: testhelpers.CreateRMNRemoteCfg(),
 			},
 			query: Query{
-				RMNSignatures: &rmn.ReportSignatures{},
+				RMNSignatures: &rmn.ReportSignatures{
+					Signatures: []*serialization.EcdsaSignature{{R: thirtyTwoBytes[:], S: thirtyTwoBytes[:]}},
+				},
 			},
 			setupMocks: func() {
 				mockObserver.EXPECT().ObserveMerkleRoots(mock.Anything, mock.Anything).Return([]cciptypes.MerkleRootChain{
@@ -200,7 +204,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNums, nil)
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&reader.CurseInfo{}, nil)
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(reader.CurseInfo{}, nil)
 				return chainSupport, ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
@@ -253,8 +257,8 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				delete(nextSeqNumsCp, cciptypes.ChainSelector(4))
 
 				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNumsCp, nil)
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
-					Return(&reader.CurseInfo{}, nil)
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).
+					Return(reader.CurseInfo{}, nil)
 				return chainSupport, ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
@@ -269,7 +273,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&reader.CurseInfo{
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(reader.CurseInfo{
 					CursedSourceChains: nil,
 					CursedDestination:  true,
 					GlobalCurse:        false,
@@ -284,7 +288,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&reader.CurseInfo{
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(reader.CurseInfo{
 					CursedSourceChains: nil,
 					CursedDestination:  false,
 					GlobalCurse:        true,
@@ -308,7 +312,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChainsExcludingCursed).
 					Return(nextSeqNumsExcludingCursed, nil)
 
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&reader.CurseInfo{
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(reader.CurseInfo{
 					CursedSourceChains: cursedSourceChains,
 					CursedDestination:  false,
 					GlobalCurse:        false,
@@ -331,7 +335,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&reader.CurseInfo{
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).Return(reader.CurseInfo{
 					CursedSourceChains: cursedSourceChains,
 					CursedDestination:  false,
 					GlobalCurse:        false,
@@ -347,8 +351,8 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
-					Return(&reader.CurseInfo{}, fmt.Errorf("some error"))
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).
+					Return(reader.CurseInfo{}, fmt.Errorf("some error"))
 				return chainSupport, ccipReader
 			},
 		},
@@ -896,9 +900,9 @@ func Test_shouldSkipRMNVerification(t *testing.T) {
 			queryContainsRmnSigs: true,
 		},
 		{
-			name:               "rmn sigs missing error is expected",
+			name:               "rmn sigs missing but error is not expected since chains might be rmn-disabled",
 			nextProcessorState: buildingReport,
-			expErr:             true,
+			expErr:             false,
 		},
 		{
 			name:                       "rmn sigs are present while we retry sigs in the next round this is invalid",
@@ -933,7 +937,9 @@ func Test_shouldSkipRMNVerification(t *testing.T) {
 			q := Query{}
 
 			if tc.queryContainsRmnSigs {
-				q.RMNSignatures = &rmn.ReportSignatures{}
+				q.RMNSignatures = &rmn.ReportSignatures{
+					Signatures: make([]*serialization.EcdsaSignature, 1),
+				}
 			}
 
 			if tc.queryIndicatesSigsRetrying {

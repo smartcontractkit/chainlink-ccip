@@ -10,7 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// ClearSigners is the `clearSigners` instruction.
+// Clear the temporary signer storage.
+//
+// Closes the account storing signer addresses, allowing it to be reinitialized if needed.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
 type ClearSigners struct {
 	MultisigId *[32]uint8
 

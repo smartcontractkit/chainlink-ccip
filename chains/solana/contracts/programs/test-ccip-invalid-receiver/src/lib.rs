@@ -8,7 +8,7 @@ use example_ccip_receiver::Any2SVMMessage;
 use program::TestCcipInvalidReceiver;
 use solana_program::pubkey;
 
-declare_id!("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8");
+declare_id!("FmyF3oW69MSAhyPSiZ69C4RKBdCPv5vAFTScisV7Me2j");
 
 #[program]
 pub mod test_ccip_invalid_receiver {
@@ -55,6 +55,9 @@ pub mod test_ccip_invalid_receiver {
             ctx.accounts.pool_signer.to_account_info(),
             ctx.accounts.pool_token_account.to_account_info(),
             ctx.accounts.chain_config.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             ctx.accounts.receiver_token_account.to_account_info(),
         ];
 
@@ -97,6 +100,9 @@ pub mod test_ccip_invalid_receiver {
             ctx.accounts.mint.to_account_info(),
             ctx.accounts.pool_signer.to_account_info(),
             ctx.accounts.pool_token_account.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             ctx.accounts.chain_config.to_account_info(),
         ];
 
@@ -164,7 +170,7 @@ pub mod test_ccip_invalid_receiver {
 
 const ANCHOR_DISCRIMINATOR: usize = 8;
 
-const TEST_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
+const TEST_ROUTER: Pubkey = pubkey!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 
 #[derive(Accounts, Debug)]
 #[instruction(message: Any2SVMMessage)]
@@ -305,6 +311,15 @@ pub struct PoolProxyReleaseOrMint<'info> {
     pub chain_config: UncheckedAccount<'info>,
 
     /// CHECK
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_config: UncheckedAccount<'info>,
+
+    /// CHECK
     #[account(mut)]
     pub receiver_token_account: UncheckedAccount<'info>,
 }
@@ -340,6 +355,15 @@ pub struct PoolProxyLockOrBurn<'info> {
 
     #[account(mut)]
     pub pool_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK
+    pub rmn_remote_config: UncheckedAccount<'info>,
 
     /// CHECK
     #[account(mut)]
@@ -398,7 +422,7 @@ pub const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0
 pub fn build_receiver_discriminator_and_data(msg: &Any2SVMMessage) -> Result<Vec<u8>> {
     let message = msg.try_to_vec()?;
 
-    let mut data = Vec::with_capacity(8);
+    let mut data = Vec::with_capacity(8 + message.len());
     data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
     data.extend_from_slice(&message);
 

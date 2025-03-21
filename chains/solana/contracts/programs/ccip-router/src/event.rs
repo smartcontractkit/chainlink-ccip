@@ -23,6 +23,7 @@ pub mod events {
         pub struct ConfigSet {
             pub svm_chain_selector: u64,
             pub fee_quoter: Pubkey,
+            pub rmn_remote: Pubkey,
             pub link_token_mint: Pubkey,
             pub fee_aggregator: Pubkey,
         }

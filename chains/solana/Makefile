@@ -3,6 +3,7 @@ export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
 export ANCHOR_VERSION ?=v0.29.0
 export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
+export ANCHOR_BUILD_ARGS ?=
 # Allow overriding the output directory for docker builds
 TARGET_DIR ?= $(PWD)/contracts/target
 
@@ -12,7 +13,7 @@ anchor_version:
 
 .PHONY: clippy
 clippy:
-	cargo clippy --manifest-path ./contracts/programs/ccip-router/Cargo.toml
+	cd ./contracts && cargo clippy -- -D warnings
 
 .PHONY: gomods
 gomods: ## Install gomods
@@ -67,7 +68,7 @@ docker-build-contracts:
 		-v ${TARGET_DIR}:/workdir/target \
 		-e CARGO_TARGET_DIR=/workdir/target \
 		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
-		${ANCHOR_IMAGE} anchor build
+		${ANCHOR_IMAGE} anchor build ${ANCHOR_BUILD_ARGS}
 
 .PHONY: docker-update-contracts
 docker-update-contracts:

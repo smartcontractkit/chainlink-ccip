@@ -103,13 +103,7 @@ pub struct InitializeInstruction<'info> {
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        realloc = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE
-            + operation.instructions.iter().map(|ix|
-                // program_id + 4 + data.len + 4 + accounts.len*34
-                32 + 4 + ix.data.len() + 4 + ix.accounts.len() * 34
-            ).sum::<usize>()
-            // program_id (32) + data Vec overhead (4) + accounts vec overhead (4) + each account is (32 + 1 + 1) = 34
-            + 32 + 4 + 4 + (accounts.len() * 34),
+        realloc = operation.space_after_init_instruction(&accounts),
         realloc::payer = authority,
         realloc::zero = false,
         constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled,
@@ -141,19 +135,9 @@ pub struct AppendInstructionData<'info> {
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        realloc = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE
-            + operation.instructions.iter().enumerate().map(|(i,ix)| {
-                if i == ix_index as usize {
-                    // old size + ix_data_chunk
-                    ix.data.len() + ix_data_chunk.len() +  (32 + 4 + 4 + ix.accounts.len()*34)
-                } else {
-                    // program_id + 4 + data.len + 4 + accounts.len*34
-                    32 + 4 + ix.data.len() + 4 + ix.accounts.len() * 34
-                }
-            }).sum::<usize>(),
+        realloc = operation.space_after_append_instruction(&ix_data_chunk),
         realloc::payer = authority,
         realloc::zero = false,
-
         constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled,
         constraint = !operation.is_finalized() @ TimelockError::OperationAlreadyFinalized,
         constraint = (ix_index as usize) < operation.instructions.len() @ TimelockError::InvalidInput
@@ -258,13 +242,7 @@ pub struct InitializeBypasserInstruction<'info> {
         mut,
         seeds = [TIMELOCK_BYPASSER_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        realloc = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE
-            + operation.instructions.iter().map(|ix|
-                // program_id + 4 + data.len + 4 + accounts.len*34
-                32 + 4 + ix.data.len() + 4 + ix.accounts.len() * 34
-            ).sum::<usize>()
-            // program_id (32) + data Vec overhead (4) + accounts vec overhead (4) plus each account is (32 + 1 + 1) = 34
-            + 32 + 4 + 4 + (accounts.len() * 34),
+        realloc = operation.space_after_init_instruction(&accounts),
         realloc::payer = authority,
         realloc::zero = false,
         constraint = !operation.is_finalized() @ TimelockError::OperationAlreadyFinalized,
@@ -295,19 +273,9 @@ pub struct AppendBypasserInstructionData<'info> {
         mut,
         seeds = [TIMELOCK_BYPASSER_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
-        realloc = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE
-            + operation.instructions.iter().enumerate().map(|(i,ix)| {
-                if i == ix_index as usize {
-                    // old size + ix_data_chunk
-                    ix.data.len() + ix_data_chunk.len() +  (32 + 4 + 4 + ix.accounts.len()*34)
-                } else {
-                    // program_id + 4 + data.len + 4 + accounts.len*34
-                    32 + 4 + ix.data.len() + 4 + ix.accounts.len() * 34
-                }
-            }).sum::<usize>(),
+        realloc = operation.space_after_append_instruction(&ix_data_chunk),
         realloc::payer = authority,
         realloc::zero = false,
-
         constraint = !operation.is_finalized() @ TimelockError::OperationAlreadyFinalized,
         constraint = (ix_index as usize) < operation.instructions.len() @ TimelockError::InvalidInput
     )]

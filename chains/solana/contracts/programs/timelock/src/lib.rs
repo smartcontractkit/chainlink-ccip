@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn");
+declare_id!("DoajfR5tK24xVw51fWcawUZWhAXD8yrBJVacc13neVQA");
 
 mod constants;
 pub use constants::*;
@@ -219,13 +219,26 @@ pub mod timelock {
         cancel::cancel(ctx, timelock_id, id)
     }
 
-    /// Execute a scheduled batch of instructions.
+    /// Executes a scheduled batch of operations after validating readiness and predecessor dependencies.
+    ///
+    /// This function:
+    /// 1. Verifies the operation is ready for execution (delay period has passed)
+    /// 2. Validates that any predecessor operation has been completed
+    /// 3. Executes each instruction in the operation using the timelock signer PDA
+    /// 4. Emits events for each executed instruction
     ///
     /// # Parameters
     ///
-    /// - `ctx`: The context containing the accounts required for execution.
-    /// - `timelock_id`: The timelock identifier.
-    /// - `id`: The operation identifier.
+    /// - `ctx`: Context containing operation accounts and signer information
+    /// - `timelock_id`: Identifier for the timelock instance
+    /// - `_id`: Operation ID (used for PDA derivation)
+    ///
+    /// # Security Considerations
+    ///
+    /// This instruction uses PDA signing to create a trusted execution environment.
+    /// The timelock's signer PDA will replace any account marked as a signer in the
+    /// original instructions, providing the necessary privileges while maintaining
+    /// security through program derivation.
     #[access_control(require_role_or_admin!(ctx, Role::Executor))]
     pub fn execute_batch<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteBatch<'info>>,
@@ -342,13 +355,25 @@ pub mod timelock {
         Ok(())
     }
 
-    /// Execute a bypasser operation immediately.
+    /// Execute operations immediately using the bypasser flow, bypassing time delays
+    /// and predecessor checks.
+    ///
+    /// This function provides an emergency execution mechanism that:
+    /// 1. Skips the timelock waiting period required for standard operations
+    /// 2. Does not enforce predecessor dependencies
+    /// 3. Closes the operation account after execution
+    ///
+    /// # Emergency Use Only
+    ///
+    /// The bypasser flow is intended strictly for emergency situations where
+    /// waiting for the standard timelock delay would cause harm. Access to this
+    /// function is tightly controlled through the Bypasser role.
     ///
     /// # Parameters
     ///
-    /// - `ctx`: The context containing the bypasser execution account.
-    /// - `timelock_id`: The timelock identifier.
-    /// - `id`: The operation identifier.
+    /// - `ctx`: Context containing operation accounts and signer information
+    /// - `timelock_id`: Identifier for the timelock instance
+    /// - `_id`: Operation ID (used for PDA derivation)
     #[access_control(require_role_or_admin!(ctx, Role::Bypasser))]
     pub fn bypasser_execute_batch<'info>(
         ctx: Context<'_, '_, '_, 'info, BypasserExecuteBatch<'info>>,
@@ -427,7 +452,7 @@ pub mod timelock {
         Ok(())
     }
 
-    /// Propose a new owner for the timelock.
+    /// Propose a new owner for the timelock instance config.
     ///
     /// Only the current owner (admin) can propose a new owner.
     ///
@@ -443,12 +468,15 @@ pub mod timelock {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_mut()?;
-        require!(proposed_owner != config.owner, TimelockError::InvalidInput);
+        require!(
+            proposed_owner != config.owner && proposed_owner != Pubkey::default(),
+            TimelockError::InvalidInput
+        );
         config.proposed_owner = proposed_owner;
         Ok(())
     }
 
-    /// Accept ownership of the timelock.
+    /// Accept ownership of the timelock config.
     ///
     /// The proposed new owner must call this function to assume ownership.
     ///

@@ -10,7 +10,19 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetRoot is the `setRoot` instruction.
+// Set a new Merkle root that defines approved operations.
+//
+// This function updates the active Merkle root after verifying ECDSA signatures and validating
+// the provided metadata against a Merkle proof.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
+// - `root`: The new Merkle root to set.
+// - `valid_until`: timestamp until which the root remains valid.
+// - `metadata`: Structured input containing chain_id, multisig, and operation counters.
+// - `metadata_proof`: Merkle proof validating the metadata.
 type SetRoot struct {
 	MultisigId    *[32]uint8
 	Root          *[32]uint8

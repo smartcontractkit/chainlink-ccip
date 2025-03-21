@@ -11,7 +11,6 @@ import (
 func TestExecuteOffchainConfig_Validate(t *testing.T) {
 	type fields struct {
 		BatchGasLimit             uint64
-		RelativeBoostPerWaitHour  float64
 		InflightCacheExpiry       commonconfig.Duration
 		RootSnoozeTime            commonconfig.Duration
 		MessageVisibilityInterval commonconfig.Duration
@@ -26,7 +25,6 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 			"valid",
 			fields{
 				BatchGasLimit:             1,
-				RelativeBoostPerWaitHour:  1,
 				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
@@ -38,19 +36,6 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 			"invalid, BatchGasLimit not set",
 			fields{
 				BatchGasLimit:             0,
-				RelativeBoostPerWaitHour:  1,
-				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
-				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
-				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
-				BatchingStrategyID:        0,
-			},
-			true,
-		},
-		{
-			"invalid, RelativeBoostPerWaitHour not set",
-			fields{
-				BatchGasLimit:             1,
-				RelativeBoostPerWaitHour:  0,
 				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
@@ -62,7 +47,6 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 			"invalid, InflightCacheExpiry not set",
 			fields{
 				BatchGasLimit:             1,
-				RelativeBoostPerWaitHour:  1,
 				InflightCacheExpiry:       *commonconfig.MustNewDuration(0),
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
@@ -74,7 +58,6 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 			"invalid, RootSnoozeTime not set",
 			fields{
 				BatchGasLimit:             1,
-				RelativeBoostPerWaitHour:  1,
 				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
 				RootSnoozeTime:            *commonconfig.MustNewDuration(0),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
@@ -86,7 +69,6 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 			"invalid, MessageVisibilityInterval not set",
 			fields{
 				BatchGasLimit:             1,
-				RelativeBoostPerWaitHour:  1,
 				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(0),
@@ -99,7 +81,6 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e := ExecuteOffchainConfig{
 				BatchGasLimit:             tt.fields.BatchGasLimit,
-				RelativeBoostPerWaitHour:  tt.fields.RelativeBoostPerWaitHour,
 				InflightCacheExpiry:       tt.fields.InflightCacheExpiry,
 				RootSnoozeTime:            tt.fields.RootSnoozeTime,
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,
@@ -115,7 +96,6 @@ func TestExecuteOffchainConfig_Validate(t *testing.T) {
 func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 	type fields struct {
 		BatchGasLimit             uint64
-		RelativeBoostPerWaitHour  float64
 		InflightCacheExpiry       commonconfig.Duration
 		RootSnoozeTime            commonconfig.Duration
 		MessageVisibilityInterval commonconfig.Duration
@@ -130,7 +110,6 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 			"valid",
 			fields{
 				BatchGasLimit:             1,
-				RelativeBoostPerWaitHour:  1,
 				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
@@ -138,21 +117,9 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 			},
 		},
 		{
-			"valid, boost with decimal places",
-			fields{
-				BatchGasLimit:             1,
-				RelativeBoostPerWaitHour:  1.523,
-				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
-				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
-				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
-				BatchingStrategyID:        0,
-			},
-		},
-		{
-			"valid, large gas limit, zero boost",
+			"valid, large gas limit",
 			fields{
 				BatchGasLimit:             1 << 63,
-				RelativeBoostPerWaitHour:  0.0,
 				InflightCacheExpiry:       *commonconfig.MustNewDuration(1),
 				RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
@@ -164,7 +131,6 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e := ExecuteOffchainConfig{
 				BatchGasLimit:             tt.fields.BatchGasLimit,
-				RelativeBoostPerWaitHour:  tt.fields.RelativeBoostPerWaitHour,
 				InflightCacheExpiry:       tt.fields.InflightCacheExpiry,
 				RootSnoozeTime:            tt.fields.RootSnoozeTime,
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,

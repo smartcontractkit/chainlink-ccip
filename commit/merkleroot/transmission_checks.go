@@ -54,8 +54,11 @@ func ValidateMerkleRootsState(
 		}
 
 		if newNextOnRampSeqNum != offRampExpNextSeqNum {
-			return fmt.Errorf("unexpected seq nums offRampNext=%d newOnRampNext=%d",
-				offRampExpNextSeqNum, newNextOnRampSeqNum)
+			return fmt.Errorf("the merkle root that we are about to propose is stale, some previous report "+
+				"made it on-chain, consider waiting more time for the reports to make it on chain. "+
+				"offramp expects %d but we are proposing a root with min seq num %d for chain %d",
+				offRampExpNextSeqNum, newNextOnRampSeqNum, chain,
+			)
 		}
 	}
 

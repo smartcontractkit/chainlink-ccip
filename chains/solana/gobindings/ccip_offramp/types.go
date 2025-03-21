@@ -237,11 +237,32 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
+type ConfigOcrPluginType struct {
+	Discriminant uint8
+}
+
+func (obj ConfigOcrPluginType) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Discriminant` param:
+	err = encoder.Encode(obj.Discriminant)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ConfigOcrPluginType) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Discriminant`:
+	err = decoder.Decode(&obj.Discriminant)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type ExecutionReportSingleChain struct {
 	SourceChainSelector uint64
 	Message             Any2SVMRampMessage
 	OffchainTokenData   [][]byte
-	Root                [32]uint8
 	Proofs              [][32]uint8
 }
 
@@ -258,11 +279,6 @@ func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *ag_binary.Enco
 	}
 	// Serialize `OffchainTokenData` param:
 	err = encoder.Encode(obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	// Serialize `Root` param:
-	err = encoder.Encode(obj.Root)
 	if err != nil {
 		return err
 	}
@@ -287,11 +303,6 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 	}
 	// Deserialize `OffchainTokenData`:
 	err = decoder.Decode(&obj.OffchainTokenData)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Root`:
-	err = decoder.Decode(&obj.Root)
 	if err != nil {
 		return err
 	}
@@ -409,7 +420,6 @@ type Any2SVMRampMessage struct {
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SVMTokenTransfer
 	ExtraArgs     Any2SVMRampExtraArgs
-	OnRampAddress []byte
 }
 
 func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -440,11 +450,6 @@ func (obj Any2SVMRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	}
 	// Serialize `ExtraArgs` param:
 	err = encoder.Encode(obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Serialize `OnRampAddress` param:
-	err = encoder.Encode(obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -479,11 +484,6 @@ func (obj *Any2SVMRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	}
 	// Deserialize `ExtraArgs`:
 	err = decoder.Decode(&obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OnRampAddress`:
-	err = decoder.Decode(&obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -667,7 +667,7 @@ func (obj *Ocr3ConfigInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 }
 
 type Ocr3Config struct {
-	PluginType   uint8
+	PluginType   ConfigOcrPluginType
 	ConfigInfo   Ocr3ConfigInfo
 	Signers      [16][20]uint8
 	Transmitters [16][32]uint8
@@ -722,14 +722,20 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 }
 
 type SourceChainConfig struct {
-	IsEnabled       bool
-	LaneCodeVersion CodeVersion
-	OnRamp          [2][64]uint8
+	IsEnabled                 bool
+	IsRmnVerificationDisabled bool
+	LaneCodeVersion           CodeVersion
+	OnRamp                    OnRampAddress
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `IsEnabled` param:
 	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsRmnVerificationDisabled` param:
+	err = encoder.Encode(obj.IsRmnVerificationDisabled)
 	if err != nil {
 		return err
 	}
@@ -752,6 +758,11 @@ func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	if err != nil {
 		return err
 	}
+	// Deserialize `IsRmnVerificationDisabled`:
+	err = decoder.Decode(&obj.IsRmnVerificationDisabled)
+	if err != nil {
+		return err
+	}
 	// Deserialize `LaneCodeVersion`:
 	err = decoder.Decode(&obj.LaneCodeVersion)
 	if err != nil {
@@ -759,6 +770,39 @@ func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	}
 	// Deserialize `OnRamp`:
 	err = decoder.Decode(&obj.OnRamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type OnRampAddress struct {
+	Bytes [64]uint8
+	Len   uint32
+}
+
+func (obj OnRampAddress) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Bytes` param:
+	err = encoder.Encode(obj.Bytes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Len` param:
+	err = encoder.Encode(obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OnRampAddress) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Bytes`:
+	err = decoder.Decode(&obj.Bytes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Len`:
+	err = decoder.Decode(&obj.Len)
 	if err != nil {
 		return err
 	}

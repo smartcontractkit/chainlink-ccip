@@ -9,8 +9,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 
-	mapset "github.com/deckarep/golang-set/v2"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -32,14 +30,18 @@ func (p *Plugin) Outcome(
 	// downstream processors and the ccip reader.
 	ctx, lggr := logutil.WithOCRInfo(ctx, p.lggr, outctx.SeqNr, logutil.PhaseOutcome)
 
-	lggr.Debugw("Execute plugin performing outcome",
-		"outctx", outctx,
-		"query", query,
-		"attributedObservations", aos)
 	previousOutcome, err := p.ocrTypeCodec.DecodeOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
+
+	state := previousOutcome.State.Next()
+	lggr = logger.With(lggr, "execPluginState", state)
+	lggr.Debugw("Execute plugin performing outcome",
+		"outctx", outctx,
+		"query", query,
+		"attributedObservations", aos,
+	)
 
 	decodedAos, err := decodeAttributedObservations(aos, p.ocrTypeCodec)
 	if err != nil {
@@ -70,7 +72,6 @@ func (p *Plugin) Outcome(
 	}
 
 	var outcome exectypes.Outcome
-	state := previousOutcome.State.Next()
 	switch state {
 	case exectypes.GetCommitReports:
 		outcome = p.getCommitReportsOutcome(observation)
@@ -90,9 +91,7 @@ func (p *Plugin) Outcome(
 	// This may happen if there is nothing to observe, or during startup when the contracts have
 	// been discovered. In the latter case, getCommitReportsOutcome will return an empty outcome.
 	if outcome.IsEmpty() {
-		lggr.Warnw(
-			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
-			"execPluginState", state)
+		lggr.Warnw("exec outcome: empty outcome")
 		if p.contractsInitialized {
 			return p.ocrTypeCodec.EncodeOutcome(exectypes.Outcome{State: exectypes.Initialized})
 		}
@@ -100,7 +99,12 @@ func (p *Plugin) Outcome(
 	}
 
 	p.observer.TrackOutcome(outcome, state)
-	lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
+	lggr.Infow("generated outcome",
+		"outcome", outcome,
+		"numCommitReports", len(outcome.CommitReports),
+		"numChainReports", len(outcome.Report.ChainReports),
+		"numMessages", observation.Messages.Count(),
+	)
 
 	return p.ocrTypeCodec.EncodeOutcome(outcome)
 }
@@ -125,10 +129,6 @@ func (p *Plugin) getMessagesOutcome(
 	observation exectypes.Observation,
 ) exectypes.Outcome {
 	commitReports := make([]exectypes.CommitData, 0)
-	costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
-	for _, msgID := range observation.CostlyMessages {
-		costlyMessagesSet.Add(msgID)
-	}
 
 	// First ensure that all observed messages has hashes and token data.
 	if err := validateHashesExist(observation.Messages, observation.Hashes); err != nil {
@@ -144,7 +144,6 @@ func (p *Plugin) getMessagesOutcome(
 	// add messages to their commitReports.
 	for i, report := range reports {
 		report.Messages = nil
-		report.CostlyMessages = nil
 		for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
 			if msg, ok := observation.Messages[report.SourceChain][j]; ok {
 				// Always add the message and hash, even if it wont be executed.
@@ -152,10 +151,6 @@ func (p *Plugin) getMessagesOutcome(
 				report.Messages = append(report.Messages, msg)
 
 				report.Hashes = append(report.Hashes, observation.Hashes[report.SourceChain][j])
-
-				if costlyMessagesSet.Contains(msg.Header.MessageID) {
-					report.CostlyMessages = append(report.CostlyMessages, msg.Header.MessageID)
-				}
 				report.MessageTokenData = append(report.MessageTokenData, observation.TokenData[report.SourceChain][j])
 			}
 		}
@@ -185,9 +180,10 @@ func (p *Plugin) getFilterOutcome(
 		p.reportCodec,
 		p.estimateProvider,
 		p.destChain,
+		p.addrCodec,
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
-		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces)),
+		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces, p.addrCodec)),
 		report.WithExtraMessageCheck(report.CheckIfInflight(p.inflightMessageCache.IsInflight)),
 		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
 		report.WithMaxSingleChainReports(p.offchainCfg.MaxSingleChainReports),

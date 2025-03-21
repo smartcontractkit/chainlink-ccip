@@ -1,25 +1,26 @@
 use anchor_lang::prelude::*;
+use ccip_common::seed;
+use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
 use solana_program::instruction::Instruction;
 use solana_program::program::invoke_signed;
 
-use crate::context::{seed, ExecuteReportContext, OcrPluginType};
+use crate::context::{ExecuteReportContext, OcrPluginType};
 use crate::event::{ExecutionStateChanged, SkippedAlreadyExecutedMessage};
 use crate::instructions::interfaces::Execute;
 use crate::messages::{
     Any2SVMRampMessage, ExecutionReportSingleChain, RampMessageHeader, SVMTokenAmount,
 };
-use crate::state::{CommitReport, MessageExecutionState, SourceChain};
+use crate::state::{CommitReport, MessageExecutionState, OnRampAddress, SourceChain};
 use crate::CcipOfframpError;
 
-use super::config::is_on_ramp_configured;
 use super::merkle::{calculate_merkle_root, MerkleError, LEAF_DOMAIN_SEPARATOR};
 use super::messages::{is_writable, Any2SVMMessage, ReleaseOrMintInV1, ReleaseOrMintOutV1};
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForExecutionReportSingleChain;
 use super::pools::{
-    calculate_token_pool_account_indices, get_balance, interact_with_pool,
-    validate_and_parse_token_accounts, TokenAccounts, CCIP_POOL_V1_RET_BYTES,
+    calculate_token_pool_account_indices, get_balance, interact_with_pool, CCIP_POOL_V1_RET_BYTES,
 };
+use super::rmn::verify_uncursed_cpi;
 
 pub struct Impl;
 impl Execute for Impl {
@@ -34,6 +35,13 @@ impl Execute for Impl {
             ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
                 .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
         let report_context = ReportContext::from_byte_words(report_context_byte_words);
+        verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            execution_report.source_chain_selector,
+        )?;
+
         // limit borrowing of ctx
         {
             let config = ctx.accounts.config.load()?;
@@ -41,7 +49,7 @@ impl Execute for Impl {
                 &config.ocr3[OcrPluginType::Execution as usize],
                 &ctx.accounts.sysvar_instructions,
                 ctx.accounts.authority.key(),
-                OcrPluginType::Execution as u8,
+                OcrPluginType::Execution,
                 report_context,
                 &Ocr3ReportForExecutionReportSingleChain(&execution_report),
                 Signatures {
@@ -77,6 +85,12 @@ impl Execute for Impl {
         let execution_report =
             ExecutionReportSingleChain::deserialize(&mut raw_execution_report.as_ref())
                 .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+        verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            execution_report.source_chain_selector,
+        )?;
         internal_execute(ctx, execution_report, token_indexes)
     }
 }
@@ -99,13 +113,6 @@ fn internal_execute<'info>(
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain = &ctx.accounts.source_chain;
-    require!(
-        is_on_ramp_configured(
-            &source_chain.config,
-            &execution_report.message.on_ramp_address
-        ),
-        CcipOfframpError::OnrampNotConfigured
-    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
@@ -134,6 +141,55 @@ fn internal_execute<'info>(
         return Ok(());
     }
 
+    let has_messaging = should_execute_messaging(ctx.remaining_accounts, token_indexes);
+
+    let hashed_leaf: [u8; 32] = if has_messaging {
+        let (msg_program, msg_accounts) = parse_messaging_accounts(
+            token_indexes,
+            &execution_report.message.extra_args.is_writable_bitmap,
+            ctx.remaining_accounts,
+        )?;
+
+        // Verify merkle root before doing any token operations or CPI calls
+        let recv_and_msg_account_keys = Some(*msg_program.key)
+            .into_iter()
+            .chain(msg_accounts.iter().map(|a| *a.key));
+
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            recv_and_msg_account_keys,
+            &source_chain.config.on_ramp,
+        )?
+    } else {
+        verify_merkle_root(
+            &execution_report,
+            commit_report.merkle_root,
+            None.into_iter(),
+            &source_chain.config.on_ramp,
+        )?
+    };
+
+    // Mark as InProgress and emit ExecutionStateChanged event; the event will be used by offchain to recognize that
+    // the message has been attempted in order to avoid more attempts.
+    // An attempt is considered valid only if it passes necessary validation, such as merkle proof check.
+    // Since Solana keeps logs even if the transaction errors, this approach works regardless of attempt outcome.
+    // This event should be emitted before any operations that calls 3rd party programs.
+    let in_progress_state = MessageExecutionState::InProgress;
+    execution_state::set(
+        commit_report,
+        message_header.sequence_number,
+        in_progress_state.to_owned(),
+    );
+
+    emit!(ExecutionStateChanged {
+        source_chain_selector: message_header.source_chain_selector,
+        sequence_number: message_header.sequence_number,
+        message_id: message_header.message_id,
+        message_hash: hashed_leaf,
+        state: in_progress_state,
+    });
+
     // send tokens any -> SOL
     require!(
         token_indexes.len() == execution_report.message.token_amounts.len()
@@ -148,8 +204,8 @@ fn internal_execute<'info>(
     // token_indexes = [2, 4] where remaining_accounts is [custom_account, custom_account, token1_account1, token1_account2, token2_account1, token2_account2] for example
     for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
         let accs = get_token_accounts_for(
-            ctx.accounts.reference_addresses.router,
-            ctx.accounts.reference_addresses.fee_quoter,
+            ctx.accounts.reference_addresses.load()?.router,
+            ctx.accounts.reference_addresses.load()?.fee_quoter,
             ctx.remaining_accounts,
             execution_report.message.token_receiver,
             execution_report.message.header.source_chain_selector,
@@ -181,6 +237,9 @@ fn internal_execute<'info>(
             accs.pool_signer.to_account_info(),
             accs.pool_token_account.to_account_info(),
             accs.pool_chain_config.to_account_info(),
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
             accs.user_token_account.to_account_info(),
         ];
         acc_infos.extend_from_slice(accs.remaining_accounts);
@@ -222,7 +281,7 @@ fn internal_execute<'info>(
     // handle CPI call if there are message accounts in the remaining_accounts
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens and messages, so the first token has a non-zero index (indicating extra accounts before token accounts)
-    let hashed_leaf = if should_execute_messaging(ctx.remaining_accounts, token_indexes) {
+    if has_messaging {
         let (msg_program, msg_accounts) = parse_messaging_accounts(
             token_indexes,
             &execution_report.message.extra_args.is_writable_bitmap,
@@ -267,13 +326,7 @@ fn internal_execute<'info>(
         let signer = &[&seeds[..]];
 
         invoke_signed(&instruction, &acc_infos, signer)?;
-        let recv_and_msg_account_keys = Some(*msg_program.key)
-            .into_iter()
-            .chain(msg_accounts.iter().map(|a| *a.key));
-        verify_merkle_root(&execution_report, recv_and_msg_account_keys)?
-    } else {
-        verify_merkle_root(&execution_report, None.into_iter())?
-    };
+    }
 
     let new_state = MessageExecutionState::Success;
     execution_state::set(
@@ -368,15 +421,21 @@ fn parse_messaging_accounts<'info>(
 
 pub fn verify_merkle_root(
     execution_report: &ExecutionReportSingleChain,
+    expected_root: [u8; 32],
     // logic receiver followed by all other message account keys, when they were
     // provided (i.e. when the message isn't a token transfer exclusively)
     recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+    on_ramp_address: &OnRampAddress,
 ) -> Result<[u8; 32]> {
-    let hashed_leaf = hash(&execution_report.message, recv_and_msg_account_keys);
+    let hashed_leaf = hash(
+        &execution_report.message,
+        recv_and_msg_account_keys,
+        on_ramp_address,
+    );
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
-        calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
+        calculate_merkle_root(hashed_leaf, &execution_report.proofs);
     require!(
-        verified_root.is_ok() && verified_root.unwrap() == execution_report.root,
+        verified_root.is_ok() && verified_root.unwrap() == expected_root,
         CcipOfframpError::InvalidProof
     );
     Ok(hashed_leaf)
@@ -424,12 +483,13 @@ pub fn validate_execution_report<'info>(
 fn hash(
     msg: &Any2SVMRampMessage,
     recv_and_msg_account_keys: impl Iterator<Item = Pubkey>,
+    on_ramp_address: &OnRampAddress,
 ) -> [u8; 32] {
     use anchor_lang::solana_program::keccak;
 
     // Calculate vectors size to ensure that the hash is unique
-    let sender_size = [msg.sender.len() as u8];
-    let on_ramp_address_size = [msg.on_ramp_address.len() as u8];
+    let sender_size = msg.sender.len() as u16; // it should fit in a u8, but it's safer to use u16
+    let on_ramp_address_size = on_ramp_address.bytes().len() as u16; // it should fit in a u8, but it's safer to use u16
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -449,8 +509,8 @@ fn hash(
         "Any2SVMMessageHashV1".as_bytes(),
         &header_source_chain_selector,
         &header_dest_chain_selector,
-        &on_ramp_address_size,
-        &msg.on_ramp_address,
+        &on_ramp_address_size.to_be_bytes(),
+        on_ramp_address.bytes(),
         // message header
         &msg.header.message_id,
         &msg.token_receiver.to_bytes(),
@@ -458,7 +518,7 @@ fn hash(
         msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialized
         &header_nonce,
         // message
-        &sender_size,
+        &sender_size.to_be_bytes(),
         &msg.sender,
         &data_size.to_be_bytes(),
         &msg.data,
@@ -599,7 +659,7 @@ mod tests {
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
-        let on_ramp_address = &[1, 2, 3].to_vec();
+        let on_ramp_address: OnRampAddress = [1, 2, 3].into();
 
         let message = Any2SVMRampMessage {
             sender: [
@@ -635,18 +695,17 @@ mod tests {
                 compute_units: 1000,
                 is_writable_bitmap: 1,
             },
-            on_ramp_address: on_ramp_address.clone(),
         };
         let remaining_account_keys = [
-            Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8").unwrap(),
-            Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
+            Pubkey::try_from("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C").unwrap(),
+            Pubkey::try_from("EvhgrPhTDt4LcSPS2kfJgH6T6XWZ6wT3X9ncDGLT1vui").unwrap(),
         ]
         .into_iter();
 
-        let hash_result = hash(&message, remaining_account_keys);
+        let hash_result = hash(&message, remaining_account_keys, &on_ramp_address);
 
         assert_eq!(
-            "8ceebcae8acd670231be9eb13203797bf6cb09e7a4851dd57600af3ed3945eb0",
+            "5ddb3c9fccb01abee926ec6112afa075dc81fdfe1e2902595d9c1d1d1de4f1d1",
             hex::encode(hash_result)
         );
     }

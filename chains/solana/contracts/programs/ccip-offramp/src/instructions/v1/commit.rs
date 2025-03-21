@@ -1,14 +1,15 @@
 use anchor_lang::prelude::*;
+use ccip_common::seed;
 
-use super::config::is_on_ramp_configured;
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
 
-use crate::context::{seed, CommitInput, CommitReportContext, OcrPluginType};
+use crate::context::{CommitInput, CommitReportContext, OcrPluginType};
 use crate::event::CommitReportAccepted;
 use crate::instructions::interfaces::Commit;
+use crate::instructions::v1::rmn::verify_uncursed_cpi;
 use crate::state::GlobalState;
-use crate::{CcipOfframpError, MerkleRoot, PriceOnlyCommitReportContext};
+use crate::{CcipOfframpError, PriceOnlyCommitReportContext};
 
 pub struct Impl;
 impl Commit for Impl {
@@ -24,6 +25,16 @@ impl Commit for Impl {
         let report = CommitInput::deserialize(&mut raw_report.as_ref())
             .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
 
+        // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
+        let source_chain = &mut ctx.accounts.source_chain;
+
+        verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            source_chain.chain_selector,
+        )?;
+
         require!(
             report.merkle_root.is_some(),
             CcipOfframpError::MissingExpectedMerkleRoot
@@ -34,18 +45,13 @@ impl Commit for Impl {
         // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
         let config = ctx.accounts.config.load()?;
 
-        // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-        let source_chain = &mut ctx.accounts.source_chain;
-
         require!(
             source_chain.config.is_enabled,
             CcipOfframpError::UnsupportedSourceChainSelector
         );
         require!(
-            is_on_ramp_configured(
-                &source_chain.config,
-                &report.merkle_root.as_ref().unwrap().on_ramp_address
-            ),
+            source_chain.config.on_ramp.bytes()
+                == report.merkle_root.as_ref().unwrap().on_ramp_address,
             CcipOfframpError::OnrampNotConfigured
         );
 
@@ -100,7 +106,7 @@ impl Commit for Impl {
             root.max_seq_nr
                 .to_owned()
                 .checked_sub(root.min_seq_nr)
-                .map_or_else(|| false, |seq_size| seq_size <= 64),
+                .map_or_else(|| false, |seq_size| seq_size < 64),
             CcipOfframpError::InvalidSequenceInterval
         ); // As we have 64 slots to store the execution state
         require!(
@@ -132,7 +138,7 @@ impl Commit for Impl {
         commit_report.max_msg_nr = root.max_seq_nr;
 
         emit!(CommitReportAccepted {
-            merkle_root: (*root).clone(),
+            merkle_root: Some((*root).clone()),
             price_updates: report.price_updates.clone(),
         });
 
@@ -140,7 +146,7 @@ impl Commit for Impl {
             &config.ocr3[OcrPluginType::Commit as usize],
             &ctx.accounts.sysvar_instructions,
             ctx.accounts.authority.key(),
-            OcrPluginType::Commit as u8,
+            OcrPluginType::Commit,
             report_context,
             &Ocr3ReportForCommit(&report),
             Signatures { rs, ss, raw_vs },
@@ -160,6 +166,16 @@ impl Commit for Impl {
     ) -> Result<()> {
         let report = CommitInput::deserialize(&mut raw_report.as_ref())
             .map_err(|_| CcipOfframpError::FailedToDeserializeReport)?;
+
+        verify_uncursed_cpi(
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            // No merkle root, so there's no remote chain selector to check.
+            // We pass zero to verify there's no global curse.
+            0,
+        )?;
+
         require!(
             report.merkle_root.is_none(),
             CcipOfframpError::UnexpectedMerkleRoot,
@@ -198,7 +214,7 @@ impl Commit for Impl {
         )?;
 
         emit!(CommitReportAccepted {
-            merkle_root: MerkleRoot::default(),
+            merkle_root: None,
             price_updates: report.price_updates.clone(),
         });
 
@@ -206,7 +222,7 @@ impl Commit for Impl {
             &config.ocr3[OcrPluginType::Commit as usize],
             &ctx.accounts.sysvar_instructions,
             ctx.accounts.authority.key(),
-            OcrPluginType::Commit as u8,
+            OcrPluginType::Commit,
             report_context,
             &Ocr3ReportForCommit(&report),
             Signatures { rs, ss, raw_vs },

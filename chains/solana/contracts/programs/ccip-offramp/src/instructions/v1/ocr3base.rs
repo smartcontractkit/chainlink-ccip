@@ -5,6 +5,7 @@ use anchor_lang::solana_program::{keccak, secp256k1_recover::*};
 use crate::ocr3base::{ConfigSet, Transmitted, MAX_ORACLES};
 use crate::state::{Ocr3Config, Ocr3ConfigInfo};
 use crate::CcipOfframpError;
+use crate::OcrPluginType;
 
 pub const MAX_SIGNERS: usize = MAX_ORACLES;
 pub const MAX_TRANSMITTERS: usize = MAX_ORACLES;
@@ -49,13 +50,13 @@ impl ReportContext {
 
 pub fn ocr3_set(
     ocr3_config: &mut Ocr3Config,
-    plugin_type: u8,
+    plugin_type: OcrPluginType,
     cfg: Ocr3ConfigInfo,
     signers: Vec<[u8; 20]>,
     transmitters: Vec<Pubkey>,
 ) -> Result<()> {
     require!(
-        plugin_type == ocr3_config.plugin_type,
+        plugin_type == ocr3_config.plugin_type.try_into()?,
         CcipOfframpError::Ocr3InvalidPluginType
     );
     require!(
@@ -105,7 +106,7 @@ pub fn ocr3_set(
     ocr3_config.config_info.config_digest = cfg.config_digest;
 
     emit!(ConfigSet {
-        ocr_plugin_type: ocr3_config.plugin_type,
+        ocr_plugin_type: ocr3_config.plugin_type.try_into()?,
         config_digest: ocr3_config.config_info.config_digest,
         signers,
         transmitters,
@@ -132,13 +133,13 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
     ocr3_config: &Ocr3Config,
     instruction_sysvar: &AccountInfo<'_>,
     transmitter: Pubkey,
-    plugin_type: u8,
+    plugin_type: OcrPluginType,
     report_context: ReportContext,
     report: &R,
     signatures: Signatures,
 ) -> Result<()> {
     require!(
-        plugin_type == ocr3_config.plugin_type,
+        plugin_type == ocr3_config.plugin_type.try_into()?,
         CcipOfframpError::Ocr3InvalidPluginType
     );
 
@@ -193,7 +194,7 @@ pub(super) fn ocr3_transmit<R: Ocr3Report>(
     }
 
     emit!(Transmitted {
-        ocr_plugin_type: ocr3_config.plugin_type,
+        ocr_plugin_type: ocr3_config.plugin_type.try_into()?,
         config_digest: ocr3_config.config_info.config_digest,
         sequence_number: report_context.sequence_number(),
     });

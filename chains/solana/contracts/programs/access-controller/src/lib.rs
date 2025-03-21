@@ -4,7 +4,7 @@ use std::mem;
 
 use arrayvec::arrayvec;
 
-declare_id!("9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW");
+declare_id!("6KsN58MTnRQ8FfPaXHiFPPFGDRioikj9CdPvPxZJdCjb");
 
 #[error_code]
 pub enum ErrorCode {
@@ -52,6 +52,10 @@ pub mod access_controller {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut *ctx.accounts.state.load_mut()?;
+        require!(
+            proposed_owner != Pubkey::default() && proposed_owner != state.owner,
+            ErrorCode::InvalidInput
+        );
         state.proposed_owner = proposed_owner;
         Ok(())
     }

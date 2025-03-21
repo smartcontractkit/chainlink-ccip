@@ -10,7 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AcceptOwnership is the `acceptOwnership` instruction.
+// Accept ownership of the multisig config.
+//
+// The proposed new owner must call this function to assume ownership.
+//
+// # Parameters
+//
+// - `ctx`: The context containing the configuration account.
+// - `_multisig_id`: The multisig identifier.
 type AcceptOwnership struct {
 	MultisigId *[32]uint8
 

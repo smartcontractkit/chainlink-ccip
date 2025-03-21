@@ -17,7 +17,7 @@ import (
 //
 //	Assume that we have transmitters: [1, 3, 5]
 //	And transmissionDelayMultiplier = 5s
-//	Then the transmission delays will be: [5s, 10s, 15s]
+//	Then the transmission delays will be: [0s, 5s, 10s]
 func GetTransmissionSchedule(
 	chainSupport ChainSupport,
 	allTheOracles []commontypes.OracleID,
@@ -40,7 +40,7 @@ func GetTransmissionSchedule(
 	transmissionDelays := make([]time.Duration, len(transmitters))
 
 	for i := range transmissionDelays {
-		transmissionDelays[i] = (transmissionDelayMultiplier) * time.Duration(i+1)
+		transmissionDelays[i] = (transmissionDelayMultiplier) * time.Duration(i)
 	}
 
 	if len(transmitters) == 0 {

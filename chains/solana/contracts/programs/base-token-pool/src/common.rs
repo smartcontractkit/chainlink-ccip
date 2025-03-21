@@ -2,10 +2,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::Mint,
 };
+use rmn_remote::state::CurseSubject;
 use spl_math::uint::U256;
 use std::ops::Deref;
 
-use crate::rate_limiter::{validate_token_bucket_config, RateLimitConfig, RateLimitTokenBucket};
+use crate::rate_limiter::{RateLimitConfig, RateLimitTokenBucket};
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // 8-byte anchor discriminator length
 pub const POOL_CHAINCONFIG_SEED: &[u8] = b"ccip_tokenpool_chainconfig"; // seed used by CCIP to provide correct chain config to pool
@@ -46,6 +47,9 @@ pub struct BaseConfig {
     #[max_len(0)]
     // max_len = 0 for InitSpace calculation, the actual length is calculated using the length of the allow_list. `realloc` should be used to handle the increase in account size accordingly
     pub allow_list: Vec<Pubkey>,
+
+    // RMN Remote
+    pub rmn_remote: Pubkey,
 }
 
 impl BaseConfig {
@@ -55,6 +59,7 @@ impl BaseConfig {
         pool_program: Pubkey,
         owner: Pubkey,
         router: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         let token_info = mint.to_account_info();
 
@@ -73,6 +78,7 @@ impl BaseConfig {
         self.owner = owner;
         self.rate_limit_admin = owner;
         self.router = router;
+        self.rmn_remote = rmn_remote;
         (self.router_onramp_authority, _) =
             Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &router);
 
@@ -116,7 +122,7 @@ impl BaseConfig {
         let old_router = self.router;
         self.router = new_router;
         (self.router_onramp_authority, _) =
-            Pubkey::find_program_address(&[POOL_SIGNER_SEED], &new_router);
+            Pubkey::find_program_address(&[EXTERNAL_TOKENPOOL_SIGNER], &new_router);
         emit!(RouterUpdated {
             old_router,
             new_router,
@@ -207,11 +213,10 @@ impl BaseChain {
         inbound: RateLimitConfig,
         outbound: RateLimitConfig,
     ) -> Result<()> {
-        validate_token_bucket_config(&inbound)?;
-        validate_token_bucket_config(&outbound)?;
-
-        self.inbound_rate_limit.cfg = inbound.clone();
-        self.outbound_rate_limit.cfg = outbound.clone();
+        self.inbound_rate_limit
+            .set_token_bucket_config(inbound.clone())?;
+        self.outbound_rate_limit
+            .set_token_bucket_config(outbound.clone())?;
 
         emit!(RateLimitConfigured {
             chain_selector: remote_chain_selector,
@@ -279,7 +284,8 @@ pub struct LockOrBurnInV1 {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct LockOrBurnOutV1 {
     pub dest_token_address: RemoteAddress,
-    pub dest_pool_data: RemoteAddress,
+    // Currently encodes the local decimals as there's a chance they differ.
+    pub dest_pool_data: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -382,6 +388,8 @@ pub struct OwnershipTransferred {
 pub enum CcipTokenPoolError {
     #[msg("Pool authority does not match token mint owner")]
     InvalidInitPoolPermissions,
+    #[msg("Invalid RMN Remote Address")]
+    InvalidRMNRemoteAddress,
     #[msg("Unauthorized")]
     Unauthorized,
     #[msg("Invalid inputs")]
@@ -417,12 +425,18 @@ pub enum CcipTokenPoolError {
 // validate_lock_or_burn checks for correctness on inputs
 // - token & pool is correct for chain
 // - rate limiting
-pub fn validate_lock_or_burn(
+// - destination chain is not cursed
+// - there is no global curse
+#[allow(clippy::too_many_arguments)]
+pub fn validate_lock_or_burn<'info>(
     lock_or_burn_in: &LockOrBurnInV1,
     config_mint: Pubkey,
     outbound_rate_limit: &mut RateLimitTokenBucket,
     allow_list_enabled: bool,
     allow_list: &[Pubkey],
+    rmn_remote: AccountInfo<'info>,
+    rmn_remote_curses: AccountInfo<'info>,
+    rmn_remote_config: AccountInfo<'info>,
 ) -> Result<()> {
     // validate token matches configured pool token
     require!(
@@ -435,18 +449,31 @@ pub fn validate_lock_or_burn(
         CcipTokenPoolError::InvalidSender
     );
 
-    outbound_rate_limit.consume(lock_or_burn_in.amount)
+    verify_uncursed_cpi(
+        rmn_remote,
+        rmn_remote_config,
+        rmn_remote_curses,
+        lock_or_burn_in.remote_chain_selector,
+    )?;
+
+    outbound_rate_limit.consume::<Clock>(lock_or_burn_in.amount)
 }
 
 // validate_lock_or_burn checks for correctness on inputs
 // - token & pool is correct for chain
 // - rate limiting
-pub fn validate_release_or_mint(
+// - source chain is not cursed
+// - there is no global curse
+#[allow(clippy::too_many_arguments)]
+pub fn validate_release_or_mint<'info>(
     release_or_mint_in: &ReleaseOrMintInV1,
     parsed_amount: u64,
     config_mint: Pubkey,
     pool_addresses: &[RemoteAddress],
     inbound_rate_limit: &mut RateLimitTokenBucket,
+    rmn_remote: AccountInfo<'info>,
+    rmn_remote_curses: AccountInfo<'info>,
+    rmn_remote_config: AccountInfo<'info>,
 ) -> Result<()> {
     require_eq!(
         config_mint,
@@ -460,7 +487,31 @@ pub fn validate_release_or_mint(
         CcipTokenPoolError::InvalidSourcePoolAddress
     );
 
-    inbound_rate_limit.consume(parsed_amount)
+    verify_uncursed_cpi(
+        rmn_remote,
+        rmn_remote_config,
+        rmn_remote_curses,
+        release_or_mint_in.remote_chain_selector,
+    )?;
+
+    inbound_rate_limit.consume::<Clock>(parsed_amount)
+}
+
+pub fn verify_uncursed_cpi<'info>(
+    rmn_remote: AccountInfo<'info>,
+    rmn_remote_config: AccountInfo<'info>,
+    rmn_remote_curses: AccountInfo<'info>,
+    chain_selector: u64,
+) -> Result<()> {
+    let cpi_accounts = rmn_remote::cpi::accounts::InspectCurses {
+        config: rmn_remote_config,
+        curses: rmn_remote_curses,
+    };
+    let cpi_context = CpiContext::new(rmn_remote, cpi_accounts);
+    rmn_remote::cpi::verify_not_cursed(
+        cpi_context,
+        CurseSubject::from_chain_selector(chain_selector),
+    )
 }
 
 pub fn to_svm_token_amount(

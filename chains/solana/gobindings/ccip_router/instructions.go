@@ -89,6 +89,15 @@ var (
 	// * `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token).
 	Instruction_UpdateFeeAggregator = ag_binary.TypeID([8]byte{85, 112, 115, 60, 22, 95, 230, 56})
 
+	// Updates the RMN remote program in the router configuration.
+	// The Admin is the only one able to update the RMN remote program.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `rmn_remote,` - The new RMN remote address.
+	Instruction_UpdateRmnRemote = ag_binary.TypeID([8]byte{66, 12, 215, 147, 14, 176, 55, 214})
+
 	// Adds a new chain selector to the router.
 	//
 	// The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).
@@ -257,7 +266,20 @@ var (
 	// * `ctx` - The context containing the accounts required for sending the message.
 	// * `dest_chain_selector` - The chain selector for the destination chain.
 	// * `message` - The message to be sent. The size limit of data is 256 bytes.
+	// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
 	Instruction_CcipSend = ag_binary.TypeID([8]byte{108, 216, 134, 191, 249, 234, 33, 84})
+
+	// Queries the onramp for the fee required to send a message.
+	//
+	// This call is permissionless. Note it does not verify whether there's a curse active
+	// in order to avoid the RMN CPI overhead.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for obtaining the message fee.
+	// * `dest_chain_selector` - The chain selector for the destination chain.
+	// * `message` - The message to be sent. The size limit of data is 256 bytes.
+	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -273,6 +295,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "SetDefaultCodeVersion"
 	case Instruction_UpdateFeeAggregator:
 		return "UpdateFeeAggregator"
+	case Instruction_UpdateRmnRemote:
+		return "UpdateRmnRemote"
 	case Instruction_AddChainSelector:
 		return "AddChainSelector"
 	case Instruction_UpdateDestChainConfig:
@@ -305,6 +329,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
 		return "CcipSend"
+	case Instruction_GetFee:
+		return "GetFee"
 	default:
 		return ""
 	}
@@ -339,6 +365,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"update_fee_aggregator", (*UpdateFeeAggregator)(nil),
+		},
+		{
+			"update_rmn_remote", (*UpdateRmnRemote)(nil),
 		},
 		{
 			"add_chain_selector", (*AddChainSelector)(nil),
@@ -387,6 +416,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"ccip_send", (*CcipSend)(nil),
+		},
+		{
+			"get_fee", (*GetFee)(nil),
 		},
 	},
 )

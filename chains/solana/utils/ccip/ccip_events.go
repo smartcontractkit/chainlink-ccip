@@ -21,7 +21,7 @@ type EventCCIPMessageSent struct {
 
 type EventCommitReportAccepted struct {
 	Discriminator [8]byte
-	Report        ccip_offramp.MerkleRoot
+	Report        *ccip_offramp.MerkleRoot `bin:"optional"`
 	PriceUpdates  ccip_offramp.PriceUpdates
 }
 
@@ -62,6 +62,13 @@ type UsdPerTokenUpdated struct {
 	Token         solana.PublicKey
 	Value         [28]byte
 	Timestamp     int64
+}
+
+// FeeQuoter-specific event
+type TokenPriceUpdateIgnored struct {
+	Discriminator [8]byte
+	Token         solana.PublicKey
+	Value         [28]byte
 }
 
 // FeeQuoter-specific event
@@ -108,12 +115,14 @@ type EventOfframpReferenceAddressesSet struct {
 	Router             solana.PublicKey
 	FeeQuoter          solana.PublicKey
 	OfframpLookupTable solana.PublicKey
+	RMNRemote          solana.PublicKey
 }
 
 type EventRouterConfigSet struct {
 	Discriminator    [8]byte
 	SvmChainSelector uint64
 	FeeQuoter        solana.PublicKey
+	RMNRemote        solana.PublicKey
 	LinkTokenMint    solana.PublicKey
 	FeeAggregator    solana.PublicKey
 }
@@ -122,6 +131,14 @@ type EventFeeQuoterConfigSet struct {
 	Discriminator      [8]byte
 	MaxFeeJuelsPerMsg  bin.Uint128
 	LinkTokenMint      solana.PublicKey
+	LinkTokenDecimals  uint8
 	Onramp             solana.PublicKey
 	DefaultCodeVersion fee_quoter.CodeVersion
+}
+
+type EventReferenceAddressesSet struct {
+	Discriminator      [8]byte
+	Router             solana.PublicKey
+	FeeQuoter          solana.PublicKey
+	OfframpLookupTable solana.PublicKey
 }

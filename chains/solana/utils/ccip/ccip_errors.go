@@ -411,3 +411,45 @@ func (value CcipOfframpError) String() string {
 		return ""
 	}
 }
+
+///////////////
+// RMNRemote //
+///////////////
+
+//nolint:all
+type RmnRemoteError ag_binary.BorshEnum
+
+//nolint:all
+const (
+	Unauthorized_RmnRemoteError RmnRemoteError = iota
+	SubjectIsAlreadyCursed_RmnRemoteError
+	SubjectWasNotCursed_RmnRemoteError
+	RedundantOwnerProposal_RmnRemoteError
+	InvalidVersion_RmnRemoteError
+	SubjectCursed_RmnRemoteError
+	GloballyCursed_RmnRemoteError
+	InvalidCodeVersion_RmnRemoteError
+)
+
+func (value RmnRemoteError) String() string {
+	switch value {
+	case Unauthorized_RmnRemoteError:
+		return "Unauthorized"
+	case SubjectIsAlreadyCursed_RmnRemoteError:
+		return "SubjectIsAlreadyCursed"
+	case SubjectWasNotCursed_RmnRemoteError:
+		return "SubjectWasNotCursed"
+	case RedundantOwnerProposal_RmnRemoteError:
+		return "RedundantOwnerProposal"
+	case InvalidVersion_RmnRemoteError:
+		return "InvalidVersion"
+	case SubjectCursed_RmnRemoteError:
+		return "SubjectCursed"
+	case GloballyCursed_RmnRemoteError:
+		return "GloballyCursed"
+	case InvalidCodeVersion_RmnRemoteError:
+		return "InvalidCodeVersion"
+	default:
+		return ""
+	}
+}

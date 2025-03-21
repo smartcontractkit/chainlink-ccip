@@ -15,12 +15,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	testhelpersrand "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -180,6 +183,20 @@ func makeMessage(src cciptypes.ChainSelector, num cciptypes.SeqNum, nonce uint64
 	}
 }
 
+// makeMessageWithSender is the same as makeMessage but overrides the sender to the provided input.
+//
+//nolint:unparam
+func makeMessageWithSender(
+	src cciptypes.ChainSelector,
+	seqNum cciptypes.SeqNum,
+	nonce uint64,
+	sender cciptypes.UnknownAddress,
+) cciptypes.Message {
+	base := makeMessage(src, seqNum, nonce)
+	base.Sender = sender
+	return base
+}
+
 // makeTestCommitReportWithSenders is the same as makeTestCommitReport but overrides the senders.
 func makeTestCommitReportWithSenders(
 	hasher cciptypes.MessageHasher,
@@ -197,7 +214,7 @@ func makeTestCommitReportWithSenders(
 	}
 
 	data := makeTestCommitReport(hasher, numMessages, srcChain, firstSeqNum,
-		block, timestamp, senders[0], rootOverride, executed)
+		block, timestamp, senders[0], rootOverride, executed, false)
 
 	for i := range data.Messages {
 		data.Messages[i].Sender = senders[i]
@@ -208,6 +225,8 @@ func makeTestCommitReportWithSenders(
 
 // makeTestCommitReport creates a basic commit report with messages given different parameters. This function
 // will panic if the input parameters are inconsistent.
+// if zeroNonces is set to true, nonces will be zero for all messages.
+// if its false, they will increment starting from 1.
 func makeTestCommitReport(
 	hasher cciptypes.MessageHasher,
 	numMessages,
@@ -218,6 +237,7 @@ func makeTestCommitReport(
 	sender cciptypes.UnknownAddress,
 	rootOverride cciptypes.Bytes32,
 	executed []cciptypes.SeqNum,
+	zeroNonces bool,
 ) exectypes.CommitData {
 	sequenceNumberRange :=
 		cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1))
@@ -229,11 +249,22 @@ func makeTestCommitReport(
 	}
 	var messages []cciptypes.Message
 	for i := 0; i < numMessages; i++ {
-		msg := makeMessage(
-			cciptypes.ChainSelector(srcChain),
-			cciptypes.SeqNum(i+firstSeqNum),
-			uint64(i)+1,
-		)
+		var msg cciptypes.Message
+		if zeroNonces {
+			msg = makeMessage(
+				cciptypes.ChainSelector(srcChain),
+				cciptypes.SeqNum(i+firstSeqNum),
+				0,
+			)
+		} else {
+
+			msg = makeMessage(
+				cciptypes.ChainSelector(srcChain),
+				cciptypes.SeqNum(i+firstSeqNum),
+				uint64(i)+1,
+			)
+		}
+
 		msg.Sender = sender
 		messages = append(messages, msg)
 	}
@@ -475,7 +506,9 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 				},
 			},
 			expectedExecReports:   1,
@@ -493,7 +526,9 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 				},
 			},
 			expectedExecReports:   1,
@@ -510,11 +545,15 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 				},
 			},
 			expectedExecReports:   2,
@@ -531,11 +570,15 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 				},
 			},
 			expectedExecReports:   2,
@@ -553,11 +596,15 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 				},
 			},
 			expectedExecReports:   1,
@@ -579,7 +626,9 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
+						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
+						false, // zeroNonces
+					),
 				},
 			},
 			expectedExecReports:   1,
@@ -600,7 +649,9 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
+						[]cciptypes.SeqNum{100, 101, 102, 103, 104}, // executed
+						false, // zeroNonces
+					),
 				},
 			},
 			expectedExecReports:   1,
@@ -669,7 +720,9 @@ func Test_Builder_Build(t *testing.T) {
 					breakCommitReport(makeTestCommitReport(hasher, 10, 1, 101, 1000, 10101010102,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil)),
+						nil,                 // executed
+						false,               // zeroNonces
+					)),
 				},
 			},
 			wantErr: "unable to add a single chain report",
@@ -682,13 +735,38 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						mustMakeBytes(""), // random root
-						nil),
+						nil,               // executed
+						false,             // zeroNonces
+					),
 				},
 			},
 			wantErr: "merkle root mismatch: expected 0x00000000000000000",
 		},
 		{
-			name: "skip over one large messages",
+			name: "skip over one large message in OOO",
+			args: args{
+				maxReportSize: 10000,
+				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					setMessageData(5, 20000, // message at index 5 is too big.
+						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+							sender,
+							cciptypes.Bytes32{}, // generate a correct root.
+							nil,                 // executed
+							true,                // zeroNonces must be set otherwise the skip logic will fail the nonce check.
+						)),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 0,
+			expectedExecThings:    []int{9},
+			// seq num 105 is skipped due to size.
+			// because of out of order execution, the rest can be safely included.
+			lastReportExecuted: []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 108, 109},
+		},
+		{
+			name: "skip over one large messages in ordered execution",
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
@@ -698,16 +776,21 @@ func Test_Builder_Build(t *testing.T) {
 						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 							sender,
 							cciptypes.Bytes32{}, // generate a correct root.
-							nil)),
+							nil,                 // executed
+							false,               // zeroNonces
+						)),
 				},
 			},
 			expectedExecReports:   1,
 			expectedCommitReports: 0,
-			expectedExecThings:    []int{9},
-			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 108, 109},
+			// message at index 5 is the large one, and because its skipped, so are the rest, due to nonce check.
+			expectedExecThings: []int{5},
+			// seq num 105 is initially skipped due to size.
+			// the rest are skipped due to skipped nonce checks.
+			lastReportExecuted: []cciptypes.SeqNum{100, 101, 102, 103, 104},
 		},
 		{
-			name: "skip over two large messages",
+			name: "skip over two large messages in OOO",
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
@@ -718,13 +801,41 @@ func Test_Builder_Build(t *testing.T) {
 							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 								sender,
 								cciptypes.Bytes32{}, // generate a correct root.
-								nil))),
+								nil,                 // executed
+								true,                // zeroNonces must be set otherwise the skip logic will fail the nonce check.
+							))),
 				},
 			},
 			expectedExecReports:   1,
 			expectedCommitReports: 0,
 			expectedExecThings:    []int{8},
-			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 109},
+			// seq num 105 and 108 are skipped due to size.
+			// because of out of order execution, the rest can be safely included.
+			lastReportExecuted: []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 109},
+		},
+		{
+			name: "skip over two large messages in ordered execution",
+			args: args{
+				maxReportSize: 10000,
+				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					setMessageData(8, 20000,
+						setMessageData(5, 20000,
+							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+								sender,
+								cciptypes.Bytes32{}, // generate a correct root.
+								nil,                 // executed
+								false,               // zeroNonces
+							))),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 0,
+			expectedExecThings:    []int{5},
+			// seq num 105 is skipped due to size.
+			// the rest are skipped due to skipped nonce checks.
+			lastReportExecuted: []cciptypes.SeqNum{100, 101, 102, 103, 104},
 		},
 		{
 			name: "report num message limiting",
@@ -737,7 +848,9 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,                 // executed
+						false,               // zeroNonces
+					),
 				},
 			},
 			expectedExecReports:   1,
@@ -758,7 +871,9 @@ func Test_Builder_Build(t *testing.T) {
 							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 								sender,
 								cciptypes.Bytes32{},
-								nil))),
+								nil,  // executed
+								true, // zeroNonces must be set otherwise the skip logic will fail the nonce check.
+							))),
 				},
 			},
 			expectedExecReports:   1,
@@ -777,11 +892,15 @@ func Test_Builder_Build(t *testing.T) {
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,
+						false,
+					),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
 						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
-						nil),
+						nil,
+						false,
+					),
 				},
 			},
 			expectedExecReports:   1,
@@ -789,6 +908,8 @@ func Test_Builder_Build(t *testing.T) {
 			expectedExecThings:    []int{10},
 		},
 	}
+
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -805,12 +926,13 @@ func Test_Builder_Build(t *testing.T) {
 				hasher,
 				codec,
 				ep,
-				1,
+				1, // destChainSelector
+				mockAddrCodec,
 				WithMaxReportSizeBytes(tt.args.maxReportSize),
 				WithMaxGas(tt.args.maxGasLimit),
 				WithMaxMessages(tt.args.maxMessages),
 				WithMaxSingleChainReports(tt.args.maxReports),
-				WithExtraMessageCheck(CheckNonces(tt.args.nonces)),
+				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
 			)
 
 			var updatedMessages []exectypes.CommitData
@@ -1010,6 +1132,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				resolvedEncoder,
 				ep,
 				1,
+				internal.NewMockAddressCodecHex(t),
 				WithMaxReportSizeBytes(tt.fields.maxReportSizeBytes),
 				WithMaxGas(tt.fields.maxGas),
 			)
@@ -1231,6 +1354,8 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			expectedStatus: PseudoDeleted,
 		},
 	}
+
+	mockAddrCodec := internal.NewMockAddressCodecHex(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1246,7 +1371,8 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				nil,
 				nil,
 				1,
-				WithExtraMessageCheck(CheckNonces(tt.args.nonces)),
+				internal.NewMockAddressCodecHex(t),
+				WithExtraMessageCheck(CheckNonces(tt.args.nonces, mockAddrCodec)),
 			)
 			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
 			if tt.expectedError != "" {
@@ -1268,6 +1394,179 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				assert.Equalf(t, tt.args.execReport, data, "checkMessage(...)")
 			} else {
 				assert.Equalf(t, tt.expectedData, data, "checkMessage(...)")
+			}
+		})
+	}
+}
+
+func Test_checkSkippedNonces(t *testing.T) {
+	sourceChain1 := cciptypes.ChainSelector(1)
+	sender1 := cciptypes.UnknownAddress(testhelpersrand.RandomBytes(32))
+	sender2 := cciptypes.UnknownAddress(testhelpersrand.RandomBytes(32))
+	type args struct {
+		execReport cciptypes.ExecutePluginReportSingleChain
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "valid nonces from same sender",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessageWithSender(sourceChain1, 100, 1, sender1),
+						makeMessageWithSender(sourceChain1, 101, 2, sender1),
+						makeMessageWithSender(sourceChain1, 102, 3, sender1),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "skipped nonce from same sender",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessageWithSender(sourceChain1, 100, 1, sender1),
+						// nonce 2 is skipped.
+						makeMessageWithSender(sourceChain1, 101, 3, sender1),
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "different nonce from different sender",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessageWithSender(sourceChain1, 100, 1, sender1),
+						// nonce is not really skipped, different sender
+						makeMessageWithSender(sourceChain1, 101, 3, sender2),
+						makeMessageWithSender(sourceChain1, 102, 2, sender1),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "out of order execution message from same sender",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessageWithSender(sourceChain1, 101, 1, sender1),
+						// nonce == 0 => out of order execution
+						makeMessageWithSender(sourceChain1, 102, 0, sender1),
+						makeMessageWithSender(sourceChain1, 103, 2, sender1),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple senders valid nonces",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessageWithSender(sourceChain1, 100, 1, sender1),
+						makeMessageWithSender(sourceChain1, 101, 2, sender1),
+						makeMessageWithSender(sourceChain1, 102, 1, sender2),
+						makeMessageWithSender(sourceChain1, 103, 2, sender2),
+						makeMessageWithSender(sourceChain1, 104, 3, sender1),
+						makeMessageWithSender(sourceChain1, 105, 3, sender2),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple senders skipped nonce on one of them",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						// sender1 is fine
+						makeMessageWithSender(sourceChain1, 100, 1, sender1),
+						makeMessageWithSender(sourceChain1, 101, 2, sender1),
+						// sender2 skips nonce 2
+						makeMessageWithSender(sourceChain1, 102, 1, sender2),
+						// note that seqNr _cannot_ be 103, because that would indicate
+						// that the onchain message indeed had nonce 3, but it should have nonce 2.
+						// so, essentially msg (seqNr=103, nonce=2) was skipped.
+						makeMessageWithSender(sourceChain1, 104, 3, sender2),
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unordered nonces from same sender",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						// nonce 1 should be included in messages array before nonce 2.
+						makeMessageWithSender(sourceChain1, 100, 2, sender1),
+						makeMessageWithSender(sourceChain1, 101, 1, sender1),
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "multiple senders one of them unordered nonces",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						// sender1 is fine
+						makeMessageWithSender(sourceChain1, 100, 1, sender1),
+						makeMessageWithSender(sourceChain1, 101, 2, sender1),
+						// sender2 has unordered nonces
+						makeMessageWithSender(sourceChain1, 102, 2, sender2),
+						makeMessageWithSender(sourceChain1, 103, 1, sender2),
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "all out of order execution",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessageWithSender(sourceChain1, 100, 0, sender1),
+						makeMessageWithSender(sourceChain1, 101, 0, sender1),
+						makeMessageWithSender(sourceChain1, 102, 0, sender1),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple senders all out of order execution",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						// sender1 is fine
+						makeMessageWithSender(sourceChain1, 100, 0, sender1),
+						makeMessageWithSender(sourceChain1, 101, 0, sender1),
+						// sender2 is fine
+						makeMessageWithSender(sourceChain1, 102, 0, sender2),
+						makeMessageWithSender(sourceChain1, 103, 0, sender2),
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAddrCodec := internal.NewMockAddressCodecHex(t)
+			err := verifyReportNonceContinuity(mockAddrCodec, tt.args.execReport)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}

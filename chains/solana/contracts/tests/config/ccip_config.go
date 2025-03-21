@@ -15,19 +15,19 @@ var (
 	DefaultCommitment = rpc.CommitmentConfirmed
 
 	// program ids
-	CcipRouterProgram          = solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8")
-	CcipLogicReceiver          = solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH")
+	CcipRouterProgram          = GetProgramID("ccip_router")
+	CcipLogicReceiver          = GetProgramID("test_ccip_receiver")
 	CcipTokenReceiver          = solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
-	CcipInvalidReceiverProgram = solana.MustPublicKeyFromBase58("9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8")
-	CcipTokenPoolProgram       = solana.MustPublicKeyFromBase58("GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH")
-	Token2022Program           = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
-	FeeQuoterProgram           = solana.MustPublicKeyFromBase58("FeeVB9Q77QvyaENRL1i77BjW6cTkaWwNLjNbZg9JHqpw")
-	CcipOfframpProgram         = solana.MustPublicKeyFromBase58("offRPDpDxT5MGFNmMh99QKTZfPWTkqYUrStEriAS1H5")
-	PingPongProgram            = solana.MustPublicKeyFromBase58("PPbZmYFf5SPAM9Jhm9mNmYoCwT7icPYVKAfJoMCQovU")
+	CcipInvalidReceiverProgram = GetProgramID("test_ccip_invalid_receiver")
+	CcipTokenPoolProgram       = GetProgramID("test_token_pool")
+	Token2022Program           = solana.Token2022ProgramID
+	FeeQuoterProgram           = GetProgramID("fee_quoter")
+	CcipOfframpProgram         = GetProgramID("ccip_offramp")
+	RMNRemoteProgram           = GetProgramID("rmn_remote")
+	PingPongProgram            = GetProgramID("ping_pong_demo")
 
 	// test values
 	OnRampAddress                   = []byte{1, 2, 3}
-	OnRampAddressPadded             = [64]byte{1, 2, 3}
 	EnableExecutionAfter            = int64(1800) // 30min
 	MaxOracles                      = 16
 	OcrF                      uint8 = 5
@@ -45,10 +45,10 @@ var (
 	SvmChainFamilySelector, _ = hex.DecodeString("1e10bdc4")
 
 	// example programs
-	CcipBaseSender          = solana.MustPublicKeyFromBase58("CcipSender111111111111111111111111111111111")
-	CcipBaseReceiver        = solana.MustPublicKeyFromBase58("CcipReceiver1111111111111111111111111111111")
-	CcipBasePoolBurnMint    = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111111BurnMint")
-	CcipBasePoolLockRelease = solana.MustPublicKeyFromBase58("TokenPooL11111111111111111111111LockReLease")
+	CcipBaseSender          = GetProgramID("example_ccip_sender")
+	CcipBaseReceiver        = GetProgramID("example_ccip_receiver")
+	CcipBasePoolBurnMint    = GetProgramID("burnmint_token_pool")
+	CcipBasePoolLockRelease = GetProgramID("lockrelease_token_pool")
 
 	// router/onramp PDAs
 	RouterConfigPDA, _, _                    = state.FindConfigPDA(CcipRouterProgram)
@@ -76,4 +76,8 @@ var (
 	FqEvmDestChainPDA, _, _               = state.FindFqDestChainPDA(EvmChainSelector, FeeQuoterProgram)
 	FqSvmDestChainPDA, _, _               = state.FindFqDestChainPDA(SvmChainSelector, FeeQuoterProgram)
 	FqAllowedPriceUpdaterOfframpPDA, _, _ = state.FindFqAllowedPriceUpdaterPDA(OfframpBillingSignerPDA, FeeQuoterProgram)
+
+	// RMN Remote PDAs
+	RMNRemoteConfigPDA, _, _ = state.FindRMNRemoteConfigPDA(RMNRemoteProgram)
+	RMNRemoteCursesPDA, _, _ = state.FindRMNRemoteCursesPDA(RMNRemoteProgram)
 )

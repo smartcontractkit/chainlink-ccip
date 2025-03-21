@@ -10,7 +10,17 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AppendSignatures is the `appendSignatures` instruction.
+// Append a batch of ECDSA signatures to the temporary storage.
+//
+// Allows adding multiple signatures in batches to overcome transaction size limits.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
+// - `root`: The Merkle root being approved.
+// - `valid_until`: Timestamp until which the root will remain valid.
+// - `signatures_batch`: A batch of ECDSA signatures to be verified.
 type AppendSignatures struct {
 	MultisigId      *[32]uint8
 	Root            *[32]uint8

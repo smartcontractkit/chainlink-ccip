@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use bytemuck::{Pod, Zeroable};
+use ccip_common::seed;
 use solana_program::sysvar::instructions;
 
 use crate::messages::ExecutionReportSingleChain;
@@ -24,28 +26,6 @@ pub const fn valid_version(v: u8, max_version: u8) -> bool {
 
 pub const fn uninitialized(v: u8) -> bool {
     v == 0
-}
-
-/// Fixed seeds for PDA derivation: different context must use different seeds.
-pub mod seed {
-    pub const SOURCE_CHAIN: &[u8] = b"source_chain_state";
-    pub const COMMIT_REPORT: &[u8] = b"commit_report";
-    pub const CONFIG: &[u8] = b"config";
-    pub const REFERENCE_ADDRESSES: &[u8] = b"reference_addresses";
-    pub const STATE: &[u8] = b"state";
-
-    // arbitrary messaging signer
-    pub const EXTERNAL_EXECUTION_CONFIG: &[u8] = b"external_execution_config";
-    // token pool interaction signer
-    pub const EXTERNAL_TOKEN_POOL: &[u8] = b"external_token_pools_signer";
-    // signer for billing fee token transfer
-    pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer";
-
-    // token specific
-    pub const TOKEN_ADMIN_REGISTRY: &[u8] = b"token_admin_registry";
-    pub const CCIP_TOKENPOOL_CONFIG: &[u8] = b"ccip_tokenpool_config";
-    pub const CCIP_TOKENPOOL_SIGNER: &[u8] = b"ccip_tokenpool_signer";
-    pub const TOKEN_POOL_CONFIG: &[u8] = b"ccip_tokenpool_chainconfig";
 }
 
 #[derive(Accounts)]
@@ -81,12 +61,14 @@ pub struct Initialize<'info> {
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ReferenceAddresses::INIT_SPACE,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     /// CHECK: Router address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub router: UncheckedAccount<'info>,
     /// CHECK: FeeQuoter address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub fee_quoter: UncheckedAccount<'info>,
+    /// CHECK: RMNRemote address, to be persisted in reference_addresses. Just they key is used, no data is read.
+    pub rmn_remote: UncheckedAccount<'info>,
     /// CHECK: ALT address, to be persisted in reference_addresses. Just they key is used, no data is read.
     pub offramp_lookup_table: UncheckedAccount<'info>,
 
@@ -128,6 +110,26 @@ pub struct Initialize<'info> {
     // Initialization only allowed by program upgrade authority
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipOfframpError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateReferenceAddresses<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+    )]
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
+
+    #[account(address = config.load()?.owner @ CcipOfframpError::Unauthorized)]
+    pub authority: Signer<'info>,
 }
 
 /// Input from an offchain node, containing the Merkle root and interval for
@@ -314,9 +316,9 @@ pub struct CommitReportContext<'info> {
     #[account(
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
-        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(
         mut,
@@ -352,14 +354,14 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: fee quoter program account, used to invoke fee quoter with price updates
     #[account(
-        address = reference_addresses.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
+        address = reference_addresses.load()?.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
     /// CHECK: fee quoter allowed price updater account, used to invoke fee quoter with price updates
     /// so that it can authorize the call made by this offramp
     #[account(
-        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
+        seeds = [seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
         bump,
         seeds::program = fee_quoter.key(),
     )]
@@ -367,11 +369,36 @@ pub struct CommitReportContext<'info> {
 
     /// CHECK: fee quoter config account, used to invoke fee quoter with price updates
     #[account(
-        seeds = [fee_quoter::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
-        seeds::program = reference_addresses.fee_quoter,
+        seeds::program = reference_addresses.load()?.fee_quoter,
     )]
     pub fee_quoter_config: UncheckedAccount<'info>,
+
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = reference_addresses.load()?.rmn_remote @ CcipOfframpError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [seed::CURSES],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
     // remaining accounts
     // global state account (to update the last seen price sequence number)
     // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
@@ -390,9 +417,9 @@ pub struct PriceOnlyCommitReportContext<'info> {
     #[account(
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
-        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -411,14 +438,14 @@ pub struct PriceOnlyCommitReportContext<'info> {
 
     /// CHECK: fee quoter program account, used to invoke fee quoter with price updates
     #[account(
-        address = reference_addresses.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
+        address = reference_addresses.load()?.fee_quoter @ CcipOfframpError::InvalidInputsFeeQuoterAccount,
     )]
     pub fee_quoter: UncheckedAccount<'info>,
 
     /// CHECK: fee quoter allowed price updater account, used to invoke fee quoter with price updates
     /// so that it can authorize the call made by this offramp
     #[account(
-        seeds = [fee_quoter::context::seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
+        seeds = [seed::ALLOWED_PRICE_UPDATER, fee_billing_signer.key().as_ref()],
         bump,
         seeds::program = fee_quoter.key(),
     )]
@@ -426,11 +453,36 @@ pub struct PriceOnlyCommitReportContext<'info> {
 
     /// CHECK: fee quoter config account, used to invoke fee quoter with price updates
     #[account(
-        seeds = [fee_quoter::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
-        seeds::program = reference_addresses.fee_quoter,
+        seeds::program = reference_addresses.load()?.fee_quoter,
     )]
     pub fee_quoter_config: UncheckedAccount<'info>,
+
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = reference_addresses.load()?.rmn_remote @ CcipOfframpError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [seed::CURSES],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
     // remaining accounts
     // global state account (to update the last seen price sequence number)
     // [...billingTokenConfig accounts] fee quoter accounts used to store token prices
@@ -452,9 +504,9 @@ pub struct ExecuteReportContext<'info> {
     #[account(
         seeds = [seed::REFERENCE_ADDRESSES],
         bump,
-        constraint = valid_version(reference_addresses.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
     )]
-    pub reference_addresses: Account<'info, ReferenceAddresses>,
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(
         seeds = [seed::SOURCE_CHAIN, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref()],
@@ -465,7 +517,7 @@ pub struct ExecuteReportContext<'info> {
 
     #[account(
         mut,
-        seeds = [seed::COMMIT_REPORT, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.root.as_ref()],
+        seeds = [seed::COMMIT_REPORT, ExecutionReportSingleChain::deserialize(&mut raw_report.as_ref())?.source_chain_selector.to_le_bytes().as_ref(), commit_report.merkle_root.as_ref()],
         bump,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
     )]
@@ -478,10 +530,10 @@ pub struct ExecuteReportContext<'info> {
     /// so that token pools and receivers can then check that the caller is an actual offramp that
     /// has been registered in the router as such for that source chain.
     #[account(
-        owner = reference_addresses.router @ CcipOfframpError::InvalidInputsAllowedOfframpAccount, // this guarantees that it was initialized
+        owner = reference_addresses.load()?.router @ CcipOfframpError::InvalidInputsAllowedOfframpAccount, // this guarantees that it was initialized
         seeds = [ALLOWED_OFFRAMP, source_chain.chain_selector.to_le_bytes().as_ref(), offramp.key().as_ref()],
         bump,
-        seeds::program = reference_addresses.router,
+        seeds::program = reference_addresses.load()?.router,
     )]
     pub allowed_offramp: UncheckedAccount<'info>,
 
@@ -499,6 +551,31 @@ pub struct ExecuteReportContext<'info> {
 
     #[account(seeds = [seed::EXTERNAL_TOKEN_POOL], bump)]
     pub token_pools_signer: Account<'info, ExternalExecutionConfig>,
+
+    ////////////////////
+    // RMN Remote CPI //
+    ////////////////////
+    /// CHECK: This is the account for the RMN Remote program
+    #[account(
+        address = reference_addresses.load()?.rmn_remote @ CcipOfframpError::InvalidRMNRemoteAddress,
+    )]
+    pub rmn_remote: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [seed::CURSES],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_curses: UncheckedAccount<'info>,
+
+    /// CHECK: This account is just used in the CPI to the RMN Remote program
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        seeds::program = reference_addresses.load()?.rmn_remote,
+    )]
+    pub rmn_remote_config: UncheckedAccount<'info>,
     // remaining accounts
     // [receiver_program, receiver_account, ...user specified accounts from message data for arbitrary messaging]
     // +
@@ -518,7 +595,37 @@ pub struct ExecuteReportContext<'info> {
     // ] x N tokens
 }
 
-#[derive(Copy, Clone, AnchorSerialize, AnchorDeserialize)]
+/// It's not possible to store enums in zero_copy accounts, so we wrap the discriminant
+/// in a struct to store in config.
+#[derive(
+    Copy, Clone, AnchorSerialize, AnchorDeserialize, PartialEq, Eq, InitSpace, Pod, Zeroable,
+)]
+#[repr(C)]
+pub struct ConfigOcrPluginType {
+    discriminant: u8,
+}
+
+impl From<OcrPluginType> for ConfigOcrPluginType {
+    fn from(value: OcrPluginType) -> Self {
+        Self {
+            discriminant: value as u8,
+        }
+    }
+}
+
+impl TryFrom<ConfigOcrPluginType> for OcrPluginType {
+    type Error = CcipOfframpError;
+
+    fn try_from(value: ConfigOcrPluginType) -> std::result::Result<Self, Self::Error> {
+        match value.discriminant {
+            0 => Ok(Self::Commit),
+            1 => Ok(Self::Execution),
+            _ => Err(CcipOfframpError::InvalidPluginType),
+        }
+    }
+}
+
+#[derive(Copy, Clone, AnchorSerialize, AnchorDeserialize, PartialEq, Eq)]
 pub enum OcrPluginType {
     Commit,
     Execution,

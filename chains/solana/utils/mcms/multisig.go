@@ -16,7 +16,7 @@ type Multisig struct {
 	RootMetadataPDA           solana.PublicKey
 	ExpiringRootAndOpCountPDA solana.PublicKey
 	ConfigSignersPDA          solana.PublicKey
-	RootSignaturesPDA         func(root [32]byte, validUntil uint32) solana.PublicKey
+	RootSignaturesPDA         func(root [32]byte, validUntil uint32, authority solana.PublicKey) solana.PublicKey
 	SeenSignedHashesPDA       func(root [32]byte, validUntil uint32) solana.PublicKey
 
 	RawConfig McmConfigArgs

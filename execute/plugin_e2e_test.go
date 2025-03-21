@@ -10,15 +10,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-var ocrTypeCodec = ocrtypecodec.NewExecCodecJSON()
+var ocrTypeCodec = ocrtypecodec.DefaultExecCodec
 
 func TestPlugin(t *testing.T) {
 	ctx := tests.Context(t)
@@ -35,8 +34,8 @@ func TestPlugin(t *testing.T) {
 		makeMsgWithMetadata(105, srcSelector, dstSelector, false),
 	}
 
-	intTest := SetupSimpleTest(t, logger.Test(t), srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1)
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector}, dstSelector)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1, srcSelector)
 	runner := intTest.Start()
 	defer intTest.Close()
 
@@ -64,80 +63,6 @@ func TestPlugin(t *testing.T) {
 	require.Len(t, outcome.Report.ChainReports, 1)
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
-}
-
-func Test_ExcludingCostlyMessages(t *testing.T) {
-	ctx := tests.Context(t)
-
-	srcSelector := cciptypes.ChainSelector(1)
-	dstSelector := cciptypes.ChainSelector(2)
-
-	messages := []inmem.MessagesWithMetadata{
-		makeMsgWithMetadata(100, srcSelector, dstSelector, false, withFeeValueJuels(100)),
-		makeMsgWithMetadata(101, srcSelector, dstSelector, false, withFeeValueJuels(200)),
-		makeMsgWithMetadata(102, srcSelector, dstSelector, false, withFeeValueJuels(300)),
-	}
-
-	messageTimestamp := time.Now().Add(-4 * time.Hour)
-	tm := timeMachine{now: messageTimestamp}
-
-	intTest := SetupSimpleTest(t, logger.Test(t), srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, messageTimestamp, 1)
-	intTest.WithCustomFeeBoosting(1.0, tm.Now, map[cciptypes.Bytes32]plugintypes.USD18{
-		messages[0].Header.MessageID: plugintypes.NewUSD18(40000),
-		messages[1].Header.MessageID: plugintypes.NewUSD18(200000),
-		messages[2].Header.MessageID: plugintypes.NewUSD18(200000),
-	})
-
-	runner := intTest.Start()
-	defer intTest.Close()
-
-	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Equal(t, exectypes.Initialized, outcome.State)
-
-	// First outcome is empty - all messages are too expensive to be executed
-	// Message1 cost=40000,  fee=10000
-	// Message2 cost=200000, fee=20000
-	// Message3 cost=200000, fee=30000
-	for i := 0; i < 3; i++ {
-		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	}
-	require.Len(t, outcome.Report.ChainReports, 0)
-
-	// 4 hours later, we agree to pay higher fee, but only for the first message
-	// Message1 cost=40000,  fee=50000 boosted original_fee * (1 + 4*1.0),
-	// Message2 cost=200000, fee=20000
-	// Message3 cost=200000, fee=30000
-	tm.SetNow(time.Now())
-	for i := 0; i < 3; i++ {
-		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	}
-	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100})
-
-	// Second message execution cost drops, it should be included in the outcome
-	// the first message is excluded by the inflight message cache.
-	// Message1 cost=40000,  fee=50000   boosted original_fee * (1 + 4*1.0),
-	// Message2 cost=40000,  fee=100000
-	// Message3 cost=200000, fee=150000
-	intTest.UpdateExecutionCost(messages[1].Header.MessageID, 40000)
-	for i := 0; i < 3; i++ {
-		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	}
-	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{101})
-
-	// 3 hours in the future, we agree to pay higher fee for the third message (7 hours since the message was sent)
-	// the first and second message are excluded by the inflight message cache.
-	// Message1 cost=40000,  fee=80000  boosted 10000 * (1 + 7*1.0),
-	// Message2 cost=40000,  fee=160000
-	// Message3 cost=200000, fee=240000
-	tm.SetNow(time.Now().Add(3 * time.Hour))
-	for i := 0; i < 3; i++ {
-		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	}
-	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102})
 }
 
 // TestExceedSizeObservation tests the case where the observation size exceeds the maximum size.
@@ -173,8 +98,8 @@ func TestExceedSizeObservation(t *testing.T) {
 		)
 	}
 
-	intTest := SetupSimpleTest(t, mocks.NullLogger, srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), nReports)
+	intTest := SetupSimpleTest(t, mocks.NullLogger, []cciptypes.ChainSelector{srcSelector}, dstSelector)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), nReports, srcSelector)
 	runner := intTest.Start()
 	defer intTest.Close()
 
@@ -192,13 +117,156 @@ func TestExceedSizeObservation(t *testing.T) {
 	// Only 1 pending report from previous round.
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.CommitReports, 1)
+	require.Len(t, outcome.CommitReports, 2)
 	require.Len(t, outcome.CommitReports[0].Messages, maxMsgsPerReport)
 
 	// Round 3 - Filter
 	// An execute report with the messages executed until the max per report
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
-	require.Len(t, outcome.Report.ChainReports, 1)
+	require.Len(t, outcome.Report.ChainReports, 2)
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.Len(t, sequenceNumbers, maxMsgsPerReport)
+}
+
+func TestPlugin_FinalizedUnfinalizedCaching(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcSelector := cciptypes.ChainSelector(1)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	// Create messages for finalized execution report
+	finalizedMessages := []inmem.MessagesWithMetadata{
+		{
+			Message:     makeMsgWithMetadata(100, srcSelector, dstSelector, true).Message, // Executed
+			Executed:    true,
+			Destination: dstSelector,
+		},
+		{
+			Message:     makeMsgWithMetadata(101, srcSelector, dstSelector, true).Message, // Executed
+			Executed:    true,
+			Destination: dstSelector,
+		},
+	}
+
+	// Create messages for non-executed report
+	unexecutedMessages := []inmem.MessagesWithMetadata{
+		{
+			Message:     makeMsgWithMetadata(200, srcSelector, dstSelector, false).Message, // Not executed
+			Executed:    false,
+			Destination: dstSelector,
+		},
+		{
+			Message:     makeMsgWithMetadata(201, srcSelector, dstSelector, false).Message, // Not executed
+			Executed:    false,
+			Destination: dstSelector,
+		},
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcSelector}, dstSelector)
+
+	// Set up first report - should be executed and finalized
+	intTest.WithMessages(finalizedMessages, 1000, time.Now().Add(-4*time.Hour), 1, srcSelector)
+
+	// Set up second report - should remain available
+	intTest.WithMessages(unexecutedMessages, 1001, time.Now().Add(-3*time.Hour), 1, srcSelector)
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// First round - process both reports
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+
+	// First report should be marked as executed and removed from commits
+	// Second report should be available since it's not executed
+	require.Len(t, outcome.CommitReports, 1)
+
+	// Check that we see the second report
+	report := outcome.CommitReports[0]
+	require.Equal(t, cciptypes.NewSeqNumRange(200, 201), report.SequenceNumberRange)
+}
+
+func TestPlugin_CommitReportTimestampOrdering(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcChainA := cciptypes.ChainSelector(1)
+	srcChainB := cciptypes.ChainSelector(3)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	// Create messages for multiple commit reports with different timestamps
+	baseTime := time.Now().Add(-4 * time.Hour)
+	msgSets := []struct {
+		messages  []inmem.MessagesWithMetadata
+		timestamp time.Time
+		blockNum  uint64
+		srcChain  cciptypes.ChainSelector
+	}{
+		{
+			// Latest messages
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(104, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(105, srcChainA, dstSelector, false),
+			},
+			timestamp: baseTime.Add(2 * time.Hour),
+			blockNum:  1002,
+			srcChain:  srcChainA,
+		},
+		{
+			// Earliest messages, From a chain that's chronologically after the other chain
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(100, srcChainB, dstSelector, false),
+				makeMsgWithMetadata(101, srcChainB, dstSelector, false),
+			},
+			timestamp: baseTime,
+			blockNum:  1000,
+			srcChain:  srcChainB,
+		},
+		{
+			// Middle messages
+			messages: []inmem.MessagesWithMetadata{
+				makeMsgWithMetadata(102, srcChainA, dstSelector, false),
+				makeMsgWithMetadata(103, srcChainA, dstSelector, false),
+			},
+			timestamp: baseTime.Add(time.Hour),
+			blockNum:  1001,
+			srcChain:  srcChainA,
+		},
+	}
+
+	intTest := SetupSimpleTest(t, logger.Test(t), []cciptypes.ChainSelector{srcChainA, srcChainB}, dstSelector)
+
+	// Add messages in non-chronological order
+	for _, set := range msgSets {
+		intTest.WithMessages(set.messages, set.blockNum, set.timestamp, 1, set.srcChain)
+	}
+
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round
+	outcome := runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// GetCommitReports round - should return chronologically ordered reports
+	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
+	require.Equal(t, exectypes.GetCommitReports, outcome.State)
+	require.Len(t, outcome.CommitReports, 3)
+
+	// Verify timestamps are in ascending order
+	for i := 0; i < len(outcome.CommitReports)-1; i++ {
+		require.True(t, outcome.CommitReports[i].Timestamp.Before(
+			outcome.CommitReports[i+1].Timestamp),
+			"commit reports should be ordered by timestamp")
+	}
+
+	// Verify the specific order matches our expected chronological order
+	require.Equal(t, cciptypes.SeqNum(100),
+		outcome.CommitReports[0].SequenceNumberRange.Start(), "oldest report should be first")
+	require.Equal(t, cciptypes.SeqNum(102),
+		outcome.CommitReports[1].SequenceNumberRange.Start(), "middle report should be second")
+	require.Equal(t, cciptypes.SeqNum(104),
+		outcome.CommitReports[2].SequenceNumberRange.Start(), "newest report should be last")
 }

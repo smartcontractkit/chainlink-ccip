@@ -7,7 +7,7 @@ use arrayvec::arrayvec;
 use crate::constants::{MAX_SELECTORS, TIMELOCK_ID_PADDED};
 use crate::error::TimelockError;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum Role {
     Admin = 0,
     Proposer = 1,

@@ -21,5 +21,7 @@ anchor-spl = "0.29.0"
 solana-program = "1.17.25" # pin solana to 1.17
 spl-math = { version = "0.2.0", features = [ "no-entrypoint" ] }
 base-token-pool = { version = "0.1.0-dev", path = "../base-token-pool/", features = ["no-entrypoint"] }
-example-burnmint-token-pool = { version = "0.1.0-dev", path = "../example-burnmint-token-pool", features = ["no-entrypoint"] }
-example-lockrelease-token-pool = { version = "0.1.0-dev", path = "../example-lockrelease-token-pool", features = ["no-entrypoint"] }
+burnmint-token-pool = { version = "0.1.0-dev", path = "../burnmint-token-pool", features = ["no-entrypoint"] }
+lockrelease-token-pool = { version = "0.1.0-dev", path = "../lockrelease-token-pool", features = ["no-entrypoint"] }
+rmn_remote = {path = "../rmn-remote", features = ["cpi"]}
+ccip_common = {path = "../ccip-common"}

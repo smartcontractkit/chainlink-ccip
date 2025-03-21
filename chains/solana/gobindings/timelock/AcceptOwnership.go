@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Accept ownership of the timelock.
+// Accept ownership of the timelock config.
 //
 // The proposed new owner must call this function to assume ownership.
 //

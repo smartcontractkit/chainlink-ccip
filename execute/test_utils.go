@@ -3,7 +3,6 @@ package execute
 import (
 	"context"
 	"encoding/binary"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -23,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
@@ -33,10 +33,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
+	cciptypesmocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -51,28 +50,34 @@ type IntTest struct {
 	lggr  logger.Logger
 	donID uint32
 
-	srcSelector cciptypes.ChainSelector
-	dstSelector cciptypes.ChainSelector
+	srcSelectors []cciptypes.ChainSelector
+	dstSelector  cciptypes.ChainSelector
 
 	msgHasher           cciptypes.MessageHasher
 	ccipReader          *inmem.InMemoryCCIPReader
 	server              *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
 	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
-	feeCalculator       *costlymessages.CCIPMessageFeeUSD18Calculator
-	execCostCalculator  *costlymessages.StaticMessageExecCostUSD18Calculator
 }
 
-func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
+func SetupSimpleTest(t *testing.T,
+	lggr logger.Logger,
+	srcSelectors []cciptypes.ChainSelector,
+	dstSelector cciptypes.ChainSelector,
+) *IntTest {
 	donID := uint32(1)
 
+	messagesMap := make(map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata)
+
+	for _, src := range srcSelectors {
+		messagesMap[src] = []inmem.MessagesWithMetadata{}
+
+	}
 	msgHasher := mocks.NewMessageHasher()
 	ccipReader := inmem.InMemoryCCIPReader{
-		Reports: []plugintypes2.CommitPluginReportWithMeta{},
-		Messages: map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata{
-			srcSelector: {},
-		},
-		Dest: dstSelector,
+		Reports:  []plugintypes2.CommitPluginReportWithMeta{},
+		Messages: messagesMap,
+		Dest:     dstSelector,
 	}
 
 	return &IntTest{
@@ -80,7 +85,7 @@ func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelector, dstSelector 
 		lggr:                lggr,
 		donID:               donID,
 		msgHasher:           msgHasher,
-		srcSelector:         srcSelector,
+		srcSelectors:        srcSelectors,
 		dstSelector:         dstSelector,
 		ccipReader:          &ccipReader,
 		tokenObserverConfig: []pluginconfig.TokenDataObserverConfig{},
@@ -92,7 +97,8 @@ func (it *IntTest) WithMessages(
 	messages []inmem.MessagesWithMetadata,
 	crBlockNumber uint64,
 	crTimestamp time.Time,
-	numReports int) {
+	numReports int,
+	srcSelector cciptypes.ChainSelector) {
 	mapped := slicelib.Map(messages,
 		func(m inmem.MessagesWithMetadata) cciptypes.Message {
 			return m.Message
@@ -116,7 +122,7 @@ func (it *IntTest) WithMessages(
 			hashes[i] = hash
 		}
 		reportData := exectypes.CommitData{
-			SourceChain: it.srcSelector,
+			SourceChain: srcSelector,
 			SequenceNumberRange: cciptypes.NewSeqNumRange(
 				mapped[startIndex].Header.SequenceNumber,
 				mapped[endIndex-1].Header.SequenceNumber,
@@ -124,6 +130,7 @@ func (it *IntTest) WithMessages(
 			Messages:         msgs,
 			Hashes:           hashes,
 			MessageTokenData: make([]exectypes.MessageTokenData, len(msgs)),
+			Timestamp:        crTimestamp,
 		}
 
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
@@ -144,30 +151,17 @@ func (it *IntTest) WithMessages(
 		})
 	}
 
-	it.ccipReader.Messages[it.srcSelector] = append(
-		it.ccipReader.Messages[it.srcSelector],
+	it.ccipReader.Messages[srcSelector] = append(
+		it.ccipReader.Messages[srcSelector],
 		messages...,
 	)
-}
-
-func (it *IntTest) WithCustomFeeBoosting(
-	relativeBoostPerWaitHour float64,
-	now func() time.Time,
-	messageCost map[cciptypes.Bytes32]plugintypes.USD18,
-) {
-	it.feeCalculator = costlymessages.NewCCIPMessageFeeUSD18Calculator(
-		it.lggr,
-		it.ccipReader,
-		relativeBoostPerWaitHour,
-		now,
-	)
-	it.execCostCalculator = costlymessages.NewStaticMessageExecCostUSD18Calculator(messageCost)
 }
 
 func (it *IntTest) WithUSDC(
 	sourcePoolAddress string,
 	attestations map[string]string,
 	events []*readerpkg.MessageSentEvent,
+	srcSelector cciptypes.ChainSelector,
 ) {
 	it.server = newConfigurableAttestationServer(attestations)
 	it.tokenObserverConfig = []pluginconfig.TokenDataObserverConfig{
@@ -176,7 +170,7 @@ func (it *IntTest) WithUSDC(
 			Version: "1",
 			USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
 				Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-					it.srcSelector: {
+					srcSelector: {
 						SourcePoolAddress:            sourcePoolAddress,
 						SourceMessageTransmitterAddr: sourcePoolAddress,
 					},
@@ -204,7 +198,7 @@ func (it *IntTest) WithUSDC(
 	).Return(usdcEvents, nil).Maybe()
 
 	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-		it.srcSelector: r,
+		srcSelector:    r,
 		it.dstSelector: r,
 	}
 }
@@ -216,15 +210,6 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
-			ChainSelector: it.srcSelector,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
-			},
-		}, {
 			ChainSelector: it.dstSelector,
 			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
@@ -235,12 +220,25 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 			},
 		},
 	}
+	// Add config for all srcSelectors
+	for _, src := range it.srcSelectors {
+		chainConfigInfos = append(chainConfigInfos, reader.ChainConfigInfo{
+			ChainSelector: src,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
+			},
+		})
+	}
 
 	homeChain := setupHomeChainPoller(it.t, it.lggr, chainConfigInfos)
 	ctx := tests.Context(it.t)
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
-
+	mockAddrCodec := internal.NewMockAddressCodecHex(it.t)
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
 		it.lggr,
@@ -248,39 +246,19 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		it.tokenObserverConfig,
 		testhelpers.TokenDataEncoderInstance,
 		it.tokenChainReader,
+		mockAddrCodec,
 	)
 	require.NoError(it.t, err)
 
-	var feeCalculator costlymessages.MessageFeeE18USDCalculator
-	if it.feeCalculator != nil {
-		feeCalculator = it.feeCalculator
-	} else {
-		feeCalculator = costlymessages.NewConstMessageFeeUSD18Calculator(big.NewInt(5))
-	}
-
-	var execCostCalculator costlymessages.MessageExecCostUSD18Calculator
-	if it.execCostCalculator != nil {
-		execCostCalculator = it.execCostCalculator
-	} else {
-		execCostCalculator = costlymessages.NewConstMessageExecCostUSD18Calculator(big.NewInt(3))
-	}
-
-	costlyMessageObserver := costlymessages.NewObserver(
-		it.lggr,
-		true,
-		feeCalculator,
-		execCostCalculator,
-	)
-
-	ep := gasmock.NewMockEstimateProvider(it.t)
+	ep := cciptypesmocks.NewMockEstimateProvider(it.t)
 	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}),
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
+		it.newNode(cfg, homeChain, ep, tkObs, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}, mockAddrCodec),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -304,20 +282,16 @@ func (it *IntTest) Close() {
 	}
 }
 
-func (it *IntTest) UpdateExecutionCost(id cciptypes.Bytes32, val int64) {
-	it.execCostCalculator.UpdateCosts(id, plugintypes.NewUSD18(val))
-}
-
 func (it *IntTest) newNode(
 	cfg pluginconfig.ExecuteOffchainConfig,
 	homeChain reader.HomeChain,
 	ep cciptypes.EstimateProvider,
 	tokenDataObserver tokendata.TokenDataObserver,
-	costlyMessageObserver costlymessages.Observer,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
 	configDigest [32]byte,
+	mockCodec *cciptypesmocks.MockAddressCodec,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
 	rCfg := ocr3types.ReportingPluginConfig{
@@ -327,7 +301,6 @@ func (it *IntTest) newNode(
 	}
 
 	it.ccipReader.ConfigDigest = configDigest
-
 	node1 := NewPlugin(
 		it.donID,
 		rCfg,
@@ -341,8 +314,8 @@ func (it *IntTest) newNode(
 		tokenDataObserver,
 		ep,
 		it.lggr,
-		costlyMessageObserver,
 		&metrics.Noop{},
+		mockCodec,
 	)
 
 	// FIXME: Test should not rely on the specific type of the plugin but rather than that on
@@ -419,13 +392,6 @@ func newMessageSentEvent(
 }
 
 type msgOption func(*cciptypes.Message)
-
-func withFeeValueJuels(fee int64) msgOption {
-	return func(m *cciptypes.Message) {
-		juels := new(big.Int).Mul(big.NewInt(fee), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
-		m.FeeValueJuels = cciptypes.NewBigInt(juels)
-	}
-}
 
 func withData(data []byte) msgOption {
 	return func(m *cciptypes.Message) {
@@ -522,18 +488,6 @@ func extractSequenceNumbers(messages []cciptypes.Message) []cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})
 	return sequenceNumbers
-}
-
-type timeMachine struct {
-	now time.Time
-}
-
-func (t *timeMachine) Now() time.Time {
-	return t.now
-}
-
-func (t *timeMachine) SetNow(now time.Time) {
-	t.now = now
 }
 
 func emptyMessagesForRange(start, end uint64) []cciptypes.Message {

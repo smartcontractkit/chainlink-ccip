@@ -4,14 +4,17 @@ use super::ocr3base::ocr3_set;
 
 use crate::context::{
     AcceptOwnership, AddSourceChain, OcrPluginType, SetOcrConfig, TransferOwnership, UpdateConfig,
-    UpdateSourceChain,
+    UpdateReferenceAddresses, UpdateSourceChain,
 };
 use crate::event::admin::{
-    ConfigSet, OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded,
-    SourceChainConfigUpdated,
+    ConfigSet, OwnershipTransferRequested, OwnershipTransferred, ReferenceAddressesSet,
+    SourceChainAdded, SourceChainConfigUpdated,
 };
 use crate::instructions::interfaces::Admin;
-use crate::state::{CodeVersion, Ocr3ConfigInfo, SourceChain, SourceChainConfig, SourceChainState};
+use crate::state::{
+    CodeVersion, Ocr3ConfigInfo, ReferenceAddresses, SourceChain, SourceChainConfig,
+    SourceChainState,
+};
 use crate::CcipOfframpError;
 
 pub struct Impl;
@@ -56,6 +59,32 @@ impl Admin for Impl {
             CcipOfframpError::InvalidCodeVersion
         );
         ctx.accounts.config.load_mut()?.default_code_version = code_version.into();
+        Ok(())
+    }
+
+    fn update_reference_addresses(
+        &self,
+        ctx: Context<UpdateReferenceAddresses>,
+        router: Pubkey,
+        fee_quoter: Pubkey,
+        offramp_lookup_table: Pubkey,
+        rmn_remote: Pubkey,
+    ) -> Result<()> {
+        *ctx.accounts.reference_addresses.load_mut()? = ReferenceAddresses {
+            version: 1,
+            router,
+            fee_quoter,
+            offramp_lookup_table,
+            rmn_remote,
+        };
+
+        emit!(ReferenceAddressesSet {
+            router,
+            fee_quoter,
+            offramp_lookup_table,
+            rmn_remote
+        });
+
         Ok(())
     }
 
@@ -154,15 +183,14 @@ impl Admin for Impl {
     fn set_ocr_config(
         &self,
         ctx: Context<SetOcrConfig>,
-        plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
+        plugin_type: OcrPluginType,
         config_info: Ocr3ConfigInfo,
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
-        require!(plugin_type < 2, CcipOfframpError::InvalidPluginType);
         let mut config = ctx.accounts.config.load_mut()?;
 
-        let is_commit = plugin_type == OcrPluginType::Commit as u8;
+        let is_commit = plugin_type == OcrPluginType::Commit;
 
         ocr3_set(
             &mut config.ocr3[plugin_type as usize],

@@ -1,0 +1,21 @@
+[package]
+name = "rmn_remote"
+version = "0.1.0-dev"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "rmn_remote"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.29.0"
+bytemuck = "1.7"
+ccip_common = {path = "../ccip-common"}

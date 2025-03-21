@@ -8,15 +8,16 @@ import (
 	"testing"
 	"time"
 
+	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-
-	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -28,7 +29,7 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -69,7 +70,7 @@ func Test_maxQueryLength(t *testing.T) {
 		ChainFeeQuery:   chainfee.Query{},
 	}
 
-	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeQuery(q)
+	b, err := ocrtypecodec.DefaultCommitCodec.EncodeQuery(q)
 	require.NoError(t, err)
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
@@ -155,7 +156,7 @@ func Test_maxObservationLength(t *testing.T) {
 		maxObs.TokenPriceObs.FeedTokenPrices[tokenID] = ccipocr3.NewBigIntFromInt64(math.MaxInt64)
 	}
 
-	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeObservation(maxObs)
+	b, err := ocrtypecodec.DefaultCommitCodec.EncodeObservation(maxObs)
 	require.NoError(t, err)
 
 	const testOffset = 50
@@ -241,7 +242,7 @@ func Test_maxOutcomeLength(t *testing.T) {
 		}
 	}
 
-	b, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(maxOutc)
+	b, err := ocrtypecodec.DefaultCommitCodec.EncodeOutcome(maxOutc)
 	require.NoError(t, err)
 
 	const testOffset = 50
@@ -304,6 +305,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		b, err := json.Marshal(offChainConfig)
 		require.NoError(t, err)
 
+		mockAddrCodec := internal.NewMockAddressCodecHex(t)
 		p := &PluginFactory{
 			baseLggr: lggr,
 			ocrConfig: reader.OCR3ConfigWithMeta{
@@ -316,6 +318,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 					ChainSelector: 12922642891491394802,
 				},
 			},
+			addrCodec: mockAddrCodec,
 		}
 
 		plugin, pluginInfo, err := p.NewReportingPlugin(ctx, ocr3types.ReportingPluginConfig{

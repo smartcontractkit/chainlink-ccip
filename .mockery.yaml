@@ -23,6 +23,9 @@ packages:
             PriceReader:
             RMNHome:
             ConfigCache:
+    github.com/smartcontractkit/chainlink-ccip/execute/internal/cache:
+        interfaces:
+            TimeProvider:
     github.com/smartcontractkit/chainlink-ccip/pkg/contractreader:
         interfaces:
             Extended:
@@ -31,7 +34,7 @@ packages:
         interfaces:
             ExecutePluginCodec:
             EstimateProvider:
-            ExtraDataCodec:
+            AddressCodec:
     github.com/smartcontractkit/chainlink-common/pkg/types:
             interfaces:
                 ContractWriter:

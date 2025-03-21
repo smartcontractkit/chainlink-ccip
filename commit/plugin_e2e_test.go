@@ -11,11 +11,13 @@ import (
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec"
+	ocrtypecodec "github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -86,11 +88,13 @@ var (
 		Decimals:          decimals18,
 	}
 
-	sourceChainConfigs = map[ccipocr3.ChainSelector]reader2.SourceChainConfig{
+	sourceChainConfigs = map[ccipocr3.ChainSelector]reader2.StaticSourceChainConfig{
 		sourceChain1: {IsEnabled: true, IsRMNVerificationDisabled: true},
 		sourceChain2: {IsEnabled: true, IsRMNVerificationDisabled: true},
 	}
 )
+
+var ocrTypCodec = ocrtypecodec.DefaultCommitCodec
 
 func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 	params := defaultNodeParams(t)
@@ -126,9 +130,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
-			RMNEnabledChains:    map[ccipocr3.ChainSelector]bool{},
-			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
-			RMNRemoteCfg:        params.rmnReportCfg,
+			RMNRemoteCfg: params.rmnReportCfg,
 		},
 	}
 
@@ -173,7 +175,6 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 					},
 					BlessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
 					PriceUpdates:       ccipocr3.PriceUpdates{},
-					RMNSignatures:      []ccipocr3.RMNECDSASignature{},
 				},
 			},
 		},
@@ -242,13 +243,13 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				preparePriceReaderMock(n.priceReader)
 			}
 
-			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
+			encodedPrevOutcome, err := ocrTypCodec.EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -267,7 +268,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
-	merkleOutcome := baseMerkleOutcome(params.rmnReportCfg)
+	merkleOutcome := reportEmptyMerkleRootOutcome()
 
 	testCases := []struct {
 		name                  string
@@ -322,6 +323,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					},
 					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
 					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
+					RMNSignatures:        make([]ccipocr3.RMNECDSASignature, 0),
 				},
 			},
 		},
@@ -423,6 +425,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					},
 					BlessedMerkleRoots:   make([]ccipocr3.MerkleRootChain, 0),
 					UnblessedMerkleRoots: make([]ccipocr3.MerkleRootChain, 0),
+					RMNSignatures:        make([]ccipocr3.RMNECDSASignature, 0),
 				},
 			},
 		},
@@ -444,13 +447,13 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				tc.mockPriceReader(n.priceReader)
 			}
 
-			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
+			encodedPrevOutcome, err := ocrTypCodec.EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -466,7 +469,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 	params := defaultNodeParams(t)
-	merkleOutcome := baseMerkleOutcome(params.rmnReportCfg)
+	merkleOutcome := reportEmptyMerkleRootOutcome()
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
 	newFeeComponents, newNativePrice, packedGasPrice := newRandomFees()
@@ -573,7 +576,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
-				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
+				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
 				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
@@ -600,7 +603,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
-				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
+				MerkleRootOutcome: reportEmptyMerkleRootOutcome(),
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
@@ -634,7 +637,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
-				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
+				MerkleRootOutcome: reportEmptyMerkleRootOutcome(),
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
@@ -689,13 +692,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				tc.mockCCIPReader(n.ccipReader)
 			}
 
-			encodedPrevOutcome, err := ocrtypecodec.NewCommitCodecJSON().EncodeOutcome(tc.prevOutcome)
+			encodedPrevOutcome, err := ocrTypCodec.EncodeOutcome(tc.prevOutcome)
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := ocrtypecodec.NewCommitCodecJSON().DecodeOutcome(res.Outcome)
+			decodedOutcome, err := ocrTypCodec.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -736,8 +739,8 @@ func prepareCcipReaderMock(
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{1}, nil).Maybe()
-	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).
-		Return(&reader2.CurseInfo{}, nil).Maybe()
+	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything).
+		Return(reader2.CurseInfo{}, nil).Maybe()
 	ccipReader.EXPECT().GetOffRampSourceChainsConfig(mock.Anything, mock.Anything).
 		Return(sourceChainConfigs, nil).Maybe()
 
@@ -898,6 +901,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeCommit).
 		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
 
+	mockAddrCodec := internal.NewMockAddressCodecHex(params.t)
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
@@ -914,6 +918,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		nil,
 		params.reportingCfg,
 		&metrics.Noop{},
+		mockAddrCodec,
 	)
 
 	if !params.enableDiscovery {
@@ -977,6 +982,8 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		PriceFeedChainSelector:          sourceChain1,
 		InflightPriceCheckRetries:       10,
 		MerkleRootAsyncObserverDisabled: true, // we want to keep it disabled since this test is deterministic
+		ChainFeeAsyncObserverDisabled:   true,
+		TokenPriceAsyncObserverDisabled: true,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}
@@ -1005,37 +1012,20 @@ var merkleRoot1 = ccipocr3.Bytes32{0x4a, 0x44, 0xdc, 0x15, 0x36, 0x42, 0x4, 0xa8
 	0x90, 0x39, 0x45, 0x5c, 0xc1, 0x60, 0x82, 0x81, 0x82, 0xf, 0xe2, 0xb2, 0x4f, 0x1e, 0x52,
 	0x33, 0xad, 0xe6, 0xaf, 0x1d, 0xd5}
 
-func baseMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
-	return merkleroot.Outcome{
-		OutcomeType:             merkleroot.ReportIntervalsSelected,
-		RangesSelectedForReport: []plugintypes.ChainRange{},
-		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
-		RMNRemoteCfg:            r,
-	}
+func reportEmptyMerkleRootOutcome() merkleroot.Outcome {
+	return merkleroot.Outcome{OutcomeType: merkleroot.ReportEmpty}
 }
 
-func noReportMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
-	return merkleroot.Outcome{
-		OutcomeType:             merkleroot.ReportEmpty,
-		RangesSelectedForReport: nil,
-		RootsToReport:           []ccipocr3.MerkleRootChain{},
-		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
-		RMNReportSignatures:     []ccipocr3.RMNECDSASignature{},
-		RMNRemoteCfg:            r,
-		RMNEnabledChains:        map[ccipocr3.ChainSelector]bool{},
-	}
-}
-
-func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt) {
+func newRandomFees() (components types.ChainFeeComponents, nativePrice ccipocr3.BigInt, usdPrices ccipocr3.BigInt) {
 	execFee := big.NewInt(rand.RandomInt64())
 	dataAvFee := big.NewInt(rand.RandomInt64())
-	nativePrice := big.NewInt(rand.RandomInt64())
-	usdPrices := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
-		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePrice),
-		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePrice),
+	nativePriceI := big.NewInt(rand.RandomInt64())
+	usdPricesF := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
+		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePriceI),
+		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePriceI),
 	})
 
 	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee},
-		ccipocr3.NewBigInt(nativePrice),
-		ccipocr3.NewBigInt(usdPrices)
+		ccipocr3.NewBigInt(nativePriceI),
+		ccipocr3.NewBigInt(usdPricesF)
 }

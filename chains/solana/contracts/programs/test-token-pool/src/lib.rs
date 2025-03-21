@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use base_token_pool::{common::*, rate_limiter::RateLimitConfig};
 
-declare_id!("GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH");
+declare_id!("JuCcZ4smxAYv9QHJ36jshA7pA3FuQ3vQeWLUeAtZduJ");
 
 mod context;
 use crate::context::*;
@@ -9,8 +9,8 @@ use crate::context::*;
 #[program]
 pub mod test_token_pool {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
-    use example_burnmint_token_pool::{burn_tokens, mint_tokens};
-    use example_lockrelease_token_pool::{lock_tokens, release_tokens};
+    use burnmint_token_pool::{burn_tokens, mint_tokens};
+    use lockrelease_token_pool::{lock_tokens, release_tokens};
 
     use super::*;
 
@@ -18,12 +18,14 @@ pub mod test_token_pool {
         ctx: Context<InitializeTokenPool>,
         pool_type: PoolType,
         router: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         ctx.accounts.state.config.init(
             &ctx.accounts.mint,
             ctx.program_id.key(),
             ctx.accounts.authority.key(),
             router,
+            rmn_remote,
         )?;
         ctx.accounts.state.pool_type = pool_type;
         Ok(())
@@ -132,6 +134,9 @@ pub mod test_token_pool {
             ctx.accounts.state.config.mint,
             &remote.pool_addresses,
             inbound_rate_limit,
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
         match ctx.accounts.state.pool_type {
@@ -220,6 +225,9 @@ pub mod test_token_pool {
             &mut ctx.accounts.chain_config.base.outbound_rate_limit,
             ctx.accounts.state.config.list_enabled,
             &ctx.accounts.state.config.allow_list,
+            ctx.accounts.rmn_remote.to_account_info(),
+            ctx.accounts.rmn_remote_curses.to_account_info(),
+            ctx.accounts.rmn_remote_config.to_account_info(),
         )?;
 
         match ctx.accounts.state.pool_type {
@@ -284,7 +292,11 @@ pub mod test_token_pool {
 
         Ok(LockOrBurnOutV1 {
             dest_token_address: ctx.accounts.chain_config.base.remote.token_address.clone(),
-            dest_pool_data: RemoteAddress::ZERO,
+            dest_pool_data: {
+                let mut abi_encoded_decimals = vec![0u8; 32];
+                abi_encoded_decimals[31] = ctx.accounts.state.config.decimals;
+                abi_encoded_decimals
+            },
         })
     }
 }

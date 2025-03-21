@@ -23,7 +23,7 @@ use crate::instructions::router;
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
     [0x72, 0xa1, 0x5e, 0x1d, 0x93, 0x19, 0xe8, 0xbf]; // lock_or_burn_tokens
 
-declare_id!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
+declare_id!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 
 #[program]
 /// The `ccip_router` module contains the implementation of the Cross-Chain Interoperability Protocol (CCIP) Router.
@@ -36,6 +36,8 @@ declare_id!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
 /// thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface.
 pub mod ccip_router {
     #![warn(missing_docs)]
+
+    use fee_quoter::messages::GetFeeResult;
 
     use super::*;
 
@@ -58,6 +60,7 @@ pub mod ccip_router {
         fee_aggregator: Pubkey,
         fee_quoter: Pubkey,
         link_token_mint: Pubkey,
+        rmn_remote: Pubkey,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(Config {
             version: 1,
@@ -66,6 +69,7 @@ pub mod ccip_router {
             proposed_owner: Pubkey::default(),
             svm_chain_selector,
             fee_quoter,
+            rmn_remote,
             link_token_mint,
             fee_aggregator,
         });
@@ -73,6 +77,7 @@ pub mod ccip_router {
         emit!(events::admin::ConfigSet {
             svm_chain_selector: ctx.accounts.config.svm_chain_selector,
             fee_quoter: ctx.accounts.config.fee_quoter,
+            rmn_remote: ctx.accounts.config.rmn_remote,
             link_token_mint: ctx.accounts.config.link_token_mint,
             fee_aggregator: ctx.accounts.config.fee_aggregator,
         });
@@ -142,6 +147,20 @@ pub mod ccip_router {
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
             .update_fee_aggregator(ctx, fee_aggregator)
+    }
+
+    /// Updates the RMN remote program in the router configuration.
+    /// The Admin is the only one able to update the RMN remote program.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `rmn_remote,` - The new RMN remote address.
+    pub fn update_rmn_remote(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        rmn_remote: Pubkey,
+    ) -> Result<()> {
+        router::admin(ctx.accounts.config.default_code_version).update_rmn_remote(ctx, rmn_remote)
     }
 
     /// Adds a new chain selector to the router.
@@ -256,7 +275,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for the bump.
     /// * `dest_chain_selector` - The destination chain selector to bump version for.
     pub fn bump_ccip_version_for_dest_chain(
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
@@ -272,7 +291,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for the rollback.
     /// * `dest_chain_selector` - The destination chain selector to rollback the version for.
     pub fn rollback_ccip_version_for_dest_chain(
-        ctx: Context<UpdateDestChainSelectorConfig>,
+        ctx: Context<UpdateDestChainSelectorConfigNoRealloc>,
         dest_chain_selector: u64,
     ) -> Result<()> {
         router::admin(ctx.accounts.config.default_code_version)
@@ -430,6 +449,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for sending the message.
     /// * `dest_chain_selector` - The chain selector for the destination chain.
     /// * `message` - The message to be sent. The size limit of data is 256 bytes.
+    /// * `token_indexes` - Indices into the remaining accounts vector where the subslice for a token begins.
     pub fn ccip_send<'info>(
         ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
         dest_chain_selector: u64,
@@ -442,6 +462,28 @@ pub mod ccip_router {
         )
         .ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
+
+    /// Queries the onramp for the fee required to send a message.
+    ///
+    /// This call is permissionless. Note it does not verify whether there's a curse active
+    /// in order to avoid the RMN CPI overhead.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for obtaining the message fee.
+    /// * `dest_chain_selector` - The chain selector for the destination chain.
+    /// * `message` - The message to be sent. The size limit of data is 256 bytes.
+    pub fn get_fee<'info>(
+        ctx: Context<'_, '_, 'info, 'info, GetFee<'info>>,
+        dest_chain_selector: u64,
+        message: SVM2AnyMessage,
+    ) -> Result<GetFeeResult> {
+        router::onramp(
+            ctx.accounts.dest_chain_state.config.lane_code_version,
+            ctx.accounts.config.default_code_version,
+        )
+        .get_fee(ctx, dest_chain_selector, message)
+    }
 }
 
 #[error_code]
@@ -450,6 +492,8 @@ pub enum CcipRouterError {
     // offset error code so that they don't clash with other programs
     // (Anchor's base custom error code 6000 + offset 1000 = start at 7000)
     Unauthorized = 1000,
+    #[msg("Invalid RMN Remote Address")]
+    InvalidRMNRemoteAddress,
     #[msg("Mint account input is invalid")]
     InvalidInputsMint,
     #[msg("Invalid version of the onchain state")]

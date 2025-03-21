@@ -21,6 +21,8 @@ func FPlus1(f int) Threshold {
 	return Threshold(f + 1)
 }
 
+func F(f int) Threshold { return Threshold(f) }
+
 // MakeMultiThreshold constructs a threshold that maps each key to a threshold value.
 func MakeMultiThreshold[K comparable](fChain map[K]int, mapping func(int) Threshold) MultiThreshold[K] {
 	thresh := make(multiThreshold[K])

@@ -25,6 +25,7 @@ type Initialize struct {
 	FeeAggregator    *ag_solanago.PublicKey
 	FeeQuoter        *ag_solanago.PublicKey
 	LinkTokenMint    *ag_solanago.PublicKey
+	RmnRemote        *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
 	//
@@ -69,6 +70,12 @@ func (inst *Initialize) SetFeeQuoter(feeQuoter ag_solanago.PublicKey) *Initializ
 // SetLinkTokenMint sets the "linkTokenMint" parameter.
 func (inst *Initialize) SetLinkTokenMint(linkTokenMint ag_solanago.PublicKey) *Initialize {
 	inst.LinkTokenMint = &linkTokenMint
+	return inst
+}
+
+// SetRmnRemote sets the "rmnRemote" parameter.
+func (inst *Initialize) SetRmnRemote(rmnRemote ag_solanago.PublicKey) *Initialize {
+	inst.RmnRemote = &rmnRemote
 	return inst
 }
 
@@ -170,6 +177,9 @@ func (inst *Initialize) Validate() error {
 		if inst.LinkTokenMint == nil {
 			return errors.New("LinkTokenMint parameter is not set")
 		}
+		if inst.RmnRemote == nil {
+			return errors.New("RmnRemote parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -205,11 +215,12 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("SvmChainSelector", *inst.SvmChainSelector))
 						paramsBranch.Child(ag_format.Param("   FeeAggregator", *inst.FeeAggregator))
 						paramsBranch.Child(ag_format.Param("       FeeQuoter", *inst.FeeQuoter))
 						paramsBranch.Child(ag_format.Param("   LinkTokenMint", *inst.LinkTokenMint))
+						paramsBranch.Child(ag_format.Param("       RmnRemote", *inst.RmnRemote))
 					})
 
 					// Accounts of the instruction:
@@ -246,6 +257,11 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Serialize `RmnRemote` param:
+	err = encoder.Encode(obj.RmnRemote)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -269,6 +285,11 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
+	// Deserialize `RmnRemote`:
+	err = decoder.Decode(&obj.RmnRemote)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -279,6 +300,7 @@ func NewInitializeInstruction(
 	feeAggregator ag_solanago.PublicKey,
 	feeQuoter ag_solanago.PublicKey,
 	linkTokenMint ag_solanago.PublicKey,
+	rmnRemote ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -291,6 +313,7 @@ func NewInitializeInstruction(
 		SetFeeAggregator(feeAggregator).
 		SetFeeQuoter(feeQuoter).
 		SetLinkTokenMint(linkTokenMint).
+		SetRmnRemote(rmnRemote).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

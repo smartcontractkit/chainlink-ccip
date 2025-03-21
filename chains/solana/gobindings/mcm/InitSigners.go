@@ -10,7 +10,15 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitSigners is the `initSigners` instruction.
+// Initialize the storage for signer addresses.
+//
+// Creates a temporary account to hold signer addresses during the multisig configuration process.
+//
+// # Parameters
+//
+// - `ctx`: The context containing required accounts.
+// - `multisig_id`: The multisig instance identifier.
+// - `total_signers`: The total number of signers to be added.
 type InitSigners struct {
 	MultisigId   *[32]uint8
 	TotalSigners *uint8

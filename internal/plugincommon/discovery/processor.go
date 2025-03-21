@@ -39,6 +39,7 @@ func NewContractDiscoveryProcessor(
 	dest cciptypes.ChainSelector,
 	fRoleDON int,
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
+	reporter plugincommon.MetricsReporter,
 ) plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] {
 	p := &ContractDiscoveryProcessor{
 		lggr:            lggr,
@@ -48,7 +49,7 @@ func NewContractDiscoveryProcessor(
 		fRoleDON:        fRoleDON,
 		oracleIDToP2PID: oracleIDToP2PID,
 	}
-	return plugincommon.NewTrackedProcessor(lggr, p, "discovery", plugincommon.NoopReporter{})
+	return plugincommon.NewTrackedProcessor(lggr, p, "discovery", reporter)
 }
 
 // Query is not needed for this processor.
