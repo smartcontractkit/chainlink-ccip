@@ -22,15 +22,13 @@ type SetChainRateLimit struct {
 	// [1] = [WRITE] chainConfig
 	//
 	// [2] = [WRITE, SIGNER] authority
-	//
-	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetChainRateLimitInstructionBuilder creates a new `SetChainRateLimit` instruction builder.
 func NewSetChainRateLimitInstructionBuilder() *SetChainRateLimit {
 	nd := &SetChainRateLimit{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -92,17 +90,6 @@ func (inst *SetChainRateLimit) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *SetChainRateLimit) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetChainRateLimit {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
-	return inst
-}
-
-// GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *SetChainRateLimit) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
-}
-
 func (inst SetChainRateLimit) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -148,9 +135,6 @@ func (inst *SetChainRateLimit) Validate() error {
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
-		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.SystemProgram is not set")
-		}
 	}
 	return nil
 }
@@ -172,11 +156,10 @@ func (inst *SetChainRateLimit) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("  chainConfig", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("      state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("chainConfig", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("  authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -239,8 +222,7 @@ func NewSetChainRateLimitInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	chainConfig ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *SetChainRateLimit {
+	authority ag_solanago.PublicKey) *SetChainRateLimit {
 	return NewSetChainRateLimitInstructionBuilder().
 		SetRemoteChainSelector(remoteChainSelector).
 		SetMint(mint).
@@ -248,6 +230,5 @@ func NewSetChainRateLimitInstruction(
 		SetOutbound(outbound).
 		SetStateAccount(state).
 		SetChainConfigAccount(chainConfig).
-		SetAuthorityAccount(authority).
-		SetSystemProgramAccount(systemProgram)
+		SetAuthorityAccount(authority)
 }

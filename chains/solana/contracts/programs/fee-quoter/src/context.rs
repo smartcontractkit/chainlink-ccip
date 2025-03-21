@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-use seed::ALLOWED_PRICE_UPDATER;
+use ccip_common::seed;
 
 use crate::messages::SVM2AnyMessage;
 use crate::program::FeeQuoter;
@@ -13,16 +13,6 @@ use crate::state::{
 use crate::FeeQuoterError;
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8; // size in bytes
-
-// Fixed seeds - different contexts must use different PDA seeds
-pub mod seed {
-    pub const CONFIG: &[u8] = b"config";
-    pub const ALLOWED_PRICE_UPDATER: &[u8] = b"allowed_price_updater";
-    pub const DEST_CHAIN: &[u8] = b"dest_chain";
-    pub const FEE_BILLING_SIGNER: &[u8] = b"fee_billing_signer"; // signer for billing fee token transfer
-    pub const FEE_BILLING_TOKEN_CONFIG: &[u8] = b"fee_billing_token_config";
-    pub const PER_CHAIN_PER_TOKEN_CONFIG: &[u8] = b"per_chain_per_token_config";
-}
 
 // valid_version validates that the passed in version is not 0 (uninitialized)
 // and it is within the expected maximum supported version bounds
@@ -350,7 +340,7 @@ pub struct UpdatePrices<'info> {
     /// and that it was initialized.
     #[account(
         owner = crate::ID @ FeeQuoterError::UnauthorizedPriceUpdater, // this guarantees that it was initialized
-        seeds = [ALLOWED_PRICE_UPDATER, authority.key().as_ref()],
+        seeds = [seed::ALLOWED_PRICE_UPDATER, authority.key().as_ref()],
         bump,
     )]
     pub allowed_price_updater: UncheckedAccount<'info>,
