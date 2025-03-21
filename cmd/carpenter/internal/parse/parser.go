@@ -88,24 +88,6 @@ Ideal log format
 }
 */
 
-// DataFilter is used by Filter to identify lines that should be displayed.
-type DataFilter func(data Data) *Data
-
-type filter struct {
-	name string
-	df   DataFilter
-}
-
-var filters []filter
-
-// RegisterDataFilter adds a filter
-func RegisterDataFilter(name string, df DataFilter) {
-	filters = append(filters, filter{
-		name: name,
-		df:   df,
-	})
-}
-
 // sanitizeString removes any unwanted characters from the string based on the log type.
 func sanitizeString(s, logType string) string {
 	if logType == "mixed" {
@@ -143,6 +125,11 @@ func sanitizeString(s, logType string) string {
 }
 
 func ParseLine(line, logType string) (*Data, error) {
+	line = sanitizeString(line, logType)
+	if len(line) == 0 {
+		return nil, nil
+	}
+
 	if logType == LogTypeJSON {
 		var obj map[string]interface{}
 		dec := json.NewDecoder(strings.NewReader(line))
@@ -283,31 +270,6 @@ func ParseLine(line, logType string) (*Data, error) {
 	}
 }
 
-func Filter(line, logType string, disableFilters bool) (*Data, error) {
-	line = sanitizeString(line, logType)
-	if len(line) == 0 {
-		return nil, nil
-	}
-
-	data, err := ParseLine(line, logType)
-	if err != nil {
-		return nil, fmt.Errorf("ParseLine: %w", err)
-	}
-
-	if !disableFilters {
-		for _, f := range filters {
-			data := f.df(*data)
-			if data != nil {
-				data.FilterName = f.name
-				return data, nil
-			}
-			// TODO: multiple matches?
-		}
-	}
-
-	return data, nil
-}
-
 type Data struct {
 	// FilterName that generated the data.
 	FilterName string
@@ -397,7 +359,7 @@ func (data Data) GetMessage() string {
 	return data.TestMessage
 }
 
-func (d Data) IsEmpty() bool {
+func (data Data) IsEmpty() bool {
 	return false // TODO: implement
 }
 

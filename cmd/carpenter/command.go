@@ -16,10 +16,10 @@ import (
 )
 
 type arguments struct {
-	files          []string
-	logType        string
-	disableFilters bool
-	rendererName   string
+	files        []string
+	logType      string
+	filters      []string
+	rendererName string
 }
 
 func run(args arguments) error {
@@ -43,12 +43,18 @@ func run(args arguments) error {
 	scanner := bufio.NewScanner(inputStream)
 	for scanner.Scan() {
 		line := scanner.Text()
-		data, err := parse.Filter(line, args.logType, args.disableFilters)
+		data, err := parse.ParseLine(line, args.logType)
+		if err != nil {
+			return fmt.Errorf("ParseLine: %w", err)
+		}
+
+		//data, err := parse.Filter(line, args.logType, args.filters)
+		include, err := parse.Filter(data, args.filters)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to get data: %s\n", err)
 			return err
 		}
-		if data == nil {
+		if !include {
 			// no data to display.
 			continue
 		}
@@ -86,13 +92,6 @@ func makeCommand() *cli.Command {
 					return nil
 				},
 			},
-			&cli.BoolFlag{
-				Name:        "disableFilters",
-				Usage:       "Set to disable filter application on the logs.",
-				Destination: &args.disableFilters,
-				Value:       false,
-				Required:    false,
-			},
 			&cli.StringFlag{
 				OnlyOnce:    true,
 				Name:        "renderer",
@@ -106,6 +105,11 @@ func makeCommand() *cli.Command {
 					}
 					return nil
 				},
+			},
+			&cli.StringSliceFlag{
+				Name:        "filter",
+				Usage:       "Provide one or more filters to apply to the logs. Format: field=matcher",
+				Destination: &args.filters,
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
