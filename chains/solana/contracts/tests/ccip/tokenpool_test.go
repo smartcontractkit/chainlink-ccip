@@ -410,7 +410,7 @@ func TestTokenPool(t *testing.T) {
 								Value: [16]uint8{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 							}
 
-							ix, err := rmn_remote.NewCurseInstruction(
+							curseI, err := rmn_remote.NewCurseInstruction(
 								globalCurse,
 								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
@@ -418,8 +418,10 @@ func TestTokenPool(t *testing.T) {
 								solana.SystemProgramID,
 							).ValidateAndBuild()
 							require.NoError(t, err)
-							result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-							require.NotNil(t, result)
+
+							// Do not alter global state, so don't just submit the curse instruction in a tx that succeeds,
+							// as that may break parallel tests. Instead, submit the curse ix together with the pool ix
+							// that fails, which reverts the entire tx and does not affect other tests.
 
 							lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 								test_ccip_invalid_receiver.LockOrBurnInV1{
@@ -441,7 +443,7 @@ func TestTokenPool(t *testing.T) {
 							).ValidateAndBuild()
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{lbI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, lbI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
 
 							rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
 								test_ccip_invalid_receiver.ReleaseOrMintInV1{
@@ -469,25 +471,14 @@ func TestTokenPool(t *testing.T) {
 
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
-
-							ix, err = rmn_remote.NewUncurseInstruction(
-								globalCurse,
-								config.RMNRemoteConfigPDA,
-								admin.PublicKey(),
-								config.RMNRemoteCursesPDA,
-								solana.SystemProgramID,
-							).ValidateAndBuild()
-							require.NoError(t, err)
-							result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-							require.NotNil(t, result)
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, rmI}, admin, config.DefaultCommitment, []string{"Error Code: GloballyCursed"})
 						})
 
 						t.Run("subject cursed", func(t *testing.T) {
 							evmCurse := rmn_remote.CurseSubject{}
 							binary.LittleEndian.PutUint64(evmCurse.Value[:], config.EvmChainSelector)
 
-							ix, err := rmn_remote.NewCurseInstruction(
+							curseI, err := rmn_remote.NewCurseInstruction(
 								evmCurse,
 								config.RMNRemoteConfigPDA,
 								admin.PublicKey(),
@@ -495,8 +486,10 @@ func TestTokenPool(t *testing.T) {
 								solana.SystemProgramID,
 							).ValidateAndBuild()
 							require.NoError(t, err)
-							result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-							require.NotNil(t, result)
+
+							// Do not alter global state, so don't just submit the curse instruction in a tx that succeeds,
+							// as that may break parallel tests. Instead, submit the curse ix together with the pool ix
+							// that fails, which reverts the entire tx and does not affect other tests.
 
 							lbI, err := test_ccip_invalid_receiver.NewPoolProxyLockOrBurnInstruction(
 								test_ccip_invalid_receiver.LockOrBurnInV1{
@@ -518,7 +511,7 @@ func TestTokenPool(t *testing.T) {
 							).ValidateAndBuild()
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{lbI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, lbI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
 
 							rmI, err := test_ccip_invalid_receiver.NewPoolProxyReleaseOrMintInstruction(
 								test_ccip_invalid_receiver.ReleaseOrMintInV1{
@@ -546,19 +539,9 @@ func TestTokenPool(t *testing.T) {
 
 							require.NoError(t, err)
 
-							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
-
-							ix, err = rmn_remote.NewUncurseInstruction(
-								evmCurse,
-								config.RMNRemoteConfigPDA,
-								admin.PublicKey(),
-								config.RMNRemoteCursesPDA,
-								solana.SystemProgramID,
-							).ValidateAndBuild()
-							require.NoError(t, err)
-							result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
-							require.NotNil(t, result)
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{curseI, rmI}, admin, config.DefaultCommitment, []string{"Error Code: SubjectCursed"})
 						})
+
 						t.Run("exceed-rate-limit", func(t *testing.T) {
 							t.Parallel()
 
