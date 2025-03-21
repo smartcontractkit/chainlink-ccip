@@ -20,8 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
-	ag_binary "github.com/gagliardetto/binary"
-
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
@@ -3436,8 +3434,19 @@ func TestCCIPRouter(t *testing.T) {
 
 			feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, feeResult)
-			fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.FeeQuoterProgram.String(), binary.LittleEndian.Uint64)
-			require.Greater(t, fee, uint64(0))
+
+			// Check first that FQ returned something valid to the router
+			fqFee, err := common.ExtractAnchorTypedReturnValue[fee_quoter.GetFeeResult](ctx, feeResult.Meta.LogMessages, config.FeeQuoterProgram.String())
+			require.NoError(t, err)
+			require.Less(t, uint64(0), fqFee.Amount)
+			require.Equal(t, wsol.mint, fqFee.Token)
+
+			// Check that the router's response matches what FQ returned (with fewer fields)
+			routerFee, err := common.ExtractAnchorTypedReturnValue[ccip_router.GetFeeResult](ctx, feeResult.Meta.LogMessages, config.CcipRouterProgram.String())
+			require.NoError(t, err)
+			require.Equal(t, fqFee.Token, routerFee.Token)
+			require.Equal(t, fqFee.Amount, routerFee.Amount)
+			require.Equal(t, fqFee.Juels, routerFee.Juels)
 		})
 	})
 
@@ -4647,16 +4656,6 @@ func TestCCIPRouter(t *testing.T) {
 			}
 		})
 
-		decodeGetFeeResult := func(t *testing.T) func([]byte) fee_quoter.GetFeeResult {
-			return func(bytes []byte) fee_quoter.GetFeeResult {
-				result := fee_quoter.GetFeeResult{}
-				decoder := ag_binary.NewBinDecoder(bytes)
-				err := result.UnmarshalWithDecoder(decoder)
-				require.NoError(t, err)
-				return result
-			}
-		}
-
 		toFqMsg := func(msg ccip_router.SVM2AnyMessage) fee_quoter.SVM2AnyMessage {
 			fqTokenAmounts := make([]fee_quoter.SVMTokenAmount, len(msg.TokenAmounts))
 			for i, ta := range msg.TokenAmounts {
@@ -4694,7 +4693,8 @@ func TestCCIPRouter(t *testing.T) {
 					feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
 					require.NotNil(t, feeResult)
 					fmt.Println(feeResult.Meta.LogMessages)
-					fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.FeeQuoterProgram.String(), decodeGetFeeResult(t))
+					fee, err := common.ExtractAnchorTypedReturnValue[fee_quoter.GetFeeResult](ctx, feeResult.Meta.LogMessages, config.FeeQuoterProgram.String())
+					require.NoError(t, err)
 					require.Greater(t, fee.Amount, uint64(0))
 
 					initialBalance := getBalance(token.billingATA)
@@ -4804,8 +4804,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			feeResult := testutils.SimulateTransaction(ctx, t, solanaGoClient, []solana.Instruction{ix}, user)
 			require.NotNil(t, feeResult)
-			var fee fee_quoter.GetFeeResult
-			fee, err = common.ExtractTypedReturnValue(ctx, feeResult.Value.Logs, config.FeeQuoterProgram.String(), decodeGetFeeResult(t))
+			fee, err := common.ExtractAnchorTypedReturnValue[fee_quoter.GetFeeResult](ctx, feeResult.Value.Logs, config.FeeQuoterProgram.String())
 			require.NoError(t, err)
 			require.Greater(t, fee.Amount, uint64(0))
 

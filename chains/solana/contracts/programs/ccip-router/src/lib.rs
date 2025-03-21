@@ -37,8 +37,6 @@ declare_id!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 pub mod ccip_router {
     #![warn(missing_docs)]
 
-    use fee_quoter::messages::GetFeeResult;
-
     use super::*;
 
     //////////////////////////

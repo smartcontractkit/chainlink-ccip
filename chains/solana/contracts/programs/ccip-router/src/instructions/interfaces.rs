@@ -1,12 +1,11 @@
 use anchor_lang::prelude::*;
-use fee_quoter::messages::GetFeeResult;
 
 use crate::context::{
     AcceptOwnership, AddChainSelector, AddOfframp, CcipSend, RemoveOfframp, TransferOwnership,
     UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateDestChainSelectorConfigNoRealloc,
     WithdrawBilledFunds,
 };
-use crate::messages::SVM2AnyMessage;
+use crate::messages::{GetFeeResult, SVM2AnyMessage};
 use crate::state::{CodeVersion, DestChainConfig};
 use crate::token_context::{
     AcceptAdminRoleTokenAdminRegistry, ModifyTokenAdminRegistry,

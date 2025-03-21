@@ -80,3 +80,10 @@ impl<T: Into<ethnum::U256>> From<T> for CrossChainAmount {
         }
     }
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
+pub struct GetFeeResult {
+    pub amount: u64,
+    pub juels: u128,
+    pub token: Pubkey,
+}
