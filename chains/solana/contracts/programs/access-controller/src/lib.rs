@@ -52,6 +52,10 @@ pub mod access_controller {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut *ctx.accounts.state.load_mut()?;
+        require!(
+            proposed_owner != Pubkey::default() && proposed_owner != state.owner,
+            ErrorCode::InvalidInput
+        );
         state.proposed_owner = proposed_owner;
         Ok(())
     }
