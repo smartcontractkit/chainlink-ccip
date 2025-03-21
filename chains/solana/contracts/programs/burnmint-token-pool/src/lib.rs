@@ -6,7 +6,7 @@ use anchor_spl::token_2022::spl_token_2022::{
 };
 use base_token_pool::{common::*, rate_limiter::*};
 
-declare_id!("SCUGVro6XyvLbXLAqEU4ZwiAtrE22SjtryX3utdREYn");
+declare_id!("DJWPHb5TZ7vzWFBbuoEWtVTjVEWEwcLmE1BCv9TsVfLc");
 
 pub mod context;
 use crate::context::*;

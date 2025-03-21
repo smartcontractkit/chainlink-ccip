@@ -3,6 +3,6 @@ pub mod common;
 pub mod rate_limiter;
 
 // null contract required for IDL + gobinding generation
-declare_id!("31FHyhZYz2sUc1iA5EnijN2L7bUyMMnvjyX7CiPQoDQq");
+declare_id!("tZhMpqaxb4znS4RpyzVprQySmXhFpEsrrLPMXy3RCMV");
 #[program]
 pub mod base_token_pool {}

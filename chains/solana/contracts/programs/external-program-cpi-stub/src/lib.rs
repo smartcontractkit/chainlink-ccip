@@ -4,7 +4,7 @@
  */
 use anchor_lang::prelude::*;
 
-declare_id!("9e65iThKtYnLm4AQ95nbqJbMN8pFGqC8rt5z9hLrd9Di");
+declare_id!("54hq5V1tjcfcVaFJ8W2dgVRhzaCqANyes5KfzkvdkZxs");
 
 #[program]
 pub mod external_program_cpi_stub {

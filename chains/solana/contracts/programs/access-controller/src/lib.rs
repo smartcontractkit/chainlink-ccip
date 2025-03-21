@@ -4,7 +4,7 @@ use std::mem;
 
 use arrayvec::arrayvec;
 
-declare_id!("26jydKtYHMbJk3RXqvqQRxZGi5yniWs4pVeq75abiPNf");
+declare_id!("DwPqjjvswEbBe8qhyrZcPu6gyDVFu57pa4NMKt9o3V81");
 
 #[error_code]
 pub enum ErrorCode {
