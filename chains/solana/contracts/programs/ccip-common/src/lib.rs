@@ -9,7 +9,7 @@ pub mod v1;
 pub enum CommonCcipError {
     #[msg("The given sequence interval is invalid")]
     // offset error code so that they don't clash with other programs
-    // (Anchor's base custom error code 6000 + offset 3000 = start at 9000)
+    // (Anchor's base custom error code 6000 + offset 4000 = start at 10000)
     InvalidSequenceInterval = 4000,
     #[msg("Invalid pool accounts")]
     InvalidInputsPoolAccounts,
