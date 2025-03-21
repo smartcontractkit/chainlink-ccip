@@ -2,6 +2,20 @@
 version: v2beta1
 name: mockserver
 
+vars:
+  # When using a ClusterIP service, in some
+  # specific cases, we can set a static IP if needed.
+  #
+  # To find the subnet, run `kubectl get svc -A` and choose one.
+  # Alternatively, use `kubectl cluster-info dump | grep -i cluster-cidr`
+  # to find the cluster CIDR.
+  #
+  # The full list of used IPs can be found with:
+  # `kubectl get services -A -o jsonpath='{.items[*].spec.clusterIP}'`
+  MOCK_SERVER_SERVICE_IP:
+    source: env
+    default: ""
+
 pipelines:
   deploy:
     run: |-
@@ -17,6 +31,10 @@ deployments:
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-mockserver"
         version: "0.3.0"
       values:
+        mockserver:
+          service:
+            clusterIP: ${MOCK_SERVER_SERVICE_IP}
+            type: ClusterIP
         podSecurityContext:
           fsGroup: 999
         securityContext:
