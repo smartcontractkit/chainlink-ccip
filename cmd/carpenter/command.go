@@ -101,7 +101,7 @@ func makeCommand() *cli.Command {
 				Destination: &args.rendererName,
 				Validator: func(s string) error {
 					choices := render.GetRenderers()
-					if slices.Contains(choices, s) {
+					if !slices.Contains(choices, s) {
 						return fmt.Errorf("invalid renderer: %s, expected one of %s", s, choices)
 					}
 					return nil
