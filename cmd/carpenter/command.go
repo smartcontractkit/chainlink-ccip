@@ -18,8 +18,9 @@ import (
 type arguments struct {
 	files        []string
 	logType      string
-	filters      []string
 	rendererName string
+
+	parse.FilterFields
 }
 
 func run(args arguments) error {
@@ -40,6 +41,11 @@ func run(args arguments) error {
 		return fmt.Errorf("failed to initialize input stream: %w", err)
 	}
 
+	compiledFilters, err := args.FilterFields.Compile()
+	if err != nil {
+		return fmt.Errorf("failed to compile filters: %w", err)
+	}
+
 	scanner := bufio.NewScanner(inputStream)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -48,10 +54,13 @@ func run(args arguments) error {
 			return fmt.Errorf("ParseLine: %w", err)
 		}
 
-		//data, err := parse.Filter(line, args.logType, args.filters)
-		include, err := parse.Filter(data, args.filters)
+		include, err := parse.Filter(data, compiledFilters)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to get data: %s\n", err)
+			msg := fmt.Sprintf("Unable to get data: %s\n", err)
+			_, err2 := fmt.Fprintf(os.Stderr, msg)
+			if err2 != nil {
+				panic(msg)
+			}
 			return err
 		}
 		if !include {
@@ -109,7 +118,14 @@ func makeCommand() *cli.Command {
 			&cli.StringSliceFlag{
 				Name:        "filter",
 				Usage:       "Provide one or more filters to apply to the logs. Format: field=matcher",
-				Destination: &args.filters,
+				Destination: &args.FilterFields.Filters,
+				Category:    "filters",
+			},
+			&cli.StringSliceFlag{
+				Name:        "componentFilter",
+				Usage:       "Provide one or more component filters to apply to the logs.",
+				Destination: &args.FilterFields.ComponentFilters,
+				Category:    "filters",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
