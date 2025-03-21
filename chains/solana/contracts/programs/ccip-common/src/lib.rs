@@ -16,8 +16,6 @@ pub enum CommonCcipError {
     InvalidInputsPoolAccounts,
     #[msg("Invalid token accounts")]
     InvalidInputsTokenAccounts,
-    #[msg("Invalid config account")]
-    InvalidInputsConfigAccounts,
     #[msg("Invalid Token Admin Registry account")]
     InvalidInputsTokenAdminRegistryAccounts,
     #[msg("Invalid LookupTable account")]
