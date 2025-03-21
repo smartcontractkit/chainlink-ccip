@@ -560,21 +560,21 @@ func TestTimelockRBAC(t *testing.T) {
 					ExpectedError: "Error Code: " + timelockutil.UnauthorizedError.String(),
 				},
 				{
-					Name:          "invalid access controller",
+					Name:          "invalid access controller (bypasser)",
 					Ac:            roleMap[timelock.Bypasser_Role].AccessController, // invalid access controller
 					Signer:        roleMap[timelock.Bypasser_Role].RandomPick(),
 					ShouldFail:    true,
 					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
 				},
 				{
-					Name:          "invalid access controller",
+					Name:          "invalid access controller (canceller)",
 					Ac:            roleMap[timelock.Canceller_Role].AccessController, // invalid access controller
 					Signer:        roleMap[timelock.Canceller_Role].RandomPick(),
 					ShouldFail:    true,
 					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
 				},
 				{
-					Name:          "invalid access controller",
+					Name:          "invalid access controller (executor)",
 					Ac:            roleMap[timelock.Executor_Role].AccessController, // invalid access controller
 					Signer:        roleMap[timelock.Executor_Role].RandomPick(),
 					ShouldFail:    true,
@@ -632,21 +632,21 @@ func TestTimelockRBAC(t *testing.T) {
 					ExpectedError: "Error Code: " + timelockutil.UnauthorizedError.String(),
 				},
 				{
-					Name:          "invalid access controller",
+					Name:          "invalid access controller (canceller)",
 					Ac:            roleMap[timelock.Canceller_Role].AccessController, // invalid access controller
 					Signer:        roleMap[timelock.Canceller_Role].RandomPick(),
 					ShouldFail:    true,
 					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
 				},
 				{
-					Name:          "invalid access controller",
+					Name:          "invalid access controller (executor)",
 					Ac:            roleMap[timelock.Executor_Role].AccessController, // invalid access controller
 					Signer:        roleMap[timelock.Executor_Role].RandomPick(),
 					ShouldFail:    true,
 					ExpectedError: "Error Code: " + timelock.InvalidAccessController_TimelockError.String(),
 				},
 				{
-					Name:          "invalid access controller",
+					Name:          "invalid access controller (proposer)",
 					Ac:            roleMap[timelock.Proposer_Role].AccessController, // invalid access controller
 					Signer:        roleMap[timelock.Proposer_Role].RandomPick(),
 					ShouldFail:    true,
