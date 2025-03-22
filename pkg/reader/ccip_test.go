@@ -90,6 +90,16 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
 
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		if ccipReader.configPoller != nil {
+			err := ccipReader.configPoller.Close()
+			if err != nil {
+				t.Logf("Error closing config poller: %v", err)
+			}
+		}
+	})
+
 	addrStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, 111_111)
 	require.NoError(t, err)
 
@@ -814,6 +824,13 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
 
+	// Add cleanup to properly shut down the background polling
+	t.Cleanup(func() {
+		if err := ccipReader.configPoller.Close(); err != nil {
+			t.Logf("Error closing config poller: %v", err)
+		}
+	})
+
 	feeQuoterAddressStr, err := mockAddrCodec.AddressBytesToString(feeQuoterAddress, 111_111)
 	require.NoError(t, err)
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -850,6 +867,13 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		internal.NewMockAddressCodecHex(t),
 	)
 
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		if ccipReader.configPoller != nil {
+			ccipReader.configPoller.Close()
+		}
+	})
+
 	ctx := context.Background()
 	feeComponents := ccipReader.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{chainA, chainB, chainC})
 	assert.Len(t, feeComponents, 2)
@@ -878,6 +902,13 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		[]byte{0x3},
 		internal.NewMockAddressCodecHex(t),
 	)
+
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		if ccipReader.configPoller != nil {
+			ccipReader.configPoller.Close()
+		}
+	})
 
 	ctx := context.Background()
 	_, err := ccipReader.GetDestChainFeeComponents(ctx)
@@ -1553,4 +1584,12 @@ func (m *mockConfigCache) RefreshSourceChainConfigs(
 	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
 	args := m.Called(ctx, destChain, sourceChains)
 	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
+}
+
+func (m *mockConfigCache) Start() error {
+	return m.Called().Error(0)
+}
+
+func (m *mockConfigCache) Close() error {
+	return m.Called().Error(0)
 }
