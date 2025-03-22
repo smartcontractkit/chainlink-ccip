@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -30,7 +31,7 @@ func setupBasicCache(t *testing.T) (*configPoller, *reader_mocks.MockExtended) {
 		destChain: chainA,
 	}
 
-	cache := newConfigPoller(logger.Test(t), reader, 1*time.Second)
+	cache := newConfigPoller(logger.Test(t), reader, *commonconfig.MustNewDuration(1 * time.Second))
 	return cache, mockReader
 }
 
@@ -318,7 +319,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 	testCases := []struct {
 		name          string
 		setupReader   func() *ccipChainReader
-		refreshPeriod time.Duration
+		refreshPeriod commonconfig.Duration
 		chainToTest   cciptypes.ChainSelector
 		expectedErr   string
 	}{
@@ -331,7 +332,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 					destChain:       chainA,
 				}
 			},
-			refreshPeriod: time.Second,
+			refreshPeriod: *commonconfig.MustNewDuration(1 * time.Second),
 			chainToTest:   chainA,
 			expectedErr:   "no contract reader for chain",
 		},
@@ -344,7 +345,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 					destChain:       chainA,
 				}
 			},
-			refreshPeriod: time.Second,
+			refreshPeriod: *commonconfig.MustNewDuration(1 * time.Second),
 			chainToTest:   chainA,
 			expectedErr:   "no contract reader for chain",
 		},
@@ -359,7 +360,7 @@ func TestConfigCache_Initialization(t *testing.T) {
 					destChain: chainA,
 				}
 			},
-			refreshPeriod: time.Second,
+			refreshPeriod: *commonconfig.MustNewDuration(1 * time.Second),
 			chainToTest:   chainA,
 			expectedErr:   "no contract reader for chain",
 		},
@@ -530,7 +531,7 @@ func TestConfigCache_MultipleChains(t *testing.T) {
 		destChain: chainA,
 	}
 
-	cache := newConfigPoller(logger.Test(t), reader, 1*time.Second)
+	cache := newConfigPoller(logger.Test(t), reader, *commonconfig.MustNewDuration(1 * time.Second))
 	ctx := tests.Context(t)
 
 	// Setup mock response for both chains
@@ -587,19 +588,19 @@ func TestConfigCache_RefreshPeriod(t *testing.T) {
 	// Test with different refresh periods
 	testCases := []struct {
 		name          string
-		refreshPeriod time.Duration
+		refreshPeriod commonconfig.Duration
 		sleepTime     time.Duration
 		expectRefresh bool
 	}{
 		{
 			name:          "short refresh period",
-			refreshPeriod: 100 * time.Millisecond,
+			refreshPeriod: *commonconfig.MustNewDuration(100 * time.Millisecond),
 			sleepTime:     150 * time.Millisecond,
 			expectRefresh: true,
 		},
 		{
 			name:          "long refresh period",
-			refreshPeriod: 1 * time.Second,
+			refreshPeriod: *commonconfig.MustNewDuration(1 * time.Second),
 			sleepTime:     500 * time.Millisecond,
 			expectRefresh: false,
 		},
