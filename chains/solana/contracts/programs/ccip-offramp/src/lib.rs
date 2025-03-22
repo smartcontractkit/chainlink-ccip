@@ -1,7 +1,7 @@
 use anchor_lang::error_code;
 use anchor_lang::prelude::*;
 
-declare_id!("offqSMQWgQud6WJz694LRzkeN5kMYpCHTpXQr3Rkcjm");
+declare_id!("7MwS2RSiRq5EhTo2ym6AvgjNxYbXCsvQcjAhcenGGHhZ");
 
 mod event;
 mod messages;
