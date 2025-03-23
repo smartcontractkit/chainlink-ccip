@@ -4295,7 +4295,7 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, tokens.ToLittleEndianU256(36333028), ccipMessageSentEvent.Message.FeeTokenAmount.LeBytes)
 				// The difference is the ratio between the fee token value (wsol) and link token value (signified by link22 in these tests).
 				// Since they have been configured in the test setup to differ by a factor of 10, so does the token amount and its value in juels.
-				// Then, they differ again by 9 decimals due to the solana denomiation being 1e9 divisions = 1 LINK, compared to 1e18 juels = 1 LINK
+				// Then, they differ again by 9 decimals due to the solana denomination being 1e9 divisions = 1 LINK, compared to 1e18 juels = 1 LINK
 				// in EVM. Note how some precision is lost in the translation, because the price in solana is stored with respect to the native
 				// decimals.
 				require.Equal(t, tokens.ToLittleEndianU256(3633302000000000), ccipMessageSentEvent.Message.FeeValueJuels.LeBytes)
@@ -4857,7 +4857,7 @@ func TestCCIPRouter(t *testing.T) {
 	// CCIP Sender Contract //
 	//////////////////////////
 	t.Run("Ccip Sender Contract", func(t *testing.T) {
-		// addresses are not propogated as they are limited to the example sender only
+		// addresses are not propagated as they are limited to the example sender only
 		senderState, _, err := solana.FindProgramAddress([][]byte{[]byte("state")}, config.CcipBaseSender)
 		require.NoError(t, err)
 		senderPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_sender")}, config.CcipBaseSender)
@@ -4952,7 +4952,7 @@ func TestCCIPRouter(t *testing.T) {
 		for _, cc := range chainConfig {
 			t.Run(fmt.Sprintf("SVM->%s", cc.destName), func(t *testing.T) {
 				for _, fc := range feeConfig {
-					t.Run(fmt.Sprintf("billling-%s/message_only", fc.name), func(t *testing.T) {
+					t.Run(fmt.Sprintf("billing-%s/message_only", fc.name), func(t *testing.T) {
 						ix, err := example_ccip_sender.NewCcipSendInstruction(
 							cc.chainSelector,
 							[]example_ccip_sender.SVMTokenAmount{}, // no tokens
@@ -5001,7 +5001,7 @@ func TestCCIPRouter(t *testing.T) {
 				}
 
 				for _, fc := range feeConfig {
-					t.Run(fmt.Sprintf("billling-%s/with_tokens", fc.name), func(t *testing.T) {
+					t.Run(fmt.Sprintf("billing-%s/with_tokens", fc.name), func(t *testing.T) {
 						base := example_ccip_sender.NewCcipSendInstruction(
 							cc.chainSelector,
 							[]example_ccip_sender.SVMTokenAmount{

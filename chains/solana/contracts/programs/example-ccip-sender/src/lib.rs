@@ -2,11 +2,12 @@
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked};
-use fee_quoter::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount};
 use solana_program::{
     instruction::Instruction,
     program::{get_return_data, invoke, invoke_signed},
 };
+
+use ccip_router::messages::{GetFeeResult, SVM2AnyMessage, SVMTokenAmount};
 
 declare_id!("4LfBQWYaU6zQZbDyYjX8pbY4qjzrhoumUFYZEZEqMNhJ");
 

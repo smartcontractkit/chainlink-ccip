@@ -13,7 +13,7 @@ use crate::state::*;
 mod event;
 use crate::event::*;
 
-mod messages;
+pub mod messages;
 use crate::messages::*;
 
 mod instructions;
