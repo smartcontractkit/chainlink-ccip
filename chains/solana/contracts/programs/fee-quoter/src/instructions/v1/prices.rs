@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
+use ccip_common::seed;
 
-use crate::context::seed::{DEST_CHAIN, FEE_BILLING_TOKEN_CONFIG};
 use crate::context::{GasPriceUpdate, TokenPriceUpdate, UpdatePrices};
 use crate::event::{UsdPerTokenUpdated, UsdPerUnitGasUpdated};
 use crate::instructions::interfaces::Prices;
@@ -71,7 +71,10 @@ fn apply_token_price_update<'info>(
     }
 
     let (expected, _) = Pubkey::find_program_address(
-        &[FEE_BILLING_TOKEN_CONFIG, token_update.source_token.as_ref()],
+        &[
+            seed::FEE_BILLING_TOKEN_CONFIG,
+            token_update.source_token.as_ref(),
+        ],
         &crate::ID,
     );
 
@@ -119,7 +122,7 @@ fn apply_gas_price_update<'info>(
 ) -> Result<()> {
     let (expected, _) = Pubkey::find_program_address(
         &[
-            DEST_CHAIN,
+            seed::DEST_CHAIN,
             gas_update.dest_chain_selector.to_le_bytes().as_ref(),
         ],
         &crate::ID,
