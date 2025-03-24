@@ -69,9 +69,8 @@ func makeCommand() *cli.Command {
 			&cli.StringSliceFlag{
 				Name: "filter",
 				Usage: fmt.Sprintf(
-					"Line selection filters. Format as 'FieldName:Regexp', valid fields: [%s]",
+					"Line selection filters. Format as '[!]FieldName:Regexp', the optional ! prefix will omit logs that match the pattern, valid fields: [%s]",
 					strings.Join(filter.FieldNames(), ", ")),
-				//Destination: &args.FilterFields.Filters,
 				Category: "filters",
 				Validator: func(fields []string) error {
 					var err error

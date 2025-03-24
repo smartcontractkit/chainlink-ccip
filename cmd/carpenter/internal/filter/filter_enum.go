@@ -26,6 +26,8 @@ const (
 	FieldLoggerName Field = "LoggerName"
 	// FieldDONID is a Field of type DONID.
 	FieldDONID Field = "DONID"
+	// FieldSequenceNumber is a Field of type SequenceNumber.
+	FieldSequenceNumber Field = "SequenceNumber"
 )
 
 var ErrInvalidField = fmt.Errorf("not a valid Field, try [%s]", strings.Join(_FieldNames, ", "))
@@ -38,6 +40,7 @@ var _FieldNames = []string{
 	string(FieldCaller),
 	string(FieldLoggerName),
 	string(FieldDONID),
+	string(FieldSequenceNumber),
 }
 
 // FieldNames returns a list of possible string values of Field.
@@ -60,20 +63,22 @@ func (x Field) IsValid() bool {
 }
 
 var _FieldValue = map[string]Field{
-	"Plugin":     FieldPlugin,
-	"plugin":     FieldPlugin,
-	"Component":  FieldComponent,
-	"component":  FieldComponent,
-	"LogLevel":   FieldLogLevel,
-	"loglevel":   FieldLogLevel,
-	"Message":    FieldMessage,
-	"message":    FieldMessage,
-	"Caller":     FieldCaller,
-	"caller":     FieldCaller,
-	"LoggerName": FieldLoggerName,
-	"loggername": FieldLoggerName,
-	"DONID":      FieldDONID,
-	"donid":      FieldDONID,
+	"Plugin":         FieldPlugin,
+	"plugin":         FieldPlugin,
+	"Component":      FieldComponent,
+	"component":      FieldComponent,
+	"LogLevel":       FieldLogLevel,
+	"loglevel":       FieldLogLevel,
+	"Message":        FieldMessage,
+	"message":        FieldMessage,
+	"Caller":         FieldCaller,
+	"caller":         FieldCaller,
+	"LoggerName":     FieldLoggerName,
+	"loggername":     FieldLoggerName,
+	"DONID":          FieldDONID,
+	"donid":          FieldDONID,
+	"SequenceNumber": FieldSequenceNumber,
+	"sequencenumber": FieldSequenceNumber,
 }
 
 // ParseField attempts to convert a string to a Field.
