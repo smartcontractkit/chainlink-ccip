@@ -37,9 +37,10 @@ func makeCommand() *cli.Command {
 				Destination: &args.files,
 			},
 			&cli.StringFlag{
-				Name:  "logType",
-				Usage: "Specify the type of log to parse, valid options: json, mixed, ci",
-				Value: "json",
+				Name:             "logType",
+				Usage:            "Specify the type of log to parse, valid options: json, mixed, ci",
+				Value:            parse.LogTypeJSON.String(),
+				ValidateDefaults: true, // to make sure default is assigned.
 				Validator: func(s string) error {
 					var err error
 					args.logType, err = parse.ParseLogType(s)
@@ -86,8 +87,9 @@ func makeCommand() *cli.Command {
 				Usage: fmt.Sprintf(
 					"Operation to use when combining filters. Valid options: [%s]",
 					strings.Join(filter.FilterOPNames(), ", ")),
-				Category: "filters",
-				Value:    string(filter.FilterOPAND),
+				Category:         "filters",
+				Value:            string(filter.FilterOPAND),
+				ValidateDefaults: true, // to make sure default is assigned.
 				Validator: func(s string) error {
 					var err error
 					args.filterOP, err = filter.ParseFilterOP(s)

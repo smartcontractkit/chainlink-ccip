@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
 )
 
-// ENUM(Component, LogLevel, Message, Caller, LoggerName, )
+// ENUM(Plugin, Component, LogLevel, Message, Caller, LoggerName, DONID)
 type Field string
 
 // CompiledFilterFields is a collection of compiled Field filters.
@@ -93,6 +93,10 @@ func Filter(data *parse.Data, filters CompiledFilterFields, op FilterOP) (bool, 
 				fieldStr = data.GetCaller()
 			case FieldLoggerName:
 				fieldStr = data.GetLoggerName()
+			case FieldPlugin:
+				fieldStr = data.Plugin
+			case FieldDONID:
+				fieldStr = fmt.Sprintf("%d", data.DONID)
 			}
 
 			matches := compiledFilter.MatchString(fieldStr)

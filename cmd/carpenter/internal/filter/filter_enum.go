@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	// FieldPlugin is a Field of type Plugin.
+	FieldPlugin Field = "Plugin"
 	// FieldComponent is a Field of type Component.
 	FieldComponent Field = "Component"
 	// FieldLogLevel is a Field of type LogLevel.
@@ -22,16 +24,20 @@ const (
 	FieldCaller Field = "Caller"
 	// FieldLoggerName is a Field of type LoggerName.
 	FieldLoggerName Field = "LoggerName"
+	// FieldDONID is a Field of type DONID.
+	FieldDONID Field = "DONID"
 )
 
 var ErrInvalidField = fmt.Errorf("not a valid Field, try [%s]", strings.Join(_FieldNames, ", "))
 
 var _FieldNames = []string{
+	string(FieldPlugin),
 	string(FieldComponent),
 	string(FieldLogLevel),
 	string(FieldMessage),
 	string(FieldCaller),
 	string(FieldLoggerName),
+	string(FieldDONID),
 }
 
 // FieldNames returns a list of possible string values of Field.
@@ -54,6 +60,8 @@ func (x Field) IsValid() bool {
 }
 
 var _FieldValue = map[string]Field{
+	"Plugin":     FieldPlugin,
+	"plugin":     FieldPlugin,
 	"Component":  FieldComponent,
 	"component":  FieldComponent,
 	"LogLevel":   FieldLogLevel,
@@ -64,6 +72,8 @@ var _FieldValue = map[string]Field{
 	"caller":     FieldCaller,
 	"LoggerName": FieldLoggerName,
 	"loggername": FieldLoggerName,
+	"DONID":      FieldDONID,
+	"donid":      FieldDONID,
 }
 
 // ParseField attempts to convert a string to a Field.
