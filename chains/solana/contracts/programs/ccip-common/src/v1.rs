@@ -26,6 +26,30 @@ pub fn validate_and_parse_token_accounts<'info>(
     fee_quoter: Pubkey,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
+    let program_id = crate::id();
+
+    let mut input_accounts = accounts;
+    let mut bumps = <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
+    let mut reallocs = std::collections::BTreeSet::new();
+
+    // leveraging Anchor's account context validation
+    // Instead of manually checking each account (ownership, PDA derivation, constraints),
+    // we're using Anchor's `try_accounts` to perform these validations based on the
+    // constraints defined in the `TokenAccountsValidationContext` account context struct
+    TokenAccountsValidationContext::try_accounts(
+        &program_id,
+        &mut input_accounts,
+        &[
+            token_receiver.as_ref(),
+            &chain_selector.to_le_bytes(),
+            router.as_ref(),
+            fee_quoter.as_ref(),
+        ]
+        .concat(),
+        &mut bumps,
+        &mut reallocs,
+    )?;
+
     let mut accounts_iter = accounts.iter();
 
     // accounts based on user or chain
@@ -46,30 +70,6 @@ pub fn validate_and_parse_token_accounts<'info>(
 
     // collect remaining accounts
     let remaining_accounts = accounts_iter.as_slice();
-
-    // leveraging Anchor's account context validation
-    // Instead of manually checking each account (ownership, PDA derivation, constraints),
-    // we're using Anchor's `try_accounts` to perform these validations based on the
-    // constraints defined in the `TokenAccountsValidationContext` account context struct
-    let program_id = crate::id();
-
-    let mut input_accounts = accounts;
-    let mut bumps = <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
-    let mut reallocs = std::collections::BTreeSet::new();
-
-    TokenAccountsValidationContext::try_accounts(
-        &program_id,
-        &mut input_accounts,
-        &[
-            token_receiver.as_ref(),
-            &chain_selector.to_le_bytes(),
-            router.as_ref(),
-            fee_quoter.as_ref(),
-        ]
-        .concat(),
-        &mut bumps,
-        &mut reallocs,
-    )?;
 
     // Additional validations that can't be expressed in the account context
     {
