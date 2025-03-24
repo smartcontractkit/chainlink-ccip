@@ -90,7 +90,7 @@ func newCCIPChainReaderInternal(
 
 	// After contracts are synced, start the background polling
 	lggr.Info("Starting config background polling")
-	if err := reader.configPoller.Start(); err != nil {
+	if err := reader.configPoller.Start(ctx); err != nil {
 		// Log the error but don't fail - we can still function without background polling
 		// by fetching configs on demand
 		lggr.Errorw("failed to start config background polling", "err", err)

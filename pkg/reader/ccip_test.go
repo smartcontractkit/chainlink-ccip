@@ -92,11 +92,9 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 
 	// Add cleanup to ensure resources are released
 	t.Cleanup(func() {
-		if ccipReader.configPoller != nil {
-			err := ccipReader.configPoller.Close()
-			if err != nil {
-				t.Logf("Error closing config poller: %v", err)
-			}
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
 		}
 	})
 
@@ -826,8 +824,9 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 
 	// Add cleanup to properly shut down the background polling
 	t.Cleanup(func() {
-		if err := ccipReader.configPoller.Close(); err != nil {
-			t.Logf("Error closing config poller: %v", err)
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
 		}
 	})
 
@@ -869,8 +868,9 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 
 	// Add cleanup to ensure resources are released
 	t.Cleanup(func() {
-		if ccipReader.configPoller != nil {
-			ccipReader.configPoller.Close()
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
 		}
 	})
 
@@ -905,8 +905,9 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 
 	// Add cleanup to ensure resources are released
 	t.Cleanup(func() {
-		if ccipReader.configPoller != nil {
-			ccipReader.configPoller.Close()
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
 		}
 	})
 
@@ -1704,13 +1705,6 @@ func (m *mockConfigCache) GetChainConfig(
 	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
 }
 
-func (m *mockConfigCache) RefreshChainConfig(
-	ctx context.Context,
-	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
-	args := m.Called(ctx, chainSel)
-	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
-}
-
 func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
@@ -1719,18 +1713,26 @@ func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
 }
 
-func (m *mockConfigCache) RefreshSourceChainConfigs(
-	ctx context.Context,
-	destChain cciptypes.ChainSelector,
-	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
-	args := m.Called(ctx, destChain, sourceChains)
-	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
-}
-
-func (m *mockConfigCache) Start() error {
-	return m.Called().Error(0)
+// Update Start method to accept context parameter
+func (m *mockConfigCache) Start(ctx context.Context) error {
+	return m.Called(ctx).Error(0)
 }
 
 func (m *mockConfigCache) Close() error {
+	return m.Called().Error(0)
+}
+
+// Implement HealthReport method for services.Service interface
+func (m *mockConfigCache) HealthReport() map[string]error {
+	args := m.Called()
+	return args.Get(0).(map[string]error)
+}
+
+// Implement Name method for the Service interface
+func (m *mockConfigCache) Name() string {
+	return m.Called().String(0)
+}
+
+func (m *mockConfigCache) Ready() error {
 	return m.Called().Error(0)
 }

@@ -211,7 +211,7 @@ func TestConfigPoller_StartStop(t *testing.T) {
 	setupMockResponse(reader)
 
 	// Start the background poller
-	err := cache.Start()
+	err := cache.Start(t.Context())
 	require.NoError(t, err, "Starting config poller should not error")
 
 	// Verify it's running by letting it execute at least once
@@ -369,7 +369,7 @@ func TestConfigPoller_TrackSourceChain(t *testing.T) {
 	setupRefreshExpectations(reader)
 
 	// Start the background poller
-	err = cache.Start()
+	err = cache.Start(t.Context())
 	require.NoError(t, err)
 
 	// Let it run for a refresh cycle (increased duration)
@@ -398,7 +398,7 @@ func TestConfigPoller_BackgroundErrorHandling(t *testing.T) {
 		Return(nil, nil, errors.New("simulated error"))
 
 	// Start the poller
-	err := cache.Start()
+	err := cache.Start(t.Context())
 	require.NoError(t, err)
 
 	// Let it run and encounter the error
@@ -430,7 +430,7 @@ func TestConfigPoller_ConcurrentWithBackground(t *testing.T) {
 		}).Return(setupMockResponse(reader), []string{}, nil)
 
 	// Start the background poller
-	err := cache.Start()
+	err := cache.Start(t.Context())
 	require.NoError(t, err)
 
 	// Sleep briefly to ensure background poller has started a refresh
@@ -1082,7 +1082,7 @@ func TestConfigCache_BackgroundRefreshPeriod(t *testing.T) {
 			require.NoError(t, err)
 
 			// Start the background poller
-			err = cache.Start()
+			err = cache.Start(t.Context())
 			require.NoError(t, err)
 
 			// Wait for the specified time to allow background polling

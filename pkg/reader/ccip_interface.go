@@ -275,6 +275,5 @@ type CCIPReader interface {
 	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
 	) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
 
-	// Close closes the reader.
 	Close() error
 }

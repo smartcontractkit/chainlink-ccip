@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -17,7 +18,10 @@ import (
 
 // refreshAllKnownChains refreshes all known chains in background using batched requests where possible
 // bgRefreshTimeout defines the timeout for background refresh operations
-const bgRefreshTimeout = 30 * time.Second
+const (
+	bgRefreshTimeout = 30 * time.Second
+	MaxFailedPolls   = 10
+)
 
 // ConfigPoller defines the interface for caching chain configuration data
 type ConfigPoller interface {
@@ -28,10 +32,7 @@ type ConfigPoller interface {
 		ctx context.Context,
 		destChain cciptypes.ChainSelector,
 		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
-	// Start starts the background polling
-	Start() error
-	// Close stops the background polling
-	Close() error
+	services.Service
 }
 
 // configPoller handles caching of chain configuration data for multiple chains
@@ -50,6 +51,9 @@ type configPoller struct {
 	// Background polling control
 	stopChan chan struct{}
 	wg       sync.WaitGroup
+
+	// Track consecutive failed polls
+	failedPolls atomic.Uint32
 }
 
 // chainCache represents the cache for a single chain.
@@ -102,8 +106,7 @@ func (c *configPoller) startBackgroundPolling() {
 	}()
 }
 
-// Add Start method to configPoller
-func (c *configPoller) Start() error {
+func (c *configPoller) Start(ctx context.Context) error {
 	return c.StartOnce("ConfigPoller", func() error {
 		c.startBackgroundPolling()
 		c.lggr.Info("Background poller started")
@@ -111,13 +114,32 @@ func (c *configPoller) Start() error {
 	})
 }
 
-// Stop stops the background polling
 func (c *configPoller) Close() error {
 	return c.StopOnce("ConfigPoller", func() error {
 		close(c.stopChan)
 		c.wg.Wait()
+		// Reset failed polls counter on shutdown
+		c.failedPolls.Store(0)
 		return nil
 	})
+}
+
+func (c *configPoller) Name() string {
+	return c.lggr.Name()
+}
+
+func (c *configPoller) HealthReport() map[string]error {
+	// Check if consecutive failed polls exceeds the maximum
+	failCount := c.failedPolls.Load()
+	if failCount >= MaxFailedPolls {
+		c.SvcErrBuffer.Append(fmt.Errorf("polling failed %d times in a row", MaxFailedPolls))
+	}
+
+	return map[string]error{c.Name(): c.Healthy()}
+}
+
+func (c *configPoller) Ready() error {
+	return c.StateMachine.Ready()
 }
 
 // getChainsToRefresh returns all chains in the cache and their associated source chains
@@ -136,14 +158,15 @@ func (c *configPoller) getChainsToRefresh() (
 		chainSelectors = append(chainSelectors, chainSel)
 
 		// If this chain is the destination chain and has source chains, gather them
-		if chainSel == c.reader.getDestChain() {
-			if sourceChains, exists := c.knownSourceChains[chainSel]; exists && len(sourceChains) > 0 {
-				sourceList := make([]cciptypes.ChainSelector, 0, len(sourceChains))
-				for sourceChain := range sourceChains {
-					sourceList = append(sourceList, sourceChain)
-				}
-				sourceChainsMap[chainSel] = sourceList
+		if chainSel != c.reader.getDestChain() {
+			continue
+		}
+		if sourceChains, exists := c.knownSourceChains[chainSel]; exists && len(sourceChains) > 0 {
+			sourceList := make([]cciptypes.ChainSelector, 0, len(sourceChains))
+			for sourceChain := range sourceChains {
+				sourceList = append(sourceList, sourceChain)
 			}
+			sourceChainsMap[chainSel] = sourceList
 		}
 	}
 
@@ -160,6 +183,9 @@ func (c *configPoller) refreshAllKnownChains() {
 		"chainsCount", len(chainSelectors),
 		"refreshPeriod", c.refreshPeriod)
 
+	// Track success of this refresh cycle
+	refreshFailed := false
+
 	// Refresh each chain (and its source chains if applicable)
 	for _, chainSel := range chainSelectors {
 		ctx, cancel := context.WithTimeout(context.Background(), bgRefreshTimeout)
@@ -169,13 +195,13 @@ func (c *configPoller) refreshAllKnownChains() {
 			sourceChains := sourceChainsMap[chainSel]
 			err := c.batchRefreshChainAndSourceConfigs(ctx, chainSel, sourceChains)
 			if err != nil {
+				refreshFailed = true
 				c.lggr.Warnw("Failed to batch refresh chain and source configs",
 					"destChain", chainSel,
 					"sourceChains", sourceChains,
 					"error", err)
 				// Fall back to individual refreshes if batch fails
-				_, err := c.refreshChainConfig(ctx, chainSel)
-				if err != nil {
+				if _, err := c.refreshChainConfig(ctx, chainSel); err != nil {
 					c.lggr.Warnw("Failed to refresh chain config in background",
 						"chain", chainSel, "error", err)
 				}
@@ -188,8 +214,7 @@ func (c *configPoller) refreshAllKnownChains() {
 			}
 		} else {
 			// This is a source chain or a chain without source chains, just refresh its config
-			_, err := c.refreshChainConfig(ctx, chainSel)
-			if err != nil {
+			if _, err := c.refreshChainConfig(ctx, chainSel); err != nil {
 				c.lggr.Warnw("Failed to refresh chain config in background",
 					"chain", chainSel, "error", err)
 			}
@@ -197,6 +222,19 @@ func (c *configPoller) refreshAllKnownChains() {
 
 		cancel()
 	}
+
+	// Update the failed polls counter
+	if refreshFailed {
+		c.failedPolls.Add(1)
+		failCount := c.failedPolls.Load()
+		c.lggr.Warnw("Chain config refresh failed",
+			"consecutiveFailures", failCount,
+			"maxAllowed", MaxFailedPolls)
+	} else if len(chainSelectors) > 0 {
+		// Only reset on successful refresh with actual chains
+		c.failedPolls.Store(0) // Reset counter on success
+	}
+
 }
 
 // extractStandardChainConfigResults creates a copy of the batch results with only the standard
@@ -565,30 +603,38 @@ func (c *configPoller) refreshChainConfig(
 ) (ChainConfigSnapshot, error) {
 	chainCache := c.getOrCreateChainCache(chainSel)
 
-	chainCache.chainConfigMu.Lock()
-	defer chainCache.chainConfigMu.Unlock()
+	// Check if context is done and we have cached data (short read lock)
+	chainCache.chainConfigMu.RLock()
+	hasCachedData := !chainCache.chainConfigRefresh.IsZero()
+	cachedData := chainCache.chainConfigData
+	chainCache.chainConfigMu.RUnlock()
 
-	// Double check if another goroutine has already refreshed
-	if !chainCache.chainConfigRefresh.IsZero() && ctx.Err() != nil {
-		// Context is done but we have cached data, return it
-		c.lggr.Debugw("Context done but returning cached data",
-			"chain", chainSel)
-		return chainCache.chainConfigData, nil
+	if hasCachedData && ctx.Err() != nil {
+		c.lggr.Debugw("Context done but returning cached data", "chain", chainSel)
+		return cachedData, nil
 	}
 
+	// Perform I/O operation WITHOUT holding the lock
 	startTime := time.Now()
 	newData, err := c.fetchChainConfig(ctx, chainSel)
 	fetchConfigLatency := time.Since(startTime)
 
 	if err != nil {
-		if !chainCache.chainConfigRefresh.IsZero() {
+		// Handle error, possibly returning cached data
+		chainCache.chainConfigMu.RLock()
+		hasCachedData = !chainCache.chainConfigRefresh.IsZero()
+		cachedData = chainCache.chainConfigData
+		chainCache.chainConfigMu.RUnlock()
+
+		if hasCachedData {
 			c.lggr.Warnw("Failed to refresh cache, using old data",
 				"chain", chainSel,
 				"error", err,
 				"lastRefresh", chainCache.chainConfigRefresh,
 				"fetchConfigLatency", fetchConfigLatency)
-			return chainCache.chainConfigData, nil
+			return cachedData, nil
 		}
+
 		c.lggr.Errorw("Failed to refresh cache, no old data available",
 			"chain", chainSel,
 			"error", err,
@@ -596,8 +642,11 @@ func (c *configPoller) refreshChainConfig(
 		return ChainConfigSnapshot{}, fmt.Errorf("failed to refresh cache for chain %d: %w", chainSel, err)
 	}
 
+	// Acquire write lock only for updating the cache
+	chainCache.chainConfigMu.Lock()
 	chainCache.chainConfigData = newData
 	chainCache.chainConfigRefresh = time.Now()
+	chainCache.chainConfigMu.Unlock()
 
 	c.lggr.Debugw("Successfully refreshed cache",
 		"chain", chainSel,
@@ -725,3 +774,4 @@ type resultProcessor func(interface{}) error
 
 // Ensure configCache implements ConfigPoller
 var _ ConfigPoller = (*configPoller)(nil)
+var _ services.Service = (*configPoller)(nil)
