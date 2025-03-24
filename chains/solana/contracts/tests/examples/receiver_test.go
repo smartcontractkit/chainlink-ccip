@@ -189,7 +189,7 @@ func TestCcipReceiver(t *testing.T) {
 						receiverState,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"ConstraintSeeds"})
+					testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.ConstraintSeeds_AnchorError.String()})
 				})
 			}
 		})
@@ -210,7 +210,7 @@ func TestCcipReceiver(t *testing.T) {
 				receiverState,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"AccountNotInitialized"})
+			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 		})
 
 		t.Run("invalid sender", func(t *testing.T) {
@@ -228,7 +228,7 @@ func TestCcipReceiver(t *testing.T) {
 				receiverState,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"AccountNotInitialized"})
+			testutils.SendAndFailWith(ctx, t, solClient, []solana.Instruction{ix}, transmitter, rpc.CommitmentConfirmed, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 		})
 	})
 
