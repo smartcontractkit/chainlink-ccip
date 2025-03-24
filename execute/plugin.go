@@ -225,13 +225,11 @@ func removeUnconfirmedAndFinalizedMessages(
 	executableReports map[cciptypes.ChainSelector][]exectypes.CommitData,
 	finalizedMessages, unconfirmedMessages map[cciptypes.ChainSelector][]cciptypes.SeqNum,
 ) (
-	map[cciptypes.ChainSelector][]exectypes.CommitData,
-	[]exectypes.CommitData,
-	[]exectypes.CommitData,
+	remainingReportsBySelector map[cciptypes.ChainSelector][]exectypes.CommitData,
+	fullyExecutedFinalized []exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
 ) {
-	var fullyExecutedFinalized []exectypes.CommitData
-	var fullyExecutedUnfinalized []exectypes.CommitData
-	remainingReportsBySelector := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
+	remainingReportsBySelector = make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for selector, reports := range executableReports {
 		unconfirmedMsgSet := mapset.NewSet(unconfirmedMessages[selector]...)
 		finalizedMsgSet := mapset.NewSet(finalizedMessages[selector]...)
@@ -252,7 +250,7 @@ func removeUnconfirmedAndFinalizedMessages(
 		// Update groupedCommits with the remaining reports
 		remainingReportsBySelector[selector] = finalRemainingReports
 	}
-	return remainingReportsBySelector, fullyExecutedFinalized, fullyExecutedUnfinalized
+	return
 }
 
 // getPendingReportsForExecution is used to find commit reports which need to be executed.
