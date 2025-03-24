@@ -18,7 +18,7 @@ import (
 
 type arguments struct {
 	files        []string
-	logType      string
+	logType      parse.LogType
 	rendererName string
 
 	filter.CompiledFilterFields
@@ -37,18 +37,15 @@ func makeCommand() *cli.Command {
 				Destination: &args.files,
 			},
 			&cli.StringFlag{
-				Name:        "logType",
-				Usage:       "Specify the type of log to parse, valid options: json, mixed, ci",
-				Destination: &args.logType,
-				Value:       "json",
+				Name:  "logType",
+				Usage: "Specify the type of log to parse, valid options: json, mixed, ci",
+				Value: "json",
 				Validator: func(s string) error {
-					if !parse.IsValidLogType(s) {
-						return fmt.Errorf("invalid log type: %s, expected either %s or %s or %s",
-							s,
-							parse.LogTypeJSON,
-							parse.LogTypeMixed,
-							parse.LogTypeMixedGoTestJSON,
-						)
+					var err error
+					args.logType, err = parse.ParseLogType(s)
+					if err != nil {
+						return fmt.Errorf("expected one of [%s]",
+							strings.Join(parse.LogTypeNames(), ", "))
 					}
 					return nil
 				},
@@ -62,7 +59,7 @@ func makeCommand() *cli.Command {
 				Validator: func(s string) error {
 					choices := render.GetRenderers()
 					if !slices.Contains(choices, s) {
-						return fmt.Errorf("invalid renderer: %s, expected one of [%s]",
+						return fmt.Errorf("expected one of [%s]",
 							s, strings.Join(choices, ", "))
 					}
 					return nil
@@ -79,7 +76,7 @@ func makeCommand() *cli.Command {
 					var err error
 					args.CompiledFilterFields, err = filter.NewFilterFields(fields)
 					if err != nil {
-						return fmt.Errorf("invalid filter fields: %w", err)
+						return err
 					}
 					return nil
 				},
@@ -95,7 +92,7 @@ func makeCommand() *cli.Command {
 					var err error
 					args.filterOP, err = filter.ParseFilterOP(s)
 					if err != nil {
-						return fmt.Errorf("invalid filter operation: %w, should be one of %s", err,
+						return fmt.Errorf("expected one of %s", err,
 							strings.Join(filter.FilterOPNames(), ", "))
 					}
 					return nil
