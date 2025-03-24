@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"strconv"
 	"sync"
@@ -389,7 +390,10 @@ func createExecutedMessagesKeyFilter(
 	var countSqNrs uint64
 	// final query should look like
 	// (chainA && (sqRange1 || sqRange2 || ...)) || (chainB && (sqRange1 || sqRange2 || ...))
-	for srcChain, seqNumRanges := range rangesPerChain {
+	sortedChains := maps.Keys(rangesPerChain)
+	slices.Sort(sortedChains)
+	for _, srcChain := range sortedChains {
+		seqNumRanges := rangesPerChain[srcChain]
 		var seqRangeExpressions []query.Expression
 		for _, seqNr := range seqNumRanges {
 			expr := query.Comparator(consts.EventAttributeSequenceNumber,

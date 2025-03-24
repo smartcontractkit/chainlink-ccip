@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -293,7 +294,10 @@ func TestCCIPChainReader_CreateExecutedMessagesKeyFilter(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			output, count := createExecutedMessagesKeyFilter(tt.seqNrRangesByChain, tt.confidence)
-			assert.Equal(t, tt.expected, output)
+			//assert.ElementsMatch(t, tt.expected, output, "unequal values")
+			if !reflect.DeepEqual(tt.expected, output) {
+				t.Errorf("createExecutedMessagesKeyFilter() got = %+v, want %+v", output, tt.expected)
+			}
 			assert.Equal(t, tt.expectedCount, count)
 		})
 	}
