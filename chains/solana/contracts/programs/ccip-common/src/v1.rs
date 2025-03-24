@@ -26,7 +26,12 @@ pub fn validate_and_parse_token_accounts<'info>(
     fee_quoter: Pubkey,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
-    let program_id = crate::id();
+    // The program_id here is provided solely to satisfy the interface of try_accounts.
+    // Note: All program IDs for PDA derivation are explicitly defined in the account context
+    // (TokenAccountsValidationContext) via seeds and program attributes.
+    // Therefore, the value of program_id (set here to Pubkey::default()) is effectively unused.
+    // Changes in environment-specific program addresses will not affect the PDA derivation.
+    let program_id = Pubkey::default();
 
     let mut input_accounts = accounts;
     let mut bumps = <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();

@@ -18,7 +18,6 @@ pub struct TokenAccountsValidationContext<'info> {
     )]
     pub user_token_account: InterfaceAccount<'info, TokenAccount>,
 
-    // TODO: determine if this can be zero key for optional billing config?
     /// CHECK: Per chain token billing config PDA
     // billing: configured via CCIP fee quoter
     // chain config: configured via pool
