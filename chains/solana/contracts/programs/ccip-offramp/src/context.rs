@@ -595,6 +595,33 @@ pub struct ExecuteReportContext<'info> {
     // ] x N tokens
 }
 
+#[derive(Accounts)]
+#[instruction(source_chain_selector: u64, root: Vec<u8>)]
+pub struct CloseCommitReportAccount<'info> {
+    #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &root],
+        bump,
+        close = fee_token_receiver,
+        constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub commit_report: Account<'info, CommitReport>,
+
+    /// The account that will receive the rent refund
+    #[account(mut)]
+    pub fee_token_receiver: SystemAccount<'info>,
+
+    #[account(address = config.load()?.owner @ CcipOfframpError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
 /// It's not possible to store enums in zero_copy accounts, so we wrap the discriminant
 /// in a struct to store in config.
 #[derive(

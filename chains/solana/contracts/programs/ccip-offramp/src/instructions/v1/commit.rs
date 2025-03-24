@@ -4,11 +4,11 @@ use ccip_common::seed;
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
 
-use crate::context::{CommitInput, CommitReportContext, OcrPluginType};
+use crate::context::{CloseCommitReportAccount, CommitInput, CommitReportContext, OcrPluginType};
 use crate::event::CommitReportAccepted;
 use crate::instructions::interfaces::Commit;
 use crate::instructions::v1::rmn::verify_uncursed_cpi;
-use crate::state::GlobalState;
+use crate::state::{CommitReport, GlobalState, MessageExecutionState};
 use crate::{CcipOfframpError, PriceOnlyCommitReportContext};
 
 pub struct Impl;
@@ -230,6 +230,61 @@ impl Commit for Impl {
 
         Ok(())
     }
+
+    fn close_commit_report_account(
+        &self,
+        ctx: Context<CloseCommitReportAccount>,
+        _source_chain_selector: u64,
+        _root: Vec<u8>,
+    ) -> Result<()> {
+        let commit_report = &ctx.accounts.commit_report;
+
+        // Check if all messages have been executed (either Success or Failure)
+        require!(
+            all_messages_executed(commit_report),
+            CcipOfframpError::CommitReportHasPendingMessages
+        );
+
+        // The close = fee_token_receiver in the account constraint automatically
+        // closes the account and sends the lamports
+
+        Ok(())
+    }
+}
+
+// Helper function to check if all messages have been executed
+fn all_messages_executed(report: &CommitReport) -> bool {
+    let total_messages = report.max_msg_nr.saturating_sub(report.min_msg_nr) + 1;
+    let mut all_executed = true;
+
+    for i in 0..total_messages {
+        if i >= 64 {
+            break; // Only checking up to 64 messages (limitation of the bitmap)
+        }
+
+        let sequence_number = report.min_msg_nr + i;
+        let state = get_execution_state(report, sequence_number);
+
+        if state != MessageExecutionState::Success && state != MessageExecutionState::Failure {
+            all_executed = false;
+            break;
+        }
+    }
+
+    all_executed
+}
+
+// Copy of the execution_state::get function to avoid using the private module
+fn get_execution_state(report: &CommitReport, sequence_number: u64) -> MessageExecutionState {
+    let packed = report.execution_states;
+    let dif = sequence_number.checked_sub(report.min_msg_nr);
+    assert!(dif.is_some(), "Sequence number out of bounds");
+    let i = dif.unwrap();
+    assert!(i < 64, "Sequence number out of bounds");
+
+    let mask = 0b11 << (i * 2);
+    let state = (packed & mask) >> (i * 2);
+    MessageExecutionState::try_from(state).unwrap()
 }
 
 mod helpers {
