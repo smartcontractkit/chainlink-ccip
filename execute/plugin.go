@@ -200,9 +200,6 @@ func getExecutableReportRanges(lggr logger.Logger,
 			continue
 		}
 
-		rangesBySelector[selector] = make([]cciptypes.SeqNumRange, 0)
-		executableReports[selector] = make([]exectypes.CommitData, 0)
-
 		executableReports[selector] = getSortedExecutableReports(lggr, selector, reports, canExecute)
 
 		lggr.Debugw("grouped and sorted",
@@ -239,7 +236,6 @@ func removeUnconfirmedAndFinalizedMessages(
 		sortedFinalizedMessages := slicelib.ToSortedSlice(finalizedMsgSet)
 
 		// Fully finalized roots are removed from the reports and set in groupedCommits
-		var executedCommitsFinalized []exectypes.CommitData
 		remainingReports, executedCommitsFinalized := combineReportsAndMessages(reports, sortedFinalizedMessages)
 		fullyExecutedFinalized = append(fullyExecutedFinalized, executedCommitsFinalized...)
 
