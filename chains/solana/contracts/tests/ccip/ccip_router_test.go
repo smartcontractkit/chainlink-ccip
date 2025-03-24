@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_ccip_sender"
@@ -2015,7 +2016,7 @@ func TestCCIPRouter(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: InstructionDidNotDeserialize"})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + common.InstructionDidNotDeserialize_AnchorError.String()})
 			})
 
 			t.Run("It rejects F = 0", func(t *testing.T) {
@@ -2252,7 +2253,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, ccipAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
@@ -2299,7 +2300,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
@@ -2398,7 +2399,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
@@ -2421,7 +2422,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
@@ -2471,7 +2472,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
@@ -2518,7 +2519,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token0.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
@@ -2614,7 +2615,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
@@ -2622,6 +2623,49 @@ func TestCCIPRouter(t *testing.T) {
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
 					require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
 				})
+			})
+
+			t.Run("after admin is proposed but not accepted, overriding it succeeds", func(t *testing.T) {
+				instruction, err := ccip_router.NewOwnerOverridePendingAdministratorInstruction(
+					token2PoolAdmin.PublicKey(),
+					config.RouterConfigPDA,
+					token1.AdminRegistryPDA,
+					token1.Mint,
+					token1PoolAdmin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
+
+				tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+				require.NoError(t, err)
+				require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
+				require.Equal(t, token2PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
+				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
+
+				// We override it back to the previous proposal
+				instruction, err = ccip_router.NewOwnerOverridePendingAdministratorInstruction(
+					token1PoolAdmin.PublicKey(),
+					config.RouterConfigPDA,
+					token1.AdminRegistryPDA,
+					token1.Mint,
+					token1PoolAdmin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
+
+				tokenAdminRegistry = ccip_common.TokenAdminRegistry{}
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
+				require.NoError(t, err)
+				require.Equal(t, uint8(1), tokenAdminRegistry.Version)
+				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.Administrator)
+				require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.PendingAdministrator)
+				require.Equal(t, solana.PublicKey{}, tokenAdminRegistry.LookupTable)
 			})
 
 			t.Run("accept token admin registry as token admin", func(t *testing.T) {
@@ -2661,7 +2705,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, uint8(1), tokenAdminRegistry.Version)
@@ -2704,7 +2748,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction, ixAuth}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
@@ -2740,7 +2784,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token1PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token1PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
@@ -2787,7 +2831,7 @@ func TestCCIPRouter(t *testing.T) {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, token0PoolAdmin, config.DefaultCommitment)
 
 					// Validate Token Pool Registry PDA
-					tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+					tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, token1.AdminRegistryPDA, config.DefaultCommitment, &tokenAdminRegistry)
 					require.NoError(t, err)
 					require.Equal(t, token0PoolAdmin.PublicKey(), tokenAdminRegistry.Administrator)
@@ -3443,7 +3487,7 @@ func TestCCIPRouter(t *testing.T) {
 			instruction, err := raw.ValidateAndBuild()
 
 			require.NoError(t, err)
-			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: AccountNotInitialized"})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 			require.NotNil(t, result)
 		})
 
@@ -4475,81 +4519,81 @@ func TestCCIPRouter(t *testing.T) {
 				name        string
 				index       uint
 				replaceWith *solana.AccountMeta // default to zero address
-				errorStr    ccip.CcipRouterError
+				errorStr    string
 			}{
 				{
 					name:     "incorrect user token account",
 					index:    0,
-					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError,
+					errorStr: common.AccountOwnedByWrongProgram_AnchorError.String(),
 				},
 				{
 					name:     "invalid billing config",
 					index:    1,
-					errorStr: ccip.InvalidInputsConfigAccounts_CcipRouterError,
+					errorStr: common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
 					name:     "invalid token pool chain config",
 					index:    2,
-					errorStr: ccip.InvalidInputsConfigAccounts_CcipRouterError,
+					errorStr: common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
 					name:     "pool config is not owned by pool program",
 					index:    6,
-					errorStr: ccip.InvalidInputsPoolAccounts_CcipRouterError,
+					errorStr: common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
 					name:        "is pool config but for wrong token",
 					index:       6,
 					replaceWith: solana.Meta(token1.PoolConfig),
-					errorStr:    ccip.InvalidInputsPoolAccounts_CcipRouterError,
+					errorStr:    common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
 					name:        "is pool config but missing write permissions",
 					index:       6,
 					replaceWith: solana.Meta(token0.PoolConfig),
-					errorStr:    ccip.InvalidInputsLookupTableAccountWritable_CcipRouterError,
+					errorStr:    ccip.InvalidInputsLookupTableAccountWritable_CcipRouterError.String(),
 				},
 				{
 					name:        "is pool lookup table but has write permissions",
 					index:       3,
 					replaceWith: solana.Meta(token0.PoolLookupTable).WRITE(),
-					errorStr:    ccip.InvalidInputsLookupTableAccountWritable_CcipRouterError,
+					errorStr:    ccip.InvalidInputsLookupTableAccountWritable_CcipRouterError.String(),
 				},
 				{
 					name:     "incorrect pool signer",
 					index:    8,
-					errorStr: ccip.InvalidInputsPoolAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError.String(),
 				},
 				{
 					name:     "invalid token program",
 					index:    9,
-					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError,
+					errorStr: common.InvalidProgramId_AnchorError.String(),
 				},
 				{
 					name:     "incorrect pool token account",
 					index:    7,
-					errorStr: ccip.InvalidInputsTokenAccounts_CcipRouterError,
+					errorStr: common.AccountOwnedByWrongProgram_AnchorError.String(),
 				},
 				{
 					name:        "incorrect token pool lookup table",
 					index:       3,
 					replaceWith: solana.Meta(token1.PoolLookupTable),
-					errorStr:    ccip.InvalidInputsLookupTableAccounts_CcipRouterError,
+					errorStr:    ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
 				},
 				{
 					name:     "invalid fee token config",
 					index:    11,
-					errorStr: ccip.InvalidInputsConfigAccounts_CcipRouterError,
+					errorStr: common.ConstraintSeeds_AnchorError.String(),
 				},
 				{
 					name:     "extra accounts not in lookup table",
 					index:    1_000, // large number to indicate append
-					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
 				},
 				{
 					name:     "remaining accounts mismatch",
 					index:    12, // only works with token0
-					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError,
+					errorStr: ccip.InvalidInputsLookupTableAccounts_CcipRouterError.String(),
 				},
 			}
 
@@ -4598,7 +4642,7 @@ func TestCCIPRouter(t *testing.T) {
 					ix, err := tx.ValidateAndBuild()
 					require.NoError(t, err)
 
-					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, addressTables, []string{in.errorStr.String()})
+					testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, addressTables, []string{in.errorStr})
 				})
 			}
 		})
@@ -5090,7 +5134,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: ConstraintTokenOwner. Error Number: 2015"})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, ccipAdmin, config.DefaultCommitment, []string{"Error Code: " + common.ConstraintTokenOwner_AnchorError.String()})
 		})
 
 		t.Run("When withdrawing funds but sending them to a non-whitelisted token account, it fails", func(t *testing.T) {
@@ -5264,7 +5308,7 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"AnchorError caused by account: allowed_price_updater. Error Code: ConstraintSeeds. Error Number: 2006. Error Message: A seeds constraint was violated."})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"AnchorError caused by account: allowed_price_updater. Error Code: " + common.ConstraintSeeds_AnchorError.String()})
 		})
 
 		t.Run("When the caller is allowed to update the price, it succeeds", func(t *testing.T) {
@@ -5851,7 +5895,7 @@ func TestCCIPRouter(t *testing.T) {
 						config.RMNRemoteConfigPDA,
 					).ValidateAndBuild()
 					require.NoError(t, err)
-					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: AccountNotInitialized"})
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 				})
 
 				t.Run("When committing a report with an invalid interval it fails", func(t *testing.T) {
@@ -6109,7 +6153,7 @@ func TestCCIPRouter(t *testing.T) {
 							Name:              "with a gas price update for a chain that doesn't exist",
 							GasChainSelectors: []uint64{randomChain},
 							AccountMetaSlice:  solana.AccountMetaSlice{solana.Meta(randomChainPDA).WRITE()},
-							ExpectedError:     "AccountNotInitialized",
+							ExpectedError:     common.AccountNotInitialized_AnchorError.String(),
 						},
 						{
 							Name:             "with a non-writable billing token config account",
@@ -6697,16 +6741,22 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-				executionEvent := ccip.EventExecutionStateChanged{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
 
+				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
-				require.NotNil(t, executionEvent)
-				require.Equal(t, config.EvmChainSelector, executionEvent.SourceChainSelector)
-				require.Equal(t, sequenceNumber, executionEvent.SequenceNumber)
-				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvent.MessageID[:]))
-				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(executionEvent.MessageHash[:]))
-				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, sequenceNumber, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, sequenceNumber, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(root[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
@@ -7047,7 +7097,7 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"AnchorError caused by account: commit_report. Error Code: ConstraintSeeds. Error Number: 2006. Error Message: A seeds constraint was violated."})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"AnchorError caused by account: commit_report. Error Code: " + common.ConstraintSeeds_AnchorError.String()})
 			})
 
 			// TODO review test case, code does not match the test name
@@ -7366,17 +7416,21 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err)
 
 				tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-				executionEvent = ccip.EventExecutionStateChanged{}
-				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
-
+				executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 				require.NoError(t, err)
-				require.NotNil(t, executionEvent)
-				require.Equal(t, config.EvmChainSelector, executionEvent.SourceChainSelector)
-				require.Equal(t, message1.Header.SequenceNumber, executionEvent.SequenceNumber)
-				require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvent.MessageID[:]))
-				require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvent.MessageHash[:]))
 
-				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+				require.Equal(t, 2, len(executionEvents))
+				require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+				require.Equal(t, message1.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+				require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+				require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+				require.Equal(t, message1.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+				require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+				require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+				require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 				var rootAccount ccip_offramp.CommitReport
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
@@ -7677,9 +7731,13 @@ func TestCCIPRouter(t *testing.T) {
 					require.NoError(t, err)
 
 					tx = testutils.SendAndConfirmWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, common.AddComputeUnitLimit(300_000))
-					executionEvent := ccip.EventExecutionStateChanged{}
-					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
-					require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+
+					executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+					require.NoError(t, err)
+
+					require.Equal(t, 2, len(executionEvents))
+					require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+					require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 					mintEvent := tokens.EventMintRelease{}
 					require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "Minted", &mintEvent, config.PrintEvents))
@@ -8218,16 +8276,22 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 
 						tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
-						executionEvent := ccip.EventExecutionStateChanged{}
-						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
 
-						require.NoError(t, err)
-						require.NotNil(t, executionEvent)
-						require.Equal(t, config.EvmChainSelector, executionEvent.SourceChainSelector)
-						require.Equal(t, message1.Header.SequenceNumber, executionEvent.SequenceNumber)
-						require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvent.MessageID[:]))
-						require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvent.MessageHash[:]))
-						require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+						executionEvents, err2 := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
+						require.NoError(t, err2)
+
+						require.Equal(t, 2, len(executionEvents))
+						require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+						require.Equal(t, message1.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+						require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+						require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+						require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+						require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+						require.Equal(t, message1.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+						require.Equal(t, hex.EncodeToString(message1.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+						require.Equal(t, hex.EncodeToString(hash1[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+						require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 						var rootAccount ccip_offramp.CommitReport
 						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
@@ -8274,16 +8338,21 @@ func TestCCIPRouter(t *testing.T) {
 						require.NoError(t, err)
 
 						tx = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
-						executionEvent := ccip.EventExecutionStateChanged{}
-						require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "ExecutionStateChanged", &executionEvent, config.PrintEvents))
-
+						executionEvents, err := common.ParseMultipleEvents[ccip.EventExecutionStateChanged](tx.Meta.LogMessages, "ExecutionStateChanged", config.PrintEvents)
 						require.NoError(t, err)
-						require.NotNil(t, executionEvent)
-						require.Equal(t, config.EvmChainSelector, executionEvent.SourceChainSelector)
-						require.Equal(t, message2.Header.SequenceNumber, executionEvent.SequenceNumber)
-						require.Equal(t, hex.EncodeToString(message2.Header.MessageId[:]), hex.EncodeToString(executionEvent.MessageID[:]))
-						require.Equal(t, hex.EncodeToString(hash2[:]), hex.EncodeToString(executionEvent.MessageHash[:]))
-						require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvent.State)
+
+						require.Equal(t, 2, len(executionEvents))
+						require.Equal(t, config.EvmChainSelector, executionEvents[0].SourceChainSelector)
+						require.Equal(t, message2.Header.SequenceNumber, executionEvents[0].SequenceNumber)
+						require.Equal(t, hex.EncodeToString(message2.Header.MessageId[:]), hex.EncodeToString(executionEvents[0].MessageID[:]))
+						require.Equal(t, hex.EncodeToString(hash2[:]), hex.EncodeToString(executionEvents[0].MessageHash[:]))
+						require.Equal(t, ccip_offramp.InProgress_MessageExecutionState, executionEvents[0].State)
+
+						require.Equal(t, config.EvmChainSelector, executionEvents[1].SourceChainSelector)
+						require.Equal(t, message2.Header.SequenceNumber, executionEvents[1].SequenceNumber)
+						require.Equal(t, hex.EncodeToString(message2.Header.MessageId[:]), hex.EncodeToString(executionEvents[1].MessageID[:]))
+						require.Equal(t, hex.EncodeToString(hash2[:]), hex.EncodeToString(executionEvents[1].MessageHash[:]))
+						require.Equal(t, ccip_offramp.Success_MessageExecutionState, executionEvents[1].State)
 
 						var rootAccount ccip_offramp.CommitReport
 						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootPDA, config.DefaultCommitment, &rootAccount)
@@ -8395,7 +8464,7 @@ func TestCCIPRouter(t *testing.T) {
 				instruction, err = raw.ValidateAndBuild()
 				require.NoError(t, err)
 
-				testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, []string{"AccountNotInitialized"})
+				testutils.SendAndFailWithLookupTables(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, addressTables, []string{"Error Code: " + common.AccountNotInitialized_AnchorError.String()})
 
 				// create associated token account for user --------------------
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixATA}, legacyAdmin, config.DefaultCommitment)

@@ -3,6 +3,7 @@
  * Used to test CPIs made by other programs (with actual business logic).
  */
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::keccak;
 
 declare_id!("54hq5V1tjcfcVaFJ8W2dgVRhzaCqANyes5KfzkvdkZxs");
 
@@ -53,6 +54,28 @@ pub mod external_program_cpi_stub {
             "Called `big_instruction_data` with data length: {}",
             data.len()
         );
+        Ok(())
+    }
+
+    /// no-op instruction that does nothing, also can be used to test maximum account references(remaining_accounts)
+    pub fn no_op(_ctx: Context<Empty>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn compute_heavy(_ctx: Context<Empty>, iterations: u32) -> Result<()> {
+        let mut hash = [0u8; 32];
+
+        // Initialize with some data
+        hash.iter_mut().enumerate().for_each(|(i, byte)| {
+            *byte = i as u8;
+        });
+
+        // Perform multiple hash operations
+        for _ in 0..iterations {
+            hash = keccak::hash(&hash).to_bytes();
+        }
+
+        // Don't log with msg!() to avoid variable CU consumption
         Ok(())
     }
 }
