@@ -77,3 +77,55 @@ func ParseField(name string) (Field, error) {
 	}
 	return Field(""), fmt.Errorf("%s is %w", name, ErrInvalidField)
 }
+
+const (
+	// FilterOPAND is a FilterOP of type AND.
+	FilterOPAND FilterOP = "AND"
+	// FilterOPOR is a FilterOP of type OR.
+	FilterOPOR FilterOP = "OR"
+)
+
+var ErrInvalidFilterOP = fmt.Errorf("not a valid FilterOP, try [%s]", strings.Join(_FilterOPNames, ", "))
+
+var _FilterOPNames = []string{
+	string(FilterOPAND),
+	string(FilterOPOR),
+}
+
+// FilterOPNames returns a list of possible string values of FilterOP.
+func FilterOPNames() []string {
+	tmp := make([]string, len(_FilterOPNames))
+	copy(tmp, _FilterOPNames)
+	return tmp
+}
+
+// String implements the Stringer interface.
+func (x FilterOP) String() string {
+	return string(x)
+}
+
+// IsValid provides a quick way to determine if the typed value is
+// part of the allowed enumerated values
+func (x FilterOP) IsValid() bool {
+	_, err := ParseFilterOP(string(x))
+	return err == nil
+}
+
+var _FilterOPValue = map[string]FilterOP{
+	"AND": FilterOPAND,
+	"and": FilterOPAND,
+	"OR":  FilterOPOR,
+	"or":  FilterOPOR,
+}
+
+// ParseFilterOP attempts to convert a string to a FilterOP.
+func ParseFilterOP(name string) (FilterOP, error) {
+	if x, ok := _FilterOPValue[name]; ok {
+		return x, nil
+	}
+	// Case insensitive parse, do a separate lookup to prevent unnecessary cost of lowercasing a string if we don't need to.
+	if x, ok := _FilterOPValue[strings.ToLower(name)]; ok {
+		return x, nil
+	}
+	return FilterOP(""), fmt.Errorf("%s is %w", name, ErrInvalidFilterOP)
+}

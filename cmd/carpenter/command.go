@@ -22,51 +22,7 @@ type arguments struct {
 	rendererName string
 
 	filter.CompiledFilterFields
-}
-
-func run(args arguments) error {
-	var io stream.InputOptions
-
-	// If no files are provided the stream will read from stdin.
-	if len(args.files) != 0 {
-		io.Filenames = args.files
-	}
-
-	renderer, err := render.GetRenderer(args.rendererName, render.Options{})
-	if err != nil {
-		return fmt.Errorf("failed to get renderer: %w", err)
-	}
-
-	inputStream, err := stream.InitializeInputStream(io)
-	if err != nil {
-		return fmt.Errorf("failed to initialize input stream: %w", err)
-	}
-
-	scanner := bufio.NewScanner(inputStream)
-	for scanner.Scan() {
-		line := scanner.Text()
-		data, err := parse.ParseLine(line, args.logType)
-		if err != nil {
-			return fmt.Errorf("ParseLine: %w", err)
-		}
-
-		include, err := filter.Filter(data, args.CompiledFilterFields)
-		if err != nil {
-			msg := fmt.Sprintf("Unable to get data: %s\n", err)
-			_, err2 := fmt.Fprintf(os.Stderr, msg)
-			if err2 != nil {
-				panic(msg)
-			}
-			return err
-		}
-		if !include {
-			// no data to display.
-			continue
-		}
-
-		renderer(data)
-	}
-	return nil
+	filterOP filter.FilterOP
 }
 
 func makeCommand() *cli.Command {
@@ -112,8 +68,10 @@ func makeCommand() *cli.Command {
 				},
 			},
 			&cli.StringSliceFlag{
-				Name:  "filter",
-				Usage: fmt.Sprintf("Provide one or more filters to apply to the logs. Format as 'FieldName:Regexp', valid fields: [%s]", strings.Join(filter.FieldNames(), ", ")),
+				Name: "filter",
+				Usage: fmt.Sprintf(
+					"Line selection filters. Format as 'FieldName:Regexp', valid fields: [%s]",
+					strings.Join(filter.FieldNames(), ", ")),
 				//Destination: &args.FilterFields.Filters,
 				Category: "filters",
 				Action: func(ctx context.Context, command *cli.Command, fields []string) error {
@@ -125,9 +83,71 @@ func makeCommand() *cli.Command {
 					return nil
 				},
 			},
+			&cli.StringFlag{
+				Name: "filter-op",
+				Usage: fmt.Sprintf(
+					"Operation to use when combining filters. Valid options: [%s]",
+					strings.Join(filter.FilterOPNames(), ", ")),
+				Category: "filters",
+				Value:    string(filter.FilterOPAND),
+				Action: func(ctx context.Context, command *cli.Command, s string) error {
+					var err error
+					args.filterOP, err = filter.ParseFilterOP(s)
+					if err != nil {
+						return fmt.Errorf("invalid filter operation: %w, should be one of %s", err,
+							strings.Join(filter.FilterOPNames(), ", "))
+					}
+					return nil
+				},
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			return run(args)
 		},
 	}
+}
+
+func run(args arguments) error {
+	var io stream.InputOptions
+
+	// If no files are provided the stream will read from stdin.
+	if len(args.files) != 0 {
+		io.Filenames = args.files
+	}
+
+	renderer, err := render.GetRenderer(args.rendererName, render.Options{})
+	if err != nil {
+		return fmt.Errorf("failed to get renderer: %w", err)
+	}
+
+	inputStream, err := stream.InitializeInputStream(io)
+	if err != nil {
+		return fmt.Errorf("failed to initialize input stream: %w", err)
+	}
+
+	scanner := bufio.NewScanner(inputStream)
+	for scanner.Scan() {
+		line := scanner.Text()
+		data, err := parse.ParseLine(line, args.logType)
+		if err != nil {
+			return fmt.Errorf("ParseLine: %w", err)
+		}
+
+		include, err := filter.Filter(data, args.CompiledFilterFields, args.filterOP)
+		if err != nil {
+			msg := fmt.Sprintf("Unable to get data: %s\n", err)
+			_, err2 := fmt.Fprintf(os.Stderr, msg)
+			if err2 != nil {
+				panic(msg)
+			}
+			return err
+		}
+		if !include {
+			// no data to display.
+			continue
+		}
+
+		renderer(data)
+	}
+	return nil
 }

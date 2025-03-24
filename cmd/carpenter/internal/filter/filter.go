@@ -17,6 +17,9 @@ type Field string
 // CompiledFilterFields is a collection of compiled Field filters.
 type CompiledFilterFields map[Field][]*regexp.Regexp
 
+// ENUM(AND, OR)
+type FilterOP string
+
 func NewFilterFields(rawFields []string) (CompiledFilterFields, error) {
 	fields := make(CompiledFilterFields)
 	var malformedFields []string
@@ -67,11 +70,14 @@ func NewFilterFields(rawFields []string) (CompiledFilterFields, error) {
 }
 
 // Filter decides if the data should be displayed based on the provided filters.
-func Filter(data *parse.Data, filters CompiledFilterFields) (bool, error) {
+func Filter(data *parse.Data, filters CompiledFilterFields, op FilterOP) (bool, error) {
 	// No filters, include by default
 	if len(filters) == 0 {
 		return true, nil
 	}
+
+	anyMatch := false
+	allMatch := true
 
 	for field, compiledFilters := range filters {
 		var fieldStr string
@@ -89,10 +95,18 @@ func Filter(data *parse.Data, filters CompiledFilterFields) (bool, error) {
 				fieldStr = data.GetLoggerName()
 			}
 
-			if compiledFilter.MatchString(fieldStr) {
-				return true, nil
-			}
+			matches := compiledFilter.MatchString(fieldStr)
+			anyMatch = anyMatch || matches
+			allMatch = allMatch && matches
 		}
 	}
-	return false, nil
+
+	switch op {
+	case FilterOPAND:
+		return allMatch, nil
+	case FilterOPOR:
+		return anyMatch, nil
+	default:
+		return anyMatch, nil
+	}
 }
