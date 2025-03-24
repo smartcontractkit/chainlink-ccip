@@ -585,8 +585,6 @@ pub enum CcipOfframpError {
     InvalidInputsFeeQuoterAccount,
     #[msg("Invalid offramp authorization account")]
     InvalidInputsAllowedOfframpAccount,
-    #[msg("Invalid config account")]
-    InvalidInputsConfigAccounts,
     #[msg("Invalid Token Admin Registry account")]
     InvalidInputsTokenAdminRegistryAccounts,
     #[msg("Invalid LookupTable account")]

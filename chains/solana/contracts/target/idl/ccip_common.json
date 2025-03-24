@@ -59,21 +59,16 @@
     },
     {
       "code": 10003,
-      "name": "InvalidInputsConfigAccounts",
-      "msg": "Invalid config account"
-    },
-    {
-      "code": 10004,
       "name": "InvalidInputsTokenAdminRegistryAccounts",
       "msg": "Invalid Token Admin Registry account"
     },
     {
-      "code": 10005,
+      "code": 10004,
       "name": "InvalidInputsLookupTableAccounts",
       "msg": "Invalid LookupTable account"
     },
     {
-      "code": 10006,
+      "code": 10005,
       "name": "InvalidInputsLookupTableAccountWritable",
       "msg": "Invalid LookupTable account writable access"
     }
