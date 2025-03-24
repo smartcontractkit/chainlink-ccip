@@ -62,7 +62,8 @@ func makeCommand() *cli.Command {
 				Validator: func(s string) error {
 					choices := render.GetRenderers()
 					if !slices.Contains(choices, s) {
-						return fmt.Errorf("invalid renderer: %s, expected one of %s", s, choices)
+						return fmt.Errorf("invalid renderer: %s, expected one of [%s]",
+							s, strings.Join(choices, ", "))
 					}
 					return nil
 				},
@@ -74,7 +75,7 @@ func makeCommand() *cli.Command {
 					strings.Join(filter.FieldNames(), ", ")),
 				//Destination: &args.FilterFields.Filters,
 				Category: "filters",
-				Action: func(ctx context.Context, command *cli.Command, fields []string) error {
+				Validator: func(fields []string) error {
 					var err error
 					args.CompiledFilterFields, err = filter.NewFilterFields(fields)
 					if err != nil {
@@ -90,7 +91,7 @@ func makeCommand() *cli.Command {
 					strings.Join(filter.FilterOPNames(), ", ")),
 				Category: "filters",
 				Value:    string(filter.FilterOPAND),
-				Action: func(ctx context.Context, command *cli.Command, s string) error {
+				Validator: func(s string) error {
 					var err error
 					args.filterOP, err = filter.ParseFilterOP(s)
 					if err != nil {
