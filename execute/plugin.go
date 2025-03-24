@@ -154,6 +154,115 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 type CanExecuteHandle = func(sel cciptypes.ChainSelector, merkleRoot cciptypes.Bytes32) bool
 
+// getExecutableReports returns reports that are neither fully executed
+// nor snoozed.
+func getExecutableReports(
+	lggr logger.Logger,
+	commitReports []exectypes.CommitData,
+	canExecute CanExecuteHandle,
+	chainSelector cciptypes.ChainSelector,
+) []exectypes.CommitData {
+	var executableReports []exectypes.CommitData
+	{
+		var skippedCommitRoots []string
+		for _, commitReport := range commitReports {
+			if !canExecute(commitReport.SourceChain, commitReport.MerkleRoot) {
+				skippedCommitRoots = append(skippedCommitRoots, commitReport.MerkleRoot.String())
+				continue
+			}
+			executableReports = append(executableReports, commitReport)
+		}
+		lggr.Infow(
+			"skipping reports marked as executed or snoozed",
+			"selector", chainSelector,
+			"skippedCommitRoots", skippedCommitRoots,
+		)
+	}
+	return executableReports
+}
+
+// rangesAndExecutableReports computes the sequence number ranges for each
+// chain selector and returns the reports that can be executed
+// (i.e not executed nor snoozed).
+func rangesAndExecutableReports(
+	lggr logger.Logger,
+	groupedCommits exectypes.CommitObservations,
+	canExecute CanExecuteHandle,
+) (
+	rangesBySelector map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
+	executableReportsBySelector map[cciptypes.ChainSelector][]exectypes.CommitData,
+	err error,
+) {
+	rangesBySelector = make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
+	executableReportsBySelector = make(map[cciptypes.ChainSelector][]exectypes.CommitData)
+	for selector, reports := range groupedCommits {
+		if len(reports) == 0 {
+			continue
+		}
+
+		// Filter for reports that can be executed (i.e not executed nor snoozed).
+		executableReports := getExecutableReports(lggr, reports, canExecute, selector)
+
+		sort.Slice(executableReports, func(i, j int) bool {
+			return executableReports[i].SequenceNumberRange.Start() <
+				executableReports[j].SequenceNumberRange.Start()
+		})
+		lggr.Debugw("sorted reports",
+			"selector", selector,
+			"reports", executableReports,
+			"count", len(executableReports))
+
+		ranges, err := computeRanges(executableReports)
+		if err != nil {
+			return nil, nil,
+				fmt.Errorf("compute report ranges: %w", err)
+		}
+
+		rangesBySelector[selector] = ranges
+		executableReportsBySelector[selector] = executableReports
+	}
+
+	return rangesBySelector, executableReportsBySelector, nil
+}
+
+// filterOutUnconfirmedAndFinalizedExecutions filters out reports that have messages that have been executed and finalized.
+// It also filters out reports that have messages that have been executed but not finalized yet.
+// The remaining reports are returned.
+func filterOutUnconfirmedAndFinalizedExecutions(
+	executableReportsBySelector map[cciptypes.ChainSelector][]exectypes.CommitData,
+	finalizedExecutions, unconfirmedExecutions map[cciptypes.ChainSelector][]cciptypes.SeqNum,
+) (
+	fullyExecutedFinalized []exectypes.CommitData,
+	fullyExecutedUnfinalized []exectypes.CommitData,
+	remainingReportsBySelector map[cciptypes.ChainSelector][]exectypes.CommitData,
+) {
+	remainingReportsBySelector = make(map[cciptypes.ChainSelector][]exectypes.CommitData)
+	for selector, reports := range executableReportsBySelector {
+		// Get unfinalized executions by taking the set difference
+		// between unconfirmed and finalized executions.
+		// This works because unconfirmed executions are a superset of finalized executions.
+		finalizedExecutionsSet := mapset.NewSet(finalizedExecutions[selector]...)
+		unfinalizedExecutionsSet := mapset.NewSet(unconfirmedExecutions[selector]...).Difference(finalizedExecutionsSet)
+
+		// Filter out reports that have messages that have been executed and finalized.
+		remainingReports, executedCommitsFinalized := combineReportsAndMessages(
+			reports,
+			slicelib.ToSortedSlice(finalizedExecutionsSet))
+		fullyExecutedFinalized = append(fullyExecutedFinalized, executedCommitsFinalized...)
+
+		// Filter out reports that have messages that have been executed but not finalized yet.
+		finalRemainingReports, executedCommitsUnfinalized := combineReportsAndMessages(
+			remainingReports,
+			slicelib.ToSortedSlice(unfinalizedExecutionsSet))
+		fullyExecutedUnfinalized = append(fullyExecutedUnfinalized, executedCommitsUnfinalized...)
+
+		// Update groupedCommits with the remaining reports
+		remainingReportsBySelector[selector] = finalRemainingReports
+	}
+
+	return fullyExecutedFinalized, fullyExecutedUnfinalized, remainingReportsBySelector
+}
+
 // getPendingReportsForExecution is used to find commit reports which need to be executed.
 //
 // The function checks execution status at two levels:
@@ -186,88 +295,30 @@ func getPendingReportsForExecution(
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
-	rangesBySelector := make(map[cciptypes.ChainSelector][]cciptypes.SeqNumRange)
-	filteredReports := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
-	for selector, reports := range groupedCommits {
-		if len(reports) == 0 {
-			continue
-		}
-
-		// Filter out reports that cannot be executed (executed or snoozed).
-		var filtered []exectypes.CommitData
-		{
-			var skippedCommitRoots []string
-			for _, commitReport := range reports {
-				if !canExecute(commitReport.SourceChain, commitReport.MerkleRoot) {
-					skippedCommitRoots = append(skippedCommitRoots, commitReport.MerkleRoot.String())
-					continue
-				}
-				filtered = append(filtered, commitReport)
-			}
-			lggr.Infow(
-				"skipping reports marked as executed or snoozed",
-				"selector", selector,
-				"skippedCommitRoots", skippedCommitRoots,
-			)
-		}
-		filteredReports[selector] = filtered
-
-		lggr.Debugw("grouped reports",
-			"selector", selector,
-			"reports", filteredReports[selector],
-			"count", len(filteredReports[selector]))
-		sort.Slice(filteredReports[selector], func(i, j int) bool {
-			return filteredReports[selector][i].SequenceNumberRange.Start() <
-				filteredReports[selector][j].SequenceNumberRange.Start()
-		})
-		// todo: remove this logs after investigating whether the sorting above can be safely removed
-		lggr.Debugw("sorted reports",
-			"selector", selector,
-			"reports", filteredReports[selector],
-			"count", len(filteredReports[selector]))
-
-		ranges, err := computeRanges(filteredReports[selector])
-		if err != nil {
-			return nil, nil, nil,
-				fmt.Errorf("compute report ranges: %w", err)
-		}
-		rangesBySelector[selector] = ranges
+	rangesBySelector, executableReportsBySelector, err := rangesAndExecutableReports(lggr, groupedCommits, canExecute)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("ranges and executable reports: %w", err)
 	}
-	// Get all executed messages
-	allMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Unconfirmed)
+
+	// Get all unfinalized executions
+	unconfirmedExecutions, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Unconfirmed)
 	if err != nil {
 		return nil, nil, nil,
-			fmt.Errorf("get executed messages in range %v: %w", rangesBySelector, err)
+			fmt.Errorf("get unfinalized executed messages in range %v: %w", rangesBySelector, err)
 	}
-	// Get finalized messages
-	finalizedMessages, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Finalized)
+
+	// Get all finalized executions
+	finalizedExecutions, err := ccipReader.ExecutedMessages(ctx, rangesBySelector, primitives.Finalized)
 	if err != nil {
 		return nil, nil, nil,
 			fmt.Errorf("get finalized executed messages in range %v: %w", rangesBySelector, err)
 	}
 
-	for selector, reports := range filteredReports {
-		allExecutedMsgSet := mapset.NewSet(allMessages[selector]...)
-		finalizedMsgSet := mapset.NewSet(finalizedMessages[selector]...)
-		// Get unfinalized messages by taking the difference
-		unfinalizedMsgSet := allExecutedMsgSet.Difference(finalizedMsgSet)
-
-		sortedFinalizedMessages := slicelib.ToSortedSlice(finalizedMsgSet)
-
-		unfinalizedMessages := slicelib.ToSortedSlice(unfinalizedMsgSet)
-
-		// Fully finalized roots are removed from the reports and set in groupedCommits
-		var executedCommitsFinalized []exectypes.CommitData
-		remainingReports, executedCommitsFinalized := combineReportsAndMessages(reports, sortedFinalizedMessages)
-		fullyExecutedFinalized = append(fullyExecutedFinalized, executedCommitsFinalized...)
-
-		// Process unfinalized messages
-		finalRemainingReports, executedCommitsUnfinalized := combineReportsAndMessages(remainingReports, unfinalizedMessages)
-		fullyExecutedUnfinalized = append(fullyExecutedUnfinalized, executedCommitsUnfinalized...)
-
-		// Update groupedCommits with the remaining reports
-		groupedCommits[selector] = finalRemainingReports
-	}
+	// TODO: can we just assign to groupedCommits?
+	var remainingReportsBySelector map[cciptypes.ChainSelector][]exectypes.CommitData
+	fullyExecutedFinalized, fullyExecutedUnfinalized, remainingReportsBySelector = filterOutUnconfirmedAndFinalizedExecutions(
+		executableReportsBySelector, finalizedExecutions, unconfirmedExecutions)
+	maps.Copy(groupedCommits, remainingReportsBySelector)
 
 	lggr.Debugw("grouped commits after removing fully executed reports",
 		"groupedCommits", groupedCommits,
