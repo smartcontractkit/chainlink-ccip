@@ -700,7 +700,7 @@ export type CcipRouter = {
         },
         {
           "name": "tokenAdminRegistry",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1227,43 +1227,6 @@ export type CcipRouter = {
       "type": {
         "kind": "struct",
         "fields": []
-      }
-    },
-    {
-      "name": "tokenAdminRegistry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "administrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "pendingAdministrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "lookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "writableIndexes",
-            "type": {
-              "array": [
-                "u128",
-                2
-              ]
-            }
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          }
-        ]
       }
     }
   ],
@@ -2657,7 +2620,7 @@ export const IDL: CcipRouter = {
         },
         {
           "name": "tokenAdminRegistry",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -3184,43 +3147,6 @@ export const IDL: CcipRouter = {
       "type": {
         "kind": "struct",
         "fields": []
-      }
-    },
-    {
-      "name": "tokenAdminRegistry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "administrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "pendingAdministrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "lookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "writableIndexes",
-            "type": {
-              "array": [
-                "u128",
-                2
-              ]
-            }
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          }
-        ]
       }
     }
   ],

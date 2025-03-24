@@ -4,6 +4,7 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount},
 };
 use base_token_pool::common::*;
+use ccip_common::seed;
 
 use crate::{ChainConfig, State};
 
@@ -99,7 +100,6 @@ pub struct TokenOfframp<'info> {
     // Token pool accounts ------------------
     // consistent set + token pool program
     #[account(
-        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
@@ -136,7 +136,7 @@ pub struct TokenOfframp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [seed::CURSES],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
@@ -144,7 +144,7 @@ pub struct TokenOfframp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
@@ -165,7 +165,6 @@ pub struct TokenOnramp<'info> {
     // Token pool accounts ------------------
     // consistent set + token pool program
     #[account(
-        mut,
         seeds = [POOL_STATE_SEED, mint.key().as_ref()],
         bump,
     )]
@@ -195,7 +194,7 @@ pub struct TokenOnramp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CURSES],
+        seeds = [seed::CURSES],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
@@ -203,7 +202,7 @@ pub struct TokenOnramp<'info> {
 
     /// CHECK: This account is just used in the CPI to the RMN Remote program
     #[account(
-        seeds = [rmn_remote::context::seed::CONFIG],
+        seeds = [seed::CONFIG],
         bump,
         seeds::program = state.config.rmn_remote,
     )]
@@ -254,7 +253,6 @@ pub struct SetChainRateLimit<'info> {
     pub chain_config: Account<'info, ChainConfig>,
     #[account(mut, constraint = authority.key() == state.config.owner || authority.key() == state.config.rate_limit_admin)]
     pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -320,5 +318,4 @@ pub struct DeleteChainConfig<'info> {
     pub chain_config: Account<'info, ChainConfig>,
     #[account(mut, address = state.config.owner)]
     pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
 }

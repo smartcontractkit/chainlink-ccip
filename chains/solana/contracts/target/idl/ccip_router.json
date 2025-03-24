@@ -700,7 +700,7 @@
         },
         {
           "name": "tokenAdminRegistry",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1227,43 +1227,6 @@
       "type": {
         "kind": "struct",
         "fields": []
-      }
-    },
-    {
-      "name": "TokenAdminRegistry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "administrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "pendingAdministrator",
-            "type": "publicKey"
-          },
-          {
-            "name": "lookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "writableIndexes",
-            "type": {
-              "array": [
-                "u128",
-                2
-              ]
-            }
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          }
-        ]
       }
     }
   ],

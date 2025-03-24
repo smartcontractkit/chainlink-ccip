@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use ccip_common::seed;
 
 use crate::{program::RmnRemote, Config, CurseSubject, Curses, RmnRemoteError};
 
@@ -19,11 +20,6 @@ pub fn uninitialized(v: u8) -> bool {
 /// version numbers than this will be rejected.
 pub const MAX_CONFIG_V: u8 = 1;
 pub const MAX_CURSES_V: u8 = 1;
-
-pub mod seed {
-    pub const CONFIG: &[u8] = b"config";
-    pub const CURSES: &[u8] = b"curses";
-}
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {

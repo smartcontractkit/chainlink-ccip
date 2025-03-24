@@ -21,8 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
-
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -1508,75 +1506,6 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	}
 
 	return config.RMNProxy.RemoteAddress, nil
-}
-
-// Get the DestChainConfig from the FeeQuoter contract on the given chain.
-func (r *ccipChainReader) getFeeQuoterDestChainConfig(
-	ctx context.Context,
-	chainSelector cciptypes.ChainSelector,
-) (cciptypes.FeeQuoterDestChainConfig, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, chainSelector); err != nil {
-		return cciptypes.FeeQuoterDestChainConfig{}, err
-	}
-
-	var destChainConfig cciptypes.FeeQuoterDestChainConfig
-	srcReader := r.contractReaders[chainSelector]
-	err := srcReader.ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameFeeQuoter,
-		consts.MethodNameGetDestChainConfig,
-		primitives.Unconfirmed,
-		map[string]any{
-			"destChainSelector": r.destChain,
-		},
-		&destChainConfig,
-	)
-
-	if err != nil {
-		return cciptypes.FeeQuoterDestChainConfig{},
-			fmt.Errorf("get dest chain config for source chain %d: %w",
-				chainSelector, err)
-	}
-
-	return destChainConfig, nil
-}
-
-// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
-// DA data lives in the FeeQuoter contract on the source chain. To get the config of the destination chain, we need to
-// read the FeeQuoter contract on the source chain. As nodes are not required to have all chains configured, we need to
-// read all FeeQuoter contracts to get the median.
-func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
-	ctx context.Context,
-) (cciptypes.DataAvailabilityGasConfig, error) {
-	overheadGasValues := make([]uint32, 0)
-	gasPerByteValues := make([]uint16, 0)
-	multiplierBpsValues := make([]uint16, 0)
-
-	// TODO: pay attention to performance here, as we are looping through all chains
-	for chain := range r.contractReaders {
-		config, err := r.getFeeQuoterDestChainConfig(ctx, chain)
-		if err != nil {
-			continue
-		}
-		if config.IsEnabled && config.HasNonEmptyDAGasParams() {
-			overheadGasValues = append(overheadGasValues, config.DestDataAvailabilityOverheadGas)
-			gasPerByteValues = append(gasPerByteValues, config.DestGasPerDataAvailabilityByte)
-			multiplierBpsValues = append(multiplierBpsValues, config.DestDataAvailabilityMultiplierBps)
-		}
-	}
-
-	// Calculate medians
-	medianOverheadGas := consensus.Median(overheadGasValues, func(a, b uint32) bool { return a < b })
-	medianGasPerByte := consensus.Median(gasPerByteValues, func(a, b uint16) bool { return a < b })
-	medianMultiplierBps := consensus.Median(multiplierBpsValues, func(a, b uint16) bool { return a < b })
-
-	daConfig := cciptypes.DataAvailabilityGasConfig{
-		DestDataAvailabilityOverheadGas:   medianOverheadGas,
-		DestGasPerDataAvailabilityByte:    medianGasPerByte,
-		DestDataAvailabilityMultiplierBps: medianMultiplierBps,
-	}
-
-	return daConfig, nil
 }
 
 func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
