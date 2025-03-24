@@ -163,7 +163,7 @@ profiles:
             vars:
               DON_TYPE: ${DON_TYPE}
               ENABLE_BASE_PROFILE: "false"
-              ENABLE_CUSTOM_TYPE: "false"
+              ENABLE_DON_TYPE_OVERRIDES: "false"
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
