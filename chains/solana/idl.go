@@ -33,3 +33,11 @@ var rmnRemoteIdl string
 func FetchRMNRemoteIDL() string {
 	return rmnRemoteIdl
 }
+
+//go:embed contracts/target/idl/ccip_common.json
+var ccipCommonIdl string
+
+// FetchCommonIDL returns
+func FetchCommonIDL() string {
+	return ccipCommonIdl
+}
