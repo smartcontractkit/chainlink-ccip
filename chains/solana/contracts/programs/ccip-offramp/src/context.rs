@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token;
+use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use bytemuck::{Pod, Zeroable};
 use ccip_common::seed;
@@ -601,13 +601,6 @@ pub struct ExecuteReportContext<'info> {
 #[instruction(source_chain_selector: u64, root: Vec<u8>)]
 pub struct CloseCommitReportAccount<'info> {
     #[account(
-        seeds = [seed::CONFIG],
-        bump,
-        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
-    )]
-    pub config: AccountLoader<'info, Config>,
-
-    #[account(
         mut,
         seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &root],
         bump,
@@ -622,7 +615,7 @@ pub struct CloseCommitReportAccount<'info> {
     )]
     pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
-    #[account(address = token::spl_token::native_mint::ID)]
+    #[account(address = native_mint::ID)]
     pub wsol_mint: InterfaceAccount<'info, Mint>,
 
     #[account(

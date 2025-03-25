@@ -240,7 +240,7 @@ impl Commit for Impl {
     ) -> Result<()> {
         let commit_report = &ctx.accounts.commit_report;
 
-        // Check if all messages have been executed (either Success or Failure)
+        // Check if all messages have been executed (must be Success)
         require!(
             all_messages_executed(commit_report),
             CcipOfframpError::CommitReportHasPendingMessages
@@ -276,11 +276,11 @@ fn transfer_and_wrap_native_sol<'info>(
     // Get lamports before closing
     let lamports = commit_report.lamports();
 
-    // Close the account by setting its data length to 0 and transferring lamports to the fee_billing_signer
+    // Close the account by setting its data length to 0
     **commit_report.try_borrow_mut_lamports()? = 0;
     commit_report.realloc(0, false)?;
 
-    // Transfer the SOL to OnRamp fee_token_receiver
+    // Transfer wSOL to OnRamp fee_token_receiver
     **fee_token_receiver
         .to_account_info()
         .try_borrow_mut_lamports()? += lamports;
@@ -289,7 +289,6 @@ fn transfer_and_wrap_native_sol<'info>(
     let sync: anchor_spl::token_2022::SyncNative = anchor_spl::token_2022::SyncNative { account };
 
     let cpi_ctx = CpiContext::new(token_program.to_account_info(), sync);
-
     token_interface::sync_native(cpi_ctx)
 }
 
