@@ -51,7 +51,7 @@ mkShell' {
     libudev-zero
     libusb1
   ];
-  
+
   GOROOT = "${go}/share/go";
   shellHook = ''
     # Exit on unhandled errors
@@ -71,7 +71,6 @@ mkShell' {
     export GOBIN=$(go env GOPATH)/bin
     export PATH=$PATH:$repo_root/scripts:$GOBIN
 
-
     if [ "$CRIB_CI_ENV" = "true" ] && [ "$CLI_CHANGED" != "true" ]; then
       # in CI, download the CLI from the corresponding GH release if the CLI hasn't changed
       task fetch-cli
@@ -83,13 +82,19 @@ mkShell' {
     # Set up crib CLI using task
     task setup
 
+    # Check if the current directory matches either 'cre-dev' or 'cre-enterprise-sandbox'
+    # under the 'deployments' directory and build the CRE cli
+    if [[ "$PWD" == $repo_root/deployments/cre-dev || "$PWD" == $repo_root/deployments/cre-enterprise-sandbox ]]; then
+      task cre-cli:clone
+      task cre-cli:build
+    fi
+
     # Sourcing the .env file as the last step
     if [ -f ".env" ]; then
       set -a
       source .env
       set +a
     fi
-    
 
     # Prevent errors from exiting the shell from this point on
     set +e

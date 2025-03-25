@@ -264,6 +264,25 @@ tasks:
     desc: sync dependencies
     cmd: go mod tidy
 
+  # cre-cli
+  cre-cli:clone:
+    desc: Clone the dev-platform for CRE cli repository on a specific branch into /tmp and sync dependencies
+    cmds:
+      - echo "Cloning the dev-platform repo to build CRE cli - you may want to tap your YubiKey! :)"
+      - rm -rf /tmp/dev-platform && true
+      - git clone --branch bcm-devplat-cli https://github.com/smartcontractkit/dev-platform.git /tmp/dev-platform
+      - cd /tmp/dev-platform && go mod tidy
+  cre-cli:build:
+    desc: Build the CRE CLI from the /tmp repository (runs clone first)
+    env:
+      GOPATH:
+        sh: go env GOPATH
+      GOBIN:
+        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
+    dir: /tmp/dev-platform
+    cmds:
+      - go build -ldflags "-w" -o $GOBIN/cre
+
   # ccip-v2-scripts tasks
   ccip-v2-scripts:build:
     desc: Build dependencies/ccip-v2-scripts go module
