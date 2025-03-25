@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use solana_program::address_lookup_table::state::AddressLookupTable;
 
-use crate::{router_accounts::TokenAdminRegistry, seed, CommonCcipError};
+use crate::{
+    context::TokenAccountsValidationContext, router_accounts::TokenAdminRegistry, CommonCcipError,
+};
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
@@ -25,125 +26,58 @@ pub fn validate_and_parse_token_accounts<'info>(
     fee_quoter: Pubkey,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<TokenAccounts> {
+    // The program_id here is provided solely to satisfy the interface of try_accounts.
+    // Note: All program IDs for PDA derivation are explicitly defined in the account context
+    // (TokenAccountsValidationContext) via seeds and program attributes.
+    // Therefore, the value of program_id (set here to Pubkey::default()) is effectively unused.
+    // Changes in environment-specific program addresses will not affect the PDA derivation.
+    let program_id = Pubkey::default();
+
+    let mut input_accounts = accounts;
+    let mut bumps = <TokenAccountsValidationContext as anchor_lang::Bumps>::Bumps::default();
+    let mut reallocs = std::collections::BTreeSet::new();
+
+    // leveraging Anchor's account context validation
+    // Instead of manually checking each account (ownership, PDA derivation, constraints),
+    // we're using Anchor's `try_accounts` to perform these validations based on the
+    // constraints defined in the `TokenAccountsValidationContext` account context struct
+    TokenAccountsValidationContext::try_accounts(
+        &program_id,
+        &mut input_accounts,
+        &[
+            token_receiver.as_ref(),
+            &chain_selector.to_le_bytes(),
+            router.as_ref(),
+            fee_quoter.as_ref(),
+        ]
+        .concat(),
+        &mut bumps,
+        &mut reallocs,
+    )?;
+
+    let mut accounts_iter = accounts.iter();
+
     // accounts based on user or chain
-    let (user_token_account, remaining_accounts) = accounts.split_first().unwrap();
-    let (token_billing_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (pool_chain_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
+    let user_token_account = next_account_info(&mut accounts_iter)?;
+    let token_billing_config = next_account_info(&mut accounts_iter)?;
+    let pool_chain_config = next_account_info(&mut accounts_iter)?;
 
     // constant accounts for any pool interaction
-    let (lookup_table, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (token_admin_registry, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (pool_program, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (pool_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (pool_token_account, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (pool_signer, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (token_program, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (mint, remaining_accounts) = remaining_accounts.split_first().unwrap();
-    let (fee_token_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
+    let lookup_table = next_account_info(&mut accounts_iter)?;
+    let token_admin_registry = next_account_info(&mut accounts_iter)?;
+    let pool_program = next_account_info(&mut accounts_iter)?;
+    let pool_config = next_account_info(&mut accounts_iter)?;
+    let pool_token_account = next_account_info(&mut accounts_iter)?;
+    let pool_signer = next_account_info(&mut accounts_iter)?;
+    let token_program = next_account_info(&mut accounts_iter)?;
+    let mint = next_account_info(&mut accounts_iter)?;
+    let fee_token_config = next_account_info(&mut accounts_iter)?;
 
-    // Account validations (using remaining_accounts does not facilitate built-in anchor checks)
+    // collect remaining accounts
+    let remaining_accounts = accounts_iter.as_slice();
+
+    // Additional validations that can't be expressed in the account context
     {
-        // Check Token Admin Registry
-        let (expected_token_admin_registry, _) = Pubkey::find_program_address(
-            &[seed::TOKEN_ADMIN_REGISTRY, mint.key().as_ref()],
-            &router,
-        );
-        require_eq!(
-            token_admin_registry.key(),
-            expected_token_admin_registry,
-            CommonCcipError::InvalidInputsTokenAdminRegistryAccounts
-        );
-
-        // check pool program + pool config + pool signer
-        let (expected_pool_config, _) = Pubkey::find_program_address(
-            &[seed::CCIP_TOKENPOOL_CONFIG, mint.key().as_ref()],
-            &pool_program.key(),
-        );
-        let (expected_pool_signer, _) = Pubkey::find_program_address(
-            &[seed::CCIP_TOKENPOOL_SIGNER, mint.key().as_ref()],
-            &pool_program.key(),
-        );
-        require_eq!(
-            *pool_config.owner,
-            pool_program.key(),
-            CommonCcipError::InvalidInputsPoolAccounts
-        );
-        require_eq!(
-            pool_config.key(),
-            expected_pool_config,
-            CommonCcipError::InvalidInputsPoolAccounts
-        );
-        require_eq!(
-            pool_signer.key(),
-            expected_pool_signer,
-            CommonCcipError::InvalidInputsPoolAccounts
-        );
-
-        let (expected_fee_token_config, _) = Pubkey::find_program_address(
-            &[seed::FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()],
-            &fee_quoter,
-        );
-        require_eq!(
-            fee_token_config.key(),
-            expected_fee_token_config,
-            CommonCcipError::InvalidInputsConfigAccounts
-        );
-
-        // check token accounts
-        require_eq!(
-            *mint.owner,
-            token_program.key(),
-            CommonCcipError::InvalidInputsTokenAccounts
-        );
-        require_eq!(
-            user_token_account.key(),
-            get_associated_token_address_with_program_id(
-                &token_receiver,
-                &mint.key(),
-                &token_program.key()
-            ),
-            CommonCcipError::InvalidInputsTokenAccounts
-        );
-        require_eq!(
-            pool_token_account.key(),
-            get_associated_token_address_with_program_id(
-                &pool_signer.key(),
-                &mint.key(),
-                &token_program.key()
-            ),
-            CommonCcipError::InvalidInputsTokenAccounts
-        );
-
-        // check per token per chain configs
-        // billing: configured via CCIP fee quoter
-        // chain config: configured via pool
-        let (expected_billing_config, _) = Pubkey::find_program_address(
-            &[
-                seed::PER_CHAIN_PER_TOKEN_CONFIG,
-                chain_selector.to_le_bytes().as_ref(),
-                mint.key().as_ref(),
-            ],
-            &fee_quoter,
-        );
-        let (expected_pool_chain_config, _) = Pubkey::find_program_address(
-            &[
-                seed::TOKEN_POOL_CONFIG,
-                chain_selector.to_le_bytes().as_ref(),
-                mint.key().as_ref(),
-            ],
-            &pool_program.key(),
-        );
-        require_eq!(
-            token_billing_config.key(),
-            expected_billing_config, // TODO: determine if this can be zero key for optional billing config?
-            CommonCcipError::InvalidInputsConfigAccounts
-        );
-        require_eq!(
-            pool_chain_config.key(),
-            expected_pool_chain_config,
-            CommonCcipError::InvalidInputsConfigAccounts
-        );
-
         // Check Lookup Table Address configured in TokenAdminRegistry
         let token_admin_registry_account: Account<TokenAdminRegistry> =
             Account::try_from(token_admin_registry)?;
