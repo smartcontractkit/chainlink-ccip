@@ -16,7 +16,7 @@ func ConstructMerkleTree(
 	lggr logger.Logger,
 ) (*merklemulti.Tree[[32]byte], error) {
 	// Ensure we have the expected number of messages
-	numMsgs := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
+	numMsgs := report.SequenceNumberRange.Length()
 	if numMsgs != len(report.Messages) {
 		return nil, fmt.Errorf(
 			"malformed report %s, unexpected number of messages: expected %d, got %d",

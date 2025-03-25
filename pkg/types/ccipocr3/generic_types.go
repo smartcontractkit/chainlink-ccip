@@ -55,6 +55,9 @@ func (s SeqNum) String() string {
 }
 
 func NewSeqNumRange(start, end SeqNum) SeqNumRange {
+	if end < start {
+		start, end = end, start
+	}
 	return SeqNumRange{start, end}
 }
 
@@ -82,7 +85,7 @@ func (s *SeqNumRange) SetEnd(v SeqNum) {
 func (s *SeqNumRange) Limit(n uint64) SeqNumRange {
 	limitedRange := NewSeqNumRange(s.Start(), s.End())
 
-	numElems := s.End() - s.Start() + 1
+	numElems := s.Length()
 	if numElems <= 0 {
 		return limitedRange
 	}
@@ -124,6 +127,9 @@ func (s SeqNumRange) String() string {
 }
 
 func (s SeqNumRange) Length() int {
+	if s.End() < s.Start() {
+		s[0], s[1] = s[1], s[0]
+	}
 	return int(s.End() - s.Start() + 1)
 }
 
