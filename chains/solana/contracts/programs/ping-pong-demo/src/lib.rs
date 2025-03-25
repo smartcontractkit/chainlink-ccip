@@ -115,6 +115,9 @@ pub mod ping_pong_demo {
                 .accounts
                 .fee_quoter_link_token_config
                 .to_account_info(),
+            rmn_remote: ctx.accounts.rmn_remote.to_account_info(),
+            rmn_remote_curses: ctx.accounts.rmn_remote_curses.to_account_info(),
+            rmn_remote_config: ctx.accounts.rmn_remote_config.to_account_info(),
             token_pools_signer: ctx.accounts.token_pools_signer.to_account_info(),
             fee_token_program: ctx.accounts.fee_token_program.to_account_info(),
         };
@@ -162,6 +165,9 @@ pub mod ping_pong_demo {
                 .accounts
                 .fee_quoter_link_token_config
                 .to_account_info(),
+            rmn_remote: ctx.accounts.rmn_remote.to_account_info(),
+            rmn_remote_curses: ctx.accounts.rmn_remote_curses.to_account_info(),
+            rmn_remote_config: ctx.accounts.rmn_remote_config.to_account_info(),
             token_pools_signer: ctx.accounts.token_pools_signer.to_account_info(),
             fee_token_program: ctx.accounts.fee_token_program.to_account_info(),
         };
@@ -187,7 +193,7 @@ mod helpers {
         signer_bump: u8,
     ) -> Result<()> {
         let data_bytes: [u8; 32] = ping_pong_count.into();
-        let message = ccip_router::SVM2AnyMessage {
+        let message = ccip_router::messages::SVM2AnyMessage {
             receiver: config.counterpart_address.to_vec(), // TODO trim address here
             data: data_bytes.to_vec(),
             token_amounts: vec![], // no token transfer
@@ -430,6 +436,12 @@ pub mod context {
         /// CHECK
         pub fee_quoter_link_token_config: UncheckedAccount<'info>,
         /// CHECK
+        pub rmn_remote: UncheckedAccount<'info>,
+        /// CHECK
+        pub rmn_remote_curses: UncheckedAccount<'info>,
+        /// CHECK
+        pub rmn_remote_config: UncheckedAccount<'info>,
+        /// CHECK
         pub token_pools_signer: UncheckedAccount<'info>,
 
         pub system_program: Program<'info, System>,
@@ -519,6 +531,12 @@ pub mod context {
         pub fee_quoter_billing_token_config: UncheckedAccount<'info>,
         /// CHECK
         pub fee_quoter_link_token_config: UncheckedAccount<'info>,
+        /// CHECK
+        pub rmn_remote: UncheckedAccount<'info>,
+        /// CHECK
+        pub rmn_remote_curses: UncheckedAccount<'info>,
+        /// CHECK
+        pub rmn_remote_config: UncheckedAccount<'info>,
         /// CHECK
         pub token_pools_signer: UncheckedAccount<'info>,
 

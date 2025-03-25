@@ -68,17 +68,26 @@ type CcipReceive struct {
 	// [18] = [] feeQuoterLinkTokenConfig
 	// ··········· CHECK
 	//
-	// [19] = [] tokenPoolsSigner
+	// [19] = [] rmnRemote
 	// ··········· CHECK
 	//
-	// [20] = [] systemProgram
+	// [20] = [] rmnRemoteCurses
+	// ··········· CHECK
+	//
+	// [21] = [] rmnRemoteConfig
+	// ··········· CHECK
+	//
+	// [22] = [] tokenPoolsSigner
+	// ··········· CHECK
+	//
+	// [23] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCcipReceiveInstructionBuilder creates a new `CcipReceive` instruction builder.
 func NewCcipReceiveInstructionBuilder() *CcipReceive {
 	nd := &CcipReceive{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 21),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 24),
 	}
 	return nd
 }
@@ -330,28 +339,67 @@ func (inst *CcipReceive) GetFeeQuoterLinkTokenConfigAccount() *ag_solanago.Accou
 	return inst.AccountMetaSlice[18]
 }
 
+// SetRmnRemoteAccount sets the "rmnRemote" account.
+// CHECK
+func (inst *CcipReceive) SetRmnRemoteAccount(rmnRemote ag_solanago.PublicKey) *CcipReceive {
+	inst.AccountMetaSlice[19] = ag_solanago.Meta(rmnRemote)
+	return inst
+}
+
+// GetRmnRemoteAccount gets the "rmnRemote" account.
+// CHECK
+func (inst *CcipReceive) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[19]
+}
+
+// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
+// CHECK
+func (inst *CcipReceive) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *CcipReceive {
+	inst.AccountMetaSlice[20] = ag_solanago.Meta(rmnRemoteCurses)
+	return inst
+}
+
+// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
+// CHECK
+func (inst *CcipReceive) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[20]
+}
+
+// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
+// CHECK
+func (inst *CcipReceive) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *CcipReceive {
+	inst.AccountMetaSlice[21] = ag_solanago.Meta(rmnRemoteConfig)
+	return inst
+}
+
+// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
+// CHECK
+func (inst *CcipReceive) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[21]
+}
+
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 // CHECK
 func (inst *CcipReceive) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[19] = ag_solanago.Meta(tokenPoolsSigner)
+	inst.AccountMetaSlice[22] = ag_solanago.Meta(tokenPoolsSigner)
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 // CHECK
 func (inst *CcipReceive) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[19]
+	return inst.AccountMetaSlice[22]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *CcipReceive) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[20] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[23] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *CcipReceive) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[20]
+	return inst.AccountMetaSlice[23]
 }
 
 func (inst CcipReceive) Build() *Instruction {
@@ -439,9 +487,18 @@ func (inst *CcipReceive) Validate() error {
 			return errors.New("accounts.FeeQuoterLinkTokenConfig is not set")
 		}
 		if inst.AccountMetaSlice[19] == nil {
-			return errors.New("accounts.TokenPoolsSigner is not set")
+			return errors.New("accounts.RmnRemote is not set")
 		}
 		if inst.AccountMetaSlice[20] == nil {
+			return errors.New("accounts.RmnRemoteCurses is not set")
+		}
+		if inst.AccountMetaSlice[21] == nil {
+			return errors.New("accounts.RmnRemoteConfig is not set")
+		}
+		if inst.AccountMetaSlice[22] == nil {
+			return errors.New("accounts.TokenPoolsSigner is not set")
+		}
+		if inst.AccountMetaSlice[23] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -462,7 +519,7 @@ func (inst *CcipReceive) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=21]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=24]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                  authority", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("             offrampProgram", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("             allowedOfframp", inst.AccountMetaSlice[2]))
@@ -482,8 +539,11 @@ func (inst *CcipReceive) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("         feeQuoterDestChain", inst.AccountMetaSlice[16]))
 						accountsBranch.Child(ag_format.Meta("feeQuoterBillingTokenConfig", inst.AccountMetaSlice[17]))
 						accountsBranch.Child(ag_format.Meta("   feeQuoterLinkTokenConfig", inst.AccountMetaSlice[18]))
-						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[19]))
-						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[20]))
+						accountsBranch.Child(ag_format.Meta("                  rmnRemote", inst.AccountMetaSlice[19]))
+						accountsBranch.Child(ag_format.Meta("            rmnRemoteCurses", inst.AccountMetaSlice[20]))
+						accountsBranch.Child(ag_format.Meta("            rmnRemoteConfig", inst.AccountMetaSlice[21]))
+						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[22]))
+						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[23]))
 					})
 				})
 		})
@@ -530,6 +590,9 @@ func NewCcipReceiveInstruction(
 	feeQuoterDestChain ag_solanago.PublicKey,
 	feeQuoterBillingTokenConfig ag_solanago.PublicKey,
 	feeQuoterLinkTokenConfig ag_solanago.PublicKey,
+	rmnRemote ag_solanago.PublicKey,
+	rmnRemoteCurses ag_solanago.PublicKey,
+	rmnRemoteConfig ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *CcipReceive {
 	return NewCcipReceiveInstructionBuilder().
@@ -553,6 +616,9 @@ func NewCcipReceiveInstruction(
 		SetFeeQuoterDestChainAccount(feeQuoterDestChain).
 		SetFeeQuoterBillingTokenConfigAccount(feeQuoterBillingTokenConfig).
 		SetFeeQuoterLinkTokenConfigAccount(feeQuoterLinkTokenConfig).
+		SetRmnRemoteAccount(rmnRemote).
+		SetRmnRemoteCursesAccount(rmnRemoteCurses).
+		SetRmnRemoteConfigAccount(rmnRemoteConfig).
 		SetTokenPoolsSignerAccount(tokenPoolsSigner).
 		SetSystemProgramAccount(systemProgram)
 }

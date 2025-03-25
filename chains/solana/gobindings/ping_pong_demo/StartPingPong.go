@@ -59,17 +59,26 @@ type StartPingPong struct {
 	// [16] = [] feeQuoterLinkTokenConfig
 	// ··········· CHECK
 	//
-	// [17] = [] tokenPoolsSigner
+	// [17] = [] rmnRemote
 	// ··········· CHECK
 	//
-	// [18] = [] systemProgram
+	// [18] = [] rmnRemoteCurses
+	// ··········· CHECK
+	//
+	// [19] = [] rmnRemoteConfig
+	// ··········· CHECK
+	//
+	// [20] = [] tokenPoolsSigner
+	// ··········· CHECK
+	//
+	// [21] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewStartPingPongInstructionBuilder creates a new `StartPingPong` instruction builder.
 func NewStartPingPongInstructionBuilder() *StartPingPong {
 	nd := &StartPingPong{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 19),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 22),
 	}
 	return nd
 }
@@ -285,28 +294,67 @@ func (inst *StartPingPong) GetFeeQuoterLinkTokenConfigAccount() *ag_solanago.Acc
 	return inst.AccountMetaSlice[16]
 }
 
+// SetRmnRemoteAccount sets the "rmnRemote" account.
+// CHECK
+func (inst *StartPingPong) SetRmnRemoteAccount(rmnRemote ag_solanago.PublicKey) *StartPingPong {
+	inst.AccountMetaSlice[17] = ag_solanago.Meta(rmnRemote)
+	return inst
+}
+
+// GetRmnRemoteAccount gets the "rmnRemote" account.
+// CHECK
+func (inst *StartPingPong) GetRmnRemoteAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[17]
+}
+
+// SetRmnRemoteCursesAccount sets the "rmnRemoteCurses" account.
+// CHECK
+func (inst *StartPingPong) SetRmnRemoteCursesAccount(rmnRemoteCurses ag_solanago.PublicKey) *StartPingPong {
+	inst.AccountMetaSlice[18] = ag_solanago.Meta(rmnRemoteCurses)
+	return inst
+}
+
+// GetRmnRemoteCursesAccount gets the "rmnRemoteCurses" account.
+// CHECK
+func (inst *StartPingPong) GetRmnRemoteCursesAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[18]
+}
+
+// SetRmnRemoteConfigAccount sets the "rmnRemoteConfig" account.
+// CHECK
+func (inst *StartPingPong) SetRmnRemoteConfigAccount(rmnRemoteConfig ag_solanago.PublicKey) *StartPingPong {
+	inst.AccountMetaSlice[19] = ag_solanago.Meta(rmnRemoteConfig)
+	return inst
+}
+
+// GetRmnRemoteConfigAccount gets the "rmnRemoteConfig" account.
+// CHECK
+func (inst *StartPingPong) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[19]
+}
+
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 // CHECK
 func (inst *StartPingPong) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[17] = ag_solanago.Meta(tokenPoolsSigner)
+	inst.AccountMetaSlice[20] = ag_solanago.Meta(tokenPoolsSigner)
 	return inst
 }
 
 // GetTokenPoolsSignerAccount gets the "tokenPoolsSigner" account.
 // CHECK
 func (inst *StartPingPong) GetTokenPoolsSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[17]
+	return inst.AccountMetaSlice[20]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *StartPingPong) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[18] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[21] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *StartPingPong) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[18]
+	return inst.AccountMetaSlice[21]
 }
 
 func (inst StartPingPong) Build() *Instruction {
@@ -381,9 +429,18 @@ func (inst *StartPingPong) Validate() error {
 			return errors.New("accounts.FeeQuoterLinkTokenConfig is not set")
 		}
 		if inst.AccountMetaSlice[17] == nil {
-			return errors.New("accounts.TokenPoolsSigner is not set")
+			return errors.New("accounts.RmnRemote is not set")
 		}
 		if inst.AccountMetaSlice[18] == nil {
+			return errors.New("accounts.RmnRemoteCurses is not set")
+		}
+		if inst.AccountMetaSlice[19] == nil {
+			return errors.New("accounts.RmnRemoteConfig is not set")
+		}
+		if inst.AccountMetaSlice[20] == nil {
+			return errors.New("accounts.TokenPoolsSigner is not set")
+		}
+		if inst.AccountMetaSlice[21] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -402,7 +459,7 @@ func (inst *StartPingPong) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=19]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=22]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                     config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("                  authority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("             ccipSendSigner", inst.AccountMetaSlice[2]))
@@ -420,8 +477,11 @@ func (inst *StartPingPong) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("         feeQuoterDestChain", inst.AccountMetaSlice[14]))
 						accountsBranch.Child(ag_format.Meta("feeQuoterBillingTokenConfig", inst.AccountMetaSlice[15]))
 						accountsBranch.Child(ag_format.Meta("   feeQuoterLinkTokenConfig", inst.AccountMetaSlice[16]))
-						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[17]))
-						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[18]))
+						accountsBranch.Child(ag_format.Meta("                  rmnRemote", inst.AccountMetaSlice[17]))
+						accountsBranch.Child(ag_format.Meta("            rmnRemoteCurses", inst.AccountMetaSlice[18]))
+						accountsBranch.Child(ag_format.Meta("            rmnRemoteConfig", inst.AccountMetaSlice[19]))
+						accountsBranch.Child(ag_format.Meta("           tokenPoolsSigner", inst.AccountMetaSlice[20]))
+						accountsBranch.Child(ag_format.Meta("              systemProgram", inst.AccountMetaSlice[21]))
 					})
 				})
 		})
@@ -454,6 +514,9 @@ func NewStartPingPongInstruction(
 	feeQuoterDestChain ag_solanago.PublicKey,
 	feeQuoterBillingTokenConfig ag_solanago.PublicKey,
 	feeQuoterLinkTokenConfig ag_solanago.PublicKey,
+	rmnRemote ag_solanago.PublicKey,
+	rmnRemoteCurses ag_solanago.PublicKey,
+	rmnRemoteConfig ag_solanago.PublicKey,
 	tokenPoolsSigner ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *StartPingPong {
 	return NewStartPingPongInstructionBuilder().
@@ -474,6 +537,9 @@ func NewStartPingPongInstruction(
 		SetFeeQuoterDestChainAccount(feeQuoterDestChain).
 		SetFeeQuoterBillingTokenConfigAccount(feeQuoterBillingTokenConfig).
 		SetFeeQuoterLinkTokenConfigAccount(feeQuoterLinkTokenConfig).
+		SetRmnRemoteAccount(rmnRemote).
+		SetRmnRemoteCursesAccount(rmnRemoteCurses).
+		SetRmnRemoteConfigAccount(rmnRemoteConfig).
 		SetTokenPoolsSignerAccount(tokenPoolsSigner).
 		SetSystemProgramAccount(systemProgram)
 }

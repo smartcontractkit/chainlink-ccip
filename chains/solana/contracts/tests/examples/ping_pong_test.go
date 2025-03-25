@@ -120,10 +120,10 @@ func TestPingPong(t *testing.T) {
 				require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 				ix, err := fee_quoter.NewInitializeInstruction(
-					linkMint,
 					defaultMaxFeeJuelsPerMsg,
 					config.CcipRouterProgram,
 					config.FqConfigPDA,
+					linkMint,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 					config.FeeQuoterProgram,
@@ -150,6 +150,7 @@ func TestPingPong(t *testing.T) {
 					admin.PublicKey(),
 					config.FeeQuoterProgram,
 					linkMint,
+					config.RMNRemoteProgram,
 					config.RouterConfigPDA,
 					admin.PublicKey(),
 					solana.SystemProgramID,
@@ -181,6 +182,7 @@ func TestPingPong(t *testing.T) {
 					config.OfframpReferenceAddressesPDA,
 					config.CcipRouterProgram,
 					config.FeeQuoterProgram,
+					config.RMNRemoteProgram,
 					solana.PublicKey{}, // lookup table, not used in the tests, so just send an empty address,
 					config.OfframpStatePDA,
 					config.OfframpExternalExecutionConfigPDA,
@@ -264,12 +266,13 @@ func TestPingPong(t *testing.T) {
 				var onRampAddress [64]byte
 				copy(onRampAddress[:], config.CcipRouterProgram[:]) // the router is the SVM onramp
 
-				emptyAddress := [64]byte{}
-
 				instruction, err := ccip_offramp.NewAddSourceChainInstruction(
 					config.SvmChainSelector,
 					ccip_offramp.SourceChainConfig{
-						OnRamp:    [2][64]byte{onRampAddress, emptyAddress},
+						OnRamp: ccip_offramp.OnRampAddress{
+							Bytes: onRampAddress,
+							Len:   32,
+						},
 						IsEnabled: true,
 					},
 					config.OfframpSvmSourceChainPDA,
