@@ -39,8 +39,8 @@ impl Admin for Impl {
             from: config.owner,
             to: config.proposed_owner,
         });
+        // NOTE: take() resets proposed_owner to default
         config.owner = std::mem::take(&mut config.proposed_owner);
-        config.proposed_owner = Pubkey::new_from_array([0; 32]);
         Ok(())
     }
 
