@@ -104,7 +104,11 @@ func GetChainConfigBySelector(configs []devenv.ChainConfig, chainSelector uint64
 		panic("invalid chain selector")
 	}
 	for _, chainConfig := range configs {
-		if chainConfig.ChainID == chain.EvmChainID {
+		chainId, err := strconv.ParseUint(chainConfig.ChainID, 10, 0)
+		if err != nil {
+			panic(err)
+		}
+		if chainId == chain.EvmChainID {
 			return &chainConfig
 		}
 	}
@@ -281,8 +285,8 @@ func NewChainConfigurer(env DevspaceEnv, chainID string, chainType ChainType, ch
 	}
 }
 
-func NewChainConfigurerFromChainConfig(env DevspaceEnv, chainConfig devenv.ChainConfig, chainVariant string) ChainConfigurer {
-	return NewChainConfigurer(env, chainConfig.ChainID, ChainTypeFromString(chainConfig.ChainType), chainVariant, chainConfig.ChainName)
+func NewChainConfigurerFromChainConfig(env DevspaceEnv, chainConfig devenv.ChainConfig, chainVariant string, podId int) ChainConfigurer {
+	return NewChainConfigurer(env, chainConfig.ChainID, ChainTypeFromString(chainConfig.ChainType), chainVariant, chainConfig.ChainName, podId)
 }
 
 func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {

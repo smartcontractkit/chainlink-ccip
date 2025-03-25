@@ -2,7 +2,6 @@ package rmn
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
@@ -148,7 +147,7 @@ func GenerateLocalToml(env config.DevspaceEnv, chains []devenv.ChainConfig, envS
 	localTomlChains := make([]LocalTomlChain, 0)
 
 	for _, chain := range chains {
-		configurer := config.NewChainConfigurerFromChainConfig(env, chain, "geth")
+		configurer := config.NewChainConfigurerFromChainConfig(env, chain, "geth", 0)
 		httpRPC := configurer.InternalHTTPRPC()
 		localTomlChains = append(localTomlChains, LocalTomlChain{
 			Name: chainName(&chain),
@@ -173,14 +172,12 @@ func GenerateLocalToml(env config.DevspaceEnv, chains []devenv.ChainConfig, envS
 
 // RMN requires some custom chainName logic, chain names in RMN are different than in chain-selectors repo
 func chainName(chainConfig *devenv.ChainConfig) string {
-	chainIDString := strconv.FormatUint(chainConfig.ChainID, 10)
-
-	switch chainIDString {
+	switch chainConfig.ChainID {
 	case "1337":
 		return "DevnetAlpha"
 	case "2337":
 		return "DevnetBeta"
 	}
 
-	return fmt.Sprintf("test-%s", chainIDString)
+	return fmt.Sprintf("test-%s", chainConfig.ChainID)
 }

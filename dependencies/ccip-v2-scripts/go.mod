@@ -24,10 +24,10 @@ replace (
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
-//For local development you can uncomment lines below
-// github.com/smartcontractkit/chainlink/deployment => ../../../chainlink/deployment
-// github.com/smartcontractkit/chainlink/system-tests/lib => ../../../chainlink/system-tests/lib
-// github.com/smartcontractkit/chainlink/v2 => ../../../chainlink
+	//For local development you can uncomment lines below
+	github.com/smartcontractkit/chainlink/deployment => ../../../chainlink/deployment
+	github.com/smartcontractkit/chainlink/system-tests/lib => ../../../chainlink/system-tests/lib
+	github.com/smartcontractkit/chainlink/v2 => ../../../chainlink
 )
 
 require (
@@ -275,7 +275,6 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
