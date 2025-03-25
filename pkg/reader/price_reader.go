@@ -105,7 +105,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		"feeQuoterAddress", feeQuoterAddressStr,
 	)
 
-	byteTokens := make([][]byte, 0, len(tokens))
+	params := plugintypes.GetFeeQuoterTokenUpdatesParamsType{}
 	for _, token := range tokens {
 		tokenAddressBytes, err := pr.addressCodec.AddressStringToBytes(string(token), chain)
 		if err != nil {
@@ -113,7 +113,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 			continue
 		}
 
-		byteTokens = append(byteTokens, tokenAddressBytes)
+		params.Tokens = append(params.Tokens, tokenAddressBytes)
 	}
 
 	boundContract := commontypes.BoundContract{
@@ -133,9 +133,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
-			map[string]any{
-				"tokens": byteTokens,
-			},
+			params,
 			&updates,
 		); err != nil {
 		return nil, fmt.Errorf("failed to get fee quoter token updates: %w", err)
