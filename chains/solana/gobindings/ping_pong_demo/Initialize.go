@@ -12,14 +12,8 @@ import (
 
 // Initialize is the `initialize` instruction.
 type Initialize struct {
-	Router                   *ag_solanago.PublicKey
-	CounterpartChainSelector *uint64
-	CounterpartAddress       *[64]uint8
-	IsPaused                 *bool
-	DefaultGasLimit          *uint64
-	OutOfOrderExecution      *ag_solanago.PublicKey
 
-	// [0] = [WRITE] config
+	// [0] = [] config
 	//
 	// [1] = [WRITE] nameVersion
 	//
@@ -40,60 +34,20 @@ type Initialize struct {
 	// [8] = [] associatedTokenProgram
 	//
 	// [9] = [] systemProgram
-	//
-	// [10] = [] program
-	//
-	// [11] = [] programData
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 12),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
 	}
 	return nd
 }
 
-// SetRouter sets the "router" parameter.
-func (inst *Initialize) SetRouter(router ag_solanago.PublicKey) *Initialize {
-	inst.Router = &router
-	return inst
-}
-
-// SetCounterpartChainSelector sets the "counterpartChainSelector" parameter.
-func (inst *Initialize) SetCounterpartChainSelector(counterpartChainSelector uint64) *Initialize {
-	inst.CounterpartChainSelector = &counterpartChainSelector
-	return inst
-}
-
-// SetCounterpartAddress sets the "counterpartAddress" parameter.
-func (inst *Initialize) SetCounterpartAddress(counterpartAddress [64]uint8) *Initialize {
-	inst.CounterpartAddress = &counterpartAddress
-	return inst
-}
-
-// SetIsPaused sets the "isPaused" parameter.
-func (inst *Initialize) SetIsPaused(isPaused bool) *Initialize {
-	inst.IsPaused = &isPaused
-	return inst
-}
-
-// SetDefaultGasLimit sets the "defaultGasLimit" parameter.
-func (inst *Initialize) SetDefaultGasLimit(defaultGasLimit uint64) *Initialize {
-	inst.DefaultGasLimit = &defaultGasLimit
-	return inst
-}
-
-// SetOutOfOrderExecution sets the "outOfOrderExecution" parameter.
-func (inst *Initialize) SetOutOfOrderExecution(outOfOrderExecution ag_solanago.PublicKey) *Initialize {
-	inst.OutOfOrderExecution = &outOfOrderExecution
-	return inst
-}
-
 // SetConfigAccount sets the "config" account.
 func (inst *Initialize) SetConfigAccount(config ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
 	return inst
 }
 
@@ -205,28 +159,6 @@ func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[9]
 }
 
-// SetProgramAccount sets the "program" account.
-func (inst *Initialize) SetProgramAccount(program ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(program)
-	return inst
-}
-
-// GetProgramAccount gets the "program" account.
-func (inst *Initialize) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
-}
-
-// SetProgramDataAccount sets the "programData" account.
-func (inst *Initialize) SetProgramDataAccount(programData ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(programData)
-	return inst
-}
-
-// GetProgramDataAccount gets the "programData" account.
-func (inst *Initialize) GetProgramDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
-}
-
 func (inst Initialize) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -245,28 +177,6 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *Initialize) Validate() error {
-	// Check whether all (required) parameters are set:
-	{
-		if inst.Router == nil {
-			return errors.New("Router parameter is not set")
-		}
-		if inst.CounterpartChainSelector == nil {
-			return errors.New("CounterpartChainSelector parameter is not set")
-		}
-		if inst.CounterpartAddress == nil {
-			return errors.New("CounterpartAddress parameter is not set")
-		}
-		if inst.IsPaused == nil {
-			return errors.New("IsPaused parameter is not set")
-		}
-		if inst.DefaultGasLimit == nil {
-			return errors.New("DefaultGasLimit parameter is not set")
-		}
-		if inst.OutOfOrderExecution == nil {
-			return errors.New("OutOfOrderExecution parameter is not set")
-		}
-	}
-
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -299,12 +209,6 @@ func (inst *Initialize) Validate() error {
 		if inst.AccountMetaSlice[9] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
-		if inst.AccountMetaSlice[10] == nil {
-			return errors.New("accounts.Program is not set")
-		}
-		if inst.AccountMetaSlice[11] == nil {
-			return errors.New("accounts.ProgramData is not set")
-		}
 	}
 	return nil
 }
@@ -318,17 +222,10 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=6]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("                  Router", *inst.Router))
-						paramsBranch.Child(ag_format.Param("CounterpartChainSelector", *inst.CounterpartChainSelector))
-						paramsBranch.Child(ag_format.Param("      CounterpartAddress", *inst.CounterpartAddress))
-						paramsBranch.Child(ag_format.Param("                IsPaused", *inst.IsPaused))
-						paramsBranch.Child(ag_format.Param("         DefaultGasLimit", *inst.DefaultGasLimit))
-						paramsBranch.Child(ag_format.Param("     OutOfOrderExecution", *inst.OutOfOrderExecution))
-					})
+					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=12]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("           nameVersion", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("routerFeeBillingSigner", inst.AccountMetaSlice[2]))
@@ -339,89 +236,20 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[7]))
 						accountsBranch.Child(ag_format.Meta("associatedTokenProgram", inst.AccountMetaSlice[8]))
 						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("               program", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("           programData", inst.AccountMetaSlice[11]))
 					})
 				})
 		})
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Router` param:
-	err = encoder.Encode(obj.Router)
-	if err != nil {
-		return err
-	}
-	// Serialize `CounterpartChainSelector` param:
-	err = encoder.Encode(obj.CounterpartChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `CounterpartAddress` param:
-	err = encoder.Encode(obj.CounterpartAddress)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsPaused` param:
-	err = encoder.Encode(obj.IsPaused)
-	if err != nil {
-		return err
-	}
-	// Serialize `DefaultGasLimit` param:
-	err = encoder.Encode(obj.DefaultGasLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `OutOfOrderExecution` param:
-	err = encoder.Encode(obj.OutOfOrderExecution)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Router`:
-	err = decoder.Decode(&obj.Router)
-	if err != nil {
-		return err
-	}
-	// Deserialize `CounterpartChainSelector`:
-	err = decoder.Decode(&obj.CounterpartChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `CounterpartAddress`:
-	err = decoder.Decode(&obj.CounterpartAddress)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsPaused`:
-	err = decoder.Decode(&obj.IsPaused)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DefaultGasLimit`:
-	err = decoder.Decode(&obj.DefaultGasLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OutOfOrderExecution`:
-	err = decoder.Decode(&obj.OutOfOrderExecution)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
-	// Parameters:
-	router ag_solanago.PublicKey,
-	counterpartChainSelector uint64,
-	counterpartAddress [64]uint8,
-	isPaused bool,
-	defaultGasLimit uint64,
-	outOfOrderExecution ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	nameVersion ag_solanago.PublicKey,
@@ -432,16 +260,8 @@ func NewInitializeInstruction(
 	ccipSendSigner ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	associatedTokenProgram ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey,
-	program ag_solanago.PublicKey,
-	programData ag_solanago.PublicKey) *Initialize {
+	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetRouter(router).
-		SetCounterpartChainSelector(counterpartChainSelector).
-		SetCounterpartAddress(counterpartAddress).
-		SetIsPaused(isPaused).
-		SetDefaultGasLimit(defaultGasLimit).
-		SetOutOfOrderExecution(outOfOrderExecution).
 		SetConfigAccount(config).
 		SetNameVersionAccount(nameVersion).
 		SetRouterFeeBillingSignerAccount(routerFeeBillingSigner).
@@ -451,7 +271,5 @@ func NewInitializeInstruction(
 		SetCcipSendSignerAccount(ccipSendSigner).
 		SetAuthorityAccount(authority).
 		SetAssociatedTokenProgramAccount(associatedTokenProgram).
-		SetSystemProgramAccount(systemProgram).
-		SetProgramAccount(program).
-		SetProgramDataAccount(programData)
+		SetSystemProgramAccount(systemProgram)
 }

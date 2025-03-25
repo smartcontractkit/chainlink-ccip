@@ -16,7 +16,7 @@ type Config struct {
 	IsPaused                 bool
 	FeeTokenMint             ag_solanago.PublicKey
 	DefaultGasLimit          uint64
-	OutOfOrderExecution      ag_solanago.PublicKey
+	OutOfOrderExecution      bool
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}

@@ -28,6 +28,8 @@ func init() {
 }
 
 var (
+	Instruction_InitializeConfig = ag_binary.TypeID([8]byte{208, 127, 21, 1, 194, 190, 196, 70})
+
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
 	Instruction_SetCounterpart = ag_binary.TypeID([8]byte{118, 28, 243, 127, 218, 176, 228, 228})
@@ -44,6 +46,8 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
+	case Instruction_InitializeConfig:
+		return "InitializeConfig"
 	case Instruction_Initialize:
 		return "Initialize"
 	case Instruction_SetCounterpart:
@@ -76,6 +80,9 @@ func (inst *Instruction) EncodeToTree(parent ag_treeout.Branches) {
 var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
+		{
+			"initialize_config", (*InitializeConfig)(nil),
+		},
 		{
 			"initialize", (*Initialize)(nil),
 		},

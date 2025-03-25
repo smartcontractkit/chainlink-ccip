@@ -3,11 +3,77 @@ export type PingPongDemo = {
   "name": "ping_pong_demo",
   "instructions": [
     {
-      "name": "initialize",
+      "name": "initializeConfig",
       "accounts": [
         {
           "name": "config",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "counterpartAddress",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "isPaused",
+          "type": "bool"
+        },
+        {
+          "name": "defaultGasLimit",
+          "type": "u64"
+        },
+        {
+          "name": "outOfOrderExecution",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -60,49 +126,9 @@ export type PingPongDemo = {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "counterpartChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "counterpartAddress",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
-        },
-        {
-          "name": "isPaused",
-          "type": "bool"
-        },
-        {
-          "name": "defaultGasLimit",
-          "type": "u64"
-        },
-        {
-          "name": "outOfOrderExecution",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "setCounterpart",
@@ -172,7 +198,7 @@ export type PingPongDemo = {
       "args": [
         {
           "name": "outOfOrderExecution",
-          "type": "publicKey"
+          "type": "bool"
         }
       ]
     },
@@ -571,7 +597,7 @@ export type PingPongDemo = {
           },
           {
             "name": "outOfOrderExecution",
-            "type": "publicKey"
+            "type": "bool"
           }
         ]
       }
@@ -612,11 +638,77 @@ export const IDL: PingPongDemo = {
   "name": "ping_pong_demo",
   "instructions": [
     {
-      "name": "initialize",
+      "name": "initializeConfig",
       "accounts": [
         {
           "name": "config",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "publicKey"
+        },
+        {
+          "name": "counterpartChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "counterpartAddress",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "isPaused",
+          "type": "bool"
+        },
+        {
+          "name": "defaultGasLimit",
+          "type": "u64"
+        },
+        {
+          "name": "outOfOrderExecution",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -669,49 +761,9 @@ export const IDL: PingPongDemo = {
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "programData",
-          "isMut": false,
-          "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "router",
-          "type": "publicKey"
-        },
-        {
-          "name": "counterpartChainSelector",
-          "type": "u64"
-        },
-        {
-          "name": "counterpartAddress",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
-        },
-        {
-          "name": "isPaused",
-          "type": "bool"
-        },
-        {
-          "name": "defaultGasLimit",
-          "type": "u64"
-        },
-        {
-          "name": "outOfOrderExecution",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "setCounterpart",
@@ -781,7 +833,7 @@ export const IDL: PingPongDemo = {
       "args": [
         {
           "name": "outOfOrderExecution",
-          "type": "publicKey"
+          "type": "bool"
         }
       ]
     },
@@ -1180,7 +1232,7 @@ export const IDL: PingPongDemo = {
           },
           {
             "name": "outOfOrderExecution",
-            "type": "publicKey"
+            "type": "bool"
           }
         ]
       }

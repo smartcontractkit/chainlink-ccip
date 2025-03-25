@@ -328,8 +328,56 @@ func TestPingPong(t *testing.T) {
 	})
 
 	t.Run("Configure PingPong", func(t *testing.T) {
+		t.Run("Initialize Config", func(t *testing.T) {
+			type ProgramData struct {
+				DataType uint32
+				Address  solana.PublicKey
+			}
+			// get program data account
+			data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.PingPongProgram, &rpc.GetAccountInfoOpts{
+				Commitment: config.DefaultCommitment,
+			})
+			require.NoError(t, err)
+
+			// Decode program data
+			var programData ProgramData
+			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+			ix, err := ping_pong_demo.NewInitializeConfigInstruction(
+				config.CcipRouterProgram,
+				config.SvmChainSelector,
+				common.ToPadded64Bytes(config.PingPongProgram[:]),
+				true, // isPaused
+				0,    // default gas limit
+				true, // out of order
+				reusableAccounts.Config,
+				linkMint,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+				config.PingPongProgram,
+				programData.Address,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
+				config.DefaultCommitment)
+		})
+
 		t.Run("Initialize", func(t *testing.T) {
-			// TODO
+			ix, err := ping_pong_demo.NewInitializeInstruction(
+				reusableAccounts.Config,
+				reusableAccounts.NameVersion,
+				config.BillingSignerPDA,
+				config.Token2022Program,
+				linkMint,
+				reusableAccounts.FeeTokenATA,
+				reusableAccounts.CcipSendSigner,
+				admin.PublicKey(),
+				solana.SPLAssociatedTokenAccountProgramID,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
+				config.DefaultCommitment)
 		})
 
 		t.Run("Fund PingPong LINK ATA", func(t *testing.T) {

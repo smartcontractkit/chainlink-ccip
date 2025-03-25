@@ -12,7 +12,7 @@ import (
 
 // SetOutOfOrderExecution is the `setOutOfOrderExecution` instruction.
 type SetOutOfOrderExecution struct {
-	OutOfOrderExecution *ag_solanago.PublicKey
+	OutOfOrderExecution *bool
 
 	// [0] = [WRITE] config
 	//
@@ -29,7 +29,7 @@ func NewSetOutOfOrderExecutionInstructionBuilder() *SetOutOfOrderExecution {
 }
 
 // SetOutOfOrderExecution sets the "outOfOrderExecution" parameter.
-func (inst *SetOutOfOrderExecution) SetOutOfOrderExecution(outOfOrderExecution ag_solanago.PublicKey) *SetOutOfOrderExecution {
+func (inst *SetOutOfOrderExecution) SetOutOfOrderExecution(outOfOrderExecution bool) *SetOutOfOrderExecution {
 	inst.OutOfOrderExecution = &outOfOrderExecution
 	return inst
 }
@@ -135,7 +135,7 @@ func (obj *SetOutOfOrderExecution) UnmarshalWithDecoder(decoder *ag_binary.Decod
 // NewSetOutOfOrderExecutionInstruction declares a new SetOutOfOrderExecution instruction with the provided parameters and accounts.
 func NewSetOutOfOrderExecutionInstruction(
 	// Parameters:
-	outOfOrderExecution ag_solanago.PublicKey,
+	outOfOrderExecution bool,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetOutOfOrderExecution {

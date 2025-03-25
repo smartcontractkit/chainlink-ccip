@@ -18,14 +18,14 @@ pub mod ping_pong_demo {
 
     use super::*;
 
-    pub fn initialize<'info>(
-        ctx: Context<Initialize>,
+    pub fn initialize_config(
+        ctx: Context<InitializeConfig>,
         router: Pubkey,
         counterpart_chain_selector: u64,
         counterpart_address: [u8; 64],
         is_paused: bool,
         default_gas_limit: u64,
-        out_of_order_execution: Pubkey,
+        out_of_order_execution: bool,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(state::Config {
             router,
@@ -41,7 +41,10 @@ pub mod ping_pong_demo {
             // that the signer of the transaction (i.e. the authority) is the upgrade authority
             owner: ctx.accounts.authority.key(),
         });
+        Ok(())
+    }
 
+    pub fn initialize<'info>(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts.name_version.set_inner(state::NameVersion {
             name: "ping-pong-demo".to_string(),
             version: "1.5.0".to_string(), // TODO confirm if we keep EVM version here
@@ -82,7 +85,7 @@ pub mod ping_pong_demo {
 
     pub fn set_out_of_order_execution(
         ctx: Context<UpdateConfig>,
-        out_of_order_execution: Pubkey,
+        out_of_order_execution: bool,
     ) -> Result<()> {
         ctx.accounts.config.out_of_order_execution = out_of_order_execution;
         Ok(())
@@ -297,14 +300,36 @@ pub mod context {
     }
 
     #[derive(Accounts)]
-    #[instruction(router: Pubkey)]
-    pub struct Initialize<'info> {
+    pub struct InitializeConfig<'info> {
         #[account(
             init,
             seeds = [seeds::CONFIG],
             bump,
             space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
             payer = authority,
+        )]
+        pub config: Account<'info, Config>,
+
+        pub fee_token_mint: InterfaceAccount<'info, Mint>,
+
+        #[account(mut)]
+        pub authority: Signer<'info>,
+
+        pub system_program: Program<'info, System>,
+
+        #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+        pub program: Program<'info, PingPongDemo>,
+
+        // Initialization only allowed by program upgrade authority
+        #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ PingPongDemoError::Unauthorized)]
+        pub program_data: Account<'info, ProgramData>,
+    }
+
+    #[derive(Accounts)]
+    pub struct Initialize<'info> {
+        #[account(
+            seeds = [seeds::CONFIG],
+            bump,
         )]
         pub config: Account<'info, Config>,
 
@@ -320,13 +345,17 @@ pub mod context {
         #[account(
             seeds = [ccip_seeds::FEE_BILLING_SIGNER],
             bump,
-            seeds::program = router,
+            seeds::program = config.router,
         )]
         /// CHECK
         pub router_fee_billing_signer: UncheckedAccount<'info>,
 
         pub fee_token_program: Interface<'info, TokenInterface>,
 
+        #[account(
+            owner = fee_token_program.key(),
+            address = config.fee_token_mint,
+        )]
         pub fee_token_mint: InterfaceAccount<'info, Mint>,
 
         #[account(
@@ -345,19 +374,12 @@ pub mod context {
         /// CHECK
         pub ccip_send_signer: UncheckedAccount<'info>,
 
-        #[account(mut)]
+        #[account(mut, address = config.owner @ PingPongDemoError::Unauthorized)]
         pub authority: Signer<'info>,
 
         pub associated_token_program: Program<'info, AssociatedToken>,
 
         pub system_program: Program<'info, System>,
-
-        #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
-        pub program: Program<'info, PingPongDemo>,
-
-        // Initialization only allowed by program upgrade authority
-        #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ PingPongDemoError::Unauthorized)]
-        pub program_data: Account<'info, ProgramData>,
     }
 
     #[derive(Accounts)]
@@ -561,7 +583,7 @@ pub mod state {
 
         // Extra args on ccip_send
         pub default_gas_limit: u64, // Default gas limit used for EVMExtraArgsV2 construction.
-        pub out_of_order_execution: Pubkey, // Allowing out of order execution.
+        pub out_of_order_execution: bool, // Allowing out of order execution.
     }
 
     #[account]
