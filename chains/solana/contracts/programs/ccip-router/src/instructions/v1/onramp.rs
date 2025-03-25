@@ -1,9 +1,10 @@
 use crate::events::on_ramp as events;
+use crate::messages::GetFeeResult;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 use ccip_common::seed;
 use ccip_common::v1::{validate_and_parse_token_accounts, TokenAccounts};
-use fee_quoter::messages::{GetFeeResult, TokenTransferAdditionalData};
+use fee_quoter::messages::TokenTransferAdditionalData;
 
 use super::super::interfaces::OnRamp;
 use super::fees::{get_fee_cpi, transfer_and_wrap_native_sol, transfer_fee};
@@ -250,7 +251,7 @@ impl OnRamp for Impl {
         dest_chain_selector: u64,
         message: SVM2AnyMessage,
     ) -> Result<GetFeeResult> {
-        get_fee_cpi(
+        let fq_result = get_fee_cpi(
             ctx.accounts.fee_quoter.to_account_info(),
             ctx.accounts.fee_quoter_config.to_account_info(),
             ctx.accounts.fee_quoter_dest_chain.to_account_info(),
@@ -261,7 +262,14 @@ impl OnRamp for Impl {
             dest_chain_selector,
             &message,
             ctx.remaining_accounts.to_vec(),
-        )
+        )?;
+
+        // not all fields that fee quoter returns are relevant for the user, so just pick the important ones
+        Ok(GetFeeResult {
+            amount: fq_result.amount,
+            juels: fq_result.juels,
+            token: fq_result.token,
+        })
     }
 }
 
