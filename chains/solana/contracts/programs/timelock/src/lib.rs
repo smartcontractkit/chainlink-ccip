@@ -41,8 +41,6 @@ use instructions::*;
 /// All operations enforce state transitions, size limits, and role-based access.
 pub mod timelock {
     #![warn(missing_docs)]
-    use bytemuck::Zeroable;
-
     use super::*;
 
     /// Initialize the timelock configuration.
