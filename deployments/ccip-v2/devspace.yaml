@@ -336,7 +336,9 @@ commands:
     description: Un-Pause paused pods and reuse existing PVCs
     appendArgs: true
   ccip-v2-load-tests:
-    command: devspace run-pipeline ccip-v2 -p load-tests-aws
+    command: |
+      devspace run ccip-v2-scripts generate-initial-don-overrides
+      devspace run-pipeline ccip-v2 -p load-tests-aws
     description: Deploy full ccip-v2 setup to AWS with heavy load test profile. (aws only)
     appendArgs: true
   ccip-v2-infra:
