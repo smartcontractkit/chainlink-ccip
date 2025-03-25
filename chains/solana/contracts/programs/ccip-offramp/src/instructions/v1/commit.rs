@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{self, Mint, SyncNative, TokenAccount, TokenInterface};
 use ccip_common::seed;
 
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
@@ -8,7 +9,7 @@ use crate::context::{CloseCommitReportAccount, CommitInput, CommitReportContext,
 use crate::event::CommitReportAccepted;
 use crate::instructions::interfaces::Commit;
 use crate::instructions::v1::rmn::verify_uncursed_cpi;
-use crate::state::{CommitReport, GlobalState, MessageExecutionState};
+use crate::state::{CommitReport, GlobalState};
 use crate::{CcipOfframpError, PriceOnlyCommitReportContext};
 
 pub struct Impl;
@@ -245,8 +246,12 @@ impl Commit for Impl {
             CcipOfframpError::CommitReportHasPendingMessages
         );
 
-        // The close = fee_token_receiver in the account constraint automatically
-        // closes the account and sends the lamports
+        // Close the account and convert rent to wrapped SOL
+        transfer_and_wrap_native_sol(
+            &ctx.accounts.token_program,
+            ctx.accounts.commit_report.to_account_info(),
+            &ctx.accounts.fee_token_receiver,
+        )?;
 
         Ok(())
     }
@@ -254,37 +259,38 @@ impl Commit for Impl {
 
 // Helper function to check if all messages have been executed
 fn all_messages_executed(report: &CommitReport) -> bool {
-    let total_messages = report.max_msg_nr.saturating_sub(report.min_msg_nr) + 1;
-    let mut all_executed = true;
+    let num_messages = report.max_msg_nr.saturating_sub(report.min_msg_nr) + 1;
 
-    for i in 0..total_messages {
-        if i >= 64 {
-            break; // Only checking up to 64 messages (limitation of the bitmap)
-        }
-
-        let sequence_number = report.min_msg_nr + i;
-        let state = get_execution_state(report, sequence_number);
-
-        if state != MessageExecutionState::Success && state != MessageExecutionState::Failure {
-            all_executed = false;
-            break;
-        }
-    }
-
-    all_executed
+    // execution_states follow geometric series 2^0 + 2^2 + 2^4 + ... + 2^(2 * (num_messages - 1))
+    // sum is calculated as (4^num_messages - 1) / 3
+    let fully_executed = (4u128.pow(num_messages as u32) - 1) / 3;
+    return report.execution_states == fully_executed;
 }
 
-// Copy of the execution_state::get function to avoid using the private module
-fn get_execution_state(report: &CommitReport, sequence_number: u64) -> MessageExecutionState {
-    let packed = report.execution_states;
-    let dif = sequence_number.checked_sub(report.min_msg_nr);
-    assert!(dif.is_some(), "Sequence number out of bounds");
-    let i = dif.unwrap();
-    assert!(i < 64, "Sequence number out of bounds");
+// Helper function to convert the SOL from the closed account to wrapped SOL
+fn transfer_and_wrap_native_sol<'info>(
+    token_program: &Interface<'info, TokenInterface>,
+    commit_report: AccountInfo<'info>,
+    fee_token_receiver: &InterfaceAccount<'info, TokenAccount>,
+) -> Result<()> {
+    // Get lamports before closing
+    let lamports = commit_report.lamports();
 
-    let mask = 0b11 << (i * 2);
-    let state = (packed & mask) >> (i * 2);
-    MessageExecutionState::try_from(state).unwrap()
+    // Close the account by setting its data length to 0 and transferring lamports to the fee_billing_signer
+    **commit_report.try_borrow_mut_lamports()? = 0;
+    commit_report.realloc(0, false)?;
+
+    // Transfer the SOL to OnRamp fee_token_receiver
+    **fee_token_receiver
+        .to_account_info()
+        .try_borrow_mut_lamports()? += lamports;
+
+    let account = fee_token_receiver.to_account_info();
+    let sync: anchor_spl::token_2022::SyncNative = anchor_spl::token_2022::SyncNative { account };
+
+    let cpi_ctx = CpiContext::new(token_program.to_account_info(), sync);
+
+    token_interface::sync_native(cpi_ctx)
 }
 
 mod helpers {

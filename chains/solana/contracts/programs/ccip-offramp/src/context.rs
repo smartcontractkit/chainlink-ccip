@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token;
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use bytemuck::{Pod, Zeroable};
 use ccip_common::seed;
 use solana_program::sysvar::instructions;
@@ -609,17 +611,38 @@ pub struct CloseCommitReportAccount<'info> {
         mut,
         seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &root],
         bump,
-        close = fee_token_receiver,
         constraint = valid_version(commit_report.version, MAX_COMMITREPORT_V) @ CcipOfframpError::InvalidVersion,
     )]
     pub commit_report: Account<'info, CommitReport>,
 
-    /// The account that will receive the rent refund
-    #[account(mut)]
-    pub fee_token_receiver: SystemAccount<'info>,
+    #[account(
+        seeds = [seed::REFERENCE_ADDRESSES],
+        bump,
+        constraint = valid_version(reference_addresses.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
-    #[account(address = config.load()?.owner @ CcipOfframpError::Unauthorized)]
-    pub authority: Signer<'info>,
+    #[account(address = token::spl_token::native_mint::ID)]
+    pub wsol_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = wsol_mint,
+        associated_token::authority = fee_billing_signer,
+        associated_token::token_program = token_program,
+    )]
+    pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        seeds = [seed::FEE_BILLING_SIGNER],
+        bump,
+        seeds::program = reference_addresses.load()?.router,
+    )]
+    pub fee_billing_signer: UncheckedAccount<'info>,
+
+    pub token_program: Interface<'info, TokenInterface>,
+
+    pub system_program: Program<'info, System>,
 }
 
 /// It's not possible to store enums in zero_copy accounts, so we wrap the discriminant
