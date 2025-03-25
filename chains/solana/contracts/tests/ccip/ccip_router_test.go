@@ -7973,7 +7973,6 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("1 Test Token Transfer", func(t *testing.T) {
-
 					sourceChainSelector := config.EvmChainSelector
 					msgAccounts := []solana.PublicKey{}
 					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
@@ -8082,7 +8081,6 @@ func TestCCIPRouter(t *testing.T) {
 				})
 
 				t.Run("1 Test Token Transfer + Example Message Execution", func(t *testing.T) {
-
 					sourceChainSelector := config.EvmChainSelector
 					msgAccounts := []solana.PublicKey{config.CcipLogicReceiver, config.ReceiverExternalExecutionConfigPDA, config.ReceiverTargetAccountPDA, solana.SystemProgramID}
 					message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t, msgAccounts)
