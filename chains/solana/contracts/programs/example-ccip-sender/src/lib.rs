@@ -6,7 +6,7 @@ use solana_program::{
     program::{get_return_data, invoke, invoke_signed},
 };
 
-declare_id!("HcuauEVT4uGqvW4feesHwwzSPT3Pgzq9YfMGocM6D4hk");
+declare_id!("DtSMpb7nHzFQigXZeTyJFK7UkWweGLvmt9YbsYiiTWn9");
 
 #[cfg(target_os = "solana")]
 #[global_allocator]

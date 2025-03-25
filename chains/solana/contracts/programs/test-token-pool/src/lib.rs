@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use base_token_pool::{common::*, rate_limiter::RateLimitConfig};
 
-declare_id!("Hqk6iarbRLdHRrPvbfsupYa5LGi7kRZzePRhmNEe9vCy");
+declare_id!("FpmzysfT5zY5J4ApMm6c6dzUS5wsznYZLK6KsJxLTkRQ");
 
 mod context;
 use crate::context::*;

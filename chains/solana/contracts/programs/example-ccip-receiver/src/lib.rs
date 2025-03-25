@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-declare_id!("DVrUmLXRbLbBzv39AYKu71HHo4aPky6F6fGvHJWrQgg8");
+declare_id!("DGEpBuswmaEvMyFAKD4ubRyfSmUJ42qppQpEwmfKQrE5");
 
 pub const EXTERNAL_EXECUTION_CONFIG_SEED: &[u8] = b"external_execution_config";
 pub const APPROVED_SENDER_SEED: &[u8] = b"approved_ccip_sender";
