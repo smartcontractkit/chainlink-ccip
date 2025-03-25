@@ -15,6 +15,7 @@ type DevspaceEnv struct {
 	BesuChainsCount   int
 	GethChainsCount   int
 	SolanaChainsCount int
+	EnableRMN         bool
 }
 
 func NewDevspaceEnvFromEnv() DevspaceEnv {
@@ -29,5 +30,6 @@ func NewDevspaceEnvFromEnv() DevspaceEnv {
 		GethChainsCount:   viper.GetInt("GETH_CHAINS_COUNT"),
 		SolanaChainsCount: viper.GetInt("SOLANA_CHAINS_COUNT"),
 		CIEnv:             viper.GetBool("CRIB_CI_ENV"),
+		EnableRMN:         viper.GetBool("RMN_ENABLED"),
 	}
 }

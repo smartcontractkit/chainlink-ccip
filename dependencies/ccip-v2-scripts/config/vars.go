@@ -17,6 +17,7 @@ func BindEnvVars() {
 	OptionalEnv("BESU_CHAINS_COUNT")
 	OptionalEnv("GETH_CHAINS_COUNT")
 	OptionalEnv("SOLANA_CHAINS_COUNT")
+	OptionalEnv("ENABLE_RMN")
 }
 
 func OptionalEnv(key string) {

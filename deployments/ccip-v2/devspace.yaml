@@ -268,7 +268,7 @@ profiles:
             path: ${DEPENDENCIES_DIR}/k8s-remote-tester
             namespace: ${DEVSPACE_NAMESPACE}
             vars:
-              ENV_STATE_DIR: "${TMP_DIR}"
+              ENV_STATE_DIR: "${TMP_DIR}/data"
               IMAGE_TAG: "${K8S_TESTER_IMAGE_TAG}"
   - name: ccip-v2-scripts
     patches:

@@ -23,7 +23,8 @@ func ConfigureOCR(logger *zap.SugaredLogger, env config.DevspaceEnv) {
 	CallDeployerFn(logger, env, env.TmpDir, crib.ConfigureCCIPOCR)
 }
 
-type CCIPDeployerCallerFn func(ctx context.Context, lggr v2logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook) (crib.DeployCCIPOutput, error)
+type CCIPDeployerCallerFn func(ctx context.Context, lggr v2logger.Logger, envConfig devenv.EnvironmentConfig,
+	homeChainSel, feedChainSel uint64, ab deployment.AddressBook, rmnEnabled bool) (crib.DeployCCIPOutput, error)
 
 func CallDeployerFn(logger *zap.SugaredLogger, env config.DevspaceEnv, stateDirPath string, deployerFn CCIPDeployerCallerFn) {
 	ccipLogger, _ := v2logger.NewLogger()
@@ -40,7 +41,7 @@ func CallDeployerFn(logger *zap.SugaredLogger, env config.DevspaceEnv, stateDirP
 		os.Exit(1)
 	}
 
-	output, err := deployerFn(context.Background(), ccipLogger, *envConfig, alphaChainSel, betaChainSel, addressBook)
+	output, err := deployerFn(context.Background(), ccipLogger, *envConfig, alphaChainSel, betaChainSel, addressBook, env.EnableRMN)
 	if err != nil {
 		logger.Fatal("deployer function failed with error", "err", err)
 		os.Exit(1)

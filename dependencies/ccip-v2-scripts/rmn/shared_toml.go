@@ -52,7 +52,7 @@ type RemoteChain struct {
 
 func GenerateSharedConfigTOML(ccipOnChainState changeset.CCIPOnChainState, envConfig *devenv.EnvironmentConfig, envState model.CCIPEnvState, clBootstrapNode crib.BootstrapNode) error {
 	var homeChain HomeChain
-	var remoteChains []RemoteChain
+	remoteChains := make([]RemoteChain, 0)
 	for chainSelector, chain := range ccipOnChainState.Chains {
 		chainConfig := config.GetChainConfigBySelector(envConfig.Chains, chainSelector)
 		if chainConfig == nil {
@@ -77,24 +77,24 @@ func GenerateSharedConfigTOML(ccipOnChainState changeset.CCIPOnChainState, envCo
 				CCIPHome:             chain.CCIPHome.Address().String(),
 				RMNHome:              chain.RMNHome.Address().String(),
 			}
-		} else {
-			if chain.OnRamp == nil {
-				return fmt.Errorf("chain '%d' does not have a OnRamp set", chainID)
-			}
-			if chain.OffRamp == nil {
-				return fmt.Errorf("chain '%d' does not have an OffRamp set", chainID)
-			}
-			if chain.RMNRemote == nil {
-				return fmt.Errorf("chain '%d' does not have a RMNRemote set", chainID)
-			}
-			remoteChains = append(remoteChains, RemoteChain{
-				Name:                   chainName(chainConfig),
-				OnRampStartBlockNumber: 0,
-				OnRamp:                 chain.OnRamp.Address().String(),
-				OffRamp:                chain.OffRamp.Address().String(),
-				RMNRemote:              chain.RMNRemote.Address().String(),
-			})
 		}
+
+		if chain.OnRamp == nil {
+			return fmt.Errorf("chain '%d' does not have a OnRamp set", chainID)
+		}
+		if chain.OffRamp == nil {
+			return fmt.Errorf("chain '%d' does not have an OffRamp set", chainID)
+		}
+		if chain.RMNRemote == nil {
+			return fmt.Errorf("chain '%d' does not have a RMNRemote set", chainID)
+		}
+		remoteChains = append(remoteChains, RemoteChain{
+			Name:                   chainName(chainConfig),
+			OnRampStartBlockNumber: 0,
+			OnRamp:                 chain.OnRamp.Address().String(),
+			OffRamp:                chain.OffRamp.Address().String(),
+			RMNRemote:              chain.RMNRemote.Address().String(),
+		})
 	}
 
 	chainParams := make([]ChainParam, 0)

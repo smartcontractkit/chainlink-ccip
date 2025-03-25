@@ -23,7 +23,7 @@ spec:
           volumeMounts:
             # Same as the value in the ccip.toml CribEnvDirectory = "/data/crib-env-state"
             - name: k8s-remote-tester-crib-env-state-cm
-              mountPath: /data/crib-env-state
+              mountPath: /data/crib-env-state/data
           securityContext:
             capabilities:
               drop:
