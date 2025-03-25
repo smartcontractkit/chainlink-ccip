@@ -5,7 +5,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak;
 
-declare_id!("2zZwzyptLqwFJFEFxjPvrdhiGpH9pJ3MfrrmZX6NTKxm");
+declare_id!("9UAVBvUaWkEwqa3YMdjpGB4zrviDroPZQQPw6ZWn1wGw");
 
 #[program]
 pub mod external_program_cpi_stub {
