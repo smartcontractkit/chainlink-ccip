@@ -26,7 +26,7 @@ type CcipReceive struct {
 	//
 	// [3] = [] config
 	//
-	// [4] = [] ccipSendSigner
+	// [4] = [WRITE] ccipSendSigner
 	// ··········· CHECK
 	//
 	// [5] = [] feeTokenProgram
@@ -41,13 +41,13 @@ type CcipReceive struct {
 	// [9] = [] ccipRouterConfig
 	// ··········· CHECK
 	//
-	// [10] = [] ccipRouterDestChainState
+	// [10] = [WRITE] ccipRouterDestChainState
 	// ··········· CHECK
 	//
-	// [11] = [] ccipRouterNonce
+	// [11] = [WRITE] ccipRouterNonce
 	// ··········· CHECK
 	//
-	// [12] = [] ccipRouterFeeReceiver
+	// [12] = [WRITE] ccipRouterFeeReceiver
 	// ··········· CHECK
 	//
 	// [13] = [] ccipRouterFeeBillingSigner
@@ -77,7 +77,7 @@ type CcipReceive struct {
 	// [21] = [] rmnRemoteConfig
 	// ··········· CHECK
 	//
-	// [22] = [] tokenPoolsSigner
+	// [22] = [WRITE] tokenPoolsSigner
 	// ··········· CHECK
 	//
 	// [23] = [] systemProgram
@@ -153,7 +153,7 @@ func (inst *CcipReceive) GetConfigAccount() *ag_solanago.AccountMeta {
 // SetCcipSendSignerAccount sets the "ccipSendSigner" account.
 // CHECK
 func (inst *CcipReceive) SetCcipSendSignerAccount(ccipSendSigner ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(ccipSendSigner)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(ccipSendSigner).WRITE()
 	return inst
 }
 
@@ -225,7 +225,7 @@ func (inst *CcipReceive) GetCcipRouterConfigAccount() *ag_solanago.AccountMeta {
 // SetCcipRouterDestChainStateAccount sets the "ccipRouterDestChainState" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterDestChainStateAccount(ccipRouterDestChainState ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(ccipRouterDestChainState)
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(ccipRouterDestChainState).WRITE()
 	return inst
 }
 
@@ -238,7 +238,7 @@ func (inst *CcipReceive) GetCcipRouterDestChainStateAccount() *ag_solanago.Accou
 // SetCcipRouterNonceAccount sets the "ccipRouterNonce" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterNonceAccount(ccipRouterNonce ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(ccipRouterNonce)
+	inst.AccountMetaSlice[11] = ag_solanago.Meta(ccipRouterNonce).WRITE()
 	return inst
 }
 
@@ -251,7 +251,7 @@ func (inst *CcipReceive) GetCcipRouterNonceAccount() *ag_solanago.AccountMeta {
 // SetCcipRouterFeeReceiverAccount sets the "ccipRouterFeeReceiver" account.
 // CHECK
 func (inst *CcipReceive) SetCcipRouterFeeReceiverAccount(ccipRouterFeeReceiver ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[12] = ag_solanago.Meta(ccipRouterFeeReceiver)
+	inst.AccountMetaSlice[12] = ag_solanago.Meta(ccipRouterFeeReceiver).WRITE()
 	return inst
 }
 
@@ -381,7 +381,7 @@ func (inst *CcipReceive) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta {
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 // CHECK
 func (inst *CcipReceive) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *CcipReceive {
-	inst.AccountMetaSlice[22] = ag_solanago.Meta(tokenPoolsSigner)
+	inst.AccountMetaSlice[22] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 

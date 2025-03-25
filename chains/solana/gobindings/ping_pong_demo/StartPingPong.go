@@ -17,7 +17,7 @@ type StartPingPong struct {
 	//
 	// [1] = [WRITE, SIGNER] authority
 	//
-	// [2] = [] ccipSendSigner
+	// [2] = [WRITE] ccipSendSigner
 	// ··········· CHECK
 	//
 	// [3] = [] feeTokenProgram
@@ -32,13 +32,13 @@ type StartPingPong struct {
 	// [7] = [] ccipRouterConfig
 	// ··········· CHECK
 	//
-	// [8] = [] ccipRouterDestChainState
+	// [8] = [WRITE] ccipRouterDestChainState
 	// ··········· CHECK
 	//
-	// [9] = [] ccipRouterNonce
+	// [9] = [WRITE] ccipRouterNonce
 	// ··········· CHECK
 	//
-	// [10] = [] ccipRouterFeeReceiver
+	// [10] = [WRITE] ccipRouterFeeReceiver
 	// ··········· CHECK
 	//
 	// [11] = [] ccipRouterFeeBillingSigner
@@ -68,7 +68,7 @@ type StartPingPong struct {
 	// [19] = [] rmnRemoteConfig
 	// ··········· CHECK
 	//
-	// [20] = [] tokenPoolsSigner
+	// [20] = [WRITE] tokenPoolsSigner
 	// ··········· CHECK
 	//
 	// [21] = [] systemProgram
@@ -108,7 +108,7 @@ func (inst *StartPingPong) GetAuthorityAccount() *ag_solanago.AccountMeta {
 // SetCcipSendSignerAccount sets the "ccipSendSigner" account.
 // CHECK
 func (inst *StartPingPong) SetCcipSendSignerAccount(ccipSendSigner ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(ccipSendSigner)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(ccipSendSigner).WRITE()
 	return inst
 }
 
@@ -180,7 +180,7 @@ func (inst *StartPingPong) GetCcipRouterConfigAccount() *ag_solanago.AccountMeta
 // SetCcipRouterDestChainStateAccount sets the "ccipRouterDestChainState" account.
 // CHECK
 func (inst *StartPingPong) SetCcipRouterDestChainStateAccount(ccipRouterDestChainState ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(ccipRouterDestChainState)
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(ccipRouterDestChainState).WRITE()
 	return inst
 }
 
@@ -193,7 +193,7 @@ func (inst *StartPingPong) GetCcipRouterDestChainStateAccount() *ag_solanago.Acc
 // SetCcipRouterNonceAccount sets the "ccipRouterNonce" account.
 // CHECK
 func (inst *StartPingPong) SetCcipRouterNonceAccount(ccipRouterNonce ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(ccipRouterNonce)
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(ccipRouterNonce).WRITE()
 	return inst
 }
 
@@ -206,7 +206,7 @@ func (inst *StartPingPong) GetCcipRouterNonceAccount() *ag_solanago.AccountMeta 
 // SetCcipRouterFeeReceiverAccount sets the "ccipRouterFeeReceiver" account.
 // CHECK
 func (inst *StartPingPong) SetCcipRouterFeeReceiverAccount(ccipRouterFeeReceiver ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(ccipRouterFeeReceiver)
+	inst.AccountMetaSlice[10] = ag_solanago.Meta(ccipRouterFeeReceiver).WRITE()
 	return inst
 }
 
@@ -336,7 +336,7 @@ func (inst *StartPingPong) GetRmnRemoteConfigAccount() *ag_solanago.AccountMeta 
 // SetTokenPoolsSignerAccount sets the "tokenPoolsSigner" account.
 // CHECK
 func (inst *StartPingPong) SetTokenPoolsSignerAccount(tokenPoolsSigner ag_solanago.PublicKey) *StartPingPong {
-	inst.AccountMetaSlice[20] = ag_solanago.Meta(tokenPoolsSigner)
+	inst.AccountMetaSlice[20] = ag_solanago.Meta(tokenPoolsSigner).WRITE()
 	return inst
 }
 

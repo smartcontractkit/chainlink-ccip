@@ -22,7 +22,7 @@ pub mod ping_pong_demo {
         ctx: Context<InitializeConfig>,
         router: Pubkey,
         counterpart_chain_selector: u64,
-        counterpart_address: [u8; 64],
+        counterpart_address: Vec<u8>,
         is_paused: bool,
         default_gas_limit: u64,
         out_of_order_execution: bool,
@@ -30,7 +30,7 @@ pub mod ping_pong_demo {
         ctx.accounts.config.set_inner(state::Config {
             router,
             counterpart_chain_selector,
-            counterpart_address,
+            counterpart_address: counterpart_address.try_into()?,
             is_paused,
             default_gas_limit,
             out_of_order_execution,
@@ -71,10 +71,10 @@ pub mod ping_pong_demo {
     pub fn set_counterpart(
         ctx: Context<UpdateConfig>,
         counterpart_chain_selector: u64,
-        counterpart_address: [u8; 64],
+        counterpart_address: Vec<u8>,
     ) -> Result<()> {
         ctx.accounts.config.counterpart_chain_selector = counterpart_chain_selector;
-        ctx.accounts.config.counterpart_address = counterpart_address;
+        ctx.accounts.config.counterpart_address = counterpart_address.try_into()?;
         Ok(())
     }
 
@@ -197,7 +197,7 @@ mod helpers {
     ) -> Result<()> {
         let data_bytes: [u8; 32] = ping_pong_count.into();
         let message = ccip_router::messages::SVM2AnyMessage {
-            receiver: config.counterpart_address.to_vec(), // TODO trim address here
+            receiver: config.counterpart_address.bytes().to_vec(),
             data: data_bytes.to_vec(),
             token_amounts: vec![], // no token transfer
             fee_token: config.fee_token_mint,
@@ -414,6 +414,7 @@ pub mod context {
         pub authority: Signer<'info>,
 
         #[account(
+            mut,
             seeds = [seeds::CCIP_SEND_SIGNER],
             bump,
         )]
@@ -440,10 +441,13 @@ pub mod context {
         /// CHECK
         pub ccip_router_config: UncheckedAccount<'info>,
         /// CHECK
+        #[account(mut)]
         pub ccip_router_dest_chain_state: UncheckedAccount<'info>,
         /// CHECK
+        #[account(mut)]
         pub ccip_router_nonce: UncheckedAccount<'info>,
         /// CHECK
+        #[account(mut)]
         pub ccip_router_fee_receiver: UncheckedAccount<'info>,
         /// CHECK
         pub ccip_router_fee_billing_signer: UncheckedAccount<'info>,
@@ -464,6 +468,7 @@ pub mod context {
         /// CHECK
         pub rmn_remote_config: UncheckedAccount<'info>,
         /// CHECK
+        #[account(mut)]
         pub token_pools_signer: UncheckedAccount<'info>,
 
         pub system_program: Program<'info, System>,
@@ -510,6 +515,7 @@ pub mod context {
         pub config: Account<'info, Config>,
 
         #[account(
+            mut,
             seeds = [seeds::CCIP_SEND_SIGNER],
             bump,
         )]
@@ -536,10 +542,13 @@ pub mod context {
         /// CHECK
         pub ccip_router_config: UncheckedAccount<'info>,
         /// CHECK
+        #[account(mut)]
         pub ccip_router_dest_chain_state: UncheckedAccount<'info>,
         /// CHECK
+        #[account(mut)]
         pub ccip_router_nonce: UncheckedAccount<'info>,
         /// CHECK
+        #[account(mut)]
         pub ccip_router_fee_receiver: UncheckedAccount<'info>,
         /// CHECK
         pub ccip_router_fee_billing_signer: UncheckedAccount<'info>,
@@ -560,6 +569,7 @@ pub mod context {
         /// CHECK
         pub rmn_remote_config: UncheckedAccount<'info>,
         /// CHECK
+        #[account(mut)]
         pub token_pools_signer: UncheckedAccount<'info>,
 
         pub system_program: Program<'info, System>,
@@ -577,9 +587,9 @@ pub mod state {
         pub router: Pubkey, // The address of the CCIP router contract.
 
         pub counterpart_chain_selector: u64, // The chain ID of the counterpart ping pong contract.
-        pub counterpart_address: [u8; 64], // The contract address of the counterpart ping pong contract.
-        pub is_paused: bool,               // Pause ping-ponging.
-        pub fee_token_mint: Pubkey,        // The fee token used to pay for CCIP transactions.
+        pub counterpart_address: CounterpartAddress, // The contract address of the counterpart ping pong contract.
+        pub is_paused: bool,                         // Pause ping-ponging.
+        pub fee_token_mint: Pubkey, // The fee token used to pay for CCIP transactions.
 
         // Extra args on ccip_send
         pub default_gas_limit: u64, // Default gas limit used for EVMExtraArgsV2 construction.
@@ -594,6 +604,37 @@ pub mod state {
         #[max_len(10)]
         pub version: String,
     }
+
+    #[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy, InitSpace)]
+    pub struct CounterpartAddress {
+        pub bytes: [u8; 64],
+        pub len: u8,
+    }
+
+    impl CounterpartAddress {
+        pub fn bytes(&self) -> &[u8] {
+            &self.bytes[..self.len as usize]
+        }
+    }
+
+    impl TryFrom<Vec<u8>> for CounterpartAddress {
+        type Error = PingPongDemoError;
+
+        fn try_from(value: Vec<u8>) -> std::result::Result<Self, Self::Error> {
+            let mut address = CounterpartAddress {
+                bytes: [0u8; 64],
+                len: 0,
+            };
+            if value.is_empty() || value.len() > address.bytes.len() {
+                return Err(PingPongDemoError::InvalidCounterpartAddress);
+            }
+
+            address.len = value.len() as u8;
+            address.bytes[0..address.len as usize].copy_from_slice(&value);
+
+            Ok(address)
+        }
+    }
 }
 
 #[error_code]
@@ -602,4 +643,6 @@ pub enum PingPongDemoError {
     Unauthorized,
     #[msg("Invalid message data length")]
     InvalidMessageDataLength,
+    #[msg("Invalid counterpart address")]
+    InvalidCounterpartAddress,
 }

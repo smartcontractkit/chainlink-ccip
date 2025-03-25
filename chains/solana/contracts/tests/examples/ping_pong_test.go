@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ping_pong_demo"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -108,6 +110,8 @@ func TestPingPong(t *testing.T) {
 			}
 
 			t.Run("Fee Quoter", func(t *testing.T) {
+				t.Parallel()
+
 				defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
 
 				// get program data account
@@ -136,6 +140,8 @@ func TestPingPong(t *testing.T) {
 			})
 
 			t.Run("Router", func(t *testing.T) {
+				t.Parallel()
+
 				// get program data account
 				data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, config.CcipRouterProgram,
 					&rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment})
@@ -165,6 +171,8 @@ func TestPingPong(t *testing.T) {
 			})
 
 			t.Run("Offramp", func(t *testing.T) {
+				t.Parallel()
+
 				// get program data account
 				data, err := solanaGoClient.GetAccountInfoWithOpts(
 					ctx,
@@ -212,6 +220,8 @@ func TestPingPong(t *testing.T) {
 
 		t.Run("Other CCIP configs", func(t *testing.T) {
 			t.Run("register offramp", func(t *testing.T) {
+				t.Parallel()
+
 				routerIx, err := ccip_router.NewAddOfframpInstruction(
 					config.SvmChainSelector,
 					config.CcipOfframpProgram,
@@ -236,6 +246,8 @@ func TestPingPong(t *testing.T) {
 			})
 
 			t.Run("Register link as billing token", func(t *testing.T) {
+				t.Parallel()
+
 				ix, cerr := fee_quoter.NewAddBillingTokenConfigInstruction(
 					fee_quoter.BillingTokenConfig{
 						Enabled: true,
@@ -263,6 +275,8 @@ func TestPingPong(t *testing.T) {
 			})
 
 			t.Run("Register SVM as source chain", func(t *testing.T) {
+				t.Parallel()
+
 				var onRampAddress [64]byte
 				copy(onRampAddress[:], config.CcipRouterProgram[:]) // the router is the SVM onramp
 
@@ -286,6 +300,8 @@ func TestPingPong(t *testing.T) {
 			})
 
 			t.Run("Register SVM as dest chain", func(t *testing.T) {
+				t.Parallel()
+
 				routerIx, err := ccip_router.NewAddChainSelectorInstruction(
 					config.SvmChainSelector,
 					ccip_router.DestChainConfig{},
@@ -346,7 +362,7 @@ func TestPingPong(t *testing.T) {
 			ix, err := ping_pong_demo.NewInitializeConfigInstruction(
 				config.CcipRouterProgram,
 				config.SvmChainSelector,
-				common.ToPadded64Bytes(config.PingPongProgram[:]),
+				config.PingPongProgram[:],
 				true, // isPaused
 				0,    // default gas limit
 				true, // out of order
@@ -381,6 +397,8 @@ func TestPingPong(t *testing.T) {
 		})
 
 		t.Run("Fund PingPong LINK ATA", func(t *testing.T) {
+			t.Parallel()
+
 			fmt.Printf("Funding LINK ATA: %v\n", reusableAccounts.FeeTokenATA)
 			fmt.Printf("Mint: %v\n", linkMint)
 			decimals, supply, err := tokens.TokenBalance(ctx, solanaGoClient, reusableAccounts.FeeTokenATA, config.DefaultCommitment)
@@ -397,6 +415,70 @@ func TestPingPong(t *testing.T) {
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixMint}, admin,
 				config.DefaultCommitment)
+		})
+
+		t.Run("Fund PingPong CCIP Send Signer", func(t *testing.T) {
+			t.Parallel()
+
+			ix, err := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), reusableAccounts.CcipSendSigner).ValidateAndBuild()
+			require.NoError(t, err)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
+				config.DefaultCommitment)
+		})
+	})
+
+	t.Run("PingPong", func(t *testing.T) {
+		noncePDA, err := state.FindNoncePDA(config.SvmChainSelector, reusableAccounts.CcipSendSigner, config.CcipRouterProgram)
+		require.NoError(t, err)
+
+		t.Run("Start", func(t *testing.T) {
+			ix, err := ping_pong_demo.NewStartPingPongInstruction(
+				reusableAccounts.Config,
+				admin.PublicKey(),
+				reusableAccounts.CcipSendSigner,
+				config.Token2022Program,
+				linkMint,
+				reusableAccounts.FeeTokenATA,
+				config.CcipRouterProgram,
+				config.RouterConfigPDA,
+				config.SvmDestChainStatePDA,
+				noncePDA,
+				reusableAccounts.routerBillingReceiver,
+				config.BillingSignerPDA,
+				config.FeeQuoterProgram,
+				config.FqConfigPDA,
+				config.FqSvmDestChainPDA,
+				reusableAccounts.fqBillingConfig,
+				reusableAccounts.fqBillingConfig,
+				config.RMNRemoteProgram,
+				config.RMNRemoteCursesPDA,
+				config.RMNRemoteConfigPDA,
+				config.ExternalTokenPoolsSignerPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
+				config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			// Check that the CCIP Send event was emitter
+			var event ccip.EventCCIPMessageSent
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
+			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)
+			require.Equal(t, uint64(0), event.SequenceNumber)
+			require.NotNil(t, event.Message)
+		})
+
+		t.Run("Receive & send", func(t *testing.T) {
+			t.Skip("TODO")
+		})
+
+		t.Run("Pause", func(t *testing.T) {
+			t.Skip("TODO")
+		})
+
+		t.Run("Resume", func(t *testing.T) {
+			t.Skip("TODO")
 		})
 	})
 }

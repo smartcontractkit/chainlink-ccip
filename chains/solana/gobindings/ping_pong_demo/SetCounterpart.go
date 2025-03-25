@@ -13,7 +13,7 @@ import (
 // SetCounterpart is the `setCounterpart` instruction.
 type SetCounterpart struct {
 	CounterpartChainSelector *uint64
-	CounterpartAddress       *[64]uint8
+	CounterpartAddress       *[]byte
 
 	// [0] = [WRITE] config
 	//
@@ -36,7 +36,7 @@ func (inst *SetCounterpart) SetCounterpartChainSelector(counterpartChainSelector
 }
 
 // SetCounterpartAddress sets the "counterpartAddress" parameter.
-func (inst *SetCounterpart) SetCounterpartAddress(counterpartAddress [64]uint8) *SetCounterpart {
+func (inst *SetCounterpart) SetCounterpartAddress(counterpartAddress []byte) *SetCounterpart {
 	inst.CounterpartAddress = &counterpartAddress
 	return inst
 }
@@ -157,7 +157,7 @@ func (obj *SetCounterpart) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 func NewSetCounterpartInstruction(
 	// Parameters:
 	counterpartChainSelector uint64,
-	counterpartAddress [64]uint8,
+	counterpartAddress []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetCounterpart {

@@ -47,12 +47,7 @@ export type PingPongDemo = {
         },
         {
           "name": "counterpartAddress",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
+          "type": "bytes"
         },
         {
           "name": "isPaused",
@@ -151,12 +146,7 @@ export type PingPongDemo = {
         },
         {
           "name": "counterpartAddress",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -217,7 +207,7 @@ export type PingPongDemo = {
         },
         {
           "name": "ccipSendSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -256,7 +246,7 @@ export type PingPongDemo = {
         },
         {
           "name": "ccipRouterDestChainState",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -264,7 +254,7 @@ export type PingPongDemo = {
         },
         {
           "name": "ccipRouterNonce",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -272,7 +262,7 @@ export type PingPongDemo = {
         },
         {
           "name": "ccipRouterFeeReceiver",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -352,7 +342,7 @@ export type PingPongDemo = {
         },
         {
           "name": "tokenPoolsSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -399,7 +389,7 @@ export type PingPongDemo = {
         },
         {
           "name": "ccipSendSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -438,7 +428,7 @@ export type PingPongDemo = {
         },
         {
           "name": "ccipRouterDestChainState",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -446,7 +436,7 @@ export type PingPongDemo = {
         },
         {
           "name": "ccipRouterNonce",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -454,7 +444,7 @@ export type PingPongDemo = {
         },
         {
           "name": "ccipRouterFeeReceiver",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -534,7 +524,7 @@ export type PingPongDemo = {
         },
         {
           "name": "tokenPoolsSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -577,10 +567,7 @@ export type PingPongDemo = {
           {
             "name": "counterpartAddress",
             "type": {
-              "array": [
-                "u8",
-                64
-              ]
+              "defined": "CounterpartAddress"
             }
           },
           {
@@ -619,6 +606,29 @@ export type PingPongDemo = {
       }
     }
   ],
+  "types": [
+    {
+      "name": "CounterpartAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
   "errors": [
     {
       "code": 6000,
@@ -629,6 +639,11 @@ export type PingPongDemo = {
       "code": 6001,
       "name": "InvalidMessageDataLength",
       "msg": "Invalid message data length"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidCounterpartAddress",
+      "msg": "Invalid counterpart address"
     }
   ]
 };
@@ -682,12 +697,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "counterpartAddress",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
+          "type": "bytes"
         },
         {
           "name": "isPaused",
@@ -786,12 +796,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "counterpartAddress",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -852,7 +857,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "ccipSendSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -891,7 +896,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "ccipRouterDestChainState",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -899,7 +904,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "ccipRouterNonce",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -907,7 +912,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "ccipRouterFeeReceiver",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -987,7 +992,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "tokenPoolsSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -1034,7 +1039,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "ccipSendSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -1073,7 +1078,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "ccipRouterDestChainState",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -1081,7 +1086,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "ccipRouterNonce",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -1089,7 +1094,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "ccipRouterFeeReceiver",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -1169,7 +1174,7 @@ export const IDL: PingPongDemo = {
         },
         {
           "name": "tokenPoolsSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -1212,10 +1217,7 @@ export const IDL: PingPongDemo = {
           {
             "name": "counterpartAddress",
             "type": {
-              "array": [
-                "u8",
-                64
-              ]
+              "defined": "CounterpartAddress"
             }
           },
           {
@@ -1254,6 +1256,29 @@ export const IDL: PingPongDemo = {
       }
     }
   ],
+  "types": [
+    {
+      "name": "CounterpartAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
   "errors": [
     {
       "code": 6000,
@@ -1264,6 +1289,11 @@ export const IDL: PingPongDemo = {
       "code": 6001,
       "name": "InvalidMessageDataLength",
       "msg": "Invalid message data length"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidCounterpartAddress",
+      "msg": "Invalid counterpart address"
     }
   ]
 };

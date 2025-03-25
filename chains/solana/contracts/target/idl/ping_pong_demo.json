@@ -47,12 +47,7 @@
         },
         {
           "name": "counterpartAddress",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
+          "type": "bytes"
         },
         {
           "name": "isPaused",
@@ -151,12 +146,7 @@
         },
         {
           "name": "counterpartAddress",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -217,7 +207,7 @@
         },
         {
           "name": "ccipSendSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -256,7 +246,7 @@
         },
         {
           "name": "ccipRouterDestChainState",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -264,7 +254,7 @@
         },
         {
           "name": "ccipRouterNonce",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -272,7 +262,7 @@
         },
         {
           "name": "ccipRouterFeeReceiver",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -352,7 +342,7 @@
         },
         {
           "name": "tokenPoolsSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -399,7 +389,7 @@
         },
         {
           "name": "ccipSendSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -438,7 +428,7 @@
         },
         {
           "name": "ccipRouterDestChainState",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -446,7 +436,7 @@
         },
         {
           "name": "ccipRouterNonce",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -454,7 +444,7 @@
         },
         {
           "name": "ccipRouterFeeReceiver",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -534,7 +524,7 @@
         },
         {
           "name": "tokenPoolsSigner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "docs": [
             "CHECK"
@@ -577,10 +567,7 @@
           {
             "name": "counterpartAddress",
             "type": {
-              "array": [
-                "u8",
-                64
-              ]
+              "defined": "CounterpartAddress"
             }
           },
           {
@@ -619,6 +606,29 @@
       }
     }
   ],
+  "types": [
+    {
+      "name": "CounterpartAddress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
   "errors": [
     {
       "code": 6000,
@@ -629,6 +639,11 @@
       "code": 6001,
       "name": "InvalidMessageDataLength",
       "msg": "Invalid message data length"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidCounterpartAddress",
+      "msg": "Invalid counterpart address"
     }
   ]
 }

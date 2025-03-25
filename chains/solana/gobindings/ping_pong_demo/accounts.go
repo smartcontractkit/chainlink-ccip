@@ -12,7 +12,7 @@ type Config struct {
 	Owner                    ag_solanago.PublicKey
 	Router                   ag_solanago.PublicKey
 	CounterpartChainSelector uint64
-	CounterpartAddress       [64]uint8
+	CounterpartAddress       CounterpartAddress
 	IsPaused                 bool
 	FeeTokenMint             ag_solanago.PublicKey
 	DefaultGasLimit          uint64
