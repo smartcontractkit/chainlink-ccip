@@ -64,7 +64,7 @@ func TestMcmWithTimelock(t *testing.T) {
 		for _, roleMsigs := range msigs {
 			ixs := make([]solana.Instruction, 0)
 			for _, msig := range roleMsigs.Multisigs {
-				fundPDAIx := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), msig.SignerPDA).Build()
+				fundPDAIx := system.NewTransferInstruction(10*solana.LAMPORTS_PER_SOL, admin.PublicKey(), msig.SignerPDA).Build()
 				ixs = append(ixs, fundPDAIx)
 			}
 			testutils.SendAndConfirm(ctx, t, solanaGoClient,
@@ -72,7 +72,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				admin, config.DefaultCommitment)
 		}
 		// fund timelock signer
-		fundPDAIx := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockID)).Build()
+		fundPDAIx := system.NewTransferInstruction(10*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockID)).Build()
 		testutils.SendAndConfirm(ctx, t, solanaGoClient,
 			[]solana.Instruction{fundPDAIx},
 			admin, config.DefaultCommitment)
