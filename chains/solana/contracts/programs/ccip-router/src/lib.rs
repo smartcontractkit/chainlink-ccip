@@ -13,8 +13,8 @@ use crate::state::*;
 mod event;
 use crate::event::*;
 
-mod messages;
-pub use crate::messages::*;
+pub mod messages;
+use crate::messages::*;
 
 mod instructions;
 use crate::instructions::router;
@@ -36,8 +36,6 @@ declare_id!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 /// thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface.
 pub mod ccip_router {
     #![warn(missing_docs)]
-
-    use fee_quoter::messages::GetFeeResult;
 
     use super::*;
 
@@ -510,8 +508,6 @@ pub enum CcipRouterError {
     InvalidInputsPoolAccounts,
     #[msg("Invalid token accounts")]
     InvalidInputsTokenAccounts,
-    #[msg("Invalid config account")]
-    InvalidInputsConfigAccounts,
     #[msg("Invalid Token Admin Registry account")]
     InvalidInputsTokenAdminRegistryAccounts,
     #[msg("Invalid LookupTable account")]

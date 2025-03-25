@@ -632,8 +632,18 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 }
 
 func TestPlugin_Close(t *testing.T) {
-	p := &Plugin{tokenDataObserver: &tokendata.NoopTokenDataObserver{}}
+	lggr := logger.Test(t)
+	mockReader := readerpkg_mock.NewMockCCIPReader(t)
+
+	// Set up expectation for Close() method
+	mockReader.On("Close").Return(nil)
+	p := &Plugin{
+		lggr:              lggr,
+		tokenDataObserver: &tokendata.NoopTokenDataObserver{},
+		ccipReader:        mockReader}
+
 	require.NoError(t, p.Close())
+	mockReader.AssertExpectations(t)
 }
 
 func TestPlugin_Query(t *testing.T) {

@@ -25,6 +25,7 @@ pub struct RegisterTokenAdminRegistryByCCIPAdmin<'info> {
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + TokenAdminRegistry::INIT_SPACE,
+        constraint = uninitialized(token_admin_registry.version) @ CcipRouterError::InvalidVersion,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps

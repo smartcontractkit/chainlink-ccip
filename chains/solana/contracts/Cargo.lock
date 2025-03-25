@@ -1000,7 +1000,7 @@ version = "0.1.0-dev"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "fee_quoter",
+ "ccip_router",
  "smalloc",
  "solana-program",
 ]

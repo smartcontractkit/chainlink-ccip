@@ -458,7 +458,7 @@ func TestMcmSetConfig(t *testing.T) {
 		}{
 			{
 				name:               "should not be able to call set_config without preloading config_signers",
-				errorMsg:           "Error Code: " + "AccountNotInitialized.",
+				errorMsg:           "Error Code: " + common.AccountNotInitialized_AnchorError.String(),
 				modifyConfig:       func(c *mcms.McmConfigArgs) {},
 				skipPreloadSigners: true,
 			},
@@ -688,7 +688,7 @@ func TestMcmSetConfig(t *testing.T) {
 			},
 			{
 				name:            "should not be able to append signers without initializing",
-				errorMsg:        "Error Code: " + "AccountNotInitialized.",
+				errorMsg:        "Error Code: " + common.AccountNotInitialized_AnchorError.String(),
 				modifyConfig:    func(c *mcms.McmConfigArgs) {},
 				failureStage:    AppendStage,
 				skipInitSigners: true,
