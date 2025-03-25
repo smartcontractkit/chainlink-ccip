@@ -53,6 +53,9 @@ vars:
   CHAIN_ID:
     source: env
     default: 1337
+  CHAIN_NAME:
+    source: env
+    default: alpha
   # TODO make it possible to pass it upstream to donut
   DON_API_USERNAME:
     source: env
@@ -60,6 +63,12 @@ vars:
   DON_API_PASSWORD:
     source: env
     default: "hWDmgcub2gUhyrG6cxriqt7T"
+  CRIB_EKS_CLUSTER_NAME:
+    source: env
+    default: main-stage-cluster
+  ENABLE_OTEL:
+    source: env
+    default: "false"
 
 imports:
   - path: ${IMPORTS_DIR}/lib-common
@@ -95,11 +104,17 @@ pipelines:
       # add a check for the ingress
       crib devspace ingress-check --nsTimeout=2m --timeout=4m
 
+      donHostUrlProtocol="https"
+      if [ "$PROVIDER" == "kind" ]; then
+        donHostUrlProtocol="http"
+      fi
+
       DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
       DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
       DON_TYPE=${DON_TYPE} \
       DON_NODE_COUNT=${DON_NODE_COUNT} \
       DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
+      DON_HOST_URL_PROTOCOL=${donHostUrlProtocol} \
       go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -don -target-dir=${CONFIG_OVERRIDES_DIR}
 
   mockserver:
@@ -112,8 +127,8 @@ pipelines:
       run_pipelines maybe-kind
 
       run_dependency_pipelines job-distributor
-       # add a check for the ingress
-       crib devspace ingress-check --nsTimeout=2m --timeout=4m
+      # add a check for the ingress
+      crib devspace ingress-check --nsTimeout=2m --timeout=4m
       DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
       DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
       go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -jd -target-dir=${CONFIG_OVERRIDES_DIR}
@@ -121,6 +136,13 @@ pipelines:
   beholder:
     run: |-
       run_dependency_pipelines beholder
+
+  besu-chain-urls:
+    run: |-
+      CHAIN_ID=${CHAIN_ID} \
+      DEVSPACE_INGRESS_DOMAIN=${DEVSPACE_INGRESS_DOMAIN} \
+      DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+      go run ${DEPENDENCIES_DIR}/donut/scripts/urls/main.go -chain -chain-variant=besu -chain-type=evm -chain-name=${CHAIN_NAME} -target-dir=${CONFIG_OVERRIDES_DIR}
 
 profiles:
   - name: mockserver
@@ -164,6 +186,8 @@ profiles:
               DON_TYPE: ${DON_TYPE}
               ENABLE_BASE_PROFILE: "false"
               ENABLE_DON_TYPE_OVERRIDES: "false"
+              ENABLE_OTEL: ${ENABLE_OTEL}
+              CRIB_EKS_CLUSTER_NAME: ${CRIB_EKS_CLUSTER_NAME}
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
@@ -237,4 +261,8 @@ commands:
   beholder-kind:
     command: devspace run-pipeline beholder -p beholder-kind
     description: Run the Beholder pipeline for Kind.
+    appendArgs: true
+  gen-besu-chain-urls:
+    command: devspace run-pipeline besu-chain-urls
+    description: Generate chain url json only
     appendArgs: true

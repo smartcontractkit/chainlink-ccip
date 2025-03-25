@@ -80,6 +80,9 @@ vars:
   ENABLE_JOB_DISTRIBUTOR:
     source: env
     default: "false"
+  ENABLE_OTEL:
+    source: env
+    default: "false"
   ENABLE_INSTANCE_OVERRIDES:
     source: env
     default: "false"
@@ -434,6 +437,16 @@ profiles:
               git: https://github.com/smartcontractkit/infra-charts
               subPath: chainlink-cluster
               revision: a1928889c2b94f5e8e0849dee7727480d6b49cce
+  # otel: clusters=[main-fwog]
+  - name: otel-main-fwog
+    activation:
+      - vars:
+          ENABLE_OTEL: "true"
+          CRIB_EKS_CLUSTER_NAME: "main-fwog"
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${CRIB_DIR}/dependencies/donut/values/chainlink-cluster/otel.main-fwog.yaml
   # instance overrides
   - name: instance-overrides
     activation:

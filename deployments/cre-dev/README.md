@@ -57,7 +57,7 @@ kg pvc --no-headers | awk '{print $1}' | xargs -r kubectl delete pvc
 
 ### capabilities
 
-- docker image: `804282218731.dkr.ecr.us-west-2.amazonaws.com/chainlink-develop:sha-528e34fdc8-bcm-swift-poc`
+- docker image: `804282218731.dkr.ecr.us-west-2.amazonaws.com/chainlink-develop:sha-34af645425-bcm-swift-poc`
 
 - custom binaries in docker image
 

@@ -144,7 +144,12 @@ func main() {
 			panic("DON_TYPE is not set")
 		}
 
-		donUrls := generateDONUrls(namespace, ingressDomain, donType, boostrapNodeCount, workerNodeCount)
+		donHostUrlProtocol := os.Getenv("DON_HOST_URL_PROTOCOL")
+		if donHostUrlProtocol == "" {
+			panic("DON_HOST_URL_PROTOCOL is not set")
+		}
+
+		donUrls := generateDONUrls(namespace, ingressDomain, donType, boostrapNodeCount, workerNodeCount, donHostUrlProtocol)
 		fmt.Println("DON URLs:")
 
 		err = saveToFile(fmt.Sprintf("don-%s-urls.json", donType), targetDir, donUrls, printFn)
@@ -171,13 +176,18 @@ func main() {
 	}
 }
 
-func generateDONUrls(namespace, ingressDomain, donType string, boostrapNodeCount, workerNodeCount int) DonURLs {
+func generateDONUrls(namespace, ingressDomain, donType string, boostrapNodeCount, workerNodeCount int, donHostUrlProtocol string) DonURLs {
 	bootstrapNodes := make([]DonURL, boostrapNodeCount)
 	workerNodes := make([]DonURL, workerNodeCount)
 
+	donHostUrlPort := "443"
+	if donHostUrlProtocol != "https" {
+		donHostUrlPort = "80"
+	}
+
 	for i := range boostrapNodeCount {
 		bootstrapNodes[i] = DonURL{
-			HostURL:        fmt.Sprintf("http://%s-%s-bt-%d.%s:80", namespace, donType, i, ingressDomain),
+			HostURL:        fmt.Sprintf("%s://%s-%s-bt-%d.%s:%s", donHostUrlProtocol, namespace, donType, i, ingressDomain, donHostUrlPort),
 			InternalURL:    fmt.Sprintf("http://%s-%s-bt-%d:80", namespace, donType, i),
 			P2PInternalURL: fmt.Sprintf("http://%s-%s-bt-%d:6690", namespace, donType, i),
 			InternalIP:     fmt.Sprintf("%s-bt-%d", donType, i),
@@ -186,7 +196,7 @@ func generateDONUrls(namespace, ingressDomain, donType string, boostrapNodeCount
 
 	for i := range workerNodeCount {
 		workerNodes[i] = DonURL{
-			HostURL:        fmt.Sprintf("http://%s-%s-%d.%s:80", namespace, donType, i, ingressDomain),
+			HostURL:        fmt.Sprintf("%s://%s-%s-%d.%s:%s", donHostUrlProtocol, namespace, donType, i, ingressDomain, donHostUrlPort),
 			InternalURL:    fmt.Sprintf("http://%s-%s-%d:80", namespace, donType, i),
 			P2PInternalURL: fmt.Sprintf("http://%s-%s-%d:6690", namespace, donType, i),
 			InternalIP:     fmt.Sprintf("%s-%d", donType, i),

@@ -1,0 +1,8 @@
+---
+common:
+  otel:
+    enabled: true
+    gatewayURL: http://beholder-gateway.prometheus.svc.cluster.local:4318
+    resourceAttributes:
+      platformEnv: cre-sandbox
+      donID: 1
