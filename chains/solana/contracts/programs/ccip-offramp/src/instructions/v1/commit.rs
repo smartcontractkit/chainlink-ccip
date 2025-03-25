@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{self, Mint, SyncNative, TokenAccount, TokenInterface};
+use anchor_spl::token::{sync_native, Token, TokenAccount};
 use ccip_common::seed;
 
 use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
@@ -269,16 +269,15 @@ fn all_messages_executed(report: &CommitReport) -> bool {
 
 // Helper function to convert the SOL from the closed account to wrapped SOL
 fn transfer_and_wrap_native_sol<'info>(
-    token_program: &Interface<'info, TokenInterface>,
+    token_program: &Program<'info, Token>,
     commit_report: AccountInfo<'info>,
-    fee_token_receiver: &InterfaceAccount<'info, TokenAccount>,
+    fee_token_receiver: &Account<'info, TokenAccount>,
 ) -> Result<()> {
     // Get lamports before closing
     let lamports = commit_report.lamports();
 
     // Close the account by setting its data length to 0
     **commit_report.try_borrow_mut_lamports()? = 0;
-    commit_report.realloc(0, false)?;
 
     // Transfer wSOL to OnRamp fee_token_receiver
     **fee_token_receiver
@@ -286,10 +285,10 @@ fn transfer_and_wrap_native_sol<'info>(
         .try_borrow_mut_lamports()? += lamports;
 
     let account = fee_token_receiver.to_account_info();
-    let sync: anchor_spl::token_2022::SyncNative = anchor_spl::token_2022::SyncNative { account };
+    let sync: anchor_spl::token::SyncNative = anchor_spl::token::SyncNative { account };
 
     let cpi_ctx = CpiContext::new(token_program.to_account_info(), sync);
-    token_interface::sync_native(cpi_ctx)
+    sync_native(cpi_ctx)
 }
 
 mod helpers {

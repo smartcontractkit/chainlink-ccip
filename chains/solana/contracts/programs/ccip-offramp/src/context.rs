@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::native_mint;
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use bytemuck::{Pod, Zeroable};
 use ccip_common::seed;
 use solana_program::sysvar::instructions;
@@ -601,6 +601,13 @@ pub struct ExecuteReportContext<'info> {
 #[instruction(source_chain_selector: u64, root: Vec<u8>)]
 pub struct CloseCommitReportAccount<'info> {
     #[account(
+        seeds = [seed::CONFIG],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipOfframpError::InvalidVersion,
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(
         mut,
         seeds = [seed::COMMIT_REPORT, source_chain_selector.to_le_bytes().as_ref(), &root],
         bump,
@@ -616,7 +623,7 @@ pub struct CloseCommitReportAccount<'info> {
     pub reference_addresses: AccountLoader<'info, ReferenceAddresses>,
 
     #[account(address = native_mint::ID)]
-    pub wsol_mint: InterfaceAccount<'info, Mint>,
+    pub wsol_mint: Account<'info, Mint>,
 
     #[account(
         mut,
@@ -624,7 +631,7 @@ pub struct CloseCommitReportAccount<'info> {
         associated_token::authority = fee_billing_signer,
         associated_token::token_program = token_program,
     )]
-    pub fee_token_receiver: InterfaceAccount<'info, TokenAccount>,
+    pub fee_token_receiver: Account<'info, TokenAccount>,
 
     #[account(
         seeds = [seed::FEE_BILLING_SIGNER],
@@ -633,9 +640,7 @@ pub struct CloseCommitReportAccount<'info> {
     )]
     pub fee_billing_signer: UncheckedAccount<'info>,
 
-    pub token_program: Interface<'info, TokenInterface>,
-
-    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 /// It's not possible to store enums in zero_copy accounts, so we wrap the discriminant
