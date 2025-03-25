@@ -69,7 +69,7 @@ impl RemoteChainConfig {
 
 pub mod builder {
     use anchor_lang::AnchorSerialize;
-    use fee_quoter::messages::SVM2AnyMessage;
+    use ccip_router::messages::SVM2AnyMessage;
 
     pub fn instruction(
         msg: &SVM2AnyMessage,
