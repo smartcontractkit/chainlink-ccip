@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"sort"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/smartcontractkit/libocr/quorumhelper"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -797,7 +800,14 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 }
 
 func (p *Plugin) Close() error {
-	return p.tokenDataObserver.Close()
+	p.lggr.Infow("closing exec plugin")
+
+	closeable := []io.Closer{
+		p.tokenDataObserver,
+		p.ccipReader,
+	}
+
+	return services.CloseAll(closeable...)
 }
 
 func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {

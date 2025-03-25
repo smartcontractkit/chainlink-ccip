@@ -224,5 +224,12 @@ func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, ch
 	return nil, nil
 }
 
+// Close implements the reader.CCIPReader interface
+func (r InMemoryCCIPReader) Close() error {
+	// Since this is an in-memory implementation with no persistent connections
+	// or resources to clean up, we can simply return nil
+	return nil
+}
+
 // Interface compatibility check.
 var _ reader.CCIPReader = InMemoryCCIPReader{}
