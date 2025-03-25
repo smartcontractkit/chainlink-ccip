@@ -21,8 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
-
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -88,6 +86,14 @@ func newCCIPChainReaderInternal(
 		lggr.Errorw("failed to sync contracts", "err", err)
 	}
 
+	// After contracts are synced, start the background polling
+	lggr.Info("Starting config background polling")
+	if err := reader.configPoller.Start(ctx); err != nil {
+		// Log the error but don't fail - we can still function without background polling
+		// by fetching configs on demand
+		lggr.Errorw("failed to start config background polling", "err", err)
+	}
+
 	return reader
 }
 
@@ -96,6 +102,15 @@ func (r *ccipChainReader) WithExtendedContractReader(
 	ch cciptypes.ChainSelector, cr contractreader.Extended) *ccipChainReader {
 	r.contractReaders[ch] = cr
 	return r
+}
+
+func (r *ccipChainReader) Close() error {
+	if err := r.configPoller.Close(); err != nil {
+		r.lggr.Warnw("Error closing config poller", "err", err)
+		// Continue with shutdown even if there's an error
+	}
+	r.lggr.Info("Stopped CCIP chain reader")
+	return nil
 }
 
 // ---------------------------------------------------
@@ -1493,75 +1508,6 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	return config.RMNProxy.RemoteAddress, nil
 }
 
-// Get the DestChainConfig from the FeeQuoter contract on the given chain.
-func (r *ccipChainReader) getFeeQuoterDestChainConfig(
-	ctx context.Context,
-	chainSelector cciptypes.ChainSelector,
-) (cciptypes.FeeQuoterDestChainConfig, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, chainSelector); err != nil {
-		return cciptypes.FeeQuoterDestChainConfig{}, err
-	}
-
-	var destChainConfig cciptypes.FeeQuoterDestChainConfig
-	srcReader := r.contractReaders[chainSelector]
-	err := srcReader.ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameFeeQuoter,
-		consts.MethodNameGetDestChainConfig,
-		primitives.Unconfirmed,
-		map[string]any{
-			"destChainSelector": r.destChain,
-		},
-		&destChainConfig,
-	)
-
-	if err != nil {
-		return cciptypes.FeeQuoterDestChainConfig{},
-			fmt.Errorf("get dest chain config for source chain %d: %w",
-				chainSelector, err)
-	}
-
-	return destChainConfig, nil
-}
-
-// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
-// DA data lives in the FeeQuoter contract on the source chain. To get the config of the destination chain, we need to
-// read the FeeQuoter contract on the source chain. As nodes are not required to have all chains configured, we need to
-// read all FeeQuoter contracts to get the median.
-func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
-	ctx context.Context,
-) (cciptypes.DataAvailabilityGasConfig, error) {
-	overheadGasValues := make([]uint32, 0)
-	gasPerByteValues := make([]uint16, 0)
-	multiplierBpsValues := make([]uint16, 0)
-
-	// TODO: pay attention to performance here, as we are looping through all chains
-	for chain := range r.contractReaders {
-		config, err := r.getFeeQuoterDestChainConfig(ctx, chain)
-		if err != nil {
-			continue
-		}
-		if config.IsEnabled && config.HasNonEmptyDAGasParams() {
-			overheadGasValues = append(overheadGasValues, config.DestDataAvailabilityOverheadGas)
-			gasPerByteValues = append(gasPerByteValues, config.DestGasPerDataAvailabilityByte)
-			multiplierBpsValues = append(multiplierBpsValues, config.DestDataAvailabilityMultiplierBps)
-		}
-	}
-
-	// Calculate medians
-	medianOverheadGas := consensus.Median(overheadGasValues, func(a, b uint32) bool { return a < b })
-	medianGasPerByte := consensus.Median(gasPerByteValues, func(a, b uint16) bool { return a < b })
-	medianMultiplierBps := consensus.Median(multiplierBpsValues, func(a, b uint16) bool { return a < b })
-
-	daConfig := cciptypes.DataAvailabilityGasConfig{
-		DestDataAvailabilityOverheadGas:   medianOverheadGas,
-		DestGasPerDataAvailabilityByte:    medianGasPerByte,
-		DestDataAvailabilityMultiplierBps: medianMultiplierBps,
-	}
-
-	return daConfig, nil
-}
-
 func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return 0, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
@@ -2110,6 +2056,40 @@ func validateSendRequestedEvent(
 	}
 
 	return nil
+}
+
+// ccipReaderInternal defines the interface that ConfigPoller needs from the ccipChainReader
+// This allows for better encapsulation and easier testing through mocking
+type ccipReaderInternal interface {
+	// getDestChain returns the destination chain selector
+	getDestChain() cciptypes.ChainSelector
+
+	// getContractReader returns the contract reader for the specified chain
+	getContractReader(chain cciptypes.ChainSelector) (contractreader.Extended, bool)
+
+	// prepareBatchConfigRequests prepares the batch requests for fetching chain configuration
+	prepareBatchConfigRequests(chainSel cciptypes.ChainSelector) contractreader.ExtendedBatchGetLatestValuesRequest
+
+	// processConfigResults processes the batch results into a ChainConfigSnapshot
+	processConfigResults(
+		chainSel cciptypes.ChainSelector,
+		batchResult types.BatchGetLatestValuesResult) (ChainConfigSnapshot, error)
+
+	// fetchFreshSourceChainConfigs fetches source chain configurations from the specified destination chain
+	fetchFreshSourceChainConfigs(
+		ctx context.Context, destChain cciptypes.ChainSelector,
+		sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]SourceChainConfig, error)
+}
+
+// getDestChain returns the destination chain selector
+func (r *ccipChainReader) getDestChain() cciptypes.ChainSelector {
+	return r.destChain
+}
+
+// getContractReader returns the contract reader for the specified chain
+func (r *ccipChainReader) getContractReader(chain cciptypes.ChainSelector) (contractreader.Extended, bool) {
+	reader, exists := r.contractReaders[chain]
+	return reader, exists
 }
 
 // Interface compliance check

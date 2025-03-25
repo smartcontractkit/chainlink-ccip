@@ -20,5 +20,5 @@ custom-heap = []
 solana-program = "1.17.25" # pin solana to 1.17
 anchor-lang = { version = "0.29.0", features = [] }
 anchor-spl = "0.29.0"
-fee_quoter = { version = "0.1.0-dev", path = "../fee-quoter", features = ["no-entrypoint"]}
+ccip_router = { version = "0.1.0-dev", path = "../ccip-router", features = ["no-entrypoint"]}
 smalloc = "0.1.2"

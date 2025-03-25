@@ -197,12 +197,6 @@ func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) 
 	return nil
 }
 
-func (r InMemoryCCIPReader) GetMedianDataAvailabilityGasConfig(
-	ctx context.Context,
-) (cciptypes.DataAvailabilityGasConfig, error) {
-	return cciptypes.DataAvailabilityGasConfig{}, nil
-}
-
 func (r InMemoryCCIPReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
 	return 0, nil
 }
@@ -214,6 +208,13 @@ func (r InMemoryCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginTy
 func (r InMemoryCCIPReader) GetOffRampSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]reader.StaticSourceChainConfig, error) {
 	return nil, nil
+}
+
+// Close implements the reader.CCIPReader interface
+func (r InMemoryCCIPReader) Close() error {
+	// Since this is an in-memory implementation with no persistent connections
+	// or resources to clean up, we can simply return nil
+	return nil
 }
 
 // Interface compatibility check.

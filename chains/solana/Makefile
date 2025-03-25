@@ -13,7 +13,7 @@ anchor_version:
 
 .PHONY: clippy
 clippy:
-	cargo clippy --manifest-path ./contracts/programs/ccip-router/Cargo.toml
+	cd ./contracts && cargo clippy -- -D warnings
 
 .PHONY: gomods
 gomods: ## Install gomods

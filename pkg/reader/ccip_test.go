@@ -90,6 +90,14 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
 
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
 	addrStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, 111_111)
 	require.NoError(t, err)
 
@@ -814,6 +822,14 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		}, nil, chainC, offrampAddress, mockAddrCodec,
 	)
 
+	// Add cleanup to properly shut down the background polling
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
 	feeQuoterAddressStr, err := mockAddrCodec.AddressBytesToString(feeQuoterAddress, 111_111)
 	require.NoError(t, err)
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -850,6 +866,14 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		internal.NewMockAddressCodecHex(t),
 	)
 
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
 	ctx := context.Background()
 	feeComponents := ccipReader.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{chainA, chainB, chainC})
 	assert.Len(t, feeComponents, 2)
@@ -878,6 +902,14 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		[]byte{0x3},
 		internal.NewMockAddressCodecHex(t),
 	)
+
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
 
 	ctx := context.Background()
 	_, err := ccipReader.GetDestChainFeeComponents(ctx)
@@ -939,147 +971,6 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	mockCache.AssertExpectations(t)
 }
 
-func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
-	type mockValue struct {
-		overhead   uint32
-		perByte    uint16
-		multiplier uint16
-		enabled    bool
-	}
-
-	setupConfigMocks := func(
-		readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended,
-		chains []cciptypes.ChainSelector,
-		values []mockValue) {
-		for i, chain := range chains {
-			readers[chain].EXPECT().
-				ExtendedGetLatestValue(
-					mock.Anything,
-					consts.ContractNameFeeQuoter,
-					consts.MethodNameGetDestChainConfig,
-					primitives.Unconfirmed,
-					mock.Anything,
-					mock.Anything,
-				).
-				Return(nil).
-				Run(withReturnValueOverridden(func(returnVal interface{}) {
-					cfg := returnVal.(*cciptypes.FeeQuoterDestChainConfig)
-					cfg.DestDataAvailabilityOverheadGas = values[i].overhead
-					cfg.DestGasPerDataAvailabilityByte = values[i].perByte
-					cfg.DestDataAvailabilityMultiplierBps = values[i].multiplier
-					cfg.IsEnabled = values[i].enabled
-				})).Once()
-		}
-	}
-
-	tests := []struct {
-		name           string
-		expectedConfig cciptypes.DataAvailabilityGasConfig
-		expectError    bool
-		chains         []cciptypes.ChainSelector
-		setupMocks     func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
-	}{
-		{
-			name: "success - returns median values from multiple configs",
-			expectedConfig: cciptypes.DataAvailabilityGasConfig{
-				DestDataAvailabilityOverheadGas:   200,
-				DestGasPerDataAvailabilityByte:    20,
-				DestDataAvailabilityMultiplierBps: 2000,
-			},
-			chains: []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				values := []mockValue{
-					{100, 10, 1000, true},
-					{200, 20, 2000, true},
-					{300, 30, 3000, true},
-				}
-				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
-			},
-		},
-		{
-			name: "success - skips disabled configs",
-			expectedConfig: cciptypes.DataAvailabilityGasConfig{
-				DestDataAvailabilityOverheadGas:   300,
-				DestGasPerDataAvailabilityByte:    30,
-				DestDataAvailabilityMultiplierBps: 3000,
-			},
-			chains: []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				values := []mockValue{
-					{100, 10, 1000, true},
-					{200, 20, 2000, false},
-					{300, 30, 3000, true},
-				}
-				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
-			},
-		},
-		{
-			name: "no valid configs found due to empty DA params",
-			expectedConfig: cciptypes.DataAvailabilityGasConfig{
-				DestDataAvailabilityOverheadGas:   0,
-				DestGasPerDataAvailabilityByte:    0,
-				DestDataAvailabilityMultiplierBps: 0,
-			},
-			expectError: false,
-			chains:      []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				values := []mockValue{
-					{0, 0, 0, true}, // Empty DA params
-					{0, 0, 0, true}, // Empty DA params
-					{0, 0, 0, true}, // Empty DA params
-				}
-				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
-			},
-		},
-		{
-			name:        "all configs disabled",
-			expectError: false,
-			expectedConfig: cciptypes.DataAvailabilityGasConfig{
-				DestDataAvailabilityOverheadGas:   0,
-				DestGasPerDataAvailabilityByte:    0,
-				DestDataAvailabilityMultiplierBps: 0,
-			},
-			chains: []cciptypes.ChainSelector{chainA, chainB},
-			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				values := []mockValue{
-					{100, 10, 1000, false},
-					{200, 20, 2000, false},
-				}
-				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB}, values)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockReaders := make(map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
-			contractReaders := make(map[cciptypes.ChainSelector]contractreader.Extended)
-
-			// Initialize mocks
-			for _, chain := range tt.chains {
-				mockReaders[chain] = reader_mocks.NewMockExtended(t)
-				contractReaders[chain] = mockReaders[chain]
-			}
-
-			tt.setupMocks(mockReaders)
-
-			reader := &ccipChainReader{
-				lggr:            logger.Test(t),
-				contractReaders: contractReaders,
-				destChain:       chainC,
-			}
-			config, err := reader.GetMedianDataAvailabilityGasConfig(context.Background())
-
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedConfig, config)
-			}
-		})
-	}
-}
-
 func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -1099,7 +990,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "everything cursed",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
@@ -1117,7 +1008,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "no global curse",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
@@ -1134,7 +1025,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "dest cursed due to global curse",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 				GlobalCurseSubject,
@@ -1151,7 +1042,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "dest not cursed",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainB),
 				chainSelectorToBytes16(chainC),
 			),
@@ -1167,7 +1058,7 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 		},
 		{
 			name: "source chain B not cursed",
-			cursedSubjectsSet: mapset.NewSet[[16]byte](
+			cursedSubjectsSet: mapset.NewSet(
 				chainSelectorToBytes16(chainC),
 				chainSelectorToBytes16(chainA), // dest
 				GlobalCurseSubject,
@@ -1673,13 +1564,6 @@ func (m *mockConfigCache) GetChainConfig(
 	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
 }
 
-func (m *mockConfigCache) RefreshChainConfig(
-	ctx context.Context,
-	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
-	args := m.Called(ctx, chainSel)
-	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
-}
-
 func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
@@ -1688,10 +1572,26 @@ func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
 }
 
-func (m *mockConfigCache) RefreshSourceChainConfigs(
-	ctx context.Context,
-	destChain cciptypes.ChainSelector,
-	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
-	args := m.Called(ctx, destChain, sourceChains)
-	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
+// Update Start method to accept context parameter
+func (m *mockConfigCache) Start(ctx context.Context) error {
+	return m.Called(ctx).Error(0)
+}
+
+func (m *mockConfigCache) Close() error {
+	return m.Called().Error(0)
+}
+
+// Implement HealthReport method for services.Service interface
+func (m *mockConfigCache) HealthReport() map[string]error {
+	args := m.Called()
+	return args.Get(0).(map[string]error)
+}
+
+// Implement Name method for the Service interface
+func (m *mockConfigCache) Name() string {
+	return m.Called().String(0)
+}
+
+func (m *mockConfigCache) Ready() error {
+	return m.Called().Error(0)
 }

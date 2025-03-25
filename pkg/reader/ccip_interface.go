@@ -259,9 +259,6 @@ type CCIPReader interface {
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
 
-	// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
-	GetMedianDataAvailabilityGasConfig(ctx context.Context) (cciptypes.DataAvailabilityGasConfig, error)
-
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
 	// Not to confuse with the sequence number of the messages. This is the OCR sequence number.
 	GetLatestPriceSeqNr(ctx context.Context) (uint64, error)
@@ -274,4 +271,6 @@ type CCIPReader interface {
 	// If a config was not found it will be missing from the returned map.
 	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
 	) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
+
+	Close() error
 }
