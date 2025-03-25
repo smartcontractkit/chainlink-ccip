@@ -54,6 +54,15 @@ func (s SeqNum) String() string {
 	return strconv.FormatUint(uint64(s), 10)
 }
 
+func (s SeqNum) IsWithinRanges(ranges []SeqNumRange) bool {
+	for _, r := range ranges {
+		if r.Contains(s) {
+			return true
+		}
+	}
+	return false
+}
+
 func NewSeqNumRange(start, end SeqNum) SeqNumRange {
 	return SeqNumRange{start, end}
 }
