@@ -12,7 +12,6 @@ import (
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	internaltypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -165,7 +164,7 @@ func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]internaltypes.TimestampedBig {
+) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
 	return nil
 }
 

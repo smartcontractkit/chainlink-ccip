@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 

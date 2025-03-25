@@ -3,15 +3,16 @@ package v1
 import (
 	"math/big"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	rmnpb "github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/ocrtypecodec/v1/ocrtypecodecpb"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -189,7 +190,7 @@ func (t *protoTranslator) rmnEnabledChainsFromProto(rmnEnabledChains map[uint64]
 	return rmnEnabled
 }
 
-func (t *protoTranslator) seqNumChainToProto(snc []plugintypes.SeqNumChain) []*ocrtypecodecpb.SeqNumChain {
+func (t *protoTranslator) seqNumChainToProto(snc []plugintypes2.SeqNumChain) []*ocrtypecodecpb.SeqNumChain {
 	pbSnc := make([]*ocrtypecodecpb.SeqNumChain, len(snc))
 	for i, s := range snc {
 		pbSnc[i] = &ocrtypecodecpb.SeqNumChain{
@@ -200,14 +201,14 @@ func (t *protoTranslator) seqNumChainToProto(snc []plugintypes.SeqNumChain) []*o
 	return pbSnc
 }
 
-func (t *protoTranslator) seqNumChainFromProto(pbSnc []*ocrtypecodecpb.SeqNumChain) []plugintypes.SeqNumChain {
-	var snc []plugintypes.SeqNumChain
+func (t *protoTranslator) seqNumChainFromProto(pbSnc []*ocrtypecodecpb.SeqNumChain) []plugintypes2.SeqNumChain {
+	var snc []plugintypes2.SeqNumChain
 	if len(pbSnc) > 0 {
-		snc = make([]plugintypes.SeqNumChain, len(pbSnc))
+		snc = make([]plugintypes2.SeqNumChain, len(pbSnc))
 	}
 
 	for i, s := range pbSnc {
-		snc[i] = plugintypes.SeqNumChain{
+		snc[i] = plugintypes2.SeqNumChain{
 			ChainSel: cciptypes.ChainSelector(s.ChainSel),
 			SeqNum:   cciptypes.SeqNum(s.SeqNum),
 		}
@@ -311,7 +312,7 @@ func (t *protoTranslator) feedTokenPricesFromProto(pbFeedPrices map[string][]byt
 }
 
 func (t *protoTranslator) feeQuoterTokenUpdatesToProto(
-	tokenUpdates map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig,
+	tokenUpdates map[cciptypes.UnknownEncodedAddress]plugintypes2.TimestampedBig,
 ) map[string]*ocrtypecodecpb.TimestampedBig {
 	feeQuoterTokenUpdates := make(map[string]*ocrtypecodecpb.TimestampedBig, len(tokenUpdates))
 
@@ -327,10 +328,10 @@ func (t *protoTranslator) feeQuoterTokenUpdatesToProto(
 
 func (t *protoTranslator) feeQuoterTokenUpdatesFromProto(
 	pbTokenUpdates map[string]*ocrtypecodecpb.TimestampedBig,
-) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
-	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig, len(pbTokenUpdates))
+) map[cciptypes.UnknownEncodedAddress]plugintypes2.TimestampedBig {
+	feeQuoterTokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes2.TimestampedBig, len(pbTokenUpdates))
 	for k, v := range pbTokenUpdates {
-		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(k)] = plugintypes.TimestampedBig{
+		feeQuoterTokenUpdates[cciptypes.UnknownEncodedAddress(k)] = plugintypes2.TimestampedBig{
 			Value:     cciptypes.NewBigInt(big.NewInt(0).SetBytes(v.Value)),
 			Timestamp: v.Timestamp.AsTime(),
 		}
@@ -461,7 +462,7 @@ func (t *protoTranslator) discoveryAddressesFromProto(
 	return discoveryAddresses
 }
 
-func (t *protoTranslator) chainRangeToProto(chainRange []plugintypes.ChainRange) []*ocrtypecodecpb.ChainRange {
+func (t *protoTranslator) chainRangeToProto(chainRange []plugintypes2.ChainRange) []*ocrtypecodecpb.ChainRange {
 	var rangesSelectedForReport []*ocrtypecodecpb.ChainRange
 	if len(chainRange) > 0 {
 		rangesSelectedForReport = make([]*ocrtypecodecpb.ChainRange, len(chainRange))
@@ -479,14 +480,14 @@ func (t *protoTranslator) chainRangeToProto(chainRange []plugintypes.ChainRange)
 	return rangesSelectedForReport
 }
 
-func (t *protoTranslator) chainRangeFromProto(pbChainRange []*ocrtypecodecpb.ChainRange) []plugintypes.ChainRange {
-	var rangesSelectedForReport []plugintypes.ChainRange
+func (t *protoTranslator) chainRangeFromProto(pbChainRange []*ocrtypecodecpb.ChainRange) []plugintypes2.ChainRange {
+	var rangesSelectedForReport []plugintypes2.ChainRange
 	if len(pbChainRange) > 0 {
-		rangesSelectedForReport = make([]plugintypes.ChainRange, len(pbChainRange))
+		rangesSelectedForReport = make([]plugintypes2.ChainRange, len(pbChainRange))
 	}
 
 	for i, r := range pbChainRange {
-		rangesSelectedForReport[i] = plugintypes.ChainRange{
+		rangesSelectedForReport[i] = plugintypes2.ChainRange{
 			ChainSel: cciptypes.ChainSelector(r.ChainSel),
 			SeqNumRange: cciptypes.NewSeqNumRange(
 				cciptypes.SeqNum(r.SeqNumRange.MinMsgNr),

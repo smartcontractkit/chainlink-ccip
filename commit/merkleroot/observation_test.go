@@ -9,13 +9,15 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go/serialization"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/ragep2p/types"
@@ -29,7 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
 	rmn_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"

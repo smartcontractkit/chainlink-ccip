@@ -6,7 +6,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // Reporter is a simple interface used for tracking observations and outcomes of the commit plugin.

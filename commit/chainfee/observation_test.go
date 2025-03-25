@@ -13,12 +13,12 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	plugincommon2 "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"

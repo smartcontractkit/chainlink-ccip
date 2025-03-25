@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -15,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	rmnmocks "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
