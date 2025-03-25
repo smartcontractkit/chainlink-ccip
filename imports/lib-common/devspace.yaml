@@ -27,3 +27,14 @@ pipelines:
   ingress-check:
     run: |-
       crib devspace ingress-check
+
+commands:
+  show-pod-nodes:
+    command: |
+      kubectl get pods -n $DEVSPACE_NAMESPACE -o json | \
+        jq -r '.items[] |
+        "Pod: " + .metadata.name +
+        " | Node: " + .spec.nodeName +
+        " | NodeRole: " + (if .spec.nodeSelector."node-role" == "crib" then "crib" else "other" end)'
+    description: |
+      Show all pods and associated node with nodepool info. Useful to debug if the pod is scheduled on the desired NodePools

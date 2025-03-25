@@ -38,7 +38,7 @@ deployments:
       releaseName: "job-distributor"
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/job-distributor
-        version: "0.2.11"
+        version: "0.3.1"
       values:
         image:
           tag: ${JOB_DISTRIBUTOR_IMAGE_TAG}
