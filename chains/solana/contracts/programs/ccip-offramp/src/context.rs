@@ -633,6 +633,7 @@ pub struct CloseCommitReportAccount<'info> {
     )]
     pub fee_token_receiver: Account<'info, TokenAccount>,
 
+    /// CHECK: This is the signer for OnRamp billing CPIs, used here to derived OnRamp's fee accum account
     #[account(
         seeds = [seed::FEE_BILLING_SIGNER],
         bump,

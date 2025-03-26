@@ -1059,6 +1059,56 @@ export type CcipOfframp = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "closeCommitReportAccount",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "commitReport",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "referenceAddresses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "wsolMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "root",
+          "type": "bytes"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -2312,6 +2362,11 @@ export type CcipOfframp = {
       "code": 9053,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
+    },
+    {
+      "code": 9054,
+      "name": "CommitReportHasPendingMessages",
+      "msg": "Commit report has pending messages"
     }
   ]
 };
@@ -3377,6 +3432,56 @@ export const IDL: CcipOfframp = {
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "closeCommitReportAccount",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "commitReport",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "referenceAddresses",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "wsolMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "sourceChainSelector",
+          "type": "u64"
+        },
+        {
+          "name": "root",
+          "type": "bytes"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -4630,6 +4735,11 @@ export const IDL: CcipOfframp = {
       "code": 9053,
       "name": "InvalidOnrampAddress",
       "msg": "Invalid onramp address"
+    },
+    {
+      "code": 9054,
+      "name": "CommitReportHasPendingMessages",
+      "msg": "Commit report has pending messages"
     }
   ]
 };

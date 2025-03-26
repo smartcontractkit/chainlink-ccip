@@ -261,9 +261,10 @@ impl Commit for Impl {
 fn all_messages_executed(report: &CommitReport) -> bool {
     let num_messages = report.max_msg_nr.saturating_sub(report.min_msg_nr) + 1;
 
-    // execution_states follow geometric series 2^0 + 2^2 + 2^4 + ... + 2^(2 * (num_messages - 1))
-    // sum is calculated as (4^num_messages - 1) / 3
-    let fully_executed = (4u128.pow(num_messages as u32) - 1) / 3;
+    // execution_states follow geometric series 2^1 + 2^3 + 2^5 + ... + 2 * 2^(2 * (num_messages - 1))
+    // it can be converted to 2 * (4^0 + 4^1 + 4^2 + ... + 4^(num_messages - 1))
+    // sum is calculated as 2 * (4^num_messages - 1) / 3
+    let fully_executed = (4u128.pow(num_messages as u32) - 1) * 2 / 3;
     return report.execution_states == fully_executed;
 }
 

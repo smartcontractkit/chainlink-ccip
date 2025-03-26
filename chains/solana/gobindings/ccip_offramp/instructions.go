@@ -236,6 +236,8 @@ var (
 	// * `ctx` - The context containing the accounts required for the execution.
 	// * `raw_execution_report` - The serialized execution report containing the message and proofs.
 	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
+
+	Instruction_CloseCommitReportAccount = ag_binary.TypeID([8]byte{109, 145, 129, 64, 226, 172, 61, 106})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -273,6 +275,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Execute"
 	case Instruction_ManuallyExecute:
 		return "ManuallyExecute"
+	case Instruction_CloseCommitReportAccount:
+		return "CloseCommitReportAccount"
 	default:
 		return ""
 	}
@@ -340,6 +344,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"manually_execute", (*ManuallyExecute)(nil),
+		},
+		{
+			"close_commit_report_account", (*CloseCommitReportAccount)(nil),
 		},
 	},
 )
