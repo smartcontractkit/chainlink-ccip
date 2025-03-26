@@ -14,11 +14,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_ccip_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_invalid_receiver"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -35,6 +36,11 @@ type ReusableAccounts struct {
 	// Link-related accounts in other CCIP programs
 	fqBillingConfig       solana.PublicKey
 	routerBillingReceiver solana.PublicKey
+
+	// "Dumb" offramp accounts
+	offramp        solana.PublicKey
+	allowedOfframp solana.PublicKey
+	rampSigner     solana.PublicKey
 }
 
 func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccounts {
@@ -52,6 +58,12 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 	routerBillingReceiver, _, err := tokens.FindAssociatedTokenAddress(config.Token2022Program, linkMint, config.BillingSignerPDA)
 	require.NoError(t, err)
 
+	dumbRamp := config.CcipInvalidReceiverProgram
+	allowedOfframp, err := state.FindAllowedOfframpPDA(config.SvmChainSelector, dumbRamp, config.CcipRouterProgram)
+	require.NoError(t, err)
+	rampSigner, _, err := state.FindExternalExecutionConfigPDA(dumbRamp)
+	require.NoError(t, err)
+
 	return ReusableAccounts{
 		FeeTokenATA:           ppLinkAta,
 		Config:                ppConfig,
@@ -59,6 +71,9 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 		CcipSendSigner:        ppCcipSendSigner,
 		fqBillingConfig:       fqBillingConfig,
 		routerBillingReceiver: routerBillingReceiver,
+		offramp:               dumbRamp,
+		allowedOfframp:        allowedOfframp,
+		rampSigner:            rampSigner,
 	}
 }
 
@@ -67,8 +82,8 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 func TestPingPong(t *testing.T) {
 	t.Parallel()
 
-	// acting as "dumb" onramp & offramp, proxying calls to the pool that are signed by PDA
-	ccip_offramp.SetProgramID(config.CcipOfframpProgram)
+	// acting as "dumb" offramp, proxying calls to the receiver that are signed by PDA
+	test_ccip_invalid_receiver.SetProgramID(config.CcipInvalidReceiverProgram)
 	fee_quoter.SetProgramID(config.FeeQuoterProgram)
 	ccip_router.SetProgramID(config.CcipRouterProgram)
 	rmn_remote.SetProgramID(config.RMNRemoteProgram)
@@ -172,53 +187,6 @@ func TestPingPong(t *testing.T) {
 					config.DefaultCommitment)
 			})
 
-			t.Run("Offramp", func(t *testing.T) {
-				t.Parallel()
-
-				// get program data account
-				data, err := solanaGoClient.GetAccountInfoWithOpts(
-					ctx,
-					config.CcipOfframpProgram,
-					&rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment},
-				)
-				require.NoError(t, err)
-
-				// Decode program data
-				var programData ProgramData
-				require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
-
-				// Now, actually initialize the offramp
-				initIx, err := ccip_offramp.NewInitializeInstruction(
-					config.OfframpReferenceAddressesPDA,
-					config.CcipRouterProgram,
-					config.FeeQuoterProgram,
-					config.RMNRemoteProgram,
-					solana.PublicKey{}, // lookup table, not used in the tests, so just send an empty address,
-					config.OfframpStatePDA,
-					config.OfframpExternalExecutionConfigPDA,
-					config.OfframpTokenPoolsSignerPDA,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-					config.CcipOfframpProgram,
-					programData.Address,
-				).ValidateAndBuild()
-				require.NoError(t, err)
-
-				initConfigIx, err := ccip_offramp.NewInitializeConfigInstruction(
-					config.SvmChainSelector,
-					config.EnableExecutionAfter,
-					config.OfframpConfigPDA,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-					config.CcipOfframpProgram,
-					programData.Address,
-				).ValidateAndBuild()
-				require.NoError(t, err)
-
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx, initConfigIx}, admin,
-					config.DefaultCommitment)
-			})
-
 			t.Run("RMN", func(t *testing.T) {
 				t.Parallel()
 
@@ -251,29 +219,20 @@ func TestPingPong(t *testing.T) {
 		})
 
 		t.Run("Other CCIP configs", func(t *testing.T) {
-			t.Run("register offramp", func(t *testing.T) {
+			t.Run("register dumb offramp", func(t *testing.T) {
 				t.Parallel()
 
 				routerIx, err := ccip_router.NewAddOfframpInstruction(
 					config.SvmChainSelector,
-					config.CcipOfframpProgram,
-					config.AllowedOfframpSvmPDA,
+					reusableAccounts.offramp,
+					reusableAccounts.allowedOfframp,
 					config.RouterConfigPDA,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				fqIx, err := fee_quoter.NewAddPriceUpdaterInstruction(
-					config.OfframpBillingSignerPDA,
-					config.FqAllowedPriceUpdaterOfframpPDA,
-					config.FqConfigPDA,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-				require.NoError(t, err)
-
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{routerIx, fqIx}, admin,
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{routerIx}, admin,
 					config.DefaultCommitment)
 			})
 
@@ -303,31 +262,6 @@ func TestPingPong(t *testing.T) {
 				require.NoError(t, cerr)
 
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
-					config.DefaultCommitment)
-			})
-
-			t.Run("Register SVM as source chain", func(t *testing.T) {
-				t.Parallel()
-
-				var onRampAddress [64]byte
-				copy(onRampAddress[:], config.CcipRouterProgram[:]) // the router is the SVM onramp
-
-				instruction, err := ccip_offramp.NewAddSourceChainInstruction(
-					config.SvmChainSelector,
-					ccip_offramp.SourceChainConfig{
-						OnRamp: ccip_offramp.OnRampAddress{
-							Bytes: onRampAddress,
-							Len:   32,
-						},
-						IsEnabled: true,
-					},
-					config.OfframpSvmSourceChainPDA,
-					config.OfframpConfigPDA,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-				require.NoError(t, err)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin,
 					config.DefaultCommitment)
 			})
 
@@ -463,6 +397,8 @@ func TestPingPong(t *testing.T) {
 		noncePDA, err := state.FindNoncePDA(config.SvmChainSelector, reusableAccounts.CcipSendSigner, config.CcipRouterProgram)
 		require.NoError(t, err)
 
+		var latestSentMsg ccip_router.SVM2AnyRampMessage
+
 		t.Run("Start", func(t *testing.T) {
 			ix, err := ping_pong_demo.NewStartPingPongInstruction(
 				reusableAccounts.Config,
@@ -490,7 +426,7 @@ func TestPingPong(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
-				config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000_000))
+				config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			// Check that the CCIP Send event was emitted
@@ -499,10 +435,61 @@ func TestPingPong(t *testing.T) {
 			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)
 			require.Equal(t, uint64(1), event.SequenceNumber)
 			require.NotNil(t, event.Message)
+
+			latestSentMsg = event.Message
 		})
 
-		t.Run("Receive & send", func(t *testing.T) {
-			t.Skip("TODO")
+		t.Run("Receive & respond (send)", func(t *testing.T) {
+			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
+				test_ccip_invalid_receiver.Any2SVMMessage{
+					SourceChainSelector: latestSentMsg.Header.SourceChainSelector,
+					MessageId:           latestSentMsg.Header.MessageId,
+					Sender:              latestSentMsg.Sender[:],
+					Data:                latestSentMsg.Data,
+					TokenAmounts:        []example_ccip_receiver.SVMTokenAmount{},
+				},
+				config.PingPongProgram,
+				reusableAccounts.rampSigner,
+				reusableAccounts.offramp,
+				reusableAccounts.allowedOfframp,
+			)
+
+			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.Config))
+			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.CcipSendSigner).WRITE())
+			raw.AccountMetaSlice.Append(solana.Meta(config.Token2022Program))
+			raw.AccountMetaSlice.Append(solana.Meta(linkMint))
+			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.FeeTokenATA).WRITE())
+			raw.AccountMetaSlice.Append(solana.Meta(config.CcipRouterProgram))
+			raw.AccountMetaSlice.Append(solana.Meta(config.RouterConfigPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(config.SvmDestChainStatePDA).WRITE())
+			raw.AccountMetaSlice.Append(solana.Meta(noncePDA).WRITE())
+			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.routerBillingReceiver).WRITE())
+			raw.AccountMetaSlice.Append(solana.Meta(config.BillingSignerPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(config.FeeQuoterProgram))
+			raw.AccountMetaSlice.Append(solana.Meta(config.FqConfigPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(config.FqSvmDestChainPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.fqBillingConfig))
+			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.fqBillingConfig))
+			raw.AccountMetaSlice.Append(solana.Meta(config.RMNRemoteProgram))
+			raw.AccountMetaSlice.Append(solana.Meta(config.RMNRemoteCursesPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(config.RMNRemoteConfigPDA))
+			raw.AccountMetaSlice.Append(solana.Meta(config.ExternalTokenPoolsSignerPDA).WRITE())
+			raw.AccountMetaSlice.Append(solana.Meta(solana.SystemProgramID))
+
+			ix, err := raw.ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
+				config.DefaultCommitment, common.AddComputeUnitLimit(400_000))
+			require.NotNil(t, result)
+
+			// Check that the CCIP Send event was emitted
+			var event ccip.EventCCIPMessageSent
+			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
+			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)
+			require.Equal(t, latestSentMsg.Header.SequenceNumber+1, event.SequenceNumber)
+			require.NotNil(t, event.Message)
+
+			latestSentMsg = event.Message
 		})
 
 		t.Run("Pause", func(t *testing.T) {
