@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -39,6 +41,270 @@ var (
 	chainD                          = cciptypes.ChainSelector(4)
 	defaultConfigPollerSyncDuration = *commonconfig.MustNewDuration(30 * time.Second)
 )
+
+func TestCCIPChainReader_CreateExecutedMessagesKeyFilter(t *testing.T) {
+	var (
+		range1 = cciptypes.NewSeqNumRange(1, 2)
+		range2 = cciptypes.NewSeqNumRange(5, 7)
+		range3 = cciptypes.NewSeqNumRange(10, 15)
+	)
+	testCases := []struct {
+		name               string
+		seqNrRangesByChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
+		confidence         primitives.ConfidenceLevel
+		expectedCount      uint64
+		expected           query.KeyFilter
+	}{
+		{
+			name: "simple example",
+			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				chainA: {range1},
+			},
+			confidence:    primitives.Finalized,
+			expectedCount: 2,
+			expected: query.KeyFilter{
+				Key: consts.EventNameExecutionStateChanged,
+				Expressions: []query.Expression{
+					{
+						BoolExpression: query.BoolExpression{
+							BoolOperator: query.AND,
+							Expressions: []query.Expression{
+								{
+									Primitive: &primitives.Comparator{
+										Name: consts.EventAttributeSequenceNumber,
+										ValueComparators: []primitives.ValueComparator{
+											{Value: range1.Start(), Operator: primitives.Gte},
+											{Value: range1.End(), Operator: primitives.Lte},
+										},
+									},
+								},
+								{
+									Primitive: &primitives.Comparator{
+										Name: consts.EventAttributeSourceChain,
+										ValueComparators: []primitives.ValueComparator{
+											{Value: chainA, Operator: primitives.Eq},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Primitive: &primitives.Comparator{
+							Name:             consts.EventAttributeState,
+							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
+						},
+					},
+					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
+				},
+			},
+		},
+		{
+			name: "multiChain simple example",
+			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				chainA: {range1},
+				chainB: {range2},
+			},
+			confidence:    primitives.Finalized,
+			expectedCount: 5,
+			expected: query.KeyFilter{
+				Key: consts.EventNameExecutionStateChanged,
+				Expressions: []query.Expression{
+					{
+						BoolExpression: query.BoolExpression{
+							BoolOperator: query.OR,
+							Expressions: []query.Expression{
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSequenceNumber,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: range1.Start(), Operator: primitives.Gte},
+														{Value: range1.End(), Operator: primitives.Lte},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainA, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSequenceNumber,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: range2.Start(), Operator: primitives.Gte},
+														{Value: range2.End(), Operator: primitives.Lte},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainB, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Primitive: &primitives.Comparator{
+							Name:             consts.EventAttributeState,
+							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
+						},
+					},
+					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
+				},
+			},
+		},
+		{
+			name: "multichain multi range example",
+			seqNrRangesByChain: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
+				chainA: {range1, range2, range3},
+				chainB: {range2, range3},
+			},
+			confidence:    primitives.Finalized,
+			expectedCount: 20,
+			expected: query.KeyFilter{
+				Key: consts.EventNameExecutionStateChanged,
+				Expressions: []query.Expression{
+					{
+						BoolExpression: query.BoolExpression{
+							BoolOperator: query.OR,
+							Expressions: []query.Expression{
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												BoolExpression: query.BoolExpression{
+													BoolOperator: query.OR,
+													Expressions: []query.Expression{
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range1.Start(), Operator: primitives.Gte},
+																	{Value: range1.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range2.Start(), Operator: primitives.Gte},
+																	{Value: range2.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range3.Start(), Operator: primitives.Gte},
+																	{Value: range3.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainA, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+								{
+									BoolExpression: query.BoolExpression{
+										BoolOperator: query.AND,
+										Expressions: []query.Expression{
+											{
+												BoolExpression: query.BoolExpression{
+													BoolOperator: query.OR,
+													Expressions: []query.Expression{
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range2.Start(), Operator: primitives.Gte},
+																	{Value: range2.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+														{
+															Primitive: &primitives.Comparator{
+																Name: consts.EventAttributeSequenceNumber,
+																ValueComparators: []primitives.ValueComparator{
+																	{Value: range3.Start(), Operator: primitives.Gte},
+																	{Value: range3.End(), Operator: primitives.Lte},
+																},
+															},
+														},
+													},
+												},
+											},
+											{
+												Primitive: &primitives.Comparator{
+													Name: consts.EventAttributeSourceChain,
+													ValueComparators: []primitives.ValueComparator{
+														{Value: chainB, Operator: primitives.Eq},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Primitive: &primitives.Comparator{
+							Name:             consts.EventAttributeState,
+							ValueComparators: []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},
+						},
+					},
+					{Primitive: &primitives.Confidence{ConfidenceLevel: primitives.Finalized}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			output, count := createExecutedMessagesKeyFilter(tt.seqNrRangesByChain, tt.confidence)
+			//assert.ElementsMatch(t, tt.expected, output, "unequal values")
+			if !reflect.DeepEqual(tt.expected, output) {
+				t.Errorf("createExecutedMessagesKeyFilter() got = %+v, want %+v", output, tt.expected)
+			}
+			assert.Equal(t, tt.expectedCount, count)
+		})
+	}
+}
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)
@@ -92,6 +358,14 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainC: destCR,
 		}, nil, chainC, offrampAddress, mockAddrCodec, defaultConfigPollerSyncDuration,
 	)
+
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
 
 	addrStr, err := mockAddrCodec.AddressBytesToString(offrampAddress, 111_111)
 	require.NoError(t, err)
@@ -817,6 +1091,14 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		}, nil, chainC, offrampAddress, mockAddrCodec, defaultConfigPollerSyncDuration,
 	)
 
+	// Add cleanup to properly shut down the background polling
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
 	feeQuoterAddressStr, err := mockAddrCodec.AddressBytesToString(feeQuoterAddress, 111_111)
 	require.NoError(t, err)
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -854,6 +1136,14 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		defaultConfigPollerSyncDuration,
 	)
 
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
+
 	ctx := context.Background()
 	feeComponents := ccipReader.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{chainA, chainB, chainC})
 	assert.Len(t, feeComponents, 2)
@@ -883,6 +1173,14 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		internal.NewMockAddressCodecHex(t),
 		defaultConfigPollerSyncDuration,
 	)
+
+	// Add cleanup to ensure resources are released
+	t.Cleanup(func() {
+		err := ccipReader.Close()
+		if err != nil {
+			t.Logf("Error closing ccipReader: %v", err)
+		}
+	})
 
 	ctx := context.Background()
 	_, err := ccipReader.GetDestChainFeeComponents(ctx)
@@ -1537,13 +1835,6 @@ func (m *mockConfigCache) GetChainConfig(
 	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
 }
 
-func (m *mockConfigCache) RefreshChainConfig(
-	ctx context.Context,
-	chainSel cciptypes.ChainSelector) (ChainConfigSnapshot, error) {
-	args := m.Called(ctx, chainSel)
-	return args.Get(0).(ChainConfigSnapshot), args.Error(1)
-}
-
 func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
@@ -1552,10 +1843,26 @@ func (m *mockConfigCache) GetOfframpSourceChainConfigs(
 	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
 }
 
-func (m *mockConfigCache) RefreshSourceChainConfigs(
-	ctx context.Context,
-	destChain cciptypes.ChainSelector,
-	sourceChains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error) {
-	args := m.Called(ctx, destChain, sourceChains)
-	return args.Get(0).(map[cciptypes.ChainSelector]StaticSourceChainConfig), args.Error(1)
+// Update Start method to accept context parameter
+func (m *mockConfigCache) Start(ctx context.Context) error {
+	return m.Called(ctx).Error(0)
+}
+
+func (m *mockConfigCache) Close() error {
+	return m.Called().Error(0)
+}
+
+// Implement HealthReport method for services.Service interface
+func (m *mockConfigCache) HealthReport() map[string]error {
+	args := m.Called()
+	return args.Get(0).(map[string]error)
+}
+
+// Implement Name method for the Service interface
+func (m *mockConfigCache) Name() string {
+	return m.Called().String(0)
+}
+
+func (m *mockConfigCache) Ready() error {
+	return m.Called().Error(0)
 }

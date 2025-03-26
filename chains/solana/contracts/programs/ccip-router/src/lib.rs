@@ -13,7 +13,7 @@ use crate::state::*;
 mod event;
 use crate::event::*;
 
-mod messages;
+pub mod messages;
 use crate::messages::*;
 
 mod instructions;
@@ -36,8 +36,6 @@ declare_id!("Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C");
 /// thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface.
 pub mod ccip_router {
     #![warn(missing_docs)]
-
-    use fee_quoter::messages::GetFeeResult;
 
     use super::*;
 

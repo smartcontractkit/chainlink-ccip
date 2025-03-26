@@ -1414,6 +1414,26 @@ export type CcipRouter = {
       }
     },
     {
+      "name": "GetFeeResult",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "juels",
+            "type": "u128"
+          },
+          {
+            "name": "token",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
       "name": "DestChainState",
       "type": {
         "kind": "struct",
@@ -3324,6 +3344,26 @@ export const IDL: CcipRouter = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetFeeResult",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "juels",
+            "type": "u128"
+          },
+          {
+            "name": "token",
+            "type": "publicKey"
           }
         ]
       }

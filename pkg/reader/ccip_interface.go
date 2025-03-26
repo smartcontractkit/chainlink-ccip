@@ -183,14 +183,13 @@ type CCIPReader interface {
 		limit int,
 	) ([]plugintypes2.CommitPluginReportWithMeta, error)
 
-	// ExecutedMessages reads the destination chain and finds which messages are executed from the provided source chain.
-	// A slice of sequence numbers is returned to express which messages are executed.
+	// ExecutedMessages finds executed messages for all source chains/ranges provided on a single destination chain.
+	// A map of source chain to slice of sequence numbers is returned to express which seqnrs have executed.
 	ExecutedMessages(
 		ctx context.Context,
-		source cciptypes.ChainSelector,
-		seqNumRange cciptypes.SeqNumRange,
+		rangesPerChain map[cciptypes.ChainSelector][]cciptypes.SeqNumRange,
 		confidence primitives.ConfidenceLevel,
-	) ([]cciptypes.SeqNum, error)
+	) (map[cciptypes.ChainSelector][]cciptypes.SeqNum, error)
 
 	// MsgsBetweenSeqNums reads the provided chains, finds and returns ccip messages
 	// submitted between the provided sequence numbers. Messages are sorted ascending based on
@@ -283,4 +282,6 @@ type CCIPReader interface {
 	// If a config was not found it will be missing from the returned map.
 	GetOffRampSourceChainsConfig(ctx context.Context, sourceChains []cciptypes.ChainSelector,
 	) (map[cciptypes.ChainSelector]StaticSourceChainConfig, error)
+
+	Close() error
 }
