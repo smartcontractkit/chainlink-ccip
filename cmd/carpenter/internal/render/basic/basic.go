@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	render.Register("basic", basicRendererFactory)
+	render.Register("basic", basicRendererFactory, "Print logs to the console with minimal processing.")
 
 	tryUpdateTermWidth()
 }
@@ -33,7 +33,7 @@ func tryUpdateTermWidth() {
 }
 
 func basicRendererFactory(options render.Options) render.Renderer {
-	return basicRenderer
+	return render.NewWrappedRender(basicRenderer)
 }
 
 func basicRenderer(data *parse.Data) {

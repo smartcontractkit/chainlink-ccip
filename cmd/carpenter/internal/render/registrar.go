@@ -15,14 +15,16 @@ type Options struct {
 // RendererFactory is a function that returns a Renderer, implemented by renderers to apply options.
 type RendererFactory func(options Options) Renderer
 
-// Renderer is a function that renders data to somewhere.
-type Renderer func(data *parse.Data)
+// Renderer is an interface that can render data somehow.
+type Renderer interface {
+	Render(data *parse.Data)
+}
 
 // rendererFactories is a map of renderers by name.
 var rendererFactories = make(map[string]RendererFactory)
 
 // Register registers a renderer with the given name.
-func Register(name string, factory RendererFactory) {
+func Register(name string, factory RendererFactory, description string) {
 	// panic if factory is nil or already registered
 	if factory == nil {
 		panic("renderer is nil")
@@ -32,6 +34,19 @@ func Register(name string, factory RendererFactory) {
 	}
 
 	rendererFactories[name] = factory
+}
+
+// WrappedRender is a wrapper around a function that implements Renderer.
+type wrappedRender struct {
+	F func(data *parse.Data)
+}
+
+func (w wrappedRender) Render(data *parse.Data) {
+	w.F(data)
+}
+
+func NewWrappedRender(f func(data *parse.Data)) Renderer {
+	return wrappedRender{F: f}
 }
 
 // GetRenderer returns a renderer by name.

@@ -12,11 +12,11 @@ import (
 )
 
 func init() {
-	render.Register("fancy", basicRendererFactory)
+	render.Register("fancy", basicRendererFactory, "Print formatted and colorized logs to the console.")
 }
 
 func basicRendererFactory(options render.Options) render.Renderer {
-	return basicRenderer
+	return render.NewWrappedRender(fancyRenderer)
 }
 
 // renderData
@@ -31,7 +31,7 @@ func basicRendererFactory(options render.Options) render.Renderer {
                        -- oracleID
 
 */
-func basicRenderer(data *parse.Data) {
+func fancyRenderer(data *parse.Data) {
 	// simple color selection algorithm
 	withColor := func(in interface{}, i int) string {
 		color := fmt.Sprintf("%d", i%7+1)

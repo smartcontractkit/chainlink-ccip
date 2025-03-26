@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -107,11 +108,11 @@ func makeCommand() *cli.Command {
 }
 
 func run(args arguments) error {
-	var io stream.InputOptions
+	var options stream.InputOptions
 
 	// If no files are provided the stream will read from stdin.
 	if len(args.files) != 0 {
-		io.Filenames = args.files
+		options.Filenames = args.files
 	}
 
 	renderer, err := render.GetRenderer(args.rendererName, render.Options{})
@@ -119,7 +120,7 @@ func run(args arguments) error {
 		return fmt.Errorf("failed to get renderer: %w", err)
 	}
 
-	inputStream, err := stream.InitializeInputStream(io)
+	inputStream, err := stream.InitializeInputStream(options)
 	if err != nil {
 		return fmt.Errorf("failed to initialize input stream: %w", err)
 	}
@@ -146,7 +147,15 @@ func run(args arguments) error {
 			continue
 		}
 
-		renderer(data)
+		renderer.Render(data)
 	}
+
+	// Check if renderer implements io.Closer and call Close if it does
+	if closer, ok := renderer.(io.Closer); ok {
+		if err := closer.Close(); err != nil {
+			return fmt.Errorf("failed to close renderer: %w", err)
+		}
+	}
+
 	return nil
 }
