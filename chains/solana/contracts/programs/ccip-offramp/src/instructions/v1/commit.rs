@@ -375,3 +375,45 @@ mod helpers {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commit_report_has_pending_messages() {
+        let mut report = CommitReport {
+            version: 1,
+            chain_selector: 0,
+            merkle_root: [0; 32],
+            timestamp: 0,
+            min_msg_nr: 42,
+            max_msg_nr: 42,
+            execution_states: 0,
+        };
+        assert!(
+            !all_messages_executed(&report),
+            "Message should still be paneding"
+        );
+        report.execution_states = 3;
+        assert!(
+            !all_messages_executed(&report),
+            "Failed message does not acount as executed"
+        );
+        report.execution_states = 2;
+        assert!(
+            all_messages_executed(&report),
+            "Single message should executed"
+        );
+
+        // Add 2 more messages
+        report.max_msg_nr += 2;
+        report.execution_states = 0b100011;
+        assert!(
+            !all_messages_executed(&report),
+            "Single message should executed"
+        );
+        report.execution_states = 0b101010;
+        assert!(all_messages_executed(&report), "All messages executed");
+    }
+}
