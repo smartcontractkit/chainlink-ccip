@@ -147,8 +147,8 @@ func (es commitSummary) String() string {
 	return b.String()
 }
 
-// commitCollector grabs merkle root OCR data and stores it in the summaryRenderer.
-func (sr summaryRenderer) commitCollector(data *parse.Data) {
+// commitCollector grabs merkle root OCR data and stores it in the summaryFormatter.
+func (sr summaryFormatter) commitCollector(data *parse.Data) {
 	// a regex that matches "building 1 reports" and captures the number.
 	mark := false
 

@@ -7,16 +7,16 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
-	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render"
 )
 
 func init() {
-	render.Register("fancy", basicRendererFactory, "Print formatted and colorized logs to the console.")
+	format.Register("fancy", basicFormatterFactory, "Print formatted and colorized logs to the console.")
 }
 
-func basicRendererFactory(options render.Options) render.Renderer {
-	return render.NewWrappedRender(fancyRenderer)
+func basicFormatterFactory(options format.Options) format.Formatter {
+	return format.NewWrappedFormat(fancyFormatter)
 }
 
 // renderData
@@ -31,7 +31,7 @@ func basicRendererFactory(options render.Options) render.Renderer {
                        -- oracleID
 
 */
-func fancyRenderer(data *parse.Data) {
+func fancyFormatter(data *parse.Data) {
 	// simple color selection algorithm
 	withColor := func(in interface{}, i int) string {
 		color := fmt.Sprintf("%d", i%7+1)

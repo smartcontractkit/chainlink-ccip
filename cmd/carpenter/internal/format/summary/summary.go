@@ -8,20 +8,20 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
-	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render"
 )
 
 func init() {
-	render.Register("summary", basicRendererFactory, "Analyze logs and print a summary of each OCR round.")
+	format.Register("summary", basicFormatterFactory, "Analyze logs and print a summary of each OCR round.")
 
 	reportRegex = regexp.MustCompile("^built (\\d+) reports$")
 }
 
 var reportRegex *regexp.Regexp
 
-func basicRendererFactory(options render.Options) render.Renderer {
-	sr := summaryRenderer{
+func basicFormatterFactory(options format.Options) format.Formatter {
+	sr := summaryFormatter{
 		commits: make(map[int]map[int]commitSummary),
 		execs:   make(map[int]map[int]execSummary),
 	}
@@ -37,17 +37,17 @@ func (es execSummary) String() string {
 	return ""
 }
 
-// summaryRenderer holds metadata collected across multiple log lines.
-type summaryRenderer struct {
+// summaryFormatter holds metadata collected across multiple log lines.
+type summaryFormatter struct {
 	commits map[int]map[int]commitSummary
 	execs   map[int]map[int]execSummary
 }
 
-func (sr summaryRenderer) execCollector(data *parse.Data) {
+func (sr summaryFormatter) execCollector(data *parse.Data) {
 
 }
 
-func (sr summaryRenderer) Render(data *parse.Data) {
+func (sr summaryFormatter) Format(data *parse.Data) {
 	switch data.Plugin {
 	case "Commit":
 		sr.commitCollector(data)
@@ -58,7 +58,7 @@ func (sr summaryRenderer) Render(data *parse.Data) {
 	}
 }
 
-func (sr summaryRenderer) Close() error {
+func (sr summaryFormatter) Close() error {
 	dons := maps.Keys(sr.commits)
 	sort.Ints(dons)
 	for _, donID := range dons {

@@ -12,15 +12,15 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/filter"
+	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
-	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render"
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/stream"
 )
 
 type arguments struct {
-	files        []string
-	logType      parse.LogType
-	rendererName string
+	files         []string
+	logType       parse.LogType
+	formatterName string
 
 	filter.CompiledFilterFields
 	filterOP filter.FilterOP
@@ -53,13 +53,14 @@ func makeCommand() *cli.Command {
 				},
 			},
 			&cli.StringFlag{
-				OnlyOnce:    true,
-				Name:        "renderer",
-				Usage:       fmt.Sprintf("Select which rendering algorithm to use: [%s]", strings.Join(render.GetRenderers(), ", ")),
+				OnlyOnce: true,
+				Name:     "formatter",
+				Usage: fmt.Sprintf("Select which formatting algorithm to use: [%s]",
+					strings.Join(format.GetFormatters(), ", ")),
 				Value:       "basic",
-				Destination: &args.rendererName,
+				Destination: &args.formatterName,
 				Validator: func(s string) error {
-					choices := render.GetRenderers()
+					choices := format.GetFormatters()
 					if !slices.Contains(choices, s) {
 						return fmt.Errorf("expected one of [%s]",
 							s, strings.Join(choices, ", "))
@@ -115,9 +116,9 @@ func run(args arguments) error {
 		options.Filenames = args.files
 	}
 
-	renderer, err := render.GetRenderer(args.rendererName, render.Options{})
+	formatter, err := format.GetFormatter(args.formatterName, format.Options{})
 	if err != nil {
-		return fmt.Errorf("failed to get renderer: %w", err)
+		return fmt.Errorf("failed to get formatter: %w", err)
 	}
 
 	inputStream, err := stream.InitializeInputStream(options)
@@ -147,13 +148,13 @@ func run(args arguments) error {
 			continue
 		}
 
-		renderer.Render(data)
+		formatter.Format(data)
 	}
 
-	// Check if renderer implements io.Closer and call Close if it does
-	if closer, ok := renderer.(io.Closer); ok {
+	// Check if formatter implements io.Closer and call Close if it does
+	if closer, ok := formatter.(io.Closer); ok {
 		if err := closer.Close(); err != nil {
-			return fmt.Errorf("failed to close renderer: %w", err)
+			return fmt.Errorf("failed to close formatter (%s): %w", args.formatterName, err)
 		}
 	}
 

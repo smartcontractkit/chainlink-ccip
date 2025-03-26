@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	// Register the renderers
-	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render/basic"
-	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render/fancy"
-	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/render/summary"
+	// Register the formatters
+	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format/basic"
+	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format/fancy"
+	_ "github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/format/summary"
 )
 
 func main() {
