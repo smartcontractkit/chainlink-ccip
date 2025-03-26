@@ -27,8 +27,8 @@ func basicFormatterFactory(options format.Options) format.Formatter {
                        | | |    |     |-- OCR Plugin
                        | | |    |-- log level
                        | | |-- sequence number
-                       | |-- DON ID
-                       -- oracleID
+                       | |-- Oracle ID
+                       -- DON ID
 
 */
 func fancyFormatter(data *parse.Data) {
@@ -52,8 +52,8 @@ func fancyFormatter(data *parse.Data) {
 		Align(lipgloss.Left).PaddingLeft(1)
 
 	uid := fmt.Sprintf("%s.%s.%s",
-		withColor(data.OracleID, data.OracleID),
 		withColor(data.DONID, data.DONID),
+		withColor(data.OracleID, data.OracleID),
 		withColor(data.SequenceNumber, data.SequenceNumber),
 		//withColor(data.Component, 0),
 		//withColor(data.OCRPhase, ocrPhaseToColor(data.OCRPhase)),
