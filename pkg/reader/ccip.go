@@ -196,10 +196,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		"ts", ts,
 		"limit", limit*2)
 
-	reports, err := r.processCommitReports(iter, ts, limit)
-	if err != nil {
-		return nil, err
-	}
+	reports := r.processCommitReports(iter, ts, limit)
 
 	lggr.Debugw("decoded commit reports", "reports", reports)
 
@@ -234,9 +231,11 @@ func (r *ccipChainReader) queryCommitReports(
 	)
 }
 
+// processCommitReports decodes the commit reports from the query results
+// and returns the ones that can be properly parsed and validated.
 func (r *ccipChainReader) processCommitReports(
 	iter []types.Sequence, ts time.Time, limit int,
-) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+) []plugintypes2.CommitPluginReportWithMeta {
 	lggr := r.lggr
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
@@ -254,14 +253,17 @@ func (r *ccipChainReader) processCommitReports(
 		}
 		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
 		blessedMerkleRoots, unblessedMerkleRoots := r.processMerkleRoots(allMerkleRoots, isBlessed)
+
 		priceUpdates, err := r.processPriceUpdates(ev.PriceUpdates)
 		if err != nil {
-			return nil, err
+			lggr.Errorw("failed to process price updates", "err", err, "priceUpdates", ev.PriceUpdates)
+			continue
 		}
 
 		blockNum, err := strconv.ParseUint(item.Head.Height, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Height, err)
+			lggr.Errorw("failed to parse block number", "blockNum", item.Head.Height, "err", err)
+			continue
 		}
 
 		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
@@ -278,9 +280,9 @@ func (r *ccipChainReader) processCommitReports(
 	lggr.Debugw("decoded commit reports", "reports", reports)
 
 	if len(reports) < limit {
-		return reports, nil
+		return reports
 	}
-	return reports[:limit], nil
+	return reports[:limit]
 }
 
 func (r *ccipChainReader) processMerkleRoots(
@@ -514,6 +516,8 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address after query: %w", err)
 	}
+
+	// Ensure the onRamp address hasn't changed during the query.
 	if !bytes.Equal(onRampAddress, onRampAddressAfterQuery) {
 		return nil, fmt.Errorf("onRamp address has changed from %s to %s", onRampAddress, onRampAddressAfterQuery)
 	}
