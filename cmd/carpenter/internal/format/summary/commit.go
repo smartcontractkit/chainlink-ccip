@@ -15,7 +15,26 @@ import (
 
 func init() {
 	reportRegex = regexp.MustCompile("^built (\\d+) reports$")
+	divider = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#75A3A3"))
+
+	section = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#3366FF"))
+	number = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#339966"))
+	highlight = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FF9933"))
 }
+
+var divider lipgloss.Style
+var section lipgloss.Style
+var highlight lipgloss.Style
+var number lipgloss.Style
 
 var reportRegex *regexp.Regexp
 
@@ -49,11 +68,16 @@ func commitObservationSummary(logs []*parse.Data) string {
 						commitFormatSeqNumChains(obs.OffRampNextSeqNums)))
 				}
 
+				var buf strings.Builder
+				buf.WriteString(padding)
+				buf.WriteString(section.Render("Observation"))
 				if len(parts) == 0 {
-					return padding + "Observation: no seqNum data"
+					buf.WriteString(": no seqNum data")
 				} else {
-					return fmt.Sprintf("%sObservation: %s%s", padding, bullet, strings.Join(parts, bullet))
+					buf.WriteString(bullet)
+					buf.WriteString(strings.Join(parts, bullet))
 				}
+				return buf.String()
 			}
 		}
 	}
@@ -111,12 +135,10 @@ func commitOutcomeSummary(logs []*parse.Data) string {
 						otc.ReportTransmissionCheckAttempts))
 				}
 
-				style := lipgloss.NewStyle().
-					Bold(true).
-					Foreground(lipgloss.Color("#FF9933"))
 				buf.WriteString(padding)
-				buf.WriteString("Outcome [")
-				buf.WriteString(style.Render(outcomeTypeName))
+				buf.WriteString(section.Render("Outcome"))
+				buf.WriteString(" [")
+				buf.WriteString(highlight.Render(outcomeTypeName))
 				buf.WriteString("]")
 				if len(parts) > 0 {
 					buf.WriteString(bullet)
@@ -131,23 +153,18 @@ func commitOutcomeSummary(logs []*parse.Data) string {
 }
 
 func commitReportSummary(logs []*parse.Data) string {
-	style := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#339966"))
-
 	var numReports string
 	var reportParts []string
 	for _, log := range logs {
 		message := log.GetMessage()
 		if message == "generating report" {
-			if roots, ok := log.RawLoggerFields["roots"].(map[string]interface{}); ok {
-				fmt.Println(roots)
+			if roots, ok := log.RawLoggerFields["roots"].([]interface{}); ok {
 				reportParts = append(reportParts, fmt.Sprintf("Roots: %d", len(roots)))
 			}
 			if prices, ok := log.RawLoggerFields["tokenPriceUpdates"].(map[string]interface{}); ok {
 				reportParts = append(reportParts, fmt.Sprintf("TokenPriceUpdates: %d", len(prices)))
 			}
-			if gasUpdates, ok := log.RawLoggerFields["gasPriceUpdates"].(map[string]interface{}); ok {
+			if gasUpdates, ok := log.RawLoggerFields["gasPriceUpdates"].([]interface{}); ok {
 				reportParts = append(reportParts, fmt.Sprintf("GasPriceUpdates: %d", len(gasUpdates)))
 			}
 			if sigs, ok := log.RawLoggerFields["rmnSignatures"].(map[string]interface{}); ok {
@@ -163,8 +180,12 @@ func commitReportSummary(logs []*parse.Data) string {
 	if len(reportParts) > 0 || numReports != "" {
 		var buf strings.Builder
 		buf.WriteString(padding)
-		buf.WriteString("Reports: ")
-		buf.WriteString(style.Render(numReports))
+		buf.WriteString(section.Render("Reports"))
+		buf.WriteString(": ")
+		buf.WriteString(number.Render(numReports))
+		if numReports != "" && len(reportParts) == 0 {
+			fmt.Println("???")
+		}
 		if len(reportParts) > 0 {
 			buf.WriteString(bullet)
 			buf.WriteString(strings.Join(reportParts, bullet))
@@ -177,7 +198,7 @@ func commitReportSummary(logs []*parse.Data) string {
 
 func (es commitSummary) String() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%3d: %d logs", es.seqNumber, len(es.logs)))
+	b.WriteString(divider.Render(fmt.Sprintf("%3d: %d logs                       ", es.seqNumber, len(es.logs))))
 	if obs := commitObservationSummary(es.logs); obs != "" {
 		b.WriteString("\n")
 		b.WriteString(obs)
