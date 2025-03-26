@@ -12,24 +12,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
+const padding = "    "
+
+var bullet = fmt.Sprintf("\n%s* ", padding)
+
 type commitSummary struct {
 	logs      []*parse.Data
 	seqNumber int
 }
 
 func commitObservationSummary(logs []*parse.Data) string {
-	seqNumStr := func(chains []plugintypes.SeqNumChain) string {
-		if len(chains) == 0 {
-			return ""
-		}
-		var nums []string
-		for _, chain := range chains {
-			nums = append(nums, fmt.Sprintf("%d->%d", chain.ChainSel, chain.SeqNum))
-		}
-		return strings.Join(nums, ", ")
-	}
-
-	var buf strings.Builder
 	for _, log := range logs {
 		if log.GetMessage() == merkleroot.SendingObservation {
 			if raw, ok := log.RawLoggerFields["observation"].(map[string]interface{}); ok {
@@ -42,76 +34,130 @@ func commitObservationSummary(logs []*parse.Data) string {
 				}
 				var parts []string
 				if len(obs.OnRampMaxSeqNums) > 0 {
-					parts = append(parts, fmt.Sprintf("OnRampMaxSeqNums: %s", seqNumStr(obs.OnRampMaxSeqNums)))
+					parts = append(parts, fmt.Sprintf("OnRampMaxSeqNums: %s",
+						commitFormatSeqNumChains(obs.OnRampMaxSeqNums)))
 				}
 				if len(obs.OffRampNextSeqNums) > 0 {
-					parts = append(parts, fmt.Sprintf("OffRampNextSeqNums: %s", seqNumStr(obs.OffRampNextSeqNums)))
+					parts = append(parts, fmt.Sprintf("OffRampNextSeqNums: %s",
+						commitFormatSeqNumChains(obs.OffRampNextSeqNums)))
 				}
 
 				if len(parts) == 0 {
 					return "Observation: no seqNum data"
 				} else {
-					return fmt.Sprintf("Observation: \n\t* %s", strings.Join(parts, "\n\t* "))
+					return fmt.Sprintf("Observation: %s%s", bullet, strings.Join(parts, bullet))
 				}
 			}
 		}
 	}
 
-	return buf.String()
+	return ""
 }
 
 func commitOutcomeSummary(logs []*parse.Data) string {
-	var buf strings.Builder
-	var outcomeTypeName string
-	var parts []string
 	for _, log := range logs {
 		if log.GetMessage() == merkleroot.SendingOutcome {
+			var buf strings.Builder
+			var outcomeTypeName string
+			var parts []string
+
 			if raw, ok := log.RawLoggerFields["outcome"].(map[string]interface{}); ok {
-				if t, ok := raw["outcomeType"]; ok {
-					if outcomeType, ok := t.(float64); ok {
-						switch merkleroot.OutcomeType(int(outcomeType)) {
-						case merkleroot.ReportIntervalsSelected:
-							outcomeTypeName = "ReportIntervalsSelected"
-						case merkleroot.ReportGenerated:
-							outcomeTypeName = "ReportGenerated"
-						case merkleroot.ReportEmpty:
-							outcomeTypeName = "ReportEmpty"
-						case merkleroot.ReportInFlight:
-							outcomeTypeName = "ReportInFlight"
-						case merkleroot.ReportTransmitted:
-							outcomeTypeName = "ReportTransmitted"
-						case merkleroot.ReportTransmissionFailed:
-							outcomeTypeName = "ReportTransmissionFailed"
-						default:
-							outcomeTypeName = "unknown"
+				var otc merkleroot.Outcome
+				err := mapstructure.Decode(raw, &otc)
+				if err != nil {
+					// Ignore RMNRemoteCfg errors due to slice/value type mismatches.
+				}
+
+				switch otc.OutcomeType {
+				case merkleroot.ReportIntervalsSelected:
+					outcomeTypeName = "ReportIntervalsSelected"
+				case merkleroot.ReportGenerated:
+					outcomeTypeName = "ReportGenerated"
+				case merkleroot.ReportEmpty:
+					outcomeTypeName = "ReportEmpty"
+				case merkleroot.ReportInFlight:
+					outcomeTypeName = "ReportInFlight"
+				case merkleroot.ReportTransmitted:
+					outcomeTypeName = "ReportTransmitted"
+				case merkleroot.ReportTransmissionFailed:
+					outcomeTypeName = "ReportTransmissionFailed"
+				default:
+					outcomeTypeName = "unknown"
+				}
+
+				/*
+					RMNEnabledChains                map[cciptypes.ChainSelector]bool `json:"rmnEnabledChains"`
+					RMNRemoteCfg                    rmntypes.RemoteConfig            `json:"rmnRemoteCfg"`
+				*/
+
+				if len(otc.RootsToReport) > 0 {
+					parts = append(parts, fmt.Sprintf("RootsToReport: %d", len(otc.RootsToReport)))
+				}
+				if len(otc.RMNReportSignatures) != 0 {
+					parts = append(parts, fmt.Sprintf("RMNReportSignatures: %d", len(otc.RMNReportSignatures)))
+				}
+				if len(otc.RangesSelectedForReport) > 0 {
+					parts = append(parts, fmt.Sprintf("RangesSelectedForReport: %s",
+						commitFormatChainRanges(otc.RangesSelectedForReport)))
+				}
+				if len(otc.OffRampNextSeqNums) > 0 {
+					parts = append(parts, fmt.Sprintf("OffRampNextSeqNums: %s",
+						commitFormatSeqNumChains(otc.OffRampNextSeqNums)))
+				}
+				if otc.ReportTransmissionCheckAttempts != 0 {
+					parts = append(parts, fmt.Sprintf("ReportTransmissionCheckAttempts: %d",
+						otc.ReportTransmissionCheckAttempts))
+				}
+
+				style := lipgloss.NewStyle().
+					Bold(true).
+					Foreground(lipgloss.Color("#FF9933"))
+				buf.WriteString("Outcome [")
+				buf.WriteString(style.Render(outcomeTypeName))
+				buf.WriteString("]")
+				if len(parts) > 0 {
+					buf.WriteString(bullet)
+					buf.WriteString(strings.Join(parts, bullet))
+				}
+				return fmt.Sprintf(buf.String())
+				/*
+						if t, ok := raw["outcomeType"]; ok {
+							if outcomeType, ok := t.(float64); ok {
+								switch merkleroot.OutcomeType(int(outcomeType)) {
+								case merkleroot.ReportIntervalsSelected:
+									outcomeTypeName = "ReportIntervalsSelected"
+								case merkleroot.ReportGenerated:
+									outcomeTypeName = "ReportGenerated"
+								case merkleroot.ReportEmpty:
+									outcomeTypeName = "ReportEmpty"
+								case merkleroot.ReportInFlight:
+									outcomeTypeName = "ReportInFlight"
+								case merkleroot.ReportTransmitted:
+									outcomeTypeName = "ReportTransmitted"
+								case merkleroot.ReportTransmissionFailed:
+									outcomeTypeName = "ReportTransmissionFailed"
+								default:
+									outcomeTypeName = "unknown"
+								}
+							}
+						}
+						if reportRange, ok := raw["rangesSelectedForReport"].([]any); ok {
+							for _, rng := range reportRange {
+								if v, ok := rng.(map[string]any); ok {
+									i := int(v["chain"].(float64))
+									chain := fmt.Sprintf("%d", i)
+									ranges := fmt.Sprintf("%v", v["seqNumRange"])
+									parts = append(parts, fmt.Sprintf("%s %s", chain, ranges))
+								}
+							}
 						}
 					}
-				}
-				if reportRange, ok := raw["rangesSelectedForReport"].([]any); ok {
-					for _, rng := range reportRange {
-						if v, ok := rng.(map[string]any); ok {
-							i := int(v["chain"].(float64))
-							chain := fmt.Sprintf("%d", i)
-							ranges := fmt.Sprintf("%v", v["seqNumRange"])
-							parts = append(parts, fmt.Sprintf("%s %s", chain, ranges))
-						}
-					}
-				}
+				*/
 			}
 		}
 	}
 
-	style := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#FF9933"))
-	buf.WriteString("Outcome [")
-	buf.WriteString(style.Render(outcomeTypeName))
-	buf.WriteString("]")
-	if len(parts) > 0 {
-		buf.WriteString(": ")
-		buf.WriteString(strings.Join(parts, ", "))
-	}
-	return fmt.Sprintf(buf.String())
+	return ""
 }
 
 func commitReportSummary(logs []*parse.Data) string {
@@ -132,15 +178,18 @@ func (es commitSummary) String() string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("%3d: %d logs", es.seqNumber, len(es.logs)))
 	if obs := commitObservationSummary(es.logs); obs != "" {
-		b.WriteString("\n     ")
+		b.WriteString("\n")
+		b.WriteString(padding)
 		b.WriteString(obs)
 	}
 	if ocm := commitOutcomeSummary(es.logs); ocm != "" {
-		b.WriteString("\n     ")
+		b.WriteString("\n")
+		b.WriteString(padding)
 		b.WriteString(ocm)
 	}
 	if rpt := commitReportSummary(es.logs); rpt != "" {
-		b.WriteString("\n     ")
+		b.WriteString("\n")
+		b.WriteString(padding)
 		b.WriteString(rpt)
 	}
 
@@ -183,4 +232,26 @@ func (sr summaryFormatter) commitCollector(data *parse.Data) {
 	if mark && data.SequenceNumber == 0 {
 		fmt.Println("sequence number is 0")
 	}
+}
+
+func commitFormatChainRanges(chains []plugintypes.ChainRange) string {
+	if len(chains) == 0 {
+		return ""
+	}
+	var nums []string
+	for _, chain := range chains {
+		nums = append(nums, fmt.Sprintf("%d->%s", chain.ChainSel, chain.SeqNumRange))
+	}
+	return strings.Join(nums, ", ")
+}
+
+func commitFormatSeqNumChains(chains []plugintypes.SeqNumChain) string {
+	if len(chains) == 0 {
+		return ""
+	}
+	var nums []string
+	for _, chain := range chains {
+		nums = append(nums, fmt.Sprintf("%d->%d", chain.ChainSel, chain.SeqNum))
+	}
+	return strings.Join(nums, ", ")
 }

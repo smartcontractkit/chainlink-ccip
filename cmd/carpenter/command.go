@@ -54,7 +54,8 @@ func makeCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				OnlyOnce: true,
-				Name:     "formatter",
+				Name:     "format",
+				Aliases:  []string{"formatter", "renderer"},
 				Usage: fmt.Sprintf("Select which formatting algorithm to use: [%s]",
 					strings.Join(format.GetFormatters(), ", ")),
 				Value:       "basic",
@@ -69,7 +70,8 @@ func makeCommand() *cli.Command {
 				},
 			},
 			&cli.StringSliceFlag{
-				Name: "filter",
+				Name:    "filter",
+				Aliases: []string{"f"},
 				Usage: fmt.Sprintf(
 					"Line selection filters. Format as '[!]FieldName:Regexp', the optional ! prefix will omit logs that match the pattern, valid fields: [%s]",
 					strings.Join(filter.FieldNames(), ", ")),

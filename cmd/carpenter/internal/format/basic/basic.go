@@ -12,6 +12,7 @@ import (
 )
 
 func init() {
+	// Register the basic formatter by name.
 	format.Register("basic", basicFormatterFactory, "Print logs to the console with minimal processing.")
 
 	tryUpdateTermWidth()
@@ -33,6 +34,8 @@ func tryUpdateTermWidth() {
 }
 
 func basicFormatterFactory(options format.Options) format.Formatter {
+	// This simple formatter is a pure function, more advanced formats
+	// can implement the Formatter interface.
 	return format.NewWrappedFormat(basicFormatter)
 }
 
