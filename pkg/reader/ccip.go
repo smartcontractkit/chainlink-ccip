@@ -254,14 +254,17 @@ func (r *ccipChainReader) processCommitReports(
 		}
 		allMerkleRoots := append(ev.BlessedMerkleRoots, ev.UnblessedMerkleRoots...)
 		blessedMerkleRoots, unblessedMerkleRoots := r.processMerkleRoots(allMerkleRoots, isBlessed)
+
 		priceUpdates, err := r.processPriceUpdates(ev.PriceUpdates)
 		if err != nil {
-			return nil, err
+			lggr.Errorw("failed to process price updates", "err", err, "priceUpdates", ev.PriceUpdates)
+			continue
 		}
 
 		blockNum, err := strconv.ParseUint(item.Head.Height, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Height, err)
+			lggr.Errorw("failed to parse block number", "blockNum", item.Head.Height, "err", err)
+			continue
 		}
 
 		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
