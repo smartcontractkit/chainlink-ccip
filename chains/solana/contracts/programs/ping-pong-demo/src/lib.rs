@@ -44,7 +44,7 @@ pub mod ping_pong_demo {
         Ok(())
     }
 
-    pub fn initialize<'info>(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts.name_version.set_inner(state::NameVersion {
             name: "ping-pong-demo".to_string(),
             version: "1.5.0".to_string(), // TODO confirm if we keep EVM version here
@@ -91,7 +91,7 @@ pub mod ping_pong_demo {
         Ok(())
     }
 
-    pub fn start_ping_pong<'info>(ctx: Context<Start>) -> Result<()> {
+    pub fn start_ping_pong(ctx: Context<Start>) -> Result<()> {
         ctx.accounts.config.is_paused = false;
 
         let accounts = cpi::accounts::CcipSend {
@@ -186,11 +186,15 @@ pub mod ping_pong_demo {
 }
 
 mod helpers {
+    use solana_program::{instruction::Instruction, program::invoke_signed};
+
     use super::*;
+
+    pub const CCIP_SEND_DISCRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84]; // ccip_send
 
     pub fn respond<'info>(
         config: state::Config,
-        router_program: AccountInfo<'info>,
+        _router_program: AccountInfo<'info>,
         accounts: cpi::accounts::CcipSend<'info>,
         ping_pong_count: BigEndianU256,
         signer_bump: u8,
@@ -201,14 +205,39 @@ mod helpers {
             data: data_bytes.to_vec(),
             token_amounts: vec![], // no token transfer
             fee_token: config.fee_token_mint,
-            extra_args: vec![], // no extra args
+            extra_args: vec![
+                31, 59, 58, 186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0,
+            ], // TODO
         };
 
         let seeds = &[seeds::CCIP_SEND_SIGNER, &[signer_bump]];
         let signer_seeds = &[&seeds[..]];
 
-        let cpi_ctx = CpiContext::new_with_signer(router_program, accounts, signer_seeds);
-        cpi::ccip_send(cpi_ctx, config.counterpart_chain_selector, message, vec![])?;
+        let acc_infos = accounts.to_account_infos().to_vec();
+
+        let acc_metas: Vec<AccountMeta> = acc_infos
+            .iter()
+            .flat_map(|acc_info| {
+                // Check signer from PDA External Execution config
+                let is_signer = acc_info.key() == accounts.authority.key();
+                acc_info.to_account_metas(Some(is_signer))
+            })
+            .collect();
+
+        let mut data = CCIP_SEND_DISCRIMINATOR.to_vec();
+        data.extend_from_slice(config.counterpart_chain_selector.to_le_bytes().as_ref());
+        data.extend_from_slice(&message.try_to_vec().unwrap());
+        data.extend_from_slice(&[0, 0, 0, 0]);
+
+        let instruction = Instruction {
+            program_id: config.router,
+            accounts: acc_metas,
+            data,
+        };
+
+        invoke_signed(&instruction, &acc_infos, signer_seeds)?;
 
         Ok(())
     }

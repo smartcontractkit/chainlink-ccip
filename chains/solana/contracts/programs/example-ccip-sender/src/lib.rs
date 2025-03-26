@@ -204,6 +204,9 @@ pub mod example_ccip_sender {
             ),
         };
 
+        msg!("MESSAGE: {:?}", message);
+        msg!("EXAMPLE SENDER DATA: {:?}", instruction.data);
+
         let seeds = &[CCIP_SENDER, &[ctx.bumps.ccip_sender]];
         let signer = &[&seeds[..]];
 

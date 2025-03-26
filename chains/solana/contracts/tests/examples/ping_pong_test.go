@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ping_pong_demo"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -70,6 +71,7 @@ func TestPingPong(t *testing.T) {
 	ccip_offramp.SetProgramID(config.CcipOfframpProgram)
 	fee_quoter.SetProgramID(config.FeeQuoterProgram)
 	ccip_router.SetProgramID(config.CcipRouterProgram)
+	rmn_remote.SetProgramID(config.RMNRemoteProgram)
 	ping_pong_demo.SetProgramID(config.PingPongProgram)
 
 	admin, err := solana.NewRandomPrivateKey()
@@ -214,6 +216,36 @@ func TestPingPong(t *testing.T) {
 				require.NoError(t, err)
 
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx, initConfigIx}, admin,
+					config.DefaultCommitment)
+			})
+
+			t.Run("RMN", func(t *testing.T) {
+				t.Parallel()
+
+				// get program data account
+				data, err := solanaGoClient.GetAccountInfoWithOpts(
+					ctx,
+					config.RMNRemoteProgram,
+					&rpc.GetAccountInfoOpts{Commitment: config.DefaultCommitment},
+				)
+				require.NoError(t, err)
+
+				// Decode program data
+				var programData ProgramData
+				require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+				// Now, actually initialize the offramp
+				initIx, err := rmn_remote.NewInitializeInstruction(
+					config.RMNRemoteConfigPDA,
+					config.RMNRemoteCursesPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+					config.RMNRemoteProgram,
+					programData.Address,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initIx}, admin,
 					config.DefaultCommitment)
 			})
 		})
@@ -458,14 +490,14 @@ func TestPingPong(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
-				config.DefaultCommitment)
+				config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000_000))
 			require.NotNil(t, result)
 
 			// Check that the CCIP Send event was emitter
 			var event ccip.EventCCIPMessageSent
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
 			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)
-			require.Equal(t, uint64(0), event.SequenceNumber)
+			require.Equal(t, uint64(1), event.SequenceNumber)
 			require.NotNil(t, event.Message)
 		})
 
