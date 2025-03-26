@@ -196,10 +196,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		"ts", ts,
 		"limit", limit*2)
 
-	reports, err := r.processCommitReports(iter, ts, limit)
-	if err != nil {
-		return nil, err
-	}
+	reports := r.processCommitReports(iter, ts, limit)
 
 	lggr.Debugw("decoded commit reports", "reports", reports)
 
@@ -234,9 +231,11 @@ func (r *ccipChainReader) queryCommitReports(
 	)
 }
 
+// processCommitReports decodes the commit reports from the query results
+// and returns the ones that can be properly parsed and validated.
 func (r *ccipChainReader) processCommitReports(
 	iter []types.Sequence, ts time.Time, limit int,
-) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+) []plugintypes2.CommitPluginReportWithMeta {
 	lggr := r.lggr
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
