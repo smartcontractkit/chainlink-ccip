@@ -6,7 +6,7 @@ use super::ocr3base::{ocr3_transmit, ReportContext, Signatures};
 use super::ocr3impl::Ocr3ReportForCommit;
 
 use crate::context::{CloseCommitReportAccount, CommitInput, CommitReportContext, OcrPluginType};
-use crate::event::CommitReportAccepted;
+use crate::event::{CommitReportAccepted, CommitReportPDAClosed};
 use crate::instructions::interfaces::Commit;
 use crate::instructions::v1::rmn::verify_uncursed_cpi;
 use crate::state::{CommitReport, GlobalState};
@@ -252,6 +252,15 @@ impl Commit for Impl {
             ctx.accounts.commit_report.to_account_info(),
             &ctx.accounts.fee_token_receiver,
         )?;
+
+        let merkle_root_array: [u8; 32] = _root
+            .try_into()
+            .map_err(|_| CcipOfframpError::InvalidProof)?;
+
+        emit!(CommitReportPDAClosed {
+            source_chain_selector: _source_chain_selector,
+            merkle_root: merkle_root_array,
+        });
 
         Ok(())
     }
