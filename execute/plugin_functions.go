@@ -265,12 +265,29 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 }
 
 // groupByChainSelector groups the reports by their chain selector.
-func groupByChainSelector(
-	reports []plugintypes2.CommitPluginReportWithMeta) exectypes.CommitObservations {
+func groupByChainSelectorWithFilter(
+	reports []plugintypes2.CommitPluginReportWithMeta,
+	cursedSourceChains map[cciptypes.ChainSelector]bool,
+	lggr logger.Logger,
+) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
+	var filteredRoots int
+
 	for _, report := range reports {
+		// Combine blessed and unblessed merkle roots like the original function
 		merkleRoots := append(report.Report.BlessedMerkleRoots, report.Report.UnblessedMerkleRoots...)
+
 		for _, singleReport := range merkleRoots {
+			// Skip cursed chains
+			if cursedSourceChains != nil && cursedSourceChains[singleReport.ChainSel] {
+				filteredRoots++
+				lggr.Debugw("filtered merkle root from cursed chain",
+					"chainSelector", singleReport.ChainSel,
+					"merkleRoot", singleReport.MerkleRoot.String())
+				continue
+			}
+
+			// Add to result map using the same structure as the original function
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
 				exectypes.CommitData{
 					SourceChain:         singleReport.ChainSel,
@@ -282,6 +299,12 @@ func groupByChainSelector(
 				})
 		}
 	}
+
+	if filteredRoots > 0 {
+		lggr.Infow("filtered cursed chain merkle roots during grouping",
+			"filteredRoots", filteredRoots)
+	}
+
 	return commitReportCache
 }
 

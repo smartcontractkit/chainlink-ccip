@@ -267,6 +267,7 @@ func getPendingReportsForExecution(
 	ccipReader readerpkg.CCIPReader,
 	canExecute CanExecuteHandle,
 	ts time.Time,
+	cursedSourceChains map[cciptypes.ChainSelector]bool,
 	lggr logger.Logger,
 ) (
 	groupedCommits exectypes.CommitObservations,
@@ -280,7 +281,7 @@ func getPendingReportsForExecution(
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
-	groupedCommits = groupByChainSelector(commitReports)
+	groupedCommits = groupByChainSelectorWithFilter(commitReports, cursedSourceChains, lggr)
 	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 

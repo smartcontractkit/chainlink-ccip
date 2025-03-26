@@ -435,9 +435,10 @@ func Test_computeRanges(t *testing.T) {
 	}
 }
 
-func Test_groupByChainSelector(t *testing.T) {
+func Test_groupByChainSelectorWithFilter(t *testing.T) {
 	type args struct {
-		reports []plugintypes2.CommitPluginReportWithMeta
+		reports            []plugintypes2.CommitPluginReportWithMeta
+		cursedSourceChains map[cciptypes.ChainSelector]bool
 	}
 	tests := []struct {
 		name string
@@ -446,17 +447,23 @@ func Test_groupByChainSelector(t *testing.T) {
 	}{
 		{
 			name: "empty",
-			args: args{reports: []plugintypes2.CommitPluginReportWithMeta{}},
+			args: args{
+				reports:            []plugintypes2.CommitPluginReportWithMeta{},
+				cursedSourceChains: nil,
+			},
 			want: exectypes.CommitObservations{},
 		},
 		{
-			name: "reports",
-			args: args{reports: []plugintypes2.CommitPluginReportWithMeta{{
-				Report: cciptypes.CommitPluginReport{
-					BlessedMerkleRoots: []cciptypes.MerkleRootChain{
-						{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
-						{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
-					}}}}},
+			name: "reports with no cursed chains",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{{
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+							{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						}}}},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{},
+			},
 			want: exectypes.CommitObservations{
 				1: {
 					{
@@ -474,11 +481,111 @@ func Test_groupByChainSelector(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "reports with cursed chain 1",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{{
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+							{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						}}}},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{1: true},
+			},
+			want: exectypes.CommitObservations{
+				2: {
+					{
+						SourceChain:         2,
+						MerkleRoot:          cciptypes.Bytes32{2},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
+					},
+				},
+			},
+		},
+		{
+			name: "reports with all chains cursed",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{{
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+							{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						}}}},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{1: true, 2: true},
+			},
+			want: exectypes.CommitObservations{},
+		},
+		{
+			name: "reports with blessed and unblessed merkle roots",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{{
+					Report: cciptypes.CommitPluginReport{
+						BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+						},
+						UnblessedMerkleRoots: []cciptypes.MerkleRootChain{
+							{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						}}}},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{1: true},
+			},
+			want: exectypes.CommitObservations{
+				2: {
+					{
+						SourceChain:         2,
+						MerkleRoot:          cciptypes.Bytes32{2},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
+					},
+				},
+			},
+		},
+		{
+			name: "multiple reports with some cursed chains",
+			args: args{
+				reports: []plugintypes2.CommitPluginReportWithMeta{
+					{
+						Report: cciptypes.CommitPluginReport{
+							BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+								{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+							},
+						},
+					},
+					{
+						Report: cciptypes.CommitPluginReport{
+							BlessedMerkleRoots: []cciptypes.MerkleRootChain{
+								{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+								{ChainSel: 3, SeqNumsRange: cciptypes.NewSeqNumRange(50, 60), MerkleRoot: cciptypes.Bytes32{3}},
+							},
+						},
+					},
+				},
+				cursedSourceChains: map[cciptypes.ChainSelector]bool{2: true},
+			},
+			want: exectypes.CommitObservations{
+				1: {
+					{
+						SourceChain:         1,
+						MerkleRoot:          cciptypes.Bytes32{1},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
+					},
+				},
+				3: {
+					{
+						SourceChain:         3,
+						MerkleRoot:          cciptypes.Bytes32{3},
+						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
+					},
+				},
+			},
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equalf(t, tt.want, groupByChainSelector(tt.args.reports), "groupByChainSelector(%v)", tt.args.reports)
+			// Create a test logger
+			lggr := logger.Test(t)
+			assert.Equalf(t, tt.want, groupByChainSelectorWithFilter(tt.args.reports, tt.args.cursedSourceChains, lggr),
+				"groupByChainSelectorWithFilter(%v, %v)", tt.args.reports, tt.args.cursedSourceChains)
 		})
 	}
 }
