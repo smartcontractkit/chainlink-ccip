@@ -2,6 +2,7 @@ package summary
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -11,6 +12,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
+
+func init() {
+	reportRegex = regexp.MustCompile("^built (\\d+) reports$")
+}
+
+var reportRegex *regexp.Regexp
 
 const padding = "    "
 
@@ -120,39 +127,6 @@ func commitOutcomeSummary(logs []*parse.Data) string {
 					buf.WriteString(strings.Join(parts, bullet))
 				}
 				return fmt.Sprintf(buf.String())
-				/*
-						if t, ok := raw["outcomeType"]; ok {
-							if outcomeType, ok := t.(float64); ok {
-								switch merkleroot.OutcomeType(int(outcomeType)) {
-								case merkleroot.ReportIntervalsSelected:
-									outcomeTypeName = "ReportIntervalsSelected"
-								case merkleroot.ReportGenerated:
-									outcomeTypeName = "ReportGenerated"
-								case merkleroot.ReportEmpty:
-									outcomeTypeName = "ReportEmpty"
-								case merkleroot.ReportInFlight:
-									outcomeTypeName = "ReportInFlight"
-								case merkleroot.ReportTransmitted:
-									outcomeTypeName = "ReportTransmitted"
-								case merkleroot.ReportTransmissionFailed:
-									outcomeTypeName = "ReportTransmissionFailed"
-								default:
-									outcomeTypeName = "unknown"
-								}
-							}
-						}
-						if reportRange, ok := raw["rangesSelectedForReport"].([]any); ok {
-							for _, rng := range reportRange {
-								if v, ok := rng.(map[string]any); ok {
-									i := int(v["chain"].(float64))
-									chain := fmt.Sprintf("%d", i)
-									ranges := fmt.Sprintf("%v", v["seqNumRange"])
-									parts = append(parts, fmt.Sprintf("%s %s", chain, ranges))
-								}
-							}
-						}
-					}
-				*/
 			}
 		}
 	}

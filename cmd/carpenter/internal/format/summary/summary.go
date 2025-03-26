@@ -3,7 +3,6 @@ package summary
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 
 	"golang.org/x/exp/maps"
@@ -14,11 +13,7 @@ import (
 
 func init() {
 	format.Register("summary", basicFormatterFactory, "Analyze logs and print a summary of each OCR round.")
-
-	reportRegex = regexp.MustCompile("^built (\\d+) reports$")
 }
-
-var reportRegex *regexp.Regexp
 
 func basicFormatterFactory(options format.Options) format.Formatter {
 	sr := summaryFormatter{
