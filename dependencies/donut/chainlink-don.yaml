@@ -175,13 +175,17 @@ hooks:
       terminatedWithCode: 0
     container:
       labelSelector:
-        "app.kubernetes.io/name": "chainlink-don"
+        "app.kubernetes.io/component": "chainlink"
     name: "wait-for-chainlink-don-pods"
     events: ["after:deploy:chainlink-don"]
   - name: Wait for ingress hosts
     events: ["after:deploy:chainlink-don"]
     command: crib
     args: ["devspace", "ingress-check"]
+  - name: Wait for rollout status
+    events: ["after:deploy:chainlink-don"]
+    command: kubectl
+    args: ["rollout", "status", "deployment", "-l", "app.kubernetes.io/component=chainlink"]
 profiles:
   # charts
   - name: local-charts
