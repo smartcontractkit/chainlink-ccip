@@ -140,12 +140,12 @@ func validateMessagesConformToCommitReports(
 
 	msgsCount := 0
 	for chain, report := range observedData {
-		for _, data := range report {
-			msgsMap, ok := observedMsgs[chain]
-			if !ok {
-				return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
-			}
+		msgsMap, ok := observedMsgs[chain]
+		if !ok {
+			return fmt.Errorf("no messages observed for chain %d, while report was observed", chain)
+		}
 
+		for _, data := range report {
 			for seqNum := data.SequenceNumberRange.Start(); seqNum <= data.SequenceNumberRange.End(); seqNum++ {
 				_, ok = msgsMap[seqNum]
 				if !ok {
