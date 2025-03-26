@@ -280,9 +280,9 @@ func (r *ccipChainReader) processCommitReports(
 	lggr.Debugw("decoded commit reports", "reports", reports)
 
 	if len(reports) < limit {
-		return reports, nil
+		return reports
 	}
-	return reports[:limit], nil
+	return reports[:limit]
 }
 
 func (r *ccipChainReader) processMerkleRoots(
