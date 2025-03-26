@@ -535,6 +535,7 @@ func (p *Plugin) Close() error {
 		p.tokenPriceProcessor,
 		p.chainFeeProcessor,
 		p.discoveryProcessor,
+		p.ccipReader,
 	}
 
 	// Chains without RMN don't initialize the RMNHomeReader

@@ -370,6 +370,50 @@ func (obj *CrossChainAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	return nil
 }
 
+type GetFeeResult struct {
+	Amount uint64
+	Juels  ag_binary.Uint128
+	Token  ag_solanago.PublicKey
+}
+
+func (obj GetFeeResult) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Amount` param:
+	err = encoder.Encode(obj.Amount)
+	if err != nil {
+		return err
+	}
+	// Serialize `Juels` param:
+	err = encoder.Encode(obj.Juels)
+	if err != nil {
+		return err
+	}
+	// Serialize `Token` param:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *GetFeeResult) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Juels`:
+	err = decoder.Decode(&obj.Juels)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type DestChainState struct {
 	SequenceNumber          uint64
 	SequenceNumberToRestore uint64
