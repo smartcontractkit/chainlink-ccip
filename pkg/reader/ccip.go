@@ -517,6 +517,8 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 	if err != nil {
 		return nil, fmt.Errorf("get onRamp address after query: %w", err)
 	}
+
+	// Ensure the onRamp address hasn't changed during the query.
 	if !bytes.Equal(onRampAddress, onRampAddressAfterQuery) {
 		return nil, fmt.Errorf("onRamp address has changed from %s to %s", onRampAddress, onRampAddressAfterQuery)
 	}
