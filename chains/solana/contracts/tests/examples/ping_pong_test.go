@@ -493,7 +493,7 @@ func TestPingPong(t *testing.T) {
 				config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000_000))
 			require.NotNil(t, result)
 
-			// Check that the CCIP Send event was emitter
+			// Check that the CCIP Send event was emitted
 			var event ccip.EventCCIPMessageSent
 			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
 			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)

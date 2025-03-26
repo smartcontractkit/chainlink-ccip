@@ -127,7 +127,6 @@ pub mod ping_pong_demo {
 
         helpers::respond(
             *ctx.accounts.config,
-            ctx.accounts.ccip_router_program.to_account_info(),
             accounts,
             BigEndianU256::from(1), // start ping-ponging from the beginning
             ctx.bumps.ccip_send_signer,
@@ -177,7 +176,6 @@ pub mod ping_pong_demo {
 
         helpers::respond(
             *ctx.accounts.config,
-            ctx.accounts.ccip_router_program.to_account_info(),
             accounts,
             next_count,
             ctx.bumps.ccip_send_signer,
@@ -190,11 +188,11 @@ mod helpers {
 
     use super::*;
 
-    pub const CCIP_SEND_DISCRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84]; // ccip_send
+    pub const CCIP_SEND_DISCRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84];
+    pub const SVM_EXTRA_ARGS_V1_TAG: u32 = 0x1f3b3aba;
 
     pub fn respond<'info>(
         config: state::Config,
-        _router_program: AccountInfo<'info>,
         accounts: cpi::accounts::CcipSend<'info>,
         ping_pong_count: BigEndianU256,
         signer_bump: u8,
@@ -205,12 +203,9 @@ mod helpers {
             data: data_bytes.to_vec(),
             token_amounts: vec![], // no token transfer
             fee_token: config.fee_token_mint,
-            extra_args: vec![
-                31, 59, 58, 186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0,
-            ], // TODO
+            extra_args: SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec(),
         };
+        let token_indices: &[u8] = &[]; // empty token indexes vec
 
         let seeds = &[seeds::CCIP_SEND_SIGNER, &[signer_bump]];
         let signer_seeds = &[&seeds[..]];
@@ -229,7 +224,7 @@ mod helpers {
         let mut data = CCIP_SEND_DISCRIMINATOR.to_vec();
         data.extend_from_slice(config.counterpart_chain_selector.to_le_bytes().as_ref());
         data.extend_from_slice(&message.try_to_vec().unwrap());
-        data.extend_from_slice(&[0, 0, 0, 0]);
+        data.extend_from_slice(&token_indices.try_to_vec().unwrap());
 
         let instruction = Instruction {
             program_id: config.router,
