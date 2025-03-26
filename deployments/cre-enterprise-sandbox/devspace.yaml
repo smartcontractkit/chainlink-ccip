@@ -139,7 +139,9 @@ profiles:
             vars:
               NAMESPACE: prometheus
               TEMPO_NAME: tempo
-            profiles: []
+              TEMPO_PVC_SIZE: 30Gi
+              TEMPO_RETENTION: 720h # 30d
+            profiles: [enable-persistence]
 
   - name: cluster-services-beholder-gateway
     patches:

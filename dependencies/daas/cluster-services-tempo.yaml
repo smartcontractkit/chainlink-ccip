@@ -18,6 +18,12 @@ vars:
   TEMPO_NAME:
     source: env
     default: tempo
+  TEMPO_PVC_SIZE:
+    source: env
+    default: 5Gi
+  TEMPO_RETENTION:
+    source: env
+    default: 24h
 
 pipelines:
   deploy:
@@ -45,6 +51,7 @@ deployments:
           pullPolicy: IfNotPresent
           updateStrategy: RollingUpdate
           resources: {}
+          retention: ${TEMPO_RETENTION}
 
 hooks:
   - wait:
@@ -56,3 +63,14 @@ hooks:
         app.kubernetes.io/instance: ${TEMPO_NAME}
         app.kubernetes.io/name: ${TEMPO_NAME}
     events: ["after:deploy:tempo"]
+
+profiles:
+  - name: enable-persistence
+    patches:
+      - op: replace
+        path: deployments.tempo.helm.values.persistence
+        value:
+          enabled: true
+          accessModes:
+            - ReadWriteOnce
+          size: 30Gi
