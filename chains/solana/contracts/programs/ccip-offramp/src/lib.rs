@@ -522,7 +522,7 @@ pub mod ccip_offramp {
         )
     }
 
-    pub fn close_commit_report_account<'info>(
+    pub fn close_commit_report_account(
         ctx: Context<CloseCommitReportAccount>,
         source_chain_selector: u64,
         root: Vec<u8>,
