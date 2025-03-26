@@ -274,7 +274,6 @@ func groupByChainSelectorWithFilter(
 	var filteredRoots int
 
 	for _, report := range reports {
-		// Combine blessed and unblessed merkle roots like the original function
 		merkleRoots := append(report.Report.BlessedMerkleRoots, report.Report.UnblessedMerkleRoots...)
 
 		for _, singleReport := range merkleRoots {
@@ -287,7 +286,6 @@ func groupByChainSelectorWithFilter(
 				continue
 			}
 
-			// Add to result map using the same structure as the original function
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
 				exectypes.CommitData{
 					SourceChain:         singleReport.ChainSel,

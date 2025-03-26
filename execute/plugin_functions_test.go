@@ -582,7 +582,6 @@ func Test_groupByChainSelectorWithFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			// Create a test logger
 			lggr := logger.Test(t)
 			assert.Equalf(t, tt.want, groupByChainSelectorWithFilter(tt.args.reports, tt.args.cursedSourceChains, lggr),
 				"groupByChainSelectorWithFilter(%v, %v)", tt.args.reports, tt.args.cursedSourceChains)

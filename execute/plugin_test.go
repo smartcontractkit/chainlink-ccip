@@ -808,7 +808,7 @@ func Test_getPendingReportsForExecution(t *testing.T) {
 				mockReader,
 				tt.canExec,
 				time.Now(),
-				tt.cursedSourceChains, // Pass the cursed chains parameter
+				tt.cursedSourceChains,
 				logger.Test(t),
 			)
 			if !tt.wantErr(t, err, "getPendingReportsForExecution(...)") {
