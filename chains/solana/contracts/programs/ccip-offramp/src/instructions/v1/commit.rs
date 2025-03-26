@@ -265,7 +265,7 @@ fn all_messages_executed(report: &CommitReport) -> bool {
     // it can be converted to 2 * (4^0 + 4^1 + 4^2 + ... + 4^(num_messages - 1))
     // sum is calculated as 2 * (4^num_messages - 1) / 3
     let fully_executed = (4u128.pow(num_messages as u32) - 1) * 2 / 3;
-    return report.execution_states == fully_executed;
+    report.execution_states == fully_executed
 }
 
 // Helper function to convert the SOL from the closed account to wrapped SOL
@@ -401,17 +401,14 @@ mod tests {
             "Failed message does not acount as executed"
         );
         report.execution_states = 2;
-        assert!(
-            all_messages_executed(&report),
-            "Single message should executed"
-        );
+        assert!(all_messages_executed(&report), "Single successful message");
 
         // Add 2 more messages
         report.max_msg_nr += 2;
         report.execution_states = 0b100011;
         assert!(
             !all_messages_executed(&report),
-            "Single message should executed"
+            "Mix - failed, untouched, failed"
         );
         report.execution_states = 0b101010;
         assert!(all_messages_executed(&report), "All messages executed");
