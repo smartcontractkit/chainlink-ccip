@@ -166,7 +166,6 @@ func TestTokenPool(t *testing.T) {
 					releaseOrMint := poolMethodName[1]
 
 					t.Run("setup", func(t *testing.T) {
-
 						type ProgramData struct {
 							DataType uint32
 							Address  solana.PublicKey

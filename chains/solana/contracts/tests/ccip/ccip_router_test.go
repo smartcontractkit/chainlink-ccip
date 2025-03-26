@@ -313,34 +313,40 @@ func TestCCIPRouter(t *testing.T) {
 				token0.Mint,
 				legacyAdmin.PublicKey(),
 			).ValidateAndBuild()
+			require.NoError(t, err)
 			ixTransfer1, err := test_token_pool.NewTransferOwnershipInstruction(
 				token1PoolAdmin.PublicKey(),
 				token1.PoolConfig,
 				token1.Mint,
 				legacyAdmin.PublicKey(),
 			).ValidateAndBuild()
+			require.NoError(t, err)
 			ixTransfer2, err := test_token_pool.NewTransferOwnershipInstruction(
 				token2PoolAdmin.PublicKey(),
 				token2.PoolConfig,
 				token2.Mint,
 				legacyAdmin.PublicKey(),
 			).ValidateAndBuild()
+			require.NoError(t, err)
 
 			ixAccept0, err := test_token_pool.NewAcceptOwnershipInstruction(
 				token0.PoolConfig,
 				token0.Mint,
 				token0PoolAdmin.PublicKey(),
 			).ValidateAndBuild()
+			require.NoError(t, err)
 			ixAccept1, err := test_token_pool.NewAcceptOwnershipInstruction(
 				token1.PoolConfig,
 				token1.Mint,
 				token1PoolAdmin.PublicKey(),
 			).ValidateAndBuild()
+			require.NoError(t, err)
 			ixAccept2, err := test_token_pool.NewAcceptOwnershipInstruction(
 				token2.PoolConfig,
 				token2.Mint,
 				token2PoolAdmin.PublicKey(),
 			).ValidateAndBuild()
+			require.NoError(t, err)
 
 			ixAta0, addr0, err := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint, token0.PoolSigner, token0PoolAdmin.PublicKey())
 			require.NoError(t, err)
