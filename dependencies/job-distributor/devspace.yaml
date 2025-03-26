@@ -104,6 +104,7 @@ profiles:
     activation:
       - vars:
           PROVIDER: "aws"
+          CRIB_EKS_CLUSTER_NAME: "main-stage-cluster"
     merge:
       deployments:
         job-distributor:
@@ -171,6 +172,8 @@ profiles:
         job-distributor:
           helm:
             values:
+              nodeSelector: {}
+              tolerations: []
               ingress:
                 className: alb
                 annotations:

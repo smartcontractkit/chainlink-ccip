@@ -1,0 +1,17 @@
+---
+primary:
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: gp3
+  persistentVolumeClaimRetentionPolicy:
+    enabled: true
+    whenScaled: Delete
+    whenDeleted: Delete
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi

@@ -197,6 +197,7 @@ profiles:
               ENABLE_JOB_DISTRIBUTOR: "true"
 
   - name: aws
+
   - name: beholder
     patches:
       - op: add
@@ -204,7 +205,6 @@ profiles:
         value:
           beholder:
             path: ${DEPENDENCIES_DIR}/beholder
-            #            overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
 
   - name: beholder-kind
