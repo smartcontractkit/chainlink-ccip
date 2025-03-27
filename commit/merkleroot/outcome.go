@@ -363,6 +363,9 @@ func checkForReportTransmission(
 		OutcomeType:                     ReportInFlight,
 		OffRampNextSeqNums:              previousOutcome.OffRampNextSeqNums,
 		ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
+		// Carry over the previous roots since they're still in-flight.
+		// We won't re-report since outcome type is ReportInFlight.
+		RootsToReport: previousOutcome.RootsToReport,
 	}
 }
 
