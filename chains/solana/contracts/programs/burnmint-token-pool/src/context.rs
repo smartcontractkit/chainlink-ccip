@@ -6,7 +6,7 @@ use anchor_spl::{
 use base_token_pool::common::*;
 use ccip_common::seed;
 
-use crate::{ChainConfig, State};
+use crate::{program::BurnmintTokenPool, ChainConfig, State};
 
 #[derive(Accounts)]
 pub struct InitializeTokenPool<'info> {
@@ -19,9 +19,18 @@ pub struct InitializeTokenPool<'info> {
     )]
     pub state: Account<'info, State>, // config PDA for token pool
     pub mint: InterfaceAccount<'info, Mint>, // underlying token that the pool wraps
+
     #[account(mut)]
-    pub authority: Signer<'info>, // anyone can init token pool for a token, but ccip token admin registry controlls who can register pool for token
+    pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, BurnmintTokenPool>,
+
+    // Token pool initialization only allowed by program upgrade authority. Initializing token pools managed
+    // by the CLL deployment of this program is limited to CLL. Users must deploy their own instance of this program.
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ CcipTokenPoolError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
 }
 
 #[derive(Accounts)]

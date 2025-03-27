@@ -148,7 +148,20 @@ func TestBaseTokenPoolHappyPath(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("setup", func(t *testing.T) {
-						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+						type ProgramData struct {
+							DataType uint32
+							Address  solana.PublicKey
+						}
+						// get program data account
+						data, err := solanaGoClient.GetAccountInfoWithOpts(ctx, poolProgram, &rpc.GetAccountInfoOpts{
+							Commitment: config.DefaultCommitment,
+						})
+						require.NoError(t, err)
+						// Decode program data
+						var programData ProgramData
+						require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
+
+						poolInitI, err := tokenpool.NewInitializeInstruction(dumbRamp, config.RMNRemoteProgram, poolConfig, mint, admin.PublicKey(), solana.SystemProgramID, poolProgram, programData.Address).ValidateAndBuild()
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)

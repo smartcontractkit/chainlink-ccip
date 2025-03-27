@@ -340,8 +340,8 @@ impl BaseState {
             proposed_owner,
             CcipReceiverError::OnlyProposedOwner
         );
-        self.proposed_owner = Pubkey::default();
-        self.owner = proposed_owner;
+        // NOTE: take() resets proposed_owner to default
+        self.owner = std::mem::take(&mut self.proposed_owner);
         Ok(())
     }
 
