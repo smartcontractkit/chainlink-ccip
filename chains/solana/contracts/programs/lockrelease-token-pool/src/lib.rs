@@ -113,17 +113,33 @@ pub mod lockrelease_token_pool {
         add: Vec<Pubkey>,
         enabled: bool,
     ) -> Result<()> {
-        ctx.accounts
-            .state
-            .config
-            .update_allow_list(Some(enabled), add, vec![])
+        ctx.accounts.state.config.list_enabled = enabled;
+        let list = &mut ctx.accounts.state.config.allow_list;
+        for key in add {
+            require!(
+                !list.contains(&key),
+                CcipTokenPoolError::AllowlistKeyAlreadyExisted
+            );
+            list.push(key);
+        }
+
+        Ok(())
     }
 
-    pub fn remove_from_allow_list(ctx: Context<SetConfig>, remove: Vec<Pubkey>) -> Result<()> {
-        ctx.accounts
-            .state
-            .config
-            .update_allow_list(None, vec![], remove)
+    pub fn remove_from_allow_list(
+        ctx: Context<RemoveFromAllowlist>,
+        remove: Vec<Pubkey>,
+    ) -> Result<()> {
+        let list = &mut ctx.accounts.state.config.allow_list;
+        for key in remove {
+            require!(
+                list.contains(&key),
+                CcipTokenPoolError::AllowlistKeyDidNotExist
+            );
+            list.retain(|k| k != &key);
+        }
+
+        Ok(())
     }
 
     pub fn release_or_mint_tokens(

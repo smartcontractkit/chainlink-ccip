@@ -130,31 +130,6 @@ impl BaseConfig {
         Ok(())
     }
 
-    pub fn update_allow_list(
-        &mut self,
-        enabled: Option<bool>,
-        add: Vec<Pubkey>,
-        remove: Vec<Pubkey>,
-    ) -> Result<()> {
-        if let Some(enabled_val) = enabled {
-            self.list_enabled = enabled_val;
-        };
-
-        for k in remove {
-            if let Ok(v) = self.allow_list.binary_search(&k) {
-                self.allow_list.remove(v);
-            }
-        }
-
-        for k in add {
-            if let Err(v) = self.allow_list.binary_search(&k) {
-                self.allow_list.insert(v, k);
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn set_rebalancer(&mut self, address: Pubkey) -> Result<()> {
         self.rebalancer = address;
         Ok(())
@@ -404,6 +379,10 @@ pub enum CcipTokenPoolError {
     InvalidToken,
     #[msg("Invalid token amount conversion")]
     InvalidTokenAmountConversion,
+    #[msg("Key already existed in the allowlist")]
+    AllowlistKeyAlreadyExisted,
+    #[msg("Key did not exist in the allowlist")]
+    AllowlistKeyDidNotExist,
 
     // Rate limit errors
     #[msg("RateLimit: bucket overfilled")]
