@@ -185,9 +185,9 @@ mod helpers {
 
     pub const CCIP_SEND_DISCRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84];
 
-    pub fn respond<'info>(
+    pub fn respond(
         config: state::Config,
-        accounts: cpi::accounts::CcipSend<'info>,
+        accounts: cpi::accounts::CcipSend,
         ping_pong_count: BigEndianU256,
         signer_bump: u8,
     ) -> Result<()> {

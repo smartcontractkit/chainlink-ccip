@@ -478,6 +478,9 @@ func TestPingPong(t *testing.T) {
 		})
 
 		generateReceiveIx := func() solana.Instruction {
+			var extraArgs fee_quoter.SVMExtraArgsV1
+			testutils.MustDeserializeExtraArgs(t, &extraArgs, latestSentMsg.ExtraArgs, ccip.SVMExtraArgsV1Tag)
+
 			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
 				test_ccip_invalid_receiver.Any2SVMMessage{
 					SourceChainSelector: latestSentMsg.Header.SourceChainSelector,
@@ -486,14 +489,11 @@ func TestPingPong(t *testing.T) {
 					Data:                latestSentMsg.Data,
 					TokenAmounts:        []example_ccip_receiver.SVMTokenAmount{},
 				},
-				config.PingPongProgram,
+				solana.PublicKey(latestSentMsg.Receiver),
 				reusableAccounts.rampSigner,
 				reusableAccounts.offramp,
 				reusableAccounts.allowedOfframp,
 			)
-
-			var extraArgs fee_quoter.SVMExtraArgsV1
-			testutils.MustDeserializeExtraArgs(t, &extraArgs, latestSentMsg.ExtraArgs, ccip.SVMExtraArgsV1Tag)
 
 			for i, account := range extraArgs.Accounts {
 				meta := solana.Meta(account)
