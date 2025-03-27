@@ -59,7 +59,7 @@ impl RateLimitTokenBucket {
             // This acts as a lower bound of wait time.
             let min_wait_sec = (request_tokens.checked_sub(self.tokens).unwrap()
                 + rate.checked_sub(1).unwrap())
-            .checked_div(self.cfg.rate)
+            .checked_div(rate)
             .unwrap();
 
             // print human readable message before reverting with total wait time

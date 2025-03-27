@@ -117,8 +117,8 @@ pub mod mcm {
         ctx: Context<AcceptOwnership>,
         _multisig_id: [u8; MULTISIG_ID_PADDED],
     ) -> Result<()> {
+        // NOTE: take() resets proposed_owner to default
         ctx.accounts.config.owner = std::mem::take(&mut ctx.accounts.config.proposed_owner);
-        ctx.accounts.config.proposed_owner = Pubkey::new_from_array([0; 32]);
         Ok(())
     }
 

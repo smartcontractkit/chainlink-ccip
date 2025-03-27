@@ -101,8 +101,8 @@ impl BaseConfig {
 
     pub fn accept_ownership(&mut self) -> Result<()> {
         let old_owner = self.owner;
+        // NOTE: take() resets proposed_owner to default
         self.owner = std::mem::take(&mut self.proposed_owner);
-        self.proposed_owner = Pubkey::default();
 
         emit!(OwnershipTransferred {
             from: old_owner,
