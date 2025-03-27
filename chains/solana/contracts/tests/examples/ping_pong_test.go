@@ -399,6 +399,16 @@ func TestPingPong(t *testing.T) {
 
 		var latestSentMsg ccip_router.SVM2AnyRampMessage
 
+		// Check that the CCIP Send event was emitted
+		checkCcipSendEvent := func(expectedSeqNr uint64, logs []string) {
+			var event ccip.EventCCIPMessageSent
+			require.NoError(t, common.ParseEvent(logs, "CCIPMessageSent", &event, config.PrintEvents))
+			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)
+			require.Equal(t, expectedSeqNr, event.SequenceNumber)
+
+			latestSentMsg = event.Message // persist for later reuse
+		}
+
 		t.Run("Start", func(t *testing.T) {
 			ix, err := ping_pong_demo.NewStartPingPongInstruction(
 				reusableAccounts.Config,
@@ -429,17 +439,10 @@ func TestPingPong(t *testing.T) {
 				config.DefaultCommitment)
 			require.NotNil(t, result)
 
-			// Check that the CCIP Send event was emitted
-			var event ccip.EventCCIPMessageSent
-			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
-			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)
-			require.Equal(t, uint64(1), event.SequenceNumber)
-			require.NotNil(t, event.Message)
-
-			latestSentMsg = event.Message
+			checkCcipSendEvent(1, result.Meta.LogMessages)
 		})
 
-		t.Run("Receive & respond (send)", func(t *testing.T) {
+		generateReceiveIx := func() solana.Instruction {
 			raw := test_ccip_invalid_receiver.NewReceiverProxyExecuteInstruction(
 				test_ccip_invalid_receiver.Any2SVMMessage{
 					SourceChainSelector: latestSentMsg.Header.SourceChainSelector,
@@ -454,6 +457,7 @@ func TestPingPong(t *testing.T) {
 				reusableAccounts.allowedOfframp,
 			)
 
+			// TODO read remaining_accounts from the original message
 			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.Config))
 			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.CcipSendSigner).WRITE())
 			raw.AccountMetaSlice.Append(solana.Meta(config.Token2022Program))
@@ -478,26 +482,51 @@ func TestPingPong(t *testing.T) {
 
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
+
+			return ix
+		}
+
+		t.Run("Receive & respond (send)", func(t *testing.T) {
+			ix := generateReceiveIx()
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
 				config.DefaultCommitment, common.AddComputeUnitLimit(400_000))
 			require.NotNil(t, result)
 
-			// Check that the CCIP Send event was emitted
-			var event ccip.EventCCIPMessageSent
-			require.NoError(t, common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
-			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)
-			require.Equal(t, latestSentMsg.Header.SequenceNumber+1, event.SequenceNumber)
-			require.NotNil(t, event.Message)
-
-			latestSentMsg = event.Message
+			checkCcipSendEvent(latestSentMsg.Header.SequenceNumber+1, result.Meta.LogMessages)
 		})
 
 		t.Run("Pause", func(t *testing.T) {
-			t.Skip("TODO")
+			pauseIx, err := ping_pong_demo.NewSetPausedInstruction(
+				true,
+				reusableAccounts.Config,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			receiveIx := generateReceiveIx()
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{pauseIx, receiveIx}, admin,
+				config.DefaultCommitment, common.AddComputeUnitLimit(400_000))
+			require.NotNil(t, result)
+
+			// Check that no CCIP Send event was emitted, as the program is paused
+			var event ccip.EventCCIPMessageSent
+			require.Error(t, common.NewEventNotFoundError("CCIPMessageSent"), common.ParseEvent(result.Meta.LogMessages, "CCIPMessageSent", &event, config.PrintEvents))
 		})
 
 		t.Run("Resume", func(t *testing.T) {
-			t.Skip("TODO")
+			resumeIx, err := ping_pong_demo.NewSetPausedInstruction(
+				false,
+				reusableAccounts.Config,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			receiveIx := generateReceiveIx()
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{resumeIx, receiveIx}, admin,
+				config.DefaultCommitment, common.AddComputeUnitLimit(400_000))
+			require.NotNil(t, result)
+
+			checkCcipSendEvent(latestSentMsg.Header.SequenceNumber+1, result.Meta.LogMessages)
 		})
 	})
 }
