@@ -56,4 +56,3 @@ hooks:
         app.kubernetes.io/instance: ${PROMETHEUS_NAME}
         release: ${PROMETHEUS_NAME}
     events: ["after:deploy:prometheus"]
-
