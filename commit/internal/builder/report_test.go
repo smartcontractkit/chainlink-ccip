@@ -3,6 +3,7 @@ package builder
 import (
 	"fmt"
 	unsaferand "math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -371,4 +372,100 @@ func mustMakeBytes(byteStr string) ccipocr3.Bytes32 {
 		panic(err)
 	}
 	return b
+}
+
+func TestNewReportBuilder(t *testing.T) {
+	type args struct {
+		RMNEnabled              bool
+		MaxPricesPerReport      uint64
+		MaxMerkleRootsPerReport uint64
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    ReportBuilderFunc
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "RMN enabled",
+			args: args{
+				RMNEnabled:              true,
+				MaxPricesPerReport:      0,
+				MaxMerkleRootsPerReport: 0,
+			},
+			want:    buildStandardReport,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "RMN enabled with max prices",
+			args: args{
+				RMNEnabled:              true,
+				MaxPricesPerReport:      1,
+				MaxMerkleRootsPerReport: 0,
+			},
+			want:    nil,
+			wantErr: assert.Error,
+		},
+		{
+			name: "RMN enabled with max roots",
+			args: args{
+				RMNEnabled:              true,
+				MaxPricesPerReport:      0,
+				MaxMerkleRootsPerReport: 1,
+			},
+			want:    nil,
+			wantErr: assert.Error,
+		},
+		{
+			name: "RMN disabled",
+			args: args{
+				RMNEnabled:              false,
+				MaxPricesPerReport:      0,
+				MaxMerkleRootsPerReport: 0,
+			},
+			want:    buildStandardReport,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "RMN disabled with prices",
+			args: args{
+				RMNEnabled:              false,
+				MaxPricesPerReport:      1,
+				MaxMerkleRootsPerReport: 0,
+			},
+			want:    buildMultiplePriceAndMerkleRootReports,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "RMN disabled with prices and roots",
+			args: args{
+				RMNEnabled:              false,
+				MaxPricesPerReport:      1,
+				MaxMerkleRootsPerReport: 1,
+			},
+			want:    buildMultiplePriceAndMerkleRootReports,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "RMN disabled with roots",
+			args: args{
+				RMNEnabled:              false,
+				MaxPricesPerReport:      0,
+				MaxMerkleRootsPerReport: 1,
+			},
+			want:    buildMultipleMerkleRootReports,
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewReportBuilder(tt.args.RMNEnabled, tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)
+			if !tt.wantErr(t, err, fmt.Sprintf("NewReportBuilder(%v, %v, %v)", tt.args.RMNEnabled, tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)) {
+				return
+			}
+			wantFunc := reflect.ValueOf(tt.want).Pointer()
+			gotFunc := reflect.ValueOf(got).Pointer()
+			assert.Equalf(t, wantFunc, gotFunc, "NewReportBuilder(%v, %v, %v)", tt.args.RMNEnabled, tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)
+		})
+	}
 }

@@ -217,7 +217,11 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
 	}
 
-	reportBuilder, err := builder.NewReportBuilder(offchainConfig)
+	reportBuilder, err := builder.NewReportBuilder(
+		offchainConfig.RMNEnabled,
+		offchainConfig.MaxMerkleRootsPerReport,
+		offchainConfig.MaxPricesPerReport,
+	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create report builder: %w", err)
 	}

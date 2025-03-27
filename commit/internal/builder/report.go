@@ -25,26 +25,23 @@ type ReportBuilderFunc func(
 ) ([]ocr3types.ReportPlus[[]byte], error)
 
 // NewReportBuilder returns a ReportBuilderFunc based on the provided config.
-func NewReportBuilder(config pluginconfig.CommitOffchainConfig) (ReportBuilderFunc, error) {
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid commit offchain config: %w", err)
-	}
-
+func NewReportBuilder(RMNEnabled bool, MaxMerkleRootsPerReport, MaxPricesPerReport uint64) (ReportBuilderFunc, error) {
 	// These options were added to allow for more flexibility around report building. For example Solana
 	// only supports a single merkle root per report.
 
-	// Currently RMN is only supported for standard reports. Because the config is validated,
-	// we can assume that if RMN is enabled, we are building a standard report.
-	if config.RMNEnabled {
+	if RMNEnabled {
+		if MaxPricesPerReport != 0 || MaxMerkleRootsPerReport != 0 {
+			return nil, fmt.Errorf("RMNEnabled is not supported with MaxPricesPerReport or MaxMerkleRootsPerReport set")
+		}
 		return buildStandardReport, nil
 	}
 
-	// MaxPricesPerReport includes MaxMerkleRootsPerReport, so check it first.
-	if config.MaxPricesPerReport != 0 {
+	// MaxPricesPerReport is a superset of MaxMerkleRootsPerReport, so check it first.
+	if MaxPricesPerReport != 0 {
 		return buildMultiplePriceAndMerkleRootReports, nil
 	}
 
-	if config.MaxMerkleRootsPerReport != 0 {
+	if MaxMerkleRootsPerReport != 0 {
 		return buildMultipleMerkleRootReports, nil
 	}
 
