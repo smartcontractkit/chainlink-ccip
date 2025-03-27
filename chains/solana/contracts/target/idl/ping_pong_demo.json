@@ -54,12 +54,8 @@
           "type": "bool"
         },
         {
-          "name": "defaultGasLimit",
-          "type": "u64"
-        },
-        {
-          "name": "outOfOrderExecution",
-          "type": "bool"
+          "name": "extraArgs",
+          "type": "bytes"
         }
       ]
     },
@@ -172,7 +168,7 @@
       ]
     },
     {
-      "name": "setOutOfOrderExecution",
+      "name": "setExtraArgs",
       "accounts": [
         {
           "name": "config",
@@ -183,12 +179,17 @@
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "outOfOrderExecution",
-          "type": "bool"
+          "name": "extraArgs",
+          "type": "bytes"
         }
       ]
     },
@@ -579,12 +580,8 @@
             "type": "publicKey"
           },
           {
-            "name": "defaultGasLimit",
-            "type": "u64"
-          },
-          {
-            "name": "outOfOrderExecution",
-            "type": "bool"
+            "name": "extraArgs",
+            "type": "bytes"
           }
         ]
       }

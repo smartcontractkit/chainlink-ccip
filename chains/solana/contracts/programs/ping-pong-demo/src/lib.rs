@@ -24,16 +24,14 @@ pub mod ping_pong_demo {
         counterpart_chain_selector: u64,
         counterpart_address: Vec<u8>,
         is_paused: bool,
-        default_gas_limit: u64,
-        out_of_order_execution: bool,
+        extra_args: Vec<u8>,
     ) -> Result<()> {
         ctx.accounts.config.set_inner(state::Config {
             router,
             counterpart_chain_selector,
             counterpart_address: counterpart_address.try_into()?,
             is_paused,
-            default_gas_limit,
-            out_of_order_execution,
+            extra_args,
 
             fee_token_mint: ctx.accounts.fee_token_mint.key(),
 
@@ -47,7 +45,7 @@ pub mod ping_pong_demo {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts.name_version.set_inner(state::NameVersion {
             name: "ping-pong-demo".to_string(),
-            version: "1.5.0".to_string(), // TODO confirm if we keep EVM version here
+            version: "1.6.0".to_string(),
         });
 
         let seeds = &[seeds::CCIP_SEND_SIGNER, &[ctx.bumps.ccip_send_signer]];
@@ -83,11 +81,8 @@ pub mod ping_pong_demo {
         Ok(())
     }
 
-    pub fn set_out_of_order_execution(
-        ctx: Context<UpdateConfig>,
-        out_of_order_execution: bool,
-    ) -> Result<()> {
-        ctx.accounts.config.out_of_order_execution = out_of_order_execution;
+    pub fn set_extra_args(ctx: Context<UpdateReallocConfig>, extra_args: Vec<u8>) -> Result<()> {
+        ctx.accounts.config.extra_args = extra_args;
         Ok(())
     }
 
@@ -126,7 +121,7 @@ pub mod ping_pong_demo {
         };
 
         helpers::respond(
-            *ctx.accounts.config,
+            ctx.accounts.config.clone().into_inner(),
             accounts,
             BigEndianU256::from(1), // start ping-ponging from the beginning
             ctx.bumps.ccip_send_signer,
@@ -175,7 +170,7 @@ pub mod ping_pong_demo {
         };
 
         helpers::respond(
-            *ctx.accounts.config,
+            ctx.accounts.config.clone().into_inner(),
             accounts,
             next_count,
             ctx.bumps.ccip_send_signer,
@@ -189,7 +184,6 @@ mod helpers {
     use super::*;
 
     pub const CCIP_SEND_DISCRIMINATOR: [u8; 8] = [108, 216, 134, 191, 249, 234, 33, 84];
-    pub const SVM_EXTRA_ARGS_V1_TAG: u32 = 0x1f3b3aba;
 
     pub fn respond<'info>(
         config: state::Config,
@@ -203,7 +197,7 @@ mod helpers {
             data: data_bytes.to_vec(),
             token_amounts: vec![], // no token transfer
             fee_token: config.fee_token_mint,
-            extra_args: SVM_EXTRA_ARGS_V1_TAG.to_be_bytes().to_vec(),
+            extra_args: config.extra_args,
         };
         let token_indices: &[u8] = &[]; // empty token indexes vec
 
@@ -324,12 +318,19 @@ pub mod context {
     }
 
     #[derive(Accounts)]
+    #[instruction(
+        _router: Pubkey,
+        _counterpart_chain_selector: u64,
+        _counterpart_address: Vec<u8>,
+        _is_paused: bool,
+        extra_args: Vec<u8>,
+    )]
     pub struct InitializeConfig<'info> {
         #[account(
             init,
             seeds = [seeds::CONFIG],
             bump,
-            space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
+            space = Config::get_space(&extra_args),
             payer = authority,
         )]
         pub config: Account<'info, Config>,
@@ -420,6 +421,28 @@ pub mod context {
             address = config.owner @ PingPongDemoError::Unauthorized,
         )]
         pub authority: Signer<'info>,
+    }
+
+    #[derive(Accounts)]
+    #[instruction(extra_args: Vec<u8>)]
+    pub struct UpdateReallocConfig<'info> {
+        #[account(
+            mut,
+            seeds = [seeds::CONFIG],
+            bump,
+            realloc = Config::get_space(&extra_args),
+            realloc::payer = authority,
+            realloc::zero = false,
+        )]
+        pub config: Account<'info, Config>,
+
+        #[account(
+            mut,
+            address = config.owner @ PingPongDemoError::Unauthorized,
+        )]
+        pub authority: Signer<'info>,
+
+        pub system_program: Program<'info, System>,
     }
 
     #[derive(Accounts)]
@@ -604,7 +627,7 @@ pub mod state {
     use super::*;
 
     #[account]
-    #[derive(InitSpace, Copy)]
+    #[derive(InitSpace)]
     pub struct Config {
         pub owner: Pubkey, // The owner of the contract.
 
@@ -616,8 +639,15 @@ pub mod state {
         pub fee_token_mint: Pubkey, // The fee token used to pay for CCIP transactions.
 
         // Extra args on ccip_send
-        pub default_gas_limit: u64, // Default gas limit used for EVMExtraArgsV2 construction.
-        pub out_of_order_execution: bool, // Allowing out of order execution.
+        #[max_len(0)]
+        pub extra_args: Vec<u8>, // pub default_gas_limit: u64, // Default gas limit used for EVMExtraArgsV2 construction.
+                                 // pub out_of_order_execution: bool, // Allowing out of order execution.
+    }
+
+    impl Config {
+        pub fn get_space(extra_args: &[u8]) -> usize {
+            ANCHOR_DISCRIMINATOR + Config::INIT_SPACE + extra_args.len()
+        }
     }
 
     #[account]

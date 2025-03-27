@@ -16,8 +16,7 @@ type InitializeConfig struct {
 	CounterpartChainSelector *uint64
 	CounterpartAddress       *[]byte
 	IsPaused                 *bool
-	DefaultGasLimit          *uint64
-	OutOfOrderExecution      *bool
+	ExtraArgs                *[]byte
 
 	// [0] = [WRITE] config
 	//
@@ -65,15 +64,9 @@ func (inst *InitializeConfig) SetIsPaused(isPaused bool) *InitializeConfig {
 	return inst
 }
 
-// SetDefaultGasLimit sets the "defaultGasLimit" parameter.
-func (inst *InitializeConfig) SetDefaultGasLimit(defaultGasLimit uint64) *InitializeConfig {
-	inst.DefaultGasLimit = &defaultGasLimit
-	return inst
-}
-
-// SetOutOfOrderExecution sets the "outOfOrderExecution" parameter.
-func (inst *InitializeConfig) SetOutOfOrderExecution(outOfOrderExecution bool) *InitializeConfig {
-	inst.OutOfOrderExecution = &outOfOrderExecution
+// SetExtraArgs sets the "extraArgs" parameter.
+func (inst *InitializeConfig) SetExtraArgs(extraArgs []byte) *InitializeConfig {
+	inst.ExtraArgs = &extraArgs
 	return inst
 }
 
@@ -175,11 +168,8 @@ func (inst *InitializeConfig) Validate() error {
 		if inst.IsPaused == nil {
 			return errors.New("IsPaused parameter is not set")
 		}
-		if inst.DefaultGasLimit == nil {
-			return errors.New("DefaultGasLimit parameter is not set")
-		}
-		if inst.OutOfOrderExecution == nil {
-			return errors.New("OutOfOrderExecution parameter is not set")
+		if inst.ExtraArgs == nil {
+			return errors.New("ExtraArgs parameter is not set")
 		}
 	}
 
@@ -216,13 +206,12 @@ func (inst *InitializeConfig) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=6]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("                  Router", *inst.Router))
 						paramsBranch.Child(ag_format.Param("CounterpartChainSelector", *inst.CounterpartChainSelector))
 						paramsBranch.Child(ag_format.Param("      CounterpartAddress", *inst.CounterpartAddress))
 						paramsBranch.Child(ag_format.Param("                IsPaused", *inst.IsPaused))
-						paramsBranch.Child(ag_format.Param("         DefaultGasLimit", *inst.DefaultGasLimit))
-						paramsBranch.Child(ag_format.Param("     OutOfOrderExecution", *inst.OutOfOrderExecution))
+						paramsBranch.Child(ag_format.Param("               ExtraArgs", *inst.ExtraArgs))
 					})
 
 					// Accounts of the instruction:
@@ -259,13 +248,8 @@ func (obj InitializeConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err 
 	if err != nil {
 		return err
 	}
-	// Serialize `DefaultGasLimit` param:
-	err = encoder.Encode(obj.DefaultGasLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `OutOfOrderExecution` param:
-	err = encoder.Encode(obj.OutOfOrderExecution)
+	// Serialize `ExtraArgs` param:
+	err = encoder.Encode(obj.ExtraArgs)
 	if err != nil {
 		return err
 	}
@@ -292,13 +276,8 @@ func (obj *InitializeConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	if err != nil {
 		return err
 	}
-	// Deserialize `DefaultGasLimit`:
-	err = decoder.Decode(&obj.DefaultGasLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OutOfOrderExecution`:
-	err = decoder.Decode(&obj.OutOfOrderExecution)
+	// Deserialize `ExtraArgs`:
+	err = decoder.Decode(&obj.ExtraArgs)
 	if err != nil {
 		return err
 	}
@@ -312,8 +291,7 @@ func NewInitializeConfigInstruction(
 	counterpartChainSelector uint64,
 	counterpartAddress []byte,
 	isPaused bool,
-	defaultGasLimit uint64,
-	outOfOrderExecution bool,
+	extraArgs []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	feeTokenMint ag_solanago.PublicKey,
@@ -326,8 +304,7 @@ func NewInitializeConfigInstruction(
 		SetCounterpartChainSelector(counterpartChainSelector).
 		SetCounterpartAddress(counterpartAddress).
 		SetIsPaused(isPaused).
-		SetDefaultGasLimit(defaultGasLimit).
-		SetOutOfOrderExecution(outOfOrderExecution).
+		SetExtraArgs(extraArgs).
 		SetConfigAccount(config).
 		SetFeeTokenMintAccount(feeTokenMint).
 		SetAuthorityAccount(authority).

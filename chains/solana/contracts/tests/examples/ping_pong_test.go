@@ -41,6 +41,7 @@ type ReusableAccounts struct {
 	offramp        solana.PublicKey
 	allowedOfframp solana.PublicKey
 	rampSigner     solana.PublicKey
+	nonce          solana.PublicKey
 }
 
 func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccounts {
@@ -63,6 +64,8 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 	require.NoError(t, err)
 	rampSigner, _, err := state.FindExternalExecutionConfigPDA(dumbRamp)
 	require.NoError(t, err)
+	nonce, err := state.FindNoncePDA(config.SvmChainSelector, ppCcipSendSigner, config.CcipRouterProgram)
+	require.NoError(t, err)
 
 	return ReusableAccounts{
 		FeeTokenATA:           ppLinkAta,
@@ -74,6 +77,7 @@ func getReusableAccounts(t *testing.T, linkMint solana.PublicKey) ReusableAccoun
 		offramp:               dumbRamp,
 		allowedOfframp:        allowedOfframp,
 		rampSigner:            rampSigner,
+		nonce:                 nonce,
 	}
 }
 
@@ -311,6 +315,40 @@ func TestPingPong(t *testing.T) {
 
 	t.Run("Configure PingPong", func(t *testing.T) {
 		t.Run("Initialize Config", func(t *testing.T) {
+			extraArgs := testutils.MustSerializeExtraArgs(
+				t,
+				fee_quoter.SVMExtraArgsV1{
+					ComputeUnits:             400_000,
+					AccountIsWritableBitmap:  ccip.GenerateBitMapForIndexes([]int{1, 4, 7, 8, 9, 19}),
+					AllowOutOfOrderExecution: true,
+					TokenReceiver:            [32]uint8{}, // none, no token transfer
+					Accounts: [][32]uint8{
+						reusableAccounts.Config,
+						reusableAccounts.CcipSendSigner, // 1
+						config.Token2022Program,
+						linkMint,
+						reusableAccounts.FeeTokenATA, // 4
+						config.CcipRouterProgram,
+						config.RouterConfigPDA,
+						config.SvmDestChainStatePDA,            // 7
+						reusableAccounts.nonce,                 // 8
+						reusableAccounts.routerBillingReceiver, // 9
+						config.BillingSignerPDA,
+						config.FeeQuoterProgram,
+						config.FqConfigPDA,
+						config.FqSvmDestChainPDA,
+						reusableAccounts.fqBillingConfig,
+						reusableAccounts.fqBillingConfig,
+						config.RMNRemoteProgram,
+						config.RMNRemoteCursesPDA,
+						config.RMNRemoteConfigPDA,
+						config.ExternalTokenPoolsSignerPDA, // 19
+						solana.SystemProgramID,
+					},
+				},
+				ccip.SVMExtraArgsV1Tag, // msg has SVM as destination
+			)
+
 			type ProgramData struct {
 				DataType uint32
 				Address  solana.PublicKey
@@ -330,8 +368,7 @@ func TestPingPong(t *testing.T) {
 				config.SvmChainSelector,
 				config.PingPongProgram[:],
 				true, // isPaused
-				0,    // default gas limit
-				true, // out of order
+				extraArgs,
 				reusableAccounts.Config,
 				linkMint,
 				admin.PublicKey(),
@@ -394,13 +431,11 @@ func TestPingPong(t *testing.T) {
 	})
 
 	t.Run("PingPong", func(t *testing.T) {
-		noncePDA, err := state.FindNoncePDA(config.SvmChainSelector, reusableAccounts.CcipSendSigner, config.CcipRouterProgram)
-		require.NoError(t, err)
 
 		var latestSentMsg ccip_router.SVM2AnyRampMessage
 
 		// Check that the CCIP Send event was emitted
-		checkCcipSendEvent := func(expectedSeqNr uint64, logs []string) {
+		checkEventCCIPMessageSent := func(expectedSeqNr uint64, logs []string) {
 			var event ccip.EventCCIPMessageSent
 			require.NoError(t, common.ParseEvent(logs, "CCIPMessageSent", &event, config.PrintEvents))
 			require.Equal(t, config.SvmChainSelector, event.DestinationChainSelector)
@@ -420,7 +455,7 @@ func TestPingPong(t *testing.T) {
 				config.CcipRouterProgram,
 				config.RouterConfigPDA,
 				config.SvmDestChainStatePDA,
-				noncePDA,
+				reusableAccounts.nonce,
 				reusableAccounts.routerBillingReceiver,
 				config.BillingSignerPDA,
 				config.FeeQuoterProgram,
@@ -439,7 +474,7 @@ func TestPingPong(t *testing.T) {
 				config.DefaultCommitment)
 			require.NotNil(t, result)
 
-			checkCcipSendEvent(1, result.Meta.LogMessages)
+			checkEventCCIPMessageSent(1, result.Meta.LogMessages)
 		})
 
 		generateReceiveIx := func() solana.Instruction {
@@ -457,28 +492,16 @@ func TestPingPong(t *testing.T) {
 				reusableAccounts.allowedOfframp,
 			)
 
-			// TODO read remaining_accounts from the original message
-			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.Config))
-			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.CcipSendSigner).WRITE())
-			raw.AccountMetaSlice.Append(solana.Meta(config.Token2022Program))
-			raw.AccountMetaSlice.Append(solana.Meta(linkMint))
-			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.FeeTokenATA).WRITE())
-			raw.AccountMetaSlice.Append(solana.Meta(config.CcipRouterProgram))
-			raw.AccountMetaSlice.Append(solana.Meta(config.RouterConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(config.SvmDestChainStatePDA).WRITE())
-			raw.AccountMetaSlice.Append(solana.Meta(noncePDA).WRITE())
-			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.routerBillingReceiver).WRITE())
-			raw.AccountMetaSlice.Append(solana.Meta(config.BillingSignerPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(config.FeeQuoterProgram))
-			raw.AccountMetaSlice.Append(solana.Meta(config.FqConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(config.FqSvmDestChainPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.fqBillingConfig))
-			raw.AccountMetaSlice.Append(solana.Meta(reusableAccounts.fqBillingConfig))
-			raw.AccountMetaSlice.Append(solana.Meta(config.RMNRemoteProgram))
-			raw.AccountMetaSlice.Append(solana.Meta(config.RMNRemoteCursesPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(config.RMNRemoteConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(config.ExternalTokenPoolsSignerPDA).WRITE())
-			raw.AccountMetaSlice.Append(solana.Meta(solana.SystemProgramID))
+			var extraArgs fee_quoter.SVMExtraArgsV1
+			testutils.MustDeserializeExtraArgs(t, &extraArgs, latestSentMsg.ExtraArgs, ccip.SVMExtraArgsV1Tag)
+
+			for i, account := range extraArgs.Accounts {
+				meta := solana.Meta(account)
+				if (extraArgs.AccountIsWritableBitmap & (uint64(1) << i)) != 0 {
+					meta.WRITE()
+				}
+				raw.AccountMetaSlice.Append(meta)
+			}
 
 			ix, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
@@ -492,7 +515,7 @@ func TestPingPong(t *testing.T) {
 				config.DefaultCommitment, common.AddComputeUnitLimit(400_000))
 			require.NotNil(t, result)
 
-			checkCcipSendEvent(latestSentMsg.Header.SequenceNumber+1, result.Meta.LogMessages)
+			checkEventCCIPMessageSent(latestSentMsg.Header.SequenceNumber+1, result.Meta.LogMessages)
 		})
 
 		t.Run("Pause", func(t *testing.T) {
@@ -526,7 +549,7 @@ func TestPingPong(t *testing.T) {
 				config.DefaultCommitment, common.AddComputeUnitLimit(400_000))
 			require.NotNil(t, result)
 
-			checkCcipSendEvent(latestSentMsg.Header.SequenceNumber+1, result.Meta.LogMessages)
+			checkEventCCIPMessageSent(latestSentMsg.Header.SequenceNumber+1, result.Meta.LogMessages)
 		})
 	})
 }

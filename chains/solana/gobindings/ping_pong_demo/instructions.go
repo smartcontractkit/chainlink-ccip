@@ -36,7 +36,7 @@ var (
 
 	Instruction_SetPaused = ag_binary.TypeID([8]byte{91, 60, 125, 192, 176, 225, 166, 218})
 
-	Instruction_SetOutOfOrderExecution = ag_binary.TypeID([8]byte{4, 56, 160, 234, 172, 187, 9, 134})
+	Instruction_SetExtraArgs = ag_binary.TypeID([8]byte{103, 87, 237, 252, 141, 176, 81, 193})
 
 	Instruction_StartPingPong = ag_binary.TypeID([8]byte{53, 36, 169, 135, 221, 239, 52, 103})
 
@@ -54,8 +54,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "SetCounterpart"
 	case Instruction_SetPaused:
 		return "SetPaused"
-	case Instruction_SetOutOfOrderExecution:
-		return "SetOutOfOrderExecution"
+	case Instruction_SetExtraArgs:
+		return "SetExtraArgs"
 	case Instruction_StartPingPong:
 		return "StartPingPong"
 	case Instruction_CcipReceive:
@@ -93,7 +93,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"set_paused", (*SetPaused)(nil),
 		},
 		{
-			"set_out_of_order_execution", (*SetOutOfOrderExecution)(nil),
+			"set_extra_args", (*SetExtraArgs)(nil),
 		},
 		{
 			"start_ping_pong", (*StartPingPong)(nil),

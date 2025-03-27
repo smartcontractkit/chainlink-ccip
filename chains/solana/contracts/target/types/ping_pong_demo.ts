@@ -54,12 +54,8 @@ export type PingPongDemo = {
           "type": "bool"
         },
         {
-          "name": "defaultGasLimit",
-          "type": "u64"
-        },
-        {
-          "name": "outOfOrderExecution",
-          "type": "bool"
+          "name": "extraArgs",
+          "type": "bytes"
         }
       ]
     },
@@ -172,7 +168,7 @@ export type PingPongDemo = {
       ]
     },
     {
-      "name": "setOutOfOrderExecution",
+      "name": "setExtraArgs",
       "accounts": [
         {
           "name": "config",
@@ -183,12 +179,17 @@ export type PingPongDemo = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "outOfOrderExecution",
-          "type": "bool"
+          "name": "extraArgs",
+          "type": "bytes"
         }
       ]
     },
@@ -579,12 +580,8 @@ export type PingPongDemo = {
             "type": "publicKey"
           },
           {
-            "name": "defaultGasLimit",
-            "type": "u64"
-          },
-          {
-            "name": "outOfOrderExecution",
-            "type": "bool"
+            "name": "extraArgs",
+            "type": "bytes"
           }
         ]
       }
@@ -704,12 +701,8 @@ export const IDL: PingPongDemo = {
           "type": "bool"
         },
         {
-          "name": "defaultGasLimit",
-          "type": "u64"
-        },
-        {
-          "name": "outOfOrderExecution",
-          "type": "bool"
+          "name": "extraArgs",
+          "type": "bytes"
         }
       ]
     },
@@ -822,7 +815,7 @@ export const IDL: PingPongDemo = {
       ]
     },
     {
-      "name": "setOutOfOrderExecution",
+      "name": "setExtraArgs",
       "accounts": [
         {
           "name": "config",
@@ -833,12 +826,17 @@ export const IDL: PingPongDemo = {
           "name": "authority",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "outOfOrderExecution",
-          "type": "bool"
+          "name": "extraArgs",
+          "type": "bytes"
         }
       ]
     },
@@ -1229,12 +1227,8 @@ export const IDL: PingPongDemo = {
             "type": "publicKey"
           },
           {
-            "name": "defaultGasLimit",
-            "type": "u64"
-          },
-          {
-            "name": "outOfOrderExecution",
-            "type": "bool"
+            "name": "extraArgs",
+            "type": "bytes"
           }
         ]
       }

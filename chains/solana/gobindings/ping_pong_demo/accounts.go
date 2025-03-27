@@ -15,8 +15,7 @@ type Config struct {
 	CounterpartAddress       CounterpartAddress
 	IsPaused                 bool
 	FeeTokenMint             ag_solanago.PublicKey
-	DefaultGasLimit          uint64
-	OutOfOrderExecution      bool
+	ExtraArgs                []byte
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -57,13 +56,8 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `DefaultGasLimit` param:
-	err = encoder.Encode(obj.DefaultGasLimit)
-	if err != nil {
-		return err
-	}
-	// Serialize `OutOfOrderExecution` param:
-	err = encoder.Encode(obj.OutOfOrderExecution)
+	// Serialize `ExtraArgs` param:
+	err = encoder.Encode(obj.ExtraArgs)
 	if err != nil {
 		return err
 	}
@@ -114,13 +108,8 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `DefaultGasLimit`:
-	err = decoder.Decode(&obj.DefaultGasLimit)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OutOfOrderExecution`:
-	err = decoder.Decode(&obj.OutOfOrderExecution)
+	// Deserialize `ExtraArgs`:
+	err = decoder.Decode(&obj.ExtraArgs)
 	if err != nil {
 		return err
 	}
