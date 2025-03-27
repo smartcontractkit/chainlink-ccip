@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
@@ -13,7 +12,6 @@ import (
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/model"
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/rmn"
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/utils"
-	"go.uber.org/zap"
 )
 
 type RMNConfigurer struct {
@@ -97,8 +95,6 @@ func (r RMNConfigurer) GenerateTOMLConfigs() {
 		os.Exit(1)
 	}
 
-	// printChainStateViews(logger, envConfig, state)
-
 	logger.Debugw("generating shared-toml config")
 
 	nodesDetails := r.envStateReader.ReadNodesDetails()
@@ -114,23 +110,6 @@ func (r RMNConfigurer) GenerateTOMLConfigs() {
 	if err != nil {
 		logger.Fatalw("failed to generate local TOML", "err", err)
 		os.Exit(1)
-	}
-}
-
-// useful for debugging
-//
-//nolint:unused
-func printChainStateViews(logger *zap.SugaredLogger, envConfig *devenv.EnvironmentConfig, state changeset.CCIPOnChainState) {
-	for _, chain := range envConfig.Chains {
-		chainSelector, ok := chainsel.ChainByEvmChainID(chain.ChainID)
-		if !ok {
-			continue
-		}
-		view, err := state.View([]uint64{chainSelector.Selector})
-		if err != nil {
-			logger.Fatalw("failed to load chain view", "err", err, "chainID", chain.ChainID)
-		}
-		logger.Infow("chain state view", "chainID", chain, "view", view)
 	}
 }
 
