@@ -392,6 +392,10 @@ pub enum FeeQuoterError {
     ExtraArgOutOfOrderExecutionMustBeTrue,
     #[msg("Invalid extra args tag")]
     InvalidExtraArgsTag,
+    #[msg("Invalid amount of accounts in extra args")]
+    InvalidExtraArgsAccounts,
+    #[msg("Invalid writability bitmap in extra args")]
+    InvalidExtraArgsWritabilityBitmap,
     #[msg("Invalid chain family selector")]
     InvalidChainFamilySelector,
     #[msg("Invalid token receiver")]
