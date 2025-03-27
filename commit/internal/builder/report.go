@@ -30,18 +30,18 @@ func NewReportBuilder(RMNEnabled bool, MaxMerkleRootsPerReport, MaxPricesPerRepo
 	// only supports a single merkle root per report.
 
 	if RMNEnabled {
-		if MaxPricesPerReport != 0 || MaxMerkleRootsPerReport != 0 {
+		if MaxPricesPerReport > 0 || MaxMerkleRootsPerReport > 0 {
 			return nil, fmt.Errorf("RMNEnabled is not supported with MaxPricesPerReport or MaxMerkleRootsPerReport set")
 		}
 		return buildStandardReport, nil
 	}
 
 	// MaxPricesPerReport is a superset of MaxMerkleRootsPerReport, so check it first.
-	if MaxPricesPerReport != 0 {
+	if MaxPricesPerReport > 0 {
 		return buildMultiplePriceAndMerkleRootReports, nil
 	}
 
-	if MaxMerkleRootsPerReport != 0 {
+	if MaxMerkleRootsPerReport > 0 {
 		return buildMultipleMerkleRootReports, nil
 	}
 

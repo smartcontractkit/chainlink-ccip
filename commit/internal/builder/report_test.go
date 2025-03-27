@@ -459,8 +459,8 @@ func TestNewReportBuilder(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewReportBuilder(tt.args.RMNEnabled, tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)
-			if !tt.wantErr(t, err, fmt.Sprintf("NewReportBuilder(%v, %v, %v)", tt.args.RMNEnabled, tt.args.MaxPricesPerReport, tt.args.MaxMerkleRootsPerReport)) {
+			got, err := NewReportBuilder(tt.args.RMNEnabled, tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)
+			if !tt.wantErr(t, err, fmt.Sprintf("NewReportBuilder(%v, %v, %v)", tt.args.RMNEnabled, tt.args.MaxMerkleRootsPerReport, tt.args.MaxPricesPerReport)) {
 				return
 			}
 			wantFunc := reflect.ValueOf(tt.want).Pointer()
