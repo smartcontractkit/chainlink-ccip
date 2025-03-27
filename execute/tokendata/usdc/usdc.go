@@ -240,7 +240,7 @@ func (u *USDCTokenDataObserver) attestationToTokenData(
 	if status.Error != nil {
 		return exectypes.NewErrorTokenData(status.Error)
 	}
-	tokenData, err := u.attestationEncoder(ctx, status.ID, status.Attestation)
+	tokenData, err := u.attestationEncoder(ctx, status.MessageBody, status.Attestation)
 	if err != nil {
 		return exectypes.NewErrorTokenData(fmt.Errorf("unable to encode attestation: %w", err))
 	}

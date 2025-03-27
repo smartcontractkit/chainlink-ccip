@@ -48,10 +48,12 @@ type HTTPClient interface {
 // Therefore AttestationClient is a higher level abstraction that uses httpClient to fetch attestations and can be more
 // oriented around caching/processing the attestation data instead of handling the API specifics.
 type httpClient struct {
-	lggr             logger.Logger
-	apiURL           *url.URL
-	apiTimeout       time.Duration
-	rate             *rate.Limiter
+	lggr       logger.Logger
+	apiURL     *url.URL
+	apiTimeout time.Duration
+	rate       *rate.Limiter
+	// coolDownDuration defines the time to wait after getting rate limited.
+	// this value is only used if the 429 response does not contain the Retry-After header
 	coolDownDuration time.Duration
 	// coolDownUntil defines whether requests are blocked or not.
 	coolDownUntil time.Time

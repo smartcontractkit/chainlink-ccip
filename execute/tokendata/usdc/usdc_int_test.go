@@ -235,8 +235,8 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 			AttestationAPI:         server.URL,
 			AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Microsecond),
 			AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
-			AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 		},
+		AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 		Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 			fujiChain: {
 				SourcePoolAddress:            fujiPool,

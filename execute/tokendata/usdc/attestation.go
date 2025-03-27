@@ -56,7 +56,7 @@ func (r httpResponse) attestationToBytes() (cciptypes.Bytes, error) {
 
 type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
 
-// AttestationClient is an interface for fetching attestation data from the Circle API.
+// USDCAttestationClient is an client for fetching attestation data from the Circle API.
 // It returns a data grouped by chainSelector, sequenceNumber and tokenIndex
 //
 // Example: if we have two USDC tokens transferred (slot 0 and slot 2) within a single message with sequence number 12
@@ -66,13 +66,6 @@ type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) 
 //	12 ->
 //	  0 -> AttestationStatus{Error: nil, Attestation: "ABCDEF", MessageHash: bytes}
 //	  2 -> AttestationStatus{Error: ErrNotRead, Attestation: nil, MessageHash: nil}
-//type AttestationClient interface {
-//	Attestations(
-//		ctx context.Context,
-//		msgs map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
-//	) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus, error)
-//}
-
 type USDCAttestationClient struct {
 	lggr   logger.Logger
 	client http.HTTPClient
@@ -136,14 +129,14 @@ func (s *USDCAttestationClient) fetchSingleMessage(
 	if err != nil {
 		return tokendata.ErrorAttestationStatus(err)
 	}
-	response, err := parsePayload(body)
+	response, err := attestationFromResponse(body)
 	if err != nil {
 		return tokendata.ErrorAttestationStatus(err)
 	}
-	return tokendata.SuccessAttestationStatus(message, response)
+	return tokendata.SuccessAttestationStatus(messageHash[:], message, response)
 }
 
-func parsePayload(body cciptypes.Bytes) (cciptypes.Bytes, error) {
+func attestationFromResponse(body cciptypes.Bytes) (cciptypes.Bytes, error) {
 	var response httpResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode json: %w", err)

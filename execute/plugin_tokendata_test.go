@@ -100,10 +100,10 @@ func Test_USDC_Transfer(t *testing.T) {
 	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 3 - Filter
-	// Messages 102-104,106,108 are executed, 105 and 107 don't have token data ready
+	// Messages 102-104,106 are executed, 105 doesn't have token data ready
 	outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	require.NoError(t, err)
-	assert.Len(t, outcome.Report.ChainReports, 1)
+	require.Len(t, outcome.Report.ChainReports, 1)
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	assert.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 106})
 	//Attestation data added to the USDC
@@ -122,7 +122,7 @@ func Test_USDC_Transfer(t *testing.T) {
 		outcome = runRoundAndGetOutcome(ctx, ocrTypeCodec, t, runner)
 	}
 
-	assert.Len(t, outcome.Report.ChainReports, 1)
+	require.Len(t, outcome.Report.ChainReports, 1)
 	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	// 102, 103 and 104 are in the inflight message cache.
 	assert.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{105})

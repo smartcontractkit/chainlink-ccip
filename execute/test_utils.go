@@ -3,11 +3,8 @@ package execute
 import (
 	"context"
 	"encoding/binary"
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -175,8 +172,8 @@ func (it *IntTest) WithUSDC(
 				AttestationAPI:         it.usdcServer.server.URL,
 				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
-				AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 			},
+			AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 			Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 				srcSelector: {
 					SourcePoolAddress:            sourcePoolAddress,
@@ -364,55 +361,10 @@ func newConfigurableAttestationServer(responses map[string]string) *Configurable
 				}
 			}
 		}
-		if r.Method == http.MethodPost {
-			var request map[string]interface{}
-			bodyRaw, err := io.ReadAll(r.Body)
-			if err != nil {
-				panic(err)
-			}
-			err = json.Unmarshal(bodyRaw, &request)
-			if err != nil {
-				panic(err)
-			}
-			payloadHashesUntyped := request["messageHash"].([]interface{})
-			if len(payloadHashesUntyped) == 0 {
-				w.WriteHeader(http.StatusBadRequest)
-			}
-			payloadHashes := make([]string, len(payloadHashesUntyped))
-			for i, hash := range payloadHashesUntyped {
-				payloadHashes[i] = hash.(string)
-			}
-			attestationResponse := attestationBatchByMessageHashes(payloadHashes, c.responses)
-			responseBytes, err := json.Marshal(attestationResponse)
-			if err != nil {
-				panic(err)
-			}
-			_, err = w.Write(responseBytes)
-			if err != nil {
-				panic(err)
-			}
-		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	c.server = server
 	return c
-}
-
-func attestationBatchByMessageHashes(payloadHashes []string, responses map[string]string) map[string]interface{} {
-	attestations := make([]interface{}, 0, len(responses))
-	for payloadHash, attestationRaw := range responses {
-		if slices.Contains(payloadHashes, payloadHash) {
-			var attestation map[string]interface{}
-			err := json.Unmarshal([]byte(attestationRaw), &attestation)
-			if err != nil {
-				panic(err)
-			}
-			attestations = append(attestations, attestation)
-		}
-	}
-	attestationResponse := make(map[string]interface{})
-	attestationResponse["attestations"] = attestations
-	return attestationResponse
 }
 
 func (c *ConfigurableAttestationServer) AddResponse(key, response string) {

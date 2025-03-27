@@ -139,9 +139,6 @@ type AttestationConfig struct {
 	// AttestationAPIInterval defines the rate in requests per second that the attestation API can be called.
 	// Default set according to the APIs documentated 10 requests per second rate limit.
 	AttestationAPIInterval *commonconfig.Duration `json:"attestationAPIInterval"`
-	// AttestationAPICooldown defines in what time it is allowed to make next call to API.
-	// Activates when plugin hits API's rate limits
-	AttestationAPICooldown *commonconfig.Duration `json:"attestationAPICooldown"`
 }
 
 func (p *AttestationConfig) setDefaults() {
@@ -223,7 +220,10 @@ func (c *WorkerConfig) Validate() error {
 type USDCCCTPObserverConfig struct {
 	AttestationConfig
 	WorkerConfig
-	Tokens map[cciptypes.ChainSelector]USDCCCTPTokenConfig `json:"tokens"`
+	// AttestationAPICooldown defines in what time it is allowed to make next call to API.
+	// Activates when plugin hits API's rate limits
+	AttestationAPICooldown *commonconfig.Duration                          `json:"attestationAPICooldown"`
+	Tokens                 map[cciptypes.ChainSelector]USDCCCTPTokenConfig `json:"tokens"`
 }
 
 func (p *USDCCCTPObserverConfig) setDefaults() {

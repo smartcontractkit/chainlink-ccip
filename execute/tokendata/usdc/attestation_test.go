@@ -22,25 +22,29 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+type message struct {
+	hash        string
+	body        []byte
+	attestation string
+}
+
 func Test_AttestationClient(t *testing.T) {
-	type example struct {
-		hash   []byte
-		keccak string
+	messageA := message{
+		body:        []byte{0xA},
+		hash:        "0x0ef9d8f8804d174666011a394cab7901679a8944d24249fd148a6a36071151f8",
+		attestation: "0xddeabb261b885a9676022149101626834649faf58012ec5c2d1b016f8225b734",
 	}
 
-	messageA := example{
-		hash:   []byte{0xA},
-		keccak: "0x0ef9d8f8804d174666011a394cab7901679a8944d24249fd148a6a36071151f8",
+	messageB := message{
+		body:        []byte{0xB},
+		hash:        "0x60811857dd566889ff6255277d82526f2d9b3bbcb96076be22a5860765ac3d06",
+		attestation: "0x5d9b34ac9e9995bf44daa0f6f31edc6503432141834a09e28aa96786107a50b0",
 	}
 
-	messageB := example{
-		hash:   []byte{0xB},
-		keccak: "0x60811857dd566889ff6255277d82526f2d9b3bbcb96076be22a5860765ac3d06",
-	}
-
-	messageC := example{
-		hash:   []byte{0xC},
-		keccak: "0x4de0e96b0a8886e42a2c35b57df8a9d58a93b5bff655bc37a30e2ab8e29dc066",
+	messageC := message{
+		body:        []byte{0xC},
+		hash:        "0x4de0e96b0a8886e42a2c35b57df8a9d58a93b5bff655bc37a30e2ab8e29dc066",
+		attestation: "0x29f2961ca84b5de35682ed5f3fb65795698b3a0dc36eb287c830897ec740235d",
 	}
 
 	handler := newMockHandler(t)
@@ -49,8 +53,8 @@ func Test_AttestationClient(t *testing.T) {
 
 	tt := []struct {
 		name     string
-		success  []string
-		pending  []string
+		success  []message
+		pending  []message
 		input    map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes
 		expected map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus
 	}{
@@ -61,26 +65,26 @@ func Test_AttestationClient(t *testing.T) {
 		},
 		{
 			name:    "single success",
-			success: []string{messageA.keccak},
+			success: []message{messageA},
 			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): messageA.hash,
+					reader.NewMessageTokenID(1, 1): messageA.body,
 				},
 			},
 			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
 				cciptypes.ChainSelector(1): {
 					reader.NewMessageTokenID(1, 1): tokendata.SuccessAttestationStatus(
-						messageA.hash, internal.MustDecode(messageA.keccak),
+						internal.MustDecode(messageA.hash), messageA.body, internal.MustDecode(messageA.attestation),
 					),
 				},
 			},
 		},
 		{
 			name:    "single pending",
-			pending: []string{messageA.keccak},
+			pending: []message{messageA},
 			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): messageA.hash,
+					reader.NewMessageTokenID(1, 1): messageA.body,
 				},
 			},
 			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
@@ -91,42 +95,42 @@ func Test_AttestationClient(t *testing.T) {
 		},
 		{
 			name:    "multiple success",
-			success: []string{messageA.keccak, messageB.keccak, messageC.keccak},
+			success: []message{messageA, messageB, messageC},
 			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): messageA.hash,
-					reader.NewMessageTokenID(1, 2): messageB.hash,
+					reader.NewMessageTokenID(1, 1): messageA.body,
+					reader.NewMessageTokenID(1, 2): messageB.body,
 				},
 				cciptypes.ChainSelector(2): {
-					reader.NewMessageTokenID(2, 1): messageC.hash,
+					reader.NewMessageTokenID(2, 1): messageC.body,
 				},
 			},
 			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
 				cciptypes.ChainSelector(1): {
 					reader.NewMessageTokenID(1, 1): tokendata.SuccessAttestationStatus(
-						messageA.hash, internal.MustDecode(messageA.keccak),
+						internal.MustDecode(messageA.hash), messageA.body, internal.MustDecode(messageA.attestation),
 					),
 					reader.NewMessageTokenID(1, 2): tokendata.SuccessAttestationStatus(
-						messageB.hash, internal.MustDecode(messageB.keccak),
+						internal.MustDecode(messageB.hash), messageB.body, internal.MustDecode(messageB.attestation),
 					),
 				},
 				cciptypes.ChainSelector(2): {
 					reader.NewMessageTokenID(2, 1): tokendata.SuccessAttestationStatus(
-						messageC.hash, internal.MustDecode(messageC.keccak),
+						internal.MustDecode(messageC.hash), messageC.body, internal.MustDecode(messageC.attestation),
 					),
 				},
 			},
 		},
 		{
 			name:    "multiple failures - A, C not ready but B internal error",
-			pending: []string{messageA.keccak, messageC.keccak},
+			pending: []message{messageA, messageC},
 			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): messageA.hash,
-					reader.NewMessageTokenID(1, 2): messageB.hash,
+					reader.NewMessageTokenID(1, 1): messageA.body,
+					reader.NewMessageTokenID(1, 2): messageB.body,
 				},
 				cciptypes.ChainSelector(2): {
-					reader.NewMessageTokenID(2, 1): messageC.hash,
+					reader.NewMessageTokenID(2, 1): messageC.body,
 				},
 			},
 			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
@@ -141,23 +145,23 @@ func Test_AttestationClient(t *testing.T) {
 		},
 		{
 			name:    "mixed success and failure",
-			success: []string{messageA.keccak, messageC.keccak},
-			pending: []string{messageB.keccak},
+			success: []message{messageA, messageC},
+			pending: []message{messageB},
 			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					reader.NewMessageTokenID(1, 1): messageA.hash,
+					reader.NewMessageTokenID(1, 1): messageA.body,
 				},
 				cciptypes.ChainSelector(2): {
-					reader.NewMessageTokenID(2, 1): messageB.hash,
+					reader.NewMessageTokenID(2, 1): messageB.body,
 				},
 				cciptypes.ChainSelector(3): {
-					reader.NewMessageTokenID(3, 1): messageC.hash,
+					reader.NewMessageTokenID(3, 1): messageC.body,
 				},
 			},
 			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]tokendata.AttestationStatus{
 				cciptypes.ChainSelector(1): {
 					reader.NewMessageTokenID(1, 1): tokendata.SuccessAttestationStatus(
-						messageA.hash, internal.MustDecode(messageA.keccak),
+						internal.MustDecode(messageA.hash), messageA.body, internal.MustDecode(messageA.attestation),
 					),
 				},
 				cciptypes.ChainSelector(2): {
@@ -165,7 +169,7 @@ func Test_AttestationClient(t *testing.T) {
 				},
 				cciptypes.ChainSelector(3): {
 					reader.NewMessageTokenID(3, 1): tokendata.SuccessAttestationStatus(
-						messageC.hash, internal.MustDecode(messageC.keccak),
+						internal.MustDecode(messageC.hash), messageC.body, internal.MustDecode(messageC.attestation),
 					),
 				},
 			},
@@ -183,8 +187,8 @@ func Test_AttestationClient(t *testing.T) {
 							AttestationAPI:         server.URL,
 							AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 							AttestationAPITimeout:  commonconfig.MustNewDuration(5 * time.Second),
-							AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 						},
+						AttestationAPICooldown: commonconfig.MustNewDuration(5 * time.Minute),
 					},
 				)
 				require.NoError(t, err)
@@ -199,35 +203,56 @@ func Test_AttestationClient(t *testing.T) {
 func Test_httpResponse(t *testing.T) {
 	tt := []struct {
 		name                string
-		response            httpResponse
+		response            cciptypes.Bytes
 		expectedError       error
 		expectedAttestation cciptypes.Bytes
 	}{
 		{
+			name: "malformed response",
+			response: []byte(`
+				{
+					"field": 2137
+				}`),
+			expectedError: fmt.Errorf("invalid attestation response"),
+		},
+		{
 			name: "success",
-			response: httpResponse{
-				Status:      attestationStatusSuccess,
-				Attestation: "0x720502893578a89a8a87982982ef781c18b193",
-			},
+			response: []byte(`
+				{
+					"status": "complete",
+					"attestation": "0x720502893578a89a8a87982982ef781c18b193"
+				}`),
 			expectedAttestation: internal.MustDecode("0x720502893578a89a8a87982982ef781c18b193"),
 		},
 		{
+			name: "complete but malformed attestation",
+			response: []byte(`
+				{
+					"status": "complete",
+					"attestation": "0"
+				}`),
+			expectedError: fmt.Errorf("failed to decode attestation hex: " +
+				"Bytes must be of at least length 2 (i.e, '0x' prefix): 0"),
+		},
+		{
 			name: "pending",
-			response: httpResponse{
-				Status: attestationStatusPending,
-			},
+			response: []byte(`
+				{
+					"status": "pending_confirmations"
+				}`),
 			expectedError: tokendata.ErrNotReady,
 		},
 		{
 			name: "error",
-			response: httpResponse{
-				Error: "some error",
-			},
+			response: []byte(`
+				{
+					"error": "some error"
+				}`),
 			expectedError: fmt.Errorf("attestation API error: some error"),
 		},
 		{
 			name:          "empty",
-			response:      httpResponse{},
+			response:      []byte(`{}`),
 			expectedError: fmt.Errorf("invalid attestation response"),
 		},
 	}
@@ -235,15 +260,12 @@ func Test_httpResponse(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(
 			tc.name, func(t *testing.T) {
-				err := tc.response.validate()
+				attestation, err := attestationFromResponse(tc.response)
 				if tc.expectedError != nil {
 					require.EqualError(t, err, tc.expectedError.Error())
 					return
 				}
-
 				require.NoError(t, err)
-				attestation, err1 := tc.response.attestationToBytes()
-				require.NoError(t, err1)
 				require.Equal(t, tc.expectedAttestation, attestation)
 			},
 		)
@@ -278,7 +300,7 @@ func (h *mockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *mockHandler) updateURIs(success, pending []string) {
+func (h *mockHandler) updateURIs(success, pending []message) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -298,10 +320,10 @@ func (h *mockHandler) writeJSONResponse(w http.ResponseWriter, status, attestati
 	require.NoError(h.t, err)
 }
 
-func (h *mockHandler) groupedByURI(hashes []string) map[string]string {
+func (h *mockHandler) groupedByURI(msgs []message) map[string]string {
 	out := make(map[string]string)
-	for _, hash := range hashes {
-		out["/v1/attestations/"+hash] = hash
+	for _, msg := range msgs {
+		out["/v1/attestations/"+msg.hash] = msg.attestation
 	}
 	return out
 }
