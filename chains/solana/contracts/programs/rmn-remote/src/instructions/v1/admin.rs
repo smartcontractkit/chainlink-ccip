@@ -28,8 +28,8 @@ impl Admin for Impl {
             from: config.owner,
             to: config.proposed_owner,
         });
-        ctx.accounts.config.owner = ctx.accounts.config.proposed_owner;
-        ctx.accounts.config.proposed_owner = Pubkey::default();
+        // NOTE: take() resets proposed_owner to default
+        ctx.accounts.config.owner = std::mem::take(&mut ctx.accounts.config.proposed_owner);
         Ok(())
     }
 

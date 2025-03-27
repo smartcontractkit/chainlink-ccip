@@ -294,7 +294,7 @@ type Observer interface {
 	// NOTE: Make sure that caller supports the provided chains.
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
 
-	// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain.
+	// ObserveRMNRemoteCfg observes the RMN remote config from the configured destination chain.
 	// Check implementation specific details to learn if external calls are made, if values are cached, etc...
 	// NOTE: Make sure that caller supports the destination chain.
 	ObserveRMNRemoteCfg(ctx context.Context) rmntypes.RemoteConfig

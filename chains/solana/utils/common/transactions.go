@@ -279,6 +279,24 @@ func ExtractReturnedError(ctx context.Context, logs []string, programID string) 
 	return nil
 }
 
+type anchorType[T any] interface {
+	*T
+	UnmarshalWithDecoder(decoder *bin.Decoder) (err error)
+}
+
+func ExtractAnchorTypedReturnValue[T any, PT anchorType[T]](ctx context.Context, logs []string, programID string) (*T, error) {
+	var result T
+	bytes, err := ExtractReturnValue(ctx, logs, programID)
+	if err != nil {
+		return nil, err
+	}
+	err = PT(&result).UnmarshalWithDecoder(bin.NewBinDecoder(bytes))
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func ExtractTypedReturnValue[T any](ctx context.Context, logs []string, programID string, decoderFn func([]byte) T) (T, error) {
 	bytes, err := ExtractReturnValue(ctx, logs, programID)
 	return decoderFn(bytes), err
