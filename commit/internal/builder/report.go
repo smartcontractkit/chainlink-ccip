@@ -60,7 +60,7 @@ func buildOneReport(
 	lggr logger.Logger,
 	reportCodec cciptypes.CommitPluginCodec,
 	transmissionSchedule *ocr3types.TransmissionSchedule,
-	outcomeType merkleroot.OutcomeType,
+	merkleOutcomeType merkleroot.OutcomeType,
 	blessedMerkleRoots []cciptypes.MerkleRootChain,
 	unblessedMerkleRoots []cciptypes.MerkleRootChain,
 	rmnSignatures []cciptypes.RMNECDSASignature,
@@ -80,13 +80,15 @@ func buildOneReport(
 		RMNSignatures:        rmnSignatures,
 	}
 
-	if outcomeType == merkleroot.ReportEmpty {
+	// ReportEmpty and ReportInFlight means there's no roots to report.
+	// However, there still may be price updates to report.
+	if merkleOutcomeType == merkleroot.ReportEmpty || merkleOutcomeType == merkleroot.ReportInFlight {
 		rep.BlessedMerkleRoots = []cciptypes.MerkleRootChain{}
 		rep.UnblessedMerkleRoots = []cciptypes.MerkleRootChain{}
 		rep.RMNSignatures = []cciptypes.RMNECDSASignature{}
 	}
 
-	if outcomeType == merkleroot.ReportGenerated {
+	if merkleOutcomeType == merkleroot.ReportGenerated {
 		allRoots := append(blessedMerkleRoots, unblessedMerkleRoots...)
 		sort.Slice(allRoots, func(i, j int) bool { return allRoots[i].ChainSel < allRoots[j].ChainSel })
 		repInfo = cciptypes.CommitReportInfo{

@@ -1,7 +1,7 @@
 package commit
 
 import (
-	rand2 "math/rand"
+	unsaferand "math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -284,8 +284,8 @@ func Test_Plugin_isStaleReport(t *testing.T) {
 	}{
 		{
 			name:           "report is not stale when merkle roots exist no matter the seq nums",
-			onChainSeqNum:  rand2.Uint64(),
-			reportSeqNum:   rand2.Uint64(),
+			onChainSeqNum:  unsaferand.Uint64(),
+			reportSeqNum:   unsaferand.Uint64(),
 			lenMerkleRoots: 1,
 			shouldBeStale:  false,
 		},
