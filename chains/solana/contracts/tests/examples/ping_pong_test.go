@@ -471,7 +471,7 @@ func TestPingPong(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin,
-				config.DefaultCommitment)
+				config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 			require.NotNil(t, result)
 
 			checkEventCCIPMessageSent(1, result.Meta.LogMessages)
