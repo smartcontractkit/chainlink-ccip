@@ -35,6 +35,7 @@ packages:
             ExecutePluginCodec:
             EstimateProvider:
             AddressCodec:
+            CommitPluginCodec:
     github.com/smartcontractkit/chainlink-common/pkg/types:
             interfaces:
                 ContractWriter:
