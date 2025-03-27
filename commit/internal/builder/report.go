@@ -176,24 +176,24 @@ func buildMultiplePriceAndMerkleRootReports(
 	outcome committypes.Outcome,
 	config pluginconfig.CommitOffchainConfig,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-	var reports []ocr3types.ReportPlus[[]byte]
-
-	// 1. Build price reports and remove prices from outcome.
+	// 1. Build price reports.
 	maxPrices := config.MaxPricesPerReport
 	reports, err := buildMultiplePriceReports(ctx, lggr, reportCodec, transmissionSchedule, outcome, maxPrices)
 	if err != nil {
 		return nil, fmt.Errorf("problem building price reports: %w", err)
 	}
+	// remove prices from the outcome so that they won't be included in the merkle root reports.
 	outcome.TokenPriceOutcome.TokenPrices = make(cciptypes.TokenPriceMap)
 	outcome.ChainFeeOutcome.GasPrices = nil
 
-	// 2. Select algorithm for merkle root reports, and build merkle root report(s).
+	// 2. Select which algorithm to use for building merkle root reports.
 	var rootReportBuilder ReportBuilderFunc
 	if config.MaxMerkleRootsPerReport == 0 {
 		rootReportBuilder = buildStandardReport
 	} else {
 		rootReportBuilder = buildMultipleMerkleRootReports
 	}
+
 	rootReports, err := rootReportBuilder(ctx, lggr, reportCodec, transmissionSchedule, outcome, config)
 	if err != nil {
 		return nil, fmt.Errorf("problem building merkle root reports: %w", err)
@@ -293,7 +293,7 @@ func buildMultipleMerkleRootReports(
 	return reports, nil
 }
 
-// buildMultiplePriceReports is a helper to splits up price data into multiple reports.
+// buildMultiplePriceReports is a helper to split price data into multiple reports.
 // Helper for buildMultiplePriceAndMerkleRootReports.
 // Merkle root data is ignored.
 func buildMultiplePriceReports(
@@ -304,23 +304,12 @@ func buildMultiplePriceReports(
 	outcome committypes.Outcome,
 	maxPricesPerReport uint64, // passed in directly to avoid implementing ReportBuilderFunc
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-	// update joins together the different types of price updates so that they can be
-	// selected in one loop.
+	// update is a union of the different types of price updates. This is done so that one loop can
+	// create all the reports.
 	type update struct {
 		cciptypes.TokenPrice
 		cciptypes.GasPriceChain
 	}
-	// Helper to add an update to the PriceUpdates type.
-	add := func(updates cciptypes.PriceUpdates, update update) cciptypes.PriceUpdates {
-		if (update.TokenPrice != cciptypes.TokenPrice{}) {
-			updates.TokenPriceUpdates = append(updates.TokenPriceUpdates, update.TokenPrice)
-		}
-		if (update.GasPriceChain != cciptypes.GasPriceChain{}) {
-			updates.GasPriceUpdates = append(updates.GasPriceUpdates, update.GasPriceChain)
-		}
-		return updates
-	}
-
 	var updates []update
 	for _, tokenPriceUpdate := range outcome.TokenPriceOutcome.TokenPrices.ToSortedSlice() {
 		updates = append(updates, update{
@@ -333,14 +322,21 @@ func buildMultiplePriceReports(
 		})
 	}
 
+	// Build reports
 	var reports []ocr3types.ReportPlus[[]byte]
 	numUpdates := uint64(0)
 	priceUpdates := cciptypes.PriceUpdates{}
-
 	for _, u := range updates {
 		numUpdates++
-		priceUpdates = add(priceUpdates, u)
+		// Get the specific update type and add it to the priceUpdates object.
+		if (u.TokenPrice != cciptypes.TokenPrice{}) {
+			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, u.TokenPrice)
+		}
+		if (u.GasPriceChain != cciptypes.GasPriceChain{}) {
+			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates, u.GasPriceChain)
+		}
 
+		// Build a report when we have enough
 		if numUpdates == maxPricesPerReport {
 			report, err := buildOneReport(
 				ctx,
